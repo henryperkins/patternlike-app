@@ -96,11 +96,12 @@ function webCrypto(): CryptoLike {
 function cryptoRandom(bytes: number): string {
   const arr = new Uint8Array(bytes);
   const c = (globalThis as unknown as { crypto?: CryptoLike }).crypto;
-  if (c?.getRandomValues) {
-    c.getRandomValues(arr);
-  } else {
-    for (let i = 0; i < bytes; i++) arr[i] = Math.floor(Math.random() * 256);
+  if (!c?.getRandomValues) {
+    // These ids become primary keys and AEAD subjects. A Math.random fallback
+    // would be predictable and is never an acceptable substitute here.
+    throw new Error("Web Crypto getRandomValues unavailable; cannot mint an id");
   }
+  c.getRandomValues(arr);
   return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 

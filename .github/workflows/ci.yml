@@ -31,5 +31,7 @@ jobs:
       - run: npm install
       - run: npm run ephe:download -w @patternlike/calc-stub
       - run: npm run typecheck
+      - run: npm run test -w @patternlike/shared
       - run: npm run test -w @patternlike/calc-stub
       - run: npm run test -w @patternlike/api
+      - run: npm run test -w @patternlike/web

@@ -10,7 +10,7 @@
   "scripts": {
     "build": "npm run build -w @patternlike/shared -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web",
     "typecheck": "npm run typecheck -w @patternlike/shared -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web",
-    "test": "npm run test -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web && npm run test:contracts",
+    "test": "npm run test -w @patternlike/shared -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web && npm run test:contracts",
     "test:contracts": "python contracts/m0/validate_schemas.py && python contracts/m0/smoke_check.py",
     "dev:api": "npm run dev -w @patternlike/api",
     "db:local": "npm run db:local -w @patternlike/api",
