@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.2.0",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "source_id": "USR-06",
+  "enabled": true,
+  "permission_state": "active",
+  "allowed_uses": [
+    "theme_ranking",
+    "tone",
+    "reflection_prompt",
+    "notification_timing"
+  ],
+  "permission_tier": 1,
+  "consent_id": "cns_01JAMPLECONSENT00001",
+  "freshness": null,
+  "last_signal_id": "sig_01JAMPLECHECKIN000001",
+  "scopes": [],
+  "connector_status": "not_applicable",
+  "updated_at": "2026-07-30T14:00:00Z"
+}

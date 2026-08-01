@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install python deps
+        run: pip install pyyaml jsonschema referencing openapi-spec-validator
+      - name: Validate M0 contracts
+        run: |
+          python contracts/m0/validate_schemas.py
+          python contracts/m0/smoke_check.py
+
+  monorepo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm install
+      - run: npm run ephe:download -w @patternlike/calc-stub
+      - run: npm run typecheck
+      - run: npm run test -w @patternlike/calc-stub
+      - run: npm run test -w @patternlike/api

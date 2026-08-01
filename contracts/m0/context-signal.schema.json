@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m0/context-signal.schema.json",
+  "title": "ContextSignal",
+  "description": "Normalized, consent-bounded signal that may enter eligibility/ranking after registry and freshness checks. Delivery path: source -> ContextSignal -> eligibility/ranking policy -> reading evidence. Normative: registry v0.2 implementation.delivery_path; DOCX entity context_signals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "user_id",
+    "source_id",
+    "evidence_lane",
+    "allowed_uses",
+    "confidence",
+    "sensitivity",
+    "permission_state",
+    "freshness",
+    "consent",
+    "value",
+    "normalized_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "id": {
+      "$ref": "common.schema.json#/$defs/opaqueId",
+      "description": "Stable id for this signal instance (context_signals.id)."
+    },
+    "user_id": {
+      "$ref": "common.schema.json#/$defs/userId"
+    },
+    "source_id": {
+      "$ref": "common.schema.json#/$defs/ingestibleSourceId",
+      "description": "Registry source that produced this signal. NO-* excluded sources are rejected."
+    },
+    "source_window": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "description": "Optional connector or acquisition window id used in RefreshConnector idempotency (connector_id + source_window)."
+    },
+    "evidence_lane": {
+      "$ref": "common.schema.json#/$defs/evidenceLane",
+      "description": "Lane label required so context cannot be laundered as celestial discovery."
+    },
+    "allowed_uses": {
+      "$ref": "common.schema.json#/$defs/allowedUses",
+      "minItems": 1,
+      "description": "Intersection of registry allowed_uses for the source and user-granted uses. Assembly may only consume a listed use."
+    },
+    "confidence": {
+      "$ref": "common.schema.json#/$defs/confidence"
+    },
+    "sensitivity": {
+      "$ref": "common.schema.json#/$defs/sensitivity"
+    },
+    "permission_state": {
+      "$ref": "common.schema.json#/$defs/permissionState"
+    },
+    "conflict_status": {
+      "$ref": "common.schema.json#/$defs/conflictStatus",
+      "default": "none"
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consent_id", "status", "valid_for_uses"],
+      "properties": {
+        "consent_id": {
+          "$ref": "common.schema.json#/$defs/opaqueId"
+        },
+        "status": {
+          "$ref": "common.schema.json#/$defs/permissionState"
+        },
+        "valid_for_uses": {
+          "$ref": "common.schema.json#/$defs/allowedUses"
+        },
+        "permission_tier": {
+          "$ref": "common.schema.json#/$defs/permissionTier"
+        },
+        "validated_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        }
+      },
+      "description": "Consent snapshot at ingestion/use time (DER-16). Stale or revoked signals are ineligible."
+    },
+    "value": {
+      "description": "Minimized structured payload or encrypted blob. Free-form raw device/health/calendar bodies are not permitted here.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["encoding", "structured"],
+          "properties": {
+            "encoding": { "const": "structured" },
+            "structured": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "JSON-serializable minimized aggregate or user-declared fields.",
+              "additionalProperties": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["encoding", "encrypted"],
+          "properties": {
+            "encoding": { "const": "encrypted" },
+            "encrypted": {
+              "$ref": "common.schema.json#/$defs/encryptedBlobRef"
+            },
+            "value_kind": {
+              "type": "string",
+              "enum": [
+                "check_in",
+                "journal_excerpt",
+                "life_event",
+                "priority",
+                "goal",
+                "calendar_freebusy",
+                "workload_aggregate",
+                "location_coarse",
+                "environment",
+                "preference",
+                "other"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "labels": {
+      "type": "array",
+      "description": "Human-facing evidence labels (e.g. user_reported, optional_context). Context-only statements must remain labeled.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "user_reported",
+          "user_selected",
+          "optional_context",
+          "operational",
+          "environment",
+          "derived_aggregate",
+          "experimental"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ingestion_owner": {
+          "type": "string",
+          "description": "Registry implementation.ingestion_owner (e.g. first-party-context-service)."
+        },
+        "primary_runtime": {
+          "type": "string"
+        },
+        "connector_account_id": {
+          "type": ["string", "null"]
+        },
+        "provider": {
+          "type": ["string", "null"]
+        },
+        "acquisition": {
+          "type": ["string", "null"],
+          "description": "Short acquisition method note; not raw OAuth payloads."
+        }
+      }
+    },
+    "supersedes_signal_id": {
+      "type": ["string", "null"],
+      "description": "Prior signal this record expires/replaces within the same source window."
+    },
+    "normalized_hash": {
+      "$ref": "common.schema.json#/$defs/contentHash",
+      "description": "Hash of the canonical normalized representation for idempotent upsert and evidence linkage."
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/isoDateTime"
+    },
+    "updated_at": {
+      "$ref": "common.schema.json#/$defs/isoDateTime"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "permission_state": { "const": "active" }
+        },
+        "required": ["permission_state"]
+      },
+      "then": {
+        "properties": {
+          "consent": {
+            "properties": {
+              "status": { "const": "active" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

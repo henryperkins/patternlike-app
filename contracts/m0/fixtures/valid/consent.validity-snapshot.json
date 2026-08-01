@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.2.0",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "validated_at": "2026-07-30T15:55:00Z",
+  "job_type": "generate_daily_reading",
+  "job_eligible": true,
+  "ai_synthesis_allowed": false,
+  "research_allowed": false,
+  "sources": [
+    {
+      "source_id": "AST-01",
+      "permission_state": "active",
+      "eligible_for_job": true,
+      "allowed_uses": ["chart_fact", "cycle_detection", "uncertainty_model"],
+      "consent_id": "cns_birth_required",
+      "ineligible_reason": null
+    },
+    {
+      "source_id": "USR-06",
+      "permission_state": "active",
+      "eligible_for_job": true,
+      "allowed_uses": [
+        "theme_ranking",
+        "tone",
+        "reflection_prompt",
+        "notification_timing"
+      ],
+      "consent_id": "cns_01JAMPLECONSENT00001",
+      "ineligible_reason": null
+    },
+    {
+      "source_id": "CLD-01",
+      "permission_state": "never_granted",
+      "eligible_for_job": false,
+      "allowed_uses": [],
+      "consent_id": null,
+      "ineligible_reason": "tier_not_granted"
+    }
+  ]
+}

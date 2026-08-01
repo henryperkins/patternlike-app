@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m0/consent.schema.json",
+  "title": "Consent and Source Permissions",
+  "description": "Consent records, context-source permissions, and job-time consent validity (DER-16, permission tiers, /v1/context-sources). Product consent and research/model-training consent are separate (NO-24, USR-24). Revocation takes effect before the next source read or reading job.",
+  "$defs": {
+    "consentKind": {
+      "type": "string",
+      "enum": [
+        "account_processing",
+        "product_source",
+        "os_permission",
+        "oauth_scope",
+        "ai_synthesis",
+        "research",
+        "model_training",
+        "export",
+        "support_access"
+      ],
+      "description": "Research and model_training must never be implied by ordinary product consent."
+    },
+    "consentStatus": {
+      "type": "string",
+      "enum": [
+        "granted",
+        "denied",
+        "paused",
+        "revoked",
+        "expired",
+        "pending"
+      ]
+    },
+    "consentRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "user_id",
+        "kind",
+        "status",
+        "allowed_uses",
+        "policy_version",
+        "created_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/opaqueId"
+        },
+        "user_id": {
+          "$ref": "common.schema.json#/$defs/userId"
+        },
+        "kind": { "$ref": "#/$defs/consentKind" },
+        "status": { "$ref": "#/$defs/consentStatus" },
+        "source_id": {
+          "description": "Set when consent is bound to a registry source (product_source / oauth / os). NO-* never allowed.",
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "common.schema.json#/$defs/ingestibleSourceId" }
+          ]
+        },
+        "permission_tier": {
+          "$ref": "common.schema.json#/$defs/permissionTier"
+        },
+        "allowed_uses": {
+          "$ref": "common.schema.json#/$defs/allowedUses",
+          "description": "Uses granted by this consent. Must be a subset of the registry allowed_uses for the source."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "uniqueItems": true,
+          "description": "OAuth or OS permission scopes. Prefer narrow free/busy over event-body scopes."
+        },
+        "provider": {
+          "type": ["string", "null"],
+          "description": "Connector provider name when applicable (google, microsoft, apple, ...)."
+        },
+        "connector_account_id": {
+          "type": ["string", "null"]
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Version of the privacy/consent policy text shown to the user."
+        },
+        "ui_surface": {
+          "type": ["string", "null"],
+          "description": "Where consent was collected (onboarding, privacy_center, os_prompt, oauth_redirect)."
+        },
+        "granted_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "revoked_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "paused_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "supersedes_consent_id": {
+          "type": ["string", "null"]
+        },
+        "created_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        },
+        "updated_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        },
+        "notes_public": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "User-visible note only; no raw OAuth payloads."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": { "enum": ["research", "model_training"] }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "source_id": { "type": "null" }
+            },
+            "description": "Research and model_training consents are account-level and separate from product source consents (USR-24, NO-24)."
+          }
+        }
+      ]
+    },
+    "contextSourcePermission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "user_id",
+        "source_id",
+        "enabled",
+        "permission_state",
+        "allowed_uses",
+        "permission_tier"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "user_id": {
+          "$ref": "common.schema.json#/$defs/userId"
+        },
+        "source_id": {
+          "$ref": "common.schema.json#/$defs/ingestibleSourceId",
+          "description": "NO-* excluded sources cannot be enabled or listed as permissions."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "User toggle in Context & Privacy. False pauses future use without necessarily revoking OAuth."
+        },
+        "permission_state": {
+          "$ref": "common.schema.json#/$defs/permissionState"
+        },
+        "allowed_uses": {
+          "$ref": "common.schema.json#/$defs/allowedUses"
+        },
+        "permission_tier": {
+          "$ref": "common.schema.json#/$defs/permissionTier"
+        },
+        "consent_id": {
+          "type": ["string", "null"]
+        },
+        "freshness": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "common.schema.json#/$defs/freshness" }
+          ]
+        },
+        "last_signal_id": {
+          "type": ["string", "null"]
+        },
+        "scopes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "connector_status": {
+          "type": ["string", "null"],
+          "enum": [
+            null,
+            "connected",
+            "needs_reauth",
+            "revoked",
+            "error",
+            "not_applicable"
+          ]
+        },
+        "updated_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        }
+      }
+    },
+    "consentValiditySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "user_id",
+        "validated_at",
+        "sources",
+        "job_eligible"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "user_id": {
+          "$ref": "common.schema.json#/$defs/userId"
+        },
+        "validated_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        },
+        "job_type": {
+          "type": "string",
+          "enum": [
+            "generate_daily_reading",
+            "refresh_connector",
+            "export_account",
+            "delete_account",
+            "ai_synthesis",
+            "other"
+          ]
+        },
+        "job_eligible": {
+          "type": "boolean",
+          "description": "False if required consents missing or any required source is revoked/expired for this job."
+        },
+        "ai_synthesis_allowed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Requires explicit ai_synthesis consent; default assembly remains deterministic."
+        },
+        "research_allowed": {
+          "type": "boolean",
+          "default": false,
+          "description": "True only when a separate research consent record is active. Never implied by product_source consent (USR-24, NO-24)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_id",
+              "permission_state",
+              "eligible_for_job",
+              "allowed_uses"
+            ],
+            "properties": {
+              "source_id": {
+                "$ref": "common.schema.json#/$defs/ingestibleSourceId"
+              },
+              "permission_state": {
+                "$ref": "common.schema.json#/$defs/permissionState"
+              },
+              "eligible_for_job": { "type": "boolean" },
+              "allowed_uses": {
+                "$ref": "common.schema.json#/$defs/allowedUses"
+              },
+              "consent_id": { "type": ["string", "null"] },
+              "ineligible_reason": {
+                "type": ["string", "null"],
+                "enum": [
+                  null,
+                  "revoked",
+                  "expired",
+                  "paused",
+                  "stale",
+                  "scope_missing",
+                  "tier_not_granted",
+                  "source_excluded",
+                  "conflict"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "contextSourcesDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "user_id", "sources"],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "user_id": {
+          "$ref": "common.schema.json#/$defs/userId"
+        },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextSourcePermission" }
+        },
+        "updated_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        }
+      },
+      "description": "GET/PUT /v1/context-sources response/request body."
+    }
+  },
+  "oneOf": [
+    {
+      "title": "ConsentRecord",
+      "$ref": "#/$defs/consentRecord"
+    },
+    {
+      "title": "ContextSourcePermission",
+      "$ref": "#/$defs/contextSourcePermission"
+    },
+    {
+      "title": "ConsentValiditySnapshot",
+      "$ref": "#/$defs/consentValiditySnapshot"
+    },
+    {
+      "title": "ContextSourcesDocument",
+      "$ref": "#/$defs/contextSourcesDocument"
+    }
+  ]
+}

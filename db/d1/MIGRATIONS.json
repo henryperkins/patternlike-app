@@ -1,0 +1,15 @@
+{
+  "engine": "cloudflare-d1",
+  "schema_version": "0.2.0",
+  "migrations": [
+    {
+      "id": "0001_m0_core",
+      "file": "0001_m0_core.sql",
+      "description": "Core operational tables for M0/M1 with encryption CHECKs: users, keys, consents, birth/chart (birth_enc required), context signals (value pairing), content releases, readings (published ciphertext), connectors, jobs, audit, export/delete."
+    }
+  ],
+  "notes": [
+    "M0 pre-production: 0001 is edited in place for encryption hardening. Do not apply an older 0001 against a live DB without a rewrite migration."
+  ],
+  "apply_hint": "wrangler d1 execute <DB_NAME> --file=db/d1/0001_m0_core.sql"
+}

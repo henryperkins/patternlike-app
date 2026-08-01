@@ -1,0 +1,4332 @@
+schema_version: '0.2'
+document_date: '2026-07-30'
+product:
+  name: Pattern-Like Astrology App
+  positioning: Pattern-like psychological timing app with Swiss Ephemeris as the calculation authority.
+  scope_statement: The catalog is exhaustive by feasible source class for a consumer mobile app, with representative
+    provider adapters. It is not a claim that every vendor-specific API is listed.
+  architecture_profile: cloudflare-first-wordpress-editorial-fly-portable-v1
+  normative_documents:
+  - pattern_like_astrology_app_product_platform_spec_v0.2.docx
+  - pattern_like_astrology_app_product_platform_spec_v0.2.md
+  - pattern_like_astrology_app_platform_topology_v0.2.yaml
+evidence_lanes:
+  celestial_facts:
+    may:
+    - create interpretation eligibility
+    - determine cycle timing
+    - support chart evidence
+    may_not:
+    - make guaranteed predictions
+    - diagnose
+    - claim external causation
+  user_and_context:
+    may:
+    - rank valid themes
+    - select life domain
+    - adapt tone
+    - choose reflection prompt
+    - choose delivery time
+    may_not:
+    - change chart facts
+    - be laundered as an astrological prediction
+    - infer protected traits
+  operational:
+    may:
+    - deliver, cache, localize, gate, retry, and audit
+    may_not:
+    - alter interpretive substance
+allowed_use_vocabulary:
+- annual_context
+- chart_fact
+- consent_validation
+- content_quality
+- content_safety
+- cycle_detection
+- editorial_context
+- editorial_research
+- environment_context
+- evidence_graph
+- experimental_context
+- feature_gating
+- journal_import
+- life_domain_selection
+- local_day_boundary
+- narrative_continuity
+- notification_timing
+- operational_delivery
+- optional_recommendations
+- optional_relocation_context
+- pattern_profile
+- product_quality
+- product_research
+- quality_audit
+- recalculation_queue
+- reflection_prompt
+- relationship_interpretation
+- rendering
+- repetition_control
+- reproducibility
+- routine_context
+- supportability
+- sync_scheduling
+- theme_eligibility
+- theme_filtering
+- theme_ranking
+- time_travel
+- timezone_resolution
+- tone
+- travel_context
+- uncertainty_model
+- user_memory
+- weather_lookup
+- workload_context
+permission_tiers:
+- tier: 0
+  name: Calculation minimum
+  default: required
+  sources:
+  - AST-01
+  - AST-02
+  - AST-03
+  - AST-04
+  - AST-05
+  - AST-06
+  - AST-08
+  - AST-20
+- tier: 1
+  name: First-party reflective context
+  default: explicit app controls
+  sources:
+  - USR-01 through USR-17
+- tier: 2
+  name: Low-content situational context
+  default: optional opt-in
+  sources:
+  - DEV-01 through DEV-07
+  - CLD-01
+  - CLD-02
+  - AMB-01 through AMB-07
+- tier: 3
+  name: Sensitive wellness and behavior
+  default: off; separate consent
+  sources:
+  - DEV-08 through DEV-12
+  - CLD-08 through CLD-16
+- tier: 4
+  name: Prohibited or unacceptable tradeoff
+  default: never
+  sources:
+  - NO-01 through NO-24
+sources:
+- id: AST-01
+  name: Birth profile
+  category: A. Calculation authority and astrological sources
+  automated_data: Birth date, local birth time, time-accuracy class, birthplace label, and user-entered corrections.
+  acquisition: Explicit onboarding form; optionally imported from a user-selected record.
+  cadence: On create and user edit
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - chart_fact
+  - cycle_detection
+  - uncertainty_model
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Until account deletion or profile replacement
+  notes: Unknown time is a first-class mode; never silently substitute noon.
+  implementation:
+    ingestion_owner: profile-service
+    primary_runtime: cloudflare-api-worker
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-02
+  name: Birthplace geocoding
+  category: A. Calculation authority and astrological sources
+  automated_data: Latitude, longitude, normalized place label, and geocoder confidence.
+  acquisition: Geocoding API after user selects a candidate; cache normalized result.
+  cadence: On birth-place create/edit
+  sensitivity: personal
+  confidence: service_derived
+  allowed_uses:
+  - chart_fact
+  - timezone_resolution
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Normalized coordinates retained with chart; raw query 24 hours
+  notes: Require user confirmation when multiple places match.
+  reference_codes:
+  - R04
+  implementation:
+    ingestion_owner: birth-normalization-workflow
+    primary_runtime: cloudflare-workflow + connector-worker
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-03
+  name: Historical time-zone resolution
+  category: A. Calculation authority and astrological sources
+  automated_data: IANA time-zone ID and historical UTC/DST offset for the birth instant.
+  acquisition: Time-zone API plus pinned IANA tz database; derive UTC birth instant.
+  cadence: On birth-profile change; recalc on tzdb upgrade
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - chart_fact
+  - cycle_detection
+  - uncertainty_model
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Resolved zone and tzdb version retained with chart
+  notes: Never store only a fixed UTC offset.
+  reference_codes:
+  - R03
+  - R05
+  implementation:
+    ingestion_owner: birth-normalization-workflow
+    primary_runtime: cloudflare-workflow + connector-worker
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-04
+  name: Planetary positions and speeds
+  category: A. Calculation authority and astrological sources
+  automated_data: Geocentric tropical longitude, latitude, distance, speed, and retrograde state for supported bodies.
+  acquisition: Swiss Ephemeris container using pinned flags and data-file hashes.
+  cadence: Natal once; sky snapshots hourly/daily; exact-search on demand
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - chart_fact
+  - cycle_detection
+  - theme_eligibility
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Snapshots retained per reproducibility policy; raw engine results immutable
+  notes: Swiss Ephemeris is the calculation authority; wrapper output is normalized into an app-owned contract.
+  reference_codes:
+  - R01
+  - R02
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-05
+  name: Houses and angles
+  category: A. Calculation authority and astrological sources
+  automated_data: House cusps, Ascendant, Midheaven, and recorded polar fallback behavior.
+  acquisition: Swiss Ephemeris house functions using declared primary and fallback systems.
+  cadence: Natal and relocated-chart calculation
+  sensitivity: highly_sensitive
+  confidence: calculated
+  allowed_uses:
+  - chart_fact
+  - theme_eligibility
+  - life_domain_selection
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Retained with chart snapshot
+  notes: Disabled for unknown birth time; uncertainty propagated for approximate times.
+  reference_codes:
+  - R02
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-06
+  name: Natal placements and aspect graph
+  category: A. Calculation authority and astrological sources
+  automated_data: Signs, houses, major aspects, aspect orbs, applying/separating metadata where meaningful.
+  acquisition: Deterministic application layer over normalized Swiss output.
+  cadence: On chart calculation or contract change
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - chart_fact
+  - theme_eligibility
+  - pattern_profile
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Retained with chart snapshot
+  notes: Every aspect must reference the orb-policy version.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-07
+  name: Natal structural patterns
+  category: A. Calculation authority and astrological sources
+  automated_data: Stelliums, T-squares, grand trines/crosses, aspect chains, chart ruler, dispositors, element/modality
+    and angular emphasis.
+  acquisition: Rule engine over the natal aspect graph.
+  cadence: On chart calculation or rule-set change
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - theme_eligibility
+  - pattern_profile
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Retained as versioned derived chart features
+  notes: Use declared definitions; avoid unlimited post-hoc pattern mining.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-08
+  name: Natal transits and exact passes
+  category: A. Calculation authority and astrological sources
+  automated_data: Transit-to-natal contacts, orb entry/exit, exact timestamps, direct/retrograde passes, and phase.
+  acquisition: Interval scan plus numerical root refinement against Swiss positions.
+  cadence: Daily horizon scan; hourly near fast exact events
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - cycle_detection
+  - theme_eligibility
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Cycle instances retained while active plus reading lineage
+  notes: Do not infer exactitude from a single noon snapshot.
+  reference_codes:
+  - R02
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-09
+  name: Stations, ingresses, and retrograde loops
+  category: A. Calculation authority and astrological sources
+  automated_data: Station times, direction changes, sign/house ingress, and retrograde return sequence.
+  acquisition: Speed sign-change and boundary-crossing searches.
+  cadence: Daily with forward look-ahead
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - cycle_detection
+  - theme_eligibility
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Event instances retained while relevant
+  notes: Treat as supporting context unless editorial rules elevate them.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-10
+  name: Lunations and eclipses
+  category: A. Calculation authority and astrological sources
+  automated_data: New/full moon, eclipse type, exact time, zodiac position, natal contacts, and house location.
+  acquisition: Swiss Ephemeris eclipse/lunation functions plus natal-contact rules.
+  cadence: Monthly/annual precomputation; refresh on contract change
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - cycle_detection
+  - theme_eligibility
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Event instances retained 24 months
+  notes: Moon-only events should rarely override stronger long-cycle material.
+  reference_codes:
+  - R02
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-11
+  name: Secondary progressions
+  category: A. Calculation authority and astrological sources
+  automated_data: Progressed Sun, Moon, personal planets, progressed aspects, and progressed lunation phase.
+  acquisition: Day-for-year calculation using Swiss positions and declared progression rules.
+  cadence: Monthly; daily around exact contacts
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - cycle_detection
+  - theme_eligibility
+  - annual_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Cycle instances retained while active
+  notes: Especially useful for long-form Pattern-like chapters.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-12
+  name: Solar and lunar returns
+  category: A. Calculation authority and astrological sources
+  automated_data: Exact return time, return chart, angularity, return-to-natal contacts, and annual/monthly themes.
+  acquisition: Root search for return longitude followed by chart calculation at exact time/location policy.
+  cadence: Annual for solar; monthly for lunar if enabled
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - annual_context
+  - theme_ranking
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Return charts retained through covered period plus one year
+  notes: 'Location policy must be explicit: birthplace, residence, or actual location.'
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-13
+  name: Annual profections
+  category: A. Calculation authority and astrological sources
+  automated_data: Activated house, time lord, natal condition, and transit activations.
+  acquisition: Deterministic age/date calculation using declared traditional convention.
+  cadence: At birthday and on chart-contract change
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - annual_context
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Retained by profection year
+  notes: Use as a ranking signal, not a standalone certainty claim.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-14
+  name: Planetary returns and life-stage cycles
+  category: A. Calculation authority and astrological sources
+  automated_data: Saturn/Jupiter/nodal returns, oppositions, squares, and other declared age-linked cycles.
+  acquisition: Transit event aggregation over known cycle templates.
+  cadence: Daily horizon scan; annual precomputation
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - cycle_detection
+  - theme_eligibility
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Cycle instances retained while active
+  notes: Named cycles are editorial groupings over reproducible calculations.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-15
+  name: Solar arcs
+  category: A. Calculation authority and astrological sources
+  automated_data: Directed planet/angle positions and contacts to natal points.
+  acquisition: Application-layer directions using a pinned arc convention.
+  cadence: Monthly; daily near exact contacts
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - cycle_detection
+  - theme_eligibility
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Cycle instances retained while active
+  notes: Only after validation against known fixtures.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-16
+  name: Midpoints, declination, and out-of-bounds state
+  category: A. Calculation authority and astrological sources
+  automated_data: Midpoint contacts, parallels/contra-parallels, declination, and out-of-bounds flags.
+  acquisition: Derived from Swiss longitude/declination data with declared orbs.
+  cadence: On natal or sky snapshot
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - theme_eligibility
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Retained as versioned features
+  notes: Keep secondary to major placements and cycles.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-17
+  name: Synastry and composite calculations
+  category: A. Calculation authority and astrological sources
+  automated_data: Inter-chart aspects, house overlays, composite or midpoint chart, and relationship-cycle contacts.
+  acquisition: Two consented birth profiles processed through the same calculation contract.
+  cadence: On profile/contract change; daily relationship-cycle scan
+  sensitivity: third_party_private
+  confidence: calculated
+  allowed_uses:
+  - relationship_interpretation
+  - theme_eligibility
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_3
+  raw_retention: Until either party revokes sharing
+  notes: Non-user psychology must not be asserted from unverified birth data.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-18
+  name: Relocated and current-location charts
+  category: A. Calculation authority and astrological sources
+  automated_data: Current-location houses/angles, local return charts, and relocated chart features.
+  acquisition: Coarse or user-selected current location; calculate only after explicit feature enablement.
+  cadence: On meaningful location change or user request
+  sensitivity: highly_sensitive
+  confidence: calculated
+  allowed_uses:
+  - local_day_boundary
+  - optional_relocation_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Current city snapshot 35 days; saved locations until deletion
+  notes: Never maintain a continuous precise location trail.
+  reference_codes:
+  - R09
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-19
+  name: Local solar, daylight, and season state
+  category: A. Calculation authority and astrological sources
+  automated_data: Sunrise, sunset, twilight, daylight duration, season, and local date boundary.
+  acquisition: Calculate locally from coordinates/time zone; external fallback permitted.
+  cadence: Daily and on travel/time-zone change
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  - operational_delivery
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Daily aggregate 35 days
+  notes: Environmental context, not evidence that an interpretation is true.
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AST-20
+  name: Calculation provenance and versions
+  category: A. Calculation authority and astrological sources
+  automated_data: Calculation-contract ID, Swiss release, wrapper commit, data-file hashes, tzdb version, flags,
+    and output fingerprint.
+  acquisition: Captured automatically on every chart and event calculation.
+  cadence: Every calculation
+  sensitivity: ordinary
+  confidence: calculated
+  allowed_uses:
+  - reproducibility
+  - evidence_graph
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Immutable for every persisted result
+  notes: Any upgrade requires a chart-diff report.
+  reference_codes:
+  - R01
+  - R03
+  implementation:
+    ingestion_owner: calculation-engine
+    primary_runtime: cloudflare-container; fly-machine-compatible
+    primary_storage:
+    - 'd1: encrypted operational record'
+    - 'r2: immutable snapshot or rendered artifact'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-01
+  name: Current life priorities
+  category: B. First-party, user-owned sources
+  automated_data: User-selected active domains such as work, relationships, home, creativity, identity, money, grief,
+    or community.
+  acquisition: Onboarding and editable profile controls.
+  cadence: Prompt at onboarding; reconfirm every 30-90 days
+  sensitivity: personal
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - life_domain_selection
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Until replaced; retain history only with consent
+  notes: Context chooses among valid readings; it never creates an astrological fact.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-02
+  name: Active goals and projects
+  category: B. First-party, user-owned sources
+  automated_data: Named goals, project stage, deadlines, and user-selected relevance window.
+  acquisition: Explicit project cards; optional selected calendar/task import.
+  cadence: On user edit; expire at declared end
+  sensitivity: personal
+  confidence: user_confirmed
+  allowed_uses:
+  - life_domain_selection
+  - reflection_prompt
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Until expiry or deletion
+  notes: Do not infer project success or failure from astrology.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-03
+  name: Relationship, household, and caregiving context
+  category: B. First-party, user-owned sources
+  automated_data: Relationship state, household composition, caregiving load, and active family transitions.
+  acquisition: Explicit profile questionnaire with granular visibility controls.
+  cadence: On user edit; reconfirm every 90 days
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - life_domain_selection
+  - theme_ranking
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: launch
+  raw_retention: Until replaced; sensitive history off by default
+  notes: No diagnosis or behavioral claims about other people.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-04
+  name: Language, tone, and depth preferences
+  category: B. First-party, user-owned sources
+  automated_data: Direct/gentle/poetic/technical tone, jargon level, reading length, and desired action-vs-reflection
+    balance.
+  acquisition: Settings and per-reading overrides.
+  cadence: On user edit
+  sensitivity: ordinary
+  confidence: user_confirmed
+  allowed_uses:
+  - tone
+  - rendering
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Until changed
+  notes: Must not soften safety warnings or alter factual evidence.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-05
+  name: Sensitive-topic exclusions
+  category: B. First-party, user-owned sources
+  automated_data: Topics the user does not want interpreted or notified about.
+  acquisition: Explicit negative-preference controls.
+  cadence: On user edit; enforced immediately
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_filtering
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Until changed
+  notes: Exclusions override engagement and ranking.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-06
+  name: Daily check-in
+  category: B. First-party, user-owned sources
+  automated_data: Energy, pressure, clarity, connection, focus domain, and optional short note.
+  acquisition: Five-second in-app check-in or widget.
+  cadence: User initiated; at most once per local day by default
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - tone
+  - reflection_prompt
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 13 months; configurable shorter retention
+  notes: "Use \u201Cyou reported,\u201D not causal astrology language."
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    - 'r2: optional encrypted source object'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-07
+  name: Weekly reflection
+  category: B. First-party, user-owned sources
+  automated_data: Weekly themes, wins, tensions, changed priorities, and open questions.
+  acquisition: Scheduled reflection flow.
+  cadence: Weekly; user can skip
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - narrative_continuity
+  - theme_ranking
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 24 months or user-selected
+  notes: Summaries should remain attributable to the user.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    - 'r2: optional encrypted source object'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-08
+  name: Current question or intention
+  category: B. First-party, user-owned sources
+  automated_data: A user-entered question, intention, or topic for the current reading.
+  acquisition: One-time reading input; optional voice-to-text on device.
+  cadence: Per reading/session
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - life_domain_selection
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 30 days unless saved to journal
+  notes: Route medical, crisis, legal, and financial questions away from astrological interpretation.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    - 'r2: optional encrypted source object'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-09
+  name: Life-event timeline
+  category: B. First-party, user-owned sources
+  automated_data: Dated milestones, date precision, category, significance, and private note.
+  acquisition: Manual entry; optional selected imports requiring confirmation.
+  cadence: On user edit
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - time_travel
+  - narrative_continuity
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Until deletion; per-event usage controls
+  notes: Describe temporal overlap, never causal proof.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    - 'r2: optional encrypted source object'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-10
+  name: In-app journal and reflection answers
+  category: B. First-party, user-owned sources
+  automated_data: Free text, prompts answered, tags, and reading links.
+  acquisition: In-app editor; local encryption; optional cloud sync.
+  cadence: User initiated
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - reflection_prompt
+  - narrative_continuity
+  - user_memory
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: User controlled; local-only option
+  notes: Raw text is not sent to a model unless explicitly enabled for that entry.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-11
+  name: Confirmed journal themes
+  category: B. First-party, user-owned sources
+  automated_data: User-approved themes extracted from journal entries, with source entry and expiration.
+  acquisition: On-device or server extraction followed by user confirmation.
+  cadence: On save; reconfirm or expire in 90 days
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - life_domain_selection
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Theme only until expiry; raw text retained per journal setting
+  notes: Unconfirmed inferred themes cannot personalize readings.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-12
+  name: Reading resonance feedback
+  category: B. First-party, user-owned sources
+  automated_data: Connects/partly/no, too vague, wrong domain, too intense, repetitive, timing off, or disagreement.
+  acquisition: Post-reading feedback control.
+  cadence: Per reading; optional
+  sensitivity: personal
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - content_quality
+  - repetition_control
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: 24 months; aggregate longer only with consent
+  notes: Feedback measures usefulness, not objective astrological validity.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-13
+  name: Reading relevance labels
+  category: B. First-party, user-owned sources
+  automated_data: User-selected domain or real-life situation to which a reading connected.
+  acquisition: Follow-up chip after resonance feedback.
+  cadence: Per reading
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - life_domain_selection
+  - content_quality
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 24 months
+  notes: Never backfill the reading as though the app predicted the label.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-14
+  name: Reading interaction history
+  category: B. First-party, user-owned sources
+  automated_data: Open, expand evidence, save, revisit, share, dismiss, and completion timestamps.
+  acquisition: First-party product telemetry with consent and opt-out.
+  cadence: Event-driven
+  sensitivity: personal
+  confidence: system_observed
+  allowed_uses:
+  - repetition_control
+  - content_quality
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 13 months at event level; aggregate thereafter
+  notes: Engagement is a weak signal and must not outrank explicit feedback.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-15
+  name: "Topic mutes, favorites, and \u201Cless like this\u201D"
+  category: B. First-party, user-owned sources
+  automated_data: Explicit topic and cycle preferences.
+  acquisition: Settings and per-reading controls.
+  cadence: Immediate
+  sensitivity: personal
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_filtering
+  - theme_ranking
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Until changed
+  notes: User control overrides model personalization.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    - 'r2: optional encrypted source object'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-16
+  name: Corrections and assumption acceptance
+  category: B. First-party, user-owned sources
+  automated_data: Birth-time corrections, approximate-time range, chosen house fallback, location corrections, and
+    acknowledged uncertainty.
+  acquisition: Evidence drawer and chart settings.
+  cadence: On user action
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - chart_fact
+  - uncertainty_model
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Immutable change history; old chart snapshots retained only as needed for reading lineage
+  notes: Any recalculation must disclose material changes.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-17
+  name: Notification preferences
+  category: B. First-party, user-owned sources
+  automated_data: "Local delivery window, quiet days, cadence, topic exclusions, and \u201Cnotify only at peaks.\u201D"
+  acquisition: Settings and notification onboarding.
+  cadence: On user edit
+  sensitivity: ordinary
+  confidence: user_confirmed
+  allowed_uses:
+  - notification_timing
+  - operational_delivery
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Until changed
+  notes: No manipulative urgency or fear-based wording.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-18
+  name: Relationship profiles and sharing consent
+  category: B. First-party, user-owned sources
+  automated_data: Relationship type, verified birth profile, sharing status, and revocation metadata.
+  acquisition: Invite flow or user-entered profile marked as unverified.
+  cadence: On create/change/revocation
+  sensitivity: third_party_private
+  confidence: user_confirmed
+  allowed_uses:
+  - relationship_interpretation
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_3
+  raw_retention: "Delete or de-identify on either party\u2019s revocation"
+  notes: Consent status must be visible in every relationship reading.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-19
+  name: Optional nonclinical questionnaires
+  category: B. First-party, user-owned sources
+  automated_data: Big Five/IPIP-style traits, values, attachment self-description, chronotype, or reflection preferences.
+  acquisition: Validated public-domain or licensed questionnaire; explicit opt-in.
+  cadence: At user request; optional annual refresh
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - tone
+  - reflection_prompt
+  - life_domain_selection
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Until deletion or replacement
+  notes: Not clinical; never label disorders or override self-description.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-20
+  name: Selected memories, photos, songs, and places
+  category: B. First-party, user-owned sources
+  automated_data: User-selected media reference plus a user-authored caption or meaning.
+  acquisition: System picker or Journaling Suggestions selection; save only when user confirms.
+  cadence: User initiated
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - reflection_prompt
+  - narrative_continuity
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Only saved items; source media remains with platform/provider when possible
+  notes: Use as a prompt, not an inferred psychological fact.
+  reference_codes:
+  - R06
+  - R14
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-21
+  name: Locale, language, and accessibility preferences
+  category: B. First-party, user-owned sources
+  automated_data: Preferred language, region, units, text size, contrast, reduced motion, and screen-reader mode.
+  acquisition: Settings plus OS defaults with user override.
+  cadence: On app launch/change
+  sensitivity: ordinary
+  confidence: user_confirmed
+  allowed_uses:
+  - rendering
+  - operational_delivery
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Until changed
+  notes: Never infer identity from locale.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-22
+  name: Account and entitlement state
+  category: B. First-party, user-owned sources
+  automated_data: Account ID, plan, trial, purchases, and feature availability.
+  acquisition: Authentication and app-store/server billing systems.
+  cadence: Event-driven
+  sensitivity: personal
+  confidence: system_observed
+  allowed_uses:
+  - operational_delivery
+  - feature_gating
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Financial records per statutory/accounting need; entitlement while active
+  notes: Must never change interpretation severity, positivity, or chart facts.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-23
+  name: Support and error reports
+  category: B. First-party, user-owned sources
+  automated_data: User-submitted issue, affected reading ID, device/app version, and optional diagnostic bundle.
+  acquisition: In-app support flow; explicit attachment selection.
+  cadence: User initiated
+  sensitivity: personal
+  confidence: user_confirmed
+  allowed_uses:
+  - quality_audit
+  - supportability
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 90 days after resolution unless retained with consent
+  notes: Default diagnostic bundle excludes journal text and raw private context.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: USR-24
+  name: Research consent and case annotations
+  category: B. First-party, user-owned sources
+  automated_data: Separate consent, anonymized chart/cycle labels, feedback, and user-provided event annotations.
+  acquisition: Independent research enrollment; revocable.
+  cadence: At enrollment and each study update
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - product_quality
+  - editorial_research
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Per study protocol; deletion on withdrawal where feasible
+  notes: Never use ordinary product consent as research consent.
+  implementation:
+    ingestion_owner: first-party-context-service
+    primary_runtime: cloudflare-api-worker + workflow
+    primary_storage:
+    - 'd1: encrypted structured record'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-01
+  name: Device time zone, locale, and calendar
+  category: C. Device and operating-system sources
+  automated_data: Current time zone, locale, calendar system, and local date.
+  acquisition: OS APIs without precise location.
+  cadence: At foreground, midnight, and system-change event
+  sensitivity: ordinary
+  confidence: os_derived
+  allowed_uses:
+  - local_day_boundary
+  - notification_timing
+  - rendering
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Current state plus 35-day change log
+  notes: User-selected app time zone can override device.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-02
+  name: Coarse current location
+  category: C. Device and operating-system sources
+  automated_data: City-level coordinates or reduced-precision geohash.
+  acquisition: When-in-use location permission or user-selected city.
+  cadence: On foreground or explicit refresh; significant-change only if enabled
+  sensitivity: highly_sensitive
+  confidence: os_derived
+  allowed_uses:
+  - local_day_boundary
+  - weather_lookup
+  - optional_relocation_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: launch
+  raw_retention: Raw coordinates discarded after city/time-zone resolution; city snapshot 35 days
+  notes: Do not request always-on location for the core app.
+  reference_codes:
+  - R09
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-03
+  name: Travel and time-zone change state
+  category: C. Device and operating-system sources
+  automated_data: Time-zone change, distance bucket from home, travel-day flag, and return date if user supplied.
+  acquisition: Compare device time zone/coarse city to saved home; optional calendar itinerary.
+  cadence: At foreground and time-zone-change event
+  sensitivity: sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Travel-state aggregate 90 days
+  notes: Do not retain a route or precise location history.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-04
+  name: On-device calendar availability
+  category: C. Device and operating-system sources
+  automated_data: Busy/free blocks, meeting minutes, block count, evening commitment, and social-density bucket.
+  acquisition: EventKit/Calendar provider; aggregate on device before sync.
+  cadence: Every 15-60 minutes while enabled; daily snapshot
+  sensitivity: sensitive
+  confidence: os_derived
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  - workload_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Raw event data never leaves device in aggregate mode; aggregate 35 days
+  notes: Event titles, descriptions, attendees, and addresses are excluded by default.
+  reference_codes:
+  - R08
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-05
+  name: Reminders and task-load aggregate
+  category: C. Device and operating-system sources
+  automated_data: Due-today count, overdue count, priority bucket, and available focus window.
+  acquisition: OS reminders/task APIs; aggregate locally.
+  cadence: Every 30-60 minutes while enabled
+  sensitivity: sensitive
+  confidence: os_derived
+  allowed_uses:
+  - reflection_prompt
+  - workload_context
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Raw task text never stored server-side; aggregate 35 days
+  notes: No task content in model context unless user selects it.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-06
+  name: Apple Journaling Suggestions
+  category: C. Device and operating-system sources
+  automated_data: A user-selected high-level suggestion such as a place, person, photo moment, workout, or media
+    memory.
+  acquisition: System suggestion picker; app receives only selected suggestion details.
+  cadence: User initiated
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - reflection_prompt
+  - time_travel
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Nothing retained until user saves a reflection
+  notes: Requires platform entitlement; selection is the consent boundary.
+  reference_codes:
+  - R06
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-07
+  name: Selected photos and media
+  category: C. Device and operating-system sources
+  automated_data: User-selected asset, metadata made available by picker, and optional caption.
+  acquisition: Apple/Android system photo picker rather than broad library access.
+  cadence: User initiated
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - reflection_prompt
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Asset copied only when user saves it; otherwise transient
+  notes: No face recognition or background library scanning.
+  reference_codes:
+  - R14
+  - R19
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-08
+  name: Motion and activity state
+  category: C. Device and operating-system sources
+  automated_data: Stationary, walking, running, cycling, automotive, and confidence bucket.
+  acquisition: Core Motion or Android Activity Recognition.
+  cadence: On-device stream; summarize into 15-60 minute windows
+  sensitivity: sensitive
+  confidence: os_derived
+  allowed_uses:
+  - notification_timing
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Raw events 24 hours on device; daily aggregate 35 days
+  notes: Never infer mood or health condition from motion.
+  reference_codes:
+  - R11
+  - R17
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-09
+  name: Steps and activity-load aggregate
+  category: C. Device and operating-system sources
+  automated_data: Daily steps, active minutes, workout presence, and deviation from personal baseline.
+  acquisition: HealthKit/Health Connect or pedometer APIs; aggregate on device.
+  cadence: Daily; optional intra-day refresh
+  sensitivity: health
+  confidence: os_derived
+  allowed_uses:
+  - tone
+  - notification_timing
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Daily bucket 35 days by default; raw samples not retained
+  notes: App must present a legitimate wellbeing feature before requesting health access.
+  reference_codes:
+  - R07
+  - R15
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-10
+  name: Sleep and wellbeing aggregate
+  category: C. Device and operating-system sources
+  automated_data: User-authorized sleep-duration bucket, restfulness self-report, and optionally activity balance.
+  acquisition: HealthKit/Health Connect with per-type permission; aggregate locally.
+  cadence: Daily after wake window
+  sensitivity: health
+  confidence: os_derived
+  allowed_uses:
+  - tone
+  - reflection_prompt
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Daily bucket 35 days; no raw sleep stages server-side
+  notes: Never claim physiology validates astrology; no medical inference.
+  reference_codes:
+  - R07
+  - R15
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-11
+  name: Recently played music
+  category: C. Device and operating-system sources
+  automated_data: Recent track/artist IDs, user-selected representative song, and repetition count.
+  acquisition: MusicKit or Spotify adapter; prefer user selection over passive ingestion.
+  cadence: User initiated or daily while enabled
+  sensitivity: sensitive
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: IDs 30 days; saved selections until deletion
+  notes: Do not infer mental state from listening history.
+  reference_codes:
+  - R12
+  - R26
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-12
+  name: Screen-time and app-use aggregate
+  category: C. Device and operating-system sources
+  automated_data: Total screen-time bucket, category totals, pickups, and routine deviation; no app identities by
+    default.
+  acquisition: Family Controls/Device Activity or Android UsageStats with special permission.
+  cadence: Daily aggregate
+  sensitivity: highly_sensitive
+  confidence: os_derived
+  allowed_uses:
+  - notification_timing
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Daily category bucket 14 days; no raw app/site identities
+  notes: Poor privacy/value tradeoff; never required or default-on.
+  reference_codes:
+  - R13
+  - R18
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-13
+  name: Local daylight and time-of-day state
+  category: C. Device and operating-system sources
+  automated_data: Dawn/day/dusk/night, daylight duration, weekday/weekend, and seasonal change.
+  acquisition: Local calculation from time zone and coarse coordinates.
+  cadence: At app open and scheduled delivery
+  sensitivity: ordinary
+  confidence: calculated
+  allowed_uses:
+  - notification_timing
+  - tone
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Daily aggregate 35 days
+  notes: Pure delivery/context signal.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-14
+  name: Notification permission and delivery outcomes
+  category: C. Device and operating-system sources
+  automated_data: Authorization status, token validity, delivery/open/dismiss state, and quiet window.
+  acquisition: APNs/FCM and OS notification APIs.
+  cadence: Event-driven
+  sensitivity: personal
+  confidence: system_observed
+  allowed_uses:
+  - operational_delivery
+  - notification_timing
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Token while active; event-level outcome 90 days
+  notes: Never optimize for fear or compulsive reopening.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-15
+  name: Ambient smart-home sensor aggregate
+  category: C. Device and operating-system sources
+  automated_data: User-selected indoor temperature, humidity, light, noise category, or air-quality bucket.
+  acquisition: Home platform or user-owned webhook; aggregate locally where possible.
+  cadence: 15-60 minutes while enabled
+  sensitivity: highly_sensitive
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - environment_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Daily aggregate 14 days
+  notes: No occupancy inference; no raw camera or microphone feeds.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-16
+  name: Connectivity and battery state
+  category: C. Device and operating-system sources
+  automated_data: Online/offline, low-power state, and background-execution availability.
+  acquisition: OS operational APIs.
+  cadence: Event-driven
+  sensitivity: ordinary
+  confidence: os_derived
+  allowed_uses:
+  - operational_delivery
+  - sync_scheduling
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Transient only
+  notes: Must never affect interpretive content.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DEV-17
+  name: Device accessibility and presentation settings
+  category: C. Device and operating-system sources
+  automated_data: Text scale, reduced motion, contrast, screen-reader status, and language/region defaults.
+  acquisition: OS accessibility/environment APIs.
+  cadence: At launch and change
+  sensitivity: ordinary
+  confidence: os_derived
+  allowed_uses:
+  - rendering
+  - operational_delivery
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Current state only
+  notes: Presentation only; no profiling.
+  implementation:
+    ingestion_owner: device-permission-adapter
+    primary_runtime: mobile-client; cloudflare-api-worker receives minimized aggregate
+    primary_storage:
+    - on-device first
+    - 'd1: encrypted aggregate only when allowed'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-01
+  name: Google Calendar free/busy
+  category: D. Linked cloud-service sources
+  automated_data: Busy intervals and aggregate workload without event content.
+  acquisition: Google Calendar FreeBusy endpoint with narrow scope.
+  cadence: 15-60 minutes while enabled; webhook/poll hybrid
+  sensitivity: sensitive
+  confidence: service_derived
+  allowed_uses:
+  - workload_context
+  - notification_timing
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Busy intervals 24 hours; daily aggregate 35 days
+  notes: Default adapter must not request event-body scope.
+  reference_codes:
+  - R16
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-02
+  name: Microsoft Outlook schedule
+  category: D. Linked cloud-service sources
+  automated_data: Free/busy schedule, working hours, and availability buckets.
+  acquisition: Microsoft Graph getSchedule with least-privileged calendar access.
+  cadence: 15-60 minutes while enabled
+  sensitivity: sensitive
+  confidence: service_derived
+  allowed_uses:
+  - workload_context
+  - notification_timing
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Busy intervals 24 hours; daily aggregate 35 days
+  notes: Avoid event body, attendee, and subject data by default.
+  reference_codes:
+  - R23
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-03
+  name: Selected calendar event metadata
+  category: D. Linked cloud-service sources
+  automated_data: User-selected title, start/end, location category, and optional note.
+  acquisition: Explicit per-event selection after separate scope upgrade.
+  cadence: On selection and event update
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - life_domain_selection
+  - reflection_prompt
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Selected record only until deletion
+  notes: Never silently upgrade from free/busy to full calendar access.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-04
+  name: Task-service workload
+  category: D. Linked cloud-service sources
+  automated_data: Due/overdue counts, priority bucket, and selected task context from Google Tasks, Microsoft To
+    Do, Todoist, or equivalent.
+  acquisition: OAuth adapter; aggregate counts by default; selected-item flow for content.
+  cadence: 15-60 minutes while enabled
+  sensitivity: sensitive
+  confidence: service_derived
+  allowed_uses:
+  - workload_context
+  - reflection_prompt
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Counts 35 days; selected tasks until deletion
+  notes: No bulk task text in model context.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-05
+  name: Selected Google Drive or Docs files
+  category: D. Linked cloud-service sources
+  automated_data: User-selected document text or exported snapshot, plus source version.
+  acquisition: Picker/per-file scope; explicit import.
+  cadence: On user import; optional manual refresh
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - journal_import
+  - user_memory
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Imported snapshot until deletion; no background crawl
+  notes: Use per-file access rather than whole-drive scope.
+  reference_codes:
+  - R22
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-06
+  name: Selected Notion, Dropbox, or Obsidian journal imports
+  category: D. Linked cloud-service sources
+  automated_data: User-selected pages/files, timestamps, and optional tags.
+  acquisition: Provider picker, file upload, or local vault export.
+  cadence: User initiated; optional incremental sync
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - journal_import
+  - user_memory
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Imported source and derived themes under user control
+  notes: No workspace-wide indexing by default.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-07
+  name: Google Photos Picker
+  category: D. Linked cloud-service sources
+  automated_data: User-selected photo/video references and allowed metadata.
+  acquisition: Google Photos Picker session, not broad library scope.
+  cadence: User initiated
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - reflection_prompt
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Selected asset/reference only
+  notes: Picker is the required access model; no broad library scraping.
+  reference_codes:
+  - R19
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-08
+  name: Apple Music history and selection
+  category: D. Linked cloud-service sources
+  automated_data: Recently played or user-selected songs, playlists, and library relationship.
+  acquisition: MusicKit authorization; prefer explicit song selection.
+  cadence: User initiated or daily while enabled
+  sensitivity: sensitive
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Recent IDs 30 days; selected items until deletion
+  notes: No mood diagnosis from music.
+  reference_codes:
+  - R12
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-09
+  name: Spotify recent listening
+  category: D. Linked cloud-service sources
+  automated_data: Recently played tracks and user-selected representative tracks.
+  acquisition: Spotify OAuth with recently-played scope.
+  cadence: User initiated or daily while enabled
+  sensitivity: sensitive
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Recent IDs 30 days; selected items until deletion
+  notes: Respect platform policy and do not train models on Spotify content.
+  reference_codes:
+  - R26
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-10
+  name: Oura daily summaries
+  category: D. Linked cloud-service sources
+  automated_data: Sleep, readiness, activity, stress, resilience, and selected daily aggregates.
+  acquisition: Oura OAuth/API and webhooks where available.
+  cadence: Daily; webhook-supported refresh
+  sensitivity: health
+  confidence: service_derived
+  allowed_uses:
+  - tone
+  - notification_timing
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Daily buckets 35 days; raw samples not retained
+  notes: Health signals may adapt delivery only; no diagnostic or causal astrology claim.
+  reference_codes:
+  - R27
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-11
+  name: Fitbit daily summaries
+  category: D. Linked cloud-service sources
+  automated_data: Sleep duration, activity, steps, resting-heart-rate bucket, and workout presence.
+  acquisition: Fitbit OAuth/API; approval may be required for some intraday data.
+  cadence: Daily
+  sensitivity: health
+  confidence: service_derived
+  allowed_uses:
+  - tone
+  - notification_timing
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Daily buckets 35 days
+  notes: Avoid intraday physiological streams unless a legitimate wellbeing feature exists.
+  reference_codes:
+  - R28
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-12
+  name: Garmin Health summaries
+  category: D. Linked cloud-service sources
+  automated_data: Steps, sleep, stress, pulse-ox, Body Battery, and activity summary if commercially licensed.
+  acquisition: Garmin Health API under approved commercial agreement.
+  cadence: Daily/webhook per agreement
+  sensitivity: health
+  confidence: service_derived
+  allowed_uses:
+  - tone
+  - notification_timing
+  - routine_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: Daily buckets 35 days
+  notes: Commercial approval and terms are a launch gate.
+  reference_codes:
+  - R30
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-13
+  name: Strava activity summaries
+  category: D. Linked cloud-service sources
+  automated_data: Workout occurrence, duration, activity type, relative effort if authorized, and travel-like route
+    category without coordinates.
+  acquisition: Strava OAuth/API and webhooks.
+  cadence: Event-driven
+  sensitivity: health
+  confidence: service_derived
+  allowed_uses:
+  - routine_context
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Summary 90 days; no route geometry by default
+  notes: No performance or health diagnosis.
+  reference_codes:
+  - R29
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-14
+  name: Gmail metadata-only context
+  category: D. Linked cloud-service sources
+  automated_data: Message counts, labels, sender domain class, and selected headers; no body or attachment content.
+  acquisition: Gmail metadata scope; local aggregation; explicit opt-in.
+  cadence: Daily or user initiated
+  sensitivity: highly_sensitive
+  confidence: service_derived
+  allowed_uses:
+  - workload_context
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Daily counts 14 days; no message-level retention
+  notes: Questionable value; never request body scope for routine personalization.
+  reference_codes:
+  - R21
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-15
+  name: Microsoft mail basic metadata
+  category: D. Linked cloud-service sources
+  automated_data: Message counts and basic metadata excluding body, preview, and attachments.
+  acquisition: Microsoft Graph Mail.ReadBasic; local aggregation.
+  cadence: Daily or user initiated
+  sensitivity: highly_sensitive
+  confidence: service_derived
+  allowed_uses:
+  - workload_context
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Daily counts 14 days
+  notes: No content or sender-level psychological inference.
+  reference_codes:
+  - R24
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-16
+  name: Slack or Teams workload aggregate
+  category: D. Linked cloud-service sources
+  automated_data: Message volume, mentions, scheduled focus blocks, and after-hours count; no message content.
+  acquisition: Workspace-approved app; aggregate in provider boundary where possible.
+  cadence: Hourly/daily while enabled
+  sensitivity: third_party_private
+  confidence: service_derived
+  allowed_uses:
+  - workload_context
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Daily aggregate 14 days
+  notes: High third-party privacy and policy burden; exclude from consumer launch.
+  reference_codes:
+  - R25
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-17
+  name: Selected travel itinerary
+  category: D. Linked cloud-service sources
+  automated_data: Trip dates, destination city/time zone, and travel mode from a selected event, forwarded itinerary,
+    or manual import.
+  acquisition: Explicit share sheet, selected calendar event, or itinerary parser.
+  cadence: On import and update
+  sensitivity: highly_sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - travel_context
+  - notification_timing
+  - local_day_boundary
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Trip record until 30 days after return unless saved
+  notes: No inbox-wide itinerary scanning.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-18
+  name: Relationship-profile invitation
+  category: D. Linked cloud-service sources
+  automated_data: Shared verified birth profile, display name, relationship type, and permission state.
+  acquisition: Invitation link and account-to-account consent.
+  cadence: Event-driven
+  sensitivity: third_party_private
+  confidence: user_confirmed
+  allowed_uses:
+  - relationship_interpretation
+  - time_travel
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_3
+  raw_retention: Until either party revokes
+  notes: Revocation must invalidate future relationship readings.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-19
+  name: Custom webhook, Shortcuts, and App Intents
+  category: D. Linked cloud-service sources
+  automated_data: "User-defined categorical signals such as \u201Cworkday ended,\u201D \u201Ctraveling,\u201D or\
+    \ \u201Creflection completed.\u201D"
+  acquisition: Authenticated webhook or OS automation action with a strict schema.
+  cadence: Event-driven
+  sensitivity: sensitive
+  confidence: user_confirmed
+  allowed_uses:
+  - theme_ranking
+  - notification_timing
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Event 90 days; user-configurable
+  notes: Disallow arbitrary hidden text ingestion into the reading model.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: CLD-20
+  name: Provider sync metadata
+  category: D. Linked cloud-service sources
+  automated_data: OAuth scope, token status, cursor, webhook subscription, last success, error, and revocation state.
+  acquisition: Connector infrastructure.
+  cadence: Continuous/event-driven
+  sensitivity: sensitive
+  confidence: system_observed
+  allowed_uses:
+  - operational_delivery
+  - consent_validation
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: phase_1
+  raw_retention: Token encrypted while connected; audit metadata 13 months
+  notes: No reading may use a source whose scope is expired or revoked.
+  implementation:
+    ingestion_owner: linked-service-adapter
+    primary_runtime: cloudflare-connector-worker + workflow
+    primary_storage:
+    - 'd1: encrypted normalized aggregate'
+    - 'secret store: provider credentials/tokens where applicable'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-01
+  name: Weather conditions and forecast
+  category: E. Public and ambient sources
+  automated_data: Current conditions, hourly/daily forecast, temperature, precipitation, wind, and historical normals
+    where licensed.
+  acquisition: WeatherKit or equivalent weather API using coarse location.
+  cadence: Hourly; daily snapshot
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - notification_timing
+  - environment_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Daily aggregate 35 days
+  notes: Practical adaptation only; weather does not validate astrology.
+  reference_codes:
+  - R10
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-02
+  name: Severe-weather alerts
+  category: E. Public and ambient sources
+  automated_data: Active alerts, severity, affected area, and expiration.
+  acquisition: Weather provider alert feed.
+  cadence: Near real time
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - notification_timing
+  - operational_delivery
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Alert until expiration plus 7 days
+  notes: Safety alerts override horoscope notifications.
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-03
+  name: Sunrise, sunset, and twilight
+  category: E. Public and ambient sources
+  automated_data: Civil/nautical/astronomical twilight, sunrise/sunset, daylight duration, and solar noon.
+  acquisition: Local astronomical calculation; weather provider fallback.
+  cadence: Daily
+  sensitivity: public
+  confidence: calculated
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  - environment_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Daily aggregate 35 days
+  notes: No external API required in normal operation.
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-04
+  name: Season and day-of-year context
+  category: E. Public and ambient sources
+  automated_data: Astronomical/meteorological season, day length trend, weekday, weekend, and local holiday proximity.
+  acquisition: Local calendar calculation plus optional holiday dataset.
+  cadence: Daily
+  sensitivity: public
+  confidence: calculated
+  allowed_uses:
+  - tone
+  - reflection_prompt
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Daily aggregate 35 days
+  notes: Locale-specific labels require user setting.
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-05
+  name: Air-quality index
+  category: E. Public and ambient sources
+  automated_data: AQI, dominant pollutant, category, and short forecast.
+  acquisition: Google Air Quality, EPA AirNow, or regional authority using coarse location.
+  cadence: Hourly; daily aggregate
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - notification_timing
+  - environment_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Daily aggregate 35 days
+  notes: Use only for practical environmental prompts; not medical advice.
+  reference_codes:
+  - R31
+  - R34
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-06
+  name: Pollen conditions
+  category: E. Public and ambient sources
+  automated_data: Pollen index by type and short forecast.
+  acquisition: Google Pollen or regional provider.
+  cadence: Daily
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - notification_timing
+  - environment_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Daily aggregate 14 days
+  notes: Do not infer allergy or illness.
+  reference_codes:
+  - R32
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-07
+  name: Local holiday and cultural calendar
+  category: E. Public and ambient sources
+  automated_data: Public holidays, observances, school breaks, and user-selected religious/cultural dates.
+  acquisition: Licensed/public calendar datasets plus user settings.
+  cadence: Annual preload; daily lookup
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  - workload_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Current and next-year cache
+  notes: Do not infer religion or culture from locale.
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-08
+  name: Public local events
+  category: E. Public and ambient sources
+  automated_data: User-selected or licensed event category, time, and area.
+  acquisition: Event provider search using coarse location; opt-in.
+  cadence: Daily/weekly
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - reflection_prompt
+  - optional_recommendations
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Search results 7 days; selections until deletion
+  notes: Keep separate from the interpretation evidence chain.
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-09
+  name: Space-weather and geomagnetic conditions
+  category: E. Public and ambient sources
+  automated_data: Kp index, solar wind, geomagnetic alerts, and solar flare category.
+  acquisition: NOAA SWPC public JSON feeds.
+  cadence: 5-60 minutes depending on product
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - experimental_context
+  - product_research
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: experiment
+  raw_retention: Aggregate 90 days
+  notes: Never present as established cause of mood or astrology; clearly label experimental.
+  reference_codes:
+  - R33
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-10
+  name: Time-zone database updates
+  category: E. Public and ambient sources
+  automated_data: IANA tzdb release and changed zones affecting stored profiles.
+  acquisition: Automated dependency monitor and regression job.
+  cadence: On each tzdb release
+  sensitivity: public
+  confidence: service_derived
+  allowed_uses:
+  - quality_audit
+  - recalculation_queue
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Release metadata permanently
+  notes: Recalculate only affected profiles and disclose material differences.
+  reference_codes:
+  - R03
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-11
+  name: Collective astronomical events
+  category: E. Public and ambient sources
+  automated_data: Global planetary aspects, sign ingresses, stations, lunations, eclipses, and seasonal points.
+  acquisition: Swiss Ephemeris calculation independent of any user chart.
+  cadence: Daily horizon scan; annual precomputation
+  sensitivity: public
+  confidence: calculated
+  allowed_uses:
+  - theme_eligibility
+  - editorial_context
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Event catalog permanently versioned
+  notes: Collective context cannot replace personal-chart relevance.
+  reference_codes:
+  - R02
+  implementation:
+    ingestion_owner: ambient-data-adapter
+    primary_runtime: cloudflare-connector-worker
+    primary_storage:
+    - 'kv/cache: short-lived lookup'
+    - 'd1: evidence snapshot only when used'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: AMB-12
+  name: Major news and world events
+  category: E. Public and ambient sources
+  automated_data: Headlines, topic taxonomy, location, and event time.
+  acquisition: Not connected to the personal-reading product; any editorial news workflow must remain a separate
+    system.
+  cadence: Never
+  sensitivity: public
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Avoid exploiting tragedy or claiming celestial causation; keep outside the app data-source allowlist.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: DER-01
+  name: Cycle lifecycle state
+  category: F. Derived and inferred features
+  automated_data: Emerging, building, peak, reconsidering, integrating; exact-pass sequence and active window.
+  acquisition: Deterministic state machine over AST event timestamps.
+  cadence: At each daily reading and event update
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - theme_eligibility
+  - tone
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Stored with cycle instance
+  notes: State transition rules are versioned and testable.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-02
+  name: Transit/cycle importance score
+  category: F. Derived and inferred features
+  automated_data: Exactness, body/target importance, rarity, angularity, phase, and declared technique weight.
+  acquisition: Deterministic ranking model.
+  cadence: Per daily selection
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Store score components with reading
+  notes: No hidden engagement-only ranking.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-03
+  name: Birth-time uncertainty envelope
+  category: F. Derived and inferred features
+  automated_data: "Features stable or unstable across the user\u2019s approximate-time range."
+  acquisition: Calculate multiple charts across the declared interval and compare.
+  cadence: On profile/contract change
+  sensitivity: highly_sensitive
+  confidence: calculated
+  allowed_uses:
+  - uncertainty_model
+  - theme_filtering
+  - evidence_graph
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Retained with chart snapshot
+  notes: Unstable houses/angles are omitted or explicitly qualified.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-04
+  name: Annual and multi-year theme stack
+  category: F. Derived and inferred features
+  automated_data: Active profection, return, progression, and long transit themes organized by horizon.
+  acquisition: Rule-based composition over AST-08 through AST-14.
+  cadence: Daily; major refresh at birthday/return
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - annual_context
+  - theme_ranking
+  - narrative_continuity
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Retained through covered period
+  notes: Expose contributing techniques in evidence.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-05
+  name: Workload index
+  category: F. Derived and inferred features
+  automated_data: Busy minutes, blocks, due counts, fragmentation, and available focus window.
+  acquisition: Aggregate calendar/task signals; normalize to user baseline.
+  cadence: Every 15-60 minutes; daily snapshot
+  sensitivity: sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  - tone
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Daily aggregate 35 days
+  notes: Never reveal event contents or claim workload was astrologically predicted.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-06
+  name: Social-density index
+  category: F. Derived and inferred features
+  automated_data: Number and duration of social blocks or user-reported social load.
+  acquisition: Aggregate calendar/check-in signals.
+  cadence: Daily
+  sensitivity: sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Daily aggregate 35 days
+  notes: No attendee identity or relationship inference.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-07
+  name: Travel and jet-lag state
+  category: F. Derived and inferred features
+  automated_data: Home/current time-zone delta, travel-day flag, local sleep-window shift, and adaptation day.
+  acquisition: Device time zone, selected itinerary, and optional check-in.
+  cadence: At foreground and daily
+  sensitivity: sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - notification_timing
+  - tone
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Trip plus 30 days
+  notes: No medical claim about jet lag.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-08
+  name: Routine-deviation score
+  category: F. Derived and inferred features
+  automated_data: "Deviation from the user\u2019s normal calendar, motion, check-in, or sleep bucket."
+  acquisition: Baseline model over consented low-resolution aggregates.
+  cadence: Daily
+  sensitivity: highly_sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: experimental
+  phase: phase_2
+  raw_retention: Rolling 35-day baseline; no raw source retention
+  notes: Must show which signals contributed; never infer crisis or disorder.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-09
+  name: Rest and energy bucket
+  category: F. Derived and inferred features
+  automated_data: User-reported rest plus optional sleep/activity aggregate collapsed to low/typical/high.
+  acquisition: Prefer self-report; optionally combine health aggregate with explicit consent.
+  cadence: Daily
+  sensitivity: health
+  confidence: system_inferred
+  allowed_uses:
+  - tone
+  - reflection_prompt
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: restricted
+  phase: phase_2
+  raw_retention: 35 days
+  notes: Health data cannot create astrology claims.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-10
+  name: Environmental-friction index
+  category: F. Derived and inferred features
+  automated_data: Broad weather, severe alert, AQ, pollen, daylight, and indoor-environment factors.
+  acquisition: Aggregate ambient sources into user-understandable categories.
+  cadence: Hourly/daily
+  sensitivity: personal
+  confidence: system_inferred
+  allowed_uses:
+  - notification_timing
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_2
+  raw_retention: Daily aggregate 35 days
+  notes: No health diagnosis; display source breakdown.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-11
+  name: Confirmed recurring-theme map
+  category: F. Derived and inferred features
+  automated_data: Recurrence and evolution of user-confirmed themes across journal, events, feedback, and cycles.
+  acquisition: Only over user-confirmed labels and saved reflections.
+  cadence: On new confirmation; weekly consolidation
+  sensitivity: highly_sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - narrative_continuity
+  - theme_ranking
+  - reflection_prompt
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: optional
+  phase: phase_1
+  raw_retention: Until user deletes or theme expires
+  notes: No latent theme becomes active without confirmation.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-12
+  name: Narrative-continuity state
+  category: F. Derived and inferred features
+  automated_data: Last surfaced cycle, phase language, unresolved prompt, and next eligible chapter.
+  acquisition: State machine over reading and cycle history.
+  cadence: Per reading
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - theme_ranking
+  - tone
+  - repetition_control
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Active cycle plus 24 months
+  notes: Prefer continuity over novelty when the same long cycle remains primary.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-13
+  name: Resonance and preference model
+  category: F. Derived and inferred features
+  automated_data: Explicit positive/negative feedback summarized by topic, technique, tone, and format.
+  acquisition: Interpretable preference weights; explicit feedback weighted above telemetry.
+  cadence: After feedback; nightly recompute
+  sensitivity: sensitive
+  confidence: system_inferred
+  allowed_uses:
+  - theme_ranking
+  - tone
+  - theme_filtering
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: 13 months at event level; model until reset
+  notes: User can inspect/reset; never described as truth about personality.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-14
+  name: Repetition and fatigue score
+  category: F. Derived and inferred features
+  automated_data: Recent exposure to theme, title, prompt, cycle, and notification pattern.
+  acquisition: Deterministic recency/frequency model.
+  cadence: Per reading candidate
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - repetition_control
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Rolling 90 days
+  notes: May suppress content but not hide an exact major cycle from evidence.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-15
+  name: Source freshness and confidence
+  category: F. Derived and inferred features
+  automated_data: Age, expiration, permission state, user-confirmed/calculated/inferred confidence, and conflict
+    status.
+  acquisition: Policy engine over every input signal.
+  cadence: At ingestion and reading assembly
+  sensitivity: ordinary
+  confidence: calculated
+  allowed_uses:
+  - theme_filtering
+  - evidence_graph
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Stored with source snapshot
+  notes: Stale or revoked signals are ineligible.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-16
+  name: Consent and scope validity
+  category: F. Derived and inferred features
+  automated_data: OAuth scopes, OS permission, user usage consent, research consent, and revocation.
+  acquisition: Connector/permission audit.
+  cadence: Before every read/job and on provider callback
+  sensitivity: sensitive
+  confidence: calculated
+  allowed_uses:
+  - consent_validation
+  - operational_delivery
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Audit history 13 months; tokens until revoked
+  notes: No cached private source may remain active after revocation.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-17
+  name: Reading evidence graph
+  category: F. Derived and inferred features
+  automated_data: Paragraph-to-astrological fact, content version, context signal, ranking factor, and model-output
+    linkage.
+  acquisition: Created during reading assembly.
+  cadence: Every reading
+  sensitivity: highly_sensitive
+  confidence: calculated
+  allowed_uses:
+  - evidence_graph
+  - reproducibility
+  - supportability
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Immutable for life of reading
+  notes: Every paragraph requires at least one eligible astrology fact or an explicit non-astrological label.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-18
+  name: Interpretation eligibility set
+  category: F. Derived and inferred features
+  automated_data: Which editorial fragments are valid for the current calculated feature set and uncertainty constraints.
+  acquisition: Rules engine against AST facts and content requirements.
+  cadence: Per reading
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - theme_eligibility
+  - theme_ranking
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Store selected and rejected reason codes
+  notes: Language model cannot introduce a fragment outside the eligible set.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-19
+  name: Notification timing score
+  category: F. Derived and inferred features
+  automated_data: User window, quiet hours, cycle phase, calendar availability, travel, safety alerts, and fatigue.
+  acquisition: Deterministic scheduling policy.
+  cadence: For each candidate notification
+  sensitivity: personal
+  confidence: calculated
+  allowed_uses:
+  - notification_timing
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: 90-day decision log
+  notes: No urgency based on fear; safety and user quiet settings override engagement.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-20
+  name: Anonymized product-quality metrics
+  category: F. Derived and inferred features
+  automated_data: Coverage, repetition, validation failures, source errors, and aggregate feedback rates.
+  acquisition: Privacy-preserving telemetry; separate research path for content efficacy.
+  cadence: Daily/weekly
+  sensitivity: personal
+  confidence: system_inferred
+  allowed_uses:
+  - product_quality
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: launch
+  raw_retention: Aggregate long term; event-level 13 months
+  notes: No private journal text or third-party data; no covert training set.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    - 'analytics-engine: deidentified operational metrics'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-21
+  name: Context conflict detector
+  category: F. Derived and inferred features
+  automated_data: "Conflicts such as \u201Cuser says low energy\u201D vs stale wearable high activity, or contradictory\
+    \ life priorities."
+  acquisition: Rules engine prioritizing explicit recent user data.
+  cadence: Per reading
+  sensitivity: sensitive
+  confidence: calculated
+  allowed_uses:
+  - theme_filtering
+  - evidence_graph
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: recommended
+  phase: phase_1
+  raw_retention: Decision reason with reading
+  notes: Explicit, recent user statement wins over passive inference.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: DER-22
+  name: Content safety and overreach flags
+  category: F. Derived and inferred features
+  automated_data: Fatalism, diagnosis, guaranteed event, crisis topic, third-party claim, unsupported placement,
+    and source laundering.
+  acquisition: Deterministic validators plus constrained classifier.
+  cadence: Every draft before publication
+  sensitivity: sensitive
+  confidence: calculated
+  allowed_uses:
+  - content_safety
+  - quality_audit
+  prohibited_uses:
+  - alter_chart_fact
+  - diagnose_or_treat
+  - guaranteed_prediction
+  - infer_protected_trait
+  - ad_targeting
+  status: required
+  phase: launch
+  raw_retention: Validation log 13 months
+  notes: Failure falls back to reviewed deterministic copy.
+  implementation:
+    ingestion_owner: reading-intelligence-service
+    primary_runtime: cloudflare-workflow + deterministic rules package
+    primary_storage:
+    - 'd1: derived feature and evidence linkage'
+    delivery_path: source -> normalized ContextSignal -> eligibility/ranking policy -> reading evidence
+- id: NO-01
+  name: Raw email bodies and attachments
+  category: G. Deliberately excluded sources and uses
+  automated_data: Full message content, attachments, and quoted threads.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: High surveillance value; unnecessary for a reflective astrology product.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-02
+  name: Raw SMS, iMessage, and direct-message history
+  category: G. Deliberately excluded sources and uses
+  automated_data: Message bodies, reaction history, attachments, and participant graph.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Includes third-party private content and creates deceptive specificity.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-03
+  name: Slack, Teams, or Discord message content
+  category: G. Deliberately excluded sources and uses
+  automated_data: Channel/thread bodies, files, reactions, and user-level behavioral analysis.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: "Workplace privacy and consent cannot be reduced to one user\u2019s opt-in."
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-04
+  name: Continuous microphone or ambient audio
+  category: G. Deliberately excluded sources and uses
+  automated_data: Background audio, voice activity, conversations, or acoustic emotion inference.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Disproportionate surveillance risk; not needed.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-05
+  name: Browser and search history
+  category: G. Deliberately excluded sources and uses
+  automated_data: Visited URLs, search queries, page dwell, and browsing categories.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Highly revealing and unnecessary.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-06
+  name: Keystrokes, clipboard, and input monitoring
+  category: G. Deliberately excluded sources and uses
+  automated_data: Typed text, clipboard contents, autocorrection, and input timing.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Prohibited spyware-like behavior.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-07
+  name: Continuous precise location history
+  category: G. Deliberately excluded sources and uses
+  automated_data: GPS trail, dwell points, routes, and inferred home/work.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: The core product needs only coarse, transient location.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-08
+  name: Call logs and contact-frequency graph
+  category: G. Deliberately excluded sources and uses
+  automated_data: Incoming/outgoing calls, duration, and relationship frequency.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Third-party privacy and manipulative relationship inference.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-09
+  name: Wholesale contacts ingestion
+  category: G. Deliberately excluded sources and uses
+  automated_data: Entire address book and social graph.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Use explicit relationship profiles instead.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-10
+  name: Clinical records, labs, diagnoses, and medications
+  category: G. Deliberately excluded sources and uses
+  automated_data: EHR/claims data, laboratory values, imaging, diagnoses, prescriptions.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Outside product purpose and high-stakes misuse risk.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-11
+  name: Raw biometric streams
+  category: G. Deliberately excluded sources and uses
+  automated_data: ECG, continuous heart rate, HRV, blood pressure, temperature, oxygen, and raw sleep stages.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: No legitimate need; low-resolution wellbeing buckets are the maximum contemplated use.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-12
+  name: Reproductive and sexual-health data
+  category: G. Deliberately excluded sources and uses
+  automated_data: Cycle tracking, pregnancy, fertility, sexual activity, and related records.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Not needed and especially sensitive.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-13
+  name: Banking, credit, payroll, and transaction data
+  category: G. Deliberately excluded sources and uses
+  automated_data: Balances, purchases, income, debt, and credit profile.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Astrology must not personalize financial pressure from private account data.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-14
+  name: Bulk social-media content and DMs
+  category: G. Deliberately excluded sources and uses
+  automated_data: Posts, likes, private messages, follower graph, and scraped profiles.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Surveillance, third-party privacy, and weak interpretive value.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-15
+  name: Facial, voice, or emotion recognition
+  category: G. Deliberately excluded sources and uses
+  automated_data: Biometric identity or inferred affect from face/voice.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Unreliable and intrusive; self-report is preferred.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-16
+  name: Third-party birth data without consent
+  category: G. Deliberately excluded sources and uses
+  automated_data: "Another person\u2019s precise birth time/place entered as though verified."
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Relationship readings must visibly distinguish verified, approximate, and unconfirmed data.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-17
+  name: Advertising and data-broker profiles
+  category: G. Deliberately excluded sources and uses
+  automated_data: Demographic, purchase-intent, location, and inferred-interest segments.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Incompatible with a trust-centered private reflection product.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-18
+  name: Astrological ad targeting
+  category: G. Deliberately excluded sources and uses
+  automated_data: Use of chart, journal, cycle, relationship, or mood data for ads.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Explicitly prohibited.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-19
+  name: Raw app and website identities from screen-time data
+  category: G. Deliberately excluded sources and uses
+  automated_data: Specific apps, domains, duration, and behavioral categorization.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Even optional screen-time experiments must use category totals only.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-20
+  name: Medical, crisis, legal, or financial guidance through astrology
+  category: G. Deliberately excluded sources and uses
+  automated_data: High-stakes recommendations framed as chart interpretation.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Route to appropriate non-astrological help and resources.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-21
+  name: Protected-trait inference
+  category: G. Deliberately excluded sources and uses
+  automated_data: Religion, sexuality, race, disability, health status, or political belief inferred from behavior
+    or chart.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Prohibited regardless of consent.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-22
+  name: Employment, insurance, credit, housing, or eligibility decisions
+  category: G. Deliberately excluded sources and uses
+  automated_data: Using chart or context data to rank or decide access.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Prohibited high-impact use.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-23
+  name: Context-driven chart mutation
+  category: G. Deliberately excluded sources and uses
+  automated_data: Changing placements, aspects, house results, dates, or orbs based on behavior or user feedback.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Context may rank or frame only; chart facts are immutable under the contract.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+- id: NO-24
+  name: Hidden model training from private user data
+  category: G. Deliberately excluded sources and uses
+  automated_data: Using journals, check-ins, birth profiles, messages, health data, or relationship data to train
+    models without separate consent.
+  acquisition: Not acquired; enforced by connector allowlist, scope review, and data-loss-prevention tests.
+  cadence: Never
+  sensitivity: prohibited
+  confidence: not_ingested
+  allowed_uses: []
+  prohibited_uses:
+  - all_ingestion
+  - all_interpretation
+  - all_training
+  - all_targeting
+  status: excluded
+  phase: never
+  raw_retention: Not retained
+  notes: Product use and research/model-training consent must be separate.
+  implementation:
+    ingestion_owner: policy-gate
+    primary_runtime: none
+    primary_storage: []
+    delivery_path: blocked by connector allowlist and test suite
+references:
+- code: R01
+  publisher: Astrodienst / Swiss Ephemeris
+  title: Swiss Ephemeris official repository and releases
+  url: https://github.com/aloistr/swisseph
+  relevance: Pinned calculation engine, ephemeris data, release metadata.
+- code: R02
+  publisher: Astrodienst
+  title: Swiss Ephemeris Programming Interface
+  url: https://www.astro.com/swisseph-download/doc/swephprg.2.10.htm
+  relevance: Planet, speed, house, eclipse, and calculation-function behavior.
+- code: R03
+  publisher: IANA
+  title: Time Zone Database
+  url: https://www.iana.org/time-zones
+  relevance: Historical and current civil-time rules and releases.
+- code: R04
+  publisher: Google Maps Platform
+  title: Geocoding API
+  url: https://developers.google.com/maps/documentation/geocoding
+  relevance: Birthplace-to-coordinate resolution.
+- code: R05
+  publisher: Google Maps Platform
+  title: Time Zone API
+  url: https://developers.google.com/maps/documentation/timezone
+  relevance: Time-zone ID and UTC/DST offset resolution from coordinates and timestamp.
+- code: R06
+  publisher: Apple Developer
+  title: Journaling Suggestions
+  url: https://developer.apple.com/documentation/JournalingSuggestions
+  relevance: User-selected, privacy-preserving journaling moments.
+- code: R07
+  publisher: Apple Developer
+  title: HealthKit
+  url: https://developer.apple.com/documentation/healthkit
+  relevance: Per-type health permission and data access model.
+- code: R08
+  publisher: Apple Developer
+  title: EventKit EKEventStore
+  url: https://developer.apple.com/documentation/eventkit/ekeventstore
+  relevance: Calendar and reminder access on Apple platforms.
+- code: R09
+  publisher: Apple Developer
+  title: Core Location
+  url: https://developer.apple.com/documentation/corelocation
+  relevance: When-in-use and other location-permission models.
+- code: R10
+  publisher: Apple Developer
+  title: WeatherKit REST API
+  url: https://developer.apple.com/documentation/weatherkitrestapi
+  relevance: Current, forecast, alert, and historical weather data.
+- code: R11
+  publisher: Apple Developer
+  title: Core Motion
+  url: https://developer.apple.com/documentation/coremotion
+  relevance: Motion, activity, and pedometer signals.
+- code: R12
+  publisher: Apple Developer
+  title: MusicKit
+  url: https://developer.apple.com/musickit/
+  relevance: Apple Music authorization, library, and recently played content.
+- code: R13
+  publisher: Apple Developer
+  title: Family Controls and Device Activity
+  url: https://developer.apple.com/documentation/familycontrols
+  relevance: Special-entitlement screen-time and app/website activity model.
+- code: R14
+  publisher: Apple Developer
+  title: Photo picker guidance
+  url: https://developer.apple.com/documentation/photokit/phpickerviewcontroller
+  relevance: User-selected media without broad library access.
+- code: R15
+  publisher: Android Developers
+  title: Health Connect
+  url: https://developer.android.com/health-and-fitness/health-connect
+  relevance: Per-type health and fitness permissions and records.
+- code: R16
+  publisher: Google Workspace
+  title: Calendar FreeBusy and authorization scopes
+  url: https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query
+  relevance: Low-content calendar workload integration.
+- code: R17
+  publisher: Android Developers
+  title: Activity Recognition Transition API
+  url: https://developer.android.com/develop/sensors-and-location/location/transitions
+  relevance: On-device activity-state transitions.
+- code: R18
+  publisher: Android Developers
+  title: UsageStatsManager
+  url: https://developer.android.com/reference/android/app/usage/UsageStatsManager
+  relevance: Special-access app-usage aggregates.
+- code: R19
+  publisher: Google Photos
+  title: Google Photos Picker API
+  url: https://developers.google.com/photos/picker/reference/rest
+  relevance: User-selected media access.
+- code: R20
+  publisher: Google People API
+  title: Contacts and people data
+  url: https://developers.google.com/people
+  relevance: Technically possible contact access; intentionally minimized in this spec.
+- code: R21
+  publisher: Google Workspace
+  title: Gmail OAuth scopes and message metadata
+  url: https://developers.google.com/identity/protocols/oauth2/scopes#gmail
+  relevance: Metadata-only mail access boundary.
+- code: R22
+  publisher: Google Drive
+  title: Drive API scopes
+  url: https://developers.google.com/drive/api/guides/api-specific-auth
+  relevance: Per-file versus broad-drive access.
+- code: R23
+  publisher: Microsoft Learn
+  title: Get free/busy schedule
+  url: https://learn.microsoft.com/en-us/graph/outlook-get-free-busy-schedule
+  relevance: Outlook schedule workload integration.
+- code: R24
+  publisher: Microsoft Learn
+  title: Microsoft Graph permissions reference
+  url: https://learn.microsoft.com/en-us/graph/permissions-reference
+  relevance: Mail.ReadBasic and least-privileged scope review.
+- code: R25
+  publisher: Slack API
+  title: conversations.history
+  url: https://api.slack.com/methods/conversations.history
+  relevance: Technically possible work-chat access and policy burden.
+- code: R26
+  publisher: Spotify for Developers
+  title: Get Recently Played Tracks
+  url: https://developer.spotify.com/documentation/web-api/reference/get-recently-played
+  relevance: Optional recent-listening context.
+- code: R27
+  publisher: Oura
+  title: Oura API V2
+  url: https://cloud.ouraring.com/v2/docs
+  relevance: Daily sleep, readiness, activity, and wellbeing summaries.
+- code: R28
+  publisher: Fitbit
+  title: Fitbit Web API
+  url: https://dev.fitbit.com/build/reference/web-api/explore/
+  relevance: Daily activity and sleep summaries.
+- code: R29
+  publisher: Strava
+  title: Strava API reference
+  url: https://developers.strava.com/docs/reference/
+  relevance: Activity summaries and webhooks.
+- code: R30
+  publisher: Garmin
+  title: Garmin Health API
+  url: https://developer.garmin.com/gc-developer-program/health-api/
+  relevance: Commercial wearable health and activity summaries.
+- code: R31
+  publisher: Google Maps Platform
+  title: Air Quality API
+  url: https://developers.google.com/maps/documentation/air-quality
+  relevance: Current, forecast, and historical air quality.
+- code: R32
+  publisher: Google Maps Platform
+  title: Pollen API
+  url: https://developers.google.com/maps/documentation/pollen
+  relevance: Pollen conditions and forecast.
+- code: R33
+  publisher: NOAA Space Weather Prediction Center
+  title: Public products and JSON feeds
+  url: https://services.swpc.noaa.gov/products/
+  relevance: Experimental geomagnetic and solar-weather context.
+- code: R34
+  publisher: EPA AirNow
+  title: AirNow data and API
+  url: https://www.airnow.gov/about-airnow/
+  relevance: US air-quality observations and forecasts.
+- code: CF-01
+  publisher: Cloudflare
+  title: Containers overview
+  url: https://developers.cloudflare.com/containers/
+  relevance: Native/full-runtime compute integrated with Workers.
+- code: CF-02
+  publisher: Cloudflare
+  title: Containers connections to Workers bindings
+  url: https://developers.cloudflare.com/containers/platform-details/workers-connections/
+  relevance: Container access to D1, R2, KV, Durable Objects, and other bindings.
+- code: CF-03
+  publisher: Cloudflare
+  title: Workflows overview
+  url: https://developers.cloudflare.com/workflows/
+  relevance: Durable multi-step execution, retries, waits, and state.
+- code: CF-04
+  publisher: Cloudflare
+  title: Queues overview
+  url: https://developers.cloudflare.com/queues/
+  relevance: Guaranteed delivery, batching, retries, delays, and dead-letter handling.
+- code: CF-05
+  publisher: Cloudflare
+  title: Queues delivery guarantees
+  url: https://developers.cloudflare.com/queues/reference/delivery-guarantees/
+  relevance: At-least-once delivery and idempotency requirements.
+- code: CF-06
+  publisher: Cloudflare
+  title: D1 overview
+  url: https://developers.cloudflare.com/d1/
+  relevance: Serverless SQLite-compatible operational database and read replication.
+- code: CF-07
+  publisher: Cloudflare
+  title: D1 Time Travel and backups
+  url: https://developers.cloudflare.com/d1/reference/time-travel/
+  relevance: Point-in-time recovery within the documented retention window.
+- code: CF-08
+  publisher: Cloudflare
+  title: R2 data security
+  url: https://developers.cloudflare.com/r2/reference/data-security/
+  relevance: Automatic encryption at rest and TLS in transit.
+- code: CF-09
+  publisher: Cloudflare
+  title: AI Gateway logging
+  url: https://developers.cloudflare.com/ai-gateway/observability/logging/
+  relevance: Prompt/response logging controls and per-request override.
+- code: CF-10
+  publisher: Cloudflare
+  title: AI Gateway dynamic routing
+  url: https://developers.cloudflare.com/ai-gateway/features/dynamic-routing/
+  relevance: Versioned routing, fallbacks, quotas, budgets, and rollback.
+- code: CF-11
+  publisher: Cloudflare
+  title: Secrets Store overview
+  url: https://developers.cloudflare.com/secrets-store/
+  relevance: Account-level encrypted secrets; currently documented as open beta.
+- code: CF-12
+  publisher: Cloudflare
+  title: Workers Analytics Engine
+  url: https://developers.cloudflare.com/analytics/analytics-engine/
+  relevance: High-cardinality operational metrics without storing private payloads.
+- code: CF-13
+  publisher: Cloudflare
+  title: Vectorize overview
+  url: https://developers.cloudflare.com/vectorize/
+  relevance: Optional semantic retrieval for approved editorial content.
+- code: CF-14
+  publisher: Cloudflare
+  title: Vite plugin for Workers
+  url: https://developers.cloudflare.com/workers/vite-plugin/
+  relevance: Web app and Worker development in a production-compatible runtime.
+- code: WP-01
+  publisher: WordPress.com
+  title: Use your plugins
+  url: https://wordpress.com/support/plugins/use-your-plugins/
+  relevance: Custom plugin deployment is available on paid WordPress.com plans.
+- code: WP-02
+  publisher: WordPress.com
+  title: REST API
+  url: https://developer.wordpress.com/docs/api/
+  relevance: Content, taxonomy, media, users, and authenticated API access.
+- code: WP-03
+  publisher: WordPress.com
+  title: OAuth2 authentication
+  url: https://developer.wordpress.com/docs/api/oauth2/
+  relevance: Scoped WordPress.com and Jetpack API authorization.
+- code: WP-04
+  publisher: WordPress.org
+  title: REST support for custom content types
+  url: https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-rest-api-support-for-custom-content-types/
+  relevance: Custom post type and taxonomy exposure through REST.
+- code: FLY-01
+  publisher: Fly.io
+  title: Fly Machines
+  url: https://fly.io/docs/machines/
+  relevance: Fast-starting VM/container runtime with lifecycle and region control.
+- code: FLY-02
+  publisher: Fly.io
+  title: Autostop/autostart Machines
+  url: https://fly.io/docs/launch/autostop-autostart/
+  relevance: Scale-to-idle behavior for variable workloads.
+- code: FLY-03
+  publisher: Fly.io
+  title: Managed Postgres
+  url: https://fly.io/docs/mpg/
+  relevance: Managed HA PostgreSQL, backups, encryption, monitoring, and pooling.
+- code: FLY-04
+  publisher: Fly.io
+  title: Managed Postgres client configuration
+  url: https://fly.io/docs/mpg/client-configuration/
+  relevance: Pooled/direct connections and PgBouncer constraints.
+- code: FLY-05
+  publisher: Fly.io
+  title: Private networking
+  url: https://fly.io/docs/networking/private-networking/
+  relevance: Private service-to-service networking inside Fly organizations.
+- code: FLY-06
+  publisher: Fly.io
+  title: Secrets and Fly Apps
+  url: https://fly.io/docs/apps/secrets/
+  relevance: Encrypted application secrets injected at Machine startup.
+- code: SE-01
+  publisher: Astrodienst
+  title: Swiss Ephemeris official repository and releases
+  url: https://github.com/aloistr/swisseph
+  relevance: Pinned engine and data files; official release metadata.
+- code: SE-02
+  publisher: Astrodienst
+  title: Swiss Ephemeris Programming Interface
+  url: https://www.astro.com/swisseph-download/doc/swephprg.2.10.htm
+  relevance: Calculation flags, houses, polar fallback, and dual-license requirements.
+platform_policy:
+  primary_runtime: Cloudflare Workers, Workflows, Queues, D1, R2, and Containers
+  editorial_control_plane: WordPress.com custom plugin and REST-exposed content types
+  portable_compute_plane: Fly.io Machines using the same OCI image as the Cloudflare calculation container
+  database_launch_choice: Cloudflare D1 with application-layer envelope encryption
+  database_migration_option: Fly.io Managed Postgres behind a Fly-hosted data service; not directly exposed to clients
+  user_data_boundary: No birth, journal, relationship, health, or reading records stored in WordPress.com
+  llm_boundary: Optional; approved fragments only; AI Gateway logging disabled for private requests; deterministic
+    fallback mandatory

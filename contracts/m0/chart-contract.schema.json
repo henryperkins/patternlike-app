@@ -1,0 +1,586 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m0/chart-contract.schema.json",
+  "title": "Chart Calculation Contract Package",
+  "description": "App-owned, versioned calculation contract (AST-20), orb policy, birth-time uncertainty, and immutable chart snapshot shape. Swiss Ephemeris is calculation authority; wrapper output is normalized into this contract. Spec v0.2 sections 3–4 / DOCX interpretation contract.",
+  "$defs": {
+    "orbPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "version", "unit", "defaults"],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable orb-policy identifier. Every aspect must reference this version."
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/semanticVersion"
+        },
+        "unit": {
+          "type": "string",
+          "const": "degree"
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "conjunction",
+            "sextile",
+            "square",
+            "trine",
+            "opposition"
+          ],
+          "properties": {
+            "conjunction": { "type": "number", "minimum": 0, "maximum": 12 },
+            "sextile": { "type": "number", "minimum": 0, "maximum": 12 },
+            "square": { "type": "number", "minimum": 0, "maximum": 12 },
+            "trine": { "type": "number", "minimum": 0, "maximum": 12 },
+            "opposition": { "type": "number", "minimum": 0, "maximum": 12 }
+          }
+        },
+        "by_body": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            }
+          },
+          "description": "Optional body-specific orb overrides keyed by celestialBody then aspectType."
+        },
+        "applying_separating": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether applying/separating metadata is meaningful under this policy."
+        }
+      }
+    },
+    "ephemerisPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine",
+        "release",
+        "data_files",
+        "flags",
+        "wrapper_commit",
+        "container_digest"
+      ],
+      "properties": {
+        "engine": {
+          "type": "string",
+          "const": "swiss_ephemeris"
+        },
+        "release": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pinned Swiss Ephemeris release identifier (SE-01/R01)."
+        },
+        "data_files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "sha256"],
+            "properties": {
+              "name": { "type": "string" },
+              "sha256": { "$ref": "common.schema.json#/$defs/sha256Hex" }
+            }
+          }
+        },
+        "flags": {
+          "type": "object",
+          "description": "Pinned calculation flags (bitmask and/or named flags) as applied by the wrapper.",
+          "required": ["named"],
+          "additionalProperties": false,
+          "properties": {
+            "raw": {
+              "type": ["integer", "string", "null"],
+              "description": "Optional raw flag integer or hex string."
+            },
+            "named": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true,
+              "description": "Human-readable flag names (e.g. SEFLG_SPEED, SEFLG_SWIEPH)."
+            }
+          }
+        },
+        "wrapper_commit": {
+          "type": "string",
+          "minLength": 7,
+          "description": "Git commit of the calculation wrapper."
+        },
+        "container_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "OCI image digest for the Cloudflare Container / Fly-portable image."
+        },
+        "tzdb_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "IANA tzdb version used for historical birth UTC resolution (AST-03, AMB-10)."
+        }
+      }
+    },
+    "astronomyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "zodiac",
+        "coordinates",
+        "ecliptic",
+        "apparent",
+        "speed_enabled",
+        "node",
+        "houses"
+      ],
+      "properties": {
+        "zodiac": { "type": "string", "const": "tropical" },
+        "coordinates": { "type": "string", "const": "geocentric" },
+        "ecliptic": { "type": "string", "const": "of_date" },
+        "apparent": { "type": "boolean", "const": true },
+        "speed_enabled": { "type": "boolean", "const": true },
+        "node": { "type": "string", "const": "true" },
+        "houses": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary", "fallback"],
+          "properties": {
+            "primary": { "type": "string", "const": "placidus" },
+            "fallback": { "type": "string", "const": "porphyry" }
+          }
+        }
+      }
+    },
+    "uncertaintyReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accuracy", "suppressed_features", "qualified_features"],
+      "properties": {
+        "accuracy": {
+          "$ref": "common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "window": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "description": "Declared approximate-time uncertainty window when accuracy=approximate.",
+          "properties": {
+            "plus_minus_minutes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "earliest_local": {
+              "type": ["string", "null"]
+            },
+            "latest_local": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "suppressed_features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature_class", "reason"],
+            "properties": {
+              "feature_class": {
+                "type": "string",
+                "enum": [
+                  "houses",
+                  "angles",
+                  "angle_transits",
+                  "moon_time_sensitive",
+                  "house_cusp",
+                  "chart_ruler_angular",
+                  "other"
+                ]
+              },
+              "feature_id": { "type": ["string", "null"] },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "unknown_birth_time",
+                  "unstable_across_window",
+                  "insufficient_accuracy",
+                  "policy_disabled"
+                ]
+              }
+            }
+          },
+          "description": "Features omitted from interpretive eligibility (DER-03)."
+        },
+        "qualified_features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature_id", "qualification"],
+            "properties": {
+              "feature_id": { "type": "string" },
+              "qualification": {
+                "type": "string",
+                "enum": [
+                  "approximate_only",
+                  "sign_stable_house_unstable",
+                  "low_confidence_moon",
+                  "technique_specific"
+                ]
+              }
+            }
+          }
+        },
+        "user_facing_summary": {
+          "type": ["string", "null"],
+          "maxLength": 2000,
+          "description": "Plain-language uncertainty summary for the chart API; not a diagnosis."
+        }
+      }
+    },
+    "longitudePosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "longitude_deg"],
+      "properties": {
+        "body": { "$ref": "common.schema.json#/$defs/celestialBody" },
+        "longitude_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "latitude_deg": { "type": ["number", "null"] },
+        "distance_au": { "type": ["number", "null"] },
+        "speed_longitude_deg_per_day": { "type": ["number", "null"] },
+        "retrograde": { "type": ["boolean", "null"] },
+        "sign": {
+          "type": ["string", "null"],
+          "enum": [
+            null,
+            "aries",
+            "taurus",
+            "gemini",
+            "cancer",
+            "leo",
+            "virgo",
+            "libra",
+            "scorpio",
+            "sagittarius",
+            "capricorn",
+            "aquarius",
+            "pisces"
+          ]
+        },
+        "house": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 12,
+          "description": "Null when houses suppressed by unknown/unstable birth time."
+        }
+      }
+    },
+    "natalAspect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "body_a",
+        "body_b",
+        "aspect",
+        "orb_deg",
+        "orb_policy_id",
+        "orb_policy_version"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/opaqueId" },
+        "body_a": { "$ref": "common.schema.json#/$defs/celestialBody" },
+        "body_b": { "$ref": "common.schema.json#/$defs/celestialBody" },
+        "aspect": { "$ref": "common.schema.json#/$defs/aspectType" },
+        "orb_deg": { "type": "number", "minimum": 0, "maximum": 12 },
+        "applying": { "type": ["boolean", "null"] },
+        "orb_policy_id": { "type": "string" },
+        "orb_policy_version": {
+          "$ref": "common.schema.json#/$defs/semanticVersion"
+        }
+      }
+    },
+    "calculationContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_id",
+        "contract_version",
+        "ephemeris",
+        "astronomy",
+        "bodies",
+        "aspects",
+        "orb_policy",
+        "birth_time_modes"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "contract_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable calculation-contract ID (AST-20)."
+        },
+        "contract_version": {
+          "$ref": "common.schema.json#/$defs/semanticVersion"
+        },
+        "ephemeris": { "$ref": "#/$defs/ephemerisPin" },
+        "astronomy": { "$ref": "#/$defs/astronomyPolicy" },
+        "bodies": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/celestialBody" }
+        },
+        "aspects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/aspectType" }
+        },
+        "orb_policy": { "$ref": "#/$defs/orbPolicy" },
+        "birth_time_modes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/birthTimeAccuracy" },
+          "description": "exact, approximate, and unknown are all first-class."
+        },
+        "techniques_enabled": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "natal_positions",
+              "natal_aspects",
+              "houses_angles",
+              "natal_patterns",
+              "transits",
+              "stations_ingresses",
+              "lunations_eclipses",
+              "secondary_progressions",
+              "solar_lunar_returns",
+              "profections",
+              "planetary_returns",
+              "solar_arcs",
+              "midpoints_declination",
+              "synastry_composite",
+              "relocated_charts"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": ["string", "null"],
+          "maxLength": 4000
+        }
+      }
+    },
+    "chartSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "user_id",
+        "profile_version",
+        "fingerprint",
+        "contract_id",
+        "contract_version",
+        "container_digest",
+        "birth",
+        "positions",
+        "aspects",
+        "uncertainty",
+        "calculated_at",
+        "status"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "id": {
+          "$ref": "common.schema.json#/$defs/opaqueId",
+          "description": "chart_snapshots.id"
+        },
+        "user_id": { "$ref": "common.schema.json#/$defs/userId" },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "birth_profiles.version used for this calculation."
+        },
+        "fingerprint": {
+          "$ref": "common.schema.json#/$defs/contentHash",
+          "description": "Byte-stable fingerprint of normalized facts under the pinned contract. Golden fixtures must match."
+        },
+        "contract_id": { "type": "string" },
+        "contract_version": {
+          "$ref": "common.schema.json#/$defs/semanticVersion"
+        },
+        "container_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "tzdb_version": { "type": "string" },
+        "birth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accuracy", "timezone"],
+          "description": "API may return redacted birth metadata. D1 stores accuracy in clear columns and birth_enc ciphertext for date/time/place/coords — never plaintext birth PII in snapshot_json.",
+          "properties": {
+            "accuracy": {
+              "$ref": "common.schema.json#/$defs/birthTimeAccuracy"
+            },
+            "utc_instant": {
+              "type": ["string", "null"],
+              "format": "date-time",
+              "description": "Resolved UTC birth instant when known/approximate midpoint policy applies. Null only if unresolved. Storage plane encrypts this field."
+            },
+            "timezone": {
+              "$ref": "common.schema.json#/$defs/ianaTimeZone"
+            },
+            "place_label": {
+              "type": ["string", "null"],
+              "description": "May be omitted or redacted in API responses; encrypted at rest in D1 birth_enc."
+            },
+            "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+            "longitude": {
+              "type": ["number", "null"],
+              "minimum": -180,
+              "maximum": 180
+            },
+            "sensitive_profile": {
+              "description": "Preferred storage encoding for birth date/time/place when returning or persisting encrypted payloads.",
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "common.schema.json#/$defs/encryptedBlobRef" }
+              ]
+            }
+          }
+        },
+        "positions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/longitudePosition" }
+        },
+        "houses": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "system_used": { "$ref": "common.schema.json#/$defs/houseSystem" },
+            "fallback_applied": { "type": "boolean" },
+            "cusps_deg": {
+              "type": "array",
+              "minItems": 12,
+              "maxItems": 12,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360
+              }
+            }
+          },
+          "description": "Null when unknown birth time or suppressed by uncertainty."
+        },
+        "angles": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "ascendant_deg": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 360
+            },
+            "midheaven_deg": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 360
+            }
+          }
+        },
+        "aspects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/natalAspect" }
+        },
+        "patterns": {
+          "type": "array",
+          "description": "Optional natal structural patterns (AST-07).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "pattern_type", "members"],
+            "properties": {
+              "id": { "$ref": "common.schema.json#/$defs/opaqueId" },
+              "pattern_type": {
+                "type": "string",
+                "enum": [
+                  "stellium",
+                  "t_square",
+                  "grand_trine",
+                  "grand_cross",
+                  "aspect_chain",
+                  "chart_ruler",
+                  "dispositor_chain",
+                  "element_emphasis",
+                  "modality_emphasis",
+                  "angular_emphasis",
+                  "other"
+                ]
+              },
+              "members": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string" }
+              },
+              "rule_set_version": {
+                "$ref": "common.schema.json#/$defs/semanticVersion"
+              }
+            }
+          }
+        },
+        "uncertainty": { "$ref": "#/$defs/uncertaintyReport" },
+        "calculated_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "superseded", "invalid"],
+          "description": "Snapshots are immutable; supersede via new profile_version rather than edit-in-place."
+        },
+        "r2_uri": {
+          "type": ["string", "null"],
+          "description": "Immutable artifact path charts/{user_partition}/{chart_id}/{fingerprint}.json"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "title": "CalculationContract",
+      "$ref": "#/$defs/calculationContract"
+    },
+    {
+      "title": "ChartSnapshot",
+      "$ref": "#/$defs/chartSnapshot"
+    },
+    {
+      "title": "OrbPolicy",
+      "$ref": "#/$defs/orbPolicy"
+    },
+    {
+      "title": "UncertaintyReport",
+      "$ref": "#/$defs/uncertaintyReport"
+    }
+  ]
+}

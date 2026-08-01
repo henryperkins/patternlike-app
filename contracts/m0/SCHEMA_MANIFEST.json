@@ -1,0 +1,105 @@
+{
+  "package": "patternlike-contracts-m0",
+  "schema_version": "0.2.0",
+  "document_date": "2026-07-31",
+  "status": "frozen",
+  "hardening": {
+    "date": "2026-07-31",
+    "from_verification": "verify-m0-contracts majors",
+    "changes": [
+      "ingestibleSourceId excludes NO-* for pipeline objects",
+      "content-release CPT required fields + policy checks (dual-control, graph, hash match)",
+      "D1 birth_enc / encryption pairing / published reading ciphertext CHECKs",
+      "expanded fixtures and OpenAPI contract pointer hygiene"
+    ]
+  },
+  "normative_sources": [
+    "spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.2.docx",
+    "spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.2.md",
+    "spec-bundle/pattern_like_astrology_app_data_source_registry_v0.2.yaml",
+    "spec-bundle/pattern_like_astrology_app_platform_topology_v0.2.yaml"
+  ],
+  "milestone": "M0 - contracts and licensing",
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m0/common.schema.json",
+      "role": "shared_enums_and_primitives"
+    },
+    {
+      "file": "context-signal.schema.json",
+      "id": "https://patternlike.app/contracts/m0/context-signal.schema.json",
+      "role": "normalized_context_signal",
+      "primary_type": "ContextSignal"
+    },
+    {
+      "file": "chart-contract.schema.json",
+      "id": "https://patternlike.app/contracts/m0/chart-contract.schema.json",
+      "role": "calculation_contract_orb_uncertainty_chart_snapshot",
+      "defs": [
+        "calculationContract",
+        "chartSnapshot",
+        "orbPolicy",
+        "uncertaintyReport"
+      ]
+    },
+    {
+      "file": "reading-evidence.schema.json",
+      "id": "https://patternlike.app/contracts/m0/reading-evidence.schema.json",
+      "role": "reading_evidence_graph_and_assembly_request",
+      "defs": [
+        "readingEvidenceGraph",
+        "readingAssemblyRequest",
+        "paragraphEvidence"
+      ]
+    },
+    {
+      "file": "consent.schema.json",
+      "id": "https://patternlike.app/contracts/m0/consent.schema.json",
+      "role": "consent_and_source_permissions",
+      "defs": [
+        "consentRecord",
+        "contextSourcePermission",
+        "consentValiditySnapshot",
+        "contextSourcesDocument"
+      ]
+    },
+    {
+      "file": "content-release.schema.json",
+      "id": "https://patternlike.app/contracts/m0/content-release.schema.json",
+      "role": "wordpress_signed_editorial_bundle",
+      "defs": [
+        "contentReleaseBundle",
+        "contentReleaseIngestionRequest",
+        "contentReleaseIngestionResponse",
+        "patternObject",
+        "cycleObject",
+        "phaseObject",
+        "modifierObject",
+        "promptObject",
+        "safetyRuleObject"
+      ]
+    }
+  ],
+  "openapi": {
+    "file": "openapi/openapi.yaml",
+    "version": "3.1.0",
+    "api_version": "0.2.0"
+  },
+  "database": {
+    "engine": "cloudflare-d1",
+    "migrations": [
+      "db/d1/0001_m0_core.sql"
+    ]
+  },
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "breaking_change_policy": "Any change to required fields, enums, or $id requires a schema_version bump and a new freeze note."
+  },
+  "out_of_scope_for_this_freeze": [
+    "Swiss Ephemeris dual-license legal decision",
+    "Identity provider / passkey implementation",
+    "Worker runtime implementation",
+    "WordPress plugin PHP code"
+  ]
+}

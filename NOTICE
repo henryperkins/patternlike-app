@@ -1,0 +1,35 @@
+Pattern-Like Astrology App
+Copyright (C) 2026 Pattern-Like contributors
+
+This product includes software developed under multiple licenses.
+The Swiss Ephemeris calculation service (apps/calc-stub) is licensed under
+the GNU Affero General Public License v3 or later. See apps/calc-stub/LICENSE.
+
+============================================================================
+Swiss Ephemeris
+============================================================================
+Swiss Ephemeris is developed by Astrodienst AG.
+Official site: https://www.astro.com/swisseph/
+Source repository: https://github.com/aloistr/swisseph
+
+This product uses Swiss Ephemeris version 2.10.03 under the public AGPL path
+(no Astrodienst Professional License). See:
+  docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md
+
+Ephemeris data files (e.g. sepl_18.se1, semo_18.se1) are obtained from the
+official Swiss Ephemeris distribution / GitHub ephe tree.
+
+============================================================================
+sweph (Node.js bindings)
+============================================================================
+Copyright © Timotej Valentin Rojko and contributors
+https://github.com/timotejroiko/sweph
+License: AGPL-3.0-or-later (when used without a commercial Swiss Ephemeris
+license). npm package: sweph@2.10.3-7
+
+============================================================================
+Other third-party components
+============================================================================
+Additional dependencies (Hono, luxon, Wrangler, TypeScript, etc.) are used
+under their respective licenses as declared in package-lock.json and each
+package's LICENSE file.

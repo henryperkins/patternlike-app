@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m0/common.schema.json",
+  "title": "Pattern-Like M0 Common Definitions",
+  "description": "Shared enums and primitives frozen for Milestone 0. Normative sources: product platform spec v0.2 (DOCX/MD) and data_source_registry v0.2.",
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "0.2.0",
+      "description": "Contract package version. Bump only with a deliberate M0+ schema freeze."
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "description": "Opaque application identifier. Not a stable direct identifier for LLM prompts."
+    },
+    "userId": {
+      "$ref": "#/$defs/opaqueId",
+      "description": "Application user id used only inside the trusted data plane."
+    },
+    "isoDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Calendar date YYYY-MM-DD in the relevant local or civil calendar context."
+    },
+    "isoDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 / ISO-8601 timestamp with timezone offset or Z."
+    },
+    "sha256Hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Lowercase hex SHA-256 digest."
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^(sha256:)?[a-f0-9]{64}$",
+      "description": "Content hash; prefer sha256:<hex> prefix for new writes."
+    },
+    "sourceId": {
+      "type": "string",
+      "pattern": "^(AST|USR|DEV|CLD|AMB|DER|NO)-[0-9]{2}$",
+      "description": "Any registry source id including deliberate exclusions (NO-*). Prefer ingestibleSourceId for pipeline objects."
+    },
+    "ingestibleSourceId": {
+      "type": "string",
+      "pattern": "^(AST|USR|DEV|CLD|AMB|DER)-[0-9]{2}$",
+      "description": "Registry source that may enter ingestion, consent, permissions, or evidence. NO-* excluded sources are never ingestible."
+    },
+    "registryStatus": {
+      "type": "string",
+      "enum": ["required", "recommended", "optional", "restricted", "experimental", "excluded"]
+    },
+    "registryPhase": {
+      "type": "string",
+      "enum": ["launch", "phase_1", "phase_2", "phase_3", "experiment", "never"]
+    },
+    "permissionTier": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "0 calculation minimum; 1 first-party reflective; 2 situational; 3 sensitive wellness/behavior; 4 prohibited."
+    },
+    "evidenceLane": {
+      "type": "string",
+      "enum": ["celestial_facts", "user_and_context", "operational"],
+      "description": "Evidence lane governing what a signal may influence and what it must never do."
+    },
+    "sensitivity": {
+      "type": "string",
+      "enum": [
+        "public",
+        "ordinary",
+        "personal",
+        "sensitive",
+        "highly_sensitive",
+        "health",
+        "third_party_private",
+        "prohibited"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "user_confirmed",
+        "calculated",
+        "service_derived",
+        "os_derived",
+        "system_observed",
+        "system_inferred",
+        "not_ingested"
+      ]
+    },
+    "allowedUse": {
+      "type": "string",
+      "description": "Closed vocabulary from data_source_registry v0.2 allowed_use_vocabulary.",
+      "enum": [
+        "annual_context",
+        "chart_fact",
+        "consent_validation",
+        "content_quality",
+        "content_safety",
+        "cycle_detection",
+        "editorial_context",
+        "editorial_research",
+        "environment_context",
+        "evidence_graph",
+        "experimental_context",
+        "feature_gating",
+        "journal_import",
+        "life_domain_selection",
+        "local_day_boundary",
+        "narrative_continuity",
+        "notification_timing",
+        "operational_delivery",
+        "optional_recommendations",
+        "optional_relocation_context",
+        "pattern_profile",
+        "product_quality",
+        "product_research",
+        "quality_audit",
+        "recalculation_queue",
+        "reflection_prompt",
+        "relationship_interpretation",
+        "rendering",
+        "repetition_control",
+        "reproducibility",
+        "routine_context",
+        "supportability",
+        "sync_scheduling",
+        "theme_eligibility",
+        "theme_filtering",
+        "theme_ranking",
+        "time_travel",
+        "timezone_resolution",
+        "tone",
+        "travel_context",
+        "uncertainty_model",
+        "user_memory",
+        "weather_lookup",
+        "workload_context"
+      ]
+    },
+    "allowedUses": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/allowedUse" },
+      "uniqueItems": true,
+      "minItems": 0,
+      "description": "Explicit allowed uses for this record. Empty means no interpretive use is permitted."
+    },
+    "prohibitedUse": {
+      "type": "string",
+      "enum": [
+        "alter_chart_fact",
+        "diagnose_or_treat",
+        "guaranteed_prediction",
+        "infer_protected_trait",
+        "ad_targeting",
+        "all_ingestion",
+        "all_interpretation",
+        "all_targeting",
+        "all_training"
+      ]
+    },
+    "cyclePhase": {
+      "type": "string",
+      "enum": ["emerging", "building", "peak", "reconsidering", "integrating"],
+      "description": "Product phase language mapped from calculated lifecycle state (DER-01)."
+    },
+    "birthTimeAccuracy": {
+      "type": "string",
+      "enum": ["exact", "approximate", "unknown"],
+      "description": "First-class birth-time mode. Unknown time must never silently substitute noon."
+    },
+    "celestialBody": {
+      "type": "string",
+      "enum": [
+        "sun",
+        "moon",
+        "mercury",
+        "venus",
+        "mars",
+        "jupiter",
+        "saturn",
+        "uranus",
+        "neptune",
+        "pluto",
+        "true_node",
+        "ascendant",
+        "midheaven"
+      ],
+      "description": "Launch body set from the interpretation contract."
+    },
+    "aspectType": {
+      "type": "string",
+      "enum": ["conjunction", "sextile", "square", "trine", "opposition"],
+      "description": "Launch major aspects."
+    },
+    "houseSystem": {
+      "type": "string",
+      "enum": ["placidus", "porphyry"],
+      "description": "Placidus primary; Porphyry fallback when required and recorded."
+    },
+    "encryptedBlobRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "key_version", "nonce", "ciphertext"],
+      "properties": {
+        "alg": {
+          "type": "string",
+          "const": "AES-256-GCM",
+          "description": "Authenticated encryption algorithm for per-user DEK payloads."
+        },
+        "key_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-user DEK version used to encrypt this blob."
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 16,
+          "description": "Unique nonce/IV for this ciphertext (base64url or base64)."
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base64/base64url ciphertext including auth tag."
+        },
+        "aad": {
+          "type": ["string", "null"],
+          "description": "Optional additional authenticated data binding (e.g. user_id + entity_id)."
+        }
+      },
+      "description": "Application-layer envelope encryption payload. Plaintext never appears in logs or analytics."
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "observed_at"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["fresh", "stale", "expired", "unknown"],
+          "description": "Computed against source cadence and consent/permission state (DER-15)."
+        },
+        "observed_at": { "$ref": "#/$defs/isoDateTime" },
+        "ingested_at": { "$ref": "#/$defs/isoDateTime" },
+        "expires_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "max_age_seconds": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "age_seconds": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "permissionState": {
+      "type": "string",
+      "enum": ["active", "paused", "revoked", "expired", "never_granted"],
+      "description": "Effective permission state for a source or connector. Revocation applies before the next read or reading job."
+    },
+    "conflictStatus": {
+      "type": "string",
+      "enum": ["none", "conflict", "superseded", "unconfirmed"],
+      "description": "Conflict handling per DER-15/DER-21. Explicit recent user statement wins over passive inference."
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 256,
+      "description": "Required on mutating API and queue consumers. Queue delivery is at-least-once."
+    },
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)([.-][0-9A-Za-z.-]+)?$",
+      "description": "Semantic version string for content releases and contracts."
+    },
+    "lifeDomain": {
+      "type": "string",
+      "enum": [
+        "self",
+        "relationships",
+        "work",
+        "creativity",
+        "home",
+        "body_energy",
+        "money_resources",
+        "learning",
+        "community",
+        "caregiving",
+        "spirituality_meaning",
+        "unspecified"
+      ],
+      "description": "User-facing life domains used for ranking and prompts. Not a clinical taxonomy."
+    },
+    "localeTag": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 35,
+      "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$",
+      "description": "BCP 47 language/locale tag."
+    },
+    "ianaTimeZone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "IANA time zone id (e.g. America/Los_Angeles). Never store only a fixed UTC offset as authority."
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "#/$defs/schemaVersion" }
+  }
+}

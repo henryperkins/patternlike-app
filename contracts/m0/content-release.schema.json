@@ -1,0 +1,703 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m0/content-release.schema.json",
+  "title": "Editorial Content Release Bundle",
+  "description": "Signed immutable content bundle produced by the WordPress.com editorial control plane and ingested at POST /internal/content-releases. WordPress must not contain user PII. Spec v0.2 § WordPress.com editorial model; DOCX CPT table.",
+  "$defs": {
+    "contentType": {
+      "type": "string",
+      "enum": [
+        "astrology_pattern",
+        "astrology_cycle",
+        "astrology_phase",
+        "astrology_modifier",
+        "astrology_prompt",
+        "astrology_safety_rule"
+      ]
+    },
+    "fragmentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_./@+-]+$",
+      "description": "Stable editorial fragment id referenced by reading assembly approved_fragments."
+    },
+    "objectBase": {
+      "type": "object",
+      "required": [
+        "id",
+        "content_type",
+        "content_version",
+        "title",
+        "object_hash",
+        "locale"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/fragmentId" },
+        "content_type": { "$ref": "#/$defs/contentType" },
+        "content_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Per-object semantic or integer version string."
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "locale": { "$ref": "common.schema.json#/$defs/localeTag" },
+        "object_hash": {
+          "$ref": "common.schema.json#/$defs/contentHash",
+          "description": "Hash of canonical sorted-key JSON for this object."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "deprecated"],
+          "default": "approved"
+        },
+        "prohibited_claims": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Explicit frames this object must never assert."
+        },
+        "eligibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Calculated-feature requirements for DER-18 eligibility.",
+          "properties": {
+            "required_fact_classes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "natal_position",
+                  "natal_aspect",
+                  "natal_pattern",
+                  "cycle_instance",
+                  "exact_pass",
+                  "lunation",
+                  "station_ingress",
+                  "houses_angles",
+                  "uncertainty_feature"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "required_bodies": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/$defs/celestialBody" },
+              "uniqueItems": true
+            },
+            "required_aspects": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/$defs/aspectType" },
+              "uniqueItems": true
+            },
+            "min_birth_time_accuracy": {
+              "$ref": "common.schema.json#/$defs/birthTimeAccuracy"
+            },
+            "requires_houses": { "type": "boolean", "default": false },
+            "techniques": {
+              "type": "array",
+              "items": { "type": "string" },
+              "uniqueItems": true
+            }
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "patternObject": {
+      "allOf": [
+        { "$ref": "#/$defs/objectBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "content_type",
+            "content_version",
+            "title",
+            "object_hash",
+            "locale",
+            "summary",
+            "body",
+            "resources",
+            "tensions",
+            "counter_expression",
+            "prompt_ids",
+            "evidence_requirements"
+          ],
+          "properties": {
+            "id": true,
+            "content_type": { "const": "astrology_pattern" },
+            "content_version": true,
+            "title": true,
+            "locale": true,
+            "object_hash": true,
+            "status": true,
+            "prohibited_claims": true,
+            "eligibility": true,
+            "tags": true,
+            "summary": { "type": "string", "minLength": 1 },
+            "body": { "type": "string", "minLength": 1 },
+            "resources": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Strengths / supportive expressions."
+            },
+            "tensions": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "counter_expression": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Balanced counter-expression; required so patterns are not one-sided."
+            },
+            "prompt_ids": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/fragmentId" }
+            },
+            "evidence_requirements": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "DOCX CPT: evidence requirements are required for astrology_pattern."
+            }
+          }
+        }
+      ]
+    },
+    "cycleObject": {
+      "allOf": [
+        { "$ref": "#/$defs/objectBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "content_type",
+            "content_version",
+            "title",
+            "object_hash",
+            "locale",
+            "technique",
+            "bodies",
+            "targets",
+            "aspect",
+            "themes",
+            "phase_ids",
+            "orb_policy_id",
+            "prohibited_claims"
+          ],
+          "properties": {
+            "id": true,
+            "content_type": { "const": "astrology_cycle" },
+            "content_version": true,
+            "title": true,
+            "locale": true,
+            "object_hash": true,
+            "status": true,
+            "prohibited_claims": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true,
+              "description": "DOCX CPT: prohibited claims required on astrology_cycle."
+            },
+            "eligibility": true,
+            "tags": true,
+            "technique": {
+              "type": "string",
+              "enum": [
+                "transit",
+                "progression",
+                "solar_return",
+                "lunar_return",
+                "profection",
+                "planetary_return",
+                "solar_arc",
+                "lunation",
+                "eclipse",
+                "station_ingress",
+                "other"
+              ]
+            },
+            "bodies": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "common.schema.json#/$defs/celestialBody" }
+            },
+            "targets": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Natal targets (body, angle, or feature ids)."
+            },
+            "aspect": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "common.schema.json#/$defs/aspectType" }
+              ],
+              "description": "Required property; null only when technique has no aspect (e.g. some ingress-only events)."
+            },
+            "orb_policy_id": { "type": "string", "minLength": 1 },
+            "themes": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            },
+            "phase_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/fragmentId" },
+              "description": "Links to astrology_phase objects in this bundle."
+            },
+            "summary": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "phaseObject": {
+      "allOf": [
+        { "$ref": "#/$defs/objectBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "content_type",
+            "content_version",
+            "title",
+            "object_hash",
+            "locale",
+            "parent_cycle_id",
+            "phase",
+            "summary",
+            "constructive_expression",
+            "shadow_expression"
+          ],
+          "properties": {
+            "id": true,
+            "content_type": { "const": "astrology_phase" },
+            "content_version": true,
+            "title": true,
+            "locale": true,
+            "object_hash": true,
+            "status": true,
+            "prohibited_claims": true,
+            "eligibility": true,
+            "tags": true,
+            "parent_cycle_id": { "$ref": "#/$defs/fragmentId" },
+            "phase": { "$ref": "common.schema.json#/$defs/cyclePhase" },
+            "summary": { "type": "string", "minLength": 1 },
+            "constructive_expression": { "type": "string", "minLength": 1 },
+            "shadow_expression": { "type": "string", "minLength": 1 },
+            "body": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "modifierObject": {
+      "allOf": [
+        { "$ref": "#/$defs/objectBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "content_type",
+            "content_version",
+            "title",
+            "object_hash",
+            "locale",
+            "modifier_kind",
+            "body",
+            "precedence",
+            "eligibility",
+            "allowed_combinations"
+          ],
+          "properties": {
+            "id": true,
+            "content_type": { "const": "astrology_modifier" },
+            "content_version": true,
+            "title": true,
+            "locale": true,
+            "object_hash": true,
+            "status": true,
+            "prohibited_claims": true,
+            "eligibility": {
+              "type": "object",
+              "description": "DOCX CPT: eligibility requirements required for modifiers.",
+              "minProperties": 0,
+              "additionalProperties": true
+            },
+            "tags": true,
+            "modifier_kind": {
+              "type": "string",
+              "enum": [
+                "house",
+                "domain",
+                "uncertainty",
+                "annual_layer",
+                "tone",
+                "other"
+              ]
+            },
+            "body": { "type": "string", "minLength": 1 },
+            "precedence": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Higher wins when modifiers compete."
+            },
+            "allowed_combinations": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "DOCX CPT: allowed combinations required; validated against combination rules."
+            },
+            "life_domains": {
+              "type": "array",
+              "items": { "$ref": "common.schema.json#/$defs/lifeDomain" }
+            }
+          }
+        }
+      ]
+    },
+    "promptObject": {
+      "allOf": [
+        { "$ref": "#/$defs/objectBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "content_type",
+            "content_version",
+            "title",
+            "object_hash",
+            "locale",
+            "prompt_text",
+            "intensity",
+            "theme",
+            "life_domains",
+            "exclusions"
+          ],
+          "properties": {
+            "id": true,
+            "content_type": { "const": "astrology_prompt" },
+            "content_version": true,
+            "title": true,
+            "locale": true,
+            "object_hash": true,
+            "status": true,
+            "prohibited_claims": true,
+            "eligibility": true,
+            "tags": true,
+            "prompt_text": { "type": "string", "minLength": 1 },
+            "intensity": {
+              "type": "string",
+              "enum": ["gentle", "standard", "direct"]
+            },
+            "theme": {
+              "type": "string",
+              "minLength": 1,
+              "description": "DOCX CPT: theme required for astrology_prompt."
+            },
+            "life_domains": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "common.schema.json#/$defs/lifeDomain" }
+            },
+            "exclusions": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Sensitive topics this prompt must not pair with. Required array (may be empty)."
+            }
+          }
+        }
+      ]
+    },
+    "safetyRuleObject": {
+      "allOf": [
+        { "$ref": "#/$defs/objectBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "content_type",
+            "content_version",
+            "title",
+            "object_hash",
+            "locale",
+            "rule_id",
+            "trigger_class",
+            "action",
+            "fallback_fragment_id"
+          ],
+          "properties": {
+            "id": true,
+            "content_type": { "const": "astrology_safety_rule" },
+            "content_version": true,
+            "title": true,
+            "locale": true,
+            "object_hash": true,
+            "status": true,
+            "prohibited_claims": true,
+            "eligibility": true,
+            "tags": true,
+            "rule_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable safety rule id used by DER-22 validators."
+            },
+            "trigger_class": {
+              "type": "string",
+              "enum": [
+                "fatalism",
+                "diagnosis",
+                "guaranteed_event",
+                "crisis_topic",
+                "third_party_claim",
+                "unsupported_placement",
+                "source_laundering",
+                "medical_legal_financial",
+                "other"
+              ]
+            },
+            "action": {
+              "type": "string",
+              "enum": ["reject_model_output", "replace_paragraph", "block_theme"]
+            },
+            "fallback_fragment_id": { "$ref": "#/$defs/fragmentId" },
+            "fallback_text": {
+              "type": ["string", "null"],
+              "description": "Reviewed deterministic fallback copy when fragment not resolved."
+            }
+          }
+        }
+      ]
+    },
+    "releaseMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "bundle_hash",
+        "created_at",
+        "approver_id",
+        "last_author_id",
+        "changelog",
+        "status"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semantic release version (astrology_release). Used in reading_key and activation pointer."
+        },
+        "bundle_hash": {
+          "$ref": "common.schema.json#/$defs/contentHash",
+          "description": "Hash of canonical sorted-key bundle body excluding signature."
+        },
+        "created_at": { "$ref": "common.schema.json#/$defs/isoDateTime" },
+        "approver_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "WordPress reviewer id; must be distinct from last_author_id."
+        },
+        "last_author_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changelog": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["submitted", "active", "rejected", "superseded"]
+        },
+        "locale_default": {
+          "$ref": "common.schema.json#/$defs/localeTag"
+        },
+        "wordpress_site_id": {
+          "type": ["string", "null"]
+        },
+        "calc_contract_id": {
+          "type": ["string", "null"],
+          "description": "Optional pin to calculation contract this release was smoke-tested against."
+        }
+      }
+    },
+    "bundleSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "key_id", "signature", "signed_payload_hash"],
+      "properties": {
+        "alg": {
+          "type": "string",
+          "enum": ["Ed25519", "ES256"],
+          "description": "Signing algorithm for the release bundle."
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Public key id known to Cloudflare ingestion."
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base64url signature over the canonical bundle body."
+        },
+        "signed_payload_hash": {
+          "$ref": "common.schema.json#/$defs/contentHash"
+        }
+      }
+    },
+    "contentReleaseBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "release",
+        "objects",
+        "signature"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "release": { "$ref": "#/$defs/releaseMetadata" },
+        "objects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "patterns",
+            "cycles",
+            "phases",
+            "modifiers",
+            "prompts",
+            "safety_rules"
+          ],
+          "properties": {
+            "patterns": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/patternObject" }
+            },
+            "cycles": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/cycleObject" }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/phaseObject" }
+            },
+            "modifiers": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/modifierObject" }
+            },
+            "prompts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/promptObject" }
+            },
+            "safety_rules": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/safetyRuleObject" }
+            }
+          }
+        },
+        "signature": { "$ref": "#/$defs/bundleSignature" },
+        "fixtures": {
+          "type": "array",
+          "description": "Optional smoke-test fixture ids Cloudflare must pass before activation.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fixture_id", "expect"],
+            "properties": {
+              "fixture_id": { "type": "string" },
+              "expect": {
+                "type": "string",
+                "enum": ["eligible", "ineligible", "fallback"]
+              }
+            }
+          }
+        }
+      },
+      "description": "Application must enforce approver_id != last_author_id (editorial dual control) before acceptance."
+    },
+    "contentReleaseIngestionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "bundle", "idempotency_key"],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "bundle": { "$ref": "#/$defs/contentReleaseBundle" },
+        "idempotency_key": {
+          "$ref": "common.schema.json#/$defs/idempotencyKey"
+        },
+        "activate": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, activate after smoke tests; if false, store only."
+        }
+      }
+    },
+    "contentReleaseIngestionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "release_version",
+        "bundle_hash",
+        "status",
+        "received_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "release_version": { "type": "string" },
+        "bundle_hash": {
+          "$ref": "common.schema.json#/$defs/contentHash"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted_pending_tests",
+            "active",
+            "rejected",
+            "duplicate"
+          ]
+        },
+        "r2_uri": { "type": ["string", "null"] },
+        "active_pointer": { "type": ["string", "null"] },
+        "rejection_reason_class": {
+          "type": ["string", "null"],
+          "description": "Opaque error class only; no private content."
+        },
+        "received_at": {
+          "$ref": "common.schema.json#/$defs/isoDateTime"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "title": "ContentReleaseBundle",
+      "$ref": "#/$defs/contentReleaseBundle"
+    },
+    {
+      "title": "ContentReleaseIngestionRequest",
+      "$ref": "#/$defs/contentReleaseIngestionRequest"
+    },
+    {
+      "title": "ContentReleaseIngestionResponse",
+      "$ref": "#/$defs/contentReleaseIngestionResponse"
+    }
+  ]
+}

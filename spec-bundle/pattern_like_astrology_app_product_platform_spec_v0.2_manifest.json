@@ -1,0 +1,27 @@
+{
+  "version": "0.2",
+  "date": "2026-07-30",
+  "source_count": 139,
+  "files": {
+    "pattern_like_astrology_app_product_platform_spec_v0.2.docx": {
+      "sha256": "7f740aa29dcf165c82e3d2ca7448500d0973a67432691aa12b67944ade079957",
+      "bytes": 718011
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.2.pdf": {
+      "sha256": "dbe2a76a267801d1193bd0a95c2ef147a1dd85b2e8f5354967e513597c904536",
+      "bytes": 887337
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.2.md": {
+      "sha256": "48c091da2ff8b6f34f3430bc1068260df95629b4ffe53d0c2335b0418b588ca7",
+      "bytes": 23687
+    },
+    "pattern_like_astrology_app_data_source_registry_v0.2.yaml": {
+      "sha256": "27b663ec70599a0b804a40bfc88e1166aef38dc52e3a56b8fb874157bcb9e5ef",
+      "bytes": 157200
+    },
+    "pattern_like_astrology_app_platform_topology_v0.2.yaml": {
+      "sha256": "819a4cc49f101eb5f5b9026d015809a6992bd2311e235e33122f526203e169ad",
+      "bytes": 2876
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.2.0",
+  "contract_id": "calc-contract-launch",
+  "contract_version": "0.2.0",
+  "ephemeris": {
+    "engine": "swiss_ephemeris",
+    "release": "2.10.03",
+    "data_files": [
+      {
+        "name": "seas_18.se1",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "flags": {
+      "raw": null,
+      "named": ["SEFLG_SWIEPH", "SEFLG_SPEED"]
+    },
+    "wrapper_commit": "deadbeefcafebabe0123456",
+    "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "tzdb_version": "2026a"
+  },
+  "astronomy": {
+    "zodiac": "tropical",
+    "coordinates": "geocentric",
+    "ecliptic": "of_date",
+    "apparent": true,
+    "speed_enabled": true,
+    "node": "true",
+    "houses": {
+      "primary": "placidus",
+      "fallback": "porphyry"
+    }
+  },
+  "bodies": [
+    "sun",
+    "moon",
+    "mercury",
+    "venus",
+    "mars",
+    "jupiter",
+    "saturn",
+    "uranus",
+    "neptune",
+    "pluto",
+    "true_node",
+    "ascendant",
+    "midheaven"
+  ],
+  "aspects": ["conjunction", "sextile", "square", "trine", "opposition"],
+  "orb_policy": {
+    "policy_id": "orb-launch-default",
+    "version": "0.2.0",
+    "unit": "degree",
+    "defaults": {
+      "conjunction": 8,
+      "sextile": 4,
+      "square": 6,
+      "trine": 6,
+      "opposition": 8
+    },
+    "applying_separating": true
+  },
+  "birth_time_modes": ["exact", "approximate", "unknown"],
+  "techniques_enabled": [
+    "natal_positions",
+    "natal_aspects",
+    "houses_angles",
+    "natal_patterns",
+    "transits",
+    "stations_ingresses",
+    "lunations_eclipses"
+  ],
+  "notes": "Launch calculation contract frozen with M0 schemas."
+}

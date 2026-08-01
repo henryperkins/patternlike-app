@@ -1,0 +1,28 @@
+name = "patternlike-api"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Local / default D1 binding (create with: wrangler d1 create patternlike-ops)
+[[d1_databases]]
+binding = "DB"
+database_name = "patternlike-ops"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "../../db/d1"
+
+# R2 placeholder for chart artifacts / content bundles
+# [[r2_buckets]]
+# binding = "ARTIFACTS"
+# bucket_name = "patternlike-artifacts"
+
+[vars]
+ENVIRONMENT = "development"
+AUTH_STUB = "1"
+CALC_SERVICE_URL = "http://127.0.0.1:8080"
+SCHEMA_VERSION = "0.2.0"
+# M0 decision: AGPL public SE — docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md
+SE_LICENSE_MODE = "agpl"
+
+# Secrets (set via `wrangler secret put`):
+# ROOT_KEK — envelope encryption root key
+# SERVICE_AUTH_TOKEN — internal WordPress → CF release auth

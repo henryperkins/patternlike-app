@@ -1,0 +1,24 @@
+{
+  "name": "@patternlike/api",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir=dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "db:local": "wrangler d1 execute patternlike-ops --local --file=../../db/d1/0001_m0_core.sql",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@patternlike/shared": "0.2.0",
+    "hono": "^4.7.10"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4",
+    "wrangler": "^4.16.1"
+  }
+}

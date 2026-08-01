@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.2.0",
+  "id": "cht_01JAMPLECHART00000001",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "profile_version": 1,
+  "fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "contract_id": "calc-contract-launch",
+  "contract_version": "0.2.0",
+  "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "tzdb_version": "2026a",
+  "birth": {
+    "accuracy": "exact",
+    "utc_instant": "1990-05-15T12:34:00Z",
+    "timezone": "America/Los_Angeles",
+    "place_label": "Los Angeles, CA, US",
+    "latitude": 34.0522,
+    "longitude": -118.2437,
+    "sensitive_profile": null
+  },
+  "positions": [
+    {
+      "body": "sun",
+      "longitude_deg": 54.12,
+      "latitude_deg": 0.0,
+      "distance_au": 1.01,
+      "speed_longitude_deg_per_day": 0.957,
+      "retrograde": false,
+      "sign": "taurus",
+      "house": 10
+    },
+    {
+      "body": "moon",
+      "longitude_deg": 201.4,
+      "latitude_deg": 1.2,
+      "distance_au": 0.0025,
+      "speed_longitude_deg_per_day": 13.1,
+      "retrograde": false,
+      "sign": "libra",
+      "house": 3
+    }
+  ],
+  "houses": {
+    "system_used": "placidus",
+    "fallback_applied": false,
+    "cusps_deg": [10, 40, 70, 100, 130, 160, 190, 220, 250, 280, 310, 340]
+  },
+  "angles": {
+    "ascendant_deg": 10.0,
+    "midheaven_deg": 280.0
+  },
+  "aspects": [
+    {
+      "id": "asp_01JAMPLESUNMOONSQUARE01",
+      "body_a": "sun",
+      "body_b": "moon",
+      "aspect": "square",
+      "orb_deg": 2.72,
+      "applying": false,
+      "orb_policy_id": "orb-launch-default",
+      "orb_policy_version": "0.2.0"
+    }
+  ],
+  "patterns": [],
+  "uncertainty": {
+    "accuracy": "exact",
+    "window": null,
+    "suppressed_features": [],
+    "qualified_features": [],
+    "user_facing_summary": "Birth time is exact; houses and angles are included."
+  },
+  "calculated_at": "2026-07-30T15:00:00Z",
+  "status": "active",
+  "r2_uri": "charts/u0/cht_01JAMPLECHART00000001/sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.json"
+}

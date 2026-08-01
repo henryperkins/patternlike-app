@@ -1,0 +1,96 @@
+{
+  "schema_version": "0.2.0",
+  "reading_id": "rdg_01JAMPLEREADING000001",
+  "reading_key": "user:usr_01JAMPLEUSER00000001:2026-07-30:release-12",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "local_date": "2026-07-30",
+  "release_version": "release-12",
+  "chart_fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "contract_id": "calc-contract-launch",
+  "contract_version": "0.2.0",
+  "assembly_mode": "deterministic",
+  "primary_theme": {
+    "cycle_id": "cycle_981",
+    "phase": "building",
+    "fragment_ids": ["transit.saturn.square.moon@3/building"]
+  },
+  "supporting_theme": null,
+  "paragraphs": [
+    {
+      "paragraph_id": "par_primary_01",
+      "role": "primary_theme",
+      "evidence_lane": "celestial_facts",
+      "text_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "facts": [
+        {
+          "id": "cycle_981",
+          "fact_type": "cycle_instance",
+          "phase": "building",
+          "orb_deg": 0.42,
+          "chart_fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "technique": "transit"
+        }
+      ],
+      "content": [
+        {
+          "fragment_id": "transit.saturn.square.moon@3/building",
+          "content_version": "3",
+          "release_version": "release-12",
+          "content_type": "astrology_phase",
+          "bundle_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ],
+      "context_signals": [],
+      "ranking_factors": [
+        {
+          "factor": "exactness",
+          "weight": 0.9,
+          "reason": "orb_0.42_applying"
+        },
+        {
+          "factor": "phase",
+          "weight": 0.7,
+          "reason": "building_toward_exact"
+        }
+      ],
+      "model_output": null
+    },
+    {
+      "paragraph_id": "par_context_01",
+      "role": "context_label",
+      "evidence_lane": "user_and_context",
+      "text_hash": "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+      "facts": [],
+      "content": [],
+      "context_signals": [
+        {
+          "signal_id": "sig_01JAMPLECHECKIN000001",
+          "source_id": "USR-06",
+          "allowed_use": "theme_ranking",
+          "evidence_lane": "user_and_context",
+          "label": "user_reported"
+        }
+      ],
+      "ranking_factors": [
+        {
+          "factor": "domain_match",
+          "weight": 0.4,
+          "reason": "user_focus_domain_caregiving"
+        }
+      ],
+      "model_output": null
+    }
+  ],
+  "validation": {
+    "passed": true,
+    "fallback_used": false,
+    "checks": [
+      { "check": "schema", "result": "pass", "detail_code": null },
+      { "check": "provenance", "result": "pass", "detail_code": null },
+      { "check": "source_laundering", "result": "pass", "detail_code": null },
+      { "check": "eligibility_allowlist", "result": "pass", "detail_code": null }
+    ]
+  },
+  "content_hash": "sha256:3434343434343434343434343434343434343434343434343434343434343434",
+  "created_at": "2026-07-30T16:00:00Z"
+}

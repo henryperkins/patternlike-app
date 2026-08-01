@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.2.0",
+  "reading_key": "user:usr_01:2026-07-30:release-12",
+  "output_schema": "daily-reading-v2",
+  "facts": [],
+  "approved_fragments": ["fragment.a"],
+  "context": []
+}

@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage/
+.turbo/
+apps/api/.wrangler/
+# Ephemeris binaries: download via npm run ephe:download (not committed by default)
+apps/calc-stub/data/ephe/*.se1
+apps/calc-stub/data/ephe/*.txt
+!apps/calc-stub/data/.gitkeep
+*.pyc
+__pycache__/
+.venv/
+spec-bundle/_analyze*
+spec-bundle/_analysis*
+spec-bundle/_docx*

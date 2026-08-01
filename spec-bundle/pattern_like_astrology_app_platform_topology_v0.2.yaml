@@ -1,0 +1,88 @@
+schema_version: '0.2'
+document_date: '2026-07-30'
+architecture_profile: cloudflare-first-wordpress-editorial-fly-portable-v1
+decision:
+  launch: Run the product on Cloudflare; use WordPress.com for editorial operations; maintain Fly.io deployment
+    parity without putting Fly in the launch critical path.
+  calculation_runtime: Cloudflare Container at launch; same OCI image deployable to Fly Machines.
+  operational_database: D1 at launch.
+  postgres_trigger: Adopt Fly Managed Postgres only when query complexity, shard size, transactional requirements,
+    or operational reporting justify the additional service boundary.
+components:
+- id: mobile
+  platform: client
+  responsibility: iOS/Android experience, device permissions, local aggregation, encrypted local cache
+- id: web
+  platform: cloudflare
+  service: Workers + Vite
+  responsibility: PWA, account portal, support and evidence surfaces
+- id: api
+  platform: cloudflare
+  service: Worker
+  responsibility: API contracts, authz, consent enforcement, idempotency, rate limits
+- id: workflows
+  platform: cloudflare
+  service: Workflows
+  responsibility: durable chart, reading, content-release, export, and deletion flows
+- id: queues
+  platform: cloudflare
+  service: Queues
+  responsibility: fan-out, buffering, retries, dead-letter handling
+- id: calc
+  platform: cloudflare
+  service: Containers
+  responsibility: Swiss Ephemeris calculations from a pinned OCI image
+- id: d1
+  platform: cloudflare
+  service: D1
+  responsibility: encrypted operational records, evidence graphs, job state, consent state
+- id: r2
+  platform: cloudflare
+  service: R2
+  responsibility: signed content bundles, chart renders, encrypted exports, immutable artifacts
+- id: wp-cms
+  platform: wordpress.com
+  service: custom plugin + REST API
+  responsibility: interpretation authoring, review, versioning, release approval
+- id: fly-compute
+  platform: fly.io
+  service: Machines
+  responsibility: optional warm Swiss engine, backfills, or compute escape hatch
+- id: fly-db
+  platform: fly.io
+  service: Managed Postgres
+  responsibility: optional relational migration target behind Fly-hosted services
+data_boundaries:
+  wordpress.com:
+    allowed:
+    - editorial content
+    - public help and policy content
+    - release metadata
+    forbidden:
+    - birth profiles
+    - journal text
+    - relationship records
+    - health signals
+    - private readings
+  analytics:
+    allowed:
+    - deidentified operational counters
+    - latency
+    - validation failures
+    - source error classes
+    forbidden:
+    - prompts
+    - responses
+    - birth data
+    - journal text
+    - OAuth payloads
+  llm:
+    allowed:
+    - calculated fact IDs
+    - approved content fragments
+    - minimal framing signals
+    forbidden:
+    - raw device data
+    - raw health data
+    - unreviewed external content
+    - stable direct identifiers

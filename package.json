@@ -1,0 +1,24 @@
+{
+  "name": "patternlike-app",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Pattern-Like Astrology App monorepo — Cloudflare-first, Swiss Ephemeris calculation authority",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @patternlike/calc-stub -w @patternlike/api",
+    "typecheck": "npm run typecheck -w @patternlike/shared -w @patternlike/calc-stub -w @patternlike/api",
+    "test": "npm run test -w @patternlike/calc-stub -w @patternlike/api && npm run test:contracts",
+    "test:contracts": "python contracts/m0/validate_schemas.py && python contracts/m0/smoke_check.py",
+    "dev:api": "npm run dev -w @patternlike/api",
+    "db:local": "npm run db:local -w @patternlike/api",
+    "calc:dev": "npm run dev -w @patternlike/calc-stub",
+    "calc:golden": "npm run test:golden -w @patternlike/calc-stub",
+    "ephe:download": "npm run ephe:download -w @patternlike/calc-stub"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

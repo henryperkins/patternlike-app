@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.2.0",
+  "reading_key": "user:usr_01JAMPLEUSER00000001:2026-07-30:release-12",
+  "output_schema": "daily-reading-v2",
+  "facts": [
+    { "id": "cycle_981", "phase": "building", "orb": 0.42 }
+  ],
+  "approved_fragments": [
+    "transit.saturn.square.moon@3/building",
+    "domain.caregiving@2",
+    "prompt.boundaries@4"
+  ],
+  "context": [
+    {
+      "signal_id": "priority_caregiving",
+      "allowed_use": "life_domain_selection",
+      "framing": "caregiving"
+    }
+  ],
+  "locale": "en-US",
+  "domain_preference": "caregiving"
+}

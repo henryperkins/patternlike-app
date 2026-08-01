@@ -1,0 +1,61 @@
+{
+  "schema_version": "0.2.0",
+  "id": "sig_01JAMPLECHECKIN000001",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "source_id": "USR-06",
+  "source_window": null,
+  "evidence_lane": "user_and_context",
+  "allowed_uses": [
+    "theme_ranking",
+    "tone",
+    "reflection_prompt",
+    "notification_timing"
+  ],
+  "confidence": "user_confirmed",
+  "sensitivity": "sensitive",
+  "permission_state": "active",
+  "conflict_status": "none",
+  "freshness": {
+    "status": "fresh",
+    "observed_at": "2026-07-30T14:05:00Z",
+    "ingested_at": "2026-07-30T14:05:01Z",
+    "expires_at": "2026-07-31T14:05:00Z",
+    "max_age_seconds": 86400,
+    "age_seconds": 120
+  },
+  "consent": {
+    "consent_id": "cns_01JAMPLECONSENT00001",
+    "status": "active",
+    "valid_for_uses": [
+      "theme_ranking",
+      "tone",
+      "reflection_prompt",
+      "notification_timing"
+    ],
+    "permission_tier": 1,
+    "validated_at": "2026-07-30T14:05:01Z"
+  },
+  "value": {
+    "encoding": "structured",
+    "structured": {
+      "energy": "low",
+      "pressure": "medium",
+      "clarity": "medium",
+      "connection": "high",
+      "focus_domain": "caregiving",
+      "note_present": false
+    }
+  },
+  "labels": ["user_reported", "optional_context"],
+  "provenance": {
+    "ingestion_owner": "first-party-context-service",
+    "primary_runtime": "cloudflare-api-worker + workflow",
+    "connector_account_id": null,
+    "provider": null,
+    "acquisition": "explicit_daily_check_in"
+  },
+  "supersedes_signal_id": null,
+  "normalized_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at": "2026-07-30T14:05:01Z",
+  "updated_at": "2026-07-30T14:05:01Z"
+}

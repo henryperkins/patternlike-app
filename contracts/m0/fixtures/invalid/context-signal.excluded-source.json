@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.2.0",
+  "id": "sig_bad_excluded_01",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "source_id": "NO-01",
+  "evidence_lane": "user_and_context",
+  "allowed_uses": ["theme_ranking"],
+  "confidence": "not_ingested",
+  "sensitivity": "prohibited",
+  "permission_state": "active",
+  "freshness": {
+    "status": "fresh",
+    "observed_at": "2026-07-30T14:05:00Z"
+  },
+  "consent": {
+    "consent_id": "cns_bad_excluded_01",
+    "status": "active",
+    "valid_for_uses": ["theme_ranking"]
+  },
+  "value": {
+    "encoding": "structured",
+    "structured": { "x": 1 }
+  },
+  "normalized_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

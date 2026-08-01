@@ -1,0 +1,904 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API
+  version: 0.2.0
+  description: |
+    M0 OpenAPI stub for public `/v1` and internal content-release routes.
+    Normative body shapes are defined in `contracts/m0/*.schema.json`
+    (schema_version 0.2.0). This document wires routes, headers, and
+    response envelopes to those frozen contracts.
+
+    Spec: product platform v0.2 — all mutating endpoints require
+    `Idempotency-Key` because queue delivery is at-least-once.
+  contact:
+    name: Pattern-Like Engineering
+servers:
+  - url: https://api.patternlike.app
+    description: Production (placeholder)
+  - url: http://localhost:8787
+    description: Local Workers dev
+tags:
+  - name: birth
+  - name: chart
+  - name: readings
+  - name: pattern
+  - name: timing
+  - name: context
+  - name: privacy
+  - name: internal
+paths:
+  /v1/birth-profiles:
+    post:
+      tags: [birth]
+      operationId: createOrUpdateBirthProfile
+      summary: Create/update a birth profile and start calculation
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BirthProfileRequest'
+      responses:
+        '202':
+          description: Profile accepted; calculation workflow started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowAccepted'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+
+  /v1/chart:
+    get:
+      tags: [chart]
+      operationId: getChart
+      summary: Return normalized natal facts and uncertainty summary
+      description: |
+        Response aligns with chart-contract `chartSnapshot` (redacted as needed).
+        Contract: `chart-contract.schema.json#/$defs/chartSnapshot`
+      responses:
+        '200':
+          description: Active chart snapshot summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChartResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/readings/today:
+    get:
+      tags: [readings]
+      operationId: getTodayReading
+      summary: Daily reading for the user local date
+      responses:
+        '200':
+          description: Published daily reading
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReadingResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/readings/{id}/evidence:
+    get:
+      tags: [readings]
+      operationId: getReadingEvidence
+      summary: Paragraph-level provenance
+      description: |
+        Contract: `reading-evidence.schema.json#/$defs/readingEvidenceGraph`
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+      responses:
+        '200':
+          description: Evidence graph
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadingEvidenceGraph'
+        '404':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/readings/{id}/feedback:
+    post:
+      tags: [readings]
+      operationId: postReadingFeedback
+      summary: Record structured usefulness feedback
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReadingFeedbackRequest'
+      responses:
+        '201':
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadingFeedbackResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/pattern:
+    get:
+      tags: [pattern]
+      operationId: getPattern
+      summary: Stable natal pattern chapters
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated pattern chapters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatternListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/timing:
+    get:
+      tags: [timing]
+      operationId: getTiming
+      summary: Active and upcoming cycle instances
+      parameters:
+        - name: phase
+          in: query
+          schema:
+            type: string
+            enum: [emerging, building, peak, reconsidering, integrating]
+        - name: domain
+          in: query
+          schema:
+            type: string
+        - name: duration
+          in: query
+          schema:
+            type: string
+            enum: [short, medium, long]
+      responses:
+        '200':
+          description: Cycle list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimingResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/time-travel:
+    get:
+      tags: [timing]
+      operationId: getTimeTravel
+      summary: Reconstruct a selected date
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Date reconstruction with separated fact/context layers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeTravelResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/check-ins:
+    post:
+      tags: [context]
+      operationId: postCheckIn
+      summary: Store an explicit short-lived context signal
+      description: |
+        Creates a ContextSignal (typically USR-06). Contract:
+        `context-signal.schema.json`
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInRequest'
+      responses:
+        '201':
+          description: Context signal stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextSignal'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/context-sources:
+    get:
+      tags: [context]
+      operationId: getContextSources
+      summary: Inspect context source permissions
+      description: |
+        Contract: `consent.schema.json#/$defs/contextSourcesDocument`
+      responses:
+        '200':
+          description: Source permission list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextSourcesDocument'
+        '401':
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [context]
+      operationId: putContextSources
+      summary: Enable, pause, or revoke sources
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextSourcesDocument'
+      responses:
+        '200':
+          description: Updated permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextSourcesDocument'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/exports:
+    post:
+      tags: [privacy]
+      operationId: startExport
+      summary: Start portable account export
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '202':
+          description: Export workflow accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowAccepted'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /v1/account:
+    delete:
+      tags: [privacy]
+      operationId: startDeletion
+      summary: Start account deletion workflow
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '202':
+          description: Deletion workflow accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowAccepted'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /internal/content-releases:
+    post:
+      tags: [internal]
+      operationId: ingestContentRelease
+      summary: Receive signed WordPress release bundles
+      description: |
+        Service-authenticated only. Request body contract:
+        `content-release.schema.json#/$defs/contentReleaseIngestionRequest`
+        (embeds `contentReleaseBundle` plus idempotency_key / activate).
+        Normative validation is the JSON Schema package, not the OAS stub envelope.
+      security:
+        - serviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentReleaseIngestionRequest'
+      responses:
+        '202':
+          description: Bundle accepted for verification/activation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentReleaseIngestionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Consumer identity TBD (open decision). Placeholder bearer.
+    serviceAuth:
+      type: http
+      scheme: bearer
+      description: Internal service token for WordPress → Cloudflare release ingestion.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 256
+      description: Required on all mutating endpoints.
+    ReadingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 8
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Opaque error class for clients/ops; no private payloads.
+            message:
+              type: string
+            request_id:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+    WorkflowAccepted:
+      type: object
+      additionalProperties: false
+      required: [schema_version, workflow, status, idempotency_key]
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        workflow:
+          type: string
+          enum:
+            - NormalizeBirthAndCalculateChart
+            - GenerateDailyReading
+            - PublishContentRelease
+            - ExportAccount
+            - DeleteAccount
+            - RefreshConnector
+        status:
+          type: string
+          enum: [queued, running, succeeded, duplicate]
+        idempotency_key:
+          type: string
+        job_id:
+          type: [string, 'null']
+        resource_id:
+          type: [string, 'null']
+
+    BirthProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [accuracy, consent_id]
+      properties:
+        accuracy:
+          type: string
+          enum: [exact, approximate, unknown]
+        birth_date:
+          type: string
+          format: date
+          description: Required when accuracy is exact or approximate.
+        birth_time_local:
+          type: [string, 'null']
+          description: Local civil time HH:MM or HH:MM:SS; null when unknown.
+        approximate_window_minutes:
+          type: [integer, 'null']
+          minimum: 1
+        birthplace:
+          type: object
+          additionalProperties: false
+          properties:
+            label:
+              type: string
+            place_id:
+              type: [string, 'null']
+            latitude:
+              type: [number, 'null']
+            longitude:
+              type: [number, 'null']
+        timezone_hint:
+          type: [string, 'null']
+        consent_id:
+          type: string
+          minLength: 8
+
+    ChartResponse:
+      type: object
+      description: |
+        API projection of chartSnapshot. Full schema:
+        contracts/m0/chart-contract.schema.json#/$defs/chartSnapshot
+      additionalProperties: true
+      required:
+        - schema_version
+        - id
+        - fingerprint
+        - contract_id
+        - uncertainty
+        - status
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        id:
+          type: string
+        fingerprint:
+          type: string
+        contract_id:
+          type: string
+        contract_version:
+          type: string
+        status:
+          type: string
+          enum: [active, superseded, invalid]
+        uncertainty:
+          type: object
+          additionalProperties: true
+        positions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        houses:
+          type: [object, 'null']
+        angles:
+          type: [object, 'null']
+        aspects:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      x-patternlike-contract: >-
+        https://patternlike.app/contracts/m0/chart-contract.schema.json#/$defs/chartSnapshot
+
+    DailyReadingResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - id
+        - reading_key
+        - local_date
+        - release_version
+        - assembly_mode
+        - status
+        - paragraphs
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        id:
+          type: string
+        reading_key:
+          type: string
+        local_date:
+          type: string
+          format: date
+        release_version:
+          type: string
+        assembly_mode:
+          type: string
+          enum: [deterministic, constrained_model]
+        status:
+          type: string
+        primary_theme:
+          type: [object, 'null']
+          additionalProperties: true
+        supporting_theme:
+          type: [object, 'null']
+          additionalProperties: true
+        paragraphs:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [paragraph_id, role, text]
+            properties:
+              paragraph_id:
+                type: string
+              role:
+                type: string
+              text:
+                type: string
+              evidence_lane:
+                type: string
+                enum: [celestial_facts, user_and_context, operational]
+
+    ReadingEvidenceGraph:
+      type: object
+      description: |
+        Full contract:
+        contracts/m0/reading-evidence.schema.json#/$defs/readingEvidenceGraph
+      additionalProperties: true
+      required:
+        - schema_version
+        - reading_id
+        - reading_key
+        - paragraphs
+        - validation
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        reading_id:
+          type: string
+        reading_key:
+          type: string
+        paragraphs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        validation:
+          type: object
+          additionalProperties: true
+      x-patternlike-contract: >-
+        https://patternlike.app/contracts/m0/reading-evidence.schema.json#/$defs/readingEvidenceGraph
+
+    ReadingFeedbackRequest:
+      type: object
+      additionalProperties: false
+      required: [resonance]
+      properties:
+        resonance:
+          type: string
+          enum: [helpful, neutral, not_helpful, off]
+        relevance_labels:
+          type: array
+          items:
+            type: string
+        note:
+          type: [string, 'null']
+          maxLength: 2000
+
+    ReadingFeedbackResponse:
+      type: object
+      additionalProperties: false
+      required: [id, reading_id, created_at]
+      properties:
+        id:
+          type: string
+        reading_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    PatternListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, title, summary]
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              summary:
+                type: string
+              content_version:
+                type: string
+              release_version:
+                type: string
+        next_cursor:
+          type: [string, 'null']
+
+    TimingResponse:
+      type: object
+      additionalProperties: false
+      required: [items, calculation_status]
+      properties:
+        calculation_status:
+          type: object
+          additionalProperties: false
+          required: [last_refresh_at, stale]
+          properties:
+            last_refresh_at:
+              type: [string, 'null']
+              format: date-time
+            stale:
+              type: boolean
+            contract_id:
+              type: string
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, technique, phase]
+            properties:
+              id:
+                type: string
+              technique:
+                type: string
+              phase:
+                type: string
+                enum: [emerging, building, peak, reconsidering, integrating]
+              start_at:
+                type: [string, 'null']
+                format: date-time
+              exact_at:
+                type: [string, 'null']
+                format: date-time
+              end_at:
+                type: [string, 'null']
+                format: date-time
+              body:
+                type: [string, 'null']
+              target:
+                type: [string, 'null']
+              aspect:
+                type: [string, 'null']
+
+    TimeTravelResponse:
+      type: object
+      additionalProperties: false
+      required: [date, historical_facts, saved_context, retrospective_note]
+      properties:
+        date:
+          type: string
+          format: date
+        historical_facts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Calculated cycle state for the date.
+        saved_context:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Context signals that existed/were saved for that date.
+        retrospective_note:
+          type: string
+          description: Must distinguish reconstruction from saved contemporaneous context.
+
+    CheckInRequest:
+      type: object
+      additionalProperties: false
+      required: [energy]
+      properties:
+        energy:
+          type: string
+          enum: [low, medium, high]
+        pressure:
+          type: string
+          enum: [low, medium, high]
+        clarity:
+          type: string
+          enum: [low, medium, high]
+        connection:
+          type: string
+          enum: [low, medium, high]
+        focus_domain:
+          type: string
+        note:
+          type: [string, 'null']
+          maxLength: 1000
+        expires_in_seconds:
+          type: integer
+          minimum: 300
+          maximum: 604800
+          default: 86400
+
+    ContextSignal:
+      type: object
+      description: |
+        Full contract: contracts/m0/context-signal.schema.json
+      additionalProperties: true
+      required:
+        - schema_version
+        - id
+        - source_id
+        - allowed_uses
+        - evidence_lane
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        id:
+          type: string
+        source_id:
+          type: string
+        allowed_uses:
+          type: array
+          items:
+            type: string
+        evidence_lane:
+          type: string
+      x-patternlike-contract: >-
+        https://patternlike.app/contracts/m0/context-signal.schema.json
+
+    ContextSourcesDocument:
+      type: object
+      description: |
+        Full contract: consent.schema.json#/$defs/contextSourcesDocument
+      additionalProperties: true
+      required: [schema_version, user_id, sources]
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        user_id:
+          type: string
+        sources:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      x-patternlike-contract: >-
+        https://patternlike.app/contracts/m0/consent.schema.json#/$defs/contextSourcesDocument
+
+    ExportRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        include_readings:
+          type: boolean
+          default: true
+        include_journal:
+          type: boolean
+          default: true
+
+    DeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm]
+      properties:
+        confirm:
+          type: string
+          const: DELETE
+        reason:
+          type: [string, 'null']
+
+    ContentReleaseIngestionRequest:
+      type: object
+      description: |
+        Full contract:
+        content-release.schema.json#/$defs/contentReleaseIngestionRequest
+      additionalProperties: true
+      required: [schema_version, bundle, idempotency_key]
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        idempotency_key:
+          type: string
+        activate:
+          type: boolean
+        bundle:
+          type: object
+          additionalProperties: true
+      x-patternlike-contract: >-
+        https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/contentReleaseIngestionRequest
+
+    ContentReleaseIngestionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - release_version
+        - bundle_hash
+        - status
+        - received_at
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        release_version:
+          type: string
+        bundle_hash:
+          type: string
+        status:
+          type: string
+          enum:
+            - accepted_pending_tests
+            - active
+            - rejected
+            - duplicate
+        r2_uri:
+          type: [string, 'null']
+        active_pointer:
+          type: [string, 'null']
+        rejection_reason_class:
+          type: [string, 'null']
+        received_at:
+          type: string
+          format: date-time
+      x-patternlike-contract: >-
+        https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/contentReleaseIngestionResponse
+
+security:
+  - bearerAuth: []

@@ -1,0 +1,255 @@
+{
+  "schema_version": "0.2.0",
+  "release": {
+    "version": "release-hash-mismatch",
+    "bundle_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "created_at": "2026-07-30T12:00:00Z",
+    "approver_id": "wp_user_reviewer_02",
+    "last_author_id": "wp_user_author_01",
+    "changelog": "Launch cycle phase copy for Saturn-Moon square building phase.",
+    "status": "submitted",
+    "locale_default": "en-US",
+    "wordpress_site_id": "wp_site_demo",
+    "calc_contract_id": "calc-contract-launch"
+  },
+  "objects": {
+    "patterns": [
+      {
+        "id": "pattern.saturn.moon.tension",
+        "content_type": "astrology_pattern",
+        "content_version": "1",
+        "title": "Structure meets feeling",
+        "locale": "en-US",
+        "object_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "approved",
+        "prohibited_claims": [
+          "guaranteed_external_event",
+          "clinical_diagnosis"
+        ],
+        "eligibility": {
+          "required_fact_classes": [
+            "natal_aspect"
+          ],
+          "required_bodies": [
+            "saturn",
+            "moon"
+          ],
+          "required_aspects": [
+            "square"
+          ],
+          "min_birth_time_accuracy": "unknown",
+          "requires_houses": false,
+          "techniques": [
+            "natal"
+          ]
+        },
+        "tags": [
+          "boundaries",
+          "care"
+        ],
+        "summary": "A lasting pattern of negotiating care with limits.",
+        "body": "You learn to hold feeling inside workable structure without abandoning either.",
+        "resources": [
+          "patience",
+          "reliability"
+        ],
+        "tensions": [
+          "emotional austerity",
+          "over-responsibility"
+        ],
+        "counter_expression": "Softness and structure can coexist when limits are spoken early.",
+        "prompt_ids": [
+          "prompt.boundaries@4"
+        ],
+        "evidence_requirements": [
+          "natal_aspect:saturn-square-moon"
+        ]
+      }
+    ],
+    "cycles": [
+      {
+        "id": "transit.saturn.square.moon",
+        "content_type": "astrology_cycle",
+        "content_version": "3",
+        "title": "Saturn square Moon transit",
+        "locale": "en-US",
+        "object_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "approved",
+        "prohibited_claims": [
+          "fatalism",
+          "guaranteed_loss"
+        ],
+        "eligibility": {
+          "required_fact_classes": [
+            "cycle_instance"
+          ],
+          "required_bodies": [
+            "saturn",
+            "moon"
+          ],
+          "required_aspects": [
+            "square"
+          ],
+          "min_birth_time_accuracy": "unknown",
+          "requires_houses": false,
+          "techniques": [
+            "transit"
+          ]
+        },
+        "tags": [
+          "timing"
+        ],
+        "technique": "transit",
+        "bodies": [
+          "saturn"
+        ],
+        "targets": [
+          "moon"
+        ],
+        "aspect": "square",
+        "orb_policy_id": "orb-launch-default",
+        "themes": [
+          "boundaries",
+          "caregiving",
+          "emotional_maturity"
+        ],
+        "phase_ids": [
+          "transit.saturn.square.moon@3/building"
+        ],
+        "summary": "A developmental window for emotional boundaries."
+      }
+    ],
+    "phases": [
+      {
+        "id": "transit.saturn.square.moon@3/building",
+        "content_type": "astrology_phase",
+        "content_version": "3",
+        "title": "Building: Saturn square Moon",
+        "locale": "en-US",
+        "object_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "status": "approved",
+        "prohibited_claims": [
+          "alarm",
+          "medical_claim"
+        ],
+        "eligibility": {
+          "required_fact_classes": [
+            "cycle_instance"
+          ],
+          "min_birth_time_accuracy": "unknown",
+          "requires_houses": false,
+          "techniques": [
+            "transit"
+          ]
+        },
+        "tags": [
+          "building"
+        ],
+        "parent_cycle_id": "transit.saturn.square.moon",
+        "phase": "building",
+        "summary": "Pressure gathers around care and limits.",
+        "constructive_expression": "Name what is sustainable before resentment hardens.",
+        "shadow_expression": "Withholding warmth to feel in control.",
+        "body": "As this cycle builds, small boundary experiments matter more than dramatic vows."
+      }
+    ],
+    "modifiers": [
+      {
+        "id": "domain.caregiving@2",
+        "content_type": "astrology_modifier",
+        "content_version": "2",
+        "title": "Caregiving domain framing",
+        "locale": "en-US",
+        "object_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "status": "approved",
+        "prohibited_claims": [],
+        "eligibility": {
+          "required_fact_classes": [],
+          "min_birth_time_accuracy": "unknown",
+          "requires_houses": false
+        },
+        "tags": [
+          "domain"
+        ],
+        "modifier_kind": "domain",
+        "body": "When caregiving is active for the user, emphasize sustainable support rather than self-erasure.",
+        "precedence": 10,
+        "allowed_combinations": [
+          "transit.saturn.square.moon"
+        ],
+        "life_domains": [
+          "caregiving"
+        ]
+      }
+    ],
+    "prompts": [
+      {
+        "id": "prompt.boundaries@4",
+        "content_type": "astrology_prompt",
+        "content_version": "4",
+        "title": "Boundary reflection",
+        "locale": "en-US",
+        "object_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "approved",
+        "prohibited_claims": [],
+        "eligibility": {
+          "required_fact_classes": [],
+          "min_birth_time_accuracy": "unknown",
+          "requires_houses": false
+        },
+        "tags": [
+          "reflection"
+        ],
+        "prompt_text": "Where could a clearer limit protect both care and energy today?",
+        "intensity": "gentle",
+        "theme": "boundaries",
+        "life_domains": [
+          "caregiving",
+          "self"
+        ],
+        "exclusions": [
+          "crisis"
+        ]
+      }
+    ],
+    "safety_rules": [
+      {
+        "id": "safety.no_fatalism.v1",
+        "content_type": "astrology_safety_rule",
+        "content_version": "1",
+        "title": "Reject fatalism",
+        "locale": "en-US",
+        "object_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "status": "approved",
+        "prohibited_claims": [
+          "destiny_without_agency"
+        ],
+        "eligibility": {
+          "required_fact_classes": [],
+          "min_birth_time_accuracy": "unknown",
+          "requires_houses": false
+        },
+        "tags": [
+          "safety"
+        ],
+        "rule_id": "NO_FATALISM",
+        "trigger_class": "fatalism",
+        "action": "reject_model_output",
+        "fallback_fragment_id": "transit.saturn.square.moon@3/building",
+        "fallback_text": "This period asks for careful choices, not a fixed outcome."
+      }
+    ]
+  },
+  "signature": {
+    "alg": "Ed25519",
+    "key_id": "wp-release-key-1",
+    "signature": "dGVzdC1zaWduYXR1cmUtbm90LXJlYWw",
+    "signed_payload_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "fixtures": [
+    {
+      "fixture_id": "golden_saturn_moon_building",
+      "expect": "eligible"
+    }
+  ]
+}

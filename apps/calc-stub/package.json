@@ -1,0 +1,28 @@
+{
+  "name": "@patternlike/calc-stub",
+  "version": "0.2.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "ephe:download": "node scripts/download-ephe.mjs",
+    "pretest": "node scripts/download-ephe.mjs",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:golden": "tsx --test src/golden.test.ts"
+  },
+  "dependencies": {
+    "@patternlike/shared": "0.2.0",
+    "luxon": "^3.7.2",
+    "sweph": "^2.10.3-7"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.2",
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

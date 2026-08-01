@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.2.0",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "source_id": "NO-14",
+  "enabled": true,
+  "permission_state": "active",
+  "allowed_uses": ["theme_ranking"],
+  "permission_tier": 4,
+  "consent_id": "cns_bad_perm_00000001",
+  "freshness": null,
+  "last_signal_id": null,
+  "scopes": [],
+  "connector_status": null,
+  "updated_at": "2026-07-30T14:00:00Z"
+}
