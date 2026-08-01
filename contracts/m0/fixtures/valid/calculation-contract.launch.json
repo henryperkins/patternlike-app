@@ -7,15 +7,23 @@
     "release": "2.10.03",
     "data_files": [
       {
+        "name": "sepl_18.se1",
+        "sha256": "ca1393ceab3a44fbc895887cf789c68819ae6a1cbc9b22225872dbe4ccd99a66"
+      },
+      {
+        "name": "semo_18.se1",
+        "sha256": "1ca07bd67c24374d77226180c20a4f9996cba013697894810518e7eb582ca4f7"
+      },
+      {
         "name": "seas_18.se1",
-        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        "sha256": "a2cd8fc33807c78ca9a700c91c2e042258b12fc4796519e00781440b5ad8b2e2"
       }
     ],
     "flags": {
       "raw": null,
       "named": ["SEFLG_SWIEPH", "SEFLG_SPEED"]
     },
-    "wrapper_commit": "deadbeefcafebabe0123456",
+    "wrapper_commit": "50e77c5d34858147ed77caec35868041989ef922",
     "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "tzdb_version": "2026a"
   },

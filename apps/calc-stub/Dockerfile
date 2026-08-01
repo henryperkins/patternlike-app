@@ -25,9 +25,19 @@ COPY packages/shared /app/packages/shared
 COPY apps/calc-stub /app/apps/calc-stub
 WORKDIR /app/apps/calc-stub
 
-# Ephemeris files must be present (download at build or COPY pre-fetched data/ephe)
-RUN npm run ephe:download || true
-RUN test -f data/ephe/sepl_18.se1 && test -f data/ephe/semo_18.se1
+# Ephemeris files are fetched from the commit pinned in ephemeris.lock.json and
+# verified by SHA-256. No `|| true`: a failed, truncated, or tampered download
+# must fail the build.
+#
+# The presence gate checks $SE_EPHE_PATH — the directory the downloader actually
+# writes to. It previously checked `data/ephe` relative to WORKDIR
+# (/app/apps/calc-stub/data/ephe), a gitignored path populated only by COPY,
+# while SE_EPHE_PATH sent the download to /app/data/ephe. On a clean clone the
+# build hard-failed despite a successful download; with stale files in the
+# context it passed while `|| true` had swallowed a download failure, producing
+# an image that built green and could not compute a single chart.
+RUN npm run ephe:download
+RUN test -f "$SE_EPHE_PATH/sepl_18.se1" && test -f "$SE_EPHE_PATH/semo_18.se1"
 
 LABEL org.opencontainers.image.title="patternlike-calc"
 LABEL org.opencontainers.image.description="Swiss Ephemeris 2.10.03 calculation service"

@@ -1,0 +1,24 @@
+# Build context for apps/calc-stub/Dockerfile is the repository root, so this
+# file (not one inside apps/calc-stub) is what Docker reads.
+#
+# data/ephe is excluded deliberately: the image must obtain ephemeris data by
+# running the pinned, digest-verified downloader, never by inheriting whatever
+# happens to be on the build host. Without this, stale local files let the build
+# pass while a download failure had been swallowed.
+**/data/ephe
+
+node_modules
+**/node_modules
+**/dist
+**/.wrangler
+.wrangler
+.git
+.github
+.venv
+__pycache__
+**/*.log
+**/coverage
+**/.turbo
+spec-bundle
+*.zip
+docs
