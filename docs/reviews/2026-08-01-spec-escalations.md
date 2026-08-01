@@ -166,15 +166,29 @@ workflow status. There is no concurrency contract on any mutation.
 
 ---
 
-## Known testing gap
+## Testing posture
 
-`apps/api` has no Miniflare or `wrangler dev` harness, so there is no integration
-test binding a real D1. The remediation's unit tests cover the pure validation and
-configuration logic, and the D1 constraint changes are covered by
-`contracts/m0/smoke_check.py` against in-memory SQLite — but the request-handling
-behaviour that was rewritten (idempotency scoping, batched writes, 409 on
-duplicate fingerprint, the config guard's 503) is verified by construction rather
-than by execution.
+**Resolved.** `apps/api` now runs its tests inside workerd via
+`@cloudflare/vitest-pool-workers`, with a real local D1 bound from
+`wrangler.toml` and `0001_m0_core.sql` applied per test file. The rewritten
+request handling — idempotency scoping, batched writes, 409 on a duplicate
+fingerprint, failed-job retry and recovery, the lifecycle invariants — is
+verified by execution rather than by construction. 67 api tests, 33 calc-stub
+tests, plus the contract validators.
 
-Standing up `@cloudflare/vitest-pool-workers` is the obvious next step and was not
-part of this remediation.
+Outbound calls to the calculation service are intercepted by a deterministic
+mock (`apps/api/test/mock-calc-service.ts`) wired through miniflare's
+`outboundService`, so the suite is hermetic. The real engine's behaviour is
+covered separately by the 33 tests in `apps/calc-stub`.
+
+Remaining gaps, smaller than before:
+
+- **No end-to-end test across both services.** Nothing exercises the real
+  Worker against the real Swiss Ephemeris container. The mock mirrors the
+  engine's contract by hand, so a divergence between them would go unnoticed.
+- **The config guard's production 503 is unit-tested, not driven through a
+  request.** `ENVIRONMENT` comes from `wrangler.toml` at config time and cannot
+  be varied per test without a second vitest project.
+- **CI has still never executed.** The workflow is well-formed and now has more
+  to run, but no git remote is configured, so nothing has been validated on a
+  clean Linux checkout.

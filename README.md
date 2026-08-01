@@ -94,7 +94,8 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 
 ## M1 status
 
-- [x] Monorepo + CI
+- [x] Monorepo + CI (workflow configured; has not yet run — no git remote)
+- [x] Workers integration tests: `apps/api` runs inside workerd with a real local D1 (`@cloudflare/vitest-pool-workers`)
 - [x] M0 contracts validation in CI
 - [x] D1 core schema with encryption CHECKs
 - [x] Birth profile + chart calculation path
