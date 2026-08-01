@@ -15,7 +15,19 @@ PRAGMA foreign_keys = ON;
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY NOT NULL,
+  -- Public label. Appears in logs, in calc-service requests, and inside
+  -- daily_readings.reading_key. Opaque and server-minted: the spec forbids
+  -- "stable direct identifiers" at the LLM boundary and requires opaque ids in
+  -- telemetry, so this is never derived from an IdP subject. GLOB treats '_' as
+  -- a literal, so 'usr_*' matches the prefix exactly. ':' is excluded because
+  -- reading_key uses it as a field delimiter over a UNIQUE column.
+  id TEXT PRIMARY KEY NOT NULL
+    CHECK (id GLOB 'usr_*' AND id NOT GLOB '*:*'),
+  -- The cryptographic identity. Bound into every AEAD additional-data blob and
+  -- into every wrapped DEK, so it must NEVER change once ciphertext exists.
+  -- Separate from id precisely so that id CAN change without re-encryption.
+  crypto_subject TEXT NOT NULL UNIQUE
+    CHECK (crypto_subject GLOB 'cs_*' AND crypto_subject NOT GLOB '*:*'),
   status TEXT NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'frozen', 'pending_deletion', 'deleted')),
   locale TEXT NOT NULL DEFAULT 'en-US',
@@ -57,6 +69,25 @@ CREATE TABLE IF NOT EXISTS identities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_identities_user ON identities(user_id);
+
+-- Worker-minted sessions. The IdP proves who the user is once, at
+-- POST /v1/sessions; this table is what every subsequent request checks, and
+-- what makes "invalidate sessions" a row update rather than a wait for token
+-- expiry.
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  -- SHA-256 hex of the bearer, never the bearer. A database disclosure must not
+  -- hand the reader a set of usable session tokens.
+  token_sha256 TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  last_seen_at TEXT,
+  revoked_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user_live
+  ON sessions(user_id) WHERE revoked_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Consent and source permissions

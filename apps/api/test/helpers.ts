@@ -2,14 +2,20 @@ import { env, SELF } from "cloudflare:test";
 import type { BirthProfileRequest } from "@patternlike/shared";
 
 /**
- * Tables the birth→chart path writes, in foreign-key-safe delete order.
- * Storage is not isolated per test in this pool version, so tests clear
- * explicitly rather than relying on rollback.
+ * Tables the API writes, in foreign-key-safe delete order. Storage is not
+ * isolated per test in this pool version, so tests clear explicitly rather than
+ * relying on rollback. A table missing from this list leaks rows between suites
+ * and makes tests pass for the wrong reason.
  */
 const TABLES = [
   "natal_features",
   "chart_snapshots",
   "birth_profiles",
+  "sessions",
+  "identities",
+  "export_requests",
+  "deletion_requests",
+  "consents",
   "user_keys",
   "jobs",
   "users",

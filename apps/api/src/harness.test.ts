@@ -67,8 +67,10 @@ describe("workers test harness", () => {
 
     it("writes are visible within a test", async () => {
       await env.DB.prepare(
-        "INSERT INTO users (id, status, locale, timezone, entitlement_tier, created_at, updated_at)" +
-          " VALUES ('usr_reset_probe_1','active','en-US','UTC','free','2026-01-01','2026-01-01')",
+        "INSERT INTO users (id, crypto_subject, status, locale, timezone," +
+          " entitlement_tier, created_at, updated_at)" +
+          " VALUES ('usr_reset_probe_1','cs_reset_probe_1','active','en-US','UTC'," +
+          "'free','2026-01-01','2026-01-01')",
       ).run();
       expect(await rows("SELECT id FROM users")).toHaveLength(1);
     });
