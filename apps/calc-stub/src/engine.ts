@@ -95,6 +95,10 @@ const ASPECT_ANGLES: Array<{ aspect: AspectType; angle: number }> = [
   { aspect: "opposition", angle: 180 },
 ];
 
+export const ASPECT_ANGLE_BY_TYPE: Record<AspectType, number> = Object.fromEntries(
+  ASPECT_ANGLES.map(({ aspect, angle }) => [aspect, angle]),
+) as Record<AspectType, number>;
+
 let epheInitialized = false;
 
 export function initSwissEphemeris(ephePath = resolveEphePath()): string {
@@ -119,7 +123,8 @@ function norm360(x: number): number {
   return v;
 }
 
-function angleDiff(a: number, b: number): number {
+/** Smallest angle between two ecliptic longitudes, in [0, 180]. */
+export function angularSeparation(a: number, b: number): number {
   let d = Math.abs(norm360(a) - norm360(b)) % 360;
   if (d > 180) d = 360 - d;
   return d;
@@ -475,6 +480,44 @@ function houseNumber(lon: number, cusps: number[]): number {
   return 1;
 }
 
+/**
+ * An aspect is applying when the orb to exactness is shrinking:
+ * d|separation − aspect_angle| / dt < 0.
+ *
+ * Let d = norm360(lonA − lonB) ∈ [0, 360). The separation reported by
+ * angularSeparation is d when d ≤ 180 and 360 − d otherwise, so
+ *
+ *   d(separation)/dt = (speedA − speedB)   when d ≤ 180
+ *                    = (speedB − speedA)   otherwise
+ *
+ * and, since orb = |separation − angle|,
+ *
+ *   d(orb)/dt = sign(separation − angle) · d(separation)/dt
+ *
+ * The previous heuristic tested only whether the raw separation was shrinking.
+ * That is the rule for a conjunction; for a sextile, square, trine, or
+ * opposition it inverts the answer whenever the separation sits on the near
+ * side of the aspect angle — 8 of 15 aspects on the golden chart were wrong.
+ *
+ * Exactly on the aspect the orb is at a minimum and the derivative is
+ * undefined; the aspect is neither applying nor separating, so this returns
+ * false. Retrograde motion needs no special case — it is a negative speed.
+ */
+export function isApplying(
+  lonA: number,
+  lonB: number,
+  speedA: number,
+  speedB: number,
+  aspectAngle: number,
+): boolean {
+  const d = norm360(lonA - lonB);
+  const separation = d <= 180 ? d : 360 - d;
+  const separationRate = d <= 180 ? speedA - speedB : speedB - speedA;
+  const offset = separation - aspectAngle;
+  if (offset === 0) return false;
+  return Math.sign(offset) * separationRate < 0;
+}
+
 function buildAspects(positions: LongitudePosition[]): NatalAspect[] {
   const aspectable = positions.filter(
     (p) => p.body !== "ascendant" && p.body !== "midheaven",
@@ -484,24 +527,25 @@ function buildAspects(positions: LongitudePosition[]): NatalAspect[] {
     for (let j = i + 1; j < aspectable.length; j++) {
       const a = aspectable[i]!;
       const b = aspectable[j]!;
-      const diff = angleDiff(a.longitude_deg, b.longitude_deg);
+      const diff = angularSeparation(a.longitude_deg, b.longitude_deg);
       for (const { aspect, angle } of ASPECT_ANGLES) {
         const orb = Math.abs(diff - angle);
         const maxOrb = ORB_DEFAULTS[aspect];
         if (orb <= maxOrb) {
-          // applying: if faster body approaches aspect — approximate via speed sign
-          const sa = a.speed_longitude_deg_per_day ?? 0;
-          const sb = b.speed_longitude_deg_per_day ?? 0;
-          const closing =
-            (norm360(a.longitude_deg - b.longitude_deg) < 180 && sa < sb) ||
-            (norm360(b.longitude_deg - a.longitude_deg) < 180 && sb < sa);
+          const applying = isApplying(
+            a.longitude_deg,
+            b.longitude_deg,
+            a.speed_longitude_deg_per_day ?? 0,
+            b.speed_longitude_deg_per_day ?? 0,
+            angle,
+          );
           out.push({
             id: newId("asp"),
             body_a: a.body,
             body_b: b.body,
             aspect,
             orb_deg: Number(orb.toFixed(4)),
-            applying: closing,
+            applying,
             orb_policy_id: ORB_POLICY_ID,
             orb_policy_version: ORB_POLICY_VERSION,
           });
