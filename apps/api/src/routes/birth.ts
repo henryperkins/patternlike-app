@@ -17,56 +17,140 @@ export const birthRoutes = new Hono<{
   Variables: AppVariables;
 }>();
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LOCAL_TIME_RE = /^\d{2}:\d{2}(?::\d{2})?$/;
+const ACCURACIES = new Set(["exact", "approximate", "unknown"]);
+
+export interface ValidationFailure {
+  code: "invalid_body";
+  message: string;
+}
+
+function badCoordinate(value: unknown, label: string, limit: number): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return `${label} must be a finite number`;
+  }
+  if (value < -limit || value > limit) {
+    return `${label} out of range: ${value} (expected ${-limit}..${limit})`;
+  }
+  return null;
+}
+
+/**
+ * Validate everything the calculation engine would otherwise have to guess at.
+ *
+ * birth_time_local is required for exact and approximate because without it the
+ * engine synthesizes noon, and houses and angles derived from a synthetic noon
+ * are not facts about the user. Previously only birth_date was required, so
+ * `accuracy: "exact"` with no time produced a chart claiming a rising sign.
+ */
+export function validateBirthProfileRequest(
+  body: Partial<BirthProfileRequest>,
+): ValidationFailure | null {
+  const fail = (message: string): ValidationFailure => ({ code: "invalid_body", message });
+
+  if (!body.accuracy || !ACCURACIES.has(body.accuracy)) {
+    return fail("accuracy must be one of exact, approximate, unknown");
+  }
+  if (!body.consent_id) {
+    return fail("accuracy and consent_id are required");
+  }
+
+  if (body.accuracy !== "unknown") {
+    if (!body.birth_date) {
+      return fail("birth_date required unless accuracy is unknown");
+    }
+    if (!body.birth_time_local) {
+      return fail(
+        "birth_time_local required when accuracy is exact or approximate; " +
+          'use accuracy "unknown" when the birth time is not known',
+      );
+    }
+  }
+
+  if (body.birth_date !== undefined && body.birth_date !== null) {
+    if (typeof body.birth_date !== "string" || !ISO_DATE_RE.test(body.birth_date)) {
+      return fail("birth_date must be formatted YYYY-MM-DD");
+    }
+  }
+  if (body.birth_time_local !== undefined && body.birth_time_local !== null) {
+    if (
+      typeof body.birth_time_local !== "string" ||
+      !LOCAL_TIME_RE.test(body.birth_time_local)
+    ) {
+      return fail("birth_time_local must be formatted HH:MM or HH:MM:SS");
+    }
+  }
+  if (
+    body.approximate_window_minutes !== undefined &&
+    body.approximate_window_minutes !== null
+  ) {
+    const w = body.approximate_window_minutes;
+    if (typeof w !== "number" || !Number.isInteger(w) || w < 1 || w > 1440) {
+      return fail("approximate_window_minutes must be an integer between 1 and 1440");
+    }
+  }
+
+  const latError = badCoordinate(body.birthplace?.latitude, "birthplace.latitude", 90);
+  if (latError) return fail(latError);
+  const lonError = badCoordinate(body.birthplace?.longitude, "birthplace.longitude", 180);
+  if (lonError) return fail(lonError);
+
+  const hasLat =
+    body.birthplace?.latitude !== null && body.birthplace?.latitude !== undefined;
+  const hasLon =
+    body.birthplace?.longitude !== null && body.birthplace?.longitude !== undefined;
+  if (hasLat !== hasLon) {
+    return fail("birthplace latitude and longitude must be supplied together");
+  }
+
+  return null;
+}
+
 birthRoutes.post("/v1/birth-profiles", async (c) => {
+  const requestId = c.get("requestId");
+  const errorBody = (code: string, message: string) => ({
+    error: { code, message, request_id: requestId },
+  });
+
   const idem = requireIdempotencyKey(c.req.header("idempotency-key"));
   if (!idem) {
     return c.json(
-      {
-        error: {
-          code: "missing_idempotency_key",
-          message: "Idempotency-Key header required (min 8 chars)",
-          request_id: c.get("requestId"),
-        },
-      },
+      errorBody(
+        "missing_idempotency_key",
+        "Idempotency-Key header required (8-256 chars)",
+      ),
       400,
     );
   }
 
   const userId = c.get("userId");
-  const body = (await c.req.json()) as BirthProfileRequest;
 
-  if (!body.accuracy || !body.consent_id) {
-    return c.json(
-      {
-        error: {
-          code: "invalid_body",
-          message: "accuracy and consent_id are required",
-          request_id: c.get("requestId"),
-        },
-      },
-      400,
-    );
+  let body: Partial<BirthProfileRequest>;
+  try {
+    body = (await c.req.json()) as Partial<BirthProfileRequest>;
+  } catch {
+    return c.json(errorBody("invalid_json", "Request body must be valid JSON"), 400);
+  }
+  if (body === null || typeof body !== "object") {
+    return c.json(errorBody("invalid_body", "Request body must be a JSON object"), 400);
   }
 
-  if (body.accuracy !== "unknown" && !body.birth_date) {
-    return c.json(
-      {
-        error: {
-          code: "invalid_body",
-          message: "birth_date required unless accuracy is unknown",
-          request_id: c.get("requestId"),
-        },
-      },
-      400,
-    );
+  const invalid = validateBirthProfileRequest(body);
+  if (invalid) {
+    return c.json(errorBody(invalid.code, invalid.message), 400);
   }
+  const accuracy = body.accuracy!;
 
-  // Idempotent job short-circuit
+  // Idempotency is scoped to this user. Without the user_id predicate a second
+  // user reusing the same key received the first user's job and chart ids while
+  // their own profile was never written and their chart never calculated.
   const existingJob = await c.env.DB.prepare(
     `SELECT id, status, result_class FROM jobs
-     WHERE job_type = ? AND idempotency_key = ?`,
+     WHERE job_type = ? AND user_id = ? AND idempotency_key = ?`,
   )
-    .bind("NormalizeBirthAndCalculateChart", idem)
+    .bind("NormalizeBirthAndCalculateChart", userId, idem)
     .first<{ id: string; status: string; result_class: string | null }>();
 
   if (existingJob?.status === "succeeded") {
@@ -78,6 +162,21 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
         idempotency_key: idem,
         job_id: existingJob.id,
         resource_id: existingJob.result_class,
+      },
+      202,
+    );
+  }
+  if (existingJob && (existingJob.status === "queued" || existingJob.status === "running")) {
+    // In flight. Report it rather than re-running the insert and 500ing on the
+    // unique index, which is what every non-success retry used to do.
+    return c.json(
+      {
+        schema_version: SCHEMA_VERSION,
+        workflow: "NormalizeBirthAndCalculateChart",
+        status: "running",
+        idempotency_key: idem,
+        job_id: existingJob.id,
+        resource_id: null,
       },
       202,
     );
@@ -101,56 +200,59 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     consent_id: body.consent_id,
   };
 
-  const { keyVersion, nonce, ciphertext } = await encryptPayload(
-    c.env,
-    userId,
-    sensitive,
-  );
-
-  // D1 bind BLOB: use Uint8Array from base64 ciphertext for payload_enc
+  const { keyVersion, nonce, ciphertext } = await encryptPayload(c.env, userId, sensitive);
+  // D1 bind BLOB: Uint8Array from the base64 ciphertext
   const encBytes = Uint8Array.from(atob(ciphertext), (ch) => ch.charCodeAt(0));
 
-  await c.env.DB.prepare(
-    `INSERT INTO birth_profiles (
-      user_id, version, accuracy, status, timezone,
-      payload_enc, payload_key_version, payload_nonce,
-      geocode_confidence, created_at, updated_at
-    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL, ?, ?)`,
-  )
-    .bind(
+  const jobId = existingJob?.id ?? newId("job");
+
+  // The profile lands as 'pending' and the job as 'running' in one transaction.
+  // A prior failed job for this key is reused rather than re-inserted, so a
+  // retry can never collide with uq_jobs_scope_key.
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO birth_profiles (
+        user_id, version, accuracy, status, timezone,
+        payload_enc, payload_key_version, payload_nonce,
+        geocode_confidence, created_at, updated_at
+      ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, NULL, ?, ?)`,
+    ).bind(
       userId,
       profileVersion,
-      body.accuracy,
+      accuracy,
       body.timezone_hint ?? "UTC",
       encBytes,
       keyVersion,
       nonce,
       now,
       now,
-    )
-    .run();
-
-  const jobId = newId("job");
-  await c.env.DB.prepare(
-    `INSERT INTO jobs (
-      id, job_type, user_id, idempotency_key, status, payload_json,
-      attempts, created_at
-    ) VALUES (?, 'NormalizeBirthAndCalculateChart', ?, ?, 'running', ?, 1, ?)`,
-  )
-    .bind(
-      jobId,
-      userId,
-      idem,
-      JSON.stringify({ profile_version: profileVersion }),
-      now,
-    )
-    .run();
+    ),
+    existingJob
+      ? c.env.DB.prepare(
+          `UPDATE jobs SET status = 'running', payload_json = ?, attempts = attempts + 1,
+                           started_at = ?, finished_at = NULL, result_class = NULL
+           WHERE id = ?`,
+        ).bind(JSON.stringify({ profile_version: profileVersion }), now, jobId)
+      : c.env.DB.prepare(
+          `INSERT INTO jobs (
+            id, job_type, user_id, idempotency_key, status, payload_json,
+            attempts, started_at, created_at
+          ) VALUES (?, 'NormalizeBirthAndCalculateChart', ?, ?, 'running', ?, 1, ?, ?)`,
+        ).bind(
+          jobId,
+          userId,
+          idem,
+          JSON.stringify({ profile_version: profileVersion }),
+          now,
+          now,
+        ),
+  ]);
 
   const calc = await invokeCalc(c.env, {
     request_id: jobId,
     user_id: userId,
     profile_version: profileVersion,
-    accuracy: body.accuracy,
+    accuracy,
     birth_date: body.birth_date ?? null,
     birth_time_local: body.birth_time_local ?? null,
     timezone: body.timezone_hint ?? "UTC",
@@ -163,24 +265,76 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   });
 
   if (!calc.ok || !calc.chart) {
-    await c.env.DB.prepare(
-      `UPDATE jobs SET status = 'failed', result_class = ?, finished_at = ? WHERE id = ?`,
-    )
-      .bind(calc.error_class ?? "calc_failed", now, jobId)
-      .run();
+    const calcClass = calc.error_class ?? "calc_failed";
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE jobs SET status = 'failed', result_class = ?, finished_at = ? WHERE id = ?`,
+      ).bind(calcClass, now, jobId),
+      c.env.DB.prepare(
+        `UPDATE birth_profiles SET status = 'invalid', updated_at = ?
+         WHERE user_id = ? AND version = ?`,
+      ).bind(now, userId, profileVersion),
+    ]);
+
+    // Bad input is the caller's problem and is safe to echo back. Anything else
+    // is an upstream fault whose message has previously carried the calculation
+    // service's absolute filesystem path, so it is logged rather than returned.
+    if (calcClass === "invalid_birth_profile") {
+      return c.json(
+        errorBody(
+          "invalid_birth_profile",
+          calc.error_message ?? "Birth profile is not valid",
+        ),
+        400,
+      );
+    }
+    console.error("calc_failed", {
+      request_id: requestId,
+      job_id: jobId,
+      error_class: calcClass,
+      error_message: calc.error_message,
+    });
     return c.json(
-      {
-        error: {
-          code: calc.error_class ?? "calc_failed",
-          message: calc.error_message ?? "Calculation failed",
-          request_id: c.get("requestId"),
-        },
-      },
+      errorBody("calc_failed", "Calculation service could not produce a chart"),
       502,
     );
   }
 
   const chart = calc.chart;
+
+  // Identical birth data under a new key reproduces the fingerprint. OpenAPI
+  // declares 409 for this; the previous code let UNIQUE(user_id, fingerprint)
+  // throw a bare 500 after the profile and job rows were already committed,
+  // leaving the job stuck 'running' forever.
+  const duplicate = await c.env.DB.prepare(
+    `SELECT id FROM chart_snapshots WHERE user_id = ? AND fingerprint = ?`,
+  )
+    .bind(userId, chart.fingerprint)
+    .first<{ id: string }>();
+
+  if (duplicate) {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE jobs SET status = 'succeeded', result_class = ?, finished_at = ? WHERE id = ?`,
+      ).bind(duplicate.id, now, jobId),
+      c.env.DB.prepare(
+        `UPDATE birth_profiles SET status = 'superseded', updated_at = ?
+         WHERE user_id = ? AND version = ?`,
+      ).bind(now, userId, profileVersion),
+    ]);
+    return c.json(
+      {
+        error: {
+          code: "chart_already_exists",
+          message: "This birth data already has a chart",
+          request_id: requestId,
+          details: { chart_id: duplicate.id, fingerprint: chart.fingerprint },
+        },
+      },
+      409,
+    );
+  }
+
   // Non-PII snapshot for query; birth PII encrypted separately
   const publicSnapshot = {
     positions: chart.positions,
@@ -201,15 +355,19 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     ch.charCodeAt(0),
   );
 
-  await c.env.DB.prepare(
-    `INSERT INTO chart_snapshots (
-      id, user_id, profile_version, fingerprint, contract_id, contract_version,
-      container_digest, tzdb_version, status, calculated_at, snapshot_json,
-      birth_accuracy, birth_enc, birth_key_version, birth_nonce,
-      r2_uri, uncertainty_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
-  )
-    .bind(
+  // One transaction: publish the chart, supersede the previous chart AND the
+  // previous profile versions, activate this profile, close the job. Previously
+  // only charts were superseded, so failed calculations left several profile
+  // rows at status='active' simultaneously for one user.
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO chart_snapshots (
+        id, user_id, profile_version, fingerprint, contract_id, contract_version,
+        container_digest, tzdb_version, status, calculated_at, snapshot_json,
+        birth_accuracy, birth_enc, birth_key_version, birth_nonce,
+        r2_uri, uncertainty_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    ).bind(
       chart.id,
       userId,
       profileVersion,
@@ -226,22 +384,23 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       birthEnc.nonce,
       JSON.stringify(chart.uncertainty),
       now,
-    )
-    .run();
-
-  // Supersede older active charts
-  await c.env.DB.prepare(
-    `UPDATE chart_snapshots SET status = 'superseded'
-     WHERE user_id = ? AND id != ? AND status = 'active'`,
-  )
-    .bind(userId, chart.id)
-    .run();
-
-  await c.env.DB.prepare(
-    `UPDATE jobs SET status = 'succeeded', result_class = ?, finished_at = ? WHERE id = ?`,
-  )
-    .bind(chart.id, now, jobId)
-    .run();
+    ),
+    c.env.DB.prepare(
+      `UPDATE chart_snapshots SET status = 'superseded'
+       WHERE user_id = ? AND id != ? AND status = 'active'`,
+    ).bind(userId, chart.id),
+    c.env.DB.prepare(
+      `UPDATE birth_profiles SET status = 'superseded', updated_at = ?
+       WHERE user_id = ? AND version != ? AND status IN ('pending', 'active')`,
+    ).bind(now, userId, profileVersion),
+    c.env.DB.prepare(
+      `UPDATE birth_profiles SET status = 'active', updated_at = ?
+       WHERE user_id = ? AND version = ?`,
+    ).bind(now, userId, profileVersion),
+    c.env.DB.prepare(
+      `UPDATE jobs SET status = 'succeeded', result_class = ?, finished_at = ? WHERE id = ?`,
+    ).bind(chart.id, now, jobId),
+  ]);
 
   return c.json(
     {
@@ -262,3 +421,4 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     202,
   );
 });
+
