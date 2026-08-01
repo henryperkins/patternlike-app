@@ -27,7 +27,9 @@ internal.use("*", configGuard);
 internal.use("*", serviceAuth);
 internal.route("/", internalRoutes);
 
-app.route("/", internal);
+// Mounted under a prefix, not "/". A sub-app routed at "/" contributes its
+// `use("*", ...)` middleware to every path in the parent.
+app.route("/internal", internal);
 app.route("/", api);
 
 // Without this, Hono's default handler returns 500 as text/plain, so the

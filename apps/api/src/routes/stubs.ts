@@ -52,16 +52,17 @@ stubRoutes.delete("/v1/account", (c) =>
 );
 
 /**
- * Internal service-to-service surfaces. Mounted behind serviceAuth, not
- * authStub. This route previously sat on the consumer router, so a plain
- * X-User-Id header routed through it while serviceAuth was exported and wired
- * to nothing.
+ * Internal service-to-service surfaces. Paths here are relative to the
+ * `/internal` mount prefix in index.ts — NOT absolute. Mounting this router at
+ * "/" made its `use("*", serviceAuth)` match every path in the application, so
+ * the service token gated the whole consumer API and any consumer bearer token
+ * was compared against SERVICE_AUTH_TOKEN and rejected.
  */
 export const internalRoutes = new Hono<{
   Bindings: Env;
   Variables: AppVariables;
 }>();
 
-internalRoutes.post("/internal/content-releases", (c) =>
+internalRoutes.post("/content-releases", (c) =>
   c.json(notImplemented("Content release ingestion (M2)"), 501),
 );
