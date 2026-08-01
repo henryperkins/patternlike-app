@@ -84,7 +84,9 @@ Confirmed by executing code or reading the cited line, not by inference.
 | Spec: deletion is `"Freeze jobs, revoke tokens, delete rows/objects, destroy DEK, audit."` | `spec-bundle/_docx_extract.txt:440` |
 | Spec: `chart_snapshots` retention is `"Immutable; active plus lineage."`; `audit_events` `"13 months minimum target."` | `spec-bundle/_docx_extract.txt:466, :494` |
 | `apps/api` has exactly two runtime deps (`hono`, `@patternlike/shared`); installed Hono is 4.12.32 | `apps/api/package.json`; `node_modules/hono/package.json` |
-| `hono/jwk` and `hono/cookie` are declared subpath exports at **4.7.10**, the low end of the declared `^4.7.10` range — so both are available without widening the dependency, and identity needs **no new runtime dependency** | `npm view hono@4.7.10 exports`; installed 4.12.32 exports |
+| Identity needs **no new runtime dependency** — `Jwt.verifyWithJwks` and `hono/cookie` both ship in the installed Hono 4.12.32 | `node_modules/hono/dist/types/utils/jwt/jwt.d.ts`; package exports |
+| **But the declared `^4.7.10` floor is too low and must be raised to `^4.12.32`.** At 4.7.10 the function is named `verifyFromJwks`, there is no `allowedAlgorithms` option, and `verify` takes only `alg?` — so it **cannot check `iss` or `aud` at all**. The subpath exports exist at the floor; the API does not | unpacked `hono@4.7.10` tarball: `verify: (token, publicKey, alg?)`, `verifyFromJwks` |
+| `verifyWithJwks` **re-fetches the JWKS on every call** when given `jwks_uri`. The spec's module-scope cache requirement therefore means fetching the key set ourselves and passing `keys:`, not `jwks_uri:` | `node_modules/hono/dist/utils/jwt/jwt.js`, `verifyWithJwks` body |
 | `isDevEnvironment` returns true for **both** `"development"` and `"test"` | `apps/api/src/crypto.ts:56-58` |
 | The schema has 21 tables and **16** of them carry `REFERENCES users(id)` — so an id change is a 16-table cascade, several into unique indexes | `grep -c` over `db/d1/0001_m0_core.sql` |
 
@@ -495,11 +497,16 @@ artifact schema without a conforming fixture name is validated by nothing.
 
 ### Testing
 
-- **Auth tests need a second vitest project.** `ENVIRONMENT` comes from
-  `wrangler.toml` at config time and cannot be varied per test —
-  `docs/reviews/2026-08-01-spec-escalations.md:195-197` already records this as a
-  known gap. Both Stream 1's wrong-issuer test and its "the guard actually fires"
-  test depend on it.
+- **Auth tests do *not* need a second vitest project.**
+  `docs/reviews/2026-08-01-spec-escalations.md:195-197` records that `ENVIRONMENT`
+  comes from `wrangler.toml` at config time and cannot be varied per test. That is
+  true of `SELF.fetch`, which drives the deployed Worker with wrangler's vars — but
+  not of the Hono app imported directly. `app.request(path, init, env)` takes
+  bindings as its third argument, so a test can spread the real `env` from
+  `cloudflare:test` and override `ENVIRONMENT`/`AUTH_STUB` per request, keeping
+  real D1 with a production-shaped config. Verified by probe against Hono 4.12.32.
+  The review's note should be narrowed to `SELF.fetch` rather than treated as a
+  blanket limitation.
 - **`test/helpers.ts`'s `TABLES` reset list must gain** `identities`, `consents`,
   `sessions`, `export_requests`, and `deletion_requests`, or integration rows leak
   between suites.
