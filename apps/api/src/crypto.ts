@@ -24,14 +24,86 @@ async function importAesKey(raw: Uint8Array): Promise<CryptoKey> {
   ]);
 }
 
-/** Dev-only KEK derivation — replace with Secrets Store in production. */
-export async function resolveRootKey(rootKek?: string): Promise<CryptoKey> {
-  const material = rootKek ?? "patternlike-dev-only-root-kek-change-me!!";
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
+/** The placeholder that shipped in the repository. Never valid outside dev. */
+export const DEV_ROOT_KEK = "patternlike-dev-only-root-kek-change-me!!";
+
+/**
+ * Bumped from 1 when the derivation moved from a bare unsalted SHA-256 of the
+ * passphrase to HKDF-SHA256 with a salt and domain separation. Ciphertext
+ * produced under v1 is not readable under v2; M0 is pre-production, so local
+ * databases are recreated rather than migrated. See db/d1/MIGRATIONS.json.
+ */
+export const KEK_DERIVATION_VERSION = 2;
+
+const KEK_HKDF_SALT = new TextEncoder().encode("patternlike/kek/v2");
+const KEK_HKDF_INFO = new TextEncoder().encode("patternlike:root-kek:aes-256-gcm");
+
+const MIN_ROOT_KEK_LENGTH = 32;
+
+export interface RootKeyEnv {
+  ROOT_KEK?: string;
+  ENVIRONMENT?: string;
+}
+
+export class RootKekError extends Error {
+  readonly code = "root_kek_not_configured";
+  constructor(message: string) {
+    super(message);
+    this.name = "RootKekError";
+  }
+}
+
+export function isDevEnvironment(environment: string | undefined): boolean {
+  return environment === "development" || environment === "test";
+}
+
+async function deriveKek(material: string): Promise<CryptoKey> {
+  const ikm = await crypto.subtle.importKey(
+    "raw",
     new TextEncoder().encode(material),
+    "HKDF",
+    false,
+    ["deriveKey"],
   );
-  return importAesKey(new Uint8Array(hash));
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: KEK_HKDF_SALT, info: KEK_HKDF_INFO },
+    ikm,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Resolve the root KEK.
+ *
+ * Outside development a missing, placeholder, or implausibly short ROOT_KEK is
+ * a hard failure. The previous behaviour was to fall back silently to a string
+ * committed in this repository, so a deploy that forgot the secret encrypted
+ * every user's birth date, time, and coordinates under a key any reader of the
+ * source could derive, with nothing failing or warning.
+ */
+export async function resolveRootKey(env: RootKeyEnv): Promise<CryptoKey> {
+  const configured = env.ROOT_KEK?.trim();
+  const dev = isDevEnvironment(env.ENVIRONMENT);
+
+  if (!configured) {
+    if (!dev) {
+      throw new RootKekError(
+        "ROOT_KEK is not configured; set it with `wrangler secret put ROOT_KEK`",
+      );
+    }
+    return deriveKek(DEV_ROOT_KEK);
+  }
+  if (configured === DEV_ROOT_KEK && !dev) {
+    throw new RootKekError("ROOT_KEK is set to the development placeholder");
+  }
+  if (configured.length < MIN_ROOT_KEK_LENGTH) {
+    throw new RootKekError(
+      `ROOT_KEK must be at least ${MIN_ROOT_KEK_LENGTH} characters`,
+    );
+  }
+  return deriveKek(configured);
 }
 
 export async function generateUserDek(): Promise<Uint8Array> {

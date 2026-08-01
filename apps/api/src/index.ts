@@ -1,22 +1,33 @@
 import { Hono } from "hono";
 import type { Env } from "./env.js";
-import { authStub, type AppVariables } from "./middleware/auth.js";
+import { authStub, serviceAuth, type AppVariables } from "./middleware/auth.js";
+import { configGuard } from "./middleware/config-guard.js";
 import { healthRoutes } from "./routes/health.js";
 import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
-import { stubRoutes } from "./routes/stubs.js";
+import { stubRoutes, internalRoutes } from "./routes/stubs.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
 app.route("/", healthRoutes);
 
-// Authenticated product API
+// Authenticated product API. configGuard runs first so no surface serves on a
+// development-shaped configuration in a non-development environment.
 const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
+api.use("*", configGuard);
 api.use("*", authStub);
 api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", stubRoutes);
 
+// Internal service-to-service API, behind the service token rather than the
+// consumer auth stub.
+const internal = new Hono<{ Bindings: Env; Variables: AppVariables }>();
+internal.use("*", configGuard);
+internal.use("*", serviceAuth);
+internal.route("/", internalRoutes);
+
+app.route("/", internal);
 app.route("/", api);
 
 // Without this, Hono's default handler returns 500 as text/plain, so the

@@ -11,7 +11,10 @@ describe("envelope encryption helpers", () => {
   });
 
   it("wraps DEK with root key", async () => {
-    const root = await resolveRootKey("test-root");
+    const root = await resolveRootKey({
+      ENVIRONMENT: "test",
+      ROOT_KEK: "a-test-root-key-long-enough-to-pass-32",
+    });
     const dek = await generateUserDek();
     const wrapped = await wrapDek(dek, root);
     expect(wrapped.wrapped_b64).toBeTruthy();

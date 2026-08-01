@@ -50,6 +50,18 @@ stubRoutes.post("/v1/exports", (c) =>
 stubRoutes.delete("/v1/account", (c) =>
   c.json(notImplemented("Account deletion (M1 privacy skeleton follows)"), 501),
 );
-stubRoutes.post("/internal/content-releases", (c) =>
+
+/**
+ * Internal service-to-service surfaces. Mounted behind serviceAuth, not
+ * authStub. This route previously sat on the consumer router, so a plain
+ * X-User-Id header routed through it while serviceAuth was exported and wired
+ * to nothing.
+ */
+export const internalRoutes = new Hono<{
+  Bindings: Env;
+  Variables: AppVariables;
+}>();
+
+internalRoutes.post("/internal/content-releases", (c) =>
   c.json(notImplemented("Content release ingestion (M2)"), 501),
 );

@@ -15,6 +15,9 @@ migrations_dir = "../../db/d1"
 # binding = "ARTIFACTS"
 # bucket_name = "patternlike-artifacts"
 
+# Default (development) vars. A bare `wrangler deploy` uses these, which is why
+# `npm run deploy` targets the production environment explicitly and the
+# configGuard middleware refuses AUTH_STUB=1 outside development.
 [vars]
 ENVIRONMENT = "development"
 AUTH_STUB = "1"
@@ -23,6 +26,26 @@ SCHEMA_VERSION = "0.2.0"
 # M0 decision: AGPL public SE — docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md
 SE_LICENSE_MODE = "agpl"
 
-# Secrets (set via `wrangler secret put`):
-# ROOT_KEK — envelope encryption root key
+# Named environments do not inherit top-level bindings, so D1 is redeclared.
+[env.production]
+name = "patternlike-api-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+CALC_SERVICE_URL = "https://calc.internal.patternlike.app"
+SCHEMA_VERSION = "0.2.0"
+SE_LICENSE_MODE = "agpl"
+# AUTH_STUB is deliberately absent. Setting it here re-enables auth that trusts
+# an unauthenticated X-User-Id header.
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "patternlike-ops"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "../../db/d1"
+
+# Secrets (set via `wrangler secret put --env production`):
+# ROOT_KEK — envelope encryption root key. Required: every request outside
+#            development returns 503 until it is set, and it must not be the
+#            development placeholder.
 # SERVICE_AUTH_TOKEN — internal WordPress → CF release auth

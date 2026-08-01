@@ -4,6 +4,7 @@ import {
   resolveRootKey,
   wrapDek,
   encryptJson,
+  KEK_DERIVATION_VERSION,
 } from "../crypto.js";
 
 export async function ensureUser(db: D1Database, userId: string): Promise<void> {
@@ -23,30 +24,45 @@ export async function ensureUser(db: D1Database, userId: string): Promise<void> 
     .run();
 }
 
+export class UserKeyDestroyedError extends Error {
+  readonly code = "user_key_destroyed";
+  constructor(userId: string) {
+    super(`Encryption key for ${userId} has been destroyed`);
+    this.name = "UserKeyDestroyedError";
+  }
+}
+
+export class UnsupportedKekVersionError extends Error {
+  readonly code = "kek_version_unsupported";
+  constructor(found: number) {
+    super(
+      `user_keys.kek_version ${found} predates KEK derivation v${KEK_DERIVATION_VERSION}; ` +
+        "recreate the local database with: npm run db:local -w @patternlike/api",
+    );
+    this.name = "UnsupportedKekVersionError";
+  }
+}
+
 export async function ensureUserKey(
   env: Env,
   userId: string,
 ): Promise<{ dek: Uint8Array; keyVersion: number }> {
-  const row = await env.DB.prepare(
-    "SELECT key_version, wrapped_dek FROM user_keys WHERE user_id = ? AND destroyed_at IS NULL",
+  const active = await env.DB.prepare(
+    `SELECT key_version, kek_version, wrapped_dek FROM user_keys
+     WHERE user_id = ? AND destroyed_at IS NULL
+     ORDER BY key_version DESC LIMIT 1`,
   )
     .bind(userId)
-    .first<{ key_version: number; wrapped_dek: ArrayBuffer }>();
+    .first<{ key_version: number; kek_version: number; wrapped_dek: ArrayBuffer }>();
 
-  const root = await resolveRootKey(env.ROOT_KEK);
+  const root = await resolveRootKey(env);
 
-  if (row) {
-    // M1 stub: re-generate session DEK is wrong for real unwrap; store raw DEK wrapped.
-    // For local demo we re-derive is not possible without unwrap — generate new only if missing.
-    // Production: unwrap with root key. Here we store wrapped DEK and keep in-memory only on create.
-  }
-
-  // If key exists we cannot recover DEK without storing unwrap path.
-  // M1 approach: store wrapped form of DEK and also keep dek material recoverable via wrap/unwrap.
-  if (row) {
-    // Unwrap
-    const wrapped = new Uint8Array(row.wrapped_dek);
-    // Format: nonce(12) || ciphertext
+  if (active) {
+    if (active.kek_version !== KEK_DERIVATION_VERSION) {
+      throw new UnsupportedKekVersionError(active.kek_version);
+    }
+    // Stored as nonce(12) || ciphertext
+    const wrapped = new Uint8Array(active.wrapped_dek);
     const nonce = wrapped.slice(0, 12);
     const ct = wrapped.slice(12);
     const dekBuf = await crypto.subtle.decrypt(
@@ -54,7 +70,20 @@ export async function ensureUserKey(
       root,
       ct,
     );
-    return { dek: new Uint8Array(dekBuf), keyVersion: row.key_version };
+    return { dek: new Uint8Array(dekBuf), keyVersion: active.key_version };
+  }
+
+  // No live key. If one was destroyed the account was crypto-shredded, and
+  // minting a fresh DEK would quietly undo that, so refuse instead. Previously
+  // this path 500ed forever: the destroyed_at IS NULL lookup missed while the
+  // insert still collided on the user_id primary key.
+  const destroyed = await env.DB.prepare(
+    "SELECT 1 AS present FROM user_keys WHERE user_id = ? LIMIT 1",
+  )
+    .bind(userId)
+    .first<{ present: number }>();
+  if (destroyed) {
+    throw new UserKeyDestroyedError(userId);
   }
 
   const dek = await generateUserDek();
@@ -69,9 +98,9 @@ export async function ensureUserKey(
   const now = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at)
-     VALUES (?, 1, 1, ?, ?)`,
+     VALUES (?, 1, ?, ?, ?)`,
   )
-    .bind(userId, packed, now)
+    .bind(userId, KEK_DERIVATION_VERSION, packed, now)
     .run();
 
   return { dek, keyVersion: 1 };
