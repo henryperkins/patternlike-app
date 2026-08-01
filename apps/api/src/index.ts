@@ -1,21 +1,33 @@
 import { Hono } from "hono";
 import type { Env } from "./env.js";
-import { authStub, serviceAuth, type AppVariables } from "./middleware/auth.js";
+import { authenticate, serviceAuth, type AppVariables } from "./middleware/auth.js";
 import { configGuard } from "./middleware/config-guard.js";
 import { healthRoutes } from "./routes/health.js";
 import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
 import { stubRoutes, internalRoutes } from "./routes/stubs.js";
+import { sessionRoutes } from "./routes/sessions.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
 app.route("/", healthRoutes);
 
+// Session exchange is unauthenticated by necessity — it is what mints the
+// session everything else requires — but still config-guarded.
+//
+// configGuard is attached to the two session paths directly rather than via a
+// sub-app with use("*", ...) routed at "/". That sub-app pattern is exactly the
+// defect the /internal mount fix removed: a router mounted at "/" contributes
+// its wildcard middleware to EVERY path in the parent.
+app.use("/v1/sessions", configGuard);
+app.use("/v1/sessions/*", configGuard);
+app.route("/", sessionRoutes);
+
 // Authenticated product API. configGuard runs first so no surface serves on a
 // development-shaped configuration in a non-development environment.
 const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 api.use("*", configGuard);
-api.use("*", authStub);
+api.use("*", authenticate);
 api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", stubRoutes);

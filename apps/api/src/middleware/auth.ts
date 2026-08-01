@@ -1,6 +1,8 @@
 import type { Context, Next } from "hono";
+import { getCookie } from "hono/cookie";
 import type { Env } from "../env.js";
 import type { CryptoSubject } from "../crypto.js";
+import { resolveSession } from "../db/sessions.js";
 import { loadUserIdentity } from "../db/users.js";
 
 export type AppVariables = {
@@ -8,16 +10,53 @@ export type AppVariables = {
   /** The immutable AEAD/DEK subject. Never a request-supplied value. */
   cryptoSubject: CryptoSubject;
   requestId: string;
+  /** Present only when a real session authenticated the request. */
+  sessionId?: string;
 };
 
-export async function authStub(
+/** Same-origin browsers present the session here; native clients use Bearer. */
+export const SESSION_COOKIE = "pl_session";
+
+function unauthorized(c: Context, requestId: string) {
+  return c.json(
+    {
+      error: {
+        code: "unauthorized",
+        message: "Authentication required",
+        request_id: requestId,
+      },
+    },
+    401,
+  );
+}
+
+/** Cookie first — a browser sends both only if something is misconfigured. */
+export function readSessionToken(c: Context): string | null {
+  const cookie = getCookie(c, SESSION_COOKIE);
+  if (cookie) return cookie;
+  const auth = c.req.header("authorization");
+  if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length).trim();
+  return null;
+}
+
+/**
+ * Resolve the caller.
+ *
+ * The AUTH_STUB=1 branch is development-only and is refused outside development
+ * by configGuard. It trusts the header to *name* a user but no longer to create
+ * one: the crypto subject is read from the row, because fabricating one from a
+ * request header would produce ciphertext nobody can read.
+ *
+ * Everything else resolves an opaque session token — issued by POST /v1/sessions
+ * after an OIDC exchange — to a user id and a crypto subject in a single read.
+ */
+export async function authenticate(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
 ) {
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
 
-  // Open decision: real IdP later. Local/dev stub only.
   if (c.env.AUTH_STUB === "1") {
     const userId = c.req.header("x-user-id");
     if (!userId || userId.length < 8) {
@@ -32,53 +71,26 @@ export async function authStub(
         401,
       );
     }
-    // The header now *names* an existing user rather than conjuring one: the
-    // crypto subject is read from the row, because it is the AEAD subject and
-    // must never come from a request.
     const identity = await loadUserIdentity(c.env, userId);
-    if (!identity) {
-      return c.json(
-        {
-          error: {
-            code: "unauthorized",
-            message: "Provide X-User-Id header when AUTH_STUB=1",
-            request_id: requestId,
-          },
-        },
-        401,
-      );
-    }
+    if (!identity) return unauthorized(c, requestId);
     c.set("userId", identity.userId);
     c.set("cryptoSubject", identity.cryptoSubject);
     await next();
     return;
   }
 
-  const auth = c.req.header("authorization");
-  if (!auth?.startsWith("Bearer ")) {
-    return c.json(
-      {
-        error: {
-          code: "unauthorized",
-          message: "Bearer token required",
-          request_id: requestId,
-        },
-      },
-      401,
-    );
-  }
+  const token = readSessionToken(c);
+  if (!token) return unauthorized(c, requestId);
 
-  // Placeholder until identity provider is chosen (M0 open decision).
-  return c.json(
-    {
-      error: {
-        code: "auth_not_configured",
-        message: "Production auth not configured; set AUTH_STUB=1 for local",
-        request_id: requestId,
-      },
-    },
-    501,
-  );
+  const principal = await resolveSession(c.env, token);
+  // Unknown, revoked, and expired are one answer: which it was is free
+  // information for an attacker.
+  if (!principal) return unauthorized(c, requestId);
+
+  c.set("userId", principal.userId);
+  c.set("cryptoSubject", principal.cryptoSubject);
+  c.set("sessionId", principal.sessionId);
+  await next();
 }
 
 export async function serviceAuth(

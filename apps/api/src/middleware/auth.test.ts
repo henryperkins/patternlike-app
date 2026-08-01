@@ -1,6 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
 import app from "../index.js";
+import { resetDb, rows } from "../../test/helpers.js";
+import { linkIdentity } from "../db/identities.js";
+import { createSession } from "../db/sessions.js";
 
 /**
  * These drive the real Hono app but override bindings per request via
@@ -93,5 +96,189 @@ describe("service auth is scoped to /internal", () => {
     );
     expect(res.status).toBe(503);
     expect((await body(res)).error?.code).toBe("service_auth_not_configured");
+  });
+});
+
+describe("authenticate", () => {
+  beforeEach(resetDb);
+
+  it("rejects a request with no credential", async () => {
+    const res = await app.request("/v1/chart", {}, prodEnv());
+    expect(res.status).toBe(401);
+    expect((await body(res)).error?.code).toBe("unauthorized");
+  });
+
+  it("rejects an unknown bearer", async () => {
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { authorization: "Bearer totally-made-up" } },
+      prodEnv(),
+    );
+    expect(res.status).toBe(401);
+    expect((await body(res)).error?.code).toBe("unauthorized");
+  });
+
+  it("never answers 501 auth_not_configured again", async () => {
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { authorization: "Bearer anything" } },
+      prodEnv(),
+    );
+    expect(res.status).not.toBe(501);
+    expect((await body(res)).error?.code).not.toBe("auth_not_configured");
+  });
+
+  it("accepts a live session presented as a bearer", async () => {
+    const id = await linkIdentity(env, "oidc", "sub-alice");
+    const { token } = await createSession(env, id.userId);
+
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { authorization: `Bearer ${token}` } },
+      prodEnv(),
+    );
+    // No chart exists for this user yet, so 404 — but authentication passed.
+    // The code is `chart_not_found` (routes/chart.ts), NOT the router's
+    // `not_found`: reaching the handler at all is what proves auth succeeded.
+    expect(res.status).toBe(404);
+    expect((await body(res)).error?.code).toBe("chart_not_found");
+  });
+
+  it("accepts the same session presented as a cookie", async () => {
+    const id = await linkIdentity(env, "oidc", "sub-alice");
+    const { token } = await createSession(env, id.userId);
+
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { cookie: `pl_session=${token}` } },
+      prodEnv(),
+    );
+    expect(res.status).toBe(404);
+    expect((await body(res)).error?.code).toBe("chart_not_found");
+  });
+
+  it("rejects a revoked session presented as a cookie", async () => {
+    const id = await linkIdentity(env, "oidc", "sub-alice");
+    const { token } = await createSession(env, id.userId);
+    await env.DB.prepare("UPDATE sessions SET revoked_at = ?")
+      .bind(new Date().toISOString())
+      .run();
+
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { cookie: `pl_session=${token}` } },
+      prodEnv(),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns the same request id it was given", async () => {
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { "x-request-id": "req-abc-123" } },
+      prodEnv(),
+    );
+    expect((await body(res)).error?.request_id).toBe("req-abc-123");
+  });
+
+  it("still trusts X-User-Id under AUTH_STUB=1 in development", async () => {
+    const id = await linkIdentity(env, "oidc", "sub-alice");
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { "x-user-id": id.userId } },
+      { ...env, ENVIRONMENT: "development", AUTH_STUB: "1" },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("401s under AUTH_STUB=1 when the header names no existing user", async () => {
+    // The header names a user; it can no longer conjure one. Fabricating a
+    // crypto subject from a header would produce ciphertext nobody can read.
+    const res = await app.request(
+      "/v1/chart",
+      { headers: { "x-user-id": "usr_does_not_exist_0001" } },
+      { ...env, ENVIRONMENT: "development", AUTH_STUB: "1" },
+    );
+    expect(res.status).toBe(401);
+    expect((await body(res)).error?.code).toBe("unauthorized");
+  });
+});
+
+describe("POST /v1/sessions", () => {
+  beforeEach(resetDb);
+
+  it("is reachable without an existing session", async () => {
+    const res = await app.request(
+      "/v1/sessions",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id_token: "not-a-real-token" }),
+      },
+      prodEnv(),
+    );
+    // 401 because the token is bad — NOT 401 because a session was required.
+    expect(res.status).toBe(401);
+    expect((await body(res)).error?.code).toBe("unauthorized");
+  });
+
+  it("rejects a body with no id_token", async () => {
+    const res = await app.request(
+      "/v1/sessions",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      },
+      prodEnv(),
+    );
+    expect(res.status).toBe(400);
+    expect((await body(res)).error?.code).toBe("invalid_body");
+  });
+
+  it("never leaks the underlying verification failure", async () => {
+    const res = await app.request(
+      "/v1/sessions",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id_token: "not-a-real-token" }),
+      },
+      prodEnv(),
+    );
+    const message = (await body(res)).error?.message ?? "";
+    expect(message).toBe("Authentication required");
+    expect(message).not.toMatch(/jwt|token|kid|claim|signature/i);
+  });
+
+  it("revokes the current session on DELETE and stops accepting its token", async () => {
+    const id = await linkIdentity(env, "oidc", "sub-alice");
+    const { token } = await createSession(env, id.userId);
+
+    const del = await app.request(
+      "/v1/sessions/current",
+      { method: "DELETE", headers: { authorization: `Bearer ${token}` } },
+      prodEnv(),
+    );
+    expect(del.status).toBe(204);
+
+    const after = await app.request(
+      "/v1/chart",
+      { headers: { authorization: `Bearer ${token}` } },
+      prodEnv(),
+    );
+    expect(after.status).toBe(401);
+
+    const live = await rows("SELECT id FROM sessions WHERE revoked_at IS NULL");
+    expect(live).toHaveLength(0);
+  });
+
+  it("is idempotent on DELETE with no credential at all", async () => {
+    const res = await app.request(
+      "/v1/sessions/current",
+      { method: "DELETE" },
+      prodEnv(),
+    );
+    expect(res.status).toBe(204);
   });
 });

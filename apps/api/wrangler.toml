@@ -25,6 +25,14 @@ CALC_SERVICE_URL = "http://127.0.0.1:8080"
 SCHEMA_VERSION = "0.2.0"
 # M0 decision: AGPL public SE — docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md
 SE_LICENSE_MODE = "agpl"
+# Identity. Placeholders for local development only — AUTH_STUB=1 means the
+# session exchange is not on the critical path here. configGuard refuses these
+# values outside development, so a deploy cannot inherit them by accident.
+# The vitest pool reads this block, so tests get a well-formed URL rather than
+# undefined; a real key set is never fetched because outbound fetches are mocked.
+OIDC_ISSUER = "https://issuer.invalid"
+OIDC_AUDIENCE = "patternlike-dev"
+OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
 
 # Named environments do not inherit top-level bindings, so D1 is redeclared.
 [env.production]
@@ -35,6 +43,12 @@ ENVIRONMENT = "production"
 CALC_SERVICE_URL = "https://calc.internal.patternlike.app"
 SCHEMA_VERSION = "0.2.0"
 SE_LICENSE_MODE = "agpl"
+# Identity. These MUST be replaced with the real issuer before deploying:
+# configGuard returns 503 on every request while any of them is missing or
+# still points at issuer.invalid.
+OIDC_ISSUER = "https://issuer.invalid"
+OIDC_AUDIENCE = "patternlike-web"
+OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
 # AUTH_STUB is deliberately absent. Setting it here re-enables auth that trusts
 # an unauthenticated X-User-Id header.
 
