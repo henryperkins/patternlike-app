@@ -24,14 +24,12 @@ export function newCryptoSubject(): CryptoSubject {
  * user id and the crypto subject are minted here, so the identity provider can
  * be swapped without touching a single byte of ciphertext.
  */
-export async function linkIdentity(
+async function readIdentity(
   env: Env,
   provider: string,
   providerSubject: string,
-): Promise<UserIdentity> {
-  const now = new Date().toISOString();
-
-  const existing = await env.DB.prepare(
+): Promise<UserIdentity | null> {
+  const row = await env.DB.prepare(
     `SELECT u.id AS user_id, u.crypto_subject AS crypto_subject
      FROM identities i
      JOIN users u ON u.id = i.user_id
@@ -39,6 +37,21 @@ export async function linkIdentity(
   )
     .bind(provider, providerSubject)
     .first<{ user_id: string; crypto_subject: string }>();
+  if (!row) return null;
+  return {
+    userId: row.user_id,
+    cryptoSubject: asCryptoSubject(row.crypto_subject),
+  };
+}
+
+export async function linkIdentity(
+  env: Env,
+  provider: string,
+  providerSubject: string,
+): Promise<UserIdentity> {
+  const now = new Date().toISOString();
+
+  const existing = await readIdentity(env, provider, providerSubject);
 
   if (existing) {
     await env.DB.prepare(
@@ -46,10 +59,7 @@ export async function linkIdentity(
     )
       .bind(now, provider, providerSubject)
       .run();
-    return {
-      userId: existing.user_id,
-      cryptoSubject: asCryptoSubject(existing.crypto_subject),
-    };
+    return existing;
   }
 
   const identity: UserIdentity = {
@@ -57,18 +67,34 @@ export async function linkIdentity(
     cryptoSubject: newCryptoSubject(),
   };
 
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO users (id, crypto_subject, status, locale, timezone,
-                          entitlement_tier, created_at, updated_at)
-       VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
-    ).bind(identity.userId, identity.cryptoSubject, now, now),
-    env.DB.prepare(
-      `INSERT INTO identities (id, user_id, provider, provider_subject, created_at, last_login_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(newId("idn"), identity.userId, provider, providerSubject, now, now),
-    await buildUserKeyInsert(env, identity),
-  ]);
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO users (id, crypto_subject, status, locale, timezone,
+                            entitlement_tier, created_at, updated_at)
+         VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
+      ).bind(identity.userId, identity.cryptoSubject, now, now),
+      env.DB.prepare(
+        `INSERT INTO identities (id, user_id, provider, provider_subject, created_at, last_login_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(newId("idn"), identity.userId, provider, providerSubject, now, now),
+      await buildUserKeyInsert(env, identity),
+    ]);
+  } catch (err) {
+    // Another request for this same subject won the race between our read and
+    // our write — two overlapping first sign-ins, e.g. a double-tapped button.
+    // The batch is one transaction, so all three of OUR inserts rolled back;
+    // re-read and return the winner rather than surfacing a 500 on a legitimate
+    // first login.
+    //
+    // The guard has to wrap the whole batch. Putting ON CONFLICT DO NOTHING on
+    // the identities insert alone would let the users and user_keys inserts
+    // commit, leaving an orphaned user with a DEK and no identity — strictly
+    // worse than the error it replaced.
+    const winner = await readIdentity(env, provider, providerSubject);
+    if (winner) return winner;
+    throw err;
+  }
 
   return identity;
 }

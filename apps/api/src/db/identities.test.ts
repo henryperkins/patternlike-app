@@ -43,13 +43,59 @@ describe("linkIdentity", () => {
     expect(await rows("SELECT id FROM identities")).toHaveLength(1);
   });
 
-  it("stamps last_login_at on every link", async () => {
+  it("stamps last_login_at on the second link, not just at creation", async () => {
     const id = await linkIdentity(env, "oidc", "sub-alice");
-    const [before] = await rows<{ last_login_at: string }>(
+
+    // Backdate before re-linking. Comparing two live timestamps would be flaky:
+    // both links can land in the same millisecond. Backdating makes the UPDATE
+    // branch the only thing that can change this value, so deleting that branch
+    // fails this test.
+    const STALE = "2020-01-01T00:00:00.000Z";
+    await env.DB.prepare("UPDATE identities SET last_login_at = ? WHERE user_id = ?")
+      .bind(STALE, id.userId)
+      .run();
+
+    await linkIdentity(env, "oidc", "sub-alice");
+
+    const [row] = await rows<{ last_login_at: string }>(
       "SELECT last_login_at FROM identities WHERE user_id = ?",
       id.userId,
     );
-    expect(before!.last_login_at).not.toBeNull();
+    expect(row!.last_login_at).not.toBe(STALE);
+    expect(row!.last_login_at).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+  });
+
+  it("recovers when another request wins the account-creation race", async () => {
+    const winner = await linkIdentity(env, "oidc", "sub-alice");
+
+    // Force the interleaving: an env whose first identity lookup misses, so
+    // linkIdentity takes the create path and its batch collides with the
+    // UNIQUE (provider, provider_subject) index the winner already holds.
+    let lookupMissed = false;
+    const racingEnv = {
+      ...env,
+      DB: {
+        prepare: (sql: string) => {
+          if (sql.includes("FROM identities i") && !lookupMissed) {
+            lookupMissed = true;
+            return { bind: () => ({ first: async () => null }) };
+          }
+          return env.DB.prepare(sql);
+        },
+        batch: (stmts: D1PreparedStatement[]) => env.DB.batch(stmts),
+      },
+    } as unknown as typeof env;
+
+    const result = await linkIdentity(racingEnv, "oidc", "sub-alice");
+
+    expect(lookupMissed).toBe(true);
+    expect(result.userId).toBe(winner.userId);
+    expect(result.cryptoSubject).toBe(winner.cryptoSubject);
+    // The loser's inserts must have rolled back entirely — no orphan user, and
+    // no orphan wrapped DEK.
+    expect(await rows("SELECT id FROM users")).toHaveLength(1);
+    expect(await rows("SELECT user_id FROM user_keys")).toHaveLength(1);
+    expect(await rows("SELECT id FROM identities")).toHaveLength(1);
   });
 
   it("gives different subjects different users", async () => {
