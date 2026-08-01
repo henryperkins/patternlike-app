@@ -1,5 +1,81 @@
 # Identity and Sessions Implementation Plan
 
+> **STATUS: EXECUTED.** All ten tasks implemented and committed, `38e13c9..e758f48`,
+> on branch `feat/identity-and-sessions`. Final state: `npm test` exits 0 —
+> shared 4, calc-stub 33, **api 164** (from 87), web 12, contracts pass;
+> `npm run typecheck` clean across four workspaces; `npm run build` exits 0.
+>
+> The plan was verified against the tree before execution rather than trusted.
+> That pass checked 254 cited claims and found three that would have shipped
+> wrong code. All three are corrected below.
+>
+> The finished branch was then adversarially reviewed across six dimensions
+> (auth bypass, crypto, schema, test quality, error leakage, regression), which
+> raised 19 findings and refuted 17 under independent verification. The two that
+> survived were fixed in `e758f48`, both low severity:
+>
+> - `linkIdentity` read-then-wrote in two round-trips, so two overlapping first
+>   sign-ins for one IdP subject made the loser 500 on the unique index. It now
+>   re-reads and returns the winner. The recovery wraps the **whole** batch:
+>   `ON CONFLICT DO NOTHING` on the identities insert alone would let the users
+>   and `user_keys` inserts commit, orphaning a user who holds a DEK and no
+>   identity — and `loadUserKey` refuses to mint, so that account would be
+>   permanently broken.
+> - `"stamps last_login_at on every link"` linked only once. The creation INSERT
+>   already writes that column, so the UPDATE branch the test was named after
+>   never ran and could be deleted with the suite green.
+>
+> Both fixes were mutation-tested: each mutation kills exactly its own test.
+>
+> **Deviations, all deliberate:**
+>
+> 1. **Task 4 Step 5 would have changed which PII is encrypted.** The plan's
+>    replacement for the `chart_snapshots.birth_enc` call site re-pointed the
+>    sealed payload from `chart.birth.*` (the calc service's normalized values)
+>    to `body.birthplace?.*` (the raw request). Both are in scope in that
+>    handler, so it would have compiled silently. Only the identity argument and
+>    the AAD context were changed.
+> 2. **Task 4 Step 6(c)'s blanket find-replace was wrong at one site.** Of the
+>    four `ensureUserKey` calls in `key-rotation.test.ts`, one passes `rotated`
+>    — the post-rewrap env carrying the new root secret — not `env`.
+>    Substituting `env` there would have made the test unwrap under the
+>    pre-rotation root and throw. The env argument is preserved per call site.
+> 3. **Task 4 Step 6(c) under-specified the import edit**, omitting `seedUser`,
+>    `IDENTITY_A`, `IDENTITY_OTHER`, `SUBJECT_A`, and `USER_OTHER`.
+> 4. **`USER_A`/`USER_B` keep their existing literals.** The plan lengthened
+>    them; the CHECK is a prefix rule with no length constraint, so the rename
+>    was churn across three more files.
+> 5. **Task 9's `wrangler.toml` `[vars]` edit was applied during Task 8.** The
+>    vitest pool reads that block, so without it `OIDC_JWKS_URL` was `undefined`
+>    and `fetch(undefined)` produced unhandled rejections *behind passing tests*.
+> 6. **`checkSecureConfig` also rejects the shipped `issuer.invalid`
+>    placeholder**, not just absence — presence alone is not configuration, and a
+>    presence-only guard would wave an unreplaced placeholder into production.
+>    This mirrors how `ROOT_KEK` already rejects its own committed placeholder.
+> 7. **Task 7 requires `exp` explicitly and disables `iat`.** Hono's `exp` check
+>    is presence-guarded (`if (exp && payload.exp !== undefined)`), so a token
+>    with no `exp` claim verifies and never expires — confirmed by deleting the
+>    added guard and watching exactly that one test fail. `iat` is disabled
+>    because Hono exposes no clock-skew leeway, so an issuer running a second
+>    fast would have every token rejected.
+> 8. **CI gained `shared` and `web` test steps.** The `monorepo` job runs
+>    explicit per-workspace steps and never invokes the root `test` script, so
+>    neither suite would have run there.
+>
+> **Not done, and why:** the local D1 at `apps/api/.wrangler/state/v3/d1` was not
+> recreated — a `wrangler dev` server was holding the file lock, and killing a
+> running user process was not worth it. The test suite does not use that
+> database (it applies migrations to miniflare's own storage via
+> `readD1Migrations`), and `smoke_check.py` executes the real SQL file, so the
+> schema is verified either way. Recreate it before the next `npm run dev:api`:
+> `rm -rf apps/api/.wrangler/state/v3/d1 && npm run db:local -w @patternlike/api`.
+>
+> **Open item this created:** `apps/web/src/lib/api-client.ts` sends
+> `x-user-id: usr_local_dev_0001`, which now 401s because that user does not
+> exist and `loadUserKey` refuses to mint. `npm run web:dev` needs a seeded user.
+> Documented in README; no seeding mechanism was added, because a SQL-only seed
+> cannot produce a valid wrapped DEK.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make production authentication reachable and real — fix the middleware
