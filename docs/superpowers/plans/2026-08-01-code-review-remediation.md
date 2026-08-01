@@ -1,5 +1,18 @@
 # Code Review Remediation Implementation Plan
 
+> **STATUS: EXECUTED.** All nine tasks were implemented and committed, `53847f0..0d2784b`.
+> Final state: `npm run typecheck` clean, calc-stub 33 tests pass, api 26 tests pass,
+> `npm run test:contracts` passes, `npm run build` exits 0 with `apps/calc-stub/dist` populated.
+> Two things diverged from the plan as written, both deliberately:
+> 1. Task 1 gained a tenth test after the NaN Julian day was found to **corrupt sweph's
+>    ephemeris cache for the life of the process**, failing every subsequent request from
+>    every user — a worse consequence than the review reported.
+> 2. Task 8's `.dockerignore` was created at the repository root, not in `apps/calc-stub/`.
+>    The build context is the repo root, so a file inside `apps/calc-stub` would have no effect.
+>
+> Contract-level findings deliberately not patched in code are recorded in
+> [`docs/reviews/2026-08-01-spec-escalations.md`](../../reviews/2026-08-01-spec-escalations.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Execute steps 1–7 of the suggested remediation order from the Pattern-Like code review, so the M0/M1 skeleton fails closed instead of emitting confidently wrong charts, silently losing users' data, and encrypting birth PII under a key committed to the repo.
