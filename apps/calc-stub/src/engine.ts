@@ -305,52 +305,95 @@ export function resolveUtcInstant(req: CalcRequest): UtcInstantParts {
   };
 }
 
-function buildUncertainty(
-  accuracy: BirthTimeAccuracy,
-  syntheticNoon: boolean,
-): UncertaintyReport {
-  if (accuracy === "exact" && !syntheticNoon) {
-    return {
-      accuracy,
-      window: null,
-      suppressed_features: [],
-      qualified_features: [],
-      user_facing_summary:
-        "Birth time is exact; houses and angles are included (Swiss Ephemeris).",
-    };
+export const DEFAULT_APPROXIMATE_WINDOW_MINUTES = 30;
+
+export interface UncertaintyInputs {
+  /** Accuracy as it will be stored on the chart, after any downgrade. */
+  accuracy: BirthTimeAccuracy;
+  /** True when no real birth time was supplied and noon was used as an epoch. */
+  syntheticNoon: boolean;
+  /** True only when houses and angles were actually computed and returned. */
+  anglesIncluded: boolean;
+  approximateWindowMinutes: number | null;
+}
+
+/**
+ * Describe what the calculation actually produced.
+ *
+ * The previous implementation keyed entirely off the caller-declared accuracy,
+ * so a request with accuracy "exact" and no birth time computed Placidus houses
+ * from synthetic noon and simultaneously reported them as suppressed — the same
+ * payload told a user with no known birth time both that they were a Leo rising
+ * and that angles were unavailable.
+ */
+function buildUncertainty(input: UncertaintyInputs): UncertaintyReport {
+  const { accuracy, syntheticNoon, anglesIncluded, approximateWindowMinutes } = input;
+
+  const suppressed_features: UncertaintyReport["suppressed_features"] = [];
+  if (!anglesIncluded) {
+    const reason = syntheticNoon ? "unknown_birth_time" : "birthplace_unavailable";
+    suppressed_features.push(
+      { feature_class: "houses", reason },
+      { feature_class: "angles", reason },
+      { feature_class: "angle_transits", reason },
+    );
   }
+  if (syntheticNoon) {
+    suppressed_features.push({
+      feature_class: "moon_time_sensitive",
+      reason: "unknown_birth_time",
+    });
+  }
+
+  const qualified_features: UncertaintyReport["qualified_features"] = [];
+  let window: UncertaintyReport["window"] = null;
+
   if (accuracy === "approximate") {
-    return {
-      accuracy,
-      window: {
-        plus_minus_minutes: 30,
-        earliest_local: null,
-        latest_local: null,
-      },
-      suppressed_features: [],
-      qualified_features: [
-        { feature_id: "moon", qualification: "low_confidence_moon" },
-        {
-          feature_id: "houses",
-          qualification: "approximate_only",
-        },
-      ],
-      user_facing_summary:
-        "Birth time is approximate; Moon and house claims are qualified across the uncertainty window.",
+    window = {
+      plus_minus_minutes:
+        approximateWindowMinutes ?? DEFAULT_APPROXIMATE_WINDOW_MINUTES,
+      earliest_local: null,
+      latest_local: null,
     };
+    qualified_features.push({
+      feature_id: "moon",
+      qualification: "low_confidence_moon",
+    });
+    if (anglesIncluded) {
+      qualified_features.push({
+        feature_id: "houses",
+        qualification: "approximate_only",
+      });
+    }
   }
+
+  const user_facing_summary = (() => {
+    if (syntheticNoon) {
+      return (
+        "Birth time is unknown; houses, angles, and time-sensitive Moon claims are suppressed. " +
+        "Noon is used only as a technical epoch for planetary longitudes and is never stored as the birth instant."
+      );
+    }
+    if (accuracy === "approximate") {
+      const pm = window?.plus_minus_minutes ?? DEFAULT_APPROXIMATE_WINDOW_MINUTES;
+      return (
+        `Birth time is approximate (±${pm} minutes); Moon` +
+        (anglesIncluded ? " and house" : "") +
+        " claims are qualified across the uncertainty window."
+      );
+    }
+    if (!anglesIncluded) {
+      return "Birth time is exact, but no birthplace was supplied; houses and angles are suppressed.";
+    }
+    return "Birth time is exact; houses and angles are included (Swiss Ephemeris).";
+  })();
+
   return {
-    accuracy: "unknown",
-    window: null,
-    suppressed_features: [
-      { feature_class: "houses", reason: "unknown_birth_time" },
-      { feature_class: "angles", reason: "unknown_birth_time" },
-      { feature_class: "angle_transits", reason: "unknown_birth_time" },
-      { feature_class: "moon_time_sensitive", reason: "unknown_birth_time" },
-    ],
-    qualified_features: [],
-    user_facing_summary:
-      "Birth time is unknown; houses, angles, and time-sensitive Moon claims are suppressed. Noon is used only as a technical epoch for planetary longitudes and is never stored as the birth instant.",
+    accuracy,
+    window,
+    suppressed_features,
+    qualified_features,
+    user_facing_summary,
   };
 }
 
@@ -570,10 +613,20 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
       : positions;
     const aspects = buildAspects(aspectPositions);
 
-    const uncertainty = buildUncertainty(
-      req.accuracy,
-      utc.synthetic_local_noon,
-    );
+    // A declared accuracy of exact/approximate is not evidence a time was given.
+    // When noon was synthesized the effective accuracy is unknown; storing that
+    // keeps chart.birth.accuracy and chart.uncertainty.accuracy from disagreeing.
+    // The API rejects this combination up front, so this is a backstop.
+    const effectiveAccuracy: BirthTimeAccuracy = utc.synthetic_local_noon
+      ? "unknown"
+      : req.accuracy;
+
+    const uncertainty = buildUncertainty({
+      accuracy: effectiveAccuracy,
+      syntheticNoon: utc.synthetic_local_noon,
+      anglesIncluded: !suppressAngles,
+      approximateWindowMinutes: req.approximate_window_minutes ?? null,
+    });
 
     const chartId = newId("cht");
     const calculated_at = new Date().toISOString();
@@ -585,7 +638,7 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
       flags: ["SEFLG_SWIEPH", "SEFLG_SPEED"],
       contract_id: req.contract_id || CALC_CONTRACT_ID,
       contract_version: req.contract_version || CALC_CONTRACT_VERSION,
-      accuracy: req.accuracy,
+      accuracy: effectiveAccuracy,
       jd_ut: Number(jdUt.toFixed(8)),
       positions: positions.map((p) => ({
         body: p.body,
@@ -619,12 +672,9 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
       container_digest: STUB_CONTAINER_DIGEST,
       tzdb_version: STUB_TZDB_VERSION,
       birth: {
-        accuracy: req.accuracy,
+        accuracy: effectiveAccuracy,
         // Never store synthetic noon as birth UTC authority
-        utc_instant:
-          req.accuracy === "unknown" || utc.synthetic_local_noon
-            ? null
-            : utc.iso,
+        utc_instant: utc.synthetic_local_noon ? null : utc.iso,
         timezone: req.timezone,
         place_label: req.place_label,
         latitude: coordinates?.latitude ?? null,
