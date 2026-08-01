@@ -82,10 +82,13 @@ curl http://127.0.0.1:8080/v1/engine
 
 **License (M0 — decided):** **AGPL public Swiss Ephemeris** path.
 
+**This repository is not under a single license** — see [`LICENSING.md`](LICENSING.md) for per-directory terms. Only `apps/calc-stub` is AGPL.
+
 | Item | Value |
 | --- | --- |
+| Per-directory terms | [`LICENSING.md`](LICENSING.md) — start here |
 | Decision | [`docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md`](docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md) — **`DECIDED` / AGPL** |
-| Calc service | [`apps/calc-stub/LICENSE`](apps/calc-stub/LICENSE) — **AGPL-3.0-or-later** |
+| Calc service | [`apps/calc-stub/LICENSE`](apps/calc-stub/LICENSE) — full **AGPL-3.0** text · [`COPYRIGHT`](apps/calc-stub/COPYRIGHT) |
 | Source offer | [`docs/legal/AGPL_SOURCE_OFFER.md`](docs/legal/AGPL_SOURCE_OFFER.md) |
 | Notices | [`NOTICE`](NOTICE) |
 | Runtime | `SE_LICENSE_MODE=agpl` (default) |

@@ -2,6 +2,7 @@
   "name": "@patternlike/api",
   "version": "0.2.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

@@ -53,7 +53,16 @@ Counsel should confirm the final boundary. Engineering default:
 | **`apps/api`**, **`packages/shared`**, mobile (future) | **Not auto-relicensed** in this commit; if they form one combined AGPL work with calc over the network, counsel must map obligations. Prefer treating **calc as the AGPL network service** with a documented source offer. |
 | **Third-party** (luxon, hono, wrangler, …) | Remain under their own licenses (see `NOTICE`) |
 
-If counsel requires the entire monorepo under AGPL, update root `LICENSE` and this table in a follow-up PR.
+This table is implemented at [`LICENSING.md`](../../LICENSING.md), which is the
+file a reader of the public repository will find first.
+
+There is deliberately **no root `LICENSE`**: GitHub and most tooling read one as
+covering the whole repository, which would over-grant AGPL rights to `apps/api`,
+`packages/shared`, and `spec-bundle/`. The visible cost is that the repository
+summary shows no license, which is accurate — there is no single one.
+
+If counsel requires the entire monorepo under AGPL, add a root `LICENSE` and
+update both this table and `LICENSING.md` in the same PR.
 
 ---
 
@@ -103,14 +112,18 @@ If counsel requires the entire monorepo under AGPL, update root `LICENSE` and th
 
 - [x] Record decision as `AGPL`  
 - [x] Set `SE_LICENSE_MODE=agpl` (defaults / wrangler / health)  
-- [x] `apps/calc-stub/LICENSE` (AGPL-3.0-or-later)  
+- [x] `apps/calc-stub/LICENSE` — **full verbatim AGPL-3.0 text** (34,524 bytes, 662 lines, SPDX `AGPL-3.0`). Until 2026-08-01 this was a 27-line notice claiming "you should have received a copy of the GNU Affero General Public License" while no copy was in the repository; AGPL §4 requires conveying an actual copy.  
+- [x] `apps/calc-stub/COPYRIGHT` — copyright line, §13 network-use pointer, incorporated works, and scope  
+- [x] `LICENSING.md` at root — per-directory terms, and why there is deliberately no root `LICENSE`  
 - [x] `NOTICE` (SE + sweph attribution)  
 - [x] Source offer process documented (`docs/legal/AGPL_SOURCE_OFFER.md`)  
 - [x] `/health` reports `se_license_mode: agpl`  
+- [x] **Public git repository exists** — https://github.com/henryperkins/patternlike-app. The §2 clone procedure in the source offer was inoperable before this: there was no history and no remote.  
 
 ### Still required before public end-user launch
 
 - [ ] Counsel maps AGPL network obligations to Workers API + any mobile clients  
+- [ ] **Decide terms for `packages/shared`**, which `apps/calc-stub` imports. Corresponding Source for the AGPL service reaches into it. AGPL or a permissive AGPL-compatible license (e.g. MIT) both work; "all rights reserved" is the current default and is the weakest position. See `LICENSING.md`.  
 - [ ] User-facing legal page links to source offer (website / app settings)  
 - [ ] App store distribution strategy reviewed under AGPL  
 - [ ] CONTRIBUTING / CLA policy if accepting external patches to calc  
@@ -119,7 +132,7 @@ If counsel requires the entire monorepo under AGPL, update root `LICENSE` and th
 ### Always
 
 - [x] Pin SE version + ephe download script  
-- [ ] Pin ephe file SHA-256 in each release artifact  
+- [x] Pin ephe file SHA-256 — `apps/calc-stub/ephemeris.lock.json` pins the upstream commit and a digest per file; the downloader refuses to write a file that does not match and exits non-zero  
 - [x] No LLM-invented chart facts  
 
 ---

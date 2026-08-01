@@ -28,15 +28,31 @@ non-AGPL packages unless counsel expands the AGPL boundary.
 
 ## 2. How to obtain source (public git)
 
-Preferred method when the repository is public:
+The repository is public, so this is the operative method:
 
-1. Clone the git repository at the **same tag or commit** as the deployed
-   calc container / release.
+**https://github.com/henryperkins/patternlike-app**
+
+1. Clone at the **same tag or commit** as the deployed calc container:
+   ```bash
+   git clone https://github.com/henryperkins/patternlike-app.git
+   cd patternlike-app
+   git checkout <tag-or-commit-matching-the-deployed-image>
+   ```
 2. Directory: `apps/calc-stub/`
 3. Install: from monorepo root, `npm install`
 4. Ephemeris data: `npm run ephe:download -w @patternlike/calc-stub`
-5. Run: `npm run calc:dev` or build the Docker image from
-   `apps/calc-stub/Dockerfile`
+   — fetches from the commit pinned in `apps/calc-stub/ephemeris.lock.json`
+   and verifies every file against a recorded SHA-256, so the data is
+   reproducible rather than whatever `master` happens to hold.
+5. Run: `npm run calc:dev`, or build the image from `apps/calc-stub/Dockerfile`
+6. License: `apps/calc-stub/LICENSE` (full AGPL-3.0 text) and
+   `apps/calc-stub/COPYRIGHT`. Directory-by-directory terms for the rest of the
+   monorepo: `LICENSING.md` at the repository root.
+
+> Before this repository existed, this section described a procedure that could
+> not be followed: there was no git history to check out and no remote to clone.
+> Both now exist. What is still missing is a release tag that corresponds to a
+> deployed image — see §5.
 
 ### Release tagging convention
 
@@ -48,7 +64,11 @@ Preferred method when the repository is public:
 
 ---
 
-## 3. Written offer (if source is not continuously public)
+## 3. Written offer (currently not required, kept for the private-repo case)
+
+Not operative today: the source is continuously public at the URL in §2. This
+section applies only if the repository is ever made private.
+
 
 If the full source is not available from a network server to the public at no
 charge, operators must provide a written offer valid for at least three years

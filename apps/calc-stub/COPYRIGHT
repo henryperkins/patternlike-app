@@ -1,0 +1,41 @@
+Pattern-Like calculation service
+Copyright (C) 2026 Pattern-Like Astrology App contributors
+
+This program (the Pattern-Like calculation service in apps/calc-stub) is free
+software: you can redistribute it and/or modify it under the terms of the GNU
+Affero General Public License as published by the Free Software Foundation,
+either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program.  It is the file LICENSE in this directory. If it is missing,
+see <https://www.gnu.org/licenses/>.
+
+---------------------------------------------------------------------------
+Network use is distribution
+---------------------------------------------------------------------------
+
+AGPL section 13 requires that users who interact with this service remotely over
+a network be offered its Corresponding Source. The process for that is
+documented in docs/legal/AGPL_SOURCE_OFFER.md.
+
+---------------------------------------------------------------------------
+Incorporated works
+---------------------------------------------------------------------------
+
+This service incorporates Swiss Ephemeris (Astrodienst) and the sweph Node.js
+binding under AGPL-compatible terms. See the repository NOTICE file and
+docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md.
+
+Swiss Ephemeris data files are downloaded rather than vendored; they are pinned
+by commit and SHA-256 in apps/calc-stub/ephemeris.lock.json.
+
+---------------------------------------------------------------------------
+Scope
+---------------------------------------------------------------------------
+
+This AGPL grant covers apps/calc-stub only. Other workspaces in this monorepo
+carry different terms — see LICENSING.md at the repository root.

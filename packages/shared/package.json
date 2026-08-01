@@ -2,6 +2,8 @@
   "name": "@patternlike/shared",
   "version": "0.2.0",
   "private": true,
+  "//license": "UNLICENSED pending the AGPL-boundary decision — apps/calc-stub (AGPL) imports this package. See LICENSING.md.",
+  "license": "UNLICENSED",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
