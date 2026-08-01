@@ -21,8 +21,24 @@ export interface ConfigFailure {
  * unauthenticated X-User-Id header; and ROOT_KEK silently defaulted to a string
  * committed in this repository.
  */
+/**
+ * The identity placeholder shipped in wrangler.toml. `.invalid` is reserved and
+ * can never resolve, so it is safe to ship and unusable in production.
+ */
+export const PLACEHOLDER_OIDC_HOST = "issuer.invalid";
+
 export function checkSecureConfig(
-  env: Pick<Env, "ENVIRONMENT" | "AUTH_STUB" | "ROOT_KEK"> | Partial<Env>,
+  env:
+    | Pick<
+        Env,
+        | "ENVIRONMENT"
+        | "AUTH_STUB"
+        | "ROOT_KEK"
+        | "OIDC_ISSUER"
+        | "OIDC_AUDIENCE"
+        | "OIDC_JWKS_URL"
+      >
+    | Partial<Env>,
 ): ConfigFailure | null {
   if (isDevEnvironment(env.ENVIRONMENT)) return null;
 
@@ -38,6 +54,27 @@ export function checkSecureConfig(
     return {
       code: "root_kek_not_configured",
       message: "ROOT_KEK must be configured with a real secret outside development",
+    };
+  }
+
+  // Identity is not optional outside development. Without these the verifier
+  // fails per request as an opaque 401; a deploy that forgot a value should
+  // fail loudly at the guard instead.
+  //
+  // The placeholder check matters as much as the presence check: wrangler.toml
+  // ships issuer.invalid so the Env interface is satisfied locally, and a
+  // deploy that never replaced it would otherwise sail past a presence-only
+  // guard. This mirrors how ROOT_KEK rejects its own committed placeholder.
+  const identityKeys = ["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"] as const;
+  const unusable = identityKeys.filter((k) => {
+    const value = env[k]?.trim();
+    return !value || value.includes(PLACEHOLDER_OIDC_HOST);
+  });
+  if (unusable.length > 0) {
+    return {
+      code: "identity_not_configured",
+      message:
+        "Identity provider configuration is incomplete; the API cannot authenticate anyone",
     };
   }
   return null;

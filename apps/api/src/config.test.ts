@@ -9,9 +9,15 @@ describe("secure configuration guard", () => {
     expect(checkSecureConfig({ ENVIRONMENT: "development", AUTH_STUB: "1" })).toBeNull();
   });
 
-  it("passes in production with a real ROOT_KEK and no AUTH_STUB", () => {
+  it("accepts a fully configured production environment", () => {
     expect(
-      checkSecureConfig({ ENVIRONMENT: "production", ROOT_KEK: STRONG_KEK }),
+      checkSecureConfig({
+        ENVIRONMENT: "production",
+        ROOT_KEK: STRONG_KEK,
+        OIDC_ISSUER: "https://issuer.example.com",
+        OIDC_AUDIENCE: "patternlike-web",
+        OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+      }),
     ).toBeNull();
   });
 
@@ -36,6 +42,63 @@ describe("secure configuration guard", () => {
 
   it("treats an unset ENVIRONMENT as non-development", () => {
     expect(checkSecureConfig({})?.code).toBe("root_kek_not_configured");
+  });
+});
+
+describe("identity configuration", () => {
+  const configured = {
+    ENVIRONMENT: "production",
+    ROOT_KEK: "a-real-root-kek-long-enough-to-pass-the-check",
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+  };
+
+  it("passes when every OIDC value is present", () => {
+    expect(checkSecureConfig(configured)).toBeNull();
+  });
+
+  it.each(["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"] as const)(
+    "refuses to serve when %s is missing",
+    (key) => {
+      const failure = checkSecureConfig({ ...configured, [key]: undefined });
+      expect(failure?.code).toBe("identity_not_configured");
+    },
+  );
+
+  it.each(["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"] as const)(
+    "refuses to serve when %s is blank",
+    (key) => {
+      const failure = checkSecureConfig({ ...configured, [key]: "   " });
+      expect(failure?.code).toBe("identity_not_configured");
+    },
+  );
+
+  it.each(["OIDC_ISSUER", "OIDC_JWKS_URL"] as const)(
+    "refuses to serve when %s is still the shipped placeholder",
+    (key) => {
+      // Presence alone is not configuration. wrangler.toml ships
+      // issuer.invalid so the Env interface is satisfied locally; a deploy that
+      // never replaced it would otherwise pass the guard and then fail per
+      // request inside the verifier as an opaque 401.
+      const failure = checkSecureConfig({
+        ...configured,
+        [key]: key === "OIDC_ISSUER"
+          ? "https://issuer.invalid"
+          : "https://issuer.invalid/.well-known/jwks.json",
+      });
+      expect(failure?.code).toBe("identity_not_configured");
+    },
+  );
+
+  it("does not require OIDC configuration in development", () => {
+    expect(
+      checkSecureConfig({ ENVIRONMENT: "development", AUTH_STUB: "1" }),
+    ).toBeNull();
+  });
+
+  it("does not require OIDC configuration under ENVIRONMENT=test", () => {
+    expect(checkSecureConfig({ ENVIRONMENT: "test" })).toBeNull();
   });
 });
 

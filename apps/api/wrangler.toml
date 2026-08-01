@@ -63,3 +63,7 @@ migrations_dir = "../../db/d1"
 #            development returns 503 until it is set, and it must not be the
 #            development placeholder.
 # SERVICE_AUTH_TOKEN — internal WordPress → CF release auth
+#
+# NOTE ON ENVIRONMENT NAMING: isDevEnvironment() treats BOTH "development" and
+# "test" as development, which disables configGuard and re-enables the
+# X-User-Id header. A staging deployment must NOT set ENVIRONMENT = "test".

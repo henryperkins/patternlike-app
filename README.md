@@ -116,9 +116,34 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Real Swiss Ephemeris 2.10.03 + golden fingerprint tests
 - [x] SE licensing decision: **AGPL public path** (counsel + store strategy still open)
 - [x] Responsive web/PWA shell with birth onboarding, chart facts/evidence, uncertainty, and privacy status
+- [x] Production identity: OIDC token exchange, Worker-minted sessions, and a crypto identity decoupled from the user's public id
 - [ ] Historical TZ geocode connectors (IANA zone via luxon is local-only)
-- [ ] Production identity provider
 - [ ] Privacy center export/delete workflows (API stubs 501)
+
+## Authentication
+
+`POST /v1/sessions` exchanges an OIDC ID token for a session. Browsers receive
+an httpOnly `pl_session` cookie; native clients use the returned `token` as a
+bearer. Both resolve the same session row, so `DELETE /v1/sessions/current`
+logs out either. Sessions expire absolutely after 30 days and are revocable by
+row update, which is what makes "invalidate sessions" a real control rather
+than a wait for token expiry.
+
+Three variables are required outside development — `OIDC_ISSUER`,
+`OIDC_AUDIENCE`, and `OIDC_JWKS_URL`. They are configuration, not secrets (the
+JWKS document is public), so they belong in `wrangler.toml` `[vars]`. The
+shipped values point at `issuer.invalid`; `configGuard` rejects them outside
+development, so a deploy that forgets to replace them returns a loud
+`503 configuration_error` rather than opaque 401s from inside the verifier.
+
+Local development keeps `AUTH_STUB=1` and the `X-User-Id` header. **That header
+now names an existing user — it no longer creates one**, because user creation
+moved to identity-link time and a crypto subject can never come from a request.
+Seed a user first (see `seedUser` in `apps/api/test/helpers.ts` for the shape:
+the `users` row, its `identities` row, and its wrapped DEK must land together).
+
+`ENVIRONMENT=test` counts as development and disables the config guard. Do not
+name a staging deployment `test`.
 
 ## Architecture profile
 

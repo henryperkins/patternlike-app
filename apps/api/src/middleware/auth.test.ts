@@ -21,6 +21,12 @@ function prodEnv(overrides: Record<string, unknown> = {}) {
     AUTH_STUB: "",
     ROOT_KEK: "test-root-kek-that-is-long-enough-to-pass",
     SERVICE_AUTH_TOKEN: "svc-token-for-internal-only",
+    // A *properly configured* production environment. The values spread from
+    // `env` are wrangler.toml's issuer.invalid placeholders, which configGuard
+    // now refuses — that refusal is the point, so override rather than relax it.
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
     ...overrides,
   };
 }
@@ -179,6 +185,18 @@ describe("authenticate", () => {
       prodEnv(),
     );
     expect((await body(res)).error?.request_id).toBe("req-abc-123");
+  });
+
+  it("503s loudly rather than 401ing when identity is unconfigured", async () => {
+    // A deploy that never replaced the shipped placeholder should fail at the
+    // guard, not per-request inside the verifier as an opaque 401.
+    const res = await app.request(
+      "/v1/chart",
+      {},
+      prodEnv({ OIDC_JWKS_URL: "https://issuer.invalid/.well-known/jwks.json" }),
+    );
+    expect(res.status).toBe(503);
+    expect((await body(res)).error?.code).toBe("configuration_error");
   });
 
   it("still trusts X-User-Id under AUTH_STUB=1 in development", async () => {
