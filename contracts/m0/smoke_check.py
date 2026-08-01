@@ -75,6 +75,80 @@ def check_sql() -> None:
     except sqlite3.IntegrityError:
         print("D1 OK  content_releases dual-control CHECK rejects same approver/author")
 
+    # Idempotency keys must be per-user, not a global namespace (review: critical)
+    con.execute(
+        "INSERT INTO users (id, status, locale, timezone, entitlement_tier, created_at, updated_at) "
+        "VALUES ('usr_b', 'active', 'en-US', 'UTC', 'free', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+    )
+    con.execute(
+        "INSERT INTO jobs (id, job_type, user_id, idempotency_key, status, attempts, created_at) "
+        "VALUES ('job_a', 'NormalizeBirthAndCalculateChart', 'usr_t', 'shared-key-001', 'succeeded', 1, "
+        "'2026-01-01T00:00:00Z')"
+    )
+    try:
+        con.execute(
+            "INSERT INTO jobs (id, job_type, user_id, idempotency_key, status, attempts, created_at) "
+            "VALUES ('job_b', 'NormalizeBirthAndCalculateChart', 'usr_b', 'shared-key-001', 'queued', 1, "
+            "'2026-01-01T00:00:00Z')"
+        )
+        print("D1 OK  jobs idempotency_key is scoped per user")
+    except sqlite3.IntegrityError as exc:
+        raise SystemExit(
+            f"jobs idempotency_key is a global namespace across users: {exc}"
+        )
+
+    try:
+        con.execute(
+            "INSERT INTO jobs (id, job_type, user_id, idempotency_key, status, attempts, created_at) "
+            "VALUES ('job_c', 'NormalizeBirthAndCalculateChart', 'usr_t', 'shared-key-001', 'queued', 1, "
+            "'2026-01-01T00:00:00Z')"
+        )
+        raise SystemExit("jobs must still reject a duplicate key for the SAME user")
+    except sqlite3.IntegrityError:
+        print("D1 OK  jobs still rejects a duplicate key for the same user")
+
+    for table, extra_cols, extra_vals in (
+        ("export_requests", "", ""),
+        ("deletion_requests", "", ""),
+    ):
+        con.execute(
+            f"INSERT INTO {table} (id, user_id, status, idempotency_key, created_at{extra_cols}) "
+            f"VALUES ('{table}_a', 'usr_t', 'queued', 'shared-key-002', "
+            f"'2026-01-01T00:00:00Z'{extra_vals})"
+        )
+        try:
+            con.execute(
+                f"INSERT INTO {table} (id, user_id, status, idempotency_key, created_at{extra_cols}) "
+                f"VALUES ('{table}_b', 'usr_b', 'queued', 'shared-key-002', "
+                f"'2026-01-01T00:00:00Z'{extra_vals})"
+            )
+            print(f"D1 OK  {table} idempotency_key is scoped per user")
+        except sqlite3.IntegrityError as exc:
+            raise SystemExit(f"{table} idempotency_key is global across users: {exc}")
+
+    # A destroyed key must not block re-keying (review: permanent 500)
+    con.execute(
+        "INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at, destroyed_at) "
+        "VALUES ('usr_t', 1, 2, X'00', '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z')"
+    )
+    try:
+        con.execute(
+            "INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at) "
+            "VALUES ('usr_t', 2, 2, X'01', '2026-02-01T00:00:00Z')"
+        )
+        print("D1 OK  user_keys supports rotation after destruction")
+    except sqlite3.IntegrityError as exc:
+        raise SystemExit(f"user_keys cannot rotate after destruction: {exc}")
+
+    try:
+        con.execute(
+            "INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at) "
+            "VALUES ('usr_t', 3, 2, X'02', '2026-03-01T00:00:00Z')"
+        )
+        raise SystemExit("user_keys must allow at most one live key per user")
+    except sqlite3.IntegrityError:
+        print("D1 OK  user_keys allows at most one live key per user")
+
 
 def check_openapi() -> None:
     try:

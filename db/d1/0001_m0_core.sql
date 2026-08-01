@@ -28,14 +28,23 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS user_keys (
-  user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
   key_version INTEGER NOT NULL DEFAULT 1,
   kek_version INTEGER NOT NULL DEFAULT 1,
   wrapped_dek BLOB NOT NULL,
   created_at TEXT NOT NULL,
   rotated_at TEXT,
-  destroyed_at TEXT
+  destroyed_at TEXT,
+  -- Keyed by version so a destroyed key does not permanently block the user.
+  -- With user_id alone as the primary key, the `destroyed_at IS NULL` lookup
+  -- missed while the insert still collided: every request 500ed forever, and
+  -- DEK rotation was impossible for the same reason.
+  PRIMARY KEY (user_id, key_version)
 );
+
+-- At most one live key per user; destroyed rows are retained for audit.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_keys_active
+  ON user_keys(user_id) WHERE destroyed_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS identities (
   id TEXT PRIMARY KEY NOT NULL,
@@ -443,9 +452,19 @@ CREATE TABLE IF NOT EXISTS jobs (
   available_at TEXT,
   started_at TEXT,
   finished_at TEXT,
-  created_at TEXT NOT NULL,
-  UNIQUE (job_type, idempotency_key)
+  created_at TEXT NOT NULL
 );
+
+-- Idempotency is scoped to (job_type, user, key). A global (job_type, key)
+-- namespace let a client-supplied string collide across tenants: the second
+-- user's write was silently dropped and the first user's job and resource ids
+-- were handed back to them.
+--
+-- user_id is nullable for system jobs, and SQLite treats NULLs as distinct in a
+-- UNIQUE constraint, so COALESCE keeps system jobs in a single namespace rather
+-- than silently skipping deduplication for them.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_scope_key
+  ON jobs(job_type, COALESCE(user_id, ''), idempotency_key);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_status_available
   ON jobs(status, available_at);
@@ -476,9 +495,11 @@ CREATE TABLE IF NOT EXISTS export_requests (
     )),
   r2_uri TEXT,
   expires_at TEXT,
-  idempotency_key TEXT NOT NULL UNIQUE,
+  idempotency_key TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  completed_at TEXT
+  completed_at TEXT,
+  -- Per-user, for the same reason as uq_jobs_scope_key.
+  UNIQUE (user_id, idempotency_key)
 );
 
 CREATE TABLE IF NOT EXISTS deletion_requests (
@@ -489,7 +510,9 @@ CREATE TABLE IF NOT EXISTS deletion_requests (
       'queued', 'running', 'completed', 'failed'
     )),
   dek_destroyed INTEGER NOT NULL DEFAULT 0 CHECK (dek_destroyed IN (0, 1)),
-  idempotency_key TEXT NOT NULL UNIQUE,
+  idempotency_key TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  completed_at TEXT
+  completed_at TEXT,
+  -- Per-user, for the same reason as uq_jobs_scope_key.
+  UNIQUE (user_id, idempotency_key)
 );

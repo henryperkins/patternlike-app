@@ -5,11 +5,12 @@
     {
       "id": "0001_m0_core",
       "file": "0001_m0_core.sql",
-      "description": "Core operational tables for M0/M1 with encryption CHECKs: users, keys, consents, birth/chart (birth_enc required), context signals (value pairing), content releases, readings (published ciphertext), connectors, jobs, audit, export/delete."
+      "description": "Core operational tables for M0/M1 with encryption CHECKs: users, keys, consents, birth/chart (birth_enc required), context signals (value pairing), content releases, readings (published ciphertext), connectors, jobs, audit, export/delete. Idempotency keys are scoped per user; user_keys is keyed by (user_id, key_version) so a destroyed key does not block re-keying and DEK rotation is possible."
     }
   ],
   "notes": [
-    "M0 pre-production: 0001 is edited in place for encryption hardening. Do not apply an older 0001 against a live DB without a rewrite migration."
+    "M0 pre-production: 0001 is edited in place for encryption hardening. Do not apply an older 0001 against a live DB without a rewrite migration.",
+    "2026-08-01: 0001 edited in place for per-user idempotency scoping (uq_jobs_scope_key over COALESCE(user_id,''), plus UNIQUE(user_id, idempotency_key) on export_requests and deletion_requests), user_keys PRIMARY KEY (user_id, key_version) with a partial unique index on live keys, and KEK derivation v2. Local databases must be recreated: npm run db:local -w @patternlike/api. Rows written under KEK derivation v1 (bare SHA-256) are not readable under v2 (HKDF-SHA256); ensureUserKey rejects them with kek_version_unsupported rather than returning garbage."
   ],
   "apply_hint": "wrangler d1 execute <DB_NAME> --file=db/d1/0001_m0_core.sql"
 }
