@@ -112,45 +112,138 @@ export async function generateUserDek(): Promise<Uint8Array> {
   return dek;
 }
 
+/** Bumped when the AAD construction changes; ciphertext is not cross-readable. */
+export const AEAD_VERSION = 1;
+
+/**
+ * Where a ciphertext belongs. Bound into the AES-GCM additional authenticated
+ * data, so a blob lifted from one row, column, or user cannot be decrypted in
+ * another position even when the attacker holds the right DEK.
+ */
+export interface EncryptionContext {
+  userId: string;
+  /** `table.column`, e.g. "birth_profiles.payload_enc". */
+  field: string;
+  /** Identifies the row within that table, e.g. a profile version or chart id. */
+  recordId: string;
+}
+
+/**
+ * JSON array encoding, not concatenation: JSON escapes the delimiter, so no
+ * choice of userId/field/recordId can produce the same AAD as a different
+ * triple.
+ */
+function buildAad(ctx: EncryptionContext, keyVersion: number): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify([
+      "patternlike.aead",
+      AEAD_VERSION,
+      ctx.userId,
+      ctx.field,
+      ctx.recordId,
+      keyVersion,
+    ]),
+  );
+}
+
+/** AAD for the wrapped DEK itself, binding it to its owner and KEK generation. */
+function buildDekAad(userId: string, keyVersion: number): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify([
+      "patternlike.dek",
+      KEK_DERIVATION_VERSION,
+      userId,
+      keyVersion,
+    ]),
+  );
+}
+
 export async function wrapDek(
   dek: Uint8Array,
   rootKey: CryptoKey,
+  userId: string,
+  keyVersion: number,
 ): Promise<{ wrapped_b64: string; nonce_b64: string }> {
   const nonce = new Uint8Array(12);
   crypto.getRandomValues(nonce);
   const ct = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce },
+    { name: "AES-GCM", iv: nonce, additionalData: buildDekAad(userId, keyVersion) },
     rootKey,
     dek,
   );
   return { wrapped_b64: b64(ct), nonce_b64: b64(nonce) };
 }
 
+export async function unwrapDek(
+  packed: Uint8Array,
+  rootKey: CryptoKey,
+  userId: string,
+  keyVersion: number,
+): Promise<Uint8Array> {
+  // Stored as nonce(12) || ciphertext
+  const nonce = packed.slice(0, 12);
+  const ct = packed.slice(12);
+  const plain = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: nonce, additionalData: buildDekAad(userId, keyVersion) },
+    rootKey,
+    ct,
+  );
+  return new Uint8Array(plain);
+}
+
+export interface EncryptedPayload {
+  alg: "AES-256-GCM";
+  aead_version: number;
+  key_version: number;
+  nonce: string;
+  ciphertext: string;
+}
+
 export async function encryptJson(
   value: unknown,
   dek: Uint8Array,
   keyVersion: number,
-): Promise<{
-  alg: "AES-256-GCM";
-  key_version: number;
-  nonce: string;
-  ciphertext: string;
-}> {
+  ctx: EncryptionContext,
+): Promise<EncryptedPayload> {
   const key = await importAesKey(dek);
   const nonce = new Uint8Array(12);
   crypto.getRandomValues(nonce);
   const pt = new TextEncoder().encode(JSON.stringify(value));
   const ct = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce },
+    { name: "AES-GCM", iv: nonce, additionalData: buildAad(ctx, keyVersion) },
     key,
     pt,
   );
   return {
     alg: "AES-256-GCM",
+    aead_version: AEAD_VERSION,
     key_version: keyVersion,
     nonce: b64(nonce),
     ciphertext: b64(ct),
   };
+}
+
+/**
+ * Decrypt a payload in its declared position. Throws if the ciphertext, the
+ * nonce, the recorded key version, or any part of the context does not match
+ * what was sealed — AES-GCM authenticates all of it.
+ */
+export async function decryptJson<T = unknown>(
+  payload: Pick<EncryptedPayload, "key_version" | "nonce" | "ciphertext">,
+  dek: Uint8Array,
+  ctx: EncryptionContext,
+): Promise<T> {
+  const key = await importAesKey(dek);
+  const plain = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: fromB64(payload.nonce),
+      additionalData: buildAad(ctx, payload.key_version),
+    },
+    key,
+    fromB64(payload.ciphertext),
+  );
+  return JSON.parse(new TextDecoder().decode(plain)) as T;
 }
 
 export { fromB64, b64 };

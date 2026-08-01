@@ -200,7 +200,19 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     consent_id: body.consent_id,
   };
 
-  const { keyVersion, nonce, ciphertext } = await encryptPayload(c.env, userId, sensitive);
+  // The AAD binds this ciphertext to this user, this column, and this profile
+  // version, so a blob lifted into another row or another user's record fails
+  // to decrypt even when the DEK is correct.
+  const { keyVersion, nonce, ciphertext } = await encryptPayload(
+    c.env,
+    userId,
+    sensitive,
+    {
+      userId,
+      field: "birth_profiles.payload_enc",
+      recordId: String(profileVersion),
+    },
+  );
   // D1 bind BLOB: Uint8Array from the base64 ciphertext
   const encBytes = Uint8Array.from(atob(ciphertext), (ch) => ch.charCodeAt(0));
 
@@ -345,12 +357,17 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     uncertainty: chart.uncertainty,
   };
 
-  const birthEnc = await encryptPayload(c.env, userId, {
-    utc_instant: chart.birth.utc_instant,
-    place_label: chart.birth.place_label,
-    latitude: chart.birth.latitude,
-    longitude: chart.birth.longitude,
-  });
+  const birthEnc = await encryptPayload(
+    c.env,
+    userId,
+    {
+      utc_instant: chart.birth.utc_instant,
+      place_label: chart.birth.place_label,
+      latitude: chart.birth.latitude,
+      longitude: chart.birth.longitude,
+    },
+    { userId, field: "chart_snapshots.birth_enc", recordId: chart.id },
+  );
   const birthEncBytes = Uint8Array.from(atob(birthEnc.ciphertext), (ch) =>
     ch.charCodeAt(0),
   );

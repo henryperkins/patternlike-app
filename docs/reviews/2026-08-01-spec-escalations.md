@@ -134,10 +134,16 @@ facts only … Must NOT contain birth date/time/place plaintext" — but the der
 values are equivalent to the plaintext. The per-user DEK protecting `birth_enc` in
 the same row buys nothing against a reader of that column.
 
-Separately: no AAD binds any ciphertext to a user or record, and there is no
-rewrap path. Fixing the first requires deciding what precision the snapshot needs,
-which is a product question. AAD binding and rewrap are implementable now and are
-the obvious next crypto task.
+The AAD and rewrap halves of this finding are **resolved**. AES-GCM additional
+authenticated data now binds every payload to `(user_id, table.column, record id,
+key_version)` and every wrapped DEK to `(user_id, key_version)`, so a ciphertext
+lifted into another row, column, or user's record fails authentication even when
+the DEK is correct. `rewrapUserKey` re-wraps a DEK under a new `ROOT_KEK` without
+touching stored data, and `rotateUserDek` generates a new DEK, re-encrypts
+everything it protects in a single D1 batch, and destroys the superseded key.
+
+What remains is the part that is a product question: `snapshot_json` precision.
+Deciding it means deciding what the queryable snapshot is allowed to reveal.
 
 ### 12. The M0 quality gate lets a model overwrite part of its own verdict
 
