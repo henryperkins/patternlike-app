@@ -11,7 +11,8 @@ Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculatio
 | Path | Role |
 | --- | --- |
 | `apps/api` | Cloudflare Worker (Hono) — birth/chart M1 path |
-| `apps/calc-stub` | Portable calc OCI-shaped service (stub until SE licensed) |
+| `apps/calc-stub` | Portable AGPL Swiss Ephemeris calculation service |
+| `apps/web` | React/Vite PWA — onboarding, chart evidence, and privacy surface |
 | `packages/shared` | Shared types, fingerprint helpers, constants |
 | `contracts/m0` | Frozen JSON Schema + OpenAPI + fixtures |
 | `db/d1` | Operational schema (encrypted birth, idempotent jobs) |
@@ -38,7 +39,16 @@ npm run db:local -w @patternlike/api
 
 # API (terminal 2)
 npm run dev:api
+
+# Web client (terminal 3)
+npm run web:dev
 ```
+
+The web client opens at `http://127.0.0.1:5173` and proxies `/v1` requests to
+the local Worker at `http://127.0.0.1:8787`. Development defaults to
+`usr_local_dev_0001`; override `VITE_DEV_USER_ID`, `VITE_CONSENT_ID`, or
+`VITE_API_PROXY_TARGET` in `apps/web/.env.local` when needed. These values are
+local scaffolding only while production identity and consent APIs remain M1 work.
 
 ### Birth → chart (local)
 
@@ -97,7 +107,7 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 
 ## M1 status
 
-- [x] Monorepo + CI (workflow configured; has not yet run — no git remote)
+- [x] Monorepo + green CI on GitHub Actions
 - [x] Workers integration tests: `apps/api` runs inside workerd with a real local D1 (`@cloudflare/vitest-pool-workers`)
 - [x] M0 contracts validation in CI
 - [x] D1 core schema with encryption CHECKs
@@ -105,6 +115,7 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Unknown birth-time mode: noon is a technical epoch only. It is never stored as the birth instant, and houses, angles, and time-sensitive Moon claims are suppressed whenever no real birth time was supplied — regardless of the accuracy label the caller sends. `birth_time_local` is required for `exact` and `approximate`.
 - [x] Real Swiss Ephemeris 2.10.03 + golden fingerprint tests
 - [x] SE licensing decision: **AGPL public path** (counsel + store strategy still open)
+- [x] Responsive web/PWA shell with birth onboarding, chart facts/evidence, uncertainty, and privacy status
 - [ ] Historical TZ geocode connectors (IANA zone via luxon is local-only)
 - [ ] Production identity provider
 - [ ] Privacy center export/delete workflows (API stubs 501)

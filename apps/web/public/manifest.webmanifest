@@ -1,0 +1,17 @@
+{
+  "name": "Pattern/Like",
+  "short_name": "Pattern/Like",
+  "description": "Private, inspectable psychological timing.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2efe6",
+  "theme_color": "#173f35",
+  "icons": [
+    {
+      "src": "/mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
