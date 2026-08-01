@@ -3,12 +3,15 @@ import { SELF } from "cloudflare:test";
 import {
   ALICE,
   BOB,
+  IDENTITY_A,
+  IDENTITY_B,
   USER_A,
   USER_B,
   getChart,
   postBirthProfile,
   resetDb,
   rows,
+  seedUser,
 } from "../../test/helpers.js";
 import {
   LEAKY_UPSTREAM_MESSAGE,
@@ -16,7 +19,15 @@ import {
   TRIGGER_INVALID_PROFILE,
 } from "../../test/mock-calc-service.js";
 
-beforeEach(resetDb);
+// Users exist before any request now — creation moved to identity-link time.
+// resetDb truncates users, so both are seeded unconditionally: a suite that
+// authenticates as USER_B without a row would 401 where it asserts a
+// route-level status.
+beforeEach(async () => {
+  await resetDb();
+  await seedUser(IDENTITY_A);
+  await seedUser(IDENTITY_B);
+});
 
 describe("POST /v1/birth-profiles — the cross-tenant defect", () => {
   it("does not hand one user's chart to another who reuses their idempotency key", async () => {
@@ -338,8 +349,11 @@ describe("unknown birth time", () => {
 });
 
 describe("GET /v1/chart", () => {
-  it("404s for a user with no chart", async () => {
-    const res = await getChart("usr_test_nobody_0001");
+  it("404s for an authenticated user with no chart", async () => {
+    // USER_B is seeded and has no chart in this suite, so this keeps its
+    // original meaning. The "no such user" case it used to conflate is a
+    // different concern, covered by the authenticate tests.
+    const res = await getChart(USER_B);
     expect(res.status).toBe(404);
     expect((res.body.error as Record<string, unknown>).code).toBe("chart_not_found");
   });

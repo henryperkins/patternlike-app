@@ -28,12 +28,13 @@ async function importAesKey(raw: Uint8Array): Promise<CryptoKey> {
 export const DEV_ROOT_KEK = "patternlike-dev-only-root-kek-change-me!!";
 
 /**
- * Bumped from 1 when the derivation moved from a bare unsalted SHA-256 of the
- * passphrase to HKDF-SHA256 with a salt and domain separation. Ciphertext
- * produced under v1 is not readable under v2; M0 is pre-production, so local
- * databases are recreated rather than migrated. See db/d1/MIGRATIONS.json.
+ * Bumped to 2 when the derivation moved from a bare unsalted SHA-256 of the
+ * passphrase to HKDF-SHA256 with a salt and domain separation, and to 3 when
+ * the DEK AAD subject changed from users.id to users.crypto_subject.
+ * Ciphertext is not cross-readable between versions; M0 is pre-production, so
+ * local databases are recreated rather than migrated. See db/d1/MIGRATIONS.json.
  */
-export const KEK_DERIVATION_VERSION = 2;
+export const KEK_DERIVATION_VERSION = 3;
 
 const KEK_HKDF_SALT = new TextEncoder().encode("patternlike/kek/v2");
 const KEK_HKDF_INFO = new TextEncoder().encode("patternlike:root-kek:aes-256-gcm");
@@ -112,8 +113,28 @@ export async function generateUserDek(): Promise<Uint8Array> {
   return dek;
 }
 
-/** Bumped when the AAD construction changes; ciphertext is not cross-readable. */
-export const AEAD_VERSION = 1;
+/** Bumped to 2 when the AAD subject changed from users.id to crypto_subject. */
+export const AEAD_VERSION = 2;
+
+/**
+ * The immutable cryptographic identity of a user. Distinct from `users.id`,
+ * which is a mutable public label. Branded so that passing a user id where a
+ * subject is expected is a compile error rather than a silent AAD mismatch that
+ * only surfaces as an unreadable blob later.
+ */
+export type CryptoSubject = string & { readonly __cryptoSubject: unique symbol };
+
+/**
+ * Assert that a value is a crypto subject. The ONLY place a plain string
+ * becomes a CryptoSubject. Callers must have read it from users.crypto_subject
+ * or just minted it — never from a request.
+ */
+export function asCryptoSubject(value: string): CryptoSubject {
+  if (!value.startsWith("cs_") || value.length < 8 || value.includes(":")) {
+    throw new Error("not a crypto subject");
+  }
+  return value as CryptoSubject;
+}
 
 /**
  * Where a ciphertext belongs. Bound into the AES-GCM additional authenticated
@@ -121,7 +142,7 @@ export const AEAD_VERSION = 1;
  * another position even when the attacker holds the right DEK.
  */
 export interface EncryptionContext {
-  userId: string;
+  subject: CryptoSubject;
   /** `table.column`, e.g. "birth_profiles.payload_enc". */
   field: string;
   /** Identifies the row within that table, e.g. a profile version or chart id. */
@@ -130,7 +151,7 @@ export interface EncryptionContext {
 
 /**
  * JSON array encoding, not concatenation: JSON escapes the delimiter, so no
- * choice of userId/field/recordId can produce the same AAD as a different
+ * choice of subject/field/recordId can produce the same AAD as a different
  * triple.
  */
 function buildAad(ctx: EncryptionContext, keyVersion: number): Uint8Array {
@@ -138,7 +159,7 @@ function buildAad(ctx: EncryptionContext, keyVersion: number): Uint8Array {
     JSON.stringify([
       "patternlike.aead",
       AEAD_VERSION,
-      ctx.userId,
+      ctx.subject,
       ctx.field,
       ctx.recordId,
       keyVersion,
@@ -146,13 +167,13 @@ function buildAad(ctx: EncryptionContext, keyVersion: number): Uint8Array {
   );
 }
 
-/** AAD for the wrapped DEK itself, binding it to its owner and KEK generation. */
-function buildDekAad(userId: string, keyVersion: number): Uint8Array {
+/** AAD for the wrapped DEK itself, binding it to its subject and KEK generation. */
+function buildDekAad(subject: CryptoSubject, keyVersion: number): Uint8Array {
   return new TextEncoder().encode(
     JSON.stringify([
       "patternlike.dek",
       KEK_DERIVATION_VERSION,
-      userId,
+      subject,
       keyVersion,
     ]),
   );
@@ -161,13 +182,13 @@ function buildDekAad(userId: string, keyVersion: number): Uint8Array {
 export async function wrapDek(
   dek: Uint8Array,
   rootKey: CryptoKey,
-  userId: string,
+  subject: CryptoSubject,
   keyVersion: number,
 ): Promise<{ wrapped_b64: string; nonce_b64: string }> {
   const nonce = new Uint8Array(12);
   crypto.getRandomValues(nonce);
   const ct = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce, additionalData: buildDekAad(userId, keyVersion) },
+    { name: "AES-GCM", iv: nonce, additionalData: buildDekAad(subject, keyVersion) },
     rootKey,
     dek,
   );
@@ -177,14 +198,14 @@ export async function wrapDek(
 export async function unwrapDek(
   packed: Uint8Array,
   rootKey: CryptoKey,
-  userId: string,
+  subject: CryptoSubject,
   keyVersion: number,
 ): Promise<Uint8Array> {
   // Stored as nonce(12) || ciphertext
   const nonce = packed.slice(0, 12);
   const ct = packed.slice(12);
   const plain = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: nonce, additionalData: buildDekAad(userId, keyVersion) },
+    { name: "AES-GCM", iv: nonce, additionalData: buildDekAad(subject, keyVersion) },
     rootKey,
     ct,
   );

@@ -7,33 +7,48 @@ import {
   unwrapDek,
   encryptJson,
   decryptJson,
+  asCryptoSubject,
   KEK_DERIVATION_VERSION,
+  type CryptoSubject,
   type EncryptedPayload,
   type EncryptionContext,
   type RootKeyEnv,
 } from "../crypto.js";
 
-export async function ensureUser(db: D1Database, userId: string): Promise<void> {
-  const existing = await db
-    .prepare("SELECT id FROM users WHERE id = ?")
-    .bind(userId)
-    .first();
-  if (existing) return;
-
-  const now = new Date().toISOString();
-  await db
-    .prepare(
-      `INSERT INTO users (id, status, locale, timezone, entitlement_tier, created_at, updated_at)
-       VALUES (?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
-    )
-    .bind(userId, now, now)
-    .run();
+/**
+ * A user's two identifiers. `userId` addresses rows; `cryptoSubject` addresses
+ * ciphertext. They are deliberately not interchangeable — see
+ * docs/superpowers/specs/2026-08-01-stream0-decisions-design.md §0.2.
+ */
+export interface UserIdentity {
+  userId: string;
+  cryptoSubject: CryptoSubject;
 }
 
+/** Read both identifiers for a user, or null if the user does not exist. */
+export async function loadUserIdentity(
+  env: Env,
+  userId: string,
+): Promise<UserIdentity | null> {
+  const row = await env.DB.prepare(
+    "SELECT id, crypto_subject FROM users WHERE id = ?",
+  )
+    .bind(userId)
+    .first<{ id: string; crypto_subject: string }>();
+  if (!row) return null;
+  return { userId: row.id, cryptoSubject: asCryptoSubject(row.crypto_subject) };
+}
+
+/**
+ * The user id is carried as a field rather than interpolated into the message.
+ * `onError` logs `err.message`, and the spec requires opaque user ids in error
+ * telemetry — this error fires on the first request from a deleted account, so
+ * interpolating would write that user's id into the log line every time.
+ */
 export class UserKeyDestroyedError extends Error {
   readonly code = "user_key_destroyed";
-  constructor(userId: string) {
-    super(`Encryption key for ${userId} has been destroyed`);
+  constructor(readonly userId: string) {
+    super("Encryption key has been destroyed for this account");
     this.name = "UserKeyDestroyedError";
   }
 }
@@ -51,8 +66,8 @@ export class UnsupportedKekVersionError extends Error {
 
 export class NoUserKeyError extends Error {
   readonly code = "user_key_missing";
-  constructor(userId: string) {
-    super(`No encryption key exists for ${userId}`);
+  constructor(readonly userId: string) {
+    super("No encryption key exists for this account");
     this.name = "NoUserKeyError";
   }
 }
@@ -83,70 +98,87 @@ async function readLiveKey(env: Env, userId: string): Promise<LiveKeyRow | null>
     .first<LiveKeyRow>();
 }
 
-export async function ensureUserKey(
+/**
+ * Load a user's live DEK. Never mints.
+ *
+ * Minting moved to identity-link time (db/identities.ts), so a user row that
+ * exists without a key row is a real fault, not a first-use case. The previous
+ * behaviour — mint on miss — meant that a user id change which failed to cascade
+ * into user_keys silently produced a fresh DEK and orphaned every prior
+ * ciphertext with a 200 response and no error anywhere.
+ */
+export async function loadUserKey(
   env: Env,
-  userId: string,
+  id: UserIdentity,
 ): Promise<{ dek: Uint8Array; keyVersion: number }> {
-  const active = await readLiveKey(env, userId);
+  const active = await readLiveKey(env, id.userId);
+
+  if (!active) {
+    const destroyed = await env.DB.prepare(
+      "SELECT 1 AS present FROM user_keys WHERE user_id = ? LIMIT 1",
+    )
+      .bind(id.userId)
+      .first<{ present: number }>();
+    throw destroyed
+      ? new UserKeyDestroyedError(id.userId)
+      : new NoUserKeyError(id.userId);
+  }
+
+  if (active.kek_version !== KEK_DERIVATION_VERSION) {
+    throw new UnsupportedKekVersionError(active.kek_version);
+  }
+
   const root = await resolveRootKey(env);
+  const dek = await unwrapDek(
+    new Uint8Array(active.wrapped_dek),
+    root,
+    id.cryptoSubject,
+    active.key_version,
+  );
+  return { dek, keyVersion: active.key_version };
+}
 
-  if (active) {
-    if (active.kek_version !== KEK_DERIVATION_VERSION) {
-      throw new UnsupportedKekVersionError(active.kek_version);
-    }
-    const dek = await unwrapDek(
-      new Uint8Array(active.wrapped_dek),
-      root,
-      userId,
-      active.key_version,
-    );
-    return { dek, keyVersion: active.key_version };
-  }
-
-  // No live key. If one was destroyed the account was crypto-shredded, and
-  // minting a fresh DEK would quietly undo that, so refuse instead. Previously
-  // this path 500ed forever: the destroyed_at IS NULL lookup missed while the
-  // insert still collided on the user_id primary key.
-  const destroyed = await env.DB.prepare(
-    "SELECT 1 AS present FROM user_keys WHERE user_id = ? LIMIT 1",
-  )
-    .bind(userId)
-    .first<{ present: number }>();
-  if (destroyed) {
-    throw new UserKeyDestroyedError(userId);
-  }
-
+/**
+ * Build the user_keys INSERT for a brand-new user, so it can be batched with the
+ * users and identities inserts. Returning a statement rather than running it is
+ * what makes account creation atomic.
+ */
+export async function buildUserKeyInsert(
+  env: Env,
+  id: UserIdentity,
+): Promise<D1PreparedStatement> {
+  const root = await resolveRootKey(env);
   const dek = await generateUserDek();
-  const { wrapped_b64, nonce_b64 } = await wrapDek(dek, root, userId, 1);
-  const now = new Date().toISOString();
-  await env.DB.prepare(
+  const { wrapped_b64, nonce_b64 } = await wrapDek(dek, root, id.cryptoSubject, 1);
+  return env.DB.prepare(
     `INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at)
      VALUES (?, 1, ?, ?, ?)`,
-  )
-    .bind(userId, KEK_DERIVATION_VERSION, packWrapped(nonce_b64, wrapped_b64), now)
-    .run();
-
-  return { dek, keyVersion: 1 };
+  ).bind(
+    id.userId,
+    KEK_DERIVATION_VERSION,
+    packWrapped(nonce_b64, wrapped_b64),
+    new Date().toISOString(),
+  );
 }
 
 export async function encryptPayload(
   env: Env,
-  userId: string,
+  id: UserIdentity,
   value: unknown,
   ctx: EncryptionContext,
 ): Promise<EncryptedPayload & { keyVersion: number }> {
-  const { dek, keyVersion } = await ensureUserKey(env, userId);
+  const { dek, keyVersion } = await loadUserKey(env, id);
   const enc = await encryptJson(value, dek, keyVersion, ctx);
   return { ...enc, keyVersion: enc.key_version };
 }
 
 export async function decryptPayload<T = unknown>(
   env: Env,
-  userId: string,
+  id: UserIdentity,
   payload: Pick<EncryptedPayload, "key_version" | "nonce" | "ciphertext">,
   ctx: EncryptionContext,
 ): Promise<T> {
-  const { dek } = await ensureUserKey(env, userId);
+  const { dek } = await loadUserKey(env, id);
   return decryptJson<T>(payload, dek, ctx);
 }
 
@@ -161,11 +193,11 @@ export async function decryptPayload<T = unknown>(
  */
 export async function rewrapUserKey(
   env: Env,
-  userId: string,
+  id: UserIdentity,
   previous: RootKeyEnv,
 ): Promise<{ keyVersion: number }> {
-  const active = await readLiveKey(env, userId);
-  if (!active) throw new NoUserKeyError(userId);
+  const active = await readLiveKey(env, id.userId);
+  if (!active) throw new NoUserKeyError(id.userId);
   if (active.kek_version !== KEK_DERIVATION_VERSION) {
     throw new UnsupportedKekVersionError(active.kek_version);
   }
@@ -174,7 +206,7 @@ export async function rewrapUserKey(
   const dek = await unwrapDek(
     new Uint8Array(active.wrapped_dek),
     oldRoot,
-    userId,
+    id.cryptoSubject,
     active.key_version,
   );
 
@@ -182,7 +214,7 @@ export async function rewrapUserKey(
   const { wrapped_b64, nonce_b64 } = await wrapDek(
     dek,
     newRoot,
-    userId,
+    id.cryptoSubject,
     active.key_version,
   );
 
@@ -193,7 +225,7 @@ export async function rewrapUserKey(
     .bind(
       packWrapped(nonce_b64, wrapped_b64),
       new Date().toISOString(),
-      userId,
+      id.userId,
       active.key_version,
     )
     .run();
@@ -227,7 +259,7 @@ const ENCRYPTED_COLUMNS = [
 
 async function assertNoUnrotatedCiphertext(
   env: Env,
-  userId: string,
+  id: UserIdentity,
   newKeyVersion: number,
 ): Promise<void> {
   // chart_snapshots.snapshot_enc is declared but nothing writes it yet. If that
@@ -239,7 +271,7 @@ async function assertNoUnrotatedCiphertext(
        AND (snapshot_key_version IS NULL OR snapshot_key_version <> ?)
      LIMIT 1`,
   )
-    .bind(userId, newKeyVersion)
+    .bind(id.userId, newKeyVersion)
     .first<{ id: string }>();
 
   if (orphan) {
@@ -260,10 +292,10 @@ async function assertNoUnrotatedCiphertext(
  */
 export async function rotateUserDek(
   env: Env,
-  userId: string,
+  id: UserIdentity,
 ): Promise<{ keyVersion: number; reencrypted: number }> {
-  const active = await readLiveKey(env, userId);
-  if (!active) throw new NoUserKeyError(userId);
+  const active = await readLiveKey(env, id.userId);
+  if (!active) throw new NoUserKeyError(id.userId);
   if (active.kek_version !== KEK_DERIVATION_VERSION) {
     throw new UnsupportedKekVersionError(active.kek_version);
   }
@@ -272,7 +304,7 @@ export async function rotateUserDek(
   const oldDek = await unwrapDek(
     new Uint8Array(active.wrapped_dek),
     root,
-    userId,
+    id.cryptoSubject,
     active.key_version,
   );
   const newKeyVersion = active.key_version + 1;
@@ -288,7 +320,7 @@ export async function rotateUserDek(
        FROM ${col.table}
        WHERE user_id = ? AND ${col.encColumn} IS NOT NULL`,
     )
-      .bind(userId)
+      .bind(id.userId)
       .all<{
         record_id: string | number;
         enc: ArrayBuffer;
@@ -298,7 +330,7 @@ export async function rotateUserDek(
 
     for (const row of found.results) {
       const ctx: EncryptionContext = {
-        userId,
+        subject: id.cryptoSubject,
         field: `${col.table}.${col.encColumn}`,
         recordId: String(row.record_id),
       };
@@ -321,7 +353,7 @@ export async function rotateUserDek(
           Uint8Array.from(atob(sealed.ciphertext), (c) => c.charCodeAt(0)),
           newKeyVersion,
           sealed.nonce,
-          userId,
+          id.userId,
           row.record_id,
         ),
       );
@@ -330,7 +362,12 @@ export async function rotateUserDek(
   }
 
   const now = new Date().toISOString();
-  const { wrapped_b64, nonce_b64 } = await wrapDek(newDek, root, userId, newKeyVersion);
+  const { wrapped_b64, nonce_b64 } = await wrapDek(
+    newDek,
+    root,
+    id.cryptoSubject,
+    newKeyVersion,
+  );
 
   // Destroy the old key before inserting the new one: uq_user_keys_active
   // permits only one row with destroyed_at IS NULL.
@@ -338,12 +375,12 @@ export async function rotateUserDek(
     env.DB.prepare(
       `UPDATE user_keys SET rotated_at = ?, destroyed_at = ?
        WHERE user_id = ? AND key_version = ?`,
-    ).bind(now, now, userId, active.key_version),
+    ).bind(now, now, id.userId, active.key_version),
     env.DB.prepare(
       `INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at)
        VALUES (?, ?, ?, ?, ?)`,
     ).bind(
-      userId,
+      id.userId,
       newKeyVersion,
       KEK_DERIVATION_VERSION,
       packWrapped(nonce_b64, wrapped_b64),
@@ -352,7 +389,7 @@ export async function rotateUserDek(
   );
 
   await env.DB.batch(writes);
-  await assertNoUnrotatedCiphertext(env, userId, newKeyVersion);
+  await assertNoUnrotatedCiphertext(env, id, newKeyVersion);
 
   return { keyVersion: newKeyVersion, reencrypted };
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  asCryptoSubject,
   generateUserDek,
   encryptJson,
   resolveRootKey,
@@ -9,7 +10,7 @@ import {
 } from "./crypto.js";
 
 const CTX: EncryptionContext = {
-  userId: "usr_crypto_test_0001",
+  subject: asCryptoSubject("cs_crypto_test_0001"),
   field: "birth_profiles.payload_enc",
   recordId: "1",
 };
@@ -28,7 +29,7 @@ describe("envelope encryption helpers", () => {
   it("wraps and unwraps a DEK with the root key", async () => {
     const root = await resolveRootKey(TEST_KEK);
     const dek = await generateUserDek();
-    const wrapped = await wrapDek(dek, root, CTX.userId, 1);
+    const wrapped = await wrapDek(dek, root, CTX.subject, 1);
     expect(wrapped.wrapped_b64).toBeTruthy();
     expect(wrapped.nonce_b64).toBeTruthy();
 
@@ -38,14 +39,16 @@ describe("envelope encryption helpers", () => {
     packed.set(nonce, 0);
     packed.set(ct, nonce.length);
 
-    const out = await unwrapDek(packed, root, CTX.userId, 1);
+    const out = await unwrapDek(packed, root, CTX.subject, 1);
     expect(Array.from(out)).toEqual(Array.from(dek));
   });
 
   it("refuses to unwrap another user's DEK", async () => {
+    // "another user" is now another *subject* — the DEK AAD binds to
+    // users.crypto_subject rather than to the mutable users.id label.
     const root = await resolveRootKey(TEST_KEK);
     const dek = await generateUserDek();
-    const wrapped = await wrapDek(dek, root, CTX.userId, 1);
+    const wrapped = await wrapDek(dek, root, CTX.subject, 1);
 
     const nonce = Uint8Array.from(atob(wrapped.nonce_b64), (c) => c.charCodeAt(0));
     const ct = Uint8Array.from(atob(wrapped.wrapped_b64), (c) => c.charCodeAt(0));
@@ -53,6 +56,8 @@ describe("envelope encryption helpers", () => {
     packed.set(nonce, 0);
     packed.set(ct, nonce.length);
 
-    await expect(unwrapDek(packed, root, "usr_someone_else_01", 1)).rejects.toThrow();
+    await expect(
+      unwrapDek(packed, root, asCryptoSubject("cs_someone_else_001"), 1),
+    ).rejects.toThrow();
   });
 });

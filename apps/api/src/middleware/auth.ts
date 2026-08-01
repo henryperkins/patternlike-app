@@ -1,8 +1,12 @@
 import type { Context, Next } from "hono";
 import type { Env } from "../env.js";
+import type { CryptoSubject } from "../crypto.js";
+import { loadUserIdentity } from "../db/users.js";
 
 export type AppVariables = {
   userId: string;
+  /** The immutable AEAD/DEK subject. Never a request-supplied value. */
+  cryptoSubject: CryptoSubject;
   requestId: string;
 };
 
@@ -28,7 +32,24 @@ export async function authStub(
         401,
       );
     }
-    c.set("userId", userId);
+    // The header now *names* an existing user rather than conjuring one: the
+    // crypto subject is read from the row, because it is the AEAD subject and
+    // must never come from a request.
+    const identity = await loadUserIdentity(c.env, userId);
+    if (!identity) {
+      return c.json(
+        {
+          error: {
+            code: "unauthorized",
+            message: "Provide X-User-Id header when AUTH_STUB=1",
+            request_id: requestId,
+          },
+        },
+        401,
+      );
+    }
+    c.set("userId", identity.userId);
+    c.set("cryptoSubject", identity.cryptoSubject);
     await next();
     return;
   }

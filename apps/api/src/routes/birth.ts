@@ -9,7 +9,7 @@ import {
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
-import { ensureUser, encryptPayload } from "../db/users.js";
+import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { invokeCalc } from "../services/calc-client.js";
 
 export const birthRoutes = new Hono<{
@@ -126,6 +126,10 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   }
 
   const userId = c.get("userId");
+  const identity: UserIdentity = {
+    userId,
+    cryptoSubject: c.get("cryptoSubject"),
+  };
 
   let body: Partial<BirthProfileRequest>;
   try {
@@ -182,8 +186,6 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     );
   }
 
-  await ensureUser(c.env.DB, userId);
-
   const now = new Date().toISOString();
   const versionRow = await c.env.DB.prepare(
     `SELECT COALESCE(MAX(version), 0) AS v FROM birth_profiles WHERE user_id = ?`,
@@ -205,10 +207,10 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   // to decrypt even when the DEK is correct.
   const { keyVersion, nonce, ciphertext } = await encryptPayload(
     c.env,
-    userId,
+    identity,
     sensitive,
     {
-      userId,
+      subject: identity.cryptoSubject,
       field: "birth_profiles.payload_enc",
       recordId: String(profileVersion),
     },
@@ -359,14 +361,18 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
 
   const birthEnc = await encryptPayload(
     c.env,
-    userId,
+    identity,
     {
       utc_instant: chart.birth.utc_instant,
       place_label: chart.birth.place_label,
       latitude: chart.birth.latitude,
       longitude: chart.birth.longitude,
     },
-    { userId, field: "chart_snapshots.birth_enc", recordId: chart.id },
+    {
+      subject: identity.cryptoSubject,
+      field: "chart_snapshots.birth_enc",
+      recordId: chart.id,
+    },
   );
   const birthEncBytes = Uint8Array.from(atob(birthEnc.ciphertext), (ch) =>
     ch.charCodeAt(0),

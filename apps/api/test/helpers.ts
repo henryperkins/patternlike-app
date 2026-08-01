@@ -1,5 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import type { BirthProfileRequest } from "@patternlike/shared";
+import { asCryptoSubject } from "../src/crypto.js";
+import { buildUserKeyInsert, type UserIdentity } from "../src/db/users.js";
 
 /**
  * Tables the API writes, in foreign-key-safe delete order. Storage is not
@@ -92,3 +94,33 @@ export const BOB: Partial<BirthProfileRequest> = {
 
 export const USER_A = "usr_test_alice_00001";
 export const USER_B = "usr_test_bob_000001";
+/** A third party, used to prove per-user isolation in the rotation tests. */
+export const USER_OTHER = "usr_test_other_00001";
+
+export const SUBJECT_A = asCryptoSubject("cs_test_alice_00001");
+export const SUBJECT_B = asCryptoSubject("cs_test_bob_000001");
+export const SUBJECT_OTHER = asCryptoSubject("cs_test_other_00001");
+
+export const IDENTITY_A: UserIdentity = { userId: USER_A, cryptoSubject: SUBJECT_A };
+export const IDENTITY_B: UserIdentity = { userId: USER_B, cryptoSubject: SUBJECT_B };
+export const IDENTITY_OTHER: UserIdentity = {
+  userId: USER_OTHER,
+  cryptoSubject: SUBJECT_OTHER,
+};
+
+/**
+ * Create a user the way identity linking does — row plus key, one batch — so
+ * integration tests exercise the same shape production does. Not idempotent:
+ * seed in exactly one place per suite or the users.id PRIMARY KEY collides.
+ */
+export async function seedUser(id: UserIdentity): Promise<void> {
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO users (id, crypto_subject, status, locale, timezone,
+                          entitlement_tier, created_at, updated_at)
+       VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
+    ).bind(id.userId, id.cryptoSubject, now, now),
+    await buildUserKeyInsert(env, id),
+  ]);
+}
