@@ -11,7 +11,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { DateTime } from "luxon";
+import { DateTime, IANAZone } from "luxon";
 import sweph from "sweph";
 import {
   CALC_CONTRACT_ID,
@@ -125,6 +125,68 @@ function angleDiff(a: number, b: number): number {
   return d;
 }
 
+/**
+ * Coverage of the pinned data files (sepl_18.se1 / semo_18.se1 are the
+ * 1800–2400 series). Outside this range swe_calc_ut fails with an error that
+ * embeds the ephemeris directory path, so reject the input before calling it.
+ */
+export const EPHEMERIS_MIN_YEAR = 1800;
+export const EPHEMERIS_MAX_YEAR = 2399;
+
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const LOCAL_TIME_RE = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+/** Thrown for anything the caller supplied that cannot describe a real birth. */
+export class InvalidBirthProfileError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidBirthProfileError";
+  }
+}
+
+function assertFiniteInRange(
+  value: unknown,
+  label: string,
+  min: number,
+  max: number,
+): number {
+  if (typeof value !== "number") {
+    throw new InvalidBirthProfileError(
+      `${label} must be a number, received ${typeof value}`,
+    );
+  }
+  if (!Number.isFinite(value)) {
+    throw new InvalidBirthProfileError(`${label} must be finite`);
+  }
+  if (value < min || value > max) {
+    throw new InvalidBirthProfileError(
+      `${label} out of range: ${value} (expected ${min}..${max})`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Validate birthplace coordinates. Returns null when both are absent, which is
+ * a legitimate state (no birthplace supplied) rather than an error.
+ */
+export function resolveCoordinates(
+  req: CalcRequest,
+): { latitude: number; longitude: number } | null {
+  const hasLat = req.latitude !== null && req.latitude !== undefined;
+  const hasLon = req.longitude !== null && req.longitude !== undefined;
+  if (!hasLat && !hasLon) return null;
+  if (hasLat !== hasLon) {
+    throw new InvalidBirthProfileError(
+      "latitude and longitude must be supplied together",
+    );
+  }
+  return {
+    latitude: assertFiniteInRange(req.latitude, "latitude", -90, 90),
+    longitude: assertFiniteInRange(req.longitude, "longitude", -180, 180),
+  };
+}
+
 export interface UtcInstantParts {
   year: number;
   month: number;
@@ -143,55 +205,101 @@ export interface UtcInstantParts {
  */
 export function resolveUtcInstant(req: CalcRequest): UtcInstantParts {
   if (!req.birth_date) {
-    throw new Error("birth_date required for Swiss Ephemeris calculation");
+    throw new InvalidBirthProfileError(
+      "birth_date required for Swiss Ephemeris calculation",
+    );
   }
-  const [ys, ms, ds] = req.birth_date.split("-");
-  const year = Number(ys);
-  const month = Number(ms);
-  const day = Number(ds);
-  if (!year || !month || !day) {
-    throw new Error(`invalid birth_date: ${req.birth_date}`);
+
+  const dateMatch = ISO_DATE_RE.exec(req.birth_date);
+  if (!dateMatch) {
+    throw new InvalidBirthProfileError(
+      `invalid birth_date: ${req.birth_date} (expected YYYY-MM-DD)`,
+    );
+  }
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+
+  // Prove the date exists before any zone handling. The previous implementation
+  // treated an invalid DateTime as "bad timezone" and retried in UTC, which is
+  // equally invalid for a date that never existed — 2023-02-30 became NaN parts,
+  // then a NaN Julian day, which corrupts sweph's ephemeris cache for the whole
+  // process and fails every subsequent request from every user.
+  const calendarProbe = DateTime.fromObject({ year, month, day }, { zone: "UTC" });
+  if (!calendarProbe.isValid) {
+    throw new InvalidBirthProfileError(
+      `invalid birth_date: ${req.birth_date} (${calendarProbe.invalidReason ?? "not a real calendar date"})`,
+    );
+  }
+
+  if (year < EPHEMERIS_MIN_YEAR || year > EPHEMERIS_MAX_YEAR) {
+    throw new InvalidBirthProfileError(
+      `birth_date outside supported ephemeris range: ${req.birth_date} ` +
+        `(supported ${EPHEMERIS_MIN_YEAR}-01-01 through ${EPHEMERIS_MAX_YEAR}-12-31)`,
+    );
+  }
+
+  const zone = req.timezone || "UTC";
+  if (!IANAZone.isValidZone(zone)) {
+    throw new InvalidBirthProfileError(
+      `invalid timezone: ${zone} (expected an IANA zone id)`,
+    );
   }
 
   let hour = 12;
   let minute = 0;
   let second = 0;
-  let synthetic = false;
+  const hasRealTime =
+    req.accuracy !== "unknown" && typeof req.birth_time_local === "string";
 
-  if (req.accuracy === "unknown" || !req.birth_time_local) {
-    synthetic = req.accuracy === "unknown" || !req.birth_time_local;
-    hour = 12;
-    minute = 0;
-    second = 0;
-  } else {
-    const parts = req.birth_time_local.split(":").map(Number);
-    hour = parts[0] ?? 0;
-    minute = parts[1] ?? 0;
-    second = parts[2] ?? 0;
+  if (hasRealTime) {
+    const timeMatch = LOCAL_TIME_RE.exec(req.birth_time_local!);
+    if (!timeMatch) {
+      throw new InvalidBirthProfileError(
+        `invalid birth_time_local: ${req.birth_time_local} (expected HH:MM or HH:MM:SS)`,
+      );
+    }
+    hour = Number(timeMatch[1]);
+    minute = Number(timeMatch[2]);
+    second = timeMatch[3] === undefined ? 0 : Number(timeMatch[3]);
+    if (hour > 23 || minute > 59 || second > 59) {
+      throw new InvalidBirthProfileError(
+        `invalid birth_time_local: ${req.birth_time_local} (out of range)`,
+      );
+    }
   }
 
-  const zone = req.timezone || "UTC";
-  let dt = DateTime.fromObject(
+  const synthetic = !hasRealTime;
+
+  const dt = DateTime.fromObject(
     { year, month, day, hour, minute, second },
     { zone },
   );
   if (!dt.isValid) {
-    // Fallback: treat as UTC if zone invalid
-    dt = DateTime.fromObject(
-      { year, month, day, hour, minute, second },
-      { zone: "UTC" },
+    // Backstop only. Luxon resolves DST spring-forward gaps by shifting forward
+    // and stays valid, so with the date and zone already proven this is not
+    // expected to be reachable — fail closed rather than fabricate an instant.
+    throw new InvalidBirthProfileError(
+      `birth date/time cannot be resolved in ${zone}: ${dt.invalidReason ?? "invalid local time"}`,
     );
   }
+
   const utc = dt.toUTC();
   const hourDecimal =
     utc.hour + utc.minute / 60 + utc.second / 3600 + utc.millisecond / 3_600_000;
+  const iso = utc.toISO();
+  if (iso === null) {
+    throw new InvalidBirthProfileError(
+      `birth date/time did not resolve to an instant: ${req.birth_date}`,
+    );
+  }
 
   return {
     year: utc.year,
     month: utc.month,
     day: utc.day,
     hourDecimal,
-    iso: utc.toISO() ?? `${utc.toISODate()}T${utc.toFormat("HH:mm:ss")}Z`,
+    iso,
     zone: dt.zoneName ?? zone,
     synthetic_local_noon: synthetic,
   };
@@ -392,25 +500,31 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
       C.SE_GREG_CAL,
     );
 
-    const includeAngles =
-      req.accuracy !== "unknown" &&
-      req.latitude != null &&
-      req.longitude != null &&
-      !Number.isNaN(req.latitude) &&
-      !Number.isNaN(req.longitude);
+    // Last line of defence. A non-finite Julian day does not merely produce a
+    // bad chart: it corrupts sweph's internal ephemeris file cache for the life
+    // of the process, so every subsequent request from every user fails until
+    // the container restarts. Nothing may reach calc_ut unchecked.
+    if (!Number.isFinite(jdUt)) {
+      throw new InvalidBirthProfileError(
+        `birth date did not resolve to a Julian day: ${req.birth_date}`,
+      );
+    }
+
+    const coordinates = resolveCoordinates(req);
 
     let housesMeta: ReturnType<typeof computeHouses> | null = null;
-    if (includeAngles) {
+    if (coordinates && req.accuracy !== "unknown" && !utc.synthetic_local_noon) {
       try {
-        housesMeta = computeHouses(jdUt, req.latitude!, req.longitude!);
+        housesMeta = computeHouses(jdUt, coordinates.latitude, coordinates.longitude);
       } catch {
         housesMeta = null;
       }
     }
 
-    // Unknown time: still compute planets at technical noon, suppress angles/houses/Moon claims
-    const suppressAngles = req.accuracy === "unknown" || !includeAngles;
-    const suppressMoon = req.accuracy === "unknown";
+    // Angles and houses require a real birth time AND a birthplace. Accuracy is
+    // a label the caller supplies; it is not evidence that a time was given.
+    const suppressAngles = housesMeta === null;
+    const suppressMoon = utc.synthetic_local_noon;
 
     const positions: LongitudePosition[] = [];
     for (const { body, seId } of PLANET_SE_IDS) {
@@ -513,8 +627,8 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
             : utc.iso,
         timezone: req.timezone,
         place_label: req.place_label,
-        latitude: req.latitude,
-        longitude: req.longitude,
+        latitude: coordinates?.latitude ?? null,
+        longitude: coordinates?.longitude ?? null,
         sensitive_profile: null,
       },
       positions,
@@ -545,6 +659,14 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
 
     return { ok: true, chart };
   } catch (err) {
+    if (err instanceof InvalidBirthProfileError) {
+      return {
+        ok: false,
+        chart: null,
+        error_class: "invalid_birth_profile",
+        error_message: err.message,
+      };
+    }
     return {
       ok: false,
       chart: null,
