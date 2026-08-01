@@ -4,6 +4,8 @@ Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculatio
 
 **Spec:** `spec-bundle/` (v0.2) · **Contracts:** `contracts/m0/` · **D1:** `db/d1/`
 
+**Open contract decisions:** [`docs/reviews/2026-08-01-spec-escalations.md`](docs/reviews/2026-08-01-spec-escalations.md) — twelve reviewed items where the code implements the frozen contract faithfully and the fix belongs in the spec.
+
 ## Monorepo
 
 | Path | Role |
@@ -53,7 +55,9 @@ curl -s http://127.0.0.1:8787/v1/chart \
   -H "x-user-id: usr_local_dev_0001"
 ```
 
-`AUTH_STUB=1` (default in `wrangler.toml`) accepts **`X-User-Id`** for local development only.
+`AUTH_STUB=1` (default `[vars]` in `wrangler.toml`) accepts **`X-User-Id`** for local development only. It is absent from `[env.production]`, and the `configGuard` middleware returns `503 configuration_error` for any request when `AUTH_STUB=1` or `ROOT_KEK` is unset/placeholder outside `ENVIRONMENT=development|test`. `npm run deploy` targets `--env production`.
+
+Idempotency keys are scoped per user, so the static `demo-birth-001` above is safe across local users. Resubmitting the same birth data under a different key returns `409 chart_already_exists` rather than a 500.
 
 ## Swiss Ephemeris (`apps/calc-stub`)
 
@@ -64,9 +68,13 @@ curl -s http://127.0.0.1:8787/v1/chart \
 | Houses | Placidus primary, Porphyry fallback |
 | Node | True lunar node |
 | Data | `data/ephe/sepl_18.se1`, `semo_18.se1` (1800–2400) |
+| Data pin | `apps/calc-stub/ephemeris.lock.json` — upstream commit + SHA-256 per file |
+
+Birth dates outside 1800-01-01 … 2399-12-31 are rejected as
+`invalid_birth_profile` rather than reaching Swiss Ephemeris.
 
 ```bash
-npm run ephe:download -w @patternlike/calc-stub   # official aloistr/swisseph files
+npm run ephe:download -w @patternlike/calc-stub   # pinned commit, digest-verified
 npm run calc:dev
 curl http://127.0.0.1:8080/health
 curl http://127.0.0.1:8080/v1/engine
@@ -90,7 +98,7 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] M0 contracts validation in CI
 - [x] D1 core schema with encryption CHECKs
 - [x] Birth profile + chart calculation path
-- [x] Unknown birth-time mode (no silent noon as stored instant)
+- [x] Unknown birth-time mode: noon is a technical epoch only. It is never stored as the birth instant, and houses, angles, and time-sensitive Moon claims are suppressed whenever no real birth time was supplied — regardless of the accuracy label the caller sends. `birth_time_local` is required for `exact` and `approximate`.
 - [x] Real Swiss Ephemeris 2.10.03 + golden fingerprint tests
 - [x] SE licensing decision: **AGPL public path** (counsel + store strategy still open)
 - [ ] Historical TZ geocode connectors (IANA zone via luxon is local-only)
