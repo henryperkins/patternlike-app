@@ -95,6 +95,31 @@ curl http://127.0.0.1:8080/v1/engine
 
 Counsel should still review AGPL network obligations and app-store strategy before public end-user launch. Production boot still refuses `SE_LICENSE_MODE=pending`.
 
+### Fly.io calculation service
+
+The root `fly.toml` deploys only `apps/calc-stub`; the API remains a
+Cloudflare Worker backed by D1. Configure the same generated service token in
+Fly and Cloudflare, then deploy from the repository root:
+
+```bash
+fly secrets set CALC_SERVICE_AUTH_TOKEN="<generated-secret>" -a patternlike-app
+fly deploy
+
+cd apps/api
+npx wrangler secret put CALC_SERVICE_AUTH_TOKEN --env production
+```
+
+Verify the public metadata endpoints:
+
+```bash
+curl --fail https://patternlike-app.fly.dev/health
+curl --fail https://patternlike-app.fly.dev/v1/engine
+```
+
+`POST /v1/calculate` returns `401` without the shared bearer token, or `503`
+until the Fly secret is configured. Do not expose that token in source or
+client-side code.
+
 ## M1 status
 
 - [x] Monorepo + CI (workflow configured; has not yet run — no git remote)

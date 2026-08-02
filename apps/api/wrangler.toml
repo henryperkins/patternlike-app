@@ -32,7 +32,7 @@ name = "patternlike-api-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
-CALC_SERVICE_URL = "https://calc.internal.patternlike.app"
+CALC_SERVICE_URL = "https://patternlike-app.fly.dev"
 SCHEMA_VERSION = "0.2.0"
 SE_LICENSE_MODE = "agpl"
 # AUTH_STUB is deliberately absent. Setting it here re-enables auth that trusts
@@ -49,3 +49,4 @@ migrations_dir = "../../db/d1"
 #            development returns 503 until it is set, and it must not be the
 #            development placeholder.
 # SERVICE_AUTH_TOKEN — internal WordPress → CF release auth
+# CALC_SERVICE_AUTH_TOKEN — shared bearer token for Worker → Fly calc requests

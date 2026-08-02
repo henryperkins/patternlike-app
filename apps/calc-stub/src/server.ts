@@ -13,6 +13,7 @@ import {
   licenseStatusPayload,
 } from "./license-mode.js";
 import type { CalcRequest } from "@patternlike/shared";
+import { isServiceAuthorized } from "./service-auth.js";
 
 const port = Number(process.env.PORT ?? 8080);
 
@@ -92,6 +93,30 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/v1/calculate") {
+    if (
+      !isServiceAuthorized(
+        req.headers.authorization,
+        process.env.CALC_SERVICE_AUTH_TOKEN,
+      )
+    ) {
+      const configured = Boolean(process.env.CALC_SERVICE_AUTH_TOKEN);
+      res.writeHead(configured ? 401 : 503, {
+        "content-type": "application/json",
+      });
+      res.end(
+        JSON.stringify({
+          ok: false,
+          chart: null,
+          error_class: configured
+            ? "unauthorized"
+            : "service_auth_not_configured",
+          error_message: configured
+            ? "Valid service credentials are required"
+            : "Calculation service authentication is not configured",
+        }),
+      );
+      return;
+    }
     try {
       const raw = await readBody(req);
       const body = JSON.parse(raw) as CalcRequest;

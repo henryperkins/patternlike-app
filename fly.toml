@@ -1,0 +1,24 @@
+app = "patternlike-app"
+
+[build]
+  dockerfile = "apps/calc-stub/Dockerfile"
+
+[env]
+  ENVIRONMENT = "production"
+  PORT = "8080"
+  SE_LICENSE_MODE = "agpl"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
