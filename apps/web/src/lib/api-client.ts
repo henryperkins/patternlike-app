@@ -81,7 +81,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, body);
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    // A 200 that is not JSON means something other than the API answered —
+    // an SPA fallback, a proxy, a captive portal. Surface that instead of
+    // leaking a raw SyntaxError into the UI.
+    throw new Error("The API answered with something that is not JSON.");
+  }
 }
 
 export function getChart(signal?: AbortSignal): Promise<ChartResponse> {
