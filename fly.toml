@@ -1,0 +1,40 @@
+# Fly.io configuration for the Swiss Ephemeris calculation service.
+#
+# IMPORTANT — build context:
+#   The build context is the repository ROOT, not apps/calc-stub.
+#   The Dockerfile copies root-level package.json/package-lock.json and
+#   packages/shared, so the context must never be changed to apps/calc-stub.
+#
+# App name: change "patternlike-calc" if that name is already taken or you
+# already have a Fly app with a different name (--app YOUR_APP in fly deploy).
+
+app = "patternlike-calc"
+primary_region = "iad"
+
+[build]
+  dockerfile = "apps/calc-stub/Dockerfile"
+
+[env]
+  PORT            = "8080"
+  NODE_ENV        = "production"
+  ENVIRONMENT     = "production"
+  SE_LICENSE_MODE = "agpl"
+  SE_EPHE_PATH    = "/app/data/ephe"
+
+[http_service]
+  internal_port       = 8080
+  force_https         = true
+  auto_stop_machines  = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method       = "GET"
+    path         = "/health"
+    interval     = "30s"
+    timeout      = "5s"
+    grace_period = "30s"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "1gb"
