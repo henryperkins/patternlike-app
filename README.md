@@ -109,6 +109,62 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [ ] Production identity provider
 - [ ] Privacy center export/delete workflows (API stubs 501)
 
+## Deploying to Fly.io (`apps/calc-stub`)
+
+The Swiss Ephemeris calculation service can be deployed to Fly.io using the
+root-level `fly.toml`. **All commands must run from the repository root** — the
+Docker build context must remain the root so the Dockerfile can copy
+`package.json`, `package-lock.json`, and `packages/shared`.
+
+### First deployment
+
+```bash
+# Authenticate (one-time)
+fly auth login
+
+# Create the app on Fly without deploying yet.
+# Change "patternlike-calc" if that name is already taken.
+fly launch \
+  --name patternlike-calc \
+  --dockerfile apps/calc-stub/Dockerfile \
+  --no-deploy
+
+# Build the image and deploy (from the repository root).
+fly deploy
+```
+
+### Subsequent deployments
+
+```bash
+# From the repository root:
+fly deploy
+
+# If your Fly app has a different name than fly.toml:
+fly deploy --app YOUR_EXISTING_FLY_APP_NAME
+```
+
+> **Do not** run `fly deploy` from `apps/calc-stub` and do not pass
+> `--build-context` pointing to `apps/calc-stub`. The Dockerfile expects
+> root-level workspace files.
+
+### Secrets
+
+Set runtime secrets with `fly secrets set` — never commit them to source:
+
+```bash
+fly secrets set ROOT_KEK=<value> SOME_API_KEY=<value>
+```
+
+### Verify the deployment
+
+```bash
+curl https://YOUR_APP.fly.dev/health
+curl https://YOUR_APP.fly.dev/v1/engine
+```
+
+The `/health` check has a 30-second grace period configured in `fly.toml` to
+allow for ephemeris initialisation on first start.
+
 ## Architecture profile
 
 `cloudflare-first-wordpress-editorial-fly-portable-v1` — see `spec-bundle/pattern_like_astrology_app_platform_topology_v0.2.yaml`.
