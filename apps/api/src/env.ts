@@ -3,6 +3,7 @@ export interface Env {
   ENVIRONMENT: string;
   AUTH_STUB: string;
   CALC_SERVICE_URL: string;
+  CALC_SERVICE_AUTH_TOKEN?: string;
   SCHEMA_VERSION: string;
   /** Set in wrangler.toml; was previously absent from this interface. */
   SE_LICENSE_MODE: string;

@@ -145,61 +145,54 @@ the `users` row, its `identities` row, and its wrapped DEK must land together).
 `ENVIRONMENT=test` counts as development and disables the config guard. Do not
 name a staging deployment `test`.
 
-## Deploying to Fly.io (`apps/calc-stub`)
+## Deploying to Fly.io
 
-The Swiss Ephemeris calculation service can be deployed to Fly.io using the
-root-level `fly.toml`. **All commands must run from the repository root** — the
-Docker build context must remain the root so the Dockerfile can copy
-`package.json`, `package-lock.json`, and `packages/shared`.
+Two Fly apps deploy from this repo. **All commands run from the repository
+root** — the Docker build context must remain the root so the Dockerfiles can
+copy `package.json`, `package-lock.json`, `tsconfig.base.json`, and
+`packages/shared`. The API is not on Fly; it remains a Cloudflare Worker
+backed by D1.
 
-### First deployment
+| App | Serves | Config | Deploy |
+| --- | --- | --- | --- |
+| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` |
+| `patternlike-app` | Web PWA (`apps/web`, static nginx) | `fly.web.toml` | `fly deploy -c fly.web.toml` |
 
-```bash
-# Authenticate (one-time)
-fly auth login
+> **Do not** run `fly deploy` from inside an app directory and do not pass
+> `--build-context`. Both Dockerfiles expect root-level workspace files.
+> To recreate an app from scratch: `fly apps create <name> --org personal`.
 
-# Create the app on Fly without deploying yet.
-# Change "patternlike-calc" if that name is already taken.
-fly launch \
-  --name patternlike-calc \
-  --dockerfile apps/calc-stub/Dockerfile \
-  --no-deploy
+### Calc service auth
 
-# Build the image and deploy (from the repository root).
-fly deploy
-```
+`POST /v1/calculate` requires a shared bearer token in production:
+`503 service_auth_not_configured` until the secret is set, `401 unauthorized`
+without a valid token. `/health` and `/v1/engine` stay public so health checks
+keep working. Outside `ENVIRONMENT=production` no token is required — the
+local dev loop runs unchanged — while setting `CALC_SERVICE_AUTH_TOKEN`
+locally enforces auth anywhere.
 
-### Subsequent deployments
-
-```bash
-# From the repository root:
-fly deploy
-
-# If your Fly app has a different name than fly.toml:
-fly deploy --app YOUR_EXISTING_FLY_APP_NAME
-```
-
-> **Do not** run `fly deploy` from `apps/calc-stub` and do not pass
-> `--build-context` pointing to `apps/calc-stub`. The Dockerfile expects
-> root-level workspace files.
-
-### Secrets
-
-Set runtime secrets with `fly secrets set` — never commit them to source:
+Configure the same generated token on both sides; never commit it:
 
 ```bash
-fly secrets set ROOT_KEK=<value> SOME_API_KEY=<value>
+fly secrets set CALC_SERVICE_AUTH_TOKEN="<generated-secret>" -a patternlike-calc
+
+# Worker side (when the production API deploys):
+npx wrangler secret put CALC_SERVICE_AUTH_TOKEN --env production
 ```
 
 ### Verify the deployment
 
 ```bash
-curl https://YOUR_APP.fly.dev/health
-curl https://YOUR_APP.fly.dev/v1/engine
+curl --fail https://patternlike-calc.fly.dev/health
+curl --fail https://patternlike-calc.fly.dev/v1/engine
+curl --fail https://patternlike-app.fly.dev/
+
+# 401 proves the calculate gate is enforcing:
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://patternlike-calc.fly.dev/v1/calculate
 ```
 
-The `/health` check has a 30-second grace period configured in `fly.toml` to
-allow for ephemeris initialisation on first start.
+The calc `/health` check has a 30-second grace period configured in `fly.toml`
+to allow for ephemeris initialisation on first start.
 
 ## Architecture profile
 

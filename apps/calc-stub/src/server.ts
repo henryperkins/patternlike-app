@@ -13,6 +13,7 @@ import {
   licenseStatusPayload,
 } from "./license-mode.js";
 import type { CalcRequest } from "@patternlike/shared";
+import { isServiceAuthorized } from "./service-auth.js";
 
 const port = Number(process.env.PORT ?? 8080);
 
@@ -92,6 +93,44 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/v1/calculate") {
+    // Same environment resolution as license-mode: outside production, a
+    // missing token leaves the endpoint open so the local calc:dev/dev:api
+    // loop needs no shared secret. A configured token is enforced anywhere.
+    const expectedToken = process.env.CALC_SERVICE_AUTH_TOKEN;
+    const environment = (
+      process.env.ENVIRONMENT ??
+      process.env.NODE_ENV ??
+      "development"
+    ).toLowerCase();
+    if (!expectedToken && environment === "production") {
+      // Fail closed, mirroring the API's configGuard: a production deploy
+      // that forgot the secret refuses loudly instead of serving open compute.
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: false,
+          chart: null,
+          error_class: "service_auth_not_configured",
+          error_message: "Calculation service authentication is not configured",
+        }),
+      );
+      return;
+    }
+    if (
+      expectedToken &&
+      !isServiceAuthorized(req.headers.authorization, expectedToken)
+    ) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: false,
+          chart: null,
+          error_class: "unauthorized",
+          error_message: "Valid service credentials are required",
+        }),
+      );
+      return;
+    }
     try {
       const raw = await readBody(req);
       const body = JSON.parse(raw) as CalcRequest;

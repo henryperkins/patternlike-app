@@ -20,9 +20,15 @@ export async function invokeCalc(
   }
 
   try {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+    };
+    if (env.CALC_SERVICE_AUTH_TOKEN) {
+      headers.authorization = `Bearer ${env.CALC_SERVICE_AUTH_TOKEN}`;
+    }
     const res = await fetch(`${base}/v1/calculate`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify(req),
     });
     const json = (await res.json()) as CalcResponse;

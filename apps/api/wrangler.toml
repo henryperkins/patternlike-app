@@ -40,7 +40,7 @@ name = "patternlike-api-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
-CALC_SERVICE_URL = "https://calc.internal.patternlike.app"
+CALC_SERVICE_URL = "https://patternlike-calc.fly.dev"
 SCHEMA_VERSION = "0.2.0"
 SE_LICENSE_MODE = "agpl"
 # Identity. These MUST be replaced with the real issuer before deploying:
@@ -63,6 +63,9 @@ migrations_dir = "../../db/d1"
 #            development returns 503 until it is set, and it must not be the
 #            development placeholder.
 # SERVICE_AUTH_TOKEN — internal WordPress → CF release auth
+# CALC_SERVICE_AUTH_TOKEN — shared bearer token for Worker → calc requests.
+#            The calc service returns 503 on /v1/calculate in production until
+#            the same value is set there: fly secrets set CALC_SERVICE_AUTH_TOKEN=…
 #
 # NOTE ON ENVIRONMENT NAMING: isDevEnvironment() treats BOTH "development" and
 # "test" as development, which disables configGuard and re-enables the
