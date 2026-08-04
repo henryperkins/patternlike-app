@@ -1,15 +1,10 @@
-# Fly.io configuration for the Swiss Ephemeris calculation service.
+# fly.toml app configuration file generated for patternlike-calc on 2026-08-04T02:32:54Z
 #
-# IMPORTANT — build context:
-#   The build context is the repository ROOT, not apps/calc-stub.
-#   The Dockerfile copies root-level package.json/package-lock.json and
-#   packages/shared, so the context must never be changed to apps/calc-stub.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# App name: change "patternlike-calc" if that name is already taken or you
-# already have a Fly app with a different name (--app YOUR_APP in fly deploy).
 
 app = "patternlike-calc"
-primary_region = "iad"
+primary_region = 'iad'
 
 [build]
   dockerfile = "apps/calc-stub/Dockerfile"
@@ -22,11 +17,12 @@ primary_region = "iad"
   SE_EPHE_PATH    = "/app/data/ephe"
 
 [http_service]
-  internal_port       = 8080
-  force_https         = true
-  auto_stop_machines  = "stop"
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 2
+  checks = [{ grace_period = '10s', interval = '30s', method = 'GET', path = '/', timeout = '5s' }]
 
   [[http_service.checks]]
     method       = "GET"
@@ -36,5 +32,5 @@ primary_region = "iad"
     grace_period = "30s"
 
 [[vm]]
-  size   = "shared-cpu-1x"
-  memory = "1gb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
