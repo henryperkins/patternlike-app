@@ -115,6 +115,46 @@ export function createBirthProfile(
   });
 }
 
+export function requestAccountExport(signal?: AbortSignal): Promise<unknown> {
+  return request<unknown>("/v1/exports", {
+    method: "POST",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function deleteAccount(signal?: AbortSignal): Promise<unknown> {
+  return request<unknown>("/v1/account", {
+    method: "DELETE",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getTodayReadings(signal?: AbortSignal): Promise<unknown> {
+  return request<unknown>("/v1/readings/today", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getTiming(signal?: AbortSignal): Promise<unknown> {
+  return request<unknown>("/v1/timing", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getTimeTravel(signal?: AbortSignal): Promise<unknown> {
+  return request<unknown>("/v1/time-travel", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
 export function onboardingConsentId(): string {
   return import.meta.env.VITE_CONSENT_ID ?? "cns_local_web_0001";
 }

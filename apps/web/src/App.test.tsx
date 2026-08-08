@@ -11,6 +11,38 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+type MockResponse = { status: number; body: unknown; delayMs?: number };
+
+function mockApiResponses(responses: Record<string, MockResponse>) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((input: string | URL | Request) => {
+      const path = new URL(typeof input === "string" ? input : input.toString(), "http://localhost").pathname;
+
+      const entry = responses[path];
+      if (!entry) {
+        return Promise.resolve(
+          jsonResponse(500, {
+            error: {
+              code: "unexpected_path",
+              message: `No stubbed response for ${path}`,
+            },
+          }),
+        );
+      }
+
+      const response = Promise.resolve(jsonResponse(entry.status, entry.body));
+      if (entry.delayMs == null || entry.delayMs <= 0) return response;
+
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          resolve(response);
+        }, entry.delayMs);
+      });
+    }),
+  );
+}
+
 const chart = {
   schema_version: "0.2.0",
   id: "cht_web_test_0001",
@@ -54,14 +86,12 @@ const chart = {
 
 describe("web application shell", () => {
   it("routes a user without a chart into honest onboarding", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse(404, {
-          error: { code: "chart_not_found", message: "No active chart for user" },
-        }),
-      ),
-    );
+    mockApiResponses({
+      "/v1/chart": {
+        status: 404,
+        body: { error: { code: "chart_not_found", message: "No active chart for user" } },
+      },
+    });
 
     render(<App />);
 
@@ -72,7 +102,9 @@ describe("web application shell", () => {
   });
 
   it("renders calculated facts without inventing an interpretation", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, chart)));
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
 
     render(<App />);
 
@@ -85,14 +117,12 @@ describe("web application shell", () => {
   });
 
   it("keeps the onboarding surface free of detectable structural accessibility violations", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse(404, {
-          error: { code: "chart_not_found", message: "No active chart for user" },
-        }),
-      ),
-    );
+    mockApiResponses({
+      "/v1/chart": {
+        status: 404,
+        body: { error: { code: "chart_not_found", message: "No active chart for user" } },
+      },
+    });
     const { container } = render(<App />);
     await screen.findByRole("heading", { name: /Begin with what you know/i });
 
@@ -105,19 +135,92 @@ describe("web application shell", () => {
     expect(results.violations).toEqual([]);
   });
 
-  it("opens future surfaces without presenting them as live", async () => {
+  it("navigates future routes through hash links and API-first states", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, chart)));
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/readings/today": {
+        status: 501,
+        body: {
+          error: {
+            code: "not_implemented",
+            message: "Daily readings lands in a later milestone",
+            request_id: "req_today",
+          },
+        },
+      },
+      "/v1/timing": {
+        status: 501,
+        body: {
+          error: {
+            code: "not_implemented",
+            message: "Timing cycles lands in a later milestone",
+            request_id: "req_timing",
+          },
+        },
+      },
+      "/v1/time-travel": {
+        status: 501,
+        body: {
+          error: {
+            code: "not_implemented",
+            message: "Time travel lands in a later milestone",
+            request_id: "req_travel",
+          },
+        },
+      },
+    });
+
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
 
     await user.click(screen.getAllByRole("link", { name: "Today" })[0]);
+    expect(await screen.findByText("Available in a later milestone (Request req_today)")).toBeInTheDocument();
+    expect(window.location.hash).toBe("#today");
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: /clear day, not a horoscope feed/i }),
-      ).toBeInTheDocument();
+    await user.click(screen.getAllByRole("link", { name: "Timing" })[0]);
+    expect(await screen.findByText("Available in a later milestone (Request req_timing)")).toBeInTheDocument();
+    expect(window.location.hash).toBe("#timing");
+
+    await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
+    expect(await screen.findByText("Available in a later milestone (Request req_travel)")).toBeInTheDocument();
+    expect(window.location.hash).toBe("#travel");
+  });
+
+  it("renders privacy action states and displays not implemented copy", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/exports": {
+        status: 200,
+        body: { workflow: "export", status: "queued", idempotency_key: "id", job_id: null, resource_id: null, schema_version: "0.2.0" },
+        delayMs: 50,
+      },
+      "/v1/account": {
+        status: 501,
+        body: {
+          error: {
+            code: "not_implemented",
+            message: "Account deletion lands in a later milestone",
+            request_id: "req_delete",
+          },
+        },
+        delayMs: 50,
+      },
     });
-    expect(screen.getByText("Planned / M3")).toBeInTheDocument();
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+
+    const exportButton = screen.getByRole("button", { name: /Request data export/i });
+    await user.click(exportButton);
+    expect(await screen.findByText("Submitting...")).toBeInTheDocument();
+    expect(await screen.findByText("Request accepted")).toBeInTheDocument();
+
+    const deleteButton = screen.getByRole("button", { name: /Delete account/i });
+    await user.click(deleteButton);
+    expect(await screen.findByText("Submitting...")).toBeInTheDocument();
+    expect(await screen.findByText("Available in a later milestone (Request req_delete)")).toBeInTheDocument();
   });
 });

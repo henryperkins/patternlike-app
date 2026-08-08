@@ -1,4 +1,14 @@
+import { useState } from "react";
+import { flushSync } from "react-dom";
+import { ApiError, deleteAccount, requestAccountExport } from "../lib/api-client.js";
 import { Icon } from "./icons.js";
+
+type PrivacyActionState =
+  | { status: "idle" }
+  | { status: "submitting" }
+  | { status: "accepted" }
+  | { status: "not_implemented"; requestId: string | null }
+  | { status: "failed"; requestId: string | null };
 
 const sources = [
   {
@@ -27,7 +37,77 @@ const sources = [
   },
 ];
 
+function parseActionError(error: unknown): PrivacyActionState {
+  if (error instanceof ApiError && error.status === 501 && error.code === "not_implemented") {
+    return { status: "not_implemented", requestId: error.requestId };
+  }
+  if (error instanceof Error) {
+    return { status: "failed", requestId: error instanceof ApiError ? error.requestId : null };
+  }
+  return { status: "failed", requestId: null };
+}
+
+function actionLabel(state: PrivacyActionState): string | null {
+  switch (state.status) {
+    case "submitting":
+      return "Submitting...";
+    case "accepted":
+      return "Request accepted";
+    case "not_implemented":
+      return `Available in a later milestone${state.requestId ? ` (Request ${state.requestId})` : ""}`;
+    case "failed":
+      return `Failed${state.requestId ? ` (Request ${state.requestId})` : ""}`;
+    default:
+      return null;
+  }
+}
+
+function PrivacyActionStatus({ state }: { state: PrivacyActionState }) {
+  const label = actionLabel(state);
+  return label ? <p role="status" aria-live="polite">{label}</p> : null;
+}
+
 export function PrivacyView({ hasChart }: { hasChart: boolean }) {
+  const [exportState, setExportState] = useState<PrivacyActionState>({ status: "idle" });
+  const [deleteState, setDeleteState] = useState<PrivacyActionState>({ status: "idle" });
+  const actionDisabled = !hasChart;
+  const deferSubmit = () =>
+    new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 0);
+    });
+
+  const requestExport = () => {
+    flushSync(() => {
+      setExportState({ status: "submitting" });
+    });
+    void deferSubmit().then(() => {
+      requestAccountExport().then(
+        () => {
+          setExportState({ status: "accepted" });
+        },
+        (error) => {
+          setExportState(parseActionError(error));
+        },
+      );
+    });
+  };
+
+  const requestDelete = () => {
+    flushSync(() => {
+      setDeleteState({ status: "submitting" });
+    });
+    void deferSubmit().then(() => {
+      deleteAccount().then(
+        () => {
+          setDeleteState({ status: "accepted" });
+        },
+        (error) => {
+          setDeleteState(parseActionError(error));
+        },
+      );
+    });
+  };
+
   return (
     <div className="privacy-page page-enter">
       <header className="page-header privacy-page__header">
@@ -88,17 +168,35 @@ export function PrivacyView({ hasChart }: { hasChart: boolean }) {
           <p className="eyebrow">Account data</p>
           <h2 id="account-data-heading">Portable in. Portable out.</h2>
           <p>
-            Export and deletion workflows are part of M1, but their API routes are not
-            active yet. The controls remain disabled until they can complete safely.
+            Export and deletion workflows are available as API actions. You can trigger them
+            directly from here once a backend route is active.
           </p>
         </div>
         <div className="privacy-actions__buttons">
-          <button className="button button--secondary" type="button" disabled>
-            Request export <span>M1 pending</span>
-          </button>
-          <button className="button button--danger" type="button" disabled>
-            Delete account <span>M1 pending</span>
-          </button>
+          <div>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={requestExport}
+              disabled={actionDisabled || exportState.status === "submitting"}
+              aria-label="Request data export"
+            >
+              Request export <span>M1</span>
+            </button>
+            <PrivacyActionStatus state={exportState} />
+          </div>
+          <div>
+            <button
+              className="button button--danger"
+              type="button"
+              onClick={requestDelete}
+              disabled={actionDisabled || deleteState.status === "submitting"}
+              aria-label="Delete account"
+            >
+              Delete account <span>M1</span>
+            </button>
+            <PrivacyActionStatus state={deleteState} />
+          </div>
         </div>
       </section>
     </div>

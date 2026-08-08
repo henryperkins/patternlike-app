@@ -4,8 +4,10 @@ import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
 import { Icon } from "./components/icons.js";
 import { Onboarding } from "./components/Onboarding.js";
+import { TodayView } from "./components/TodayView.js";
+import { TimeTravelView } from "./components/TimeTravelView.js";
+import { TimingView } from "./components/TimingView.js";
 import { PrivacyView } from "./components/PrivacyView.js";
-import { UnavailableView } from "./components/UnavailableView.js";
 import {
   ApiError,
   createBirthProfile,
@@ -119,8 +121,12 @@ export default function App() {
     );
   } else if (view === "privacy") {
     content = <PrivacyView hasChart={chart !== null} />;
-  } else if (view !== "pattern") {
-    content = <UnavailableView view={view} hasChart={chart !== null} />;
+  } else if (view === "today") {
+    content = <TodayView />;
+  } else if (view === "timing") {
+    content = <TimingView />;
+  } else if (view === "travel") {
+    content = <TimeTravelView />;
   } else if (chart) {
     content = <ChartView chart={chart} />;
   } else {
