@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 
@@ -8,47 +8,53 @@ export const stubRoutes = new Hono<{
   Variables: AppVariables;
 }>();
 
-function notImplemented(feature: string) {
-  return {
-    error: {
-      code: "not_implemented",
-      message: `${feature} lands in a later milestone`,
+type StubContext = Context<{ Bindings: Env; Variables: AppVariables }>;
+
+/**
+ * Every other error producer in the Worker (auth, config-guard, chart, birth,
+ * sessions, onError, notFound) carries `request_id`. These stubs were the sole
+ * exception, so the clients that surface "(Request <id>)" to a user had nothing
+ * to print on any 501 and support had no thread to pull.
+ */
+function notImplemented(c: StubContext, feature: string) {
+  return c.json(
+    {
+      error: {
+        code: "not_implemented",
+        message: `${feature} lands in a later milestone`,
+        request_id: c.get("requestId") ?? c.req.header("x-request-id") ?? null,
+      },
     },
-  };
+    501,
+  );
 }
 
 stubRoutes.get("/v1/readings/today", (c) =>
-  c.json(notImplemented("Daily readings (M3)"), 501),
+  notImplemented(c, "Daily readings (M3)"),
 );
 stubRoutes.get("/v1/readings/:id/evidence", (c) =>
-  c.json(notImplemented("Reading evidence (M3)"), 501),
+  notImplemented(c, "Reading evidence (M3)"),
 );
 stubRoutes.post("/v1/readings/:id/feedback", (c) =>
-  c.json(notImplemented("Reading feedback (M3)"), 501),
+  notImplemented(c, "Reading feedback (M3)"),
 );
 stubRoutes.get("/v1/pattern", (c) =>
-  c.json(notImplemented("Your Pattern chapters (M3)"), 501),
+  notImplemented(c, "Your Pattern chapters (M3)"),
 );
-stubRoutes.get("/v1/timing", (c) =>
-  c.json(notImplemented("Timing cycles (M3)"), 501),
-);
-stubRoutes.get("/v1/time-travel", (c) =>
-  c.json(notImplemented("Time Travel (M4)"), 501),
-);
-stubRoutes.post("/v1/check-ins", (c) =>
-  c.json(notImplemented("Check-ins (M4)"), 501),
-);
+stubRoutes.get("/v1/timing", (c) => notImplemented(c, "Timing cycles (M3)"));
+stubRoutes.get("/v1/time-travel", (c) => notImplemented(c, "Time Travel (M4)"));
+stubRoutes.post("/v1/check-ins", (c) => notImplemented(c, "Check-ins (M4)"));
 stubRoutes.get("/v1/context-sources", (c) =>
-  c.json(notImplemented("Context sources (M4)"), 501),
+  notImplemented(c, "Context sources (M4)"),
 );
 stubRoutes.put("/v1/context-sources", (c) =>
-  c.json(notImplemented("Context sources (M4)"), 501),
+  notImplemented(c, "Context sources (M4)"),
 );
 stubRoutes.post("/v1/exports", (c) =>
-  c.json(notImplemented("Account export (M1 privacy skeleton follows)"), 501),
+  notImplemented(c, "Account export (M1 privacy skeleton follows)"),
 );
 stubRoutes.delete("/v1/account", (c) =>
-  c.json(notImplemented("Account deletion (M1 privacy skeleton follows)"), 501),
+  notImplemented(c, "Account deletion (M1 privacy skeleton follows)"),
 );
 
 /**
@@ -64,5 +70,5 @@ export const internalRoutes = new Hono<{
 }>();
 
 internalRoutes.post("/content-releases", (c) =>
-  c.json(notImplemented("Content release ingestion (M2)"), 501),
+  notImplemented(c, "Content release ingestion (M2)"),
 );

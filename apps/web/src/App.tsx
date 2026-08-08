@@ -4,10 +4,10 @@ import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
 import { Icon } from "./components/icons.js";
 import { Onboarding } from "./components/Onboarding.js";
-import { TodayView } from "./components/TodayView.js";
+import { PrivacyView } from "./components/PrivacyView.js";
 import { TimeTravelView } from "./components/TimeTravelView.js";
 import { TimingView } from "./components/TimingView.js";
-import { PrivacyView } from "./components/PrivacyView.js";
+import { TodayView } from "./components/TodayView.js";
 import {
   ApiError,
   createBirthProfile,

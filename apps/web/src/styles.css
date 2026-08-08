@@ -1479,22 +1479,105 @@ summary:focus-visible {
 }
 
 .privacy-actions__buttons {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(160px, 1fr);
   gap: 10px;
+  align-items: start;
+  /*
+   * Top-pinned and width-capped on purpose. The parent is `1fr auto` with
+   * `align-items: end`, so without `align-self` the delete disclosure expanding
+   * would drag the sibling export button ~100px upward; without the cap, the
+   * status paragraph's max-content would widen the `auto` track and squeeze the
+   * prose column.
+   */
+  align-self: start;
+  max-width: 360px;
+}
+
+/*
+ * Each action owns a button plus its status line. The wrapper — not the button —
+ * is the grid item, so the button is stretched explicitly rather than relying on
+ * the default `justify-items: stretch` it used to receive directly.
+ */
+.privacy-action {
+  display: grid;
 }
 
 .privacy-actions__buttons .button {
+  width: 100%;
   flex-direction: column;
   align-items: start;
   gap: 2px;
-  min-width: 160px;
 }
 
-.privacy-actions__buttons span {
+.privacy-actions__buttons .button span {
   font-family: var(--mono);
   font-size: 7px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/*
+ * `.privacy-actions` is `align-items: end`, so anything that grows below a
+ * button shoves it upward. Reserving two lines keeps the control still under
+ * the pointer when a status message appears on click.
+ */
+.privacy-actions p.privacy-action__status {
+  min-height: 34px;
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+.privacy-action__confirm {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(199, 96, 67, 0.5);
+}
+
+.privacy-action__confirm label {
+  color: var(--coral);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.privacy-action__confirm input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 0;
+  background: var(--paper-light);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+/*
+ * auto-fit rather than two fixed tracks: at narrow widths a forced two-up row
+ * cannot hold "Confirm deletion" + "Cancel" at their min-content widths and the
+ * buttons overflow their column.
+ */
+.privacy-action__confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.privacy-action__confirm-actions .button {
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding-inline: 12px;
 }
 
 /* Future surfaces */
@@ -1558,50 +1641,28 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
-.readiness-steps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  margin-top: 30px;
-  border-top: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-}
-
-.readiness-step {
-  display: grid;
-  min-height: 146px;
-  align-content: space-between;
-  padding: 18px;
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
-.readiness-step > span {
-  color: var(--ink-faint);
-  font-family: var(--mono);
-  font-size: 8px;
-}
-
-.readiness-step strong {
-  align-self: end;
+.route-status {
+  margin-top: 18px;
+  color: var(--ink-soft);
   font-family: var(--serif);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.6;
 }
 
-.readiness-step small {
-  margin-top: 5px;
-  color: var(--coral);
-  font-family: var(--mono);
-  font-size: 8px;
-  text-transform: uppercase;
+.readiness-panel .button {
+  margin-top: 22px;
 }
 
-.readiness-step--done {
+.route-payload {
+  overflow-x: auto;
+  max-height: 320px;
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
   background: var(--forest-light);
-}
-
-.readiness-step--done small {
-  color: var(--forest);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .return-link {
@@ -1973,8 +2034,9 @@ summary:focus-visible {
   }
 
   .privacy-actions__buttons {
-    display: grid;
+    grid-auto-flow: row;
     grid-template-columns: 1fr 1fr;
+    max-width: none;
   }
 
   .milestone-stamp {
@@ -1990,10 +2052,6 @@ summary:focus-visible {
   .readiness-state {
     display: inline-block;
     margin-top: 16px;
-  }
-
-  .readiness-steps {
-    grid-template-columns: 1fr 1fr;
   }
 
   .return-link {
@@ -2045,8 +2103,8 @@ summary:focus-visible {
     padding-inline: 14px;
   }
 
-  .privacy-actions__buttons,
-  .readiness-steps {
+  .privacy-actions__buttons {
+    grid-auto-flow: row;
     grid-template-columns: 1fr;
   }
 }
