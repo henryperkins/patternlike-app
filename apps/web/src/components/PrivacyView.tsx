@@ -1,6 +1,15 @@
-import { useState } from "react";
-import { flushSync } from "react-dom";
-import { ApiError, deleteAccount, requestAccountExport } from "../lib/api-client.js";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  ApiError,
+  deleteAccount,
+  newIdempotencyKey,
+  requestAccountExport,
+} from "../lib/api-client.js";
+import {
+  NOT_IMPLEMENTED_MESSAGE,
+  isNotImplemented,
+  withRequestId,
+} from "../lib/api-status.js";
 import { Icon } from "./icons.js";
 
 type PrivacyActionState =
@@ -8,7 +17,21 @@ type PrivacyActionState =
   | { status: "submitting" }
   | { status: "accepted" }
   | { status: "not_implemented"; requestId: string | null }
-  | { status: "failed"; requestId: string | null };
+  | { status: "failed"; message: string; requestId: string | null };
+
+/** The literal the contract requires in the deletion body, typed by the user. */
+const DELETE_CONFIRMATION = "DELETE";
+
+/**
+ * Module scope, not a ref: App unmounts PrivacyView on every hash navigation, so
+ * instance-held keys would be reminted on return and a retried deletion would
+ * queue a second workflow instead of resuming the first. One user intent, one
+ * key, for the life of the page.
+ */
+const actionKeys: { export: string | null; delete: string | null } = {
+  export: null,
+  delete: null,
+};
 
 const sources = [
   {
@@ -38,75 +61,106 @@ const sources = [
 ];
 
 function parseActionError(error: unknown): PrivacyActionState {
-  if (error instanceof ApiError && error.status === 501 && error.code === "not_implemented") {
+  if (isNotImplemented(error)) {
     return { status: "not_implemented", requestId: error.requestId };
   }
-  if (error instanceof Error) {
-    return { status: "failed", requestId: error instanceof ApiError ? error.requestId : null };
+  if (error instanceof ApiError) {
+    return { status: "failed", message: error.message, requestId: error.requestId };
   }
-  return { status: "failed", requestId: null };
+  return {
+    status: "failed",
+    // Losing this message left every network failure reading "Failed" with
+    // nothing a user or a support thread could act on.
+    message:
+      error instanceof Error ? error.message : "The request could not be completed.",
+    requestId: null,
+  };
 }
 
-function actionLabel(state: PrivacyActionState): string | null {
+function actionLabel(state: PrivacyActionState): string {
   switch (state.status) {
+    case "idle":
+      return "";
     case "submitting":
       return "Submitting...";
     case "accepted":
       return "Request accepted";
     case "not_implemented":
-      return `Available in a later milestone${state.requestId ? ` (Request ${state.requestId})` : ""}`;
+      return withRequestId(NOT_IMPLEMENTED_MESSAGE, state.requestId);
     case "failed":
-      return `Failed${state.requestId ? ` (Request ${state.requestId})` : ""}`;
-    default:
-      return null;
+      return withRequestId(state.message, state.requestId);
   }
 }
 
-function PrivacyActionStatus({ state }: { state: PrivacyActionState }) {
-  const label = actionLabel(state);
-  return label ? <p role="status" aria-live="polite">{label}</p> : null;
+/**
+ * Mounted unconditionally rather than only once there is something to say — a
+ * live region inserted alongside its first message is unreliably announced.
+ */
+function PrivacyActionStatus({ id, state }: { id: string; state: PrivacyActionState }) {
+  return (
+    <p className="privacy-action__status" id={id} role="status" aria-live="polite">
+      {actionLabel(state)}
+    </p>
+  );
 }
 
 export function PrivacyView({ hasChart }: { hasChart: boolean }) {
   const [exportState, setExportState] = useState<PrivacyActionState>({ status: "idle" });
   const [deleteState, setDeleteState] = useState<PrivacyActionState>({ status: "idle" });
-  const actionDisabled = !hasChart;
-  const deferSubmit = () =>
-    new Promise<void>((resolve) => {
-      window.setTimeout(resolve, 0);
-    });
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
+  const confirmFieldRef = useRef<HTMLInputElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreTriggerFocus = useRef(false);
+
+  // Opening and closing the disclosure unmounts whichever control had focus, so
+  // focus is placed deliberately on both edges rather than falling to <body>.
+  useEffect(() => {
+    if (confirmingDelete) {
+      confirmFieldRef.current?.focus();
+    } else if (restoreTriggerFocus.current) {
+      restoreTriggerFocus.current = false;
+      deleteTriggerRef.current?.focus();
+    }
+  }, [confirmingDelete]);
+
+  // React no-ops a setState on an unmounted component, so no guard is needed
+  // here — navigating away simply drops the status the view would have shown.
+  const runAction = async (
+    key: string,
+    action: (idempotencyKey: string) => Promise<unknown>,
+    setState: (next: PrivacyActionState) => void,
+  ) => {
+    setState({ status: "submitting" });
+    try {
+      await action(key);
+      setState({ status: "accepted" });
+    } catch (error) {
+      setState(parseActionError(error));
+    }
+  };
 
   const requestExport = () => {
-    flushSync(() => {
-      setExportState({ status: "submitting" });
-    });
-    void deferSubmit().then(() => {
-      requestAccountExport().then(
-        () => {
-          setExportState({ status: "accepted" });
-        },
-        (error) => {
-          setExportState(parseActionError(error));
-        },
-      );
-    });
+    actionKeys.export ??= newIdempotencyKey("web-export");
+    void runAction(actionKeys.export, requestAccountExport, setExportState);
   };
 
-  const requestDelete = () => {
-    flushSync(() => {
-      setDeleteState({ status: "submitting" });
-    });
-    void deferSubmit().then(() => {
-      deleteAccount().then(
-        () => {
-          setDeleteState({ status: "accepted" });
-        },
-        (error) => {
-          setDeleteState(parseActionError(error));
-        },
-      );
-    });
+  const confirmDelete = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (confirmText !== DELETE_CONFIRMATION) return;
+    actionKeys.delete ??= newIdempotencyKey("web-delete");
+    void runAction(actionKeys.delete, (key) => deleteAccount(key), setDeleteState);
   };
+
+  const cancelDelete = () => {
+    restoreTriggerFocus.current = true;
+    setConfirmingDelete(false);
+    setConfirmText("");
+  };
+
+  const exportBusy = exportState.status === "submitting";
+  const deleteBusy = deleteState.status === "submitting";
 
   return (
     <div className="privacy-page page-enter">
@@ -168,34 +222,76 @@ export function PrivacyView({ hasChart }: { hasChart: boolean }) {
           <p className="eyebrow">Account data</p>
           <h2 id="account-data-heading">Portable in. Portable out.</h2>
           <p>
-            Export and deletion workflows are available as API actions. You can trigger them
-            directly from here once a backend route is active.
+            Both controls call their real API route. Those routes answer with a
+            not-implemented response until M1 ships, and whatever the API says is
+            printed back to you here — nothing is quietly swallowed. Deletion asks
+            you to type the confirmation the contract requires.
           </p>
         </div>
         <div className="privacy-actions__buttons">
-          <div>
+          <div className="privacy-action">
             <button
               className="button button--secondary"
               type="button"
               onClick={requestExport}
-              disabled={actionDisabled || exportState.status === "submitting"}
-              aria-label="Request data export"
+              disabled={exportBusy || exportState.status === "accepted"}
+              aria-describedby="export-status"
             >
               Request export <span>M1</span>
             </button>
-            <PrivacyActionStatus state={exportState} />
+            <PrivacyActionStatus id="export-status" state={exportState} />
           </div>
-          <div>
-            <button
-              className="button button--danger"
-              type="button"
-              onClick={requestDelete}
-              disabled={actionDisabled || deleteState.status === "submitting"}
-              aria-label="Delete account"
-            >
-              Delete account <span>M1</span>
-            </button>
-            <PrivacyActionStatus state={deleteState} />
+          <div className="privacy-action">
+            {confirmingDelete ? (
+              <form className="privacy-action__confirm" onSubmit={confirmDelete}>
+                <label htmlFor="delete-confirm">
+                  Type {DELETE_CONFIRMATION} to confirm. This cannot be undone.
+                </label>
+                <input
+                  id="delete-confirm"
+                  name="delete-confirm"
+                  type="text"
+                  autoComplete="off"
+                  ref={confirmFieldRef}
+                  value={confirmText}
+                  onChange={(event) => setConfirmText(event.target.value)}
+                />
+                <div className="privacy-action__confirm-actions">
+                  <button
+                    className="button button--danger"
+                    type="submit"
+                    disabled={
+                      confirmText !== DELETE_CONFIRMATION ||
+                      deleteBusy ||
+                      deleteState.status === "accepted"
+                    }
+                  >
+                    Confirm deletion
+                  </button>
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    onClick={cancelDelete}
+                    disabled={deleteBusy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                className="button button--danger"
+                type="button"
+                ref={deleteTriggerRef}
+                onClick={() => setConfirmingDelete(true)}
+                disabled={deleteState.status === "accepted"}
+                aria-expanded={confirmingDelete}
+                aria-describedby="delete-status"
+              >
+                Delete account <span>M1</span>
+              </button>
+            )}
+            <PrivacyActionStatus id="delete-status" state={deleteState} />
           </div>
         </div>
       </section>

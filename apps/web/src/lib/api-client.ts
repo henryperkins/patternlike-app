@@ -43,9 +43,20 @@ export class ApiError extends Error {
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
-function requestHeaders(withJson = false): Headers {
+interface HeaderOptions {
+  json?: boolean;
+  /**
+   * `Idempotency-Key` is `required: true` on every mutating operation in the
+   * frozen OpenAPI contract, so any POST/DELETE that omits it is a 400 waiting
+   * for the real handler to land.
+   */
+  idempotencyKey?: string;
+}
+
+function requestHeaders({ json = false, idempotencyKey }: HeaderOptions = {}): Headers {
   const headers = new Headers();
-  if (withJson) headers.set("content-type", "application/json");
+  if (json) headers.set("content-type", "application/json");
+  if (idempotencyKey) headers.set("idempotency-key", idempotencyKey);
 
   const devUserId =
     import.meta.env.VITE_DEV_USER_ID ??
@@ -53,6 +64,17 @@ function requestHeaders(withJson = false): Headers {
   if (devUserId) headers.set("x-user-id", devUserId);
 
   return headers;
+}
+
+/**
+ * Callers hold the key for the lifetime of one user intent so a retry after a
+ * transient failure resumes the same workflow instead of starting a second
+ * export — or a second deletion.
+ */
+export function newIdempotencyKey(prefix: string): string {
+  const suffix =
+    globalThis.crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  return `${prefix}-${suffix}`;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -104,30 +126,46 @@ export function createBirthProfile(
 ): Promise<BirthWorkflowResponse> {
   return request<BirthWorkflowResponse>("/v1/birth-profiles", {
     method: "POST",
-    headers: (() => {
-      const headers = requestHeaders(true);
-      const suffix =
-        globalThis.crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-      headers.set("idempotency-key", `web-birth-${suffix}`);
-      return headers;
-    })(),
+    headers: requestHeaders({
+      json: true,
+      idempotencyKey: newIdempotencyKey("web-birth"),
+    }),
     body: JSON.stringify(profile),
   });
 }
 
-export function requestAccountExport(signal?: AbortSignal): Promise<unknown> {
-  return request<unknown>("/v1/exports", {
+export interface AccountExportOptions {
+  includeReadings?: boolean;
+  includeJournal?: boolean;
+}
+
+export function requestAccountExport(
+  idempotencyKey: string,
+  options: AccountExportOptions = {},
+): Promise<WorkflowAccepted> {
+  return request<WorkflowAccepted>("/v1/exports", {
     method: "POST",
-    headers: requestHeaders(),
-    signal,
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({
+      include_readings: options.includeReadings ?? true,
+      include_journal: options.includeJournal ?? true,
+    }),
   });
 }
 
-export function deleteAccount(signal?: AbortSignal): Promise<unknown> {
-  return request<unknown>("/v1/account", {
+/**
+ * `confirm` is fixed at "DELETE" by the contract — it is the interlock that
+ * makes an accidental deletion impossible to express, so the caller must have
+ * collected that confirmation from the user before reaching here.
+ */
+export function deleteAccount(
+  idempotencyKey: string,
+  reason?: string | null,
+): Promise<WorkflowAccepted> {
+  return request<WorkflowAccepted>("/v1/account", {
     method: "DELETE",
-    headers: requestHeaders(),
-    signal,
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({ confirm: "DELETE", reason: reason ?? null }),
   });
 }
 
@@ -139,16 +177,39 @@ export function getTodayReadings(signal?: AbortSignal): Promise<unknown> {
   });
 }
 
-export function getTiming(signal?: AbortSignal): Promise<unknown> {
-  return request<unknown>("/v1/timing", {
+export interface TimingFilters {
+  phase?: string;
+  domain?: string;
+  duration?: string;
+}
+
+export function getTiming(
+  filters: TimingFilters = {},
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) query.set(key, value);
+  }
+  // `URLSearchParams.size` only landed in Safari 17; serialising is universal.
+  const serialized = query.toString();
+  const suffix = serialized ? `?${serialized}` : "";
+
+  return request<unknown>(`/v1/timing${suffix}`, {
     method: "GET",
     headers: requestHeaders(),
     signal,
   });
 }
 
-export function getTimeTravel(signal?: AbortSignal): Promise<unknown> {
-  return request<unknown>("/v1/time-travel", {
+/** `date` (ISO `YYYY-MM-DD`) is a required query parameter on this route. */
+export function getTimeTravel(
+  date: string,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const query = new URLSearchParams({ date });
+
+  return request<unknown>(`/v1/time-travel?${query.toString()}`, {
     method: "GET",
     headers: requestHeaders(),
     signal,
