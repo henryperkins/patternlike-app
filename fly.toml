@@ -1,20 +1,20 @@
-# fly.toml app configuration file generated for patternlike-calc on 2026-08-04T02:32:54Z
+# fly.toml app configuration file generated for patternlike-app on 2026-08-08T18:08:53Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "patternlike-calc"
-primary_region = 'iad'
+app = 'patternlike-app'
+primary_region = 'ord'
 
 [build]
-  dockerfile = "apps/calc-stub/Dockerfile"
+  dockerfile = 'apps/calc-stub/Dockerfile'
 
 [env]
-  PORT            = "8080"
-  NODE_ENV        = "production"
-  ENVIRONMENT     = "production"
-  SE_LICENSE_MODE = "agpl"
-  SE_EPHE_PATH    = "/app/data/ephe"
+  ENVIRONMENT = 'production'
+  NODE_ENV = 'production'
+  PORT = '8080'
+  SE_EPHE_PATH = '/app/data/ephe'
+  SE_LICENSE_MODE = 'agpl'
 
 [http_service]
   internal_port = 8080
@@ -23,17 +23,12 @@ primary_region = 'iad'
   auto_start_machines = true
   min_machines_running = 2
 
-  # Declared only as an array-of-tables. Do not also add an inline
-  # `checks = [{ ... }]` key here -- TOML rejects the same key defined both
-  # ways, and flyctl fails to load this file at all. The Fly dashboard's
-  # "scale from UI" export has written that inline form before; drop it and
-  # edit the table below instead.
   [[http_service.checks]]
-    method       = "GET"
-    path         = "/health"
-    interval     = "30s"
-    timeout      = "5s"
-    grace_period = "30s"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
   size = 'shared-cpu-1x'
