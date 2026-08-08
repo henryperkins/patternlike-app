@@ -2,6 +2,7 @@
 
 export * from "./types.js";
 export * from "./chart-types.js";
+export * from "./timezone.js";
 
 export const SCHEMA_VERSION = "0.2.0" as const;
 
@@ -9,6 +10,7 @@ export const CALC_CONTRACT_ID = "calc-contract-launch" as const;
 export const CALC_CONTRACT_VERSION = "0.2.0" as const;
 
 import type { AspectType, BirthTimeAccuracy, CelestialBody, WorkflowName } from "./types.js";
+import type { ResolvedLocalTime } from "./timezone.js";
 
 export const LAUNCH_BODIES: readonly CelestialBody[] = [
   "sun",
@@ -65,6 +67,60 @@ export interface BirthProfileRequest {
     longitude?: number | null;
   };
   timezone_hint?: string | null;
+}
+
+/**
+ * Where the zone a chart is calculated in came from.
+ *
+ * `coordinates` is a lookup against timezone boundaries; `hint` is the value
+ * the client supplied, used only when no coordinates were given; `default` is
+ * the UTC fallback when there is neither.
+ */
+export type TimezoneSource = "coordinates" | "hint" | "default";
+
+/**
+ * How much the resolution can be relied on. Stored on `birth_profiles.
+ * geocode_confidence` so a weak match can be qualified in the uncertainty
+ * report instead of being presented as fact. `none` means nothing was
+ * geocoded — the zone is whatever the client said.
+ */
+export type TimezoneConfidence = "high" | "medium" | "low" | "none";
+
+export interface TimezoneQualifier {
+  /** Stable machine class; safe for logs and audit `detail_class` values. */
+  code:
+    | "pre_1970_zone_boundary"
+    | "near_zone_boundary"
+    | "hint_replaced"
+    | "no_coordinates"
+    | "nautical_zone"
+    | "local_time_ambiguous"
+    | "local_time_nonexistent";
+  message: string;
+}
+
+export interface TimezoneLookupRequest {
+  latitude?: number | null;
+  longitude?: number | null;
+  birth_date?: string | null;
+  birth_time_local?: string | null;
+  timezone_hint?: string | null;
+}
+
+export interface TimezoneLookupResponse {
+  schema_version: typeof SCHEMA_VERSION;
+  timezone: string;
+  source: TimezoneSource;
+  confidence: TimezoneConfidence;
+  /** True when a point roughly 11 km away resolves to a different zone. */
+  boundary_nearby: boolean;
+  /** The client's `timezone_hint`, when coordinates overruled it. */
+  hint_overridden: string | null;
+  /** First year tzdb guarantees this zone matches the location's clocks. */
+  tzdb_stable_from_year: number;
+  /** Null when no usable birth date was supplied. */
+  local: ResolvedLocalTime | null;
+  qualifiers: TimezoneQualifier[];
 }
 
 /** Opaque ids safe for app data plane (not LLM prompts). */

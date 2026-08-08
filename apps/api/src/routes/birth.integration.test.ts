@@ -348,6 +348,145 @@ describe("unknown birth time", () => {
   });
 });
 
+describe("historical timezone resolution", () => {
+  /**
+   * `timezone_hint` is the browser's *current* zone, which is wrong for anyone
+   * who has moved since being born. Before the lookup was connected it was
+   * passed straight through to the calculation, so a Londoner requesting their
+   * Los Angeles chart got one built eight hours out.
+   */
+  it("calculates in the birthplace's zone, not the client's hint", async () => {
+    const res = await postBirthProfile(USER_A, "key-tz-override", {
+      ...ALICE,
+      timezone_hint: "Europe/London",
+    });
+
+    expect(res.status).toBe(202);
+    expect(res.body.timezone).toMatchObject({
+      resolved: "America/Los_Angeles",
+      source: "coordinates",
+      hint_overridden: "Europe/London",
+    });
+
+    const profile = await rows<{ timezone: string }>(
+      "SELECT timezone FROM birth_profiles WHERE user_id = ?",
+      USER_A,
+    );
+    expect(profile[0]!.timezone).toBe("America/Los_Angeles");
+  });
+
+  it("grades the lookup instead of leaving geocode_confidence null", async () => {
+    await postBirthProfile(USER_A, "key-tz-confidence", ALICE);
+
+    const profile = await rows<{ geocode_confidence: string | null }>(
+      "SELECT geocode_confidence FROM birth_profiles WHERE user_id = ?",
+      USER_A,
+    );
+    expect(profile[0]!.geocode_confidence).toBe("high");
+  });
+
+  it("qualifies a pre-1970 birth rather than presenting the zone as settled", async () => {
+    const res = await postBirthProfile(USER_A, "key-tz-pre-1970", {
+      ...ALICE,
+      birth_date: "1952-03-04",
+    });
+
+    expect(res.body.timezone).toMatchObject({ confidence: "medium" });
+    const qualifiers = (res.body.timezone as { qualifiers: Array<{ code: string }> })
+      .qualifiers;
+    expect(qualifiers.map((q) => q.code)).toContain("pre_1970_zone_boundary");
+
+    const profile = await rows<{ geocode_confidence: string | null }>(
+      "SELECT geocode_confidence FROM birth_profiles WHERE user_id = ?",
+      USER_A,
+    );
+    expect(profile[0]!.geocode_confidence).toBe("medium");
+  });
+
+  it("keeps the hint when there is no birthplace to check it against", async () => {
+    const res = await postBirthProfile(USER_A, "key-tz-no-place", {
+      accuracy: "exact",
+      consent_id: "cns_alice_0001",
+      birth_date: "1990-05-15",
+      birth_time_local: "12:34:00",
+      timezone_hint: "America/Los_Angeles",
+    });
+
+    expect(res.status).toBe(202);
+    expect(res.body.timezone).toMatchObject({
+      resolved: "America/Los_Angeles",
+      source: "hint",
+      confidence: "none",
+    });
+  });
+
+  it("rejects a timezone_hint that is not an IANA zone before calculating", async () => {
+    const res = await postBirthProfile(USER_A, "key-tz-garbage", {
+      accuracy: "exact",
+      consent_id: "cns_alice_0001",
+      birth_date: "1990-05-15",
+      birth_time_local: "12:34:00",
+      // A fixed offset has no history, so it can never be a birth zone.
+      timezone_hint: "-07:00",
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body.error as Record<string, unknown>).code).toBe("invalid_body");
+
+    // Nothing was written and no calculation was invoked.
+    const profiles = await rows("SELECT 1 FROM birth_profiles WHERE user_id = ?", USER_A);
+    expect(profiles).toHaveLength(0);
+  });
+
+  it("rejects a non-string timezone_hint as a bad request, not a crash", async () => {
+    const res = await postBirthProfile(
+      USER_A,
+      "key-tz-not-a-string",
+      JSON.stringify({
+        accuracy: "exact",
+        consent_id: "cns_alice_0001",
+        birth_date: "1990-05-15",
+        birth_time_local: "12:34:00",
+        timezone_hint: -7,
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect((res.body.error as Record<string, unknown>).code).toBe("invalid_body");
+  });
+
+  it("agrees with what the lookup endpoint told the client", async () => {
+    const preview = await SELF.fetch("http://api.test/v1/timezone-lookup", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": USER_A },
+      body: JSON.stringify({
+        latitude: ALICE.birthplace!.latitude,
+        longitude: ALICE.birthplace!.longitude,
+        birth_date: ALICE.birth_date,
+        birth_time_local: ALICE.birth_time_local,
+        timezone_hint: ALICE.timezone_hint,
+      }),
+    });
+    const previewed = (await preview.json()) as { timezone: string };
+
+    const created = await postBirthProfile(USER_A, "key-tz-agreement", ALICE);
+    const profile = await rows<{ timezone: string }>(
+      "SELECT timezone FROM birth_profiles WHERE user_id = ?",
+      USER_A,
+    );
+
+    // The onboarding form asks the user to confirm the previewed zone; a chart
+    // calculated in a different one would make that confirmation meaningless.
+    // GET /v1/chart redacts birth.timezone, so the stored profile is where the
+    // two can be compared.
+    expect(previewed.timezone).toBe("America/Los_Angeles");
+    expect(profile[0]!.timezone).toBe(previewed.timezone);
+    expect((created.body.timezone as { resolved: string }).resolved).toBe(
+      previewed.timezone,
+    );
+  });
+});
+
 describe("GET /v1/chart", () => {
   it("404s for an authenticated user with no chart", async () => {
     // USER_B is seeded and has no chart in this suite, so this keeps its
