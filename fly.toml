@@ -22,8 +22,12 @@ primary_region = 'iad'
   auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 2
-  checks = [{ grace_period = '10s', interval = '30s', method = 'GET', path = '/', timeout = '5s' }]
 
+  # Declared only as an array-of-tables. Do not also add an inline
+  # `checks = [{ ... }]` key here -- TOML rejects the same key defined both
+  # ways, and flyctl fails to load this file at all. The Fly dashboard's
+  # "scale from UI" export has written that inline form before; drop it and
+  # edit the table below instead.
   [[http_service.checks]]
     method       = "GET"
     path         = "/health"
