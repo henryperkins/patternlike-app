@@ -11,6 +11,8 @@ import {
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
 
+const CYCLE_FETCH_TIMEOUT_MS = 10_000;
+
 /**
  * Three outcomes, not two, and the distinction is load-bearing.
  *
@@ -102,6 +104,7 @@ export async function invokeCycles(
       method: "POST",
       headers,
       body: JSON.stringify(req),
+      signal: AbortSignal.timeout(CYCLE_FETCH_TIMEOUT_MS),
     });
   } catch (err) {
     return {
@@ -138,16 +141,20 @@ export async function invokeCycles(
   // a build answered for a policy it was not asked about. Fail closed rather
   // than freeze a command that misnames the scan it pinned.
   if (
+    json.schema_version !== req.schema_version ||
+    json.request_id !== req.request_id ||
     json.cycle_policy_id !== req.cycle_policy_id ||
     json.cycle_policy_version !== req.cycle_policy_version ||
     json.orb_policy_id !== req.orb_policy_id ||
     json.orb_policy_version !== req.orb_policy_version ||
-    json.chart_fingerprint !== req.chart_fingerprint
+    json.chart_fingerprint !== req.chart_fingerprint ||
+    json.contract_id !== req.contract_id ||
+    json.contract_version !== req.contract_version
   ) {
     return {
       ok: false,
       kind: "unavailable",
-      detail: "calc /v1/cycles echoed a different policy or chart than it was asked for",
+      detail: "calc /v1/cycles echoed a different request, policy, chart, or contract",
     };
   }
 

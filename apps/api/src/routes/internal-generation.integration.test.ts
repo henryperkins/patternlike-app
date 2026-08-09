@@ -101,11 +101,51 @@ describe("POST /internal/readings/*", () => {
       (await post("/readings/replace", { user_id: USER_A, reading_id: "rdg_x", reason: "nope" }))
         .status,
     ).toBe(400);
+    expect(
+      (
+        await post("/readings/replace", {
+          user_id: USER_A,
+          reading_id: "rdg_x",
+          reason: "calc_unavailable",
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await post("/readings/replace", {
+          user_id: USER_A,
+          reading_id: "rdg_x",
+          reason: "calc_unavailable",
+          actor: "admin",
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it("does not expose raw D1 errors in an internal response", async () => {
+    await rows("ALTER TABLE audit_events RENAME TO audit_events_unavailable");
+    try {
+      const { status, body } = await post("/readings/generate", { user_id: USER_A });
+      expect(status).toBe(424);
+      expect(body.error?.code).toBe("conflict");
+      expect(body.error?.message).toBe("The reading operation could not be committed");
+      expect(body.error?.message).not.toContain("audit_events");
+    } finally {
+      await rows("ALTER TABLE audit_events_unavailable RENAME TO audit_events");
+    }
   });
 
   it("re-dispatches what the outbox committed but never sent", async () => {
     const reserved = await post("/readings/generate", { user_id: USER_A });
+    expect(reserved.status).toBe(202);
+    expect(reserved.body.job_id).toMatch(/^job_/);
     await rows("UPDATE jobs SET dispatched_at = NULL WHERE id = ?", reserved.body.job_id!);
+
+    const [beforeSweep] = await rows<{ status: string; dispatched_at: string | null }>(
+      "SELECT status, dispatched_at FROM jobs WHERE id = ?",
+      reserved.body.job_id!,
+    );
+    expect(beforeSweep).toEqual({ status: "queued", dispatched_at: null });
 
     const { status, body } = await post("/readings/sweep", {});
     expect(status).toBe(200);

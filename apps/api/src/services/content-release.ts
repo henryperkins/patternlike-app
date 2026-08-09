@@ -61,8 +61,8 @@ const REQUIRED_NON_EMPTY: ReleaseObjectCollection[] = [
   "daily_fallbacks",
 ];
 
-/** `{token}` occurrences inside reviewed timing copy. */
-const PLACEHOLDER_RE = /\{([a-z_]+)\}/g;
+/** Any brace-delimited token inside reviewed timing copy. */
+const PLACEHOLDER_RE = /\{([^{}]+)\}/g;
 
 export const SIGNATURE_ALGORITHMS = ["Ed25519", "ES256"] as const;
 export type SignatureAlgorithm = (typeof SIGNATURE_ALGORITHMS)[number];
@@ -835,6 +835,15 @@ export function validateContentGraph(bundle: ContentReleaseBundle): RejectionRea
   // and two would make "which reviewed copy did this reader see" unanswerable.
   const approved = (object: ContentObject) =>
     object.status === undefined || object.status === "approved";
+
+  for (const fallback of objects.daily_fallbacks) {
+    if (!release.supported_locales.includes(fallback.locale)) {
+      return reject(
+        "fallback_locale_mismatch",
+        `daily_fallback ${fallback.id} locale ${fallback.locale} is not in supported_locales`,
+      );
+    }
+  }
 
   for (const locale of release.supported_locales) {
     const fallbacks = objects.daily_fallbacks.filter(

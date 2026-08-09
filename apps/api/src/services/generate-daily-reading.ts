@@ -121,14 +121,23 @@ async function loadPinnedCycles(
         detail: `pinned cycle ${pin.cycle_id} is not persisted`,
       };
     }
-    const cycle = JSON.parse(row.cycle_json) as NormalizedCycle;
-    // A rescan that would change the envelope or the pass list fails the claimed
-    // job closed rather than substituting the newer row.
-    if ((await cycleHash(cycle)) !== pin.cycle_hash) {
+    let cycle: NormalizedCycle;
+    try {
+      cycle = JSON.parse(row.cycle_json) as NormalizedCycle;
+      // A rescan that would change the envelope or the pass list fails the
+      // claimed job closed rather than substituting the newer row.
+      if ((await cycleHash(cycle)) !== pin.cycle_hash) {
+        return {
+          ok: false,
+          reason: "cycle_hash_mismatch",
+          detail: `pinned cycle ${pin.cycle_id} no longer hashes to the frozen value`,
+        };
+      }
+    } catch {
       return {
         ok: false,
         reason: "cycle_hash_mismatch",
-        detail: `pinned cycle ${pin.cycle_id} no longer hashes to the frozen value`,
+        detail: `pinned cycle ${pin.cycle_id} is not a valid normalized cycle`,
       };
     }
     cycles.push(cycle);
@@ -151,16 +160,56 @@ async function pinnedContextStillEligible(
 ): Promise<boolean> {
   for (const pin of command.context) {
     const row = await env.DB.prepare(
-      `SELECT permission_state, normalized_hash, consent_id
-       FROM context_signals WHERE id = ? AND user_id = ?`,
+      `SELECT s.source_id, s.evidence_lane, s.allowed_uses_json,
+              s.permission_state, s.conflict_status, s.freshness_status,
+              s.normalized_hash, s.consent_id, c.status AS consent_status,
+              c.version AS consent_version, c.source_id AS consent_source_id,
+              c.allowed_uses_json AS consent_allowed_uses_json
+       FROM context_signals s
+       JOIN consents c ON c.id = s.consent_id AND c.user_id = s.user_id
+       WHERE s.id = ? AND s.user_id = ?`,
     )
       .bind(pin.signal_id, userId)
-      .first<{ permission_state: string; normalized_hash: string; consent_id: string | null }>();
+      .first<{
+        source_id: string;
+        evidence_lane: string;
+        allowed_uses_json: string;
+        permission_state: string;
+        conflict_status: string;
+        freshness_status: string;
+        normalized_hash: string;
+        consent_id: string;
+        consent_status: string;
+        consent_version: number;
+        consent_source_id: string | null;
+        consent_allowed_uses_json: string;
+      }>();
+    let allowedUses: unknown = null;
+    let consentAllowedUses: unknown = null;
+    if (row) {
+      try {
+        allowedUses = JSON.parse(row.allowed_uses_json);
+        consentAllowedUses = JSON.parse(row.consent_allowed_uses_json);
+      } catch {
+        return false;
+      }
+    }
     if (
       !row ||
+      row.source_id !== pin.source_id ||
+      row.evidence_lane !== pin.evidence_lane ||
       row.permission_state !== pin.permission_state ||
+      row.conflict_status !== "none" ||
+      row.freshness_status !== pin.freshness_status ||
       row.normalized_hash !== pin.normalized_hash ||
-      row.consent_id !== pin.consent_id
+      row.consent_id !== pin.consent_id ||
+      row.consent_status !== "granted" ||
+      row.consent_version !== pin.consent_version ||
+      row.consent_source_id !== pin.source_id ||
+      !Array.isArray(allowedUses) ||
+      !allowedUses.includes(pin.allowed_use) ||
+      !Array.isArray(consentAllowedUses) ||
+      !consentAllowedUses.includes(pin.allowed_use)
     ) {
       return false;
     }
@@ -191,7 +240,20 @@ export async function generateDailyReading(
     reason: ExecutionFailure | "calc_unavailable" | "release_unreadable",
     detail: string,
   ): Promise<ExecutionOutcome> => {
-    await failReading(env, identity, command.reading_id, jobId, claimToken, reason);
+    const failed = await failReading(
+      env,
+      identity,
+      command.reading_id,
+      jobId,
+      claimToken,
+      reason,
+    );
+    if (!failed.ok) {
+      if (failed.reason === "stale_claim") {
+        return { ok: false, reason: "duplicate", detail: failed.detail };
+      }
+      throw new Error(`failure transition did not commit: ${failed.detail}`);
+    }
     return { ok: false, reason, detail } as ExecutionOutcome;
   };
 

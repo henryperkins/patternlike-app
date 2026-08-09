@@ -30,6 +30,9 @@ export const MAX_COMMAND_GENERATION = 3;
 /** How long a consumer may hold a claim before another may reclaim it. */
 export const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
+/** One initial Queue delivery plus the three retries configured in wrangler.toml. */
+export const MAX_JOB_ATTEMPTS = 4;
+
 export type ReserveOutcome =
   | { ok: true; readingId: string; jobId: string }
   /** A published or pending reading already exists for this user-day. */
@@ -285,8 +288,33 @@ export async function reserveReissue(
         now,
       ),
     ]);
-  } catch {
-    return { ok: false, reason: "stale_predecessor" };
+  } catch (err) {
+    const stillLive = await env.DB.prepare(
+      `SELECT 1 AS present FROM daily_readings
+       WHERE id = ? AND user_id = ? AND local_date = ?
+         AND status = 'published' AND revision = ?`,
+    )
+      .bind(
+        expectedLiveReadingId,
+        identity.userId,
+        command.target_local_date,
+        command.revision - 1,
+      )
+      .first<{ present: number }>();
+    const pending = await env.DB.prepare(
+      `SELECT 1 AS present FROM daily_readings
+       WHERE user_id = ? AND local_date = ? AND status = 'pending' LIMIT 1`,
+    )
+      .bind(identity.userId, command.target_local_date)
+      .first<{ present: number }>();
+    if (!stillLive || pending) {
+      return { ok: false, reason: "stale_predecessor" };
+    }
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: err instanceof Error ? err.message : "reissue reservation failed",
+    };
   }
 
   return { ok: true, readingId: command.reading_id, jobId };
@@ -294,7 +322,11 @@ export async function reserveReissue(
 
 export type ReplaceOutcome =
   | { ok: true; jobId: string }
-  | { ok: false; reason: "stale_job" | "budget_exhausted" | "not_replaceable"; detail: string };
+  | {
+      ok: false;
+      reason: "stale_job" | "budget_exhausted" | "not_replaceable" | "conflict";
+      detail: string;
+    };
 
 /**
  * Replace a terminally failed command with the next `gN` against the same
@@ -408,9 +440,34 @@ export async function replaceCommand(
       ).bind(command.reading_id, command.command_generation, jobId),
     ]);
   } catch (err) {
+    const stillReplaceable = await env.DB.prepare(
+      `SELECT 1 AS present
+       FROM daily_readings r
+       JOIN jobs j ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+       WHERE r.id = ? AND r.user_id = ? AND r.status = 'failed'
+         AND r.command_generation = ?
+         AND j.id = ? AND j.status IN ('failed', 'cancelled')
+         AND (
+           ? IS NULL OR EXISTS (
+             SELECT 1 FROM daily_readings predecessor
+             WHERE predecessor.id = ? AND predecessor.user_id = ?
+               AND predecessor.status = 'published'
+           )
+         )`,
+    )
+      .bind(
+        command.reading_id,
+        identity.userId,
+        command.command_generation - 1,
+        expectedFailedJobId,
+        command.supersedes_reading_id,
+        command.supersedes_reading_id,
+        identity.userId,
+      )
+      .first<{ present: number }>();
     return {
       ok: false,
-      reason: "stale_job",
+      reason: stillReplaceable ? "conflict" : "stale_job",
       detail: err instanceof Error ? err.message : "replacement failed",
     };
   }
@@ -422,7 +479,36 @@ export interface Claim {
   jobId: string;
   claimToken: string;
   userId: string;
+  attempts: number;
   command: GenerateDailyReadingCommandV1;
+}
+
+/**
+ * The job was claimed, but its encrypted command could not be loaded.
+ *
+ * Carrying the claim identity lets the Queue handler release or terminalize the
+ * exact lease instead of waiting for it to expire and then acknowledging the
+ * next delivery as a duplicate.
+ */
+export class ClaimLoadError extends Error {
+  readonly jobId: string;
+  readonly claimToken: string;
+  readonly attempts: number | null;
+  readonly original: unknown;
+
+  constructor(
+    jobId: string,
+    claimToken: string,
+    attempts: number | null,
+    original: unknown,
+  ) {
+    super(original instanceof Error ? original.message : "claimed command could not be loaded");
+    this.name = "ClaimLoadError";
+    this.jobId = jobId;
+    this.claimToken = claimToken;
+    this.attempts = attempts;
+    this.original = original;
+  }
 }
 
 /**
@@ -454,39 +540,65 @@ export async function claimJob(
 
   if (!result.meta.changes) return null;
 
-  const row = await env.DB.prepare(
-    `SELECT j.user_id, j.payload_enc, j.payload_key_version, j.payload_nonce,
-            u.crypto_subject
-     FROM jobs j JOIN users u ON u.id = j.user_id
-     WHERE j.id = ?`,
+  let attempts: number | null = null;
+  try {
+    const row = await env.DB.prepare(
+      `SELECT j.user_id, j.payload_enc, j.payload_key_version, j.payload_nonce,
+              j.attempts, u.crypto_subject
+       FROM jobs j JOIN users u ON u.id = j.user_id
+       WHERE j.id = ?`,
+    )
+      .bind(jobId)
+      .first<{
+        user_id: string;
+        payload_enc: ArrayBuffer;
+        payload_key_version: number;
+        payload_nonce: string;
+        attempts: number;
+        crypto_subject: string;
+      }>();
+    if (!row) {
+      throw new Error("claimed job disappeared before its command was loaded");
+    }
+    attempts = row.attempts;
+
+    const identity: UserIdentity = {
+      userId: row.user_id,
+      // Read from the row, never from a request — the only safe source.
+      cryptoSubject: asCryptoSubject(row.crypto_subject),
+    };
+    const { dek } = await loadUserKey(env, identity);
+    const command = await decryptJson<GenerateDailyReadingCommandV1>(
+      {
+        key_version: row.payload_key_version,
+        nonce: row.payload_nonce,
+        ciphertext: bytesToBase64(new Uint8Array(row.payload_enc)),
+      },
+      dek,
+      { subject: identity.cryptoSubject, field: "jobs.payload_enc", recordId: jobId },
+    );
+
+    return { jobId, claimToken, userId: row.user_id, attempts: row.attempts, command };
+  } catch (err) {
+    throw new ClaimLoadError(jobId, claimToken, attempts, err);
+  }
+}
+
+/** Return an owned running claim to the same immutable queued command. */
+export async function releaseClaim(
+  env: Env,
+  jobId: string,
+  claimToken: string,
+): Promise<boolean> {
+  const result = await env.DB.prepare(
+    `UPDATE jobs
+     SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
+         available_at = NULL
+     WHERE id = ? AND job_type = ? AND status = 'running' AND claim_token = ?`,
   )
-    .bind(jobId)
-    .first<{
-      user_id: string;
-      payload_enc: ArrayBuffer;
-      payload_key_version: number;
-      payload_nonce: string;
-      crypto_subject: string;
-    }>();
-  if (!row) return null;
-
-  const identity: UserIdentity = {
-    userId: row.user_id,
-    // Read from the row, never from a request — the only safe source.
-    cryptoSubject: asCryptoSubject(row.crypto_subject),
-  };
-  const { dek } = await loadUserKey(env, identity);
-  const command = await decryptJson<GenerateDailyReadingCommandV1>(
-    {
-      key_version: row.payload_key_version,
-      nonce: row.payload_nonce,
-      ciphertext: bytesToBase64(new Uint8Array(row.payload_enc)),
-    },
-    dek,
-    { subject: identity.cryptoSubject, field: "jobs.payload_enc", recordId: jobId },
-  );
-
-  return { jobId, claimToken, userId: row.user_id, command };
+    .bind(jobId, JOB_TYPE, claimToken)
+    .run();
+  return result.meta.changes === 1;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -664,7 +776,7 @@ export async function completeReading(
  */
 export async function failReading(
   env: Env,
-  identity: UserIdentity,
+  identity: Pick<UserIdentity, "userId">,
   readingId: string,
   jobId: string,
   claimToken: string,
@@ -701,13 +813,59 @@ export async function failReading(
       ).bind(readingId, jobId),
     ]);
   } catch (err) {
+    const stillClaimed = await env.DB.prepare(
+      `SELECT 1 AS present FROM jobs
+       WHERE id = ? AND user_id = ? AND status = 'running' AND claim_token = ?`,
+    )
+      .bind(jobId, identity.userId, claimToken)
+      .first<{ present: number }>();
     return {
       ok: false,
-      reason: "conflict",
+      reason: stillClaimed ? "conflict" : "stale_claim",
       detail: err instanceof Error ? err.message : "failure transition failed",
     };
   }
   return { ok: true };
+}
+
+/**
+ * Fail a claim even when its encrypted payload cannot be read.
+ *
+ * Ownership and the reservation id are derived from D1, never from the Queue
+ * message, so a malformed or mismatched message cannot fail somebody else's
+ * reading.
+ */
+export async function failClaimedJob(
+  env: Env,
+  jobId: string,
+  claimToken: string,
+  resultClass: string,
+): Promise<PublishOutcome> {
+  const row = await env.DB.prepare(
+    `SELECT j.user_id, r.id AS reading_id
+     FROM jobs j
+     JOIN daily_readings r
+       ON r.active_generation_job_id = j.id AND r.user_id = j.user_id
+     WHERE j.id = ? AND j.job_type = ? AND j.status = 'running'
+       AND j.claim_token = ? AND r.status = 'pending'`,
+  )
+    .bind(jobId, JOB_TYPE, claimToken)
+    .first<{ user_id: string; reading_id: string }>();
+  if (!row) {
+    return {
+      ok: false,
+      reason: "stale_claim",
+      detail: "claim no longer owns a pending reading",
+    };
+  }
+  return failReading(
+    env,
+    { userId: row.user_id },
+    row.reading_id,
+    jobId,
+    claimToken,
+    resultClass,
+  );
 }
 
 /** Mark a job dispatched. Advisory: the outbox sweeper reads the absence of this. */

@@ -66,6 +66,29 @@ function statusFor(reason: string): 409 | 424 | 503 {
   return 424;
 }
 
+const PRIVATE_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
+  conflict: "The reading operation could not be committed",
+  stale_job: "The failed reading changed before it could be replaced",
+  calc_unavailable: "The calculation service is unavailable",
+  release_unreadable: "The active content release is unavailable",
+  assembly_failed: "The reading command could not be assembled",
+};
+
+function publicFailureDetail(
+  requestId: string | null,
+  reason: string,
+  detail: string,
+): string {
+  const message = PRIVATE_FAILURE_MESSAGES[reason];
+  if (!message) return detail;
+  console.error("internal_generation_failed", {
+    request_id: requestId,
+    reason,
+    detail,
+  });
+  return message;
+}
+
 async function readJson(c: {
   req: { json: () => Promise<unknown> };
 }): Promise<Record<string, unknown> | null> {
@@ -96,7 +119,13 @@ internalGenerationRoutes.post("/readings/generate", async (c) => {
       return c.json({ status: "duplicate", detail: result.detail }, 200);
     }
     return c.json(
-      { error: { code: result.reason, message: result.detail, request_id: requestId } },
+      {
+        error: {
+          code: result.reason,
+          message: publicFailureDetail(requestId, result.reason, result.detail),
+          request_id: requestId,
+        },
+      },
       statusFor(result.reason),
     );
   }
@@ -140,7 +169,13 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
   );
   if (!result.ok) {
     return c.json(
-      { error: { code: result.reason, message: result.detail, request_id: requestId } },
+      {
+        error: {
+          code: result.reason,
+          message: publicFailureDetail(requestId, result.reason, result.detail),
+          request_id: requestId,
+        },
+      },
       statusFor(result.reason),
     );
   }
@@ -161,14 +196,20 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
   const userId = typeof body?.user_id === "string" ? body.user_id : null;
   const readingId = typeof body?.reading_id === "string" ? body.reading_id : null;
   const reason = body?.reason as CommandReplacementReason | undefined;
-  const actor = body?.actor === "scheduler" ? "scheduler" : "operator";
+  const actor = body?.actor;
 
-  if (!userId || !readingId || !reason || !REPLACEMENT_REASONS.includes(reason)) {
+  if (
+    !userId ||
+    !readingId ||
+    !reason ||
+    !REPLACEMENT_REASONS.includes(reason) ||
+    (actor !== "scheduler" && actor !== "operator")
+  ) {
     return c.json(
       {
         error: {
           code: "invalid_body",
-          message: `user_id, reading_id, and a reason of ${REPLACEMENT_REASONS.join(", ")} are required`,
+          message: `user_id, reading_id, actor (scheduler or operator), and a reason of ${REPLACEMENT_REASONS.join(", ")} are required`,
           request_id: requestId,
         },
       },
@@ -179,7 +220,13 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
   const result = await replaceFailedCommand(c.env, userId, readingId, reason, actor);
   if (!result.ok) {
     return c.json(
-      { error: { code: result.reason, message: result.detail, request_id: requestId } },
+      {
+        error: {
+          code: result.reason,
+          message: publicFailureDetail(requestId, result.reason, result.detail),
+          request_id: requestId,
+        },
+      },
       statusFor(result.reason),
     );
   }

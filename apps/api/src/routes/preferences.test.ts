@@ -1,6 +1,8 @@
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { IDENTITY_A, USER_A, resetDb, rows, seedUser } from "../../test/helpers.js";
+import type { Env } from "../env.js";
+import { setContentLocale } from "../db/preferences.js";
 
 interface PreferenceResponse {
   schema_version?: string;
@@ -32,11 +34,15 @@ async function put(
   return { status: res.status, body: (await res.json()) as PreferenceResponse };
 }
 
-const setZone = (timezone: string, source = "user_confirmed", userId?: string) =>
-  put("/v1/preferences/timezone", { timezone, source }, { userId });
+const setZone = (
+  timezone: string,
+  source = "user_confirmed",
+  userId?: string,
+  idempotencyKey?: string,
+) => put("/v1/preferences/timezone", { timezone, source }, { userId, idempotencyKey });
 
-const setLocale = (locale: string, source = "user_confirmed") =>
-  put("/v1/preferences/locale", { locale, source });
+const setLocale = (locale: string, source = "user_confirmed", idempotencyKey?: string) =>
+  put("/v1/preferences/locale", { locale, source }, { idempotencyKey });
 
 async function userRow() {
   const [row] = await rows<{
@@ -53,6 +59,56 @@ async function userRow() {
   return row!;
 }
 
+function coordinatePreferenceReads(db: D1Database): D1Database {
+  let reads = 0;
+  let release!: () => void;
+  const bothRead = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, property) {
+        if (property === "bind") {
+          return (...values: unknown[]) => wrap(target.bind(...values));
+        }
+        if (property === "first") {
+          return async <T>(columnName?: string) => {
+            const result =
+              columnName === undefined
+                ? await target.first<T>()
+                : await target.first<T>(columnName);
+            reads++;
+            if (reads === 2) release();
+            await bothRead;
+            return result;
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function"
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
+      },
+    });
+
+  return new Proxy(db, {
+    get(target, property) {
+      if (property === "prepare") {
+        return (query: string) => {
+          const statement = target.prepare(query);
+          return query.includes("SELECT timezone, timezone_source")
+            ? wrap(statement)
+            : statement;
+        };
+      }
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === "function"
+        ? (value as (...args: unknown[]) => unknown).bind(target)
+        : value;
+    },
+  });
+}
+
 describe("PUT /v1/preferences/timezone", () => {
   beforeAll(async () => {
     await resetDb();
@@ -66,6 +122,7 @@ describe("PUT /v1/preferences/timezone", () => {
       USER_A,
     );
     await rows("DELETE FROM timezone_changes WHERE user_id = ?", USER_A);
+    await rows("DELETE FROM jobs WHERE user_id = ? AND job_type LIKE 'preference_%'", USER_A);
   });
 
   it("stores a confirmed zone, increments the revision, and logs the change", async () => {
@@ -101,8 +158,8 @@ describe("PUT /v1/preferences/timezone", () => {
   });
 
   it("refuses a device sync over a zone the user chose", async () => {
-    await setZone("America/Chicago", "user_confirmed");
-    const res = await setZone("Asia/Tokyo", "device_derived");
+    await setZone("America/Chicago", "user_confirmed", undefined, "pref-zone-user-0001");
+    const res = await setZone("Asia/Tokyo", "device_derived", undefined, "pref-zone-device-0001");
     expect(res.status).toBe(409);
     expect(res.body.error?.code).toBe("preference_locked");
     expect(res.body.error?.request_id).toBeTruthy();
@@ -113,20 +170,90 @@ describe("PUT /v1/preferences/timezone", () => {
   });
 
   it("lets the user overrule their own device", async () => {
-    await setZone("Europe/Berlin", "device_derived");
-    const res = await setZone("Asia/Tokyo", "user_confirmed");
+    await setZone("Europe/Berlin", "device_derived", undefined, "pref-zone-device-0002");
+    const res = await setZone("Asia/Tokyo", "user_confirmed", undefined, "pref-zone-user-0002");
     expect(res.status).toBe(200);
     expect(res.body.timezone_revision).toBe(2);
   });
 
   it("treats an unchanged repeat as a no-op rather than a change", async () => {
-    await setZone("Europe/Berlin", "device_derived");
-    const again = await setZone("Europe/Berlin", "device_derived");
+    await setZone("Europe/Berlin", "device_derived", undefined, "pref-zone-noop-0001");
+    const again = await setZone(
+      "Europe/Berlin",
+      "device_derived",
+      undefined,
+      "pref-zone-noop-0002",
+    );
     expect(again.status).toBe(200);
     expect(again.body.timezone_revision).toBe(1);
 
     const log = await rows("SELECT id FROM timezone_changes WHERE user_id = ?", USER_A);
     expect(log).toHaveLength(1);
+  });
+
+  it("replays the original result without applying the preference again", async () => {
+    const first = await setZone(
+      "America/Chicago",
+      "user_confirmed",
+      undefined,
+      "pref-zone-replay-0001",
+    );
+    await setZone("Asia/Tokyo", "user_confirmed", undefined, "pref-zone-replay-0002");
+
+    const replay = await setZone(
+      "America/Chicago",
+      "user_confirmed",
+      undefined,
+      "pref-zone-replay-0001",
+    );
+    expect(replay).toEqual(first);
+    expect(await userRow()).toMatchObject({
+      timezone: "Asia/Tokyo",
+      timezone_revision: 2,
+    });
+    const records = await rows<{ payload_json: string | null; payload_enc: ArrayBuffer | null }>(
+      `SELECT payload_json, payload_enc FROM jobs
+       WHERE user_id = ? AND job_type = 'preference_timezone'`,
+      USER_A,
+    );
+    expect(records).toHaveLength(2);
+    expect(records.every((record) => record.payload_json === null)).toBe(true);
+    expect(records.every((record) => record.payload_enc !== null)).toBe(true);
+  });
+
+  it("rejects reuse of an idempotency key for a different time zone", async () => {
+    await setZone(
+      "America/Chicago",
+      "user_confirmed",
+      undefined,
+      "pref-zone-conflict-0001",
+    );
+    const conflict = await setZone(
+      "Asia/Tokyo",
+      "user_confirmed",
+      undefined,
+      "pref-zone-conflict-0001",
+    );
+
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.error?.code).toBe("idempotency_conflict");
+    expect((await userRow()).timezone).toBe("America/Chicago");
+  });
+
+  it("does not disguise an unrelated D1 failure as a concurrent preference write", async () => {
+    await rows("ALTER TABLE timezone_changes RENAME TO timezone_changes_unavailable");
+    try {
+      const result = await setZone(
+        "America/Chicago",
+        "user_confirmed",
+        undefined,
+        "pref-zone-outage-0001",
+      );
+      expect(result.status).toBe(500);
+      expect(result.body.error?.code).toBe("internal_error");
+    } finally {
+      await rows("ALTER TABLE timezone_changes_unavailable RENAME TO timezone_changes");
+    }
   });
 
   it("rejects a fixed offset, an unknown zone, and a missing source", async () => {
@@ -184,6 +311,7 @@ describe("PUT /v1/preferences/locale", () => {
        WHERE id = ?`,
       USER_A,
     );
+    await rows("DELETE FROM jobs WHERE user_id = ? AND job_type LIKE 'preference_%'", USER_A);
   });
 
   it("stores a confirmed locale", async () => {
@@ -207,11 +335,38 @@ describe("PUT /v1/preferences/locale", () => {
   });
 
   it("refuses a device sync over a locale the user chose", async () => {
-    await setLocale("es-ES", "user_confirmed");
-    const res = await setLocale("fr-FR", "device_derived");
+    await setLocale("es-ES", "user_confirmed", "pref-locale-user-0001");
+    const res = await setLocale("fr-FR", "device_derived", "pref-locale-device-0001");
     expect(res.status).toBe(409);
     expect(res.body.error?.code).toBe("preference_locked");
     expect((await userRow()).locale).toBe("es-ES");
+  });
+
+  it("cannot lose a concurrent user choice to a device-derived write", async () => {
+    const coordinatedEnv = {
+      ...env,
+      DB: coordinatePreferenceReads(env.DB),
+    } as Env;
+    const [user, device] = await Promise.all([
+      setContentLocale(coordinatedEnv, USER_A, "es-ES", "user_confirmed"),
+      setContentLocale(coordinatedEnv, USER_A, "fr-FR", "device_derived"),
+    ]);
+
+    expect(user.ok).toBe(true);
+    expect(device).toMatchObject({ ok: false, reason: "preference_locked" });
+    expect(await userRow()).toMatchObject({
+      locale: "es-ES",
+      locale_source: "user_confirmed",
+    });
+  });
+
+  it("replays the original locale result without overwriting a later choice", async () => {
+    const first = await setLocale("es-ES", "user_confirmed", "pref-locale-replay-0001");
+    await setLocale("de-DE", "user_confirmed", "pref-locale-replay-0002");
+
+    const replay = await setLocale("es-ES", "user_confirmed", "pref-locale-replay-0001");
+    expect(replay).toEqual(first);
+    expect((await userRow()).locale).toBe("de-DE");
   });
 
   it("rejects a malformed tag", async () => {

@@ -81,6 +81,12 @@ describe("localDayWindow", () => {
     expect(() => localDayWindow("UTC", "2026-8-9")).toThrow(LocalDayError);
     expect(() => localDayWindow("UTC", "not-a-date")).toThrow(LocalDayError);
   });
+
+  it("rejects calendar dates that only look ISO-formatted", () => {
+    for (const date of ["2026-02-30", "2026-13-01", "2026-00-10", "2025-02-29"]) {
+      expect(() => localDayWindow("UTC", date)).toThrow(LocalDayError);
+    }
+  });
 });
 
 describe("resolveLocalDay", () => {

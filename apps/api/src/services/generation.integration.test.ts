@@ -144,13 +144,13 @@ async function decryptReading(readingId: string): Promise<StoredReading> {
 }
 
 /** Drive the real queue handler the way the platform does. */
-async function deliver(messages: GenerationMessage[]) {
+async function deliver(messages: GenerationMessage[], attempts = 1) {
   const batch = createMessageBatch<GenerationMessage>(
     QUEUE,
     messages.map((body, index) => ({
       id: `msg-${index}`,
       timestamp: new Date(0),
-      attempts: 1,
+      attempts,
       body,
     })),
   );
@@ -167,13 +167,72 @@ async function seedEverything() {
   return seedActiveRelease();
 }
 
+async function seedContextSignal(
+  options: {
+    consentStatus?: string;
+    consentVersion?: number;
+    sourceId?: string;
+    signalAllowedUses?: string[];
+    consentAllowedUses?: string[];
+  } = {},
+): Promise<void> {
+  const now = "2026-08-09T12:00:00.000Z";
+  const consentId = "cns_context_0000000001";
+  const sourceId = options.sourceId ?? "USR-03";
+  const signalAllowedUses = options.signalAllowedUses ?? [
+    "life_domain_selection",
+    "theme_ranking",
+  ];
+  const consentAllowedUses = options.consentAllowedUses ?? signalAllowedUses;
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO consents
+         (id, user_id, kind, status, source_id, permission_tier,
+          allowed_uses_json, scopes_json, policy_version, granted_at, version,
+          created_at, updated_at)
+       VALUES (?, ?, 'product_source', ?, ?, 2, ?, '[]', 'policy-v1', ?, ?, ?, ?)`,
+    ).bind(
+      consentId,
+      USER_A,
+      options.consentStatus ?? "granted",
+      sourceId,
+      JSON.stringify(consentAllowedUses),
+      now,
+      options.consentVersion ?? 7,
+      now,
+      now,
+    ),
+    env.DB.prepare(
+      `INSERT INTO context_signals
+         (id, user_id, source_id, evidence_lane, allowed_uses_json, confidence,
+          sensitivity, permission_state, conflict_status, consent_id,
+          freshness_status, observed_at, ingested_at, value_encoding, value_json,
+          normalized_hash, created_at, updated_at)
+       VALUES (?, ?, ?, 'user_and_context', ?, 'user_confirmed',
+               'personal', 'active', 'none', ?, 'fresh', ?, ?, 'structured', '{}',
+               ?, ?, ?)`,
+    ).bind(
+      "sig_context_0000000001",
+      USER_A,
+      sourceId,
+      JSON.stringify(signalAllowedUses),
+      consentId,
+      now,
+      now,
+      "5".repeat(64),
+      now,
+      now,
+    ),
+  ]);
+}
+
 describe("enqueue", () => {
   beforeEach(seedEverything);
 
   it("reserves one pending reading and one encrypted queued job", async () => {
     const result = await enqueueDailyReading(env, USER_A);
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
     expect(result.dispatched).toBe(true);
 
     const [reading] = await readings();
@@ -212,7 +271,7 @@ describe("enqueue", () => {
   it("freezes a command that validates against generation-command.schema.json", async () => {
     const result = await enqueueDailyReading(env, USER_A);
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
 
     const command = await decryptCommand(result.jobId);
     const valid = validateCommand(command);
@@ -220,16 +279,66 @@ describe("enqueue", () => {
     expect(valid).toBe(true);
   });
 
+  it("pins the actual version of the granted consent for eligible context", async () => {
+    await seedContextSignal({ consentVersion: 7 });
+
+    const result = await enqueueDailyReading(env, USER_A);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
+    const command = await decryptCommand(result.jobId);
+
+    expect(command.context).toEqual([
+      expect.objectContaining({
+        signal_id: "sig_context_0000000001",
+        consent_id: "cns_context_0000000001",
+        consent_version: 7,
+        allowed_use: "life_domain_selection",
+      }),
+    ]);
+  });
+
+  it("does not freeze context whose consent is not currently granted", async () => {
+    await seedContextSignal({ consentStatus: "revoked", consentVersion: 8 });
+
+    const result = await enqueueDailyReading(env, USER_A);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
+    expect((await decryptCommand(result.jobId)).context).toEqual([]);
+  });
+
+  it.each([
+    ["an excluded source", { sourceId: "AMB-12", signalAllowedUses: ["theme_ranking"] }],
+    [
+      "a use the source registry does not permit",
+      { sourceId: "USR-03", signalAllowedUses: ["rendering"] },
+    ],
+    [
+      "a use the granted consent does not permit",
+      {
+        sourceId: "USR-03",
+        signalAllowedUses: ["life_domain_selection"],
+        consentAllowedUses: [],
+      },
+    ],
+  ])("does not freeze context from %s", async (_label, options) => {
+    await seedContextSignal(options);
+
+    const result = await enqueueDailyReading(env, USER_A);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
+    expect((await decryptCommand(result.jobId)).context).toEqual([]);
+  });
+
   it("freezes a reissue command that validates too", async () => {
     const initial = await enqueueDailyReading(env, USER_A);
-    if (!initial.ok) return;
+    if (!initial.ok) throw new Error(`initial enqueue failed: ${initial.reason}`);
     await deliver([{ job_id: initial.jobId, reading_id: initial.readingId }]);
 
     // The generation-1 branch and the revision > 1 branch are separate
     // conditional subschemas, so a valid initial command proves nothing here.
     const reissued = await enqueueReissue(env, USER_A, initial.readingId, "defect_repair");
     expect(reissued.ok).toBe(true);
-    if (!reissued.ok) return;
+    if (!reissued.ok) throw new Error(`reissue failed: ${reissued.reason}`);
 
     const command = await decryptCommand(reissued.jobId);
     expect(command.revision).toBe(2);
@@ -241,7 +350,7 @@ describe("enqueue", () => {
   it("replaying an enqueue creates no second reservation and changes no command", async () => {
     const first = await enqueueDailyReading(env, USER_A);
     expect(first.ok).toBe(true);
-    if (!first.ok) return;
+    if (!first.ok) throw new Error(`enqueue failed: ${first.reason}`);
     const frozen = await decryptCommand(first.jobId);
 
     const second = await enqueueDailyReading(env, USER_A);
@@ -294,11 +403,55 @@ describe("enqueue", () => {
     // 2026-08-09T02:00Z is still 8 August in Chicago.
     const result = await enqueueDailyReading(env, USER_A, new Date("2026-08-09T02:00:00Z"));
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
     const command = await decryptCommand(result.jobId);
     expect(command.target_local_date).toBe("2026-08-08");
     expect(command.day_start_at).toBe("2026-08-08T05:00:00Z");
     expect(command.day_end_at).toBe("2026-08-09T05:00:00Z");
+  });
+
+  it("refuses a chart whose stored uncertainty JSON is malformed", async () => {
+    await rows(
+      "UPDATE chart_snapshots SET uncertainty_json = '{not-json' WHERE user_id = ?",
+      USER_A,
+    );
+
+    expect(await enqueueDailyReading(env, USER_A)).toMatchObject({
+      ok: false,
+      reason: "chart_not_found",
+    });
+    expect(await readings()).toEqual([]);
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("refuses a chart whose stored snapshot has no position array", async () => {
+    await rows(
+      "UPDATE chart_snapshots SET snapshot_json = '{\"positions\":null}' WHERE user_id = ?",
+      USER_A,
+    );
+
+    expect(await enqueueDailyReading(env, USER_A)).toMatchObject({
+      ok: false,
+      reason: "chart_not_found",
+    });
+    expect(await readings()).toEqual([]);
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("refuses a chart whose stored uncertainty feature entries are malformed", async () => {
+    await rows(
+      `UPDATE chart_snapshots
+       SET uncertainty_json = json_set(uncertainty_json, '$.suppressed_features', json('[null]'))
+       WHERE user_id = ?`,
+      USER_A,
+    );
+
+    expect(await enqueueDailyReading(env, USER_A)).toMatchObject({
+      ok: false,
+      reason: "chart_not_found",
+    });
+    expect(await readings()).toEqual([]);
+    expect(await jobs()).toEqual([]);
   });
 });
 
@@ -308,7 +461,7 @@ describe("queue delivery", () => {
   it("publishes the reading, its evidence, and closes the job", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
     expect(enqueued.ok).toBe(true);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
 
     const result = await deliver([
       { job_id: enqueued.jobId, reading_id: enqueued.readingId },
@@ -339,7 +492,7 @@ describe("queue delivery", () => {
 
   it("publishes exactly once under duplicate delivery", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
 
     await deliver([message]);
@@ -358,7 +511,7 @@ describe("queue delivery", () => {
 
   it("keeps the clear columns free of anything that reconstructs the reading", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
 
     const stored = await decryptReading(enqueued.readingId);
@@ -387,6 +540,102 @@ describe("queue delivery", () => {
     expect(result.retryMessages).toEqual([]);
   });
 
+  it("retries when the terminal failure transition itself cannot commit", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error("enqueue failed");
+    await rows("DELETE FROM cycle_passes WHERE user_id = ?", USER_A);
+    await rows("DELETE FROM cycle_instances WHERE user_id = ?", USER_A);
+    await rows("ALTER TABLE audit_events RENAME TO audit_events_unavailable");
+    try {
+      const delivery = await deliver([
+        { job_id: enqueued.jobId, reading_id: enqueued.readingId },
+      ]);
+      expect(delivery.retryMessages).toHaveLength(1);
+      expect((await jobs())[0]).toMatchObject({ status: "queued", claim_token: null });
+      expect((await readings())[0]!.status).toBe("pending");
+    } finally {
+      await rows("ALTER TABLE audit_events_unavailable RENAME TO audit_events");
+    }
+  });
+
+  it("keeps the final failed transition reclaimable when D1 cannot commit it", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows("DELETE FROM cycle_passes WHERE user_id = ?", USER_A);
+    await rows("DELETE FROM cycle_instances WHERE user_id = ?", USER_A);
+    await rows("ALTER TABLE audit_events RENAME TO audit_events_unavailable");
+    try {
+      const delivery = await deliver(
+        [{ job_id: enqueued.jobId, reading_id: enqueued.readingId }],
+        4,
+      );
+      expect(delivery.retryMessages).toHaveLength(1);
+      expect((await jobs())[0]).toMatchObject({ status: "running" });
+      expect((await jobs())[0]!.claim_token).not.toBeNull();
+      expect((await readings())[0]!.status).toBe("pending");
+    } finally {
+      await rows("ALTER TABLE audit_events_unavailable RENAME TO audit_events");
+    }
+  });
+
+  it("releases a retryable claim so the next delivery can finish it", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    const key = "content-releases/release-12.json";
+    const stored = await env.ARTIFACTS!.get(key);
+    expect(stored).not.toBeNull();
+    const bytes = await stored!.arrayBuffer();
+    const options = {
+      httpMetadata: stored!.httpMetadata,
+      customMetadata: stored!.customMetadata,
+    };
+    await env.ARTIFACTS!.delete(key);
+
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+    const first = await deliver([message]);
+    expect(first.retryMessages).toHaveLength(1);
+    expect((await jobs())[0]).toMatchObject({ status: "queued", claim_token: null });
+    expect((await readings())[0]!.status).toBe("pending");
+
+    await env.ARTIFACTS!.put(key, bytes, options);
+    const second = await deliver([message], 2);
+    expect(second.retryMessages).toEqual([]);
+    expect((await jobs())[0]!.status).toBe("succeeded");
+    expect((await readings())[0]!.status).toBe("published");
+  });
+
+  it("fails a persistently unreadable encrypted command after bounded deliveries", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    const [stored] = await rows<{ payload_enc: ArrayBuffer }>(
+      "SELECT payload_enc FROM jobs WHERE id = ?",
+      enqueued.jobId,
+    );
+    const corrupted = new Uint8Array(stored!.payload_enc);
+    corrupted[0] = corrupted[0]! ^ 0xff;
+    await rows("UPDATE jobs SET payload_enc = ? WHERE id = ?", corrupted, enqueued.jobId);
+
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+    const first = await deliver([message]);
+    expect(first.retryMessages).toHaveLength(1);
+    expect((await jobs())[0]).toMatchObject({ status: "queued", claim_token: null });
+
+    const final = await deliver([message], 4);
+    expect(final.retryMessages).toEqual([]);
+    expect((await jobs())[0]).toMatchObject({
+      status: "failed",
+      claim_token: null,
+      result_class: "payload_undecryptable",
+    });
+    expect((await readings())[0]!.status).toBe("failed");
+  });
+
   it("publishes the locale's universal fallback when no cycle is in orb", async () => {
     await resetDb();
     await seedUser(IDENTITY_A);
@@ -396,7 +645,7 @@ describe("queue delivery", () => {
 
     const enqueued = await enqueueDailyReading(env, USER_A);
     expect(enqueued.ok).toBe(true);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
 
     const [reading] = await readings();
@@ -412,7 +661,7 @@ describe("frozen inputs", () => {
 
   it("ignores a release activated after the command was frozen", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     const frozen = await decryptCommand(enqueued.jobId);
 
     await seedActiveRelease("release-13");
@@ -426,7 +675,7 @@ describe("frozen inputs", () => {
 
   it("ignores a timezone change and a midnight rollover after enqueue", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A, new Date("2026-08-09T18:00:00Z"));
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     const frozen = await decryptCommand(enqueued.jobId);
     expect(frozen.target_local_date).toBe("2026-08-09");
 
@@ -441,7 +690,7 @@ describe("frozen inputs", () => {
 
   it("fails closed when a pinned cycle's envelope changed under it", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     const frozen = await decryptCommand(enqueued.jobId);
 
     const pinned = frozen.cycle_scan.cycles[0]!.cycle_id;
@@ -462,6 +711,74 @@ describe("frozen inputs", () => {
     expect(job!.status).toBe("failed");
     expect(job!.result_class ?? "").toBe("cycle_hash_mismatch");
   });
+
+  it("fails closed when a pinned cycle's stored JSON is malformed", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    const frozen = await decryptCommand(enqueued.jobId);
+
+    await rows(
+      "UPDATE cycle_instances SET cycle_json = '{not-json' WHERE id = ?",
+      frozen.cycle_scan.cycles[0]!.cycle_id,
+    );
+    const result = await deliver([
+      { job_id: enqueued.jobId, reading_id: enqueued.readingId },
+    ]);
+
+    expect(result.retryMessages).toEqual([]);
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("cycle_hash_mismatch");
+  });
+
+  it("fails closed when the pinned consent is revoked after enqueue", async () => {
+    await seedContextSignal({ consentVersion: 7 });
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    const now = new Date().toISOString();
+    await rows(
+      `UPDATE consents SET status = 'revoked', version = 8, revoked_at = ?, updated_at = ?
+       WHERE id = 'cns_context_0000000001'`,
+      now,
+      now,
+    );
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("consent_revoked");
+  });
+
+  it("fails closed when the signal no longer permits its pinned use", async () => {
+    await seedContextSignal({ consentVersion: 7 });
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows(
+      "UPDATE context_signals SET allowed_uses_json = '[]' WHERE id = 'sig_context_0000000001'",
+    );
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("consent_revoked");
+  });
+
+  it("fails closed when consent no longer permits the pinned use", async () => {
+    await seedContextSignal({ consentVersion: 7 });
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows(
+      "UPDATE consents SET allowed_uses_json = '[]' WHERE id = 'cns_context_0000000001'",
+    );
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("consent_revoked");
+  });
 });
 
 describe("claims", () => {
@@ -469,7 +786,7 @@ describe("claims", () => {
 
   it("a stale claim cannot publish", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
-    if (!enqueued.ok) return;
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
 
     const first = await claimJob(env, enqueued.jobId);
     expect(first).not.toBeNull();
@@ -511,7 +828,7 @@ describe("reissue", () => {
 
     const reissued = await enqueueReissue(env, USER_A, first, "safety_correction");
     expect(reissued.ok).toBe(true);
-    if (!reissued.ok) return;
+    if (!reissued.ok) throw new Error(`reissue failed: ${reissued.reason}`);
 
     // The predecessor stays live while its successor is only reserved.
     const midflight = await readings();
@@ -536,6 +853,19 @@ describe("reissue", () => {
     expect(second.ok).toBe(false);
 
     expect((await readings()).filter((r) => r.status === "pending")).toHaveLength(1);
+  });
+
+  it("does not misclassify an infrastructure failure as a stale predecessor", async () => {
+    const first = await publishInitial();
+    await rows("ALTER TABLE audit_events RENAME TO audit_events_unavailable");
+    try {
+      expect(await enqueueReissue(env, USER_A, first, "defect_repair")).toMatchObject({
+        ok: false,
+        reason: "conflict",
+      });
+    } finally {
+      await rows("ALTER TABLE audit_events_unavailable RENAME TO audit_events");
+    }
   });
 
   it("refuses a reissue whose expected predecessor is not live", async () => {
@@ -576,7 +906,7 @@ describe("command replacement", () => {
       "scheduler",
     );
     expect(replaced.ok).toBe(true);
-    if (!replaced.ok) return;
+    if (!replaced.ok) throw new Error(`replacement failed: ${replaced.reason}`);
 
     const [reading] = await readings();
     expect(reading).toMatchObject({
@@ -603,6 +933,25 @@ describe("command replacement", () => {
     expect(
       await replaceFailedCommand(env, USER_A, failed.readingId, "calc_unavailable", "scheduler"),
     ).toMatchObject({ ok: false, reason: "stale_job" });
+  });
+
+  it("does not misclassify an infrastructure failure as a stale replacement", async () => {
+    const failed = await failTheDay();
+    await rows("ALTER TABLE audit_events RENAME TO audit_events_unavailable");
+    try {
+      expect(
+        await replaceFailedCommand(
+          env,
+          USER_A,
+          failed.readingId,
+          "defect_repair",
+          "operator",
+        ),
+      ).toMatchObject({ ok: false, reason: "conflict" });
+      expect((await readings())[0]!.status).toBe("failed");
+    } finally {
+      await rows("ALTER TABLE audit_events_unavailable RENAME TO audit_events");
+    }
   });
 
   it("keeps editorial and privacy judgements away from the scheduler", async () => {

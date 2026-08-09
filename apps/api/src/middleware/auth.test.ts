@@ -84,6 +84,20 @@ describe("service auth is scoped to /internal", () => {
     expect((await body(res)).error?.code).toBe("unauthorized");
   });
 
+  it("also gates daily-reading generation on the service token", async () => {
+    const res = await app.request(
+      "/internal/readings/generate",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ user_id: "usr_not_authorized_0001" }),
+      },
+      prodEnv(),
+    );
+    expect(res.status).toBe(401);
+    expect((await body(res)).error?.code).toBe("unauthorized");
+  });
+
   it("accepts the internal route with the correct service token", async () => {
     const res = await app.request(
       "/internal/content-releases",

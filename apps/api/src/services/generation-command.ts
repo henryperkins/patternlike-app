@@ -3,6 +3,7 @@ import {
   ASSEMBLY_POLICY_VERSION,
   SCHEMA_VERSION as ENGINE_SCHEMA_VERSION,
   assembleReading,
+  contextRejection,
   renderAssemblyId,
   type AssemblyInput,
   type AssemblyUncertaintyInput,
@@ -185,10 +186,89 @@ interface ContextRow {
   source_id: string;
   normalized_hash: string;
   allowed_uses_json: string;
+  consent_allowed_uses_json: string;
   evidence_lane: string;
-  consent_id: string | null;
+  consent_id: string;
+  consent_version: number;
+  consent_source_id: string | null;
   permission_state: string;
   freshness_status: string;
+}
+
+const SUPPRESSED_FEATURE_CLASSES = new Set([
+  "houses",
+  "angles",
+  "angle_transits",
+  "moon_time_sensitive",
+]);
+
+function parseStoredChart(chart: ChartRow): {
+  uncertainty: UncertaintyReport;
+  positions: LongitudePosition[];
+} | null {
+  try {
+    const parsedUncertainty = JSON.parse(chart.uncertainty_json) as unknown;
+    const snapshot = JSON.parse(chart.snapshot_json) as { positions?: unknown };
+    if (
+      !parsedUncertainty ||
+      typeof parsedUncertainty !== "object" ||
+      !Array.isArray(snapshot?.positions)
+    ) {
+      return null;
+    }
+    const report = parsedUncertainty as Record<string, unknown>;
+    if (
+      typeof report.accuracy !== "string" ||
+      !["exact", "approximate", "unknown"].includes(report.accuracy) ||
+      !Array.isArray(report.suppressed_features) ||
+      !report.suppressed_features.every(
+        (feature) =>
+          feature !== null &&
+          typeof feature === "object" &&
+          typeof (feature as Record<string, unknown>).feature_class === "string" &&
+          SUPPRESSED_FEATURE_CLASSES.has(
+            (feature as Record<string, unknown>).feature_class as string,
+          ) &&
+          typeof (feature as Record<string, unknown>).reason === "string" &&
+          ((feature as Record<string, unknown>).feature_id === undefined ||
+            (feature as Record<string, unknown>).feature_id === null ||
+            typeof (feature as Record<string, unknown>).feature_id === "string"),
+      ) ||
+      !Array.isArray(report.qualified_features) ||
+      !report.qualified_features.every(
+        (feature) =>
+          feature !== null &&
+          typeof feature === "object" &&
+          typeof (feature as Record<string, unknown>).feature_id === "string" &&
+          typeof (feature as Record<string, unknown>).qualification === "string",
+      ) ||
+      !(
+        report.window === null ||
+        (report.window !== undefined && typeof report.window === "object")
+      )
+    ) {
+      return null;
+    }
+    const positions = snapshot.positions;
+    if (
+      !positions.every(
+        (position) =>
+          position !== null &&
+          typeof position === "object" &&
+          typeof (position as { body?: unknown }).body === "string" &&
+          typeof (position as { longitude_deg?: unknown }).longitude_deg === "number" &&
+          Number.isFinite((position as { longitude_deg: number }).longitude_deg),
+      )
+    ) {
+      return null;
+    }
+    return {
+      uncertainty: report as unknown as UncertaintyReport,
+      positions: positions as LongitudePosition[],
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -263,15 +343,19 @@ async function readEligibleContext(env: Env, userId: string): Promise<ContextRow
   // eligible, and a later reader has to be able to tell "no signals" from "this
   // code never looked".
   const { results } = await env.DB.prepare(
-    `SELECT id, source_id, normalized_hash, allowed_uses_json, evidence_lane,
-            consent_id, permission_state, freshness_status
-     FROM context_signals
-     WHERE user_id = ?
-       AND permission_state = 'active'
-       AND conflict_status = 'none'
-       AND freshness_status = 'fresh'
-       AND consent_id IS NOT NULL
-     ORDER BY source_id, id`,
+    `SELECT s.id, s.source_id, s.normalized_hash, s.allowed_uses_json,
+            c.allowed_uses_json AS consent_allowed_uses_json,
+            s.evidence_lane, s.consent_id, c.version AS consent_version,
+            c.source_id AS consent_source_id,
+            s.permission_state, s.freshness_status
+     FROM context_signals s
+     JOIN consents c ON c.id = s.consent_id AND c.user_id = s.user_id
+     WHERE s.user_id = ?
+       AND s.permission_state = 'active'
+       AND s.conflict_status = 'none'
+       AND s.freshness_status = 'fresh'
+       AND c.status = 'granted'
+     ORDER BY s.source_id, s.id`,
   )
     .bind(userId)
     .all<ContextRow>();
@@ -281,13 +365,34 @@ async function readEligibleContext(env: Env, userId: string): Promise<ContextRow
 function toContextPins(rows: ContextRow[]): ContextPin[] {
   return rows.flatMap((row) => {
     let allowedUses: unknown;
+    let consentAllowedUses: unknown;
     try {
       allowedUses = JSON.parse(row.allowed_uses_json);
+      consentAllowedUses = JSON.parse(row.consent_allowed_uses_json);
     } catch {
       return [];
     }
-    const allowedUse = Array.isArray(allowedUses) ? allowedUses[0] : null;
-    if (typeof allowedUse !== "string" || !row.consent_id) return [];
+    if (!Array.isArray(allowedUses) || !Array.isArray(consentAllowedUses)) return [];
+    if (row.consent_source_id !== row.source_id) return [];
+    const consentSet = new Set(
+      consentAllowedUses.filter((use): use is string => typeof use === "string"),
+    );
+    const allowedUse = allowedUses.find((use): use is string => {
+      if (typeof use !== "string" || !consentSet.has(use)) return false;
+      const signal: NormalizedContextSignal = {
+        signal_id: row.id,
+        source_id: row.source_id,
+        normalized_hash: row.normalized_hash,
+        allowed_use: use,
+        evidence_lane: row.evidence_lane as NormalizedContextSignal["evidence_lane"],
+        permission_state:
+          row.permission_state as NormalizedContextSignal["permission_state"],
+        freshness_status:
+          row.freshness_status as NormalizedContextSignal["freshness_status"],
+      };
+      return contextRejection(signal) === null;
+    });
+    if (!allowedUse) return [];
     return [
       {
         signal_id: row.id,
@@ -296,7 +401,7 @@ function toContextPins(rows: ContextRow[]): ContextPin[] {
         allowed_use: allowedUse,
         evidence_lane: row.evidence_lane,
         consent_id: row.consent_id,
-        consent_version: 1,
+        consent_version: row.consent_version,
         permission_state: row.permission_state,
         freshness_status: row.freshness_status,
       },
@@ -424,8 +529,15 @@ export async function buildGenerationCommand(
     return { ok: false, reason: "chart_not_found", detail: "no active chart snapshot" };
   }
 
-  const uncertainty = JSON.parse(chart.uncertainty_json) as UncertaintyReport;
-  const snapshot = JSON.parse(chart.snapshot_json) as { positions: LongitudePosition[] };
+  const storedChart = parseStoredChart(chart);
+  if (!storedChart) {
+    return {
+      ok: false,
+      reason: "chart_not_found",
+      detail: "active chart snapshot is malformed",
+    };
+  }
+  const { uncertainty, positions } = storedChart;
   // The recomputed effective accuracy, never the label the caller supplied.
   const effectiveAccuracy = uncertainty.accuracy;
 
@@ -444,10 +556,8 @@ export async function buildGenerationCommand(
       requestId: newId("req"),
       chartFingerprint: chart.fingerprint,
       natalAccuracy: effectiveAccuracy,
-      suppressedFeatures: uncertainty.suppressed_features.map(
-        (f) => f.feature_class,
-      ) as never,
-      natalPositions: natalPositionsForScan(snapshot.positions, uncertainty),
+      suppressedFeatures: uncertainty.suppressed_features.map((f) => f.feature_class),
+      natalPositions: natalPositionsForScan(positions, uncertainty),
       window: { from: day.dayStartAt, to: day.dayEndAt },
       contractId: chart.contract_id,
       contractVersion: chart.contract_version,

@@ -1,27 +1,44 @@
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CYCLE_POLICY_VERSION,
   cyclePassId,
   type NormalizedCycle,
 } from "@patternlike/shared";
-import { IDENTITY_A, USER_A, resetDb, rows, seedChart, seedUser } from "../../test/helpers.js";
+import {
+  IDENTITY_A,
+  IDENTITY_B,
+  USER_A,
+  USER_B,
+  resetDb,
+  rows,
+  seedChart,
+  seedUser,
+} from "../../test/helpers.js";
 import {
   CYCLE_FP_EMPTY,
   CYCLE_FP_REFUSED,
   CYCLE_FP_UNAVAILABLE,
+  mockCalcService,
 } from "../../test/mock-calc-service.js";
-import { buildCycleRequest, invokeCycles } from "../services/cycle-client.js";
+import {
+  buildCycleRequest,
+  invokeCycles,
+  type CycleScanInputs,
+} from "../services/cycle-client.js";
 import { deriveCycle, persistCycles } from "./cycles.js";
 
 const WINDOW = { from: "2026-08-09T05:00:00Z", to: "2026-08-10T05:00:00Z" };
 
-function scanRequest(fingerprint: string, suppressed?: string[]) {
+function scanRequest(
+  fingerprint: string,
+  suppressed?: CycleScanInputs["suppressedFeatures"],
+) {
   return buildCycleRequest({
     requestId: "req_cycles_test_00001",
     chartFingerprint: fingerprint,
     natalAccuracy: suppressed?.includes("moon_time_sensitive") ? "unknown" : "exact",
-    suppressedFeatures: suppressed as never,
+    suppressedFeatures: suppressed,
     natalPositions: [
       { body: "sun", longitude_deg: 54.703 },
       { body: "moon", longitude_deg: 128.44 },
@@ -35,10 +52,23 @@ function scanRequest(fingerprint: string, suppressed?: string[]) {
 const FINGERPRINT = `sha256:${"1a".repeat(32)}`;
 
 describe("invokeCycles", () => {
+  it("uses a mock boundary that refuses an incomplete scanner request", async () => {
+    const incomplete = { ...scanRequest(FINGERPRINT) } as Record<string, unknown>;
+    delete incomplete.natal_positions;
+    const response = await mockCalcService(
+      new Request("http://calc.test/v1/cycles", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(incomplete),
+      }),
+    );
+    expect(response.status).toBe(400);
+  });
+
   it("returns the scanned cycles for an ordinary chart", async () => {
     const result = await invokeCycles(env, scanRequest(FINGERPRINT));
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error("fixture scan failed");
     expect(result.response.cycles).toHaveLength(2);
     expect(result.response.cycles[0]!.body).toBe("saturn");
     expect(result.response.cycles[0]!.pass_count).toBe(3);
@@ -48,7 +78,7 @@ describe("invokeCycles", () => {
   it("treats an empty scan as an ordinary result, not a failure", async () => {
     const result = await invokeCycles(env, scanRequest(CYCLE_FP_EMPTY));
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error("empty fixture scan failed");
     expect(result.response.cycles).toEqual([]);
   });
 
@@ -57,14 +87,14 @@ describe("invokeCycles", () => {
     // unattended: only `unavailable` is a calc_unavailable replacement reason.
     const refused = await invokeCycles(env, scanRequest(CYCLE_FP_REFUSED));
     expect(refused.ok).toBe(false);
-    if (refused.ok) return;
+    if (refused.ok) throw new Error("refusal fixture unexpectedly succeeded");
     expect(refused.kind).toBe("refused");
-    if (refused.kind !== "refused") return;
+    if (refused.kind !== "refused") throw new Error("fixture did not reach the engine");
     expect(refused.failure.error_class).toBe("cycle_window_incomplete");
 
     const unavailable = await invokeCycles(env, scanRequest(CYCLE_FP_UNAVAILABLE));
     expect(unavailable.ok).toBe(false);
-    if (unavailable.ok) return;
+    if (unavailable.ok) throw new Error("unavailable fixture unexpectedly succeeded");
     expect(unavailable.kind).toBe("unavailable");
   });
 
@@ -74,7 +104,7 @@ describe("invokeCycles", () => {
       scanRequest(FINGERPRINT, ["moon_time_sensitive"]),
     );
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok) throw new Error("suppressed-feature scan failed");
     expect(result.response.cycles.map((c) => c.target)).not.toContain("moon");
   });
 
@@ -85,6 +115,73 @@ describe("invokeCycles", () => {
     );
     expect(result).toMatchObject({ ok: false, kind: "unavailable" });
   });
+
+  it("bounds a cycle scan so an unresponsive calculation service cannot hold the job forever", async () => {
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal) throw new DOMException("timed out", "AbortError");
+        const req = scanRequest(FINGERPRINT);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            schema_version: req.schema_version,
+            request_id: req.request_id,
+            chart_fingerprint: req.chart_fingerprint,
+            cycle_policy_id: req.cycle_policy_id,
+            cycle_policy_version: req.cycle_policy_version,
+            orb_policy_id: req.orb_policy_id,
+            orb_policy_version: req.orb_policy_version,
+            contract_id: req.contract_id,
+            contract_version: req.contract_version,
+            cycles: [],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }),
+    );
+    try {
+      const result = await invokeCycles(env, scanRequest(FINGERPRINT));
+      expect(result).toMatchObject({ ok: false, kind: "unavailable" });
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
+  });
+
+  it("rejects a successful response produced for a different calculation contract", async () => {
+    const originalFetch = globalThis.fetch;
+    const req = scanRequest(FINGERPRINT);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            schema_version: req.schema_version,
+            request_id: req.request_id,
+            chart_fingerprint: req.chart_fingerprint,
+            cycle_policy_id: req.cycle_policy_id,
+            cycle_policy_version: req.cycle_policy_version,
+            orb_policy_id: req.orb_policy_id,
+            orb_policy_version: req.orb_policy_version,
+            contract_id: req.contract_id,
+            contract_version: "different-contract-version",
+            cycles: [],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+    try {
+      expect(await invokeCycles(env, req)).toMatchObject({
+        ok: false,
+        kind: "unavailable",
+      });
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
+  });
 });
 
 describe("persistCycles", () => {
@@ -94,6 +191,7 @@ describe("persistCycles", () => {
   beforeEach(async () => {
     await resetDb();
     await seedUser(IDENTITY_A);
+    await seedUser(IDENTITY_B);
     ({ chartId } = await seedChart(IDENTITY_A));
     const scan = await invokeCycles(env, scanRequest(FINGERPRINT));
     if (!scan.ok) throw new Error("fixture scan failed");
@@ -120,8 +218,21 @@ describe("persistCycles", () => {
       "SELECT id, cycle_id, pass_index FROM cycle_passes WHERE user_id = ? ORDER BY cycle_id, pass_index",
       USER_A,
     );
-    expect(passes).toHaveLength(4);
-    for (const pass of passes) {
+    const expectedPasses = cycles
+      .flatMap((cycle, cycleIndex) =>
+        cycle.passes.map((pass, passIndex) => ({
+          id: derived[cycleIndex]!.passIds[passIndex]!,
+          cycle_id: cycle.id,
+          pass_index: pass.pass_index,
+        })),
+      )
+      .sort((a, b) =>
+        a.cycle_id === b.cycle_id
+          ? a.pass_index - b.pass_index
+          : a.cycle_id.localeCompare(b.cycle_id),
+      );
+    expect(passes).toEqual(expectedPasses);
+    for (const pass of expectedPasses) {
       expect(pass.id).toBe(await cyclePassId(pass.cycle_id, pass.pass_index));
     }
   });
@@ -170,10 +281,10 @@ describe("persistCycles", () => {
       env.DB.prepare(
         `INSERT INTO cycle_passes
            (id, cycle_id, user_id, pass_index, direction, exact_at, speed_deg_per_day, created_at)
-         VALUES ('cyp_cross_user_0000000000000001', ?, 'usr_test_bob_000001', 9, 'direct', ?, 1.0, ?)`,
+         VALUES ('cyp_cross_user_0000000000000001', ?, ?, 9, 'direct', ?, 1.0, ?)`,
       )
-        .bind(cycles[0]!.id, cycles[0]!.exact_at, new Date().toISOString())
+        .bind(cycles[0]!.id, USER_B, cycles[0]!.exact_at, new Date().toISOString())
         .run(),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/FOREIGN KEY/i);
   });
 });

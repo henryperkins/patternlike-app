@@ -383,6 +383,22 @@ describe("ingestion request validation", () => {
       expect("error" in result && result.error.class).toBe("invalid_body");
     },
   );
+
+  it.each(["{bad-token}", "{Bad_token}"])(
+    "rejects an undeclared placeholder with non-lowercase-token syntax: %s",
+    (token) => {
+      const result = validateIngestionRequest(
+        wrap(
+          draftBundle((bundle) => {
+            bundle.objects.timing_templates[0]!.template_text = `Closest ${token}.`;
+          }),
+        ),
+      );
+      expect("error" in result && result.error.class).toBe(
+        "timing_undeclared_placeholder",
+      );
+    },
+  );
 });
 
 describe("content graph policy", () => {
@@ -476,6 +492,21 @@ describe("content graph policy", () => {
 
     expect(bundle.objects.safety_rules[0]!.fallback_text).toBeTruthy();
     expect(validateContentGraph(bundle)).toBeNull();
+  });
+
+  it("rejects an approved fallback for a locale the release does not support", () => {
+    const reason = validateContentGraph(
+      draftBundle((bundle) => {
+        bundle.objects.daily_fallbacks.push({
+          ...bundle.objects.daily_fallbacks[0]!,
+          id: "fallback.daily.fr-FR",
+          title: "Universal daily fallback (fr-FR)",
+          locale: "fr-FR",
+        });
+      }),
+    );
+
+    expect(reason?.class).toBe("fallback_locale_mismatch");
   });
 });
 

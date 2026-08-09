@@ -109,8 +109,23 @@ preferenceRoutes.put("/v1/preferences/timezone", async (c) => {
     );
   }
 
-  const result = await setSchedulingTimezone(c.env, c.get("userId"), timezone, source);
+  const result = await setSchedulingTimezone(
+    c.env,
+    c.get("userId"),
+    timezone,
+    source,
+    idem,
+  );
   if (!result.ok) {
+    if (result.reason === "idempotency_conflict") {
+      return c.json(
+        errorBody(
+          "idempotency_conflict",
+          "Idempotency-Key was already used for a different time zone mutation",
+        ),
+        409,
+      );
+    }
     return c.json(
       result.reason === "preference_locked"
         ? errorBody(
@@ -182,8 +197,23 @@ preferenceRoutes.put("/v1/preferences/locale", async (c) => {
     );
   }
 
-  const result = await setContentLocale(c.env, c.get("userId"), locale, source);
+  const result = await setContentLocale(
+    c.env,
+    c.get("userId"),
+    locale,
+    source,
+    idem,
+  );
   if (!result.ok) {
+    if (result.reason === "idempotency_conflict") {
+      return c.json(
+        errorBody(
+          "idempotency_conflict",
+          "Idempotency-Key was already used for a different locale mutation",
+        ),
+        409,
+      );
+    }
     return c.json(
       result.reason === "preference_locked"
         ? errorBody(

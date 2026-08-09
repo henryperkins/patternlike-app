@@ -67,11 +67,18 @@ export function localDateIn(zone: string, instant: Date): string {
 function parseLocalDate(localDate: string): { year: number; month: number; day: number } {
   const match = ISO_DATE_RE.exec(localDate);
   if (!match) throw new LocalDayError(`not an ISO calendar date: ${localDate}`);
-  return {
-    year: Number(match[1]),
-    month: Number(match[2]),
-    day: Number(match[3]),
-  };
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const normalized = new Date(Date.UTC(year, month - 1, day));
+  if (
+    normalized.getUTCFullYear() !== year ||
+    normalized.getUTCMonth() !== month - 1 ||
+    normalized.getUTCDate() !== day
+  ) {
+    throw new LocalDayError(`not a real ISO calendar date: ${localDate}`);
+  }
+  return { year, month, day };
 }
 
 function shiftLocalDate(localDate: string, days: number): string {

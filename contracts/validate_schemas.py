@@ -68,7 +68,7 @@ POLICY_ONLY = {
     "content-release.same-author",
 }
 
-PLACEHOLDER_RE = re.compile(r"\{([a-z_]+)\}")
+PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 # Tokens that must never appear in a serialized assembly request. Spec section 10
 # forbids stable direct identifiers at the assembly boundary; this is the

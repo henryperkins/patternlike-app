@@ -4,6 +4,7 @@ import { asCryptoSubject } from "../crypto.js";
 import type { UserIdentity } from "../db/users.js";
 import { persistCycles } from "../db/cycles.js";
 import {
+  MAX_COMMAND_GENERATION,
   markDispatched,
   replaceCommand,
   reserveInitial,
@@ -195,7 +196,13 @@ export type ReplaceEnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }
   | {
       ok: false;
-      reason: CommandBuildFailure | "not_replaceable" | "budget_exhausted" | "stale_job" | "day_too_old";
+      reason:
+        | CommandBuildFailure
+        | "not_replaceable"
+        | "budget_exhausted"
+        | "stale_job"
+        | "day_too_old"
+        | "conflict";
       detail: string;
     };
 
@@ -207,7 +214,8 @@ export type ReplaceEnqueueOutcome =
  * re-frozen with less context, under a new policy vintage, or because someone
  * diagnosed a defect are all judgements about a specific person or a specific
  * editorial decision, so they stay operator-only. The budget is
- * `command_generation < 3`, giving at most two automatic attempts, because each
+ * `command_generation < MAX_COMMAND_GENERATION`, giving at most two automatic
+ * attempts with the launch policy, because each
  * replacement re-freezes a NEW command and a wider budget turns a persistent
  * outage into per-user amplification against the thing that is already failing.
  * And the day must still be current: silently regenerating a failure from three
@@ -258,7 +266,7 @@ export async function replaceFailedCommand(
   }
 
   const nextGeneration = reservation.command_generation + 1;
-  if (nextGeneration > 3) {
+  if (nextGeneration > MAX_COMMAND_GENERATION) {
     return {
       ok: false,
       reason: "budget_exhausted",
