@@ -14,6 +14,7 @@ import {
   computeObjectHash,
   hashesEqual,
   normalizeHash,
+  parseReleaseKeyConfiguration,
   parseReleaseKeys,
   pendingFixtureIds,
   validateContentGraph,
@@ -118,6 +119,28 @@ describe("release key configuration", () => {
     ["a malformed raw public key", JSON.stringify({ k: { alg: "Ed25519", public_key: "AAAA" } })],
   ])("yields no usable key when %s", (_label, raw) => {
     expect(parseReleaseKeys(raw).size).toBe(0);
+  });
+
+  it("distinguishes malformed JSON from individually invalid key entries", () => {
+    expect(parseReleaseKeyConfiguration("{nope")).toEqual({
+      keys: new Map(),
+      invalidKeyIds: [],
+      malformed: true,
+    });
+
+    const parsed = parseReleaseKeyConfiguration(
+      JSON.stringify({
+        valid: { alg: "Ed25519", public_key: toBase64Url(new Uint8Array(32)) },
+        invalid: { alg: "Ed25519", public_key: "AAAA" },
+      }),
+    );
+
+    expect(parsed.malformed).toBe(false);
+    expect(parsed.invalidKeyIds).toEqual(["invalid"]);
+    expect(parsed.keys.get("valid")).toEqual({
+      alg: "Ed25519",
+      publicKey: toBase64Url(new Uint8Array(32)),
+    });
   });
 });
 
@@ -235,6 +258,40 @@ describe("ingestion request validation", () => {
   it("rejects a non-boolean activate", () => {
     const result = validateIngestionRequest(wrap(draftBundle(), { activate: "yes" }));
     expect("error" in result && result.error.class).toBe("invalid_body");
+  });
+
+  const boundaryCases: Array<[
+    string,
+    { version?: string; idempotencyKey?: string },
+    boolean,
+  ]> = [
+    ["128-character release.version", { version: `r${"a".repeat(127)}` }, true],
+    ["129-character release.version", { version: `r${"a".repeat(128)}` }, false],
+    ["256-character idempotency_key", { idempotencyKey: "k".repeat(256) }, true],
+    ["257-character idempotency_key", { idempotencyKey: "k".repeat(257) }, false],
+  ];
+
+  it.each(boundaryCases)("enforces the %s boundary", (_label, input, accepted) => {
+    const bundle = draftBundle((draft) => {
+      if (input.version) draft.release.version = input.version;
+    });
+    const result = validateIngestionRequest(
+      wrap(bundle, input.idempotencyKey ? { idempotency_key: input.idempotencyKey } : {}),
+    );
+
+    expect("request" in result).toBe(accepted);
+    if (!accepted) expect("error" in result && result.error.class).toBe("invalid_body");
+  });
+
+  it("reports the first schema path without echoing the rejected value", () => {
+    const bundle = draftBundle((draft) => {
+      delete (draft.objects.patterns[0] as Record<string, unknown>).evidence_requirements;
+    });
+    const result = validateIngestionRequest(wrap(bundle));
+
+    expect("error" in result && result.error.message).toContain(
+      "/bundle/objects/patterns/0 (required)",
+    );
   });
 
   it.each([

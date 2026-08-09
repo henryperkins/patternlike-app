@@ -18,10 +18,12 @@ database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
 # Immutable artifacts: signed editorial release bundles today, chart renders and
-# exports later. Production uses the pre-provisioned pattern-artifacts bucket.
+# exports later. The default name is deliberately not the production bucket, so
+# a remote development command cannot reserve an immutable production key. The
+# real bucket is declared in [[env.production.r2_buckets]] below.
 [[r2_buckets]]
 binding = "ARTIFACTS"
-bucket_name = "pattern-artifacts"
+bucket_name = "pattern-artifacts-dev"
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the

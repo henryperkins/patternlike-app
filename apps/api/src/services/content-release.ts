@@ -349,7 +349,7 @@ function isStringArray(value: unknown): value is string[] {
 const HASH_RE = /^(sha256:)?[a-f0-9]{64}$/;
 const RELEASE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
-const schemaValidator = new Ajv2020({ allErrors: true, strict: true });
+const schemaValidator = new Ajv2020({ strict: true });
 addFormats(schemaValidator);
 schemaValidator.addSchema(commonSchema);
 schemaValidator.addSchema(contentReleaseSchema);
@@ -402,10 +402,14 @@ export function validateIngestionRequest(
   if (bundleError) return { error: bundleError };
 
   if (!validateContentReleaseRequest(value)) {
+    const firstError = validateContentReleaseRequest.errors?.[0];
+    const schemaLocation = firstError
+      ? `${firstError.instancePath || "/"} (${firstError.keyword})`
+      : "unknown path";
     return {
       error: reject(
         "invalid_body",
-        "Request body must conform to content-release.schema.json",
+        `Request body must conform to content-release.schema.json: ${schemaLocation}`,
       ),
     };
   }

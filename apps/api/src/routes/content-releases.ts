@@ -58,6 +58,64 @@ interface IngestionResponse {
 
 /** Logical bucket name for `r2_uri`; the binding is `ARTIFACTS`. */
 const R2_BUCKET_LABEL = "artifacts";
+const MAX_INGESTION_BODY_BYTES = 8 * 1024 * 1024;
+
+type JsonBodyResult =
+  | { value: unknown }
+  | { error: "invalid_json" | "request_too_large" };
+
+async function readJsonBody(request: Request): Promise<JsonBodyResult> {
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength !== null) {
+    const parsedLength = Number(declaredLength);
+    if (Number.isFinite(parsedLength) && parsedLength > MAX_INGESTION_BODY_BYTES) {
+      return { error: "request_too_large" };
+    }
+  }
+
+  if (!request.body) return { error: "invalid_json" };
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_INGESTION_BODY_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The size decision is already final; cancellation is best effort.
+        }
+        return { error: "request_too_large" };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return { error: "invalid_json" };
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    return {
+      value: JSON.parse(
+        new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes),
+      ),
+    };
+  } catch {
+    return { error: "invalid_json" };
+  }
+}
 
 function objectKey(version: string): string {
   return `content-releases/${version}.json`;
@@ -91,7 +149,7 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
    */
   const refuse = async (
     reason: RejectionReason,
-    status: 400 | 409 | 503,
+    status: 400 | 409 | 413 | 503,
     context: { version?: string | null; keyId?: string | null } = {},
   ) => {
     await recordAudit(c.env, {
@@ -119,15 +177,23 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
     );
   }
 
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
+  const jsonBody = await readJsonBody(c.req.raw);
+  if ("error" in jsonBody && jsonBody.error === "request_too_large") {
+    return refuse(
+      {
+        class: "request_too_large",
+        message: "Request body must not exceed 8 MiB",
+      },
+      413,
+    );
+  }
+  if ("error" in jsonBody) {
     return refuse(
       { class: "invalid_json", message: "Request body must be valid JSON" },
       400,
     );
   }
+  const raw = jsonBody.value;
 
   const parsed = validateIngestionRequest(raw);
   if ("error" in parsed) return refuse(parsed.error, 400);
@@ -321,6 +387,40 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
     calcContractId: bundle.release.calc_contract_id ?? null,
   };
 
+  const activateAndRespond = async (
+    alreadyStored: boolean,
+    fallbackR2Uri: string | null,
+  ) => {
+    const transitioned = await activateRelease(
+      c.env,
+      record,
+      {
+        action: "content_release.activate",
+        resourceId: version,
+        result: "success",
+        // Stored-release transitions derive this from the target's status in
+        // D1, not this preflight snapshot, so a concurrent transition cannot
+        // turn a real rollback into a falsely labelled activation.
+        detailClass: "activate",
+        actorId: keyId,
+      },
+      alreadyStored,
+    );
+    if (!transitioned) {
+      const settledRelease = await findReleaseByVersion(c.env, version);
+      const settledPointer = await getActiveVersion(c.env);
+      return c.json(
+        response(
+          RESPONSE_STATUS.duplicate,
+          settledRelease?.r2_uri ?? fallbackR2Uri,
+          settledPointer,
+        ),
+        202,
+      );
+    }
+    return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
+  };
+
   try {
     if (!activate || holdForFixtures) {
       if (holdForFixtures) {
@@ -343,34 +443,7 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
       return c.json(response(RESPONSE_STATUS.pending, r2Uri, activePointer), 202);
     }
 
-    const transitioned = await activateRelease(
-      c.env,
-      record,
-      {
-        action: "content_release.activate",
-        resourceId: version,
-        result: "success",
-        // Stored-release transitions derive this from the target's status in
-        // D1, not this preflight snapshot, so a concurrent transition cannot
-        // turn a real rollback into a falsely labelled activation.
-        detailClass: "activate",
-        actorId: keyId,
-      },
-      existingByVersion !== null,
-    );
-    if (!transitioned) {
-      const settledRelease = await findReleaseByVersion(c.env, version);
-      const settledPointer = await getActiveVersion(c.env);
-      return c.json(
-        response(
-          RESPONSE_STATUS.duplicate,
-          settledRelease?.r2_uri ?? r2Uri,
-          settledPointer,
-        ),
-        202,
-      );
-    }
-    return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
+    return await activateAndRespond(existingByVersion !== null, r2Uri);
   } catch (error) {
     if (!isReleaseIdentityConstraint(error)) throw error;
 
@@ -387,26 +460,18 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
         );
       }
 
-      const transitioned = await activateRelease(
-        c.env,
-        record,
+      return activateAndRespond(true, winnerByVersion.r2_uri);
+    }
+
+    if (winnerByVersion) {
+      return refuse(
         {
-          action: "content_release.activate",
-          resourceId: version,
-          result: "success",
-          detailClass: "activate",
-          actorId: keyId,
+          class: "release_version_immutable",
+          message: `Release ${version} was already ingested with different content`,
         },
-        true,
+        409,
+        { version, keyId },
       );
-      if (!transitioned) {
-        const settledPointer = await getActiveVersion(c.env);
-        return c.json(
-          response(RESPONSE_STATUS.duplicate, winnerByVersion.r2_uri, settledPointer),
-          202,
-        );
-      }
-      return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
     }
 
     const winnerByHash = await findReleaseByBundleHash(c.env, computedHash);

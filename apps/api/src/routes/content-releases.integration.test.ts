@@ -67,6 +67,29 @@ async function ingest(
   };
 }
 
+async function ingestStream(
+  chunks: Uint8Array[],
+): Promise<{ status: number; body: IngestionResponse & ErrorEnvelope }> {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+      controller.close();
+    },
+  });
+  const res = await SELF.fetch(PATH, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "idempotency-key": IDEMPOTENCY_KEY,
+    },
+    body: stream,
+  });
+  return {
+    status: res.status,
+    body: (await res.json()) as IngestionResponse & ErrorEnvelope,
+  };
+}
+
 function bucket(): R2Bucket {
   if (!env.ARTIFACTS) throw new Error("ARTIFACTS R2 binding is not bound in tests");
   return env.ARTIFACTS;
@@ -501,8 +524,8 @@ describe("POST /internal/content-releases — replay and immutability", () => {
 
   it("does not overwrite an immutable R2 artifact when no D1 row exists yet", async () => {
     const bundle = await activatable();
-    const key = "content-releases/release-12.json";
-    await bucket().put(key, "{\"release\":\"already-reserved\"}", {
+    const objectKey = "content-releases/release-12.json";
+    await bucket().put(objectKey, "{\"release\":\"already-reserved\"}", {
       customMetadata: {
         release_version: "release-12",
         bundle_hash: `sha256:${"c".repeat(64)}`,
@@ -513,7 +536,7 @@ describe("POST /internal/content-releases — replay and immutability", () => {
 
     expect(status).toBe(409);
     expect(body.error.code).toBe("release_version_immutable");
-    const object = await bucket().get(key);
+    const object = await bucket().get(objectKey);
     expect(object).not.toBeNull();
     expect(await object!.text()).toBe("{\"release\":\"already-reserved\"}");
     expect(await releaseRows()).toEqual([]);
@@ -578,6 +601,67 @@ describe("POST /internal/content-releases — replay and immutability", () => {
     }
   });
 
+  it("refuses a concurrent same-version winner with different bytes", async () => {
+    const bundle = await activatable();
+    const originalDb = env.DB;
+    let injectConflict = true;
+
+    env.DB = {
+      prepare: originalDb.prepare.bind(originalDb),
+      batch: async (...args: Parameters<typeof originalDb.batch>) => {
+        if (!injectConflict) return originalDb.batch(...args);
+        injectConflict = false;
+
+        const now = new Date().toISOString();
+        await originalDb.batch([
+          originalDb
+            .prepare(
+              `INSERT INTO content_releases
+                 (version, bundle_hash, status, r2_uri, approver_id, last_author_id,
+                  changelog, calc_contract_id, activated_at, created_at)
+               VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              bundle.release.version,
+              `sha256:${"c".repeat(64)}`,
+              "r2://artifacts/content-releases/release-12.json",
+              bundle.release.approver_id,
+              bundle.release.last_author_id,
+              "Concurrent winner with different bytes.",
+              bundle.release.calc_contract_id ?? null,
+              now,
+              now,
+            ),
+          originalDb
+            .prepare(
+              `INSERT INTO content_release_pointer (id, active_version, updated_at)
+               VALUES (1, ?, ?)`,
+            )
+            .bind(bundle.release.version, now),
+        ]);
+        throw new Error(
+          "D1_ERROR: UNIQUE constraint failed: content_releases.version: SQLITE_CONSTRAINT",
+        );
+      },
+    } as D1Database;
+
+    try {
+      const refused = await ingest(ingestionBody(bundle));
+
+      expect(refused.status).toBe(409);
+      expect(refused.body.error.code).toBe("release_version_immutable");
+      expect((await auditRows()).at(-1)).toMatchObject({
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "release_version_immutable",
+        resource_id: bundle.release.version,
+        actor_id: key.keyId,
+      });
+    } finally {
+      env.DB = originalDb;
+    }
+  });
+
   /**
    * `bundle_hash` is UNIQUE in D1. `release.version` travels inside the signed
    * payload, so today two versions cannot share a hash — this guard exists so
@@ -603,6 +687,55 @@ describe("POST /internal/content-releases — replay and immutability", () => {
 });
 
 describe("POST /internal/content-releases — refusals", () => {
+  it("rejects a request body larger than 8 MiB before JSON buffering", async () => {
+    const oversizedJson = JSON.stringify("x".repeat(8 * 1024 * 1024));
+
+    const { status, body } = await ingest(oversizedJson);
+
+    expect(status).toBe(413);
+    expect(body.error.code).toBe("request_too_large");
+    expect(await releaseRows()).toEqual([]);
+    expect((await bucket().list({ prefix: "content-releases/" })).objects).toEqual([]);
+    expect(await auditRows()).toEqual([
+      expect.objectContaining({
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "request_too_large",
+      }),
+    ]);
+  });
+
+  it("rejects a streamed body larger than 8 MiB without Content-Length", async () => {
+    const fourMiB = new Uint8Array(4 * 1024 * 1024).fill(0x20);
+
+    const { status, body } = await ingestStream([
+      fourMiB,
+      fourMiB,
+      new Uint8Array([0x20]),
+    ]);
+
+    expect(status).toBe(413);
+    expect(body.error.code).toBe("request_too_large");
+    expect(await releaseRows()).toEqual([]);
+    expect((await bucket().list({ prefix: "content-releases/" })).objects).toEqual([]);
+    expect(await auditRows()).toEqual([
+      expect.objectContaining({
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "request_too_large",
+      }),
+    ]);
+  });
+
+  it("accepts an exact 8 MiB streamed body for JSON parsing", async () => {
+    const fourMiB = new Uint8Array(4 * 1024 * 1024).fill(0x20);
+
+    const { status, body } = await ingestStream([fourMiB, fourMiB]);
+
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("invalid_json");
+  });
+
   it("requires an Idempotency-Key header", async () => {
     const { status, body } = await ingest(ingestionBody(await activatable()), {
       idempotencyKey: null,

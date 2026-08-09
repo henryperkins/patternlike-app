@@ -170,6 +170,8 @@ because the bundle asserts it. In order:
 | Content graph: dual control, phase/cycle resolution, prompt and safety-fallback resolution | `dual_control_violation`, `orphan_phase`, `incomplete_cycle`, `unresolved_prompt`, `unresolved_safety_fallback` |
 | Per-object `object_hash` recomputed | `object_hash_mismatch` |
 | Version immutability | `release_version_immutable` (409) |
+| Bundle-bytes uniqueness — the same hash under a different version | `bundle_hash_conflict` (409) |
+| Request body exceeds the 8 MiB ingestion limit | `request_too_large` (413) |
 
 Refusals return the standard error envelope and write an `audit_events` row
 carrying the opaque reason class — never bundle content. Nothing is stored until

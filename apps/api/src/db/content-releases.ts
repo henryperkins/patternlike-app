@@ -155,6 +155,7 @@ function auditStoredTransitionStatement(
   env: Env,
   record: ReleaseRecord,
   entry: AuditEntry,
+  auditId: string,
   now: string,
 ) {
   return env.DB.prepare(
@@ -166,7 +167,7 @@ function auditStoredTransitionStatement(
      FROM content_releases AS target
      WHERE target.version = ? AND target.bundle_hash = ? AND target.status <> 'active'`,
   ).bind(
-    newId("aud"),
+    auditId,
     entry.actorId,
     entry.action,
     entry.result,
@@ -210,19 +211,21 @@ function supersedeForStoredActivationStatement(env: Env, record: ReleaseRecord) 
   ).bind(record.version, record.version, record.bundleHash);
 }
 
-/**
- * `changes()` refers to the preceding target update. A zero-row transition
- * leaves both the pointer and its audit history untouched.
- */
-function pointerAfterTransitionStatement(env: Env, record: ReleaseRecord, now: string) {
+/** Move the pointer only when this batch recorded the matching transition. */
+function pointerAfterTransitionStatement(
+  env: Env,
+  record: ReleaseRecord,
+  auditId: string,
+  now: string,
+) {
   return env.DB.prepare(
     `INSERT INTO content_release_pointer (id, active_version, updated_at)
      SELECT 1, ?, ?
-     WHERE changes() > 0
+     WHERE EXISTS (SELECT 1 FROM audit_events WHERE id = ?)
      ON CONFLICT(id) DO UPDATE SET
        active_version = excluded.active_version,
        updated_at = excluded.updated_at`,
-  ).bind(record.version, now);
+  ).bind(record.version, now, auditId);
 }
 
 /**
@@ -283,11 +286,12 @@ export async function activateRelease(
     return true;
   }
 
+  const transitionAuditId = newId("aud");
   const results = await env.DB.batch([
-    auditStoredTransitionStatement(env, record, audit, now),
+    auditStoredTransitionStatement(env, record, audit, transitionAuditId, now),
     supersedeForStoredActivationStatement(env, record),
     activateStoredReleaseStatement(env, record, now),
-    pointerAfterTransitionStatement(env, record, now),
+    pointerAfterTransitionStatement(env, record, transitionAuditId, now),
   ]);
   return results[2]!.meta.changes > 0;
 }
