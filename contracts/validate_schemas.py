@@ -68,7 +68,7 @@ POLICY_ONLY = {
     "content-release.same-author",
 }
 
-PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+placeholder_re = re.compile(r"\{([^{}]+)\}")
 
 # Tokens that must never appear in a serialized assembly request. Spec section 10
 # forbids stable direct identifiers at the assembly boundary; this is the
@@ -225,7 +225,7 @@ def content_release_policy(bundle: dict, catalogue: set[str]) -> list[str]:
         if tpl.get("is_locale_default"):
             defaults[loc] = defaults.get(loc, 0) + 1
         declared = set(tpl.get("placeholders") or [])
-        used = set(PLACEHOLDER_RE.findall(tpl.get("template_text") or ""))
+        used = set(placeholder_re.findall(tpl.get("template_text") or ""))
         undeclared = used - declared
         if undeclared:
             errs.append(

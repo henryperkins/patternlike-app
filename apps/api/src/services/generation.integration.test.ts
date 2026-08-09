@@ -19,7 +19,7 @@ import {
 } from "../../test/helpers.js";
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
-import { claimJob } from "../db/generation.js";
+import { claimJob, findUndispatched } from "../db/generation.js";
 import {
   enqueueDailyReading,
   enqueueReissue,
@@ -598,7 +598,15 @@ describe("queue delivery", () => {
     const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
     const first = await deliver([message]);
     expect(first.retryMessages).toHaveLength(1);
-    expect((await jobs())[0]).toMatchObject({ status: "queued", claim_token: null });
+    expect((await jobs())[0]).toMatchObject({
+      status: "queued",
+      claim_token: null,
+      dispatched_at: null,
+    });
+    expect(await findUndispatched(env)).toContainEqual({
+      id: enqueued.jobId,
+      reading_id: enqueued.readingId,
+    });
     expect((await readings())[0]!.status).toBe("pending");
 
     await env.ARTIFACTS!.put(key, bytes, options);
@@ -773,6 +781,21 @@ describe("frozen inputs", () => {
 
     await rows(
       "UPDATE consents SET allowed_uses_json = '[]' WHERE id = 'cns_context_0000000001'",
+    );
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("consent_revoked");
+  });
+
+  it("fails closed when a pinned consent moves to another source", async () => {
+    await seedContextSignal({ consentVersion: 7 });
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows(
+      "UPDATE consents SET source_id = 'AMB-12' WHERE id = 'cns_context_0000000001'",
     );
     await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
 

@@ -443,8 +443,10 @@ export async function setContentLocale(
       env.DB.prepare(
         `UPDATE users
          SET locale = ?, locale_source = ?, locale_updated_at = ?, updated_at = ?
-         WHERE id = ? AND locale = ? AND locale_source = ?
-           AND locale_updated_at IS ?`,
+         WHERE id = ? AND (
+           (locale = ? AND locale_source = ? AND locale_updated_at IS ?)
+           OR (? = 'user_confirmed' AND locale_source = 'device_derived')
+         )`,
       ).bind(
         locale,
         source,
@@ -454,6 +456,7 @@ export async function setContentLocale(
         current.locale,
         current.localeSource,
         current.localeUpdatedAt,
+        source,
       ),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)

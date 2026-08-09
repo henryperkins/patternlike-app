@@ -59,13 +59,8 @@ async function userRow() {
   return row!;
 }
 
-function coordinatePreferenceReads(db: D1Database): D1Database {
-  let reads = 0;
-  let release!: () => void;
-  const bothRead = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
+function injectDeviceLocaleAfterRead(db: D1Database): D1Database {
+  let injected = false;
   const wrap = (statement: D1PreparedStatement): D1PreparedStatement =>
     new Proxy(statement, {
       get(target, property) {
@@ -78,9 +73,18 @@ function coordinatePreferenceReads(db: D1Database): D1Database {
               columnName === undefined
                 ? await target.first<T>()
                 : await target.first<T>(columnName);
-            reads++;
-            if (reads === 2) release();
-            await bothRead;
+            if (!injected) {
+              injected = true;
+              await db
+                .prepare(
+                  `UPDATE users
+                   SET locale = 'fr-FR', locale_source = 'device_derived',
+                       locale_updated_at = '2026-08-09T12:00:00.000Z'
+                   WHERE id = ?`,
+                )
+                .bind(USER_A)
+                .run();
+            }
             return result;
           };
         }
@@ -342,18 +346,14 @@ describe("PUT /v1/preferences/locale", () => {
     expect((await userRow()).locale).toBe("es-ES");
   });
 
-  it("cannot lose a concurrent user choice to a device-derived write", async () => {
-    const coordinatedEnv = {
+  it("lets a user choice supersede a device write that lands after its read", async () => {
+    const racedEnv = {
       ...env,
-      DB: coordinatePreferenceReads(env.DB),
+      DB: injectDeviceLocaleAfterRead(env.DB),
     } as Env;
-    const [user, device] = await Promise.all([
-      setContentLocale(coordinatedEnv, USER_A, "es-ES", "user_confirmed"),
-      setContentLocale(coordinatedEnv, USER_A, "fr-FR", "device_derived"),
-    ]);
+    const user = await setContentLocale(racedEnv, USER_A, "es-ES", "user_confirmed");
 
     expect(user.ok).toBe(true);
-    expect(device).toMatchObject({ ok: false, reason: "preference_locked" });
     expect(await userRow()).toMatchObject({
       locale: "es-ES",
       locale_source: "user_confirmed",

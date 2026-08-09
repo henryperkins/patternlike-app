@@ -593,7 +593,7 @@ export async function releaseClaim(
   const result = await env.DB.prepare(
     `UPDATE jobs
      SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
-         available_at = NULL
+         available_at = NULL, dispatched_at = NULL
      WHERE id = ? AND job_type = ? AND status = 'running' AND claim_token = ?`,
   )
     .bind(jobId, JOB_TYPE, claimToken)
