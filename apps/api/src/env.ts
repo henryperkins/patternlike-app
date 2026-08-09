@@ -15,5 +15,12 @@ export interface Env {
   OIDC_JWKS_URL: string;
   ROOT_KEK?: string;
   SERVICE_AUTH_TOKEN?: string;
+  /**
+   * Public keys trusted to sign editorial release bundles, as JSON:
+   * `{"<key_id>": {"alg": "Ed25519"|"ES256", "public_key": "<base64url raw>"}}`.
+   * Public material, so it is a var rather than a secret — same reasoning as
+   * OIDC_JWKS_URL. Ingestion fails closed while it is unset.
+   */
+  CONTENT_RELEASE_KEYS?: string;
   ARTIFACTS?: R2Bucket;
 }

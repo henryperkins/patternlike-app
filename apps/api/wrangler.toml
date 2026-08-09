@@ -1,7 +1,10 @@
 name = "patternlike-api"
 main = "src/index.ts"
 compatibility_date = "2025-05-01"
-compatibility_flags = ["nodejs_compat"]
+# Ajv compiles only the bundled, frozen M0 schemas at module startup. Keep the
+# opt-in narrow: user input is data, never a schema, so it cannot supply code
+# to this capability.
+compatibility_flags = ["nodejs_compat", "allow_eval_during_startup"]
 
 # Local / default D1 binding. The id here is a deliberate non-resolving
 # placeholder, NOT an oversight: `--local` uses it only as a state-directory key,
@@ -14,10 +17,13 @@ database_name = "patternlike-ops"
 database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
-# R2 placeholder for chart artifacts / content bundles
-# [[r2_buckets]]
-# binding = "ARTIFACTS"
-# bucket_name = "patternlike-artifacts"
+# Immutable artifacts: signed editorial release bundles today, chart renders and
+# exports later. The default name is deliberately not the production bucket, so
+# a remote development command cannot reserve an immutable production key. The
+# real bucket is declared in [[env.production.r2_buckets]] below.
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "pattern-artifacts-dev"
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the
@@ -105,6 +111,19 @@ database_name = "patternlike-ops"
 database_id = "1305a75d-0a8a-4a21-b201-d94fda0aaf93"
 migrations_dir = "../../db/d1"
 
+[[env.production.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "pattern-artifacts"
+
+# CONTENT_RELEASE_KEYS is deliberately absent from both [vars] blocks. It holds
+# the PUBLIC keys trusted to sign editorial release bundles — public material,
+# so a var rather than a secret — but there is no meaningful placeholder for it:
+# POST /internal/content-releases fails closed with 503 until real keys are set,
+# in development too. Shape:
+#   CONTENT_RELEASE_KEYS = '{"wp-release-key-1":{"alg":"Ed25519","public_key":"<base64url raw>"}}'
+# Put it in [env.production.vars] once the WordPress signing key exists, and in
+# .dev.vars for the local loop.
+#
 # Secrets (set via `wrangler secret put --env production`):
 # ROOT_KEK — envelope encryption root key. Required: every request outside
 #            development returns 503 until it is set, and it must not be the

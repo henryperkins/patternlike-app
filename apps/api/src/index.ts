@@ -6,7 +6,8 @@ import { healthRoutes } from "./routes/health.js";
 import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
 import { timezoneRoutes } from "./routes/timezone.js";
-import { stubRoutes, internalRoutes } from "./routes/stubs.js";
+import { stubRoutes } from "./routes/stubs.js";
+import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { sessionRoutes } from "./routes/sessions.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -35,11 +36,12 @@ api.route("/", timezoneRoutes);
 api.route("/", stubRoutes);
 
 // Internal service-to-service API, behind the service token rather than the
-// consumer auth stub.
+// consumer auth stub. Paths inside these routers are relative to the /internal
+// mount prefix below, not absolute.
 const internal = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 internal.use("*", configGuard);
 internal.use("*", serviceAuth);
-internal.route("/", internalRoutes);
+internal.route("/", contentReleaseRoutes);
 
 // Mounted under a prefix, not "/". A sub-app routed at "/" contributes its
 // `use("*", ...)` middleware to every path in the parent.

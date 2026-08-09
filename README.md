@@ -144,6 +144,71 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
 - [ ] Privacy center export/delete workflows (API stubs 501)
 
+## M2 status — editorial control plane
+
+- [x] Cloudflare ingestion: `POST /internal/content-releases` verifies, stores, and activates signed bundles (see below)
+- [x] Release rollback by re-posting a stored bundle; activation and rollback are one D1 transaction with their audit row
+- [ ] WordPress.com plugin and content types — the authoring side that produces the bundles
+- [ ] Smoke-test fixtures: a bundle declaring `fixtures` is stored but held inactive until M3 can evaluate them
+
+## Content release ingestion
+
+`POST /internal/content-releases` is the Cloudflare half of the editorial
+pipeline. WordPress authors and reviews content, then signs a release bundle and
+posts it here; the Worker verifies the signature, stores the immutable bundle in
+R2, runs the smoke tests it can, and atomically activates the release pointer.
+
+The threat model is that WordPress can be compromised, so nothing is trusted
+because the bundle asserts it. In order:
+
+| Step | Refusal |
+| --- | --- |
+| `Idempotency-Key` header, matching the body's `idempotency_key` | `idempotency_key_required` / `idempotency_key_mismatch` |
+| Structural validation against `content-release.schema.json` | `invalid_body`, `schema_version_unsupported`, `objects_incomplete` |
+| `release.bundle_hash` recomputed from the canonical body | `bundle_hash_mismatch` |
+| Signature verified against a configured public key | `signature_invalid`, `signature_key_unknown`, `signature_alg_mismatch` |
+| Content graph: dual control, phase/cycle resolution, prompt and safety-fallback resolution | `dual_control_violation`, `orphan_phase`, `incomplete_cycle`, `unresolved_prompt`, `unresolved_safety_fallback` |
+| Per-object `object_hash` recomputed | `object_hash_mismatch` |
+| Version immutability | `release_version_immutable` (409) |
+| Bundle-bytes uniqueness — the same hash under a different version | `bundle_hash_conflict` (409) |
+| Request body exceeds the 8 MiB ingestion limit | `request_too_large` (413) |
+
+Refusals return the standard error envelope and write an `audit_events` row
+carrying the opaque reason class — never bundle content. Nothing is stored until
+every check above passes.
+
+Accepted bundles answer `202` with one of three statuses:
+
+- `active` — verified, stored at `r2://artifacts/content-releases/<version>.json`, pointer moved, previous release marked `superseded`.
+- `accepted_pending_tests` — stored but not live, either because `activate: false` was sent or because the bundle declares eligibility `fixtures` that need the M3 assembly engine to evaluate. Activating on tests nobody ran would be a claim, not a result.
+- `duplicate` — an unchanged replay of an already stored release, whether it is
+  active or still pending activation.
+
+**Rollback** needs no separate endpoint: re-post a bundle that is already stored
+and the pointer moves back to it, which is what the spec means by "rollback
+changes the active release pointer; it does not require editing previously
+published readings". The audit row distinguishes `activate` from `rollback`.
+
+Two pieces of configuration are required, and ingestion fails closed without
+either — in development too, so the path that must never be wrong is never the
+path that went unexercised:
+
+```bash
+# The signing keys. PUBLIC material, so a var rather than a secret.
+# Ed25519 (32 raw bytes) or ES256 (65-byte uncompressed point), base64url.
+CONTENT_RELEASE_KEYS='{"wp-release-key-1":{"alg":"Ed25519","public_key":"<base64url raw>"}}'
+
+# The bundle store is pre-provisioned in production.
+# R2 bucket: pattern-artifacts
+```
+
+Without keys the endpoint returns `503 release_keys_not_configured`; a malformed
+key entry returns `503 release_keys_misconfigured`; without the R2 binding it
+returns `503 object_storage_not_configured`. The algorithm is pinned per key
+rather than read from the bundle: the bundle names one too, and honouring that
+name would let a compromised CMS choose which primitive its bytes are checked
+under.
+
 ## Authentication
 
 `POST /v1/sessions` exchanges an OIDC ID token for a session. Browsers receive

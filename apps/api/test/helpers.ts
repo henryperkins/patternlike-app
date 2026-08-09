@@ -13,6 +13,11 @@ const TABLES = [
   "natal_features",
   "chart_snapshots",
   "birth_profiles",
+  // Pointer before releases: content_release_pointer.active_version is a
+  // foreign key into content_releases.
+  "content_release_pointer",
+  "content_releases",
+  "audit_events",
   "sessions",
   "identities",
   "export_requests",

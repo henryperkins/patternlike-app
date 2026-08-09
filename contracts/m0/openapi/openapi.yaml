@@ -113,6 +113,8 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 
   /v1/timezone-lookup:
     post:
@@ -461,6 +463,10 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
         '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '503':
           $ref: '#/components/responses/Error'
 
 components:
