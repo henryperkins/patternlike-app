@@ -24,7 +24,7 @@ interface Vector {
   input: unknown;
   canonical: string;
   full_digest: string;
-  rendered_id: string;
+  rendered_id?: string;
 }
 
 const vectors: Vector[] = JSON.parse(readFileSync(VECTORS, "utf8")).vectors;
@@ -62,6 +62,7 @@ test("golden vectors reproduce byte-for-byte", () => {
 
 test("cyclePassId reproduces the pass-two vector", async () => {
   const expected = vector("cycle-pass-identity-pass-two");
+  assert.ok(expected.rendered_id);
   assert.equal(await cyclePassId(SATURN_SQUARE_SUN.id, 2), expected.rendered_id);
   assert.equal(expected.rendered_id, "cyp_ed2d8c5b7059b5b12d4131ee5d2fbb65");
 });
@@ -99,6 +100,7 @@ test("pass identity rejects a non-cycle parent and a zero index", () => {
 
 test("cycleHash reproduces the retrograde vector and drops importance_score", async () => {
   const expected = vector("cycle-hash-retrograde");
+  assert.equal(expected.rendered_id, undefined);
   assert.equal(await cycleHash(SATURN_SQUARE_SUN), expected.full_digest);
 
   // The whole point of the exclusion: an advisory score change must not fail a

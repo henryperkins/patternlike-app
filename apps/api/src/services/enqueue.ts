@@ -1,5 +1,5 @@
 import { newId } from "@patternlike/shared";
-import type { Env } from "../env.js";
+import type { Env, GenerationMessage } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
 import type { UserIdentity } from "../db/users.js";
 import { persistCycles } from "../db/cycles.js";
@@ -21,11 +21,7 @@ import {
 import { isCurrentOrPreviousLocalDay } from "./local-day.js";
 import { loadPreferences } from "../db/preferences.js";
 
-/** The opaque queue message. Nothing about the reading travels in the clear. */
-export interface GenerationMessage {
-  job_id: string;
-  reading_id: string;
-}
+export type { GenerationMessage } from "../env.js";
 
 export type EnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }

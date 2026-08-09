@@ -237,6 +237,35 @@ describe("persistCycles", () => {
     }
   });
 
+  it("chunks an unbounded scan into D1-safe batches", async () => {
+    const source = cycles[0]!;
+    const largeScan = Array.from({ length: 51 }, (_, index) => ({
+      ...source,
+      id: `cyc_${index.toString(16).padStart(32, "0")}`,
+      pass_count: 1,
+      passes: [{ ...source.passes[0]!, pass_index: 1 }],
+    }));
+    const batch = env.DB.batch.bind(env.DB);
+    const limitedBatch = vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
+      if (statements.length > 100) {
+        throw new Error("D1 batch must contain at most 100 statements");
+      }
+      return batch(statements);
+    });
+
+    try {
+      await expect(persistCycles(env, USER_A, chartId, largeScan)).resolves.toHaveLength(51);
+      expect(
+        await rows("SELECT id FROM cycle_instances WHERE user_id = ?", USER_A),
+      ).toHaveLength(51);
+      expect(
+        await rows("SELECT id FROM cycle_passes WHERE user_id = ?", USER_A),
+      ).toHaveLength(51);
+    } finally {
+      limitedBatch.mockRestore();
+    }
+  });
+
   it("is idempotent: a second identical scan creates no new rows", async () => {
     await persistCycles(env, USER_A, chartId, cycles);
     const first = await rows("SELECT id FROM cycle_passes WHERE user_id = ?", USER_A);

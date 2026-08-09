@@ -86,6 +86,7 @@ describe("localDayWindow", () => {
     for (const date of ["2026-02-30", "2026-13-01", "2026-00-10", "2025-02-29"]) {
       expect(() => localDayWindow("UTC", date)).toThrow(LocalDayError);
     }
+    expect(localDayWindow("UTC", "2024-02-29").targetLocalDate).toBe("2024-02-29");
   });
 });
 

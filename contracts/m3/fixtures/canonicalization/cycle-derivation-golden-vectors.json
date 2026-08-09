@@ -1,7 +1,7 @@
 {
   "profiles": ["patternlike.cycle-pass-id.v1", "cycleHashPreimageV1"],
   "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
-  "note": "Separate from jcs-golden-vectors.json, which records the assembly-id profile. Same contract: canonical is the exact UTF-8 byte string, full_digest is SHA-256 of those bytes, and rendered_id is the prefix plus the first 32 lowercase hex characters. cycle_hash has no rendered form on the wire — it is stored as the full digest — so its vector uses the neutral vec_ prefix the generic vectors use, and the digest is the value that matters. Generated with packages/shared/src/jcs.ts, the same canonicalizer the Worker calls.",
+  "note": "Separate from jcs-golden-vectors.json, which records the assembly-id profile. Same contract: canonical is the exact UTF-8 byte string and full_digest is SHA-256 of those bytes. Identity vectors also carry rendered_id as their prefix plus the first 32 lowercase hex characters. cycle_hash has no rendered form on the wire — it is stored as the full digest — so its vector deliberately omits rendered_id. Generated with packages/shared/src/jcs.ts, the same canonicalizer the Worker calls.",
   "vectors": [
     {
       "name": "cycle-pass-identity-pass-two",
@@ -51,8 +51,7 @@
         "orb_deg": 3
       },
       "canonical": "{\"aspect\":\"square\",\"body\":\"saturn\",\"end_at\":\"2027-01-26T18:44:02Z\",\"exact_at\":\"2026-08-02T14:11:07Z\",\"id\":\"cyc_32d9bc34a5d9a4f42481de9da06defbe\",\"orb_deg\":3,\"pass_count\":3,\"passes\":[{\"direction\":\"direct\",\"exact_at\":\"2026-08-02T14:11:07Z\",\"pass_index\":1,\"speed_deg_per_day\":0.0331},{\"direction\":\"retrograde\",\"exact_at\":\"2026-10-19T03:52:44Z\",\"pass_index\":2,\"speed_deg_per_day\":-0.0288},{\"direction\":\"direct\",\"exact_at\":\"2027-01-11T21:07:19Z\",\"pass_index\":3,\"speed_deg_per_day\":0.0302}],\"start_at\":\"2026-07-19T05:22:10Z\",\"target\":\"sun\",\"technique\":\"transit\"}",
-      "full_digest": "ea1a3b6015f1f167dc8e488676b75cb4d4ba282a1aeeecdec8e5b00247e52fc4",
-      "rendered_id": "vec_ea1a3b6015f1f167dc8e488676b75cb4"
+      "full_digest": "ea1a3b6015f1f167dc8e488676b75cb4d4ba282a1aeeecdec8e5b00247e52fc4"
     }
   ]
 }
