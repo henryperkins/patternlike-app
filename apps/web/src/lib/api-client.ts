@@ -3,6 +3,8 @@ import type {
   BirthTimeAccuracy,
   ChartSnapshot,
   ErrorBody,
+  TimezoneLookupRequest,
+  TimezoneLookupResponse,
   WorkflowAccepted,
 } from "@patternlike/shared";
 
@@ -117,6 +119,26 @@ export function getChart(signal?: AbortSignal): Promise<ChartResponse> {
   return request<ChartResponse>("/v1/chart", {
     method: "GET",
     headers: requestHeaders(),
+    signal,
+  });
+}
+
+/**
+ * Ask the API which timezone a birthplace was actually on at the birth date.
+ *
+ * Same resolution `POST /v1/birth-profiles` runs, so what onboarding shows is
+ * what the chart gets calculated in. POST because the birth date and time are
+ * in the body rather than a logged query string; it stores nothing and needs no
+ * idempotency key.
+ */
+export function lookupTimezone(
+  lookup: TimezoneLookupRequest,
+  signal?: AbortSignal,
+): Promise<TimezoneLookupResponse> {
+  return request<TimezoneLookupResponse>("/v1/timezone-lookup", {
+    method: "POST",
+    headers: requestHeaders({ json: true }),
+    body: JSON.stringify(lookup),
     signal,
   });
 }

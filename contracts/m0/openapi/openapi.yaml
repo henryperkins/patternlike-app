@@ -46,12 +46,48 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowAccepted'
+                $ref: '#/components/schemas/BirthProfileAccepted'
         '400':
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '409':
+          $ref: '#/components/responses/Error'
+
+  /v1/timezone-lookup:
+    post:
+      tags: [birth]
+      operationId: lookupTimezone
+      summary: Resolve a birthplace to the timezone in force on the birth date
+      description: |
+        Answers the same question `POST /v1/birth-profiles` answers internally,
+        so onboarding can show the resolved zone before the user commits to it.
+
+        POST rather than GET because the body carries a birth date and time —
+        the values the rest of this API encrypts at rest — and a query string
+        would put them in every access log between the browser and the Worker.
+        Nothing is stored and there is no effect to repeat, so no
+        `Idempotency-Key` is required.
+
+        Coordinates decide the zone when they are present; `timezone_hint` is
+        used only when they are not, and is reported back as `hint_overridden`
+        when the birthplace disagreed with it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimezoneLookupRequest'
+      responses:
+        '200':
+          description: Resolved zone, the offset in force, and any caveats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimezoneLookupResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
           $ref: '#/components/responses/Error'
 
   /v1/chart:
@@ -450,6 +486,204 @@ components:
           type: [string, 'null']
         resource_id:
           type: [string, 'null']
+
+    TimezoneQualifier:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - pre_1970_zone_boundary
+            - near_zone_boundary
+            - hint_replaced
+            - no_coordinates
+            - nautical_zone
+            - local_time_ambiguous
+            - local_time_nonexistent
+          description: Opaque class, safe for logs and audit detail_class values.
+        message:
+          type: string
+
+    ResolvedLocalTime:
+      type: object
+      additionalProperties: false
+      required:
+        - utc_instant
+        - utc_offset_minutes
+        - utc_offset_label
+        - resolution
+      properties:
+        utc_instant:
+          type: string
+          format: date-time
+        utc_offset_minutes:
+          type: integer
+        utc_offset_label:
+          type: string
+          description: Display form of the offset, e.g. "UTC-07:00".
+        resolution:
+          type: string
+          enum: [unique, ambiguous, nonexistent]
+          description: |
+            `ambiguous` means the clock ran through this wall time twice at a
+            daylight-saving fall-back and `utc_instant` is the first of the two;
+            `nonexistent` means the clock skipped it and the instant given is
+            the one just after the change.
+        alternate_utc_instant:
+          type: [string, 'null']
+          format: date-time
+        alternate_utc_offset_minutes:
+          type: [integer, 'null']
+
+    TimezoneLookupRequest:
+      type: object
+      additionalProperties: false
+      description: Supply coordinates, a timezone_hint, or both.
+      properties:
+        latitude:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+        birth_date:
+          type: [string, 'null']
+          format: date
+        birth_time_local:
+          type: [string, 'null']
+        timezone_hint:
+          type: [string, 'null']
+
+    TimezoneLookupResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - timezone
+        - source
+        - confidence
+        - boundary_nearby
+        - hint_overridden
+        - tzdb_stable_from_year
+        - local
+        - qualifiers
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        timezone:
+          type: string
+          description: IANA zone id, e.g. America/Los_Angeles.
+        source:
+          type: string
+          enum: [coordinates, hint, default]
+          description: |
+            `coordinates` is a lookup against timezone boundaries; `hint` is the
+            client's value, used only when no coordinates were supplied;
+            `default` is the UTC fallback when there is neither.
+        confidence:
+          type: string
+          enum: [high, medium, low, none]
+          description: |
+            Stored on `birth_profiles.geocode_confidence`. Reduced when the
+            birthplace sits near a zone boundary or predates 1970. `none` means
+            nothing was geocoded.
+        boundary_nearby:
+          type: boolean
+        hint_overridden:
+          type: [string, 'null']
+          description: The client's timezone_hint, when coordinates overruled it.
+        tzdb_stable_from_year:
+          type: integer
+          description: |
+            First year tzdb guarantees the zone matches the location's clocks.
+            A birth before it is qualified rather than presented as settled.
+        local:
+          oneOf:
+            - $ref: '#/components/schemas/ResolvedLocalTime'
+            - type: 'null'
+          description: Null when no usable birth date was supplied.
+        qualifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimezoneQualifier'
+
+    BirthProfileAccepted:
+      type: object
+      additionalProperties: false
+      description: |
+        WorkflowAccepted plus what the workflow produced synchronously. The
+        `timezone` block reports the zone the chart was actually calculated in,
+        which is not necessarily the `timezone_hint` that was posted.
+
+        Spelled out rather than composed from WorkflowAccepted: that schema is
+        `additionalProperties: false`, so an allOf branch would reject the two
+        fields this one adds.
+      required: [schema_version, workflow, status, idempotency_key]
+      properties:
+        schema_version:
+          type: string
+          const: '0.2.0'
+        workflow:
+          type: string
+          enum:
+            - NormalizeBirthAndCalculateChart
+            - GenerateDailyReading
+            - PublishContentRelease
+            - ExportAccount
+            - DeleteAccount
+            - RefreshConnector
+        status:
+          type: string
+          enum: [queued, running, succeeded, duplicate]
+        idempotency_key:
+          type: string
+        job_id:
+          type: [string, 'null']
+        resource_id:
+          type: [string, 'null']
+        timezone:
+          type: object
+          additionalProperties: false
+          required: [resolved, source, confidence, qualifiers]
+          properties:
+            resolved:
+              type: string
+            source:
+              type: string
+              enum: [coordinates, hint, default]
+            confidence:
+              type: string
+              enum: [high, medium, low, none]
+            hint_overridden:
+              type: [string, 'null']
+            qualifiers:
+              type: array
+              items:
+                $ref: '#/components/schemas/TimezoneQualifier'
+        chart:
+          type: object
+          additionalProperties: true
+          description: |
+            Present on status `succeeded`. Projection of the chart snapshot;
+            full shape in chart-contract.schema.json#/$defs/chartSnapshot.
+          properties:
+            id:
+              type: string
+            fingerprint:
+              type: string
+            contract_id:
+              type: string
+            status:
+              type: string
+              enum: [active, superseded, invalid]
+            uncertainty:
+              type: object
+              additionalProperties: true
 
     BirthProfileRequest:
       type: object

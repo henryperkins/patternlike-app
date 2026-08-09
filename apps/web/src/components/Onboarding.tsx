@@ -1,11 +1,25 @@
-import { useState, type FormEvent } from "react";
-import type { BirthProfileRequest, BirthTimeAccuracy } from "@patternlike/shared";
-import { onboardingConsentId } from "../lib/api-client.js";
+import { useEffect, useState, type FormEvent } from "react";
+import type {
+  BirthProfileRequest,
+  BirthTimeAccuracy,
+  TimezoneLookupResponse,
+} from "@patternlike/shared";
+import { lookupTimezone, onboardingConsentId } from "../lib/api-client.js";
 import { Icon } from "./icons.js";
 
 interface OnboardingProps {
   onSubmit: (profile: BirthProfileRequest) => Promise<void>;
 }
+
+/** Long enough that typing a decimal does not fire a request per keystroke. */
+const LOOKUP_DEBOUNCE_MS = 350;
+
+const confidenceCopy: Record<TimezoneLookupResponse["confidence"], string> = {
+  high: "High confidence",
+  medium: "Confirm this",
+  low: "Low confidence",
+  none: "Not verified",
+};
 
 const accuracyOptions: Array<{
   value: BirthTimeAccuracy;
@@ -46,6 +60,68 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [zone, setZone] = useState<TimezoneLookupResponse | null>(null);
+  const [zoneState, setZoneState] = useState<"idle" | "loading" | "failed">("idle");
+
+  const coordinatesReady =
+    latitude.trim() !== "" &&
+    longitude.trim() !== "" &&
+    Number.isFinite(Number(latitude)) &&
+    Number.isFinite(Number(longitude)) &&
+    Math.abs(Number(latitude)) <= 90 &&
+    Math.abs(Number(longitude)) <= 180;
+
+  /**
+   * Coordinates decide the zone, so the field stops being an input the moment
+   * they are present: whatever the user typed there would be discarded by the
+   * server anyway, and an editable box that has no effect is worse than none.
+   */
+  const zoneIsDerived = coordinatesReady;
+
+  /**
+   * Resolve the birthplace to a real historical zone. The same lookup runs
+   * server-side on submit, so this is a preview of the actual value rather
+   * than a second opinion the user has to reconcile.
+   */
+  useEffect(() => {
+    if (!coordinatesReady) {
+      setZone(null);
+      setZoneState("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setZoneState("loading");
+      lookupTimezone(
+        {
+          latitude: Number(latitude),
+          longitude: Number(longitude),
+          birth_date: birthDate || null,
+          birth_time_local: accuracy === "unknown" ? null : birthTime || null,
+        },
+        controller.signal,
+      )
+        .then((resolved) => {
+          if (controller.signal.aborted) return;
+          setZone(resolved);
+          setZoneState("idle");
+          setTimezone(resolved.timezone);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          // The server resolves from the same coordinates on submit, so a
+          // failed preview costs the confirmation, not the calculation.
+          setZone(null);
+          setZoneState("failed");
+        });
+    }, LOOKUP_DEBOUNCE_MS);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [coordinatesReady, latitude, longitude, birthDate, birthTime, accuracy]);
 
   const validateStep = (targetStep: number): string | null => {
     if (targetStep === 1) {
@@ -307,11 +383,60 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
                 onChange={(event) => setTimezone(event.target.value)}
                 required
                 spellCheck="false"
+                readOnly={zoneIsDerived}
               />
               <small>
-                Historical timezone lookup is not connected yet. Confirm this value before continuing.
+                {!zoneIsDerived
+                  ? "Without coordinates this zone is used exactly as entered, and nothing can check it against a place."
+                  : zone
+                    ? "Resolved from the birthplace coordinates. Change the coordinates to change the zone."
+                    : // Derived but not yet answered: the field still holds the
+                      // browser's guess, and calling that "resolved" would be
+                      // the same claim this lookup exists to stop making.
+                      "The birthplace coordinates decide the zone. This is your browser's guess until the lookup answers."}
               </small>
             </label>
+
+            {zoneIsDerived ? (
+              <div className="zone-resolution" aria-live="polite">
+                {zoneState === "loading" ? (
+                  <p className="zone-resolution__status">Resolving the timezone...</p>
+                ) : null}
+
+                {zoneState === "failed" ? (
+                  <p className="zone-resolution__status">
+                    The timezone lookup could not be reached. The chart is still
+                    calculated from the coordinates, which is where the zone comes
+                    from — you just will not see it confirmed here first.
+                  </p>
+                ) : null}
+
+                {zone ? (
+                  <>
+                    <div className="zone-resolution__head">
+                      <strong>{zone.timezone}</strong>
+                      {zone.local ? (
+                        <span>{zone.local.utc_offset_label} on this date</span>
+                      ) : (
+                        <span>Enter a birth date to see the offset</span>
+                      )}
+                      <em
+                        className={`zone-resolution__grade zone-resolution__grade--${zone.confidence}`}
+                      >
+                        {confidenceCopy[zone.confidence]}
+                      </em>
+                    </div>
+                    {zone.qualifiers.length > 0 ? (
+                      <ul className="zone-resolution__notes">
+                        {zone.qualifiers.map((qualifier) => (
+                          <li key={qualifier.code}>{qualifier.message}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </fieldset>
         ) : null}
 

@@ -69,6 +69,29 @@ curl -s http://127.0.0.1:8787/v1/chart \
 
 Idempotency keys are scoped per user, so the static `demo-birth-001` above is safe across local users. Resubmitting the same birth data under a different key returns `409 chart_already_exists` rather than a 500.
 
+### Historical timezone lookup
+
+When `birthplace` carries coordinates they decide the zone, and `timezone_hint`
+is ignored — a browser reports the zone the user is in *now*, which is wrong for
+anyone who has moved. The 202 response's `timezone` block reports what was
+actually used. The same resolution is available on its own so a client can show
+it before committing:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/v1/timezone-lookup \
+  -H "content-type: application/json" \
+  -H "x-user-id: usr_local_dev_0001" \
+  -d '{"latitude":40.7128,"longitude":-74.006,"birth_date":"1974-01-10","birth_time_local":"06:00:00"}'
+# → America/New_York at UTC-04:00: the winter the United States stayed on
+#   daylight time. Present-day rules would answer UTC-05:00.
+```
+
+Coordinates near a zone boundary, births before 1970 (the first year tzdb
+guarantees a zone matches its location), local times a daylight change skipped
+or repeated, and coordinates that land in open water all come back qualified
+rather than silently trusted. The grade is stored on
+`birth_profiles.geocode_confidence`.
+
 ## Swiss Ephemeris (`apps/calc-stub`)
 
 | Pin | Value |
@@ -117,7 +140,8 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] SE licensing decision: **AGPL public path** (counsel + store strategy still open)
 - [x] Responsive web/PWA shell with birth onboarding, chart facts/evidence, uncertainty, and privacy status
 - [x] Production identity: OIDC token exchange, Worker-minted sessions, and a crypto identity decoupled from the user's public id
-- [ ] Historical TZ geocode connectors (IANA zone via luxon is local-only)
+- [x] Historical timezone resolution: birthplace coordinates resolve to an IANA zone (`POST /v1/timezone-lookup`), and the chart is calculated in that zone rather than the browser's current one
+- [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
 - [ ] Privacy center export/delete workflows (API stubs 501)
 
 ## Authentication

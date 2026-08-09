@@ -3,6 +3,7 @@ import {
   CALC_CONTRACT_ID,
   CALC_CONTRACT_VERSION,
   SCHEMA_VERSION,
+  isValidIanaZone,
   newId,
   requireIdempotencyKey,
   type BirthProfileRequest,
@@ -11,6 +12,7 @@ import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { invokeCalc } from "../services/calc-client.js";
+import { resolveTimezone } from "../services/timezone.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -105,6 +107,23 @@ export function validateBirthProfileRequest(
     return fail("birthplace latitude and longitude must be supplied together");
   }
 
+  // Rejected here rather than four hundred milliseconds later as a calculation
+  // failure. Without coordinates the hint is the only zone signal there is, so
+  // a typo in it silently relocates the chart instead of failing.
+  if (body.timezone_hint !== undefined && body.timezone_hint !== null) {
+    // typeof first: this body is a cast, not a parsed type, so a number here
+    // would reach .trim() and surface as a 500 rather than a bad request.
+    if (typeof body.timezone_hint !== "string") {
+      return fail("timezone_hint must be a string");
+    }
+    const hint = body.timezone_hint.trim();
+    if (hint !== "" && !isValidIanaZone(hint)) {
+      return fail(
+        `timezone_hint must be an IANA zone id such as America/New_York (got ${hint})`,
+      );
+    }
+  }
+
   return null;
 }
 
@@ -186,6 +205,18 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     );
   }
 
+  // Resolve the zone from the birthplace rather than trusting the client's
+  // hint, which is the browser's *current* zone and is therefore wrong for
+  // anyone who has moved since being born. The lookup runs after the
+  // idempotency short-circuits so a replayed request does not redo it.
+  const timezone = resolveTimezone({
+    latitude: body.birthplace?.latitude ?? null,
+    longitude: body.birthplace?.longitude ?? null,
+    birthDate: body.birth_date ?? null,
+    birthTimeLocal: body.birth_time_local ?? null,
+    timezoneHint: body.timezone_hint ?? null,
+  });
+
   const now = new Date().toISOString();
   const versionRow = await c.env.DB.prepare(
     `SELECT COALESCE(MAX(version), 0) AS v FROM birth_profiles WHERE user_id = ?`,
@@ -229,15 +260,18 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
         user_id, version, accuracy, status, timezone,
         payload_enc, payload_key_version, payload_nonce,
         geocode_confidence, created_at, updated_at
-      ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, NULL, ?, ?)`,
+      ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       userId,
       profileVersion,
       accuracy,
-      body.timezone_hint ?? "UTC",
+      timezone.timezone,
       encBytes,
       keyVersion,
       nonce,
+      // Was bound NULL on every profile. It grades the zone lookup, so a
+      // borderline or pre-1970 match can be qualified rather than trusted.
+      timezone.confidence,
       now,
       now,
     ),
@@ -269,7 +303,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     accuracy,
     birth_date: body.birth_date ?? null,
     birth_time_local: body.birth_time_local ?? null,
-    timezone: body.timezone_hint ?? "UTC",
+    timezone: timezone.timezone,
     latitude: body.birthplace?.latitude ?? null,
     longitude: body.birthplace?.longitude ?? null,
     place_label: body.birthplace?.label ?? null,
@@ -433,6 +467,16 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       idempotency_key: idem,
       job_id: jobId,
       resource_id: chart.id,
+      // What the chart was actually calculated in. A client that posted a hint
+      // the coordinates overruled would otherwise never learn the substitution
+      // happened, and would keep showing the user a zone nothing used.
+      timezone: {
+        resolved: timezone.timezone,
+        source: timezone.source,
+        confidence: timezone.confidence,
+        hint_overridden: timezone.hintOverridden,
+        qualifiers: timezone.qualifiers,
+      },
       chart: {
         id: chart.id,
         fingerprint: chart.fingerprint,

@@ -252,6 +252,8 @@ hard to violate — take a `detail_class` enum, not a free-form string.
 
 ## Stream 7 — Birthplace resolution (product quality, independent)
 
+**Status: the timezone half is done; the place-search half is not.**
+
 **Why lower:** the UI is honest about this today ("Historical timezone lookup
 is not connected yet. Confirm this value before continuing"), and asking for
 coordinates works. But it is the difference between a chart the user typed and
@@ -273,6 +275,41 @@ qualified in the uncertainty report rather than silently trusted.
 
 **Done when:** a user picks "Los Angeles" and gets `America/Los_Angeles` and
 correct coordinates without typing a decimal.
+
+### What landed
+
+Coordinates → IANA zone → historical offset, all server-side:
+
+- `apps/api/src/services/timezone.ts` resolves coordinates against a bundled
+  boundary raster (`tz-lookup`, CC0), and probes ~11 km around the point so a
+  birthplace near a border is graded rather than silently trusted.
+- `packages/shared/src/timezone.ts` maps a civil wall time onto the timeline in
+  that zone through the runtime's own tzdb, including the two cases a naive
+  conversion gets wrong: a local time a daylight change repeated, and one it
+  skipped. `apps/calc-stub/src/timezone-agreement.test.ts` pins it to the luxon
+  the calculation service actually uses, so the preview and the chart cannot
+  drift apart.
+- `POST /v1/timezone-lookup` exposes the same resolution to the onboarding
+  form, which now shows the resolved zone and its offset instead of asking the
+  user to vouch for the browser's guess.
+- `routes/birth.ts` uses the coordinate result over `timezone_hint` and writes
+  the grade to `geocode_confidence`. An invalid hint is a 400 rather than a
+  calculation failure.
+
+### What is still open
+
+- **Place search.** `place_label` is still free text; the user types the
+  decimals. Every route to fixing it — a bundled gazetteer, or an external
+  geocoder — is a decision about size or about sending a birthplace to a third
+  party, which the consent ledger currently promises not to do. That is the
+  reason this half was left rather than an oversight.
+- **The uncertainty report.** Qualifiers reach the client on the lookup and the
+  202, and the grade reaches D1, but nothing folds a `low` geocode into
+  `uncertainty.qualified_features` yet. The calculation service builds that
+  report and does not currently receive the grade.
+- **Dataset vintage.** The boundary raster is timezone-boundary-builder 2019b.
+  Zones split after 2019 (`America/Ciudad_Juarez`, for one) resolve to their
+  pre-split neighbour, which is right until the rules diverge.
 
 ---
 

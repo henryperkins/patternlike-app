@@ -682,6 +682,82 @@ summary:focus-visible {
   max-width: 320px;
 }
 
+/*
+ * A resolved zone is a derived fact, not a field, so it reads as a panel rather
+ * than another box to fill in. Coordinates own the value while it is showing.
+ */
+.field input[readonly] {
+  color: var(--ink-soft);
+  border-style: dashed;
+  background: var(--paper);
+  cursor: default;
+}
+
+.zone-resolution {
+  margin: -6px 0 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.zone-resolution__status {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.zone-resolution__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.zone-resolution__head strong {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.zone-resolution__head span {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.zone-resolution__grade {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.zone-resolution__grade--high {
+  color: var(--forest);
+}
+
+.zone-resolution__grade--medium,
+.zone-resolution__grade--low {
+  color: var(--coral);
+}
+
+.zone-resolution__notes {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.zone-resolution__notes li + li {
+  margin-top: 6px;
+}
+
 .unknown-time-note {
   display: flex;
   min-height: 72px;

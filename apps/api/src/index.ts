@@ -5,6 +5,7 @@ import { configGuard } from "./middleware/config-guard.js";
 import { healthRoutes } from "./routes/health.js";
 import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
+import { timezoneRoutes } from "./routes/timezone.js";
 import { stubRoutes, internalRoutes } from "./routes/stubs.js";
 import { sessionRoutes } from "./routes/sessions.js";
 
@@ -30,6 +31,7 @@ api.use("*", configGuard);
 api.use("*", authenticate);
 api.route("/", birthRoutes);
 api.route("/", chartRoutes);
+api.route("/", timezoneRoutes);
 api.route("/", stubRoutes);
 
 // Internal service-to-service API, behind the service token rather than the

@@ -28,6 +28,30 @@ License: AGPL-3.0-or-later (when used without a commercial Swiss Ephemeris
 license). npm package: sweph@2.10.3-7
 
 ============================================================================
+tz-lookup (timezone boundary dataset)
+============================================================================
+Copyright © The Dark Sky Company, LLC
+https://github.com/darkskyapp/tz-lookup
+License: CC0-1.0 — copyright and neighbouring rights waived to the extent
+possible by law. npm package: tz-lookup@6.1.25
+
+Used by apps/api to resolve birthplace coordinates to an IANA timezone id
+without calling an external geocoding service, which would put a birthplace in
+a third party's hands. The encoded boundary raster is derived from Evan
+Siroky's timezone-boundary-builder, release 2019b.
+
+Two consequences of that vintage, both handled in
+apps/api/src/services/timezone.ts rather than left implicit: boundary changes
+made after 2019 are not in the dataset, and the compression is lossy near
+borders. Coordinates within roughly 11 km of a boundary are reported at
+reduced confidence for that reason.
+
+The tz database itself is not vendored. Zone rules come from the tzdb each
+runtime already carries — luxon's in apps/calc-stub, the platform's Intl
+elsewhere — and the release a chart was calculated against is recorded on the
+snapshot as tzdb_version.
+
+============================================================================
 Other third-party components
 ============================================================================
 Additional dependencies (Hono, luxon, Wrangler, TypeScript, etc.) are used

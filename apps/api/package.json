@@ -14,11 +14,13 @@
   },
   "dependencies": {
     "@patternlike/shared": "0.2.0",
-    "hono": "^4.12.32"
+    "hono": "^4.12.32",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.19.1",
     "@cloudflare/workers-types": "^4.20250525.0",
+    "@types/tz-lookup": "^6.1.2",
     "typescript": "^5.8.3",
     "vitest": "^4.1.10",
     "wrangler": "^4.16.1"
