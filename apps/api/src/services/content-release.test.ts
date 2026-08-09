@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canonicalJson, SCHEMA_VERSION } from "@patternlike/shared";
+import { canonicalJson, M3_SCHEMA_VERSION } from "@patternlike/shared";
 import {
   draftBundle,
   generateSigningKey,
@@ -7,6 +7,7 @@ import {
   signBundle,
   signedBundle,
   toBase64Url,
+  withPattern,
 } from "../../test/content-release-fixtures.js";
 import {
   bundleSigningPayload,
@@ -232,7 +233,7 @@ describe("object hash verification", () => {
 
 describe("ingestion request validation", () => {
   const wrap = (bundle: ContentReleaseBundle, extra: Record<string, unknown> = {}) => ({
-    schema_version: SCHEMA_VERSION,
+    schema_version: M3_SCHEMA_VERSION,
     bundle,
     idempotency_key: "release-ingest-key-0001",
     ...extra,
@@ -285,6 +286,7 @@ describe("ingestion request validation", () => {
 
   it("reports the first schema path without echoing the rejected value", () => {
     const bundle = draftBundle((draft) => {
+      withPattern(draft);
       delete (draft.objects.patterns[0] as Record<string, unknown>).evidence_requirements;
     });
     const result = validateIngestionRequest(wrap(bundle));
@@ -296,6 +298,7 @@ describe("ingestion request validation", () => {
 
   it.each([
     ["a missing schema-required pattern evidence_requirements", (bundle: ContentReleaseBundle) => {
+      withPattern(bundle);
       delete (bundle.objects.patterns[0] as Record<string, unknown>).evidence_requirements;
     }],
     ["an unsupported release status", (bundle: ContentReleaseBundle) => {
@@ -380,6 +383,22 @@ describe("ingestion request validation", () => {
       expect("error" in result && result.error.class).toBe("invalid_body");
     },
   );
+
+  it.each(["{bad-token}", "{Bad_token}"])(
+    "rejects an undeclared placeholder with non-lowercase-token syntax: %s",
+    (token) => {
+      const result = validateIngestionRequest(
+        wrap(
+          draftBundle((bundle) => {
+            bundle.objects.timing_templates[0]!.template_text = `Closest ${token}.`;
+          }),
+        ),
+      );
+      expect("error" in result && result.error.class).toBe(
+        "timing_undeclared_placeholder",
+      );
+    },
+  );
 });
 
 describe("content graph policy", () => {
@@ -421,6 +440,7 @@ describe("content graph policy", () => {
     [
       "unresolved_prompt",
       (bundle: ContentReleaseBundle) => {
+        withPattern(bundle);
         bundle.objects.patterns[0]!.prompt_ids = ["prompt.missing@1"];
       },
     ],
@@ -465,17 +485,38 @@ describe("content graph policy", () => {
 
   it("accepts an unresolvable fallback fragment when reviewed fallback_text is present", () => {
     const bundle = draftBundle((draft) => {
-      draft.objects.safety_rules[0]!.fallback_fragment_id = "fragment.not.here";
+      const rule = draft.objects.safety_rules[0]!;
+      rule.fallback_fragment_id = "fragment.not.here";
+      rule.fallback_text = "Take what is useful here and leave the rest.";
     });
 
     expect(bundle.objects.safety_rules[0]!.fallback_text).toBeTruthy();
     expect(validateContentGraph(bundle)).toBeNull();
   });
+
+  it("rejects an approved fallback for a locale the release does not support", () => {
+    const reason = validateContentGraph(
+      draftBundle((bundle) => {
+        bundle.objects.daily_fallbacks.push({
+          ...bundle.objects.daily_fallbacks[0]!,
+          id: "fallback.daily.fr-FR",
+          title: "Universal daily fallback (fr-FR)",
+          locale: "fr-FR",
+        });
+      }),
+    );
+
+    expect(reason?.class).toBe("fallback_locale_mismatch");
+  });
 });
 
 describe("smoke-test fixtures", () => {
   it("reports the fixture ids this milestone cannot evaluate", () => {
-    expect(pendingFixtureIds(draftBundle())).toEqual(["golden_saturn_moon_building"]);
+    expect(pendingFixtureIds(draftBundle())).toEqual([
+      "saturn-square-sun-building",
+      "quiet-day-no-cycles",
+      "unknown-time-angle-theme",
+    ]);
   });
 
   it("reports none when the bundle declares none", () => {

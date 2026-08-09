@@ -23,4 +23,11 @@ export interface Env {
    */
   CONTENT_RELEASE_KEYS?: string;
   ARTIFACTS?: R2Bucket;
+  /**
+   * Daily-reading generation. The message is opaque — job id and reserved
+   * reading id only; the immutable command itself lives encrypted in
+   * `jobs.payload_enc`, because a queue message is not a place to put a user's
+   * frozen chart, cycle, and context state.
+   */
+  READING_QUEUE: Queue<{ job_id: string; reading_id: string }>;
 }

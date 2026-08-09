@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import app from "../index.js";
+import { app } from "../index.js";
 import { resetDb, rows } from "../../test/helpers.js";
 import { linkIdentity } from "../db/identities.js";
 import { createSession } from "../db/sessions.js";
@@ -78,6 +78,20 @@ describe("service auth is scoped to /internal", () => {
     const res = await app.request(
       "/internal/content-releases",
       { method: "POST" },
+      prodEnv(),
+    );
+    expect(res.status).toBe(401);
+    expect((await body(res)).error?.code).toBe("unauthorized");
+  });
+
+  it("also gates daily-reading generation on the service token", async () => {
+    const res = await app.request(
+      "/internal/readings/generate",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ user_id: "usr_not_authorized_0001" }),
+      },
       prodEnv(),
     );
     expect(res.status).toBe(401);

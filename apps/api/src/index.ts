@@ -6,9 +6,12 @@ import { healthRoutes } from "./routes/health.js";
 import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
 import { timezoneRoutes } from "./routes/timezone.js";
+import { preferenceRoutes } from "./routes/preferences.js";
 import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
+import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { sessionRoutes } from "./routes/sessions.js";
+import { queue } from "./queue.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -33,6 +36,7 @@ api.use("*", authenticate);
 api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", timezoneRoutes);
+api.route("/", preferenceRoutes);
 api.route("/", stubRoutes);
 
 // Internal service-to-service API, behind the service token rather than the
@@ -42,6 +46,7 @@ const internal = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 internal.use("*", configGuard);
 internal.use("*", serviceAuth);
 internal.route("/", contentReleaseRoutes);
+internal.route("/", internalGenerationRoutes);
 
 // Mounted under a prefix, not "/". A sub-app routed at "/" contributes its
 // `use("*", ...)` middleware to every path in the parent.
@@ -87,4 +92,22 @@ app.notFound((c) =>
   ),
 );
 
-export default app;
+/**
+ * The Hono app itself, for tests that drive it with `app.request()`.
+ *
+ * The default export is the Worker's handler object and no longer has that
+ * method, so this is the seam rather than a convenience.
+ */
+export { app };
+
+/**
+ * Both entry points, not just `fetch`.
+ *
+ * The queue consumer deliberately does NOT reuse the Hono pipeline: a message is
+ * not a request, and there is no `configGuard` on this path. `queue()` performs
+ * that fail-closed check itself — see src/queue.ts.
+ */
+export default {
+  fetch: app.fetch,
+  queue,
+};

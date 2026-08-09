@@ -30,6 +30,20 @@
         "hash": "SHA-256",
         "rendering": "'cyc_' + lowercaseHex(digest)[0:32]",
         "preimage": "cycle-identity.schema.json#/$defs/cycleIdentityV1"
+      },
+      "patternlike.cycle-pass-id.v1": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "'cyp_' + lowercaseHex(digest)[0:32]",
+        "preimage": "cycle-derivation.schema.json#/$defs/cyclePassIdentityV1",
+        "note": "ADDED additively — see amendments. Keyed on the parent cyc_ rather than on cycleIdentityV1, because oriented_branch and winding never leave the calculation service and the trusted plane that persists a pass therefore cannot rebuild the parent preimage."
+      },
+      "cycleHashPreimageV1": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "none — generation-command.cyclePin.cycle_hash stores the full 64-character digest",
+        "preimage": "cycle-derivation.schema.json#/$defs/cycleHashPreimageV1",
+        "note": "ADDED additively — see amendments. Not an identity profile: it names a scan result, not a physical encounter, which is exactly why it carries no identity_profile field and no rendered prefix."
       }
     },
     "rules": [
@@ -37,7 +51,7 @@
       "ECMAScript number serialization; recursive UTF-16 property-name ordering; UTF-8 output; no implicit Unicode normalization.",
       "Arrays are put into their contractually defined total order BEFORE canonicalization, because JCS deliberately preserves array order.",
       "The 128-bit rendered suffix is only the opaque handle. Golden vectors retain the full digest AND the exact canonical bytes, so an implementation cannot silently change canonicalization while its digests keep round-tripping.",
-      "SCOPE: JCS applies to these two new profiles only. M0 release, object, and signature hashes remain byte-frozen on the repository's legacy canonicalJson behaviour (JSON.stringify over sorted keys). M3 must not reinterpret them as JCS — naming and versioning that legacy profile is still an open escalation."
+      "SCOPE: JCS applies to the patternlike.* profiles listed above and to cycleHashPreimageV1, and to nothing else. M0 release, object, and signature hashes remain byte-frozen on the repository's legacy canonicalJson behaviour (JSON.stringify over sorted keys) — generation-command.release_bundle_hash is recomputed with THAT procedure, not this one. M3 must not reinterpret them as JCS; naming and versioning that legacy profile is still an open escalation."
     ],
     "vectors": "fixtures/canonicalization/jcs-golden-vectors.json"
   },
@@ -152,6 +166,15 @@
         "cycleIdentityV1",
         "orientedBranch"
       ]
+    },
+    {
+      "file": "cycle-derivation.schema.json",
+      "id": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json",
+      "defines": [
+        "cyclePassIdentityV1",
+        "cycleHashPreimageV1"
+      ],
+      "note": "ADDED after the freeze, additively — see amendments. generation-command.schema.json required cyclePin.pass_ids and cyclePin.cycle_hash while describing neither preimage, which is the one gap that stops a pass from being persisted at all."
     },
     {
       "file": "cycle-request.schema.json",
@@ -287,6 +310,39 @@
         "fixtures/invalid/cycle-response.inverted-envelope.json"
       ],
       "implemented_by": "apps/calc-stub/src/cycles.ts (POST /v1/cycles)"
+    },
+    {
+      "date": "2026-08-09",
+      "kind": "additive_schema",
+      "summary": "cycle-derivation.schema.json pins the two derivations the freeze named but never defined: the cyp_ pass-id preimage and the cycle_hash normalization.",
+      "detail": "generation-command.schema.json REQUIRES cyclePin.pass_ids and cyclePin.cycle_hash. The freeze specified pass ids only as prose — 'derived from the parent cycle identity plus pass_index' — with no preimage document and no golden vector, and cycle_hash only as a hash 'of the normalized cycle row as scanned' with no stated normalization. Two implementations reading that would mint different ids for the same pass and different hashes for the same scan, and Phase 4 cannot persist a pass until both are pinned. Two decisions are recorded here. First, cyclePassIdentityV1 keys on the parent cyc_ rather than on cycleIdentityV1: oriented_branch and winding are deliberately private to the calculation service and never appear on the wire, so the trusted plane that persists a pass cannot rebuild the parent preimage — and does not need to, because cyc_ is already a collision-resistant function of it. The pass timestamp stays out, because refinement may move exact_at while the index does not move. Second, cycleHashPreimageV1 is the normalized cycle exactly as scanned MINUS importance_score, which is optional and advisory on the wire and cannot change assembly output; including it would fail a claimed job closed over a value that does not affect the reading. No existing $id, required field, or enum changed, so the freeze is untouched.",
+      "files": [
+        "cycle-derivation.schema.json",
+        "fixtures/valid/cycle-pass-identity.pass-two.json",
+        "fixtures/valid/cycle-hash.retrograde.json",
+        "fixtures/invalid/cycle-pass-identity.zero-index.json",
+        "fixtures/invalid/cycle-hash.carries-importance-score.json",
+        "fixtures/canonicalization/cycle-derivation-golden-vectors.json"
+      ],
+      "implemented_by": "packages/shared/src/cycle-types.ts (buildCyclePassIdentity, buildCycleHashPreimage); apps/api/src/db/cycles.ts"
+    },
+    {
+      "date": "2026-08-09",
+      "kind": "additive_schema",
+      "summary": "content-release.schema.json gains contentReleaseIngestionRequest, the wrapper M0 shipped and this package omitted.",
+      "detail": "M0 defines contentReleaseIngestionRequest; M3 redefined contentReleaseBundle but not the request that carries it. The Worker compiles the bundled schemas at startup and had no M3 wrapper to compile, so it was structurally validating M3 ingestion bodies against the M0 bundle — which has no timing_templates, no daily_fallbacks, and a schema_version const of 0.2.0, and therefore rejected every M3 bundle as `/schema_version (const)`. Without this, no release the assembler can read could ever be ingested, and the daily-reading pipeline has no content to assemble from. Identical to the M0 wrapper except that `bundle` points at the M3 bundle. No existing $id, required field, or enum changed.",
+      "files": [
+        "content-release.schema.json"
+      ],
+      "implemented_by": "apps/api/src/services/content-release.ts"
+    },
+    {
+      "date": "2026-08-09",
+      "kind": "runtime_enforcement",
+      "summary": "Ingestion now enforces the M3 per-locale content rules the OpenAPI already described, and accepts only 0.3.0 bundles.",
+      "detail": "openapi.yaml's /internal/content-releases already stated that 'a bundle must carry exactly one universal daily_fallback and at least one default timing_template for every declared supported locale', but the M2 runtime validated neither — it iterated a hardcoded six-collection list that did not include timing_templates or daily_fallbacks, and never read supported_locales. The Worker now validates both new collections, requires supported_locales/locale_default/language_fallbacks to be coherent, checks that every {token} in reviewed timing copy is declared, and enforces the per-locale fallback and default-template rules. It also narrows the accepted schema_version to 0.3.0: a 0.2.0 bundle cannot produce a reading, so accepting one would reserve an immutable release version for bytes that can never be served. Nothing has been ingested in production (CONTENT_RELEASE_KEYS is unset there and ingestion fails closed at 503), so the narrowing orphans no stored release. No contract document changed; this row records that the runtime caught up with one.",
+      "files": [],
+      "implemented_by": "apps/api/src/services/content-release.ts (RELEASE_OBJECT_COLLECTIONS, validateBundleShape, validateObjectShape, validateContentGraph)"
     }
   ]
 }

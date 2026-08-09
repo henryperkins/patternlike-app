@@ -1,4 +1,5 @@
 import type { AspectType, BirthTimeAccuracy, CelestialBody } from "./types.js";
+import type { SuppressedFeatureClass } from "./cycle-types.js";
 
 export interface UncertaintyReport {
   accuracy: BirthTimeAccuracy;
@@ -8,7 +9,7 @@ export interface UncertaintyReport {
     latest_local?: string | null;
   } | null;
   suppressed_features: Array<{
-    feature_class: string;
+    feature_class: SuppressedFeatureClass;
     feature_id?: string | null;
     reason: string;
   }>;

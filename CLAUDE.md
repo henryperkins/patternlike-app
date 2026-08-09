@@ -48,6 +48,21 @@ Four workspaces (`apps/*`, `packages/*`), one request path:
 
 Order on the product API is `configGuard` → `authenticate`. Unimplemented product surfaces (readings, timing, time-travel, check-ins, exports, account delete) return 501 from `routes/stubs.ts`.
 
+The default export is `{ fetch, queue }`, not the Hono app — tests that drive it with `app.request()` import the named `app` export instead. **A queue message never enters the Hono pipeline, so `configGuard` does not run on it**; `src/queue.ts` calls `checkSecureConfig` itself. Deleting that call would leave the one surface that decrypts a frozen command and writes a user's prose as the only surface a development-shaped deployment could still run.
+
+### Daily reading generation (M3 phase 4)
+
+Two transactions, never one. **Enqueue** (`services/enqueue.ts`) freezes every input into a `GenerateDailyReadingCommandV1`, stores it DEK-encrypted in `jobs.payload_enc`, reserves a `pending` `daily_readings` row pointing at that job, and only then sends an opaque `{job_id, reading_id}`. **Execute** (`services/generate-daily-reading.ts`) claims the job by CAS, dereferences only the versions the command pinned, and publishes in one guarded batch. Queues is at-least-once, so nothing on the execute path may resolve "today" or "active" again — a retry that did would produce different prose under the same `assembly_id`.
+
+- The D1 job row is the **durable outbox**; the queue is a nudge. `dispatched_at` is advisory, `POST /internal/readings/sweep` re-sends what committed but never went out, and a zero-row claim does no work. No code treats a send response as proof of anything.
+- `assembly_id` is computed by *running* `assembleReading` and hashing `identity_canonical`, at enqueue and again at execute. Calling `buildAssemblyIdentity` directly would re-implement the eligibility partition the assembler applies internally, and drift would surface on a real reader's reading rather than in a test.
+- Conditional aborts inside a batch use the `assertion_probe` table (`0002:50`), whose only column is `CHECK (id = 0)`. `completeReading` opens *and closes* with one: a guarded `UPDATE` that merely affects zero rows would let later statements commit anyway.
+- Generation is withheld while `users.timezone_source` or `locale_source` reads `default_unconfirmed`. `PUT /v1/preferences/{timezone,locale}` are the only writers; a `device_derived` write over a `user_confirmed` value is `409 preference_locked`.
+- The scheduler may replace its own terminal failure only for `calc_unavailable`/`release_unreadable`, only while `command_generation < 3`, and only for the current or preceding local day. Everything else is operator-only.
+- `cyp_` pass ids and `cyclePin.cycle_hash` are derived in the Worker (`packages/shared/src/cycle-types.ts`), keyed on the parent `cyc_` because `oriented_branch`/`winding` never leave the calc service. `cycle_hash` deliberately excludes `importance_score`. Contract: `contracts/m3/cycle-derivation.schema.json`.
+- `persistCycles` is `INSERT OR IGNORE` throughout. A refined rescan does **not** overwrite a stored envelope — the pinned `cycle_hash` fails the claimed job closed instead, which is a state an operator can see.
+- `CYCLE_POLICY_ID`/`VERSION` and the orb policy pair live in `@patternlike/shared` and are re-exported by `apps/calc-stub/src/cycle-policy.ts`. Calc refuses any request naming a policy it does not implement, so a second hand-copied pair would turn a version bump into a silent scan refusal on every reading.
+
 ### Sign-in
 
 Auth0 authenticates; the Worker authorises. `apps/web/src/lib/auth.ts` runs an authorization-code + PKCE redirect, then trades the one-shot `id_token` for a `pl_session` cookie via `POST /v1/sessions`. Auth0 is never consulted again — **the cookie is the only source of truth for "am I signed in", answered by calling the API and watching for a 401**, never by asking the issuer. Nothing from Auth0 is persisted: `cacheLocation` stays in-memory and refresh tokens are off.
@@ -85,7 +100,11 @@ rm -rf apps/api/.wrangler/state/v3/d1 && npm run db:local -w @patternlike/api
 
 `apps/api` runs inside workerd via `@cloudflare/vitest-pool-workers`: `SELF.fetch()` drives the real Hono app against a real local D1 seeded from `db/d1/` by `test/apply-migrations.ts`. All outbound fetches — including `invokeCalc` — are intercepted by `test/mock-calc-service.ts`, so tests are hermetic. Storage is **not** isolated per test in this pool version; `resetDb()` in `test/helpers.ts` deletes from an explicit FK-ordered table list, and a table missing from that list leaks rows between suites.
 
-Because `X-User-Id` names a user rather than creating one, every API test must `seedUser()` first — the `users` row, its `identities` row, and its wrapped DEK land together.
+Because `X-User-Id` names a user rather than creating one, every API test must `seedUser()` first — the `users` row, its `identities` row, and its wrapped DEK land together. `confirmPreferences()`, `seedChart()`, and `seedActiveRelease()` supply the rest of what generation needs; a test that skips `confirmPreferences` gets a correct `timezone_confirmation_required` refusal rather than a reading.
+
+`resetDb()` unwinds the `daily_readings` revision chain leaf-first. It cannot null `supersedes_reading_id` to break the self-reference any more: 0002's revision CHECK requires a non-null predecessor whenever `revision > 1`, so clearing it fails the constraint.
+
+Queue handlers are driven with `createMessageBatch` + `getQueueResult` from `cloudflare:test`, calling the worker's `queue()` export directly. `test/mock-calc-service.ts` answers `/v1/cycles` as well as `/v1/calculate`; the `CYCLE_FP_*` sentinel fingerprints steer it, because a cycle request carries no birth data to hang a trigger on.
 
 ## Domain invariants
 
@@ -97,7 +116,9 @@ Because `X-User-Id` names a user rather than creating one, every API test must `
 
 ## Contracts and licensing
 
-`contracts/m0` is frozen. Breaking a required field, an enum, or a schema `$id` needs a schema-version bump and a freeze note; contract changes need a fixture under `fixtures/valid/` and a rejection case under `fixtures/invalid/`. Purely additive changes (a new OpenAPI path, a new inline schema) do not trip that policy — record them in the `amendments` array of `SCHEMA_MANIFEST.json` rather than rewriting `out_of_scope_for_this_freeze`, which is a record of what the freeze covered. Wire format is `snake_case` even though TypeScript is `camelCase`. Open contract questions where the code implements the spec faithfully and the spec is what needs fixing are tracked in `docs/reviews/2026-08-01-spec-escalations.md`.
+`contracts/m0` is frozen, and `contracts/m3` is frozen at `schema_version` 0.3.0 with its own `amendments` array. Breaking a required field, an enum, or a schema `$id` needs a schema-version bump and a freeze note; contract changes need a fixture under `fixtures/valid/` and a rejection case under `fixtures/invalid/`.
+
+Editorial bundles are **M3-only**: `POST /internal/content-releases` accepts `schema_version` 0.3.0 and requires `timing_templates`, `daily_fallbacks`, `supported_locales`, and `locale_default`, with exactly one universal fallback and one default timing template per declared locale. A 0.2.0 bundle cannot produce a reading, so accepting one would reserve an immutable release version for bytes that can never be served. Purely additive changes (a new OpenAPI path, a new inline schema) do not trip that policy — record them in the `amendments` array of `SCHEMA_MANIFEST.json` rather than rewriting `out_of_scope_for_this_freeze`, which is a record of what the freeze covered. Wire format is `snake_case` even though TypeScript is `camelCase`. Open contract questions where the code implements the spec faithfully and the spec is what needs fixing are tracked in `docs/reviews/2026-08-01-spec-escalations.md`.
 
 The repo is **not** under a single license — see `LICENSING.md`. Only `apps/calc-stub` is AGPL-3.0-or-later; it must keep its `LICENSE`, `COPYRIGHT`, `NOTICE`, and source-offer documentation intact. `packages/shared` is imported by the AGPL service, and that boundary is the open legal question.
 
@@ -111,3 +132,6 @@ The repo is **not** under a single license — see `LICENSING.md`. Only `apps/ca
 - `fly.web.toml` / `patternlike-app` is the **superseded** Fly copy of the PWA, retired 2026-08-08 by scaling to 0 machines. The app and its name still exist, so `fly deploy -c fly.web.toml` would resurrect it; `fly apps destroy patternlike-app` releases the name for good.
 - The `app`/`primary_region` lines in each Fly config are load-bearing. Fly Launch rewrote `fly.toml` once (commit `5e6acec`), pointing the calc Dockerfile at the web app's name, which turns a bare `fly deploy` into "replace the PWA with the calc service". After anything regenerates a Fly config, diff those two lines and the `[[http_service.checks]]` block before deploying.
 - Worker secrets go in after the first deploy (`wrangler secret put` prompts interactively on a Worker that does not exist yet): `ROOT_KEK`, `CALC_SERVICE_AUTH_TOKEN`, and `SERVICE_AUTH_TOKEN` for `/internal/*`.
+- **Queues must exist before the first deploy that declares them**, or the upload fails on an unknown queue. All four were created 2026-08-09: `patternlike-daily-readings` and `…-dlq` for production, `…-dev` and `…-dev-dlq` for the default environment. Named environments do not inherit bindings, so both blocks declare their own producer and consumer.
+- `db/d1/0002_m3_daily_reading_pipeline.sql` **is applied** to the remote database (ledger entry 2026-08-09 10:38 UTC). Verified after the fact: the three new tables exist, every new column on `users`/`jobs`/`daily_readings`/`reading_sources`/`cycle_instances` is present, `assertion_probe` is empty, `PRAGMA foreign_key_check` returns zero rows, and `PRAGMA quick_check` is `ok`. Migrations from here go through `wrangler d1 migrations apply patternlike-ops --env production --remote` and the ordered runbook in `docs/superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md` §5 — bookmark and export first.
+- Production has **no content release** (`content_releases` is empty) and `CONTENT_RELEASE_KEYS` is unset, so generation there answers `release_not_active` until an editorial bundle is signed and ingested.

@@ -17,9 +17,15 @@ import {
   SUBJECT_A,
   IDENTITY_A,
   IDENTITY_OTHER,
+  confirmPreferences,
   postBirthProfile,
+  seedActiveRelease,
+  seedChart,
   seedUser,
 } from "../../test/helpers.js";
+import { claimJob } from "./generation.js";
+import { enqueueDailyReading } from "../services/enqueue.js";
+import { generateDailyReading } from "../services/generate-daily-reading.js";
 
 const NEW_ROOT_KEK = "a-rotated-root-kek-with-enough-entropy-01";
 
@@ -210,5 +216,91 @@ describe("DEK rotation", () => {
     );
     expect(other.length).toBeGreaterThan(0);
     expect(other.every((p) => p.payload_key_version === 1)).toBe(true);
+  });
+});
+
+/**
+ * The three columns M3 added, rotated through a real generated reading.
+ *
+ * `encrypted-columns.test.ts` proves each is registered; this proves the walk
+ * actually reaches them. The distinction matters because all three reach the
+ * walker through a `user_id` the rotation query filters on, and
+ * `reading_sources.user_id` exists for exactly that reason — a column that is
+ * registered but unreachable would still leave its data under a destroyed key.
+ */
+describe("DEK rotation over the M3 pipeline columns", () => {
+  beforeEach(async () => {
+    await confirmPreferences(USER_A);
+    await seedChart(IDENTITY_A);
+    await seedActiveRelease();
+  });
+
+  it("re-encrypts the command, the prose, and every evidence row", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) return;
+    const claim = await claimJob(env, enqueued.jobId);
+    expect(await generateDailyReading(env, claim!)).toMatchObject({ ok: true });
+
+    const before = await rows<{ n: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM jobs WHERE user_id = ? AND payload_enc IS NOT NULL)
+       + (SELECT COUNT(*) FROM daily_readings WHERE user_id = ? AND reading_enc IS NOT NULL)
+       + (SELECT COUNT(*) FROM reading_sources WHERE user_id = ?) AS n`,
+      USER_A,
+      USER_A,
+      USER_A,
+    );
+    expect(before[0]!.n).toBeGreaterThan(2);
+
+    const result = await rotateUserDek(env, IDENTITY_A);
+    expect(result.keyVersion).toBe(2);
+    // Birth profile and chart snapshot are covered by the suite above; these
+    // three are the M3 additions.
+    expect(result.reencrypted).toBeGreaterThanOrEqual(before[0]!.n);
+
+    for (const [table, column] of [
+      ["jobs", "payload_key_version"],
+      ["daily_readings", "reading_key_version"],
+      ["reading_sources", "evidence_key_version"],
+    ] as const) {
+      const stale = await rows(
+        `SELECT rowid FROM ${table} WHERE user_id = ? AND ${column} IS NOT NULL AND ${column} != 2`,
+        USER_A,
+      );
+      expect(stale, `${table}.${column} was not rotated`).toEqual([]);
+    }
+
+    // Readable under the new key, which is the part a version bump alone does
+    // not prove.
+    const [reading] = await rows<{
+      id: string;
+      reading_enc: ArrayBuffer;
+      reading_key_version: number;
+      reading_nonce: string;
+    }>(
+      `SELECT id, reading_enc, reading_key_version, reading_nonce
+       FROM daily_readings WHERE user_id = ?`,
+      USER_A,
+    );
+    let binary = "";
+    for (const byte of new Uint8Array(reading!.reading_enc)) {
+      binary += String.fromCharCode(byte);
+    }
+    const stored = await decryptPayload<{ assembly_id: string }>(
+      env,
+      IDENTITY_A,
+      {
+        key_version: reading!.reading_key_version,
+        nonce: reading!.reading_nonce,
+        ciphertext: btoa(binary),
+      },
+      {
+        subject: SUBJECT_A,
+        field: "daily_readings.reading_enc",
+        recordId: reading!.id,
+      },
+    );
+    expect(stored.assembly_id).toMatch(/^asm_[a-f0-9]{32}$/);
   });
 });

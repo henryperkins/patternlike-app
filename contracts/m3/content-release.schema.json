@@ -19,7 +19,13 @@
     },
     "timingPlaceholder": {
       "type": "string",
-      "enum": ["start_date", "exact_date", "end_date", "orb", "phase"],
+      "enum": [
+        "start_date",
+        "exact_date",
+        "end_date",
+        "orb",
+        "phase"
+      ],
       "description": "Closed placeholder set. The renderer fills these with locale-formatted calculated values and nothing else: no executable expression, no free-form interpolation, no nested template."
     },
     "timingTemplateObject": {
@@ -40,9 +46,18 @@
         "id": {
           "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/fragmentId"
         },
-        "content_type": { "const": "timing_template" },
-        "content_version": { "type": "string", "minLength": 1 },
-        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "content_type": {
+          "const": "timing_template"
+        },
+        "content_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
         "locale": {
           "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
         },
@@ -51,7 +66,10 @@
         },
         "status": {
           "type": "string",
-          "enum": ["approved", "deprecated"],
+          "enum": [
+            "approved",
+            "deprecated"
+          ],
           "default": "approved"
         },
         "template_text": {
@@ -64,13 +82,21 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/timingPlaceholder" }
+          "items": {
+            "$ref": "#/$defs/timingPlaceholder"
+          }
         },
         "is_locale_default": {
           "type": "boolean",
           "description": "Exactly one approved default per supported locale. Ingestion rejects a release without one as timing_template_missing_for_locale."
         },
-        "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
       }
     },
     "fallbackCopyObject": {
@@ -91,9 +117,18 @@
         "id": {
           "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/fragmentId"
         },
-        "content_type": { "const": "daily_fallback" },
-        "content_version": { "type": "string", "minLength": 1 },
-        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "content_type": {
+          "const": "daily_fallback"
+        },
+        "content_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
         "locale": {
           "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
         },
@@ -102,10 +137,17 @@
         },
         "status": {
           "type": "string",
-          "enum": ["approved", "deprecated"],
+          "enum": [
+            "approved",
+            "deprecated"
+          ],
           "default": "approved"
         },
-        "body": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
         "eligibility_mode": {
           "type": "string",
           "const": "universal",
@@ -113,7 +155,10 @@
         },
         "prohibited_claims": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "uniqueItems": true
         }
       }
@@ -133,7 +178,10 @@
         "locale_default"
       ],
       "properties": {
-        "version": { "type": "string", "minLength": 1 },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
         "bundle_hash": {
           "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash",
           "description": "Hash of the canonical bundle body excluding signature, under the repository's legacy canonicalJson procedure. M3 does NOT reinterpret this as RFC 8785."
@@ -141,12 +189,26 @@
         "created_at": {
           "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
         },
-        "approver_id": { "type": "string", "minLength": 1 },
-        "last_author_id": { "type": "string", "minLength": 1 },
-        "changelog": { "type": "string", "minLength": 1 },
+        "approver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "last_author_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changelog": {
+          "type": "string",
+          "minLength": 1
+        },
         "status": {
           "type": "string",
-          "enum": ["submitted", "active", "rejected", "superseded"]
+          "enum": [
+            "submitted",
+            "active",
+            "rejected",
+            "superseded"
+          ]
         },
         "supported_locales": {
           "type": "array",
@@ -171,17 +233,36 @@
           },
           "description": "Explicit locale -> locale map consulted between exact match and locale_default. Explicit rather than inferred from tag prefixes, so 'pt-BR falls back to pt-PT' is an editorial decision and not a string operation."
         },
-        "wordpress_site_id": { "type": ["string", "null"] },
-        "calc_contract_id": { "type": ["string", "null"] }
+        "wordpress_site_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "calc_contract_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "contentReleaseBundle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "release", "objects", "signature"],
+      "required": [
+        "schema_version",
+        "release",
+        "objects",
+        "signature"
+      ],
       "properties": {
-        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-        "release": { "$ref": "#/$defs/releaseMetadata" },
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "release": {
+          "$ref": "#/$defs/releaseMetadata"
+        },
         "objects": {
           "type": "object",
           "additionalProperties": false,
@@ -237,12 +318,16 @@
             "timing_templates": {
               "type": "array",
               "minItems": 1,
-              "items": { "$ref": "#/$defs/timingTemplateObject" }
+              "items": {
+                "$ref": "#/$defs/timingTemplateObject"
+              }
             },
             "daily_fallbacks": {
               "type": "array",
               "minItems": 1,
-              "items": { "$ref": "#/$defs/fallbackCopyObject" }
+              "items": {
+                "$ref": "#/$defs/fallbackCopyObject"
+              }
             }
           }
         },
@@ -255,21 +340,60 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["fixture_id", "expect"],
+            "required": [
+              "fixture_id",
+              "expect"
+            ],
             "properties": {
-              "fixture_id": { "type": "string", "minLength": 1 },
+              "fixture_id": {
+                "type": "string",
+                "minLength": 1
+              },
               "expect": {
                 "type": "string",
-                "enum": ["eligible", "ineligible", "fallback"]
+                "enum": [
+                  "eligible",
+                  "ineligible",
+                  "fallback"
+                ]
               }
             }
           }
         }
       },
       "$comment": "Policy checks beyond JSON Schema, enforced at ingestion and pinned by invalid fixtures: approver_id != last_author_id; locale_default in supported_locales (locale_default_not_supported); exactly one approved daily_fallback per supported locale (fallback_missing_for_locale, fallback_duplicate_for_locale); every daily_fallback locale in supported_locales (fallback_locale_mismatch); eligibility_mode universal (fallback_not_universal); at least one default timing_template per supported locale (timing_template_missing_for_locale); every template placeholder token declared; phase parent_cycle_id graph resolution; and every declared fixture id present in the catalogue (fixtures_unknown)."
+    },
+    "contentReleaseIngestionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ADDED additively after the freeze. M0 shipped this wrapper but M3 did not, so the Worker had no bundled schema to validate an M3 ingestion request against and was structurally validating M3 bodies against the M0 bundle. Identical to the M0 wrapper except that `bundle` points at the M3 bundle and `schema_version` is pinned to this package.",
+      "required": [
+        "schema_version",
+        "bundle",
+        "idempotency_key"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "bundle": {
+          "$ref": "#/$defs/contentReleaseBundle"
+        },
+        "idempotency_key": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/idempotencyKey"
+        },
+        "activate": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, activate after smoke tests; if false, store only."
+        }
+      }
     }
   },
   "oneOf": [
-    { "title": "ContentReleaseBundle", "$ref": "#/$defs/contentReleaseBundle" }
+    {
+      "title": "ContentReleaseBundle",
+      "$ref": "#/$defs/contentReleaseBundle"
+    }
   ]
 }

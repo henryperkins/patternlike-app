@@ -167,8 +167,9 @@ paths:
 
         A user-confirmed value wins over a device-derived one; a device update
         may refresh a device-derived value but never overwrites a user override.
-        Each accepted write increments `timezone_revision` and appends to the
-        registry-required 35-day change log. Scheduled generation is withheld
+        Each changed value increments `timezone_revision` and appends to the
+        registry-required 35-day change log; an unchanged replay is a no-op.
+        Scheduled generation is withheld
         while the source is still `default_unconfirmed`, and a change affects
         only commands enqueued afterwards — an already reserved local day never
         moves.
@@ -192,7 +193,10 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '401': { $ref: '#/components/responses/Error' }
         '409':
-          description: '`preference_locked` — a user override cannot be overwritten by a device-derived write.'
+          description: |
+            `preference_locked` — a user override cannot be overwritten by a
+            device-derived write; `preference_conflict` — another writer won;
+            or `idempotency_conflict` — the key names different input.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -227,7 +231,9 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '401': { $ref: '#/components/responses/Error' }
         '409':
-          description: '`preference_locked`'
+          description: |
+            `preference_locked`, `preference_conflict`, or
+            `idempotency_conflict`, with the same semantics as the time-zone writer.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
