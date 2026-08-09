@@ -29,7 +29,7 @@ beforeEach(async () => {
  */
 describe("not-implemented stubs", () => {
   const routes: Array<[string, RequestInit]> = [
-    ["/v1/readings/today", {}],
+    ["/v1/readings/rdg_seed_00000001/feedback", { method: "POST" }],
     ["/v1/timing", {}],
     ["/v1/time-travel?date=2026-08-08", {}],
     ["/v1/pattern", {}],

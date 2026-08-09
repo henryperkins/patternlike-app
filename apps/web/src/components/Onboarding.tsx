@@ -5,6 +5,7 @@ import type {
   TimezoneLookupResponse,
 } from "@patternlike/shared";
 import { lookupTimezone, onboardingConsentId } from "../lib/api-client.js";
+import { systemTimezone } from "../lib/device.js";
 import { Icon } from "./icons.js";
 
 interface OnboardingProps {
@@ -42,10 +43,6 @@ const accuracyOptions: Array<{
     description: "Keep stable planetary facts and omit houses and angles.",
   },
 ];
-
-function systemTimezone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-}
 
 export function Onboarding({ onSubmit }: OnboardingProps) {
   const [step, setStep] = useState(1);

@@ -33,6 +33,12 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId: string | null;
+  /**
+   * The envelope's optional `details`. Carried because some refusals are only
+   * actionable with it — `reading_not_generated` names the local date the reader
+   * is being told to wait for, which the client cannot derive on its own.
+   */
+  readonly details: Record<string, unknown> | null;
 
   constructor(status: number, body: ErrorBody) {
     super(body.error.message);
@@ -40,6 +46,7 @@ export class ApiError extends Error {
     this.status = status;
     this.code = body.error.code;
     this.requestId = body.error.request_id ?? null;
+    this.details = body.error.details ?? null;
   }
 }
 
@@ -257,11 +264,188 @@ export function deleteAccount(
   });
 }
 
-export function getTodayReadings(signal?: AbortSignal): Promise<unknown> {
-  return request<unknown>("/v1/readings/today", {
+export type ParagraphRole =
+  | "primary_theme"
+  | "supporting_theme"
+  | "phase_context"
+  | "timing"
+  | "reflection"
+  | "uncertainty_notice"
+  | "context_label"
+  | "safety_fallback";
+
+export interface ReadingParagraph {
+  paragraph_id: string;
+  role: ParagraphRole;
+  /** 1-based, contiguous, strictly increasing. Sorted on before render anyway. */
+  order: number;
+  text: string;
+}
+
+export interface DailyReading {
+  schema_version: string;
+  output_schema: "daily-reading-v3";
+  reading_id: string;
+  /**
+   * A bare calendar date in the reader's *scheduling* zone, not an instant.
+   * Never hand it to `new Date()`: that parses as UTC midnight and then renders
+   * in the browser's zone, which is a day early for everyone west of UTC.
+   * `formatLocalDate` in lib/reading-format.ts is the only correct reader.
+   */
+  local_date: string;
+  generated_at: string;
+  assembly_mode: "deterministic";
+  revision: number;
+  locale: string;
+  domain_preference?: string | null;
+  paragraphs: ReadingParagraph[];
+  fallback_used: boolean;
+}
+
+export interface DailyReadingResponse {
+  schema_version: string;
+  reading: DailyReading;
+  /**
+   * Optional *and* nullable in the contract. Its presence is the only signal
+   * that there is provenance to show.
+   */
+  evidence_url?: string | null;
+}
+
+export function getTodayReading(signal?: AbortSignal): Promise<DailyReadingResponse> {
+  return request<DailyReadingResponse>("/v1/readings/today", {
     method: "GET",
     headers: requestHeaders(),
     signal,
+  });
+}
+
+/**
+ * The evidence graph, narrowed to what the "Why this?" drawer renders.
+ *
+ * Deliberately not the full graph: the wire projection is itself
+ * `additionalProperties: true` with untyped paragraph items, so a complete
+ * client type would assert more than the contract promises. The enum-valued
+ * fields are typed `string` on purpose — the drawer renders each through a label
+ * lookup that falls back to the raw value, so a member added in a later release
+ * degrades to showing its code instead of rendering `undefined`.
+ */
+export interface EvidenceFactRef {
+  id: string;
+  fact_type: string;
+  phase?: string | null;
+  orb_deg?: number | null;
+  technique?: string | null;
+  pass_index?: number | null;
+}
+
+export interface EvidenceContentRef {
+  fragment_id: string;
+  content_version: string;
+  release_version: string;
+  content_type?: string | null;
+}
+
+export interface EvidenceContextRef {
+  signal_id: string;
+  source_id: string;
+  allowed_use: string;
+  evidence_lane: string;
+  label?: string | null;
+}
+
+export interface EvidenceRankingFactor {
+  factor: string;
+  weight?: number | null;
+  reason: string;
+}
+
+export interface ParagraphEvidence {
+  paragraph_id: string;
+  /** Typed, unlike its neighbours: the drawer joins on it to follow the prose. */
+  role: ParagraphRole;
+  evidence_lane: string;
+  facts: EvidenceFactRef[];
+  content: EvidenceContentRef[];
+  context_signals: EvidenceContextRef[];
+  ranking_factors?: EvidenceRankingFactor[];
+}
+
+export interface ReadingEvidence {
+  schema_version: string;
+  reading_id: string;
+  revision: number;
+  revision_reason?: string;
+  assembly_id: string;
+  release_version?: string;
+  created_at?: string;
+  paragraphs: ParagraphEvidence[];
+}
+
+/**
+ * Takes the reading id, not the response's `evidence_url`.
+ *
+ * Interpolating a server-supplied string into a fetch URL is a trust edge with
+ * nothing to buy it, and `request()` prefixes `apiBaseUrl` — so a relative path
+ * from the server would only work by coincidence of format. `evidence_url` is
+ * used purely as the flag "there is evidence to show".
+ */
+export function getReadingEvidence(
+  readingId: string,
+  signal?: AbortSignal,
+): Promise<ReadingEvidence> {
+  return request<ReadingEvidence>(
+    `/v1/readings/${encodeURIComponent(readingId)}/evidence`,
+    { method: "GET", headers: requestHeaders(), signal },
+  );
+}
+
+export type PreferenceWriteSource = "user_confirmed" | "device_derived";
+export type PreferenceSource = PreferenceWriteSource | "default_unconfirmed";
+
+export interface TimezonePreferenceResponse {
+  schema_version: string;
+  timezone: string;
+  source: PreferenceSource;
+  timezone_revision: number;
+  updated_at: string;
+}
+
+export interface LocalePreferenceResponse {
+  schema_version: string;
+  locale: string;
+  source: PreferenceSource;
+  updated_at: string;
+}
+
+/**
+ * The zone that decides which local day a reading is generated for.
+ *
+ * Not the birthplace zone: `birth_profiles.timezone` says where the reader was
+ * born, and substituting it here would schedule a reader's day in a place they
+ * may not have lived for decades.
+ */
+export function setSchedulingTimezone(
+  timezone: string,
+  source: PreferenceWriteSource,
+  idempotencyKey: string,
+): Promise<TimezonePreferenceResponse> {
+  return request<TimezonePreferenceResponse>("/v1/preferences/timezone", {
+    method: "PUT",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({ timezone, source }),
+  });
+}
+
+export function setContentLocale(
+  locale: string,
+  source: PreferenceWriteSource,
+  idempotencyKey: string,
+): Promise<LocalePreferenceResponse> {
+  return request<LocalePreferenceResponse>("/v1/preferences/locale", {
+    method: "PUT",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({ locale, source }),
   });
 }
 

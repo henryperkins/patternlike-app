@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { BirthProfileRequest } from "@patternlike/shared";
 import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
@@ -112,6 +112,16 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
+  /**
+   * A 401 from a view, rather than from the mount probe.
+   *
+   * Sessions expire mid-visit, and the view that discovers it has no business
+   * rendering the failure itself — "Unreachable with a retry" is wrong about a
+   * state the app already has a screen for. Stable identity because TodayView
+   * holds it as an effect dependency.
+   */
+  const handleSignedOut = useCallback(() => setAuthState({ status: "signed-out" }), []);
+
   const endSessionAndSignOut = async () => {
     await signOut(async () => {
       try {
@@ -187,7 +197,7 @@ export default function App() {
   } else if (view === "privacy") {
     content = <PrivacyView hasChart={chart !== null} />;
   } else if (view === "today") {
-    content = <TodayView />;
+    content = <TodayView onUnauthorized={handleSignedOut} />;
   } else if (view === "timing") {
     content = <TimingView />;
   } else if (view === "travel") {

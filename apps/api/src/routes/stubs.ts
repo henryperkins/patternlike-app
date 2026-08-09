@@ -29,12 +29,10 @@ function notImplemented(c: StubContext, feature: string) {
   );
 }
 
-stubRoutes.get("/v1/readings/today", (c) =>
-  notImplemented(c, "Daily readings (M3)"),
-);
-stubRoutes.get("/v1/readings/:id/evidence", (c) =>
-  notImplemented(c, "Reading evidence (M3)"),
-);
+// `/v1/readings/today` and `/v1/readings/:id/evidence` are served by
+// routes/readings.ts. Feedback stays here: M3 documents it as 501 on purpose,
+// and `resonance_feedback` was removed from the ranking vocabulary, so there is
+// nowhere for an engagement signal to land even if it were collected.
 stubRoutes.post("/v1/readings/:id/feedback", (c) =>
   notImplemented(c, "Reading feedback (M3)"),
 );
