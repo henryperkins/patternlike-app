@@ -10,7 +10,7 @@ import {
   withoutFixtures,
   type ReleaseSigningKey,
 } from "../../test/content-release-fixtures.js";
-import { storeRelease, type ReleaseRecord } from "../db/content-releases.js";
+import { activateRelease, storeRelease, type ReleaseRecord } from "../db/content-releases.js";
 import type { ContentReleaseBundle } from "../services/content-release.js";
 
 const PATH = "http://api.test/internal/content-releases";
@@ -360,6 +360,145 @@ describe("POST /internal/content-releases — replay and immutability", () => {
     ]);
   });
 
+  it("records one activation when a stored release is activated twice", async () => {
+    const record: ReleaseRecord = {
+      version: "release-transition",
+      bundleHash: `sha256:${"d".repeat(64)}`,
+      r2Uri: "r2://artifacts/content-releases/release-transition.json",
+      approverId: "wp_reviewer",
+      lastAuthorId: "wp_author",
+      changelog: "Transition race regression.",
+      calcContractId: null,
+    };
+    const storeAudit = {
+      action: "content_release.store",
+      resourceId: record.version,
+      result: "success" as const,
+      detailClass: "activate_false",
+      actorId: "wp-release-key-1",
+    };
+    const activateAudit = {
+      action: "content_release.activate",
+      resourceId: record.version,
+      result: "success" as const,
+      detailClass: "activate",
+      actorId: "wp-release-key-1",
+    };
+
+    await storeRelease(env, record, storeAudit, "2026-08-08T00:00:00.000Z");
+    const first = await activateRelease(
+      env,
+      record,
+      activateAudit,
+      true,
+      "2026-08-08T00:01:00.000Z",
+    );
+    const second = await activateRelease(
+      env,
+      record,
+      activateAudit,
+      true,
+      "2026-08-08T00:02:00.000Z",
+    );
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+    expect(await releaseRows()).toEqual([
+      expect.objectContaining({
+        version: record.version,
+        status: "active",
+        activated_at: "2026-08-08T00:01:00.000Z",
+      }),
+    ]);
+    expect(await pointer()).toEqual([{ active_version: record.version }]);
+    expect(await auditRows()).toEqual([
+      expect.objectContaining({ action: "content_release.store", detail_class: "activate_false" }),
+      expect.objectContaining({ action: "content_release.activate", detail_class: "activate" }),
+    ]);
+  });
+
+  it("classifies a stored reactivation from its transactional previous status", async () => {
+    const original: ReleaseRecord = {
+      version: "release-rollback",
+      bundleHash: `sha256:${"e".repeat(64)}`,
+      r2Uri: "r2://artifacts/content-releases/release-rollback.json",
+      approverId: "wp_reviewer",
+      lastAuthorId: "wp_author",
+      changelog: "Release to reactivate.",
+      calcContractId: null,
+    };
+    const successor: ReleaseRecord = {
+      ...original,
+      version: "release-successor",
+      bundleHash: `sha256:${"f".repeat(64)}`,
+      r2Uri: "r2://artifacts/content-releases/release-successor.json",
+      changelog: "Release that temporarily supersedes the original.",
+    };
+    const storeAudit = (record: ReleaseRecord) => ({
+      action: "content_release.store",
+      resourceId: record.version,
+      result: "success" as const,
+      detailClass: "activate_false",
+      actorId: "wp-release-key-1",
+    });
+    // This deliberately supplies the stale route-side classification that a
+    // request could have calculated before another transaction intervened.
+    const staleActivateAudit = (record: ReleaseRecord) => ({
+      action: "content_release.activate",
+      resourceId: record.version,
+      result: "success" as const,
+      detailClass: "activate",
+      actorId: "wp-release-key-1",
+    });
+
+    await storeRelease(env, original, storeAudit(original), "2026-08-08T00:00:00.000Z");
+    await storeRelease(env, successor, storeAudit(successor), "2026-08-08T00:01:00.000Z");
+    expect(
+      await activateRelease(
+        env,
+        original,
+        staleActivateAudit(original),
+        true,
+        "2026-08-08T00:02:00.000Z",
+      ),
+    ).toBe(true);
+    expect(
+      await activateRelease(
+        env,
+        successor,
+        staleActivateAudit(successor),
+        true,
+        "2026-08-08T00:03:00.000Z",
+      ),
+    ).toBe(true);
+    expect(
+      await activateRelease(
+        env,
+        original,
+        staleActivateAudit(original),
+        true,
+        "2026-08-08T00:04:00.000Z",
+      ),
+    ).toBe(true);
+
+    expect(await releaseRows()).toEqual([
+      expect.objectContaining({
+        version: original.version,
+        status: "active",
+        activated_at: "2026-08-08T00:04:00.000Z",
+      }),
+      expect.objectContaining({ version: successor.version, status: "superseded" }),
+    ]);
+    expect(await pointer()).toEqual([{ active_version: original.version }]);
+    expect((await auditRows()).map((entry) => entry.detail_class)).toEqual([
+      "activate_false",
+      "activate_false",
+      "activate",
+      "activate",
+      "rollback",
+    ]);
+  });
+
   it("does not overwrite an immutable R2 artifact when no D1 row exists yet", async () => {
     const bundle = await activatable();
     const key = "content-releases/release-12.json";
@@ -639,6 +778,15 @@ describe("POST /internal/content-releases — refusals", () => {
 
     expect(status).toBe(503);
     expect(body.error.code).toBe("release_keys_not_configured");
+    expect(await auditRows()).toEqual([
+      {
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "release_keys_not_configured",
+        resource_id: null,
+        actor_id: null,
+      },
+    ]);
   });
 
   it("fails closed when any configured release signing key is malformed", async () => {
@@ -651,6 +799,38 @@ describe("POST /internal/content-releases — refusals", () => {
 
     expect(status).toBe(503);
     expect(body.error.code).toBe("release_keys_misconfigured");
+    expect(await auditRows()).toEqual([
+      {
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "release_keys_misconfigured",
+        resource_id: null,
+        actor_id: null,
+      },
+    ]);
+  });
+
+  it("audits a missing R2 binding after the signer has been verified", async () => {
+    const originalArtifacts = env.ARTIFACTS;
+    env.ARTIFACTS = undefined as never;
+
+    try {
+      const { status, body } = await ingest(ingestionBody(await activatable()));
+
+      expect(status).toBe(503);
+      expect(body.error.code).toBe("object_storage_not_configured");
+      expect(await auditRows()).toEqual([
+        {
+          action: "content_release.ingest",
+          result: "denied",
+          detail_class: "object_storage_not_configured",
+          resource_id: "release-12",
+          actor_id: "wp-release-key-1",
+        },
+      ]);
+    } finally {
+      env.ARTIFACTS = originalArtifacts;
+    }
   });
 
   it("carries a request id on every refusal", async () => {

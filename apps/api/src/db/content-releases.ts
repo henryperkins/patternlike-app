@@ -145,6 +145,37 @@ function insertReleaseStatement(
   );
 }
 
+/**
+ * Capture the stored target's state before this transaction changes it. This
+ * must be in the same batch as the transition: a route-side read can be stale
+ * by the time the write starts, which would mislabel a genuine rollback as an
+ * ordinary activation.
+ */
+function auditStoredTransitionStatement(
+  env: Env,
+  record: ReleaseRecord,
+  entry: AuditEntry,
+  now: string,
+) {
+  return env.DB.prepare(
+    `INSERT INTO audit_events
+       (id, actor_type, actor_id, action, resource_type, resource_id, result, detail_class, created_at)
+     SELECT ?, 'service', ?, ?, 'content_release', target.version, ?,
+       CASE target.status WHEN 'superseded' THEN 'rollback' ELSE 'activate' END,
+       ?
+     FROM content_releases AS target
+     WHERE target.version = ? AND target.bundle_hash = ? AND target.status <> 'active'`,
+  ).bind(
+    newId("aud"),
+    entry.actorId,
+    entry.action,
+    entry.result,
+    now,
+    record.version,
+    record.bundleHash,
+  );
+}
+
 /** Reactivating a stored release changes its state but never its identity. */
 function activateStoredReleaseStatement(
   env: Env,
@@ -156,8 +187,42 @@ function activateStoredReleaseStatement(
      SET status = 'active',
          r2_uri = COALESCE(?, r2_uri),
          activated_at = ?
-     WHERE version = ? AND bundle_hash = ?`,
+     WHERE version = ? AND bundle_hash = ? AND status <> 'active'`,
   ).bind(record.r2Uri, now, record.version, record.bundleHash);
+}
+
+/**
+ * Only retire the active pointer's predecessor if the stored target can still
+ * transition. This condition is evaluated in the same D1 transaction as the
+ * target update, closing the gap between the route's preflight reads and the
+ * write batch.
+ */
+function supersedeForStoredActivationStatement(env: Env, record: ReleaseRecord) {
+  return env.DB.prepare(
+    `UPDATE content_releases
+     SET status = 'superseded'
+     WHERE status = 'active'
+       AND version <> ?
+       AND EXISTS (
+         SELECT 1 FROM content_releases
+         WHERE version = ? AND bundle_hash = ? AND status <> 'active'
+       )`,
+  ).bind(record.version, record.version, record.bundleHash);
+}
+
+/**
+ * `changes()` refers to the preceding target update. A zero-row transition
+ * leaves both the pointer and its audit history untouched.
+ */
+function pointerAfterTransitionStatement(env: Env, record: ReleaseRecord, now: string) {
+  return env.DB.prepare(
+    `INSERT INTO content_release_pointer (id, active_version, updated_at)
+     SELECT 1, ?, ?
+     WHERE changes() > 0
+     ON CONFLICT(id) DO UPDATE SET
+       active_version = excluded.active_version,
+       updated_at = excluded.updated_at`,
+  ).bind(record.version, now);
 }
 
 /**
@@ -198,22 +263,31 @@ export async function activateRelease(
   audit: AuditEntry,
   alreadyStored = false,
   now = new Date().toISOString(),
-): Promise<void> {
-  await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE content_releases SET status = 'superseded'
-       WHERE status = 'active' AND version <> ?`,
-    ).bind(record.version),
-    alreadyStored
-      ? activateStoredReleaseStatement(env, record, now)
-      : insertReleaseStatement(env, record, "active", now),
-    env.DB.prepare(
-      `INSERT INTO content_release_pointer (id, active_version, updated_at)
-       VALUES (1, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         active_version = excluded.active_version,
-         updated_at = excluded.updated_at`,
-    ).bind(record.version, now),
-    auditStatement(env, audit, now),
+): Promise<boolean> {
+  if (!alreadyStored) {
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE content_releases SET status = 'superseded'
+         WHERE status = 'active' AND version <> ?`,
+      ).bind(record.version),
+      insertReleaseStatement(env, record, "active", now),
+      env.DB.prepare(
+        `INSERT INTO content_release_pointer (id, active_version, updated_at)
+         VALUES (1, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           active_version = excluded.active_version,
+           updated_at = excluded.updated_at`,
+      ).bind(record.version, now),
+      auditStatement(env, audit, now),
+    ]);
+    return true;
+  }
+
+  const results = await env.DB.batch([
+    auditStoredTransitionStatement(env, record, audit, now),
+    supersedeForStoredActivationStatement(env, record),
+    activateStoredReleaseStatement(env, record, now),
+    pointerAfterTransitionStatement(env, record, now),
   ]);
+  return results[2]!.meta.changes > 0;
 }

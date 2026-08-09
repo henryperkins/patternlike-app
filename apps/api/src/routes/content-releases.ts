@@ -70,10 +70,6 @@ function isReleaseIdentityConstraint(error: unknown): boolean {
   );
 }
 
-function activationDetailClass(status: string | undefined): "activate" | "rollback" {
-  return status === "superseded" ? "rollback" : "activate";
-}
-
 contentReleaseRoutes.post("/content-releases", async (c) => {
   const requestId = c.get("requestId");
   const receivedAt = new Date().toISOString();
@@ -95,7 +91,7 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
    */
   const refuse = async (
     reason: RejectionReason,
-    status: 400 | 409,
+    status: 400 | 409 | 503,
     context: { version?: string | null; keyId?: string | null } = {},
   ) => {
     await recordAudit(c.env, {
@@ -159,11 +155,11 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
       malformed: parsedKeys.malformed,
       invalid_key_ids: parsedKeys.invalidKeyIds,
     });
-    return c.json(
-      errorBody({
+    return refuse(
+      {
         class: "release_keys_misconfigured",
         message: "CONTENT_RELEASE_KEYS contains an invalid signing-key entry",
-      }),
+      },
       503,
     );
   }
@@ -172,11 +168,11 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
     // Fails closed everywhere, development included. A branch that skipped
     // verification locally would mean the one path that must never be wrong is
     // the one path never exercised before production.
-    return c.json(
-      errorBody({
+    return refuse(
+      {
         class: "release_keys_not_configured",
         message: "CONTENT_RELEASE_KEYS is not configured; cannot verify release signatures",
-      }),
+      },
       503,
     );
   }
@@ -270,12 +266,13 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
   // --- Store the immutable artifact, then move the pointer. ---
 
   if (!c.env.ARTIFACTS) {
-    return c.json(
-      errorBody({
+    return refuse(
+      {
         class: "object_storage_not_configured",
         message: "ARTIFACTS R2 bucket is not bound; cannot store the release bundle",
-      }),
+      },
       503,
+      { version, keyId },
     );
   }
 
@@ -346,21 +343,33 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
       return c.json(response(RESPONSE_STATUS.pending, r2Uri, activePointer), 202);
     }
 
-    await activateRelease(
+    const transitioned = await activateRelease(
       c.env,
       record,
       {
         action: "content_release.activate",
         resourceId: version,
         result: "success",
-        // A previously submitted release is being activated for the first
-        // time. Only moving the pointer back to a superseded release is a
-        // rollback.
-        detailClass: activationDetailClass(existingByVersion?.status),
+        // Stored-release transitions derive this from the target's status in
+        // D1, not this preflight snapshot, so a concurrent transition cannot
+        // turn a real rollback into a falsely labelled activation.
+        detailClass: "activate",
         actorId: keyId,
       },
       existingByVersion !== null,
     );
+    if (!transitioned) {
+      const settledRelease = await findReleaseByVersion(c.env, version);
+      const settledPointer = await getActiveVersion(c.env);
+      return c.json(
+        response(
+          RESPONSE_STATUS.duplicate,
+          settledRelease?.r2_uri ?? r2Uri,
+          settledPointer,
+        ),
+        202,
+      );
+    }
     return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
   } catch (error) {
     if (!isReleaseIdentityConstraint(error)) throw error;
@@ -378,18 +387,25 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
         );
       }
 
-      await activateRelease(
+      const transitioned = await activateRelease(
         c.env,
         record,
         {
           action: "content_release.activate",
           resourceId: version,
           result: "success",
-          detailClass: activationDetailClass(winnerByVersion.status),
+          detailClass: "activate",
           actorId: keyId,
         },
         true,
       );
+      if (!transitioned) {
+        const settledPointer = await getActiveVersion(c.env);
+        return c.json(
+          response(RESPONSE_STATUS.duplicate, winnerByVersion.r2_uri, settledPointer),
+          202,
+        );
+      }
       return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
     }
 

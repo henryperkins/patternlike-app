@@ -1,7 +1,10 @@
 name = "patternlike-api"
 main = "src/index.ts"
 compatibility_date = "2025-05-01"
-compatibility_flags = ["nodejs_compat"]
+# Ajv compiles only the bundled, frozen M0 schemas at module startup. Keep the
+# opt-in narrow: user input is data, never a schema, so it cannot supply code
+# to this capability.
+compatibility_flags = ["nodejs_compat", "allow_eval_during_startup"]
 
 # Local / default D1 binding. The id here is a deliberate non-resolving
 # placeholder, NOT an oversight: `--local` uses it only as a state-directory key,
