@@ -25,6 +25,37 @@ migrations_dir = "../../db/d1"
 binding = "ARTIFACTS"
 bucket_name = "pattern-artifacts-dev"
 
+# Daily-reading generation. Producer and consumer are the same Worker: enqueue
+# reserves the day in D1 and sends an opaque {job_id, reading_id}, and the
+# consumer claims that job and publishes.
+#
+# The queue is a NUDGE, not the durable record. The D1 job row is the outbox, so
+# a message lost before send is recovered by the undispatched sweeper and a
+# message delivered twice is absorbed by the claim CAS. Nothing treats a send
+# response as proof that generation completed.
+#
+# Dev-named queues for the same reason the D1 id is a placeholder and the R2
+# bucket is `-dev`: a remote command that forgets `--env production` must not
+# reach production work. Create both before the first deploy —
+# `wrangler queues create patternlike-daily-readings` and
+# `wrangler queues create patternlike-daily-readings-dlq` — or the upload fails
+# on an unknown queue.
+[[queues.producers]]
+binding = "READING_QUEUE"
+queue = "patternlike-daily-readings-dev"
+
+[[queues.consumers]]
+queue = "patternlike-daily-readings-dev"
+# One at a time: each message decrypts a command, runs the assembler, and writes
+# a guarded batch. Batching would only widen the blast radius of a retry.
+max_batch_size = 1
+max_batch_timeout = 5
+# Three attempts, then the dead-letter queue. Beyond that a retry is no longer
+# waiting out an outage, and the replacement path — which re-freezes a NEW
+# command against working dependencies — is the correct repair.
+max_retries = 3
+dead_letter_queue = "patternlike-daily-readings-dev-dlq"
+
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the
 # configGuard middleware refuses AUTH_STUB=1 outside development.
@@ -122,6 +153,20 @@ migrations_dir = "../../db/d1"
 [[env.production.r2_buckets]]
 binding = "ARTIFACTS"
 bucket_name = "pattern-artifacts"
+
+# Redeclared because named environments do not inherit top-level bindings — the
+# same reason D1 and R2 appear twice above. A production deploy that inherited
+# the dev queue would publish real readings off a queue nobody watches.
+[[env.production.queues.producers]]
+binding = "READING_QUEUE"
+queue = "patternlike-daily-readings"
+
+[[env.production.queues.consumers]]
+queue = "patternlike-daily-readings"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "patternlike-daily-readings-dlq"
 
 # Workers Logs / Traces. Declared here so a deploy cannot silently reset what
 # the dashboard currently has: observability is part of the uploaded metadata,

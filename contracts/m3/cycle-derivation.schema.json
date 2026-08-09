@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json",
+  "title": "Cycle Pass Identity and Cycle Hash Preimages",
+  "description": "The two derivations a generation command needs but the freeze only described in prose. generation-command.schema.json requires cyclePin.pass_ids and cyclePin.cycle_hash, while the freeze specified pass ids as 'derived from the parent cycle identity plus pass_index' with no preimage document and no golden vector, and cycle_hash as a hash 'of the normalized cycle row as scanned' with no stated normalization. Two implementations reading that would mint different ids for the same pass and different hashes for the same scan. Both preimages are defined here so that cannot happen. Purely additive: no existing $id, required field, or enum changes, so this is recorded in SCHEMA_MANIFEST.json's amendments array rather than reopening the freeze.",
+  "$defs": {
+    "cyclePassIdentityV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Closed preimage for cyp_ ids. Derived from the parent cycle id rather than from the parent's own preimage: cycleIdentityV1 carries oriented_branch and winding, which are deliberately private to the calculation service and never appear on the wire, so the trusted plane that persists a pass cannot reconstruct them. It does not need to. cyc_ is already a collision-resistant function of that private preimage, so (cycle_id, pass_index) inherits the parent's uniqueness while remaining computable by any holder of the response.",
+      "required": ["identity_profile", "cycle_id", "pass_index"],
+      "properties": {
+        "identity_profile": { "const": "patternlike.cycle-pass-id.v1" },
+        "cycle_id": {
+          "$ref": "common.schema.json#/$defs/cycleId",
+          "description": "The parent encounter. Stable across shifted scan windows, so a pass id is too."
+        },
+        "pass_index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based position in the parent's chronological pass list. Refinement may move a pass's exact_at by fractions of a second; its index does not move, which is why the timestamp is absent from this preimage."
+        }
+      }
+    },
+    "cycleHashPreimageV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Closed preimage for cyclePin.cycle_hash. It is the normalized cycle exactly as scanned, minus importance_score. That exclusion is the whole substantive decision here: importance_score is optional and advisory on the wire and cannot change assembly output, so including it would fail a claimed job closed over a value that does not affect the reading. Everything retained can change the envelope or the pass list, which is precisely what the frozen command must refuse to have changed under it.",
+      "required": [
+        "id",
+        "technique",
+        "body",
+        "target",
+        "aspect",
+        "start_at",
+        "exact_at",
+        "end_at",
+        "pass_count",
+        "passes",
+        "orb_deg"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/cycleId" },
+        "technique": { "type": "string", "const": "transit" },
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "target": { "type": "string", "minLength": 1 },
+        "aspect": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+        },
+        "start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "exact_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "pass_count": { "type": "integer", "minimum": 1 },
+        "passes": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Chronological, contiguous, and already in that total order before canonicalization — JCS preserves array order, so the order is part of the hash.",
+          "items": { "$ref": "cycle-response.schema.json#/$defs/cyclePass" }
+        },
+        "orb_deg": { "type": "number", "minimum": 0, "maximum": 12 }
+      }
+    }
+  },
+  "oneOf": [
+    { "title": "CyclePassIdentityV1", "$ref": "#/$defs/cyclePassIdentityV1" },
+    { "title": "CycleHashPreimageV1", "$ref": "#/$defs/cycleHashPreimageV1" }
+  ]
+}

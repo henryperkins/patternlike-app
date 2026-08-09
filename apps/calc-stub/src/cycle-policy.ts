@@ -15,18 +15,29 @@
 
 import type { AspectType, CelestialBody } from "@patternlike/shared";
 
-export const CYCLE_POLICY_ID = "transit-scan-launch";
-export const CYCLE_POLICY_VERSION = "1.4.0";
-
 /**
- * The transit orb policy, which is deliberately NOT the natal `orb-launch-default`
- * table in engine.ts. Natal orbs describe how wide a chart aspect may be and
- * still be reported; transit orbs describe how long an encounter is claimed to
- * last, and a natal-width orb on Pluto is a decade-long "cycle" that means
- * nothing to a reader.
+ * The policy identifiers moved to `@patternlike/shared` and are re-exported
+ * here so every call site in this service is unchanged.
+ *
+ * They moved because the Worker must name the exact policy in a `POST /v1/cycles`
+ * request — this service refuses any other — and must freeze the same strings
+ * into a generation command. A hand-copied second pair would turn a version bump
+ * here into a silent scan refusal on every reading over there.
+ *
+ * Only the identifiers are shared. The transit orb table below, the lookaround
+ * bounds, and the unwrapping epoch stay in this service: they are the policy,
+ * not its name. In particular the transit orbs are deliberately NOT the natal
+ * `orb-launch-default` table in engine.ts — natal orbs describe how wide a chart
+ * aspect may be and still be reported, transit orbs describe how long an
+ * encounter is claimed to last, and a natal-width orb on Pluto is a decade-long
+ * "cycle" that means nothing to a reader.
  */
-export const TRANSIT_ORB_POLICY_ID = "orb-launch";
-export const TRANSIT_ORB_POLICY_VERSION = "1.0.0";
+export {
+  CYCLE_POLICY_ID,
+  CYCLE_POLICY_VERSION,
+  TRANSIT_ORB_POLICY_ID,
+  TRANSIT_ORB_POLICY_VERSION,
+} from "@patternlike/shared";
 
 /**
  * The Julian days the pinned data files actually cover, measured rather than

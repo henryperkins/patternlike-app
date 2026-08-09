@@ -1,8 +1,10 @@
-import { canonicalJson, contentHash, SCHEMA_VERSION } from "@patternlike/shared";
+import { canonicalJson, contentHash, M3_SCHEMA_VERSION } from "@patternlike/shared";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import commonSchema from "../../../../contracts/m0/common.schema.json";
 import contentReleaseSchema from "../../../../contracts/m0/content-release.schema.json";
+import m3CommonSchema from "../../../../contracts/m3/common.schema.json";
+import m3ContentReleaseSchema from "../../../../contracts/m3/content-release.schema.json";
 
 /**
  * Verification for signed editorial release bundles.
@@ -28,6 +30,13 @@ export const RELEASE_OBJECT_COLLECTIONS = [
   "modifiers",
   "prompts",
   "safety_rules",
+  // M3. Both are required by contracts/m3/content-release.schema.json, and both
+  // are required by the assembler: the timing template is the reviewed copy a
+  // cycle's timing sentence is rendered from, and the daily fallback is what a
+  // day with no eligible fact publishes. A bundle without them cannot produce a
+  // reading, which is why ingestion no longer accepts one.
+  "timing_templates",
+  "daily_fallbacks",
 ] as const;
 
 export type ReleaseObjectCollection = (typeof RELEASE_OBJECT_COLLECTIONS)[number];
@@ -40,10 +49,20 @@ const COLLECTION_CONTENT_TYPE: Record<ReleaseObjectCollection, string> = {
   modifiers: "astrology_modifier",
   prompts: "astrology_prompt",
   safety_rules: "astrology_safety_rule",
+  timing_templates: "timing_template",
+  daily_fallbacks: "daily_fallback",
 };
 
 /** Collections the contract requires to be non-empty. */
-const REQUIRED_NON_EMPTY: ReleaseObjectCollection[] = ["phases", "safety_rules"];
+const REQUIRED_NON_EMPTY: ReleaseObjectCollection[] = [
+  "phases",
+  "safety_rules",
+  "timing_templates",
+  "daily_fallbacks",
+];
+
+/** `{token}` occurrences inside reviewed timing copy. */
+const PLACEHOLDER_RE = /\{([a-z_]+)\}/g;
 
 export const SIGNATURE_ALGORITHMS = ["Ed25519", "ES256"] as const;
 export type SignatureAlgorithm = (typeof SIGNATURE_ALGORITHMS)[number];
@@ -66,6 +85,16 @@ export interface ReleaseMetadata {
   last_author_id: string;
   changelog: string;
   status: string;
+  /**
+   * M3. Locale is not decoration: it selects which reviewed fallback and which
+   * timing template a reader is shown, so the set of locales a release claims
+   * to serve has to be declared and checked rather than inferred from whatever
+   * objects happen to be present.
+   */
+  supported_locales: string[];
+  locale_default: string;
+  /** Optional exact-locale redirects, e.g. {"es-MX": "es-ES"}. */
+  language_fallbacks?: Record<string, string>;
   calc_contract_id?: string | null;
   [key: string]: unknown;
 }
@@ -349,13 +378,19 @@ function isStringArray(value: unknown): value is string[] {
 const HASH_RE = /^(sha256:)?[a-f0-9]{64}$/;
 const RELEASE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+// All four documents are registered because the M3 bundle schema refs both
+// packages: `common.schema.json` relative (m3) and two absolute m0 URLs. The M0
+// pair stays registered even though nothing validates against it directly — it
+// is what the m3 refs resolve through.
 const schemaValidator = new Ajv2020({ strict: true });
 addFormats(schemaValidator);
 schemaValidator.addSchema(commonSchema);
 schemaValidator.addSchema(contentReleaseSchema);
+schemaValidator.addSchema(m3CommonSchema);
+schemaValidator.addSchema(m3ContentReleaseSchema);
 const loadedContentReleaseRequestValidator =
   schemaValidator.getSchema<ContentReleaseIngestionRequest>(
-    `${contentReleaseSchema.$id}#/$defs/contentReleaseIngestionRequest`,
+    `${m3ContentReleaseSchema.$id}#/$defs/contentReleaseIngestionRequest`,
   );
 if (!loadedContentReleaseRequestValidator) {
   throw new Error("Could not load contentReleaseIngestionRequest schema");
@@ -378,11 +413,11 @@ export function validateIngestionRequest(
   }
   const body = value as Record<string, unknown>;
 
-  if (body.schema_version !== SCHEMA_VERSION) {
+  if (body.schema_version !== M3_SCHEMA_VERSION) {
     return {
       error: reject(
         "schema_version_unsupported",
-        `schema_version must be ${SCHEMA_VERSION}`,
+        `schema_version must be ${M3_SCHEMA_VERSION}`,
       ),
     };
   }
@@ -423,10 +458,16 @@ function validateBundleShape(value: unknown): RejectionReason | null {
   }
   const bundle = value as Record<string, unknown>;
 
-  if (bundle.schema_version !== SCHEMA_VERSION) {
+  // M3 only. A 0.2.0 bundle carries no timing templates, no daily fallbacks, and
+  // no declared locales, so the assembler cannot produce a reading from it —
+  // storing one would reserve an immutable release version for bytes that can
+  // never be served. Nothing has ever been ingested in production
+  // (CONTENT_RELEASE_KEYS is unset there and ingestion fails closed at 503), so
+  // narrowing this orphans no stored release.
+  if (bundle.schema_version !== M3_SCHEMA_VERSION) {
     return reject(
       "schema_version_unsupported",
-      `bundle.schema_version must be ${SCHEMA_VERSION}`,
+      `bundle.schema_version must be ${M3_SCHEMA_VERSION}`,
     );
   }
 
@@ -459,6 +500,45 @@ function validateBundleShape(value: unknown): RejectionReason | null {
       "invalid_body",
       "bundle.release.version must be 1..128 characters of [A-Za-z0-9._-], starting alphanumeric",
     );
+  }
+
+  if (!isStringArray(meta.supported_locales) || meta.supported_locales.length === 0) {
+    return reject(
+      "invalid_body",
+      "bundle.release.supported_locales must be a non-empty array of locale tags",
+    );
+  }
+  if (new Set(meta.supported_locales).size !== meta.supported_locales.length) {
+    return reject("invalid_body", "bundle.release.supported_locales contains duplicates");
+  }
+  if (!isNonEmptyString(meta.locale_default)) {
+    return reject("invalid_body", "bundle.release.locale_default is required");
+  }
+  // A default outside the supported set is a release whose fallback path leads
+  // nowhere, which surfaces as an unassemblable reading rather than a bad
+  // bundle unless it is caught here.
+  if (!meta.supported_locales.includes(meta.locale_default)) {
+    return reject(
+      "locale_default_not_supported",
+      `bundle.release.locale_default ${meta.locale_default} is not in supported_locales`,
+    );
+  }
+  if (meta.language_fallbacks !== undefined) {
+    if (
+      !meta.language_fallbacks ||
+      typeof meta.language_fallbacks !== "object" ||
+      Array.isArray(meta.language_fallbacks)
+    ) {
+      return reject("invalid_body", "bundle.release.language_fallbacks must be an object");
+    }
+    for (const [from, to] of Object.entries(meta.language_fallbacks)) {
+      if (!isNonEmptyString(to) || !meta.supported_locales.includes(to)) {
+        return reject(
+          "locale_fallback_unsupported",
+          `bundle.release.language_fallbacks[${from}] points at unsupported locale ${String(to)}`,
+        );
+      }
+    }
   }
 
   const signature = bundle.signature;
@@ -582,6 +662,42 @@ function validateObjectShape(
       return reject("invalid_body", `${where}.fallback_fragment_id is required`);
     }
   }
+
+  if (collection === "timing_templates") {
+    if (!isNonEmptyString(object.template_text)) {
+      return reject("invalid_body", `${where}.template_text is required`);
+    }
+    if (!isStringArray(object.placeholders) || object.placeholders.length === 0) {
+      return reject("invalid_body", `${where}.placeholders must be a non-empty array`);
+    }
+    if (typeof object.is_locale_default !== "boolean") {
+      return reject("invalid_body", `${where}.is_locale_default must be a boolean`);
+    }
+    // Reviewed copy may only interpolate tokens the release declared. An
+    // undeclared token renders as a literal brace in a published paragraph, and
+    // nobody reviews the string the reader actually sees.
+    const declared = new Set(object.placeholders);
+    for (const match of (object.template_text as string).matchAll(PLACEHOLDER_RE)) {
+      if (!declared.has(match[1]!)) {
+        return reject(
+          "timing_undeclared_placeholder",
+          `${where}.template_text uses {${match[1]}}, which is not in placeholders`,
+        );
+      }
+    }
+  }
+
+  if (collection === "daily_fallbacks") {
+    if (!isNonEmptyString(object.body)) {
+      return reject("invalid_body", `${where}.body is required`);
+    }
+    // The only permitted value. A fallback that can itself be ineligible is not
+    // a fallback, so the schema gives this object no eligibility block at all.
+    if (object.eligibility_mode !== "universal") {
+      return reject("invalid_body", `${where}.eligibility_mode must be "universal"`);
+    }
+  }
+
   return null;
 }
 
@@ -709,6 +825,48 @@ export function validateContentGraph(bundle: ContentReleaseBundle): RejectionRea
       return reject(
         "unresolved_safety_fallback",
         `safety rule ${rule.id} fallback_fragment_id ${fragmentId} is not in this bundle and no fallback_text was supplied`,
+      );
+    }
+  }
+
+  // Every supported locale must be servable on its worst day. A day with no
+  // eligible fact is the commonest day there is, so a locale without exactly one
+  // approved universal fallback is a locale that can silently publish nothing —
+  // and two would make "which reviewed copy did this reader see" unanswerable.
+  const approved = (object: ContentObject) =>
+    object.status === undefined || object.status === "approved";
+
+  for (const locale of release.supported_locales) {
+    const fallbacks = objects.daily_fallbacks.filter(
+      (object) => approved(object) && object.locale === locale,
+    );
+    if (fallbacks.length === 0) {
+      return reject(
+        "fallback_missing_for_locale",
+        `no approved daily_fallback for supported locale ${locale}`,
+      );
+    }
+    if (fallbacks.length > 1) {
+      return reject(
+        "fallback_duplicate_for_locale",
+        `${fallbacks.length} approved daily_fallbacks for locale ${locale}; exactly one is permitted`,
+      );
+    }
+
+    const templates = objects.timing_templates.filter(
+      (object) => approved(object) && object.locale === locale,
+    );
+    if (templates.length === 0) {
+      return reject(
+        "timing_template_missing_for_locale",
+        `no approved timing_template for supported locale ${locale}`,
+      );
+    }
+    const defaults = templates.filter((object) => object.is_locale_default === true);
+    if (defaults.length !== 1) {
+      return reject(
+        "timing_template_missing_for_locale",
+        `locale ${locale} has ${defaults.length} approved timing templates marked is_locale_default; exactly one is required`,
       );
     }
   }

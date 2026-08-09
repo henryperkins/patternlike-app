@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
-import app from "../index.js";
+import { app } from "../index.js";
 import { resetDb, rows } from "../../test/helpers.js";
 import { linkIdentity } from "../db/identities.js";
 import { createSession } from "../db/sessions.js";

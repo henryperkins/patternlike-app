@@ -20,6 +20,29 @@ import type { AspectType, BirthTimeAccuracy, CelestialBody } from "./types.js";
 export const M3_SCHEMA_VERSION = "0.3.0" as const;
 export type M3SchemaVersion = typeof M3_SCHEMA_VERSION;
 
+/**
+ * The scan policy the calculation service implements, and the only one it will
+ * answer for: `POST /v1/cycles` refuses a request naming any other id or
+ * version rather than quietly scanning under its own.
+ *
+ * These four strings live here rather than in `apps/calc-stub/src/cycle-policy.ts`
+ * (which re-exports them) because the Worker has to put the exact values in a
+ * request and freeze them into a generation command, and a second hand-copied
+ * pair would turn a policy bump into a silent scan refusal on every reading.
+ * Only the identifiers are shared — the orb tables, lookaround bounds, and
+ * unwrapping epoch stay in the calculation service.
+ *
+ * `cycle_policy_version` must bump whenever the ephemeris or container, the
+ * unwrapping epoch, the scan grid, the station and root tolerances, or the
+ * complete-encounter lookaround can alter output. `cycle_instances.horizon_version`
+ * records this same value, so a threshold change re-scans into a new vintage
+ * instead of mixing vintages in one table.
+ */
+export const CYCLE_POLICY_ID = "transit-scan-launch" as const;
+export const CYCLE_POLICY_VERSION = "1.4.0" as const;
+export const TRANSIT_ORB_POLICY_ID = "orb-launch" as const;
+export const TRANSIT_ORB_POLICY_VERSION = "1.0.0" as const;
+
 /** Closed set emitted by the chart engine's `buildUncertainty()`. */
 export type SuppressedFeatureClass =
   | "houses"
@@ -217,4 +240,83 @@ export function renderCyclePassId(fullDigestHex: string): string {
     );
   }
   return "cyp_" + fullDigestHex.slice(0, 32);
+}
+
+/**
+ * The closed `cyp_` hash preimage.
+ *
+ * Keyed on the parent `cyc_` rather than on `CycleIdentityV1`, and that is not a
+ * shortcut. `oriented_branch` and `winding` never leave the calculation service,
+ * so the trusted plane that persists a pass cannot rebuild the parent preimage —
+ * and does not need to, because `cyc_` is already a collision-resistant function
+ * of it, so `(cycle_id, pass_index)` inherits the parent's uniqueness.
+ *
+ * The pass timestamp is deliberately absent: refinement may move `exact_at` by
+ * fractions of a second across rescans, while the index does not move.
+ *
+ * Normative definition: `contracts/m3/cycle-derivation.schema.json`.
+ */
+export interface CyclePassIdentityV1 {
+  identity_profile: "patternlike.cycle-pass-id.v1";
+  cycle_id: string;
+  pass_index: number;
+}
+
+/**
+ * The closed `cyclePin.cycle_hash` preimage: the normalized cycle exactly as
+ * scanned, minus `importance_score`.
+ *
+ * That exclusion is the substantive decision. `importance_score` is optional and
+ * advisory on the wire and cannot change assembly output, so including it would
+ * fail a claimed job closed over a value that does not affect the reading.
+ * Everything retained can change the envelope or the pass list, which is exactly
+ * what a frozen command must refuse to have changed under it.
+ */
+export type CycleHashPreimageV1 = Omit<NormalizedCycle, "importance_score">;
+
+export function buildCyclePassIdentity(
+  cycleId: string,
+  passIndex: number,
+): CyclePassIdentityV1 {
+  if (!cycleId.startsWith("cyc_")) {
+    throw new CycleIdentityError(`not a cycle id: ${cycleId}`);
+  }
+  if (!Number.isInteger(passIndex) || passIndex < 1) {
+    throw new CycleIdentityError(
+      `pass_index must be a 1-based integer, received ${passIndex}`,
+    );
+  }
+  return {
+    identity_profile: "patternlike.cycle-pass-id.v1",
+    cycle_id: cycleId,
+    pass_index: passIndex,
+  };
+}
+
+/**
+ * Project a scanned cycle into its hash preimage.
+ *
+ * Fields are copied explicitly rather than spread-and-deleted so that a new
+ * optional wire field cannot silently enter the hash and start failing claimed
+ * jobs; adding one to the preimage has to be a decision.
+ */
+export function buildCycleHashPreimage(cycle: NormalizedCycle): CycleHashPreimageV1 {
+  return {
+    id: cycle.id,
+    technique: cycle.technique,
+    body: cycle.body,
+    target: cycle.target,
+    aspect: cycle.aspect,
+    start_at: cycle.start_at,
+    exact_at: cycle.exact_at,
+    end_at: cycle.end_at,
+    pass_count: cycle.pass_count,
+    passes: cycle.passes.map((p) => ({
+      pass_index: p.pass_index,
+      direction: p.direction,
+      exact_at: p.exact_at,
+      speed_deg_per_day: p.speed_deg_per_day,
+    })),
+    orb_deg: cycle.orb_deg,
+  };
 }

@@ -1,5 +1,5 @@
-import baseFixture from "../../../contracts/m0/fixtures/valid/content-release.bundle.json";
-import { SCHEMA_VERSION } from "@patternlike/shared";
+import baseFixture from "../../../contracts/m3/fixtures/valid/content-release.bundle.json";
+import { M3_SCHEMA_VERSION } from "@patternlike/shared";
 import {
   RELEASE_OBJECT_COLLECTIONS,
   bundleSigningPayload,
@@ -12,12 +12,17 @@ import {
 /**
  * Signed test bundles, built from the frozen contract fixture.
  *
- * The base body is `contracts/m0/fixtures/valid/content-release.bundle.json`
- * rather than a copy of it, so a change to the frozen fixture reaches these
+ * The base body is `contracts/m3/fixtures/valid/content-release.bundle.json`
+ * rather than a copy of it, so a change to the contract fixture reaches these
  * tests instead of leaving them asserting against a shape the contract no
  * longer describes. Its hashes and signature are placeholders — this module
  * recomputes both, which is why no key material is committed anywhere: every
  * run mints an ephemeral keypair.
+ *
+ * It is the M3 fixture, not the M0 one, because ingestion now accepts only the
+ * M3 shape: a bundle without timing templates, daily fallbacks, and declared
+ * locales cannot produce a reading, so storing one would reserve an immutable
+ * release version for bytes that can never be served.
  */
 
 export interface ReleaseSigningKey {
@@ -156,6 +161,42 @@ export function withoutFixtures(bundle: ContentReleaseBundle): void {
   delete bundle.fixtures;
 }
 
+/**
+ * Append a schema-valid pattern.
+ *
+ * The M3 contract fixture ships `patterns: []` — patterns are a Your Pattern
+ * concern, not a daily-reading one — so the cases that exercise pattern rules
+ * add their own rather than mutating the shared contract fixture to suit them.
+ */
+export function withPattern(bundle: ContentReleaseBundle): void {
+  bundle.objects.patterns.push({
+    id: "pattern.saturn.moon.tension",
+    content_type: "astrology_pattern",
+    content_version: "1",
+    title: "Structure meets feeling",
+    locale: "en-US",
+    object_hash: `sha256:${"b".repeat(64)}`,
+    status: "approved",
+    prohibited_claims: ["guaranteed_external_event", "clinical_diagnosis"],
+    eligibility: {
+      required_fact_classes: ["natal_aspect"],
+      required_bodies: ["saturn", "moon"],
+      required_aspects: ["square"],
+      min_birth_time_accuracy: "unknown",
+      requires_houses: false,
+      techniques: ["natal"],
+    },
+    tags: ["boundaries", "care"],
+    summary: "A lasting pattern of negotiating care with limits.",
+    body: "You learn to hold feeling inside workable structure without abandoning either.",
+    resources: ["patience", "reliability"],
+    tensions: ["emotional austerity", "over-responsibility"],
+    counter_expression: "Softness and structure can coexist when limits are spoken early.",
+    prompt_ids: ["prompt.work.steady-effort.en-US"],
+    evidence_requirements: ["natal_aspect:saturn-square-moon"],
+  });
+}
+
 export interface IngestionOptions {
   idempotencyKey?: string;
   activate?: boolean;
@@ -166,7 +207,7 @@ export function ingestionBody(
   options: IngestionOptions = {},
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
-    schema_version: SCHEMA_VERSION,
+    schema_version: M3_SCHEMA_VERSION,
     bundle,
     idempotency_key: options.idempotencyKey ?? "release-ingest-key-0001",
   };

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { env } from "cloudflare:test";
 import { Jwt } from "hono/utils/jwt";
-import app from "../index.js";
+import { app } from "../index.js";
 import { resetDb, rows, ALICE } from "../../test/helpers.js";
 import { __resetJwksCacheForTests } from "../services/identity.js";
 

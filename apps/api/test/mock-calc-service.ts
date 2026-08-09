@@ -64,8 +64,142 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+/**
+ * Sentinel chart fingerprints that drive `/v1/cycles` failure paths.
+ *
+ * Fingerprints rather than a place label, because the cycle request carries no
+ * birth data at all — natal longitudes and nothing else, which is the property
+ * that keeps a decryption path out of the calculation service. A test seeds a
+ * `chart_snapshots` row with one of these and the scan behaves accordingly.
+ * All three are well-formed sha256 digests, so nothing downstream can pass or
+ * fail for the wrong reason.
+ */
+export const CYCLE_FP_EMPTY = `sha256:${"e".repeat(64)}`;
+export const CYCLE_FP_REFUSED = `sha256:${"f".repeat(64)}`;
+export const CYCLE_FP_UNAVAILABLE = `sha256:${"a".repeat(64)}`;
+
+interface CycleRequestBody {
+  schema_version: string;
+  request_id: string;
+  chart_fingerprint: string;
+  natal_accuracy: "exact" | "approximate" | "unknown";
+  suppressed_features?: string[];
+  window: { from: string; to: string };
+  cycle_policy_id: string;
+  cycle_policy_version: string;
+  orb_policy_id: string;
+  orb_policy_version: string;
+  contract_id: string;
+  contract_version: string;
+}
+
+/** `cyc_` + 32 hex, deterministic on the encounter rather than on the scan. */
+function mockCycleId(fingerprint: string, encounter: string): string {
+  return `cyc_${stableHash(`${fingerprint}|${encounter}`).slice(0, 32)}`;
+}
+
+/**
+ * Envelopes are absolute and independent of the requested window, which is the
+ * real contract: two overlapping request windows that select the same encounter
+ * must return the same complete pass list, envelope, first exact time, and id.
+ * A mock whose output moved with the window would make that untestable.
+ */
+function mockCycles(req: CycleRequestBody): Array<Record<string, unknown>> {
+  const fp = req.chart_fingerprint;
+  const suppressed = new Set(req.suppressed_features ?? []);
+
+  const cycles: Array<Record<string, unknown>> = [
+    {
+      id: mockCycleId(fp, "saturn|sun|square"),
+      technique: "transit",
+      body: "saturn",
+      target: "sun",
+      aspect: "square",
+      start_at: "2026-07-19T05:22:10Z",
+      exact_at: "2026-08-02T14:11:07Z",
+      end_at: "2027-01-26T18:44:02Z",
+      pass_count: 3,
+      passes: [
+        { pass_index: 1, direction: "direct", exact_at: "2026-08-02T14:11:07Z", speed_deg_per_day: 0.0331 },
+        { pass_index: 2, direction: "retrograde", exact_at: "2026-10-19T03:52:44Z", speed_deg_per_day: -0.0288 },
+        { pass_index: 3, direction: "direct", exact_at: "2027-01-11T21:07:19Z", speed_deg_per_day: 0.0302 },
+      ],
+      orb_deg: 3,
+      importance_score: 0.82,
+    },
+  ];
+
+  // The real scanner omits natal Moon targets when the chart's uncertainty
+  // report suppresses moon_time_sensitive; a transiting Moon against a stable
+  // target would still be allowed, and this fixture deliberately has none.
+  if (!suppressed.has("moon_time_sensitive")) {
+    cycles.push({
+      id: mockCycleId(fp, "mars|moon|trine"),
+      technique: "transit",
+      body: "mars",
+      target: "moon",
+      aspect: "trine",
+      start_at: "2026-08-05T01:00:00Z",
+      exact_at: "2026-08-09T12:00:00Z",
+      end_at: "2026-08-14T23:00:00Z",
+      pass_count: 1,
+      passes: [
+        { pass_index: 1, direction: "direct", exact_at: "2026-08-09T12:00:00Z", speed_deg_per_day: 0.61 },
+      ],
+      orb_deg: 2,
+      importance_score: 0.41,
+    });
+  }
+
+  // Response ordering is part of the contract: (exact_at, id).
+  return cycles.sort((a, b) => {
+    const at = String(a.exact_at);
+    const bt = String(b.exact_at);
+    if (at !== bt) return at < bt ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+}
+
+async function mockCycleScan(request: Request): Promise<Response> {
+  const req = (await request.json()) as CycleRequestBody;
+
+  if (req.chart_fingerprint === CYCLE_FP_UNAVAILABLE) {
+    // Transport envelope with a non-200, the shape the real service uses when a
+    // request never reached the engine. The client must read this as
+    // `unavailable`, not as a refusal.
+    return json({ error: { code: "unauthorized", message: "Valid service credentials are required" } }, 401);
+  }
+
+  if (req.chart_fingerprint === CYCLE_FP_REFUSED) {
+    return json({
+      ok: false,
+      schema_version: req.schema_version,
+      request_id: req.request_id,
+      error_class: "cycle_window_incomplete",
+      error_message: "encounter boundaries not proven within the policy lookaround limit",
+    });
+  }
+
+  return json({
+    ok: true,
+    schema_version: req.schema_version,
+    request_id: req.request_id,
+    chart_fingerprint: req.chart_fingerprint,
+    cycle_policy_id: req.cycle_policy_id,
+    cycle_policy_version: req.cycle_policy_version,
+    orb_policy_id: req.orb_policy_id,
+    orb_policy_version: req.orb_policy_version,
+    contract_id: req.contract_id,
+    contract_version: req.contract_version,
+    container_digest: `sha256:${"4d".repeat(32)}`,
+    ephemeris_data_version: "se-2.10.03-1800-2399",
+    cycles: req.chart_fingerprint === CYCLE_FP_EMPTY ? [] : mockCycles(req),
+  });
+}
+
 export async function mockCalcService(request: Request): Promise<Response> {
   const url = new URL(request.url);
+  if (url.pathname.endsWith("/v1/cycles")) return mockCycleScan(request);
   if (!url.pathname.endsWith("/v1/calculate")) {
     return json({ ok: false, chart: null, error_class: "not_found" }, 404);
   }

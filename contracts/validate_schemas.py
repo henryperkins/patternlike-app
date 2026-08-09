@@ -39,6 +39,8 @@ FIXTURE_SCHEMA = {
     "reading-evidence": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph",
     "generation-command": "https://patternlike.app/contracts/m3/generation-command.schema.json#/$defs/generateDailyReadingCommandV1",
     "cycle-identity": "https://patternlike.app/contracts/m3/cycle-identity.schema.json#/$defs/cycleIdentityV1",
+    "cycle-pass-identity": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json#/$defs/cyclePassIdentityV1",
+    "cycle-hash": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json#/$defs/cycleHashPreimageV1",
     "cycle-request": "https://patternlike.app/contracts/m3/cycle-request.schema.json#/$defs/cycleRequest",
     "cycle-response": "https://patternlike.app/contracts/m3/cycle-response.schema.json#/$defs/cycleResponse",
     "content-release": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/contentReleaseBundle",
@@ -523,16 +525,20 @@ def main() -> int:
     errors += validate_package(registry, M3, catalogue)
     errors += check_openapi(M3, registry)
 
-    vectors = M3 / "fixtures" / "canonicalization" / "jcs-golden-vectors.json"
-    if vectors.exists():
-        ve = check_golden_vectors(vectors)
-        errors += [f"VECTORS: {e}" for e in ve]
-        for e in ve:
-            print(f"FAIL vectors      {e}")
-        if not ve:
-            print("OK  vectors       jcs-golden-vectors.json")
-    else:
+    # Every vector file in the directory is checked, not one named file: the
+    # cycle-derivation profiles landed in their own file, and a checker that
+    # names a single path silently stops covering whatever is added beside it.
+    vector_dir = M3 / "fixtures" / "canonicalization"
+    vector_files = sorted(vector_dir.glob("*.json"))
+    if not any(p.name == "jcs-golden-vectors.json" for p in vector_files):
         errors.append("VECTORS: jcs-golden-vectors.json is missing")
+    for vectors in vector_files:
+        ve = check_golden_vectors(vectors)
+        errors += [f"VECTORS {vectors.name}: {e}" for e in ve]
+        for e in ve:
+            print(f"FAIL vectors      {vectors.name}: {e}")
+        if not ve:
+            print(f"OK  vectors       {vectors.name}")
 
     if errors:
         print(f"\n{len(errors)} error(s)")

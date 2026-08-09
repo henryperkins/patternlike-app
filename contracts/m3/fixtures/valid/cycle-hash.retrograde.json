@@ -1,0 +1,32 @@
+{
+  "id": "cyc_32d9bc34a5d9a4f42481de9da06defbe",
+  "technique": "transit",
+  "body": "saturn",
+  "target": "sun",
+  "aspect": "square",
+  "start_at": "2026-07-19T05:22:10Z",
+  "exact_at": "2026-08-02T14:11:07Z",
+  "end_at": "2027-01-26T18:44:02Z",
+  "pass_count": 3,
+  "passes": [
+    {
+      "pass_index": 1,
+      "direction": "direct",
+      "exact_at": "2026-08-02T14:11:07Z",
+      "speed_deg_per_day": 0.0331
+    },
+    {
+      "pass_index": 2,
+      "direction": "retrograde",
+      "exact_at": "2026-10-19T03:52:44Z",
+      "speed_deg_per_day": -0.0288
+    },
+    {
+      "pass_index": 3,
+      "direction": "direct",
+      "exact_at": "2027-01-11T21:07:19Z",
+      "speed_deg_per_day": 0.0302
+    }
+  ],
+  "orb_deg": 3.0
+}

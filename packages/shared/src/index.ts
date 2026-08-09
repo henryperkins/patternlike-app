@@ -13,6 +13,13 @@ export const CALC_CONTRACT_VERSION = "0.2.0" as const;
 
 import type { AspectType, BirthTimeAccuracy, CelestialBody, WorkflowName } from "./types.js";
 import type { ResolvedLocalTime } from "./timezone.js";
+import type { NormalizedCycle } from "./cycle-types.js";
+import {
+  buildCycleHashPreimage,
+  buildCyclePassIdentity,
+  renderCyclePassId,
+} from "./cycle-types.js";
+import { jcsCanonicalize } from "./jcs.js";
 
 export const LAUNCH_BODIES: readonly CelestialBody[] = [
   "sun",
@@ -174,6 +181,33 @@ export async function sha256Hex(input: string): Promise<string> {
 
 export async function contentHash(input: string): Promise<string> {
   return `sha256:${await sha256Hex(input)}`;
+}
+
+/**
+ * `cyp_` for one pass of a scanned cycle.
+ *
+ * Async because SHA-256 is WebCrypto on both runtimes; the preimage builders in
+ * cycle-types.ts stay pure and synchronous, matching how the reading engine
+ * separates canonicalization from hashing.
+ */
+export async function cyclePassId(
+  cycleId: string,
+  passIndex: number,
+): Promise<string> {
+  const preimage = buildCyclePassIdentity(cycleId, passIndex);
+  return renderCyclePassId(await sha256Hex(jcsCanonicalize(preimage)));
+}
+
+/**
+ * The full 64-character digest stored in `generation-command.cyclePin.cycle_hash`.
+ *
+ * Unrendered on purpose: it names a scan result rather than a physical
+ * encounter, so it gets no opaque prefix and no truncation — a rescan that
+ * would change the envelope or the pass list has to fail the claimed job, and
+ * that comparison deserves the whole digest.
+ */
+export async function cycleHash(cycle: NormalizedCycle): Promise<string> {
+  return sha256Hex(jcsCanonicalize(buildCycleHashPreimage(cycle)));
 }
 
 /** Canonical JSON for stable fingerprints (sorted object keys). */
