@@ -237,7 +237,7 @@ describe("persistCycles", () => {
     }
   });
 
-  it("chunks an unbounded scan into D1-safe batches", async () => {
+  it("streams bounded prepared statements and retries after a partial batch failure", async () => {
     const source = cycles[0]!;
     const largeScan = Array.from({ length: 51 }, (_, index) => ({
       ...source,
@@ -245,16 +245,51 @@ describe("persistCycles", () => {
       pass_count: 1,
       passes: [{ ...source.passes[0]!, pass_index: 1 }],
     }));
+    let trackPreparedStatements = false;
+    let preparedSinceFlush = 0;
+    let batchCalls = 0;
+    const prepare = env.DB.prepare.bind(env.DB);
     const batch = env.DB.batch.bind(env.DB);
+    const boundedPrepare = vi.spyOn(env.DB, "prepare").mockImplementation((query) => {
+      if (trackPreparedStatements) {
+        preparedSinceFlush += 1;
+        if (preparedSinceFlush > 100) {
+          throw new Error("D1 prepared statements must flush before the 101st write");
+        }
+      }
+      return prepare(query);
+    });
     const limitedBatch = vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
       if (statements.length > 100) {
         throw new Error("D1 batch must contain at most 100 statements");
+      }
+      if (trackPreparedStatements) {
+        expect(preparedSinceFlush).toBe(statements.length);
+        preparedSinceFlush = 0;
+        batchCalls += 1;
+        if (batchCalls === 2) {
+          throw new Error("simulated D1 batch failure");
+        }
       }
       return batch(statements);
     });
 
     try {
+      trackPreparedStatements = true;
+      await expect(persistCycles(env, USER_A, chartId, largeScan)).rejects.toThrow(
+        "simulated D1 batch failure",
+      );
+      trackPreparedStatements = false;
+      expect(
+        await rows("SELECT id FROM cycle_instances WHERE user_id = ?", USER_A),
+      ).toHaveLength(50);
+      expect(
+        await rows("SELECT id FROM cycle_passes WHERE user_id = ?", USER_A),
+      ).toHaveLength(50);
+
+      trackPreparedStatements = true;
       await expect(persistCycles(env, USER_A, chartId, largeScan)).resolves.toHaveLength(51);
+      trackPreparedStatements = false;
       expect(
         await rows("SELECT id FROM cycle_instances WHERE user_id = ?", USER_A),
       ).toHaveLength(51);
@@ -262,7 +297,9 @@ describe("persistCycles", () => {
         await rows("SELECT id FROM cycle_passes WHERE user_id = ?", USER_A),
       ).toHaveLength(51);
     } finally {
+      trackPreparedStatements = false;
       limitedBatch.mockRestore();
+      boundedPrepare.mockRestore();
     }
   });
 
