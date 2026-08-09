@@ -451,16 +451,24 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
 
 
 def check_m0_frozen() -> list[str]:
-    """Prove contracts/m0 is byte-identical to what M3 declared it a successor to.
+    """Prove contracts/m0 is unchanged from what M3 declared it a successor to.
 
     Two independent proofs, because they fail in different situations. The
     recorded manifest hash catches an edit even in a checkout with no git
     history; `git diff` catches an edit to any of the other 29 files.
+
+    The hash is over newline-NORMALISED bytes, not raw ones. There is no
+    .gitattributes, so git hands Windows checkouts CRLF and Linux checkouts LF,
+    and a raw-byte digest therefore records whichever platform generated it and
+    fails on the other. The originally recorded value came from a CRLF checkout,
+    so this check passed on Windows and failed in Linux CI on a file nobody had
+    touched. Normalising costs nothing: a real edit still moves the digest.
     """
     errors: list[str] = []
     manifest = json.loads((M3 / "SCHEMA_MANIFEST.json").read_text(encoding="utf-8"))
     expected = manifest["predecessor"]["manifest_sha256"]
-    actual = sha256((M0 / "SCHEMA_MANIFEST.json").read_bytes()).hexdigest()
+    normalised = (M0 / "SCHEMA_MANIFEST.json").read_bytes().replace(b"\r\n", b"\n")
+    actual = sha256(normalised).hexdigest()
     if actual != expected:
         errors.append(
             f"contracts/m0/SCHEMA_MANIFEST.json has changed since the M3 freeze "

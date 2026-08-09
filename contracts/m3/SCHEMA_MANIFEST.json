@@ -7,9 +7,10 @@
   "predecessor": {
     "package": "contracts/m0",
     "schema_version": "0.2.0",
-    "manifest_sha256": "7b20760b7b9b4be07471ee8b1b79c4aa99c07e257c06425717a1fa9a6fb29c68",
+    "manifest_sha256": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
     "relationship": "successor",
-    "note": "Recorded forward-only. No file under contracts/m0 changes — including its manifest, validator, fixtures, and OpenAPI. contracts/validate_schemas.py verifies this hash on every run, and the CI gate additionally runs `git diff --exit-code` over the directory."
+    "note": "Recorded forward-only. No file under contracts/m0 changes — including its manifest, validator, fixtures, and OpenAPI. contracts/validate_schemas.py verifies this hash on every run, and the CI gate additionally runs `git diff --exit-code` over the directory.",
+    "manifest_sha256_note": "Digest of the file with newlines normalised to LF, which is what git stores. The value first recorded here (7b20760b7b9b4be07471ee8b1b79c4aa99c07e257c06425717a1fa9a6fb29c68) was the raw-byte digest of a Windows CRLF checkout, so the check passed on Windows and failed on Linux CI. contracts/m0/SCHEMA_MANIFEST.json itself is unchanged; only this fingerprint of it was wrong."
   },
   "why_a_package_and_not_an_amendment": [
     "D3 REMOVES a required field: readingAssemblyRequest.reading_key. That is squarely inside the M0 breaking_change_policy — 'Any change to required fields, enums, or $id requires a schema_version bump and a new freeze note.'",
