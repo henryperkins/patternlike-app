@@ -389,6 +389,24 @@ the natural storage shape rather than a concession to it. `angularSeparation`
 and `isApplying` (`apps/calc-stub/src/engine.ts:127`, `:506`) already exist and
 are reused.
 
+**Upstream's crossing functions cover the opposite half of the problem.** Swiss
+Ephemeris exports `swe_solcross_ut` and `swe_mooncross_ut`, which return the
+exact instant a body crosses a given ecliptic longitude, and `sweph@2.10.3-7`
+exposes both (`solcross_ut`, `mooncross_ut`, `mooncross_node_ut`,
+`helio_cross_ut`, `rise_trans`). They apply to the Sun and the Moon only — the
+two launch bodies that never retrograde geocentrically and therefore can only
+ever produce a single pass. For planets the sole crossing helper is
+`swe_helio_cross_ut`, which is **heliocentric** and so cannot answer a
+geocentric transit question at all. Mercury through Pluto and the true node —
+exactly where multi-pass exists — have no upstream root finder.
+
+Two consequences. The scan-and-refine loop above is required rather than a
+reinvention. And Sun/Moon passes should be computed with `solcross_ut` /
+`mooncross_ut` anyway, not because it is faster but because it gives the golden
+tests an **independent oracle**: our bisection must agree with upstream's own
+crossing result to within tolerance on the two bodies where both methods apply,
+which is the only cheap way to validate the general scanner.
+
 **Deterministic ids.** `cyc_` + sha256 of
 `(chart_fingerprint, technique, body, target, aspect, first_exact_at)`.
 Content-addressed, so tomorrow's horizon scan rediscovering the same cycle
