@@ -8,7 +8,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web",
+    "//build": "@patternlike/web builds BEFORE @patternlike/api: the api build is a production dry-run deploy, and [env.production.assets] reads apps/web/dist, which must already exist.",
+    "build": "npm run build -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/calc-stub -w @patternlike/web -w @patternlike/api",
     "typecheck": "npm run typecheck -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web",
     "test": "npm run test -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web && npm run test:contracts",
     "test:contracts": "python contracts/validate_schemas.py && python contracts/m0/smoke_check.py && python contracts/smoke_check.py",
