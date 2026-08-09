@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/generation-command.schema.json",
+  "title": "GenerateDailyReading Command (v1)",
+  "description": "The immutable command frozen at enqueue and stored as DEK-encrypted jobs.payload_enc. Cloudflare Queues is at-least-once, so neither a retry nor a recovered lease may resolve 'today' or 'active' inputs again: this object pins the exact chart, cycles, release, and context versions the worker is allowed to dereference. A release activation, a newer chart, a changed timezone, a midnight rollover, or a fresh cycle scan cannot change a claimed job. Consent revoked after enqueue CANCELS the job rather than silently deleting a frozen input, because deleting one would change the assembly identity while pretending to be the same command.",
+  "$defs": {
+    "chartPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "fingerprint",
+        "profile_version",
+        "contract_id",
+        "contract_version",
+        "container_digest",
+        "effective_accuracy",
+        "uncertainty"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "profile_version": { "type": "integer", "minimum": 1 },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "tzdb_version": { "type": ["string", "null"] },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "uncertainty": {
+          "$ref": "assembly-identity.schema.json#/$defs/assemblyUncertaintyInput"
+        }
+      }
+    },
+    "cyclePin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cycle_id", "pass_ids", "cycle_hash"],
+      "properties": {
+        "cycle_id": { "$ref": "common.schema.json#/$defs/cycleId" },
+        "pass_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/cyclePassId" }
+        },
+        "cycle_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex",
+          "description": "Hash of the normalized cycle row as scanned. A rescan that would change the envelope or pass list fails the claimed job closed rather than substituting the newer row."
+        }
+      }
+    },
+    "cycleScanPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycles",
+        "cycle_policy_id",
+        "cycle_policy_version",
+        "orb_policy_id",
+        "orb_policy_version",
+        "container_digest",
+        "ephemeris_data_version"
+      ],
+      "properties": {
+        "cycles": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/cyclePin" }
+        },
+        "cycle_policy_id": { "type": "string", "minLength": 1 },
+        "cycle_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "orb_policy_id": { "type": "string", "minLength": 1 },
+        "orb_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "contextPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal_id",
+        "source_id",
+        "normalized_hash",
+        "allowed_use",
+        "evidence_lane",
+        "consent_id",
+        "consent_version",
+        "permission_state",
+        "freshness_status"
+      ],
+      "description": "One context signal and the exact consent, permission, and freshness state under which it was eligible. No execution-time read may ADD a source; a later context-minimized reading uses the explicit next-generation replacement path, never a retry.",
+      "properties": {
+        "signal_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "source_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ingestibleSourceId"
+        },
+        "normalized_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex"
+        },
+        "allowed_use": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/allowedUse"
+        },
+        "evidence_lane": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/evidenceLane"
+        },
+        "consent_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "consent_version": { "type": "integer", "minimum": 1 },
+        "permission_state": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/permissionState"
+        },
+        "freshness_status": {
+          "type": "string",
+          "enum": ["fresh", "stale", "expired", "unknown"]
+        }
+      }
+    },
+    "generateDailyReadingCommandV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_version",
+        "schema_version",
+        "reading_id",
+        "reading_key",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "command_generation",
+        "target_local_date",
+        "target_timezone",
+        "timezone_revision",
+        "day_start_at",
+        "day_end_at",
+        "generation_anchor",
+        "locale",
+        "domain_preference",
+        "identity_profile",
+        "output_schema",
+        "assembly_policy_id",
+        "assembly_policy_version",
+        "chart",
+        "cycle_scan",
+        "release_version",
+        "release_bundle_hash",
+        "context",
+        "assembly_id"
+      ],
+      "properties": {
+        "command_version": { "type": "string", "const": "v1" },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "reading_key": { "type": "string", "minLength": 1 },
+        "revision": { "$ref": "common.schema.json#/$defs/readingRevision" },
+        "revision_reason": {
+          "$ref": "common.schema.json#/$defs/revisionReason"
+        },
+        "supersedes_reading_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ]
+        },
+        "command_generation": {
+          "$ref": "common.schema.json#/$defs/commandGeneration"
+        },
+        "replaces_job_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ],
+          "description": "Present from generation 2 onward: the exact terminal job this command replaced. The prior job and its encrypted command remain terminal and auditable."
+        },
+        "command_replacement_reason": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "common.schema.json#/$defs/commandReplacementReason" }
+          ]
+        },
+        "target_local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate",
+          "description": "Resolved from the TRUSTED enqueue instant in the stored scheduling zone. Never from a client-supplied date and never from the worker's later attempt time."
+        },
+        "target_timezone": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone",
+          "description": "users.timezone, the present-day scheduling zone. birth_profiles.timezone is the historical birthplace zone and must never be substituted for it."
+        },
+        "timezone_revision": { "type": "integer", "minimum": 0 },
+        "day_start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "day_end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Half-open: the local day is [day_start_at, day_end_at). Computed once at enqueue so a DST transition is resolved by the enqueuer, not re-derived by each attempt."
+        },
+        "generation_anchor": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        },
+        "identity_profile": {
+          "const": "patternlike.assembly-id.v1"
+        },
+        "output_schema": {
+          "$ref": "common.schema.json#/$defs/outputSchemaName"
+        },
+        "assembly_policy_id": {
+          "$ref": "common.schema.json#/$defs/assemblyPolicyId"
+        },
+        "assembly_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion",
+          "description": "The worker selects the exact registered policy implementation named here. Old implementations are retained for at least the maximum job and lease retry horizon; an unsupported frozen version fails closed rather than running the current one."
+        },
+        "chart": { "$ref": "#/$defs/chartPin" },
+        "cycle_scan": { "$ref": "#/$defs/cycleScanPin" },
+        "release_version": { "type": "string", "minLength": 1 },
+        "release_bundle_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash",
+          "description": "Recomputed from the R2 object with the frozen M0 release-hash procedure (the repository's legacy canonicalJson), NOT with JCS, and must equal both this value and the trusted D1 release record. M3 pins JCS only for the new patternlike.*-id.v1 profiles; reinterpreting M0's byte-frozen hashes as JCS would invalidate every stored bundle."
+        },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/contextPin" }
+        },
+        "assembly_id": {
+          "$ref": "common.schema.json#/$defs/assemblyId",
+          "description": "Hashed from the D3 preimage before the command's first attempt and stored inside it. The pure assembler must reproduce this value on every retry; a mismatch is a defect, not a new reading."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "command_generation": { "const": 1 } },
+            "required": ["command_generation"]
+          },
+          "then": {
+            "properties": {
+              "replaces_job_id": { "type": "null" },
+              "command_replacement_reason": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "replaces_job_id": { "type": "string" },
+              "command_replacement_reason": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "revision_reason": { "const": "initial" } },
+            "required": ["revision_reason"]
+          },
+          "then": {
+            "properties": {
+              "revision": { "const": 1 },
+              "supersedes_reading_id": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "revision": { "minimum": 2 },
+              "supersedes_reading_id": { "type": "string" }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "title": "GenerateDailyReadingCommandV1",
+      "$ref": "#/$defs/generateDailyReadingCommandV1"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "schema_version": "0.3.0",
+  "request_id": "req_01JAMPLECYCLEREQ0001",
+  "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "cycle_policy_id": "transit-scan-launch",
+  "cycle_policy_version": "1.4.0",
+  "orb_policy_id": "orb-launch",
+  "orb_policy_version": "1.0.0",
+  "contract_id": "patternlike.chart.launch",
+  "contract_version": "0.2.0",
+  "container_digest": "sha256:4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d",
+  "ephemeris_data_version": "se-2.10.03-1800-2399",
+  "cycles": []
+}

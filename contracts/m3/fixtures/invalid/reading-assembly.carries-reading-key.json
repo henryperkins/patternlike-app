@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.3.0",
+  "assembly_id": "asm_97e0e939b208250aecdde02747d367af",
+  "output_schema": "daily-reading-v3",
+  "facts": [
+    {
+      "id": "cyc_abababababababababababababababab",
+      "phase": "building",
+      "orb": 0.42
+    },
+    {
+      "id": "cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "phase": "peak",
+      "orb": 1.1
+    }
+  ],
+  "approved_fragments": [
+    "phase.saturn-square-sun.building",
+    "prompt.work.steady-effort",
+    "timing.default.en-US"
+  ],
+  "context": [
+    {
+      "signal_id": "sig_01JAMPLESIGNAL000001",
+      "allowed_use": "life_domain_selection",
+      "framing": "work"
+    }
+  ],
+  "locale": "en-US",
+  "domain_preference": "work",
+  "reading_key": "user:usr_01JAMPLEUSER00000001:2026-07-30:release-12:r1"
+}

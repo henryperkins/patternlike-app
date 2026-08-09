@@ -240,7 +240,7 @@ export async function rewrapUserKey(
  * Adding a new encrypted column WITHOUT adding it here would leave its data
  * under a destroyed key. `assertNoUnrotatedCiphertext` below is the tripwire.
  */
-const ENCRYPTED_COLUMNS = [
+export const ENCRYPTED_COLUMNS = [
   {
     table: "birth_profiles",
     idColumn: "version",
@@ -255,6 +255,45 @@ const ENCRYPTED_COLUMNS = [
     keyVersionColumn: "birth_key_version",
     nonceColumn: "birth_nonce",
   },
+  // M3. All three are per-user by construction: jobs.payload_enc carries a CHECK
+  // requiring user_id, and reading_sources carries user_id specifically so this
+  // walk can reach it through a composite foreign key that also rejects
+  // cross-user evidence.
+  {
+    table: "jobs",
+    idColumn: "id",
+    encColumn: "payload_enc",
+    keyVersionColumn: "payload_key_version",
+    nonceColumn: "payload_nonce",
+  },
+  {
+    table: "daily_readings",
+    idColumn: "id",
+    encColumn: "reading_enc",
+    keyVersionColumn: "reading_key_version",
+    nonceColumn: "reading_nonce",
+  },
+  {
+    table: "reading_sources",
+    idColumn: "id",
+    encColumn: "evidence_enc",
+    keyVersionColumn: "evidence_key_version",
+    nonceColumn: "evidence_nonce",
+  },
+] as const;
+
+/**
+ * Encrypted columns that are DECLARED in the schema but that nothing writes.
+ *
+ * Every `*_enc` column in db/d1 must appear in exactly one of these two lists.
+ * `encrypted-columns.test.ts` reads the live schema and proves it, so a new
+ * column cannot be added without a deliberate decision about rotation — which
+ * is the failure this whole mechanism exists to prevent.
+ */
+export const UNWRITTEN_ENCRYPTED_COLUMNS = [
+  { table: "chart_snapshots", encColumn: "snapshot_enc", keyVersionColumn: "snapshot_key_version" },
+  { table: "context_signals", encColumn: "value_enc", keyVersionColumn: "value_key_version" },
+  { table: "reading_feedback", encColumn: "notes_enc", keyVersionColumn: "notes_key_version" },
 ] as const;
 
 async function assertNoUnrotatedCiphertext(
@@ -262,23 +301,30 @@ async function assertNoUnrotatedCiphertext(
   id: UserIdentity,
   newKeyVersion: number,
 ): Promise<void> {
-  // chart_snapshots.snapshot_enc is declared but nothing writes it yet. If that
-  // changes, it must join ENCRYPTED_COLUMNS or its data becomes unreadable at
-  // the next rotation. Fail loudly rather than silently orphan it.
-  const orphan = await env.DB.prepare(
-    `SELECT id FROM chart_snapshots
-     WHERE user_id = ? AND snapshot_enc IS NOT NULL
-       AND (snapshot_key_version IS NULL OR snapshot_key_version <> ?)
-     LIMIT 1`,
-  )
-    .bind(id.userId, newKeyVersion)
-    .first<{ id: string }>();
+  // These columns are declared but unwritten. The moment one acquires a writer
+  // it must join ENCRYPTED_COLUMNS, or its data is left under a destroyed key
+  // at the next rotation. Fail loudly rather than silently orphan it.
+  //
+  // Generalized from the single hardcoded chart_snapshots.snapshot_enc check:
+  // M3 triples the number of encrypted columns, and a tripwire that covers one
+  // of them is a tripwire for one specific past mistake rather than for the
+  // class of mistake.
+  for (const col of UNWRITTEN_ENCRYPTED_COLUMNS) {
+    const orphan = await env.DB.prepare(
+      `SELECT rowid AS row_id FROM ${col.table}
+       WHERE user_id = ? AND ${col.encColumn} IS NOT NULL
+         AND (${col.keyVersionColumn} IS NULL OR ${col.keyVersionColumn} <> ?)
+       LIMIT 1`,
+    )
+      .bind(id.userId, newKeyVersion)
+      .first<{ row_id: number }>();
 
-  if (orphan) {
-    throw new Error(
-      `chart_snapshots.snapshot_enc holds ciphertext that key rotation does not cover ` +
-        `(chart ${orphan.id}). Add it to ENCRYPTED_COLUMNS in apps/api/src/db/users.ts.`,
-    );
+    if (orphan) {
+      throw new Error(
+        `${col.table}.${col.encColumn} holds ciphertext that key rotation does not cover ` +
+          `(rowid ${orphan.row_id}). Add it to ENCRYPTED_COLUMNS in apps/api/src/db/users.ts.`,
+      );
+    }
   }
 }
 

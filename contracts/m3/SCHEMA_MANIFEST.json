@@ -1,0 +1,291 @@
+{
+  "package": "contracts/m3",
+  "schema_version": "0.3.0",
+  "document_date": "2026-08-09",
+  "status": "frozen",
+  "milestone": "M3 — daily reading pipeline",
+  "predecessor": {
+    "package": "contracts/m0",
+    "schema_version": "0.2.0",
+    "manifest_sha256": "7b20760b7b9b4be07471ee8b1b79c4aa99c07e257c06425717a1fa9a6fb29c68",
+    "relationship": "successor",
+    "note": "Recorded forward-only. No file under contracts/m0 changes — including its manifest, validator, fixtures, and OpenAPI. contracts/validate_schemas.py verifies this hash on every run, and the CI gate additionally runs `git diff --exit-code` over the directory."
+  },
+  "why_a_package_and_not_an_amendment": [
+    "D3 REMOVES a required field: readingAssemblyRequest.reading_key. That is squarely inside the M0 breaking_change_policy — 'Any change to required fields, enums, or $id requires a schema_version bump and a new freeze note.'",
+    "D1's revision fields would have to be added under readingEvidenceGraph's additionalProperties:false. Additive in intent, still an edit to a frozen schema document, and the amendment precedent in M0 covers OpenAPI only.",
+    "Versioning once is cheaper than arguing the boundary twice."
+  ],
+  "canonicalization": {
+    "profiles": {
+      "patternlike.assembly-id.v1": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "'asm_' + lowercaseHex(digest)[0:32]",
+        "preimage": "assembly-identity.schema.json#/$defs/assemblyIdentityInputV1"
+      },
+      "patternlike.cycle-id.v1": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "'cyc_' + lowercaseHex(digest)[0:32]",
+        "preimage": "cycle-identity.schema.json#/$defs/cycleIdentityV1"
+      }
+    },
+    "rules": [
+      "Validated I-JSON values only. Duplicate keys, non-finite numbers, undefined, lone surrogates, and values outside the schema are rejected rather than coerced.",
+      "ECMAScript number serialization; recursive UTF-16 property-name ordering; UTF-8 output; no implicit Unicode normalization.",
+      "Arrays are put into their contractually defined total order BEFORE canonicalization, because JCS deliberately preserves array order.",
+      "The 128-bit rendered suffix is only the opaque handle. Golden vectors retain the full digest AND the exact canonical bytes, so an implementation cannot silently change canonicalization while its digests keep round-tripping.",
+      "SCOPE: JCS applies to these two new profiles only. M0 release, object, and signature hashes remain byte-frozen on the repository's legacy canonicalJson behaviour (JSON.stringify over sorted keys). M3 must not reinterpret them as JCS — naming and versioning that legacy profile is still an open escalation."
+    ],
+    "vectors": "fixtures/canonicalization/jcs-golden-vectors.json"
+  },
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m3/common.schema.json",
+      "defines": [
+        "schemaVersion",
+        "assemblyId",
+        "cycleId",
+        "cyclePassId",
+        "readingRevision",
+        "commandGeneration",
+        "revisionReason",
+        "commandReplacementReason",
+        "passDirection",
+        "policyVersion",
+        "outputSchemaName",
+        "assemblyPolicyId",
+        "identityProfile",
+        "factClass",
+        "suppressedFeatureClass",
+        "suppressionReason",
+        "qualifiedFeatureId",
+        "featureQualification",
+        "timezoneSource",
+        "localeSource",
+        "eligibilityMode"
+      ],
+      "reuses_from_m0": [
+        "cyclePhase",
+        "evidenceLane",
+        "allowedUse",
+        "celestialBody",
+        "aspectType",
+        "ianaTimeZone",
+        "localeTag",
+        "lifeDomain",
+        "birthTimeAccuracy",
+        "opaqueId",
+        "userId",
+        "isoDate",
+        "isoDateTime",
+        "sha256Hex",
+        "contentHash",
+        "ingestibleSourceId",
+        "permissionState",
+        "semanticVersion"
+      ]
+    },
+    {
+      "file": "daily-reading.schema.json",
+      "id": "https://patternlike.app/contracts/m3/daily-reading.schema.json",
+      "defines": [
+        "paragraphRole",
+        "readingParagraph",
+        "dailyReading",
+        "dailyReadingResponse"
+      ],
+      "note": "NEW. M0 pinned output_schema to the literal 'daily-reading-v2' without shipping a document for it, so the assembly identity committed to a schema nobody could validate against. v3 is that document."
+    },
+    {
+      "file": "assembly-identity.schema.json",
+      "id": "https://patternlike.app/contracts/m3/assembly-identity.schema.json",
+      "defines": [
+        "assemblyIdentityInputV1",
+        "assemblyUncertaintyInput",
+        "assemblyFactInput",
+        "assemblyContextInput"
+      ]
+    },
+    {
+      "file": "generation-command.schema.json",
+      "id": "https://patternlike.app/contracts/m3/generation-command.schema.json",
+      "defines": [
+        "generateDailyReadingCommandV1",
+        "chartPin",
+        "cyclePin",
+        "cycleScanPin",
+        "contextPin"
+      ]
+    },
+    {
+      "file": "reading-assembly.schema.json",
+      "id": "https://patternlike.app/contracts/m3/reading-assembly.schema.json",
+      "defines": [
+        "assemblyRequest",
+        "assemblyFact",
+        "assemblyContext"
+      ],
+      "supersedes": "m0:reading-evidence.schema.json#/$defs/readingAssemblyRequest"
+    },
+    {
+      "file": "reading-evidence.schema.json",
+      "id": "https://patternlike.app/contracts/m3/reading-evidence.schema.json",
+      "defines": [
+        "readingEvidenceGraph",
+        "paragraphEvidence",
+        "validationResult",
+        "factRef",
+        "contentRef",
+        "contextRef",
+        "rankingFactor"
+      ],
+      "supersedes": "m0:reading-evidence.schema.json#/$defs/readingEvidenceGraph"
+    },
+    {
+      "file": "cycle-identity.schema.json",
+      "id": "https://patternlike.app/contracts/m3/cycle-identity.schema.json",
+      "defines": [
+        "cycleIdentityV1",
+        "orientedBranch"
+      ]
+    },
+    {
+      "file": "cycle-request.schema.json",
+      "id": "https://patternlike.app/contracts/m3/cycle-request.schema.json",
+      "defines": [
+        "cycleRequest",
+        "natalPosition",
+        "scanWindow"
+      ]
+    },
+    {
+      "file": "cycle-response.schema.json",
+      "id": "https://patternlike.app/contracts/m3/cycle-response.schema.json",
+      "defines": [
+        "cycleResponse",
+        "cycleResponseSuccess",
+        "cycleResponseFailure",
+        "normalizedCycle",
+        "cyclePass",
+        "cycleErrorClass"
+      ]
+    },
+    {
+      "file": "content-release.schema.json",
+      "id": "https://patternlike.app/contracts/m3/content-release.schema.json",
+      "defines": [
+        "contentReleaseBundle",
+        "releaseMetadata",
+        "timingTemplateObject",
+        "fallbackCopyObject",
+        "timingPlaceholder",
+        "contentType"
+      ],
+      "reuses_from_m0": [
+        "patternObject",
+        "cycleObject",
+        "phaseObject",
+        "modifierObject",
+        "promptObject",
+        "safetyRuleObject",
+        "bundleSignature",
+        "fragmentId"
+      ]
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.3.0",
+      "describes": "Public Worker origin — complete successor document, not a fragment."
+    },
+    {
+      "file": "openapi/calc.openapi.yaml",
+      "version": "0.3.0",
+      "describes": "Calculation service on Fly. Separate so POST /v1/cycles is not falsely advertised on the public Worker origin."
+    }
+  ],
+  "changes_from_m0": [
+    {
+      "id": "D1",
+      "summary": "A daily reading gets a revision component.",
+      "detail": "reading_key becomes user:<user_id>:<local_date>:<release_version>:r<revision>, which still matches the frozen M0 pattern because its trailing .+ absorbs the suffix. Uniqueness moves off release_version: the M0 key permitted TWO published readings for one user-day whenever a release activated mid-day, against the product's 'one coherent daily chapter'. revision_reason deliberately excludes a content-release reason — activating a release does not retroactively revise published readings."
+    },
+    {
+      "id": "D2",
+      "summary": "Cycles are a cycle plus an ordered list of passes.",
+      "detail": "The one-pass model made 'reconsidering' unreachable — that state is exactly the interior of a retrograde loop — so the schema could not express the product's own phase vocabulary. Identity is (oriented branch, integer winding), not a pass timestamp, so overlapping scan windows address the same physical encounter."
+    },
+    {
+      "id": "D3",
+      "summary": "The assembly request carries an opaque assembly_id, never reading_key.",
+      "detail": "Content-addressed, not user-addressed. Not a stable pseudonym either: the preimage carries the day's fact set, so the same user gets an unrelated id each day. Not persisted in a clear column — an unkeyed digest of the exact facts, context, release, and anchor would itself be a dictionary oracle."
+    },
+    {
+      "id": "D4",
+      "summary": "Version the contract; leave M0 byte-frozen.",
+      "detail": "See why_a_package_and_not_an_amendment."
+    },
+    {
+      "id": "D5",
+      "summary": "Fixture ids resolve against a repo-owned catalogue.",
+      "detail": "fixtures/assembly/<fixture_id>.json. An unknown id is fixtures_unknown, not a pass — otherwise a compromised control plane activates a release by naming fixtures nobody has."
+    },
+    {
+      "id": "C1",
+      "summary": "daily-reading-v3 is defined rather than merely named.",
+      "detail": "Review correction. The identity preimage pins output_schema, so committing to a schema name with no document behind it puts an unverifiable value inside a hash."
+    },
+    {
+      "id": "C2",
+      "summary": "assemblyRequest.facts and .approved_fragments lose minItems: 1.",
+      "detail": "Review correction. M0 made both non-empty and required, which makes the commonest day — no cycle inside orb — unrepresentable, and with it the reviewed universal fallback path such a day must take."
+    },
+    {
+      "id": "C3",
+      "summary": "rankingFactor drops resonance_feedback and user_priority.",
+      "detail": "Review correction. The registry requires 'no hidden engagement-only ranking'; leaving resonance_feedback in the vocabulary left the ranker somewhere to record one, with reading_feedback.resonance as the column that would feed it. user_priority is a duplicate of domain_match."
+    },
+    {
+      "id": "C4",
+      "summary": "PUT /v1/preferences/locale accompanies the timezone writer.",
+      "detail": "Review correction. Identity creation writes locale 'en-US' as a server default with no writer, exactly as it does for timezone — and M3 makes locale load-bearing for fallback and timing-template selection."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "breaking_change_policy": "Any change to required fields, enums, or $id requires a schema_version bump and a new freeze note. Purely additive changes (a new OpenAPI path, a new inline schema) are recorded in `amendments` instead.",
+    "wire_format": "snake_case on the wire even though TypeScript is camelCase."
+  },
+  "out_of_scope_for_this_freeze": [
+    "Constrained-model editing (M5). assembly_mode stays deterministic; nothing calls a model in M3.",
+    "GET /v1/pattern, /v1/timing, /v1/time-travel, /v1/check-ins response bodies",
+    "Notification delivery vendor",
+    "Relationship data (M5)"
+  ],
+  "unresolved_escalations": [
+    "§1 crypto-shredding vs D1 Time Travel: wrapped DEK and ciphertext still share a database. M3 additionally does NOT claim that encrypting reading output makes a reading unrecoverable — see the acceptance note in the M3 plan §5.",
+    "§5 cascading revocation: still no derived_features table and no invalidated_at. D1's revision model gives revocation somewhere to land for readings specifically, which is narrower than the general problem.",
+    "§8 legacy canonicalJson has no named standard: resolved for the two new patternlike.*-id.v1 profiles only.",
+    "§11 snapshot_json precision: unresolved. The cycle scan inherits whatever it settles on rather than inventing a third policy.",
+    "§9 techniques_enabled overstates the engine: M3 implements transits, closing one of the declared five. stations_ingresses and lunations_eclipses stay declared-but-absent."
+  ],
+  "amendments": [
+    {
+      "date": "2026-08-09",
+      "kind": "additive_fixtures",
+      "summary": "Four cycle-response fixtures added so every rule in cycle_response_policy() has one.",
+      "detail": "Three response-level rules shipped with the freeze had no fixture at all, because every cycle-response fixture carried zero or one cycle: ordering by (exact_at, id), cycle-id uniqueness, and start_at <= end_at. cycle-response.multi.json adds a two-cycle valid twin (the minus branch of the same square, which is a genuinely different encounter and so has a genuinely different id), and cycle-response.unordered-cycles.json, cycle-response.duplicate-cycle-ids.json, and cycle-response.inverted-envelope.json are each one mutation from it. No schema, enum, or $id changed; this does not touch the freeze.",
+      "files": [
+        "fixtures/valid/cycle-response.multi.json",
+        "fixtures/invalid/cycle-response.unordered-cycles.json",
+        "fixtures/invalid/cycle-response.duplicate-cycle-ids.json",
+        "fixtures/invalid/cycle-response.inverted-envelope.json"
+      ],
+      "implemented_by": "apps/calc-stub/src/cycles.ts (POST /v1/cycles)"
+    }
+  ]
+}

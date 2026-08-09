@@ -9,9 +9,10 @@
     "build": "wrangler deploy --dry-run --outdir=dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "db:local": "wrangler d1 execute patternlike-ops --local --file=../../db/d1/0001_m0_core.sql",
+    "db:local": "wrangler d1 migrations apply patternlike-ops --local",
     "//deploy": "Ships apps/web/dist as static assets. Prefer `npm run deploy:api` from the repository root, which builds the web app first.",
-    "deploy": "wrangler deploy --env production"
+    "deploy": "wrangler deploy --env production",
+    "//db:local": "Applies the ordered db/d1 directory, not just 0001. Deleting .wrangler state is an explicit developer reset, not the migration mechanism."
   },
   "dependencies": {
     "@patternlike/shared": "0.2.0",

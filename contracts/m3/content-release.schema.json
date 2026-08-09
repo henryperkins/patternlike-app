@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/content-release.schema.json",
+  "title": "Editorial Content Release Bundle (M3)",
+  "description": "M0's signed editorial bundle plus the two reviewed content classes the deterministic assembler cannot run without. Every unchanged object type is referenced from the M0 document by absolute $id rather than restated, so the frozen shapes stay single-sourced. Two additions. (1) timing_template: a timing paragraph asserts calculated dates in words, and without a reviewed template it was a facts-only exception to the rule that every paragraph resolves to an approved content version. (2) daily_fallback: safety_rules.minItems 1 proves a validator rule exists, not that any rule applies to the requested locale or that its referenced fragment is eligible with no facts — and since most days have no cycle inside orb, the fallback is the commonest path, not the exceptional one.",
+  "$defs": {
+    "contentType": {
+      "type": "string",
+      "enum": [
+        "astrology_pattern",
+        "astrology_cycle",
+        "astrology_phase",
+        "astrology_modifier",
+        "astrology_prompt",
+        "astrology_safety_rule",
+        "timing_template",
+        "daily_fallback"
+      ]
+    },
+    "timingPlaceholder": {
+      "type": "string",
+      "enum": ["start_date", "exact_date", "end_date", "orb", "phase"],
+      "description": "Closed placeholder set. The renderer fills these with locale-formatted calculated values and nothing else: no executable expression, no free-form interpolation, no nested template."
+    },
+    "timingTemplateObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "content_type",
+        "content_version",
+        "title",
+        "object_hash",
+        "locale",
+        "template_text",
+        "placeholders",
+        "is_locale_default"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/fragmentId"
+        },
+        "content_type": { "const": "timing_template" },
+        "content_version": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "object_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "deprecated"],
+          "default": "approved"
+        },
+        "template_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Reviewed copy containing only {placeholder} tokens drawn from the declared placeholders array."
+        },
+        "placeholders": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/timingPlaceholder" }
+        },
+        "is_locale_default": {
+          "type": "boolean",
+          "description": "Exactly one approved default per supported locale. Ingestion rejects a release without one as timing_template_missing_for_locale."
+        },
+        "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "fallbackCopyObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "content_type",
+        "content_version",
+        "title",
+        "object_hash",
+        "locale",
+        "body",
+        "eligibility_mode"
+      ],
+      "description": "The reviewed copy published when nothing survives eligibility or a required validation check rejects the draft. Its schema permits NO required fact class, body, aspect, technique, house, context signal, or minimum accuracy above unknown, and it cannot delegate to a cycle or phase fragment — a fallback that can itself be ineligible is not a fallback.",
+      "properties": {
+        "id": {
+          "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/fragmentId"
+        },
+        "content_type": { "const": "daily_fallback" },
+        "content_version": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "object_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "deprecated"],
+          "default": "approved"
+        },
+        "body": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "eligibility_mode": {
+          "type": "string",
+          "const": "universal",
+          "description": "The only permitted value. There is no eligibility block on this object at all: not an empty one, which a later edit could fill."
+        },
+        "prohibited_claims": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "releaseMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "bundle_hash",
+        "created_at",
+        "approver_id",
+        "last_author_id",
+        "changelog",
+        "status",
+        "supported_locales",
+        "locale_default"
+      ],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "bundle_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash",
+          "description": "Hash of the canonical bundle body excluding signature, under the repository's legacy canonicalJson procedure. M3 does NOT reinterpret this as RFC 8785."
+        },
+        "created_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "approver_id": { "type": "string", "minLength": 1 },
+        "last_author_id": { "type": "string", "minLength": 1 },
+        "changelog": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["submitted", "active", "rejected", "superseded"]
+        },
+        "supported_locales": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+          },
+          "description": "New in M3 and required. Every entry must have exactly one approved daily_fallback and at least one default timing_template."
+        },
+        "locale_default": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag",
+          "description": "Promoted to required and must be a member of supported_locales, otherwise ingestion rejects the release as locale_default_not_supported. Locale resolution is exact match, then the configured language fallback, then this."
+        },
+        "language_fallbacks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+          },
+          "propertyNames": {
+            "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+          },
+          "description": "Explicit locale -> locale map consulted between exact match and locale_default. Explicit rather than inferred from tag prefixes, so 'pt-BR falls back to pt-PT' is an editorial decision and not a string operation."
+        },
+        "wordpress_site_id": { "type": ["string", "null"] },
+        "calc_contract_id": { "type": ["string", "null"] }
+      }
+    },
+    "contentReleaseBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "release", "objects", "signature"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "release": { "$ref": "#/$defs/releaseMetadata" },
+        "objects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "patterns",
+            "cycles",
+            "phases",
+            "modifiers",
+            "prompts",
+            "safety_rules",
+            "timing_templates",
+            "daily_fallbacks"
+          ],
+          "properties": {
+            "patterns": {
+              "type": "array",
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/patternObject"
+              }
+            },
+            "cycles": {
+              "type": "array",
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/cycleObject"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/phaseObject"
+              }
+            },
+            "modifiers": {
+              "type": "array",
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/modifierObject"
+              }
+            },
+            "prompts": {
+              "type": "array",
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/promptObject"
+              }
+            },
+            "safety_rules": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/safetyRuleObject"
+              }
+            },
+            "timing_templates": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/timingTemplateObject" }
+            },
+            "daily_fallbacks": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/fallbackCopyObject" }
+            }
+          }
+        },
+        "signature": {
+          "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/bundleSignature"
+        },
+        "fixtures": {
+          "type": "array",
+          "description": "Smoke-test fixture ids resolved against contracts/m3/fixtures/assembly/. An id with no catalogue entry is a rejection (fixtures_unknown), never a pass — otherwise a compromised control plane activates a release by naming fixtures nobody has.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fixture_id", "expect"],
+            "properties": {
+              "fixture_id": { "type": "string", "minLength": 1 },
+              "expect": {
+                "type": "string",
+                "enum": ["eligible", "ineligible", "fallback"]
+              }
+            }
+          }
+        }
+      },
+      "$comment": "Policy checks beyond JSON Schema, enforced at ingestion and pinned by invalid fixtures: approver_id != last_author_id; locale_default in supported_locales (locale_default_not_supported); exactly one approved daily_fallback per supported locale (fallback_missing_for_locale, fallback_duplicate_for_locale); every daily_fallback locale in supported_locales (fallback_locale_mismatch); eligibility_mode universal (fallback_not_universal); at least one default timing_template per supported locale (timing_template_missing_for_locale); every template placeholder token declared; phase parent_cycle_id graph resolution; and every declared fixture id present in the catalogue (fixtures_unknown)."
+    }
+  },
+  "oneOf": [
+    { "title": "ContentReleaseBundle", "$ref": "#/$defs/contentReleaseBundle" }
+  ]
+}

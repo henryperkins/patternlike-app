@@ -1,0 +1,75 @@
+{
+  "command_version": "v1",
+  "schema_version": "0.3.0",
+  "reading_id": "rdg_01JAMPLEREADING00001",
+  "reading_key": "user:usr_01JAMPLEUSER00000001:2026-07-30:release-12:r1",
+  "revision": 1,
+  "revision_reason": "initial",
+  "supersedes_reading_id": null,
+  "command_generation": 1,
+  "replaces_job_id": null,
+  "command_replacement_reason": null,
+  "target_local_date": "2026-07-30",
+  "target_timezone": "America/Los_Angeles",
+  "timezone_revision": 2,
+  "day_start_at": "2026-07-30T07:00:00Z",
+  "day_end_at": "2026-07-31T07:00:00Z",
+  "generation_anchor": "2026-07-30T09:00:00Z",
+  "locale": "en-US",
+  "domain_preference": "work",
+  "identity_profile": "patternlike.assembly-id.v1",
+  "output_schema": "daily-reading-v3",
+  "assembly_policy_id": "daily-reading-deterministic",
+  "assembly_policy_version": "1.4.0",
+  "chart": {
+    "snapshot_id": "cht_01JAMPLECHART0000001",
+    "fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+    "profile_version": 1,
+    "contract_id": "patternlike.chart.launch",
+    "contract_version": "0.2.0",
+    "container_digest": "sha256:3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
+    "tzdb_version": "2026a",
+    "effective_accuracy": "exact",
+    "uncertainty": {
+      "accuracy": "exact",
+      "window_plus_minus_minutes": null,
+      "suppressed_features": [],
+      "qualified_features": []
+    }
+  },
+  "cycle_scan": {
+    "cycles": [
+      {
+        "cycle_id": "cyc_32d9bc34a5d9a4f42481de9da06defbe",
+        "pass_ids": [
+          "cyp_e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+          "cyp_e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "cyp_e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
+        ],
+        "cycle_hash": "6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f"
+      }
+    ],
+    "cycle_policy_id": "transit-scan-launch",
+    "cycle_policy_version": "1.4.0",
+    "orb_policy_id": "orb-launch",
+    "orb_policy_version": "1.0.0",
+    "container_digest": "sha256:4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d",
+    "ephemeris_data_version": "se-2.10.03-1800-2399"
+  },
+  "release_version": "release-12",
+  "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+  "context": [
+    {
+      "signal_id": "sig_01JAMPLESIGNAL000001",
+      "source_id": "USR-03",
+      "normalized_hash": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e",
+      "allowed_use": "life_domain_selection",
+      "evidence_lane": "user_and_context",
+      "consent_id": "cns_01JAMPLECONSENT00001",
+      "consent_version": 1,
+      "permission_state": "active",
+      "freshness_status": "fresh"
+    }
+  ],
+  "assembly_id": "asm_97e0e939b208250aecdde02747d367af"
+}

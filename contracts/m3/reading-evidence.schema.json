@@ -1,0 +1,430 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/reading-evidence.schema.json",
+  "title": "Reading Evidence Graph (M3)",
+  "description": "Successor to M0's readingEvidenceGraph. Adds the revision identity from D1, the opaque assembly_id from D3, and two provenance rules the M0 document could not express: a timing paragraph must carry its reviewed template as well as its calculated facts, and a safety_fallback paragraph must carry exactly one reviewed fallback content ref with no facts and no context. This is a trusted-plane object returned to the owning user by GET /v1/readings/{id}/evidence — it may name the user, unlike the assembly request.",
+  "$defs": {
+    "factRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fact_type"],
+      "properties": {
+        "id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "fact_type": {
+          "type": "string",
+          "enum": [
+            "chart_snapshot",
+            "natal_position",
+            "natal_aspect",
+            "natal_pattern",
+            "cycle_instance",
+            "exact_pass",
+            "lunation",
+            "station_ingress",
+            "uncertainty_feature",
+            "other_calculated"
+          ]
+        },
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            }
+          ]
+        },
+        "orb_deg": { "type": ["number", "null"], "minimum": 0, "maximum": 12 },
+        "chart_fingerprint": { "type": ["string", "null"] },
+        "technique": { "type": ["string", "null"] },
+        "pass_index": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "New in M3: which pass of a multi-pass cycle this reference is about. A retrograde encounter crosses the same lifted target three times and the evidence drawer has to be able to say which crossing it means."
+        }
+      }
+    },
+    "contentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fragment_id", "content_version", "release_version"],
+      "properties": {
+        "fragment_id": { "type": "string", "minLength": 1 },
+        "content_version": { "type": "string", "minLength": 1 },
+        "release_version": { "type": "string", "minLength": 1 },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "astrology_pattern",
+            "astrology_cycle",
+            "astrology_phase",
+            "astrology_modifier",
+            "astrology_prompt",
+            "astrology_safety_rule",
+            "timing_template",
+            "fallback_copy"
+          ],
+          "description": "timing_template is new in M3. Without it a timing paragraph had no reviewed content to point at, which made it a facts-only exception to the rule that every paragraph resolves to an approved content version."
+        },
+        "bundle_hash": { "type": ["string", "null"] }
+      }
+    },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "source_id", "allowed_use", "evidence_lane"],
+      "properties": {
+        "signal_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "source_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ingestibleSourceId",
+          "description": "Evidence must not reference an excluded source. The id-prefix rule is necessary but not sufficient — AMB-12 is excluded by status while carrying an ingestible prefix — so the engine gates on a generated registry allowlist, not on this pattern alone."
+        },
+        "allowed_use": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/allowedUse"
+        },
+        "evidence_lane": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/evidenceLane"
+        },
+        "label": {
+          "type": "string",
+          "enum": [
+            "user_reported",
+            "user_selected",
+            "optional_context",
+            "operational",
+            "environment",
+            "derived_aggregate",
+            "experimental"
+          ]
+        }
+      },
+      "description": "Context may rank or frame only; never presented as independently discovered by astrology."
+    },
+    "rankingFactor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factor", "reason"],
+      "properties": {
+        "factor": {
+          "type": "string",
+          "enum": [
+            "exactness",
+            "body_importance",
+            "target_importance",
+            "rarity",
+            "angularity",
+            "phase",
+            "technique_weight",
+            "domain_match",
+            "continuity",
+            "repetition_penalty",
+            "uncertainty_filter",
+            "safety_filter",
+            "other"
+          ],
+          "description": "M0's enum also carried resonance_feedback and user_priority. resonance_feedback is dropped: the registry's requirement is 'no hidden engagement-only ranking', and the way to keep that true is to leave the ranker nowhere to record one — reading_feedback.resonance is the column that would otherwise feed it. user_priority is dropped as a duplicate of domain_match, which is the only user preference the launch ranker reads. uncertainty_filter and safety_filter are retained because stages 3 and 8 genuinely record rejections under them."
+        },
+        "weight": { "type": ["number", "null"] },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Machine-readable short reason for the evidence drawer."
+        }
+      }
+    },
+    "paragraphEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paragraph_id",
+        "role",
+        "evidence_lane",
+        "facts",
+        "content",
+        "context_signals"
+      ],
+      "properties": {
+        "paragraph_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "role": {
+          "$ref": "daily-reading.schema.json#/$defs/paragraphRole"
+        },
+        "evidence_lane": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/evidenceLane"
+        },
+        "text_hash": {
+          "type": ["string", "null"],
+          "description": "Hash of the published paragraph text. Stored only inside reading_sources.evidence_enc: a fragment id plus a text hash in clear, together with the retained R2 release catalogue, reconstructs deleted prose offline."
+        },
+        "order": { "type": "integer", "minimum": 1 },
+        "facts": { "type": "array", "items": { "$ref": "#/$defs/factRef" } },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentRef" }
+        },
+        "context_signals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextRef" }
+        },
+        "ranking_factors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rankingFactor" }
+        },
+        "model_output": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "used": { "type": "boolean" },
+            "route_version": { "type": ["string", "null"] },
+            "model_id": { "type": ["string", "null"] },
+            "response_hash": { "type": ["string", "null"] },
+            "validated": { "type": "boolean" }
+          },
+          "description": "Never store prompt or response text here. In M3 'used' is always false."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "evidence_lane": { "const": "celestial_facts" } },
+            "required": ["evidence_lane"]
+          },
+          "then": {
+            "properties": {
+              "facts": { "minItems": 1 },
+              "content": { "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "evidence_lane": { "const": "user_and_context" } },
+            "required": ["evidence_lane"]
+          },
+          "then": {
+            "properties": { "context_signals": { "minItems": 1 } }
+          }
+        },
+        {
+          "description": "A timing paragraph states calculated dates in reviewed words, so it needs both halves: at least one calculated fact, and the exact signed template that phrased it.",
+          "if": {
+            "properties": { "role": { "const": "timing" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "facts": { "minItems": 1 },
+              "content": {
+                "minItems": 1,
+                "contains": {
+                  "type": "object",
+                  "required": ["content_type"],
+                  "properties": {
+                    "content_type": { "const": "timing_template" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "A fallback paragraph is reviewed copy that stands alone. Exactly one fallback_copy ref, no facts, no context — anything else means an unrelated rule was pressed into service as a fallback.",
+          "if": {
+            "properties": { "role": { "const": "safety_fallback" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "evidence_lane": { "const": "operational" },
+              "facts": { "maxItems": 0 },
+              "context_signals": { "maxItems": 0 },
+              "content": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["content_type"],
+                  "properties": {
+                    "content_type": { "const": "fallback_copy" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "validationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "fallback_used", "checks"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "fallback_used": { "type": "boolean" },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["check", "result"],
+            "properties": {
+              "check": {
+                "type": "string",
+                "enum": [
+                  "schema",
+                  "provenance",
+                  "dates",
+                  "unsupported_facts",
+                  "fatalism",
+                  "diagnosis",
+                  "source_laundering",
+                  "eligibility_allowlist",
+                  "uncertainty_constraints",
+                  "consent_freshness",
+                  "repetition",
+                  "other"
+                ]
+              },
+              "result": { "type": "string", "enum": ["pass", "fail", "skip"] },
+              "detail_code": {
+                "type": ["string", "null"],
+                "description": "Opaque error class only. In deterministic mode the two classifier checks record skip with detail_code 'deterministic_mode', so the log distinguishes verified from not-applicable."
+              }
+            }
+          }
+        }
+      }
+    },
+    "readingEvidenceGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "reading_id",
+        "reading_key",
+        "user_id",
+        "local_date",
+        "release_version",
+        "chart_fingerprint",
+        "contract_id",
+        "assembly_mode",
+        "assembly_id",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "paragraphs",
+        "validation",
+        "created_at"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "reading_key": {
+          "type": "string",
+          "pattern": "^user:[A-Za-z0-9_.:-]+:[0-9]{4}-[0-9]{2}-[0-9]{2}:.+:r[1-9][0-9]*$",
+          "description": "user:<user_id>:<local_date>:<release_version>:r<revision>. Still matches the M0 pattern (its trailing .+ absorbs the revision suffix) and stays unambiguously parseable because users.id excludes ':' by CHECK. This identifies a published artifact and is NOT the job idempotency key — those are separate so an editorial pointer move cannot silently create a second generation command for one day."
+        },
+        "user_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/userId"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "release_version": { "type": "string", "minLength": 1 },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "assembly_mode": {
+          "type": "string",
+          "enum": ["deterministic", "constrained_model"]
+        },
+        "assembly_id": { "$ref": "common.schema.json#/$defs/assemblyId" },
+        "assembly_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "revision": { "$ref": "common.schema.json#/$defs/readingRevision" },
+        "revision_reason": {
+          "$ref": "common.schema.json#/$defs/revisionReason"
+        },
+        "supersedes_reading_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ]
+        },
+        "primary_theme": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "cycle_id": { "$ref": "common.schema.json#/$defs/cycleId" },
+            "phase": {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            },
+            "fragment_ids": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "supporting_theme": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "description": "At most one supporting influence, and only when distinct from the primary in both (body, target, aspect) and parent cycle, so the reading cannot say the same thing twice.",
+          "properties": {
+            "cycle_id": { "$ref": "common.schema.json#/$defs/cycleId" },
+            "phase": {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            },
+            "fragment_ids": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "paragraphs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/paragraphEvidence" }
+        },
+        "validation": { "$ref": "#/$defs/validationResult" },
+        "content_hash": { "type": ["string", "null"] },
+        "created_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        }
+      },
+      "allOf": [
+        {
+          "description": "Revision 1 is the initial reading and has no predecessor; every later revision has one. The pair is checked here because it is the invariant a reissue race would otherwise break silently.",
+          "if": {
+            "properties": { "revision_reason": { "const": "initial" } },
+            "required": ["revision_reason"]
+          },
+          "then": {
+            "properties": {
+              "revision": { "const": 1 },
+              "supersedes_reading_id": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "revision": { "minimum": 2 },
+              "supersedes_reading_id": { "type": "string" }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    { "title": "ReadingEvidenceGraph", "$ref": "#/$defs/readingEvidenceGraph" },
+    { "title": "ParagraphEvidence", "$ref": "#/$defs/paragraphEvidence" }
+  ]
+}

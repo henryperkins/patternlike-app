@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/assembly-identity.schema.json",
+  "title": "Assembly Identity Preimage (patternlike.assembly-id.v1)",
+  "description": "The exact, closed object whose RFC 8785 canonical bytes are hashed to produce assembly_id. This document is the hash preimage, not a wire message: it lives only in the trusted plane, and the value derived from it is what crosses the assembly boundary in place of M0's reading_key. Spec section 10 forbids stable direct identifiers at the model boundary; a required reading_key embedding the user id violated that, and a comment cannot enforce a prohibition. Canonicalization: JSON Canonicalization Scheme (RFC 8785) over validated I-JSON, with every array put into its contractual total order BEFORE canonicalization because JCS deliberately preserves array order.",
+  "$defs": {
+    "assemblyUncertaintyInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accuracy", "suppressed_features", "qualified_features"],
+      "description": "Normalized projection of the chart's UncertaintyReport. Deliberately excludes user_facing_summary: it is free-form prose that never passes editorial review, so it must not be able to alter a reviewed artifact's identity.",
+      "properties": {
+        "accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy",
+          "description": "The EFFECTIVE accuracy recomputed by the engine, never the label the caller sent."
+        },
+        "window_plus_minus_minutes": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 1440,
+          "description": "Included because approximate-window values reach rendering; null for exact and unknown."
+        },
+        "suppressed_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Sorted by (feature_class, feature_id, reason). Anything depending on a listed class is dropped before ranking.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature_class", "reason"],
+            "properties": {
+              "feature_class": {
+                "$ref": "common.schema.json#/$defs/suppressedFeatureClass"
+              },
+              "feature_id": { "type": ["string", "null"] },
+              "reason": { "$ref": "common.schema.json#/$defs/suppressionReason" }
+            }
+          }
+        },
+        "qualified_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Sorted by (feature_id, qualification). A surviving qualified feature forces an uncertainty_notice paragraph.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature_id", "qualification"],
+            "properties": {
+              "feature_id": {
+                "$ref": "common.schema.json#/$defs/qualifiedFeatureId"
+              },
+              "qualification": {
+                "$ref": "common.schema.json#/$defs/featureQualification"
+              }
+            }
+          }
+        }
+      }
+    },
+    "assemblyFactInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fact_class"],
+      "description": "One normalized calculated fact. Ordered by (first_exact_at, id) with a total tie-break on id. No storage row id, no user linkage, no free-form text.",
+      "properties": {
+        "id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "fact_class": { "$ref": "common.schema.json#/$defs/factClass" },
+        "technique": { "type": ["string", "null"] },
+        "body": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+            }
+          ]
+        },
+        "target": { "type": ["string", "null"] },
+        "aspect": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+            }
+          ]
+        },
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            }
+          ]
+        },
+        "orb_deg": { "type": ["number", "null"], "minimum": 0, "maximum": 12 },
+        "first_exact_at": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ]
+        },
+        "pass_count": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "assemblyContextInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "source_id", "allowed_use", "evidence_lane"],
+      "description": "Minimized context signal. Ordered by (source_id, signal_id). Carries no value payload: context may rank and frame, never supply content.",
+      "properties": {
+        "signal_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "source_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ingestibleSourceId"
+        },
+        "allowed_use": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/allowedUse"
+        },
+        "evidence_lane": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/evidenceLane"
+        },
+        "normalized_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex",
+          "description": "context_signals.normalized_hash, so a changed signal value changes the assembly identity even though the value itself never enters the preimage."
+        }
+      }
+    },
+    "assemblyIdentityInputV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_profile",
+        "schema_version",
+        "assembly_policy_id",
+        "assembly_policy_version",
+        "output_schema",
+        "local_date",
+        "target_timezone",
+        "generation_anchor",
+        "chart_fingerprint",
+        "effective_accuracy",
+        "uncertainty",
+        "facts",
+        "release_version",
+        "release_bundle_hash",
+        "context",
+        "locale",
+        "domain_preference",
+        "revision"
+      ],
+      "properties": {
+        "identity_profile": {
+          "const": "patternlike.assembly-id.v1",
+          "description": "Domain separation. Changing the preimage shape requires a new profile value, never a silent reinterpretation of the same bytes."
+        },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "assembly_policy_id": {
+          "$ref": "common.schema.json#/$defs/assemblyPolicyId"
+        },
+        "assembly_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion",
+          "description": "Bumps for any ranking, selection, rendering, fallback, or validation change that can alter output for otherwise identical inputs. Pretending code version is not an input is how two different readings acquire one id."
+        },
+        "output_schema": {
+          "$ref": "common.schema.json#/$defs/outputSchemaName"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "target_timezone": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone",
+          "description": "Included because it changes locale-formatted timing dates even when every UTC cycle timestamp is identical."
+        },
+        "generation_anchor": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Written into the command before its first attempt and never recomputed from a clock. This is what makes a retry reproduce the same id."
+        },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "uncertainty": { "$ref": "#/$defs/assemblyUncertaintyInput" },
+        "facts": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/assemblyFactInput" },
+          "description": "May be empty. Most days have no cycle inside orb, and that day still has an identity and a reviewed fallback reading."
+        },
+        "release_version": { "type": "string", "minLength": 1 },
+        "release_bundle_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/assemblyContextInput" }
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        },
+        "revision": { "$ref": "common.schema.json#/$defs/readingRevision" }
+      },
+      "$comment": "effective_accuracy must equal uncertainty.accuracy — two disagreeing copies of the same decision is how an unknown-time chart acquires an exact-time reading. JSON Schema 2020-12 cannot compare two sibling values, so this one rule is enforced in code (assertIdentityConsistent in packages/reading-engine) and pinned by the invalid fixture assembly-identity.accuracy-mismatch.json. Nothing else in this document relies on out-of-band enforcement."
+    }
+  },
+  "oneOf": [
+    {
+      "title": "AssemblyIdentityInputV1",
+      "$ref": "#/$defs/assemblyIdentityInputV1"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.3.0",
+  "request_id": "req_01JAMPLECYCLEREQ0001",
+  "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "natal_positions": [
+    {
+      "body": "sun",
+      "longitude_deg": 127.483921
+    },
+    {
+      "body": "moon",
+      "longitude_deg": 12.004311
+    },
+    {
+      "body": "saturn",
+      "longitude_deg": 301.774002
+    }
+  ],
+  "natal_accuracy": "exact",
+  "suppressed_features": [],
+  "window": {
+    "from": "2026-07-30T07:00:00Z",
+    "to": "2026-07-31T07:00:00Z"
+  },
+  "techniques": [
+    "transits"
+  ],
+  "cycle_policy_id": "transit-scan-launch",
+  "cycle_policy_version": "1.4.0",
+  "orb_policy_id": "orb-launch",
+  "orb_policy_version": "1.0.0",
+  "contract_id": "patternlike.chart.launch",
+  "contract_version": "0.2.0",
+  "birth_time_local": "07:42"
+}

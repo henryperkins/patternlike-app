@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/common.schema.json",
+  "title": "Pattern-Like M3 Common Definitions",
+  "description": "Vocabulary introduced by the M3 daily-reading freeze. Anything unchanged from M0 is referenced by absolute $id from https://patternlike.app/contracts/m0/common.schema.json rather than restated here, so the frozen enums stay single-sourced. Normative sources: product platform spec v0.2 and docs/superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md.",
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "0.3.0",
+      "description": "M3 contract package version. M0 documents remain at 0.2.0 and are byte-frozen."
+    },
+    "assemblyId": {
+      "type": "string",
+      "pattern": "^asm_[a-f0-9]{32}$",
+      "description": "Opaque content-addressed assembly handle: 'asm_' + first 32 lowercase hex of SHA-256 over the RFC 8785 canonical bytes of assemblyIdentityInputV1. Never a stable pseudonym: the preimage carries the day's facts, so the value changes daily."
+    },
+    "cycleId": {
+      "type": "string",
+      "pattern": "^cyc_[a-f0-9]{32}$",
+      "description": "Opaque cycle handle: 'cyc_' + first 32 lowercase hex of SHA-256 over the RFC 8785 canonical bytes of cycleIdentityV1. Names a physical encounter, not a scan."
+    },
+    "cyclePassId": {
+      "type": "string",
+      "pattern": "^cyp_[a-f0-9]{32}$",
+      "description": "Opaque per-pass handle. Derived from the parent cycle identity plus pass_index."
+    },
+    "readingRevision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic artifact revision within one user's local day. Revision 1 is the initial reading; a correction is revision 2 and supersedes revision 1."
+    },
+    "commandGeneration": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Which immutable generation command currently owns a reservation. A retry reuses its generation; a trusted replacement after terminal failure increments it. Distinct from readingRevision: a replaced command does not consume an artifact revision."
+    },
+    "revisionReason": {
+      "type": "string",
+      "enum": [
+        "initial",
+        "chart_recalculated",
+        "consent_revoked",
+        "safety_correction",
+        "defect_repair"
+      ],
+      "description": "Why this revision exists. 'initial' requires revision 1 and no predecessor; every other value requires a predecessor. Deliberately excludes a content-release reason: activating a release does not retroactively revise published readings (spec section 7), so a reissue after a pointer move is a human safety_correction or defect_repair."
+    },
+    "commandReplacementReason": {
+      "type": "string",
+      "enum": [
+        "calc_unavailable",
+        "release_unreadable",
+        "context_minimized",
+        "policy_upgraded",
+        "defect_repair"
+      ],
+      "description": "Why a terminally failed command was replaced by the next generation. Replacement freezes a new command against the same reservation; it never mutates a retry's inputs."
+    },
+    "passDirection": {
+      "type": "string",
+      "enum": ["direct", "retrograde"],
+      "description": "Sign of Swiss longitudinal speed at the exact pass. At a station-on-target tangent the outgoing station direction is used."
+    },
+    "policyVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Opaque version of a named policy. Must change for any ranking, selection, rendering, fallback, validation, scan-grid, tolerance, or lookaround change that can alter output for otherwise identical inputs."
+    },
+    "outputSchemaName": {
+      "type": "string",
+      "const": "daily-reading-v3",
+      "description": "Pinned structured output schema for deterministic assembly. Defined by daily-reading.schema.json in this package."
+    },
+    "assemblyPolicyId": {
+      "type": "string",
+      "const": "daily-reading-deterministic",
+      "description": "The only assembly policy that exists in M3. Constrained-model editing is M5."
+    },
+    "identityProfile": {
+      "type": "string",
+      "enum": [
+        "patternlike.assembly-id.v1",
+        "patternlike.cycle-id.v1"
+      ],
+      "description": "Domain separation tag inside a hash preimage. Versions the exact set of canonical bytes so a preimage change cannot silently reuse an id."
+    },
+    "factClass": {
+      "type": "string",
+      "enum": [
+        "natal_position",
+        "natal_aspect",
+        "natal_pattern",
+        "cycle_instance",
+        "exact_pass",
+        "lunation",
+        "station_ingress",
+        "houses_angles",
+        "uncertainty_feature"
+      ],
+      "description": "Calculated fact classes usable in editorial eligibility. Identical to the M0 content-release eligibility vocabulary, promoted to a named definition because M3 references it from three documents."
+    },
+    "suppressedFeatureClass": {
+      "type": "string",
+      "enum": ["houses", "angles", "angle_transits", "moon_time_sensitive"],
+      "description": "Closed set emitted by apps/calc-stub/src/engine.ts buildUncertainty(). Closed rather than free-form because it enters a hash preimage."
+    },
+    "suppressionReason": {
+      "type": "string",
+      "enum": ["unknown_birth_time", "birthplace_unavailable"]
+    },
+    "qualifiedFeatureId": {
+      "type": "string",
+      "enum": ["moon", "houses"]
+    },
+    "featureQualification": {
+      "type": "string",
+      "enum": ["low_confidence_moon", "approximate_only"]
+    },
+    "timezoneSource": {
+      "type": "string",
+      "enum": ["default_unconfirmed", "device_derived", "user_confirmed"],
+      "description": "Provenance of users.timezone. Scheduled generation is withheld while the value is default_unconfirmed. A device update may refresh device_derived but never overwrites user_confirmed."
+    },
+    "localeSource": {
+      "type": "string",
+      "enum": ["default_unconfirmed", "device_derived", "user_confirmed"],
+      "description": "Provenance of users.locale, on the same rules as timezoneSource. Locale selects the reviewed fallback and timing template, so it cannot stay an unowned server default."
+    },
+    "eligibilityMode": {
+      "type": "string",
+      "enum": ["universal", "conditional"],
+      "description": "A universal object must be publishable with zero calculated facts and unknown birth-time accuracy. Only daily_fallback objects may declare it."
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "#/$defs/schemaVersion" }
+  }
+}

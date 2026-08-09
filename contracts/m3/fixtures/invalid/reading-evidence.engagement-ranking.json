@@ -1,0 +1,171 @@
+{
+  "schema_version": "0.3.0",
+  "reading_id": "rdg_01JAMPLEREADING00001",
+  "reading_key": "user:usr_01JAMPLEUSER00000001:2026-07-30:release-12:r1",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "local_date": "2026-07-30",
+  "release_version": "release-12",
+  "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "contract_id": "patternlike.chart.launch",
+  "contract_version": "0.2.0",
+  "assembly_mode": "deterministic",
+  "assembly_id": "asm_97e0e939b208250aecdde02747d367af",
+  "assembly_policy_version": "1.4.0",
+  "revision": 1,
+  "revision_reason": "initial",
+  "supersedes_reading_id": null,
+  "primary_theme": {
+    "cycle_id": "cyc_32d9bc34a5d9a4f42481de9da06defbe",
+    "phase": "building",
+    "fragment_ids": [
+      "phase.saturn-square-sun.building"
+    ]
+  },
+  "supporting_theme": null,
+  "content_hash": "sha256:7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+  "created_at": "2026-07-30T09:00:00Z",
+  "validation": {
+    "passed": true,
+    "fallback_used": false,
+    "checks": [
+      {
+        "check": "schema",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "provenance",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "dates",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "unsupported_facts",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "eligibility_allowlist",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "uncertainty_constraints",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "consent_freshness",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "repetition",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "source_laundering",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "fatalism",
+        "result": "skip",
+        "detail_code": "deterministic_mode"
+      },
+      {
+        "check": "diagnosis",
+        "result": "skip",
+        "detail_code": "deterministic_mode"
+      }
+    ]
+  },
+  "paragraphs": [
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH001",
+      "role": "primary_theme",
+      "order": 1,
+      "evidence_lane": "celestial_facts",
+      "text_hash": "sha256:8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b",
+      "facts": [
+        {
+          "id": "cyc_32d9bc34a5d9a4f42481de9da06defbe",
+          "fact_type": "cycle_instance",
+          "phase": "building",
+          "orb_deg": 0.42,
+          "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+          "technique": "transit",
+          "pass_index": 1
+        }
+      ],
+      "content": [
+        {
+          "fragment_id": "phase.saturn-square-sun.building",
+          "content_version": "3",
+          "release_version": "release-12",
+          "content_type": "astrology_phase",
+          "bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+        }
+      ],
+      "context_signals": [],
+      "ranking_factors": [
+        {
+          "factor": "exactness",
+          "weight": 0.51,
+          "reason": "orb_0_42_within_peak_band"
+        },
+        {
+          "factor": "body_importance",
+          "weight": 0.24,
+          "reason": "outer_body_saturn"
+        },
+        {
+          "factor": "domain_match",
+          "weight": 0.15,
+          "reason": "preference_work"
+        },
+        {
+          "factor": "resonance_feedback",
+          "weight": 0.4,
+          "reason": "user_liked_similar"
+        }
+      ],
+      "model_output": null
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH003",
+      "role": "timing",
+      "order": 3,
+      "evidence_lane": "celestial_facts",
+      "text_hash": "sha256:9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c",
+      "facts": [
+        {
+          "id": "cyc_32d9bc34a5d9a4f42481de9da06defbe",
+          "fact_type": "cycle_instance",
+          "phase": "building",
+          "orb_deg": 0.42,
+          "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+          "technique": "transit",
+          "pass_index": 1
+        }
+      ],
+      "content": [
+        {
+          "fragment_id": "timing.default.en-US",
+          "content_version": "1",
+          "release_version": "release-12",
+          "content_type": "timing_template",
+          "bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+        }
+      ],
+      "context_signals": [],
+      "ranking_factors": [],
+      "model_output": null
+    }
+  ]
+}

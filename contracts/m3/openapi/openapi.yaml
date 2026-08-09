@@ -1,0 +1,742 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API
+  version: 0.3.0
+  description: |
+    Successor to the M0 OpenAPI document, not a fragment: it describes the whole
+    public `/v1` surface plus internal content-release ingestion at M3.
+
+    Normative body shapes live in `contracts/m3/*.schema.json` and
+    `contracts/m0/*.schema.json`. Component schemas here are wire projections of
+    those documents; each operation carries `x-normative-schema` naming the
+    definition it must agree with, and `contracts/validate_schemas.py` resolves
+    every one of those pointers against the frozen packages. A pointer that
+    names a definition nobody ships is a build failure, which is the property a
+    `$ref` to an unfetchable URL would not have given us.
+
+    Two routes change substantively from M0 because they have never had a
+    successful implementation to be compatible with: `GET /v1/readings/today` and
+    `GET /v1/readings/{id}/evidence` now return real M3 shapes at
+    `schema_version: 0.3.0`.
+
+    Two routes are new: `PUT /v1/preferences/timezone` and
+    `PUT /v1/preferences/locale`. Identity creation writes `timezone: 'UTC'` and
+    `locale: 'en-US'` as server defaults with no writer anywhere, and M3 makes
+    both load-bearing — the scheduling zone decides which local day is generated,
+    and the locale selects the reviewed fallback and timing template. A default
+    nobody chose cannot be allowed to decide either.
+
+    All mutating endpoints require `Idempotency-Key`: queue delivery is
+    at-least-once.
+  contact:
+    name: Pattern-Like Engineering
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+    description: Production (API and PWA share this origin by requirement, not preference)
+  - url: http://localhost:8787
+    description: Local Workers dev
+tags:
+  - name: sessions
+  - name: birth
+  - name: chart
+  - name: preferences
+  - name: readings
+  - name: pattern
+  - name: timing
+  - name: context
+  - name: privacy
+  - name: internal
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/sessions:
+    post:
+      tags: [sessions]
+      operationId: createSession
+      summary: Exchange a one-shot OIDC id_token for a pl_session cookie
+      description: |
+        The only time the identity provider is consulted. Afterwards the cookie
+        is the sole answer to "am I signed in", determined by calling the API and
+        watching for a 401 — never by asking the issuer again.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionExchangeRequest' }
+      responses:
+        '200':
+          description: 'Session established; `Set-Cookie: pl_session` accompanies the body.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/sessions/current:
+    delete:
+      tags: [sessions]
+      operationId: revokeSession
+      summary: Revoke the current session
+      responses:
+        '204': { description: Revoked }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/birth-profiles:
+    post:
+      tags: [birth]
+      operationId: createBirthProfile
+      summary: Submit birth data and calculate the natal chart
+      description: |
+        `birth_time_local` is required for `exact` and `approximate`. Unknown
+        birth time uses noon as a computation epoch only: it is never stored as
+        the birth instant, and houses, angles, and time-sensitive Moon claims are
+        suppressed regardless of the accuracy label the caller sends.
+      x-normative-schema: 'm0:chart-contract.schema.json#/$defs/chartSnapshot'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BirthProfileRequest' }
+      responses:
+        '202':
+          description: Chart calculated or already present
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthProfileAccepted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409':
+          description: '`chart_already_exists` — identical birth data under a new idempotency key.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/timezone-lookup:
+    post:
+      tags: [birth]
+      operationId: lookupTimezone
+      summary: Resolve a historical local time to a UTC instant
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TimezoneLookupRequest' }
+      responses:
+        '200':
+          description: Resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimezoneLookupResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/chart:
+    get:
+      tags: [chart]
+      operationId: getChart
+      summary: The active natal chart, with every birth field nulled
+      description: |
+        Returns positions, houses, angles, aspects, and the uncertainty report.
+        The birth instant and coordinates stay encrypted at rest and are never
+        projected into this response.
+      x-normative-schema: 'm0:chart-contract.schema.json#/$defs/chartSnapshot'
+      responses:
+        '200':
+          description: Active chart snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChartResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: '`chart_not_found` — onboarding is unfinished.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/preferences/timezone:
+    put:
+      tags: [preferences]
+      operationId: setTimezone
+      summary: Set the scheduling time zone
+      description: |
+        `users.timezone` is the present-day scheduling zone and decides which
+        local day is generated. `birth_profiles.timezone` is the historical
+        birthplace zone and must never be substituted for it.
+
+        A user-confirmed value wins over a device-derived one; a device update
+        may refresh a device-derived value but never overwrites a user override.
+        Each accepted write increments `timezone_revision` and appends to the
+        registry-required 35-day change log. Scheduled generation is withheld
+        while the source is still `default_unconfirmed`, and a change affects
+        only commands enqueued afterwards — an already reserved local day never
+        moves.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TimezonePreferenceRequest' }
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimezonePreferenceResponse' }
+        '400':
+          description: '`invalid_timezone` — not a resolvable IANA zone id.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409':
+          description: '`preference_locked` — a user override cannot be overwritten by a device-derived write.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/preferences/locale:
+    put:
+      tags: [preferences]
+      operationId: setLocale
+      summary: Set the content locale
+      description: |
+        Locale resolution for a reading is exact supported locale, then the
+        release's explicitly configured language fallback, then its
+        `locale_default`. Because the locale selects both the reviewed timing
+        template and the universal daily fallback, it cannot remain a server
+        default nobody chose. Same override precedence as the timezone writer.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LocalePreferenceRequest' }
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalePreferenceResponse' }
+        '400':
+          description: '`invalid_locale` — not a well-formed BCP 47 tag.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409':
+          description: '`preference_locked`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/readings/today:
+    get:
+      tags: [readings]
+      operationId: getTodayReading
+      summary: The published reading for the user's current local date
+      description: |
+        Resolves the local date from the confirmed scheduling zone. The route
+        never substitutes `birth_profiles.timezone` and never accepts a
+        client-supplied date.
+
+        Two distinct 404s, because the client's next action differs:
+        `chart_not_found` means finish onboarding, `reading_not_generated` means
+        check back. At most one row can match: a partial unique index enforces
+        one published reading per (user, local date), with no release component,
+        so activating a release mid-day cannot produce two readings for one day.
+      x-normative-schema: 'm3:daily-reading.schema.json#/$defs/dailyReadingResponse'
+      responses:
+        '200':
+          description: Published daily reading
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: '`chart_not_found` or `reading_not_generated`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: |
+            `timezone_confirmation_required` — the scheduling zone is still the
+            unconfirmed server default, so no local date can be resolved and no
+            generation has been scheduled. Actionable: call
+            `PUT /v1/preferences/timezone`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/readings/{id}/evidence:
+    get:
+      tags: [readings]
+      operationId: getReadingEvidence
+      summary: Paragraph-level provenance for one reading
+      description: |
+        The "Why this?" surface. Joins `reading_sources` through an owner-filtered
+        reading and decrypts every `evidence_enc` row. Shipping Today without
+        this ships the surface without the property that distinguishes the
+        product.
+      x-normative-schema: 'm3:reading-evidence.schema.json#/$defs/readingEvidenceGraph'
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+      responses:
+        '200':
+          description: Evidence graph
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingEvidenceGraph' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: '`reading_not_found` — unknown id, or owned by another account.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/readings/{id}/feedback:
+    post:
+      tags: [readings]
+      operationId: submitReadingFeedback
+      summary: Resonance feedback on a reading
+      description: |
+        Not implemented in M3. Note that feedback deliberately does not feed
+        ranking: `resonance_feedback` was removed from the M3 ranking-factor
+        vocabulary so the ranker has nowhere to record an engagement signal.
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReadingFeedbackRequest' }
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/pattern:
+    get:
+      tags: [pattern]
+      operationId: getPattern
+      summary: Your Pattern chapters
+      description: Not implemented; blocked on a writer for `natal_features`.
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/timing:
+    get:
+      tags: [timing]
+      operationId: getTiming
+      summary: Active and upcoming cycles
+      description: |
+        Not implemented. Becomes nearly free once cycle persistence lands, but is
+        not on the daily loop's critical path. When it ships, phase is recomputed
+        from `cycle_passes` for display: the stored `phase` column is a scan-time
+        cache for filtering, not the authority.
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/time-travel:
+    get:
+      tags: [timing]
+      operationId: getTimeTravel
+      summary: Past and future dates
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/check-ins:
+    post:
+      tags: [context]
+      operationId: createCheckIn
+      summary: Record a check-in
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckInRequest' }
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/context-sources:
+    get:
+      tags: [context]
+      operationId: getContextSources
+      summary: Context source permissions
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [context]
+      operationId: putContextSources
+      summary: Update context source permissions
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/exports:
+    post:
+      tags: [privacy]
+      operationId: createExport
+      summary: Request an account export
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/account:
+    delete:
+      tags: [privacy]
+      operationId: deleteAccount
+      summary: Request account deletion
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Error' }
+  /internal/content-releases:
+    post:
+      tags: [internal]
+      operationId: ingestContentRelease
+      summary: Verify, store, and optionally activate a signed editorial bundle
+      description: |
+        M3 tightens ingestion in two ways. A bundle must carry exactly one
+        universal `daily_fallback` and at least one default `timing_template` for
+        every declared supported locale. And a declared smoke-test `fixture_id`
+        must resolve against the repository's assembly fixture catalogue: an
+        unknown id is `fixtures_unknown`, never a pass, or a compromised control
+        plane activates a release by naming fixtures nobody has.
+
+        `accepted_pending_tests` stops being a permanent state once the assembly
+        engine can evaluate fixtures, and becomes a transient one.
+      x-normative-schema: 'm3:content-release.schema.json#/$defs/contentReleaseBundle'
+      security:
+        - serviceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentReleaseIngestionRequest' }
+      responses:
+        '202':
+          description: Stored, and activated when fixtures pass
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentReleaseIngestionResponse' }
+        '400':
+          description: |
+            Rejection classes include `locale_default_not_supported`,
+            `timing_template_missing_for_locale`, `fallback_missing_for_locale`,
+            `fallback_duplicate_for_locale`, `fallback_locale_mismatch`,
+            `fallback_not_universal`, and `fixtures_unknown`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        The opaque session token returned by `POST /v1/sessions`, for native
+        clients. Not a JWT and not the identity provider's token: the OIDC
+        id_token is spent once at the exchange and never presented again.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+      description: |
+        How browsers authenticate. Set httpOnly with `SameSite=Strict` and
+        `Path=/v1` by the session exchange. `Path=/v1` is why the app and the API
+        must share an origin — cross-origin makes this a third-party cookie that
+        Safari's ITP blocks.
+    serviceAuth:
+      type: http
+      scheme: bearer
+      description: Internal service token for WordPress to Cloudflare release ingestion.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 256
+      description: Required on all mutating endpoints; queue delivery is at-least-once.
+    ReadingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 8
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotImplemented:
+      description: |
+        `not_implemented` — a documented surface that lands in a later milestone.
+        Carries `request_id` like every other error producer.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |
+                Opaque error class; no private payloads. Upstream calculation
+                messages have leaked absolute filesystem paths, so only
+                `invalid_birth_profile` is echoed to the caller and everything
+                else is logged and returned as `calc_failed` or `internal_error`.
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+            details:
+              type: object
+              additionalProperties: true
+    SessionExchangeRequest:
+      type: object
+      additionalProperties: false
+      required: [id_token]
+      properties:
+        id_token: { type: string, minLength: 1 }
+    SessionResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, user_id, expires_at]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        user_id: { type: string }
+        expires_at: { type: string, format: date-time }
+        token: { type: [string, 'null'] }
+    BirthProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [accuracy, timezone]
+      properties:
+        accuracy: { type: string, enum: [exact, approximate, unknown] }
+        birth_date: { type: [string, 'null'], format: date }
+        birth_time_local: { type: [string, 'null'] }
+        timezone: { type: string }
+        latitude: { type: [number, 'null'], minimum: -90, maximum: 90 }
+        longitude: { type: [number, 'null'], minimum: -180, maximum: 180 }
+        place_label: { type: [string, 'null'] }
+        approximate_window_minutes: { type: [integer, 'null'], minimum: 0 }
+    BirthProfileAccepted:
+      type: object
+      additionalProperties: false
+      required: [schema_version, job_id, chart_id, status]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        job_id: { type: string }
+        chart_id: { type: string }
+        status: { type: string, enum: [succeeded, queued, running] }
+    TimezoneLookupRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, local_datetime]
+      properties:
+        timezone: { type: string }
+        local_datetime: { type: string }
+    TimezoneLookupResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, utc_instant, qualifier]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        utc_instant: { type: string, format: date-time }
+        qualifier: { type: string, enum: [unique, ambiguous, nonexistent] }
+        offset_minutes: { type: integer }
+    ChartResponse:
+      type: object
+      additionalProperties: true
+      required: [schema_version, id, fingerprint, birth_accuracy, uncertainty]
+      description: |
+        Wire projection of `m0:chart-contract.schema.json#/$defs/chartSnapshot`.
+        Every birth field is null by contract.
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        id: { type: string }
+        fingerprint: { type: string }
+        birth_accuracy: { type: string, enum: [exact, approximate, unknown] }
+        uncertainty: { type: object, additionalProperties: true }
+    TimezonePreferenceRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, source]
+      properties:
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: IANA zone id. A fixed UTC offset is never accepted as authority.
+        source:
+          type: string
+          enum: [user_confirmed, device_derived]
+          description: |
+            `device_derived` is the DEV-01 foreground/system-change sync. It is
+            rejected with `preference_locked` when a user override already exists.
+    TimezonePreferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, timezone, source, timezone_revision, updated_at]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        timezone: { type: string }
+        source: { type: string, enum: [default_unconfirmed, device_derived, user_confirmed] }
+        timezone_revision: { type: integer, minimum: 0 }
+        updated_at: { type: string, format: date-time }
+    LocalePreferenceRequest:
+      type: object
+      additionalProperties: false
+      required: [locale, source]
+      properties:
+        locale: { type: string, minLength: 2, maxLength: 35 }
+        source: { type: string, enum: [user_confirmed, device_derived] }
+    LocalePreferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, locale, source, updated_at]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        locale: { type: string }
+        source: { type: string, enum: [default_unconfirmed, device_derived, user_confirmed] }
+        updated_at: { type: string, format: date-time }
+    DailyReadingResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, reading]
+      description: |
+        Wire projection of `m3:daily-reading.schema.json#/$defs/dailyReadingResponse`.
+        `reading_key` is deliberately absent: M0 returned it, and it embeds the
+        raw application user id for no benefit the opaque `reading_id` does not
+        already provide.
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        evidence_url: { type: [string, 'null'] }
+        reading:
+          type: object
+          additionalProperties: false
+          required:
+            [schema_version, output_schema, reading_id, local_date, generated_at,
+             assembly_mode, revision, locale, paragraphs, fallback_used]
+          properties:
+            schema_version: { type: string, const: '0.3.0' }
+            output_schema: { type: string, const: daily-reading-v3 }
+            reading_id: { type: string }
+            local_date: { type: string, format: date }
+            generated_at:
+              type: string
+              format: date-time
+              description: The command's frozen generation anchor, not the attempt time.
+            assembly_mode: { type: string, const: deterministic }
+            revision: { type: integer, minimum: 1 }
+            locale: { type: string }
+            domain_preference: { type: [string, 'null'] }
+            fallback_used: { type: boolean }
+            paragraphs:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                additionalProperties: false
+                required: [paragraph_id, role, order, text]
+                properties:
+                  paragraph_id: { type: string }
+                  role:
+                    type: string
+                    enum:
+                      [primary_theme, supporting_theme, phase_context, timing,
+                       reflection, uncertainty_notice, context_label, safety_fallback]
+                  order: { type: integer, minimum: 1 }
+                  text: { type: string, minLength: 1 }
+    ReadingEvidenceGraph:
+      type: object
+      additionalProperties: true
+      required:
+        [schema_version, reading_id, revision, assembly_id, paragraphs, validation]
+      description: |
+        Wire projection of `m3:reading-evidence.schema.json#/$defs/readingEvidenceGraph`.
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        reading_id: { type: string }
+        revision: { type: integer, minimum: 1 }
+        revision_reason:
+          type: string
+          enum: [initial, chart_recalculated, consent_revoked, safety_correction, defect_repair]
+        supersedes_reading_id: { type: [string, 'null'] }
+        assembly_id: { type: string, pattern: '^asm_[a-f0-9]{32}$' }
+        paragraphs:
+          type: array
+          minItems: 1
+          items: { type: object, additionalProperties: true }
+        validation: { type: object, additionalProperties: true }
+    ReadingFeedbackRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        resonance: { type: [string, 'null'], enum: [helpful, neutral, not_helpful, off, null] }
+        relevance_labels: { type: array, items: { type: string } }
+        notes: { type: [string, 'null'], maxLength: 4000 }
+    CheckInRequest:
+      type: object
+      additionalProperties: true
+    ContentReleaseIngestionRequest:
+      type: object
+      additionalProperties: false
+      required: [schema_version, bundle, idempotency_key]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        bundle:
+          type: object
+          additionalProperties: true
+          description: '`m3:content-release.schema.json#/$defs/contentReleaseBundle`'
+        idempotency_key: { type: string, minLength: 8, maxLength: 256 }
+        activate: { type: boolean, default: true }
+    ContentReleaseIngestionResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, release_version, bundle_hash, status, received_at]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        release_version: { type: string }
+        bundle_hash: { type: string }
+        status:
+          type: string
+          enum: [accepted_pending_tests, active, rejected, duplicate]
+        r2_uri: { type: [string, 'null'] }
+        active_pointer: { type: [string, 'null'] }
+        rejection_reason_class: { type: [string, 'null'] }
+        received_at: { type: string, format: date-time }

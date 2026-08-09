@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/reading-assembly.schema.json",
+  "title": "Reading Assembly Request (M3)",
+  "description": "Successor to M0's readingAssemblyRequest, promoted out of reading-evidence.schema.json into its own document and renamed assemblyRequest. Two changes from M0. (1) The required reading_key — whose pattern embeds the raw application user id, and whose canonical M0 fixture reads literally 'user:usr_01JAMPLEUSER00000001:2026-07-30:release-12' — is replaced by the opaque content-addressed assembly_id from assembly-identity.schema.json. This object is the model-boundary object: it carries output_schema and approved_fragments and states that the assembler may not introduce fragments outside that set, so spec section 10's prohibition on stable direct identifiers applies to it directly. (2) facts and approved_fragments lose minItems: 1. M0 made both non-empty and required, which makes the commonest day of all — no cycle inside orb — unrepresentable, and with it the reviewed universal fallback path that such a day must take.",
+  "$defs": {
+    "assemblyFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Calculated fact id only. Never raw health, full calendar, or raw journal bodies."
+        },
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            }
+          ]
+        },
+        "orb": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 12
+        }
+      }
+    },
+    "assemblyContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "allowed_use"],
+      "properties": {
+        "signal_id": { "type": "string", "minLength": 1 },
+        "allowed_use": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/allowedUse"
+        },
+        "framing": {
+          "type": ["string", "null"],
+          "maxLength": 200,
+          "description": "Minimal framing signal only (e.g. a domain preference id), not raw private content."
+        }
+      }
+    },
+    "assemblyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "assembly_id",
+        "output_schema",
+        "facts",
+        "approved_fragments",
+        "context"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "assembly_id": {
+          "$ref": "common.schema.json#/$defs/assemblyId",
+          "description": "Content-addressed, not user-addressed. Nothing that names a person crosses this boundary, and because the preimage carries the day's fact set the same user gets an unrelated id each day."
+        },
+        "output_schema": {
+          "$ref": "common.schema.json#/$defs/outputSchemaName"
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/assemblyFact" },
+          "description": "May be empty: a day with no eligible calculated fact still assembles, and takes the reviewed universal fallback."
+        },
+        "approved_fragments": {
+          "type": "array",
+          "minItems": 0,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Eligible editorial fragment ids from DER-18. The assembler may not introduce fragments outside this set. May be empty for the same reason facts may be empty; the fallback copy is resolved from the release's locale-bound daily_fallback rather than from this list."
+        },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/assemblyContext" }
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        }
+      },
+      "$comment": "additionalProperties:false is the mechanical half of the boundary rule — reading_key, user_id, chart_fingerprint, local_date, target_timezone, and generation_anchor are rejected because they are simply not declared. The other half is a serialization test asserting that neither 'usr_' nor 'cs_' appears anywhere in the encoded request."
+    }
+  },
+  "oneOf": [{ "title": "AssemblyRequest", "$ref": "#/$defs/assemblyRequest" }]
+}

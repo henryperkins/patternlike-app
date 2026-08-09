@@ -1,0 +1,284 @@
+{
+  "profile": "patternlike.assembly-id.v1",
+  "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
+  "note": "canonical is the exact UTF-8 byte string; full_digest is SHA-256 of those bytes; rendered_id is the prefix plus the first 32 lowercase hex characters. An implementation that produces different bytes for any input here is not interoperable, even if its digest happens to round-trip.",
+  "vectors": [
+    {
+      "name": "nested-and-unicode",
+      "description": "Nested objects, a non-ASCII key, a non-ASCII value, an escaped control character, and an empty array.",
+      "input": {
+        "z": {
+          "b": [
+            1,
+            2,
+            3
+          ],
+          "a": {
+            "deep": true
+          }
+        },
+        "ä": "ünïcödé",
+        "a": "line\nbreak\ttab",
+        "empty": [],
+        "nul": null
+      },
+      "canonical": "{\"a\":\"line\\nbreak\\ttab\",\"empty\":[],\"nul\":null,\"z\":{\"a\":{\"deep\":true},\"b\":[1,2,3]},\"ä\":\"ünïcödé\"}",
+      "full_digest": "c27e48ff9c6f7910215f015f0101ba850c7f753a954437cf9542bb9b5cee2d10",
+      "rendered_id": "vec_c27e48ff9c6f7910215f015f0101ba85"
+    },
+    {
+      "name": "number-forms",
+      "description": "Integers, negative integers, fractional numbers, and integral floats — all rendered by the ECMAScript number rule, so 3.0 canonicalizes as 3.",
+      "input": {
+        "i": 42,
+        "neg": -17,
+        "frac": 0.42,
+        "integral_float": 3.0,
+        "zero": 0
+      },
+      "canonical": "{\"frac\":0.42,\"i\":42,\"integral_float\":3,\"neg\":-17,\"zero\":0}",
+      "full_digest": "f1b9c9032f49a9f087c072f10bbf805b2abac13045c67f80a88d640319bfe820",
+      "rendered_id": "vec_f1b9c9032f49a9f087c072f10bbf805b"
+    },
+    {
+      "name": "assembly-identity-daily",
+      "description": "The canonical daily identity preimage.",
+      "input": {
+        "identity_profile": "patternlike.assembly-id.v1",
+        "schema_version": "0.3.0",
+        "assembly_policy_id": "daily-reading-deterministic",
+        "assembly_policy_version": "1.4.0",
+        "output_schema": "daily-reading-v3",
+        "local_date": "2026-07-30",
+        "target_timezone": "America/Los_Angeles",
+        "generation_anchor": "2026-07-30T09:00:00Z",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "effective_accuracy": "exact",
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "facts": [
+          {
+            "id": "cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "venus",
+            "target": "moon",
+            "aspect": "trine",
+            "phase": "peak",
+            "orb_deg": 1.1,
+            "first_exact_at": "2026-07-30T22:40:00Z",
+            "pass_count": 1
+          },
+          {
+            "id": "cyc_abababababababababababababababab",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "saturn",
+            "target": "sun",
+            "aspect": "square",
+            "phase": "building",
+            "orb_deg": 0.42,
+            "first_exact_at": "2026-08-02T14:11:07Z",
+            "pass_count": 3
+          }
+        ],
+        "release_version": "release-12",
+        "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+        "context": [
+          {
+            "signal_id": "sig_01JAMPLESIGNAL000001",
+            "source_id": "USR-03",
+            "allowed_use": "life_domain_selection",
+            "evidence_lane": "user_and_context",
+            "normalized_hash": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e"
+          }
+        ],
+        "locale": "en-US",
+        "domain_preference": "work",
+        "revision": 1
+      },
+      "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[{\"allowed_use\":\"life_domain_selection\",\"evidence_lane\":\"user_and_context\",\"normalized_hash\":\"5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e\",\"signal_id\":\"sig_01JAMPLESIGNAL000001\",\"source_id\":\"USR-03\"}],\"domain_preference\":\"work\",\"effective_accuracy\":\"exact\",\"facts\":[{\"aspect\":\"trine\",\"body\":\"venus\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-07-30T22:40:00Z\",\"id\":\"cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\",\"orb_deg\":1.1,\"pass_count\":1,\"phase\":\"peak\",\"target\":\"moon\",\"technique\":\"transit\"},{\"aspect\":\"square\",\"body\":\"saturn\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-08-02T14:11:07Z\",\"id\":\"cyc_abababababababababababababababab\",\"orb_deg\":0.42,\"pass_count\":3,\"phase\":\"building\",\"target\":\"sun\",\"technique\":\"transit\"}],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v1\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"exact\",\"qualified_features\":[],\"suppressed_features\":[],\"window_plus_minus_minutes\":null}}",
+      "full_digest": "97e0e939b208250aecdde02747d367aff78ca33fb3bde7dfeeb330efef908367",
+      "rendered_id": "asm_97e0e939b208250aecdde02747d367af"
+    },
+    {
+      "name": "assembly-identity-daily-reordered",
+      "description": "The same preimage with every top-level key in reverse insertion order. Canonical bytes and id must be identical to assembly-identity-daily: JCS sorts object keys, so source order cannot change identity.",
+      "input": {
+        "revision": 1,
+        "domain_preference": "work",
+        "locale": "en-US",
+        "context": [
+          {
+            "signal_id": "sig_01JAMPLESIGNAL000001",
+            "source_id": "USR-03",
+            "allowed_use": "life_domain_selection",
+            "evidence_lane": "user_and_context",
+            "normalized_hash": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e"
+          }
+        ],
+        "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+        "release_version": "release-12",
+        "facts": [
+          {
+            "id": "cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "venus",
+            "target": "moon",
+            "aspect": "trine",
+            "phase": "peak",
+            "orb_deg": 1.1,
+            "first_exact_at": "2026-07-30T22:40:00Z",
+            "pass_count": 1
+          },
+          {
+            "id": "cyc_abababababababababababababababab",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "saturn",
+            "target": "sun",
+            "aspect": "square",
+            "phase": "building",
+            "orb_deg": 0.42,
+            "first_exact_at": "2026-08-02T14:11:07Z",
+            "pass_count": 3
+          }
+        ],
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "effective_accuracy": "exact",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "generation_anchor": "2026-07-30T09:00:00Z",
+        "target_timezone": "America/Los_Angeles",
+        "local_date": "2026-07-30",
+        "output_schema": "daily-reading-v3",
+        "assembly_policy_version": "1.4.0",
+        "assembly_policy_id": "daily-reading-deterministic",
+        "schema_version": "0.3.0",
+        "identity_profile": "patternlike.assembly-id.v1"
+      },
+      "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[{\"allowed_use\":\"life_domain_selection\",\"evidence_lane\":\"user_and_context\",\"normalized_hash\":\"5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e\",\"signal_id\":\"sig_01JAMPLESIGNAL000001\",\"source_id\":\"USR-03\"}],\"domain_preference\":\"work\",\"effective_accuracy\":\"exact\",\"facts\":[{\"aspect\":\"trine\",\"body\":\"venus\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-07-30T22:40:00Z\",\"id\":\"cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\",\"orb_deg\":1.1,\"pass_count\":1,\"phase\":\"peak\",\"target\":\"moon\",\"technique\":\"transit\"},{\"aspect\":\"square\",\"body\":\"saturn\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-08-02T14:11:07Z\",\"id\":\"cyc_abababababababababababababababab\",\"orb_deg\":0.42,\"pass_count\":3,\"phase\":\"building\",\"target\":\"sun\",\"technique\":\"transit\"}],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v1\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"exact\",\"qualified_features\":[],\"suppressed_features\":[],\"window_plus_minus_minutes\":null}}",
+      "full_digest": "97e0e939b208250aecdde02747d367aff78ca33fb3bde7dfeeb330efef908367",
+      "rendered_id": "asm_97e0e939b208250aecdde02747d367af"
+    },
+    {
+      "name": "assembly-identity-zero-facts",
+      "description": "A day with no eligible fact and no context. Empty arrays are preserved, not omitted.",
+      "input": {
+        "identity_profile": "patternlike.assembly-id.v1",
+        "schema_version": "0.3.0",
+        "assembly_policy_id": "daily-reading-deterministic",
+        "assembly_policy_version": "1.4.0",
+        "output_schema": "daily-reading-v3",
+        "local_date": "2026-07-30",
+        "target_timezone": "America/Los_Angeles",
+        "generation_anchor": "2026-07-30T09:00:00Z",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "effective_accuracy": "exact",
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "facts": [],
+        "release_version": "release-12",
+        "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+        "context": [],
+        "locale": "en-US",
+        "domain_preference": null,
+        "revision": 1
+      },
+      "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[],\"domain_preference\":null,\"effective_accuracy\":\"exact\",\"facts\":[],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v1\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"exact\",\"qualified_features\":[],\"suppressed_features\":[],\"window_plus_minus_minutes\":null}}",
+      "full_digest": "e4b87582f27da1e85666a3ca23e657b1fd49324c7ae8d327aa508c3fe0dcd68e",
+      "rendered_id": "asm_e4b87582f27da1e85666a3ca23e657b1"
+    },
+    {
+      "name": "assembly-identity-unknown-time",
+      "description": "Same date and chart, unknown effective accuracy with four suppressed feature classes. Must differ from assembly-identity-zero-facts: an uncertainty change that can alter output must change the id.",
+      "input": {
+        "identity_profile": "patternlike.assembly-id.v1",
+        "schema_version": "0.3.0",
+        "assembly_policy_id": "daily-reading-deterministic",
+        "assembly_policy_version": "1.4.0",
+        "output_schema": "daily-reading-v3",
+        "local_date": "2026-07-30",
+        "target_timezone": "America/Los_Angeles",
+        "generation_anchor": "2026-07-30T09:00:00Z",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "effective_accuracy": "unknown",
+        "uncertainty": {
+          "accuracy": "unknown",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [
+            {
+              "feature_class": "angle_transits",
+              "feature_id": null,
+              "reason": "unknown_birth_time"
+            },
+            {
+              "feature_class": "angles",
+              "feature_id": null,
+              "reason": "unknown_birth_time"
+            },
+            {
+              "feature_class": "houses",
+              "feature_id": null,
+              "reason": "unknown_birth_time"
+            },
+            {
+              "feature_class": "moon_time_sensitive",
+              "feature_id": null,
+              "reason": "unknown_birth_time"
+            }
+          ],
+          "qualified_features": []
+        },
+        "facts": [],
+        "release_version": "release-12",
+        "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+        "context": [],
+        "locale": "en-US",
+        "domain_preference": null,
+        "revision": 1
+      },
+      "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[],\"domain_preference\":null,\"effective_accuracy\":\"unknown\",\"facts\":[],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v1\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"unknown\",\"qualified_features\":[],\"suppressed_features\":[{\"feature_class\":\"angle_transits\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"},{\"feature_class\":\"angles\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"},{\"feature_class\":\"houses\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"},{\"feature_class\":\"moon_time_sensitive\",\"feature_id\":null,\"reason\":\"unknown_birth_time\"}],\"window_plus_minus_minutes\":null}}",
+      "full_digest": "43b15b9a183bd9b9eb7b51ed362488bbb557d566435df116188a6da650ba0c81",
+      "rendered_id": "asm_43b15b9a183bd9b9eb7b51ed362488bb"
+    },
+    {
+      "name": "cycle-identity-transit",
+      "description": "The cycle identity preimage. Pass timestamps are absent by design.",
+      "input": {
+        "identity_profile": "patternlike.cycle-id.v1",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "technique": "transit",
+        "body": "saturn",
+        "target": "sun",
+        "aspect": "square",
+        "oriented_branch": "plus",
+        "winding": 3,
+        "contract_id": "patternlike.chart.launch",
+        "contract_version": "0.2.0",
+        "cycle_policy_id": "transit-scan-launch",
+        "cycle_policy_version": "1.4.0",
+        "orb_policy_id": "orb-launch",
+        "orb_policy_version": "1.0.0",
+        "container_digest": "sha256:4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d",
+        "ephemeris_data_version": "se-2.10.03-1800-2399"
+      },
+      "canonical": "{\"aspect\":\"square\",\"body\":\"saturn\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"container_digest\":\"sha256:4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d\",\"contract_id\":\"patternlike.chart.launch\",\"contract_version\":\"0.2.0\",\"cycle_policy_id\":\"transit-scan-launch\",\"cycle_policy_version\":\"1.4.0\",\"ephemeris_data_version\":\"se-2.10.03-1800-2399\",\"identity_profile\":\"patternlike.cycle-id.v1\",\"orb_policy_id\":\"orb-launch\",\"orb_policy_version\":\"1.0.0\",\"oriented_branch\":\"plus\",\"target\":\"sun\",\"technique\":\"transit\",\"winding\":3}",
+      "full_digest": "32d9bc34a5d9a4f42481de9da06defbef7b5d7a9d29e1888b798102c918feb4a",
+      "rendered_id": "cyc_32d9bc34a5d9a4f42481de9da06defbe"
+    }
+  ]
+}

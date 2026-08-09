@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/daily-reading.schema.json",
+  "title": "Daily Reading Output (daily-reading-v3)",
+  "description": "The structured artifact named by output_schema. M0 pinned the name 'daily-reading-v2' in readingAssemblyRequest without shipping a document for it, so the identity preimage committed to a schema nobody could validate against. v3 is that document: the exact shape assembleReading() returns, the shape hashed into content_hash, and the shape GET /v1/readings/today decrypts and returns.",
+  "$defs": {
+    "paragraphRole": {
+      "type": "string",
+      "enum": [
+        "primary_theme",
+        "supporting_theme",
+        "phase_context",
+        "timing",
+        "reflection",
+        "uncertainty_notice",
+        "context_label",
+        "safety_fallback"
+      ],
+      "description": "Fixed assembly order. primary_theme is required unless the reading is a safety_fallback; supporting_theme, timing, uncertainty_notice, and context_label are conditional."
+    },
+    "readingParagraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paragraph_id", "role", "order", "text"],
+      "properties": {
+        "paragraph_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "role": { "$ref": "#/$defs/paragraphRole" },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based position. Contiguous and strictly increasing across the paragraph list."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Reviewed editorial copy, or a reviewed template with its closed placeholders filled by calculated values. The renderer authors no connective prose: every character here traces to an approved content version through the paragraph's evidence."
+        }
+      }
+    },
+    "dailyReading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "output_schema",
+        "reading_id",
+        "local_date",
+        "generated_at",
+        "assembly_mode",
+        "revision",
+        "locale",
+        "paragraphs",
+        "fallback_used"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "output_schema": { "$ref": "common.schema.json#/$defs/outputSchemaName" },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "generated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "The command's frozen generation_anchor, not the attempt time. A retry reports the same instant, which is what keeps the assembly id stable."
+        },
+        "assembly_mode": {
+          "type": "string",
+          "const": "deterministic",
+          "description": "M3 never calls a model. constrained_model is M5."
+        },
+        "revision": { "$ref": "common.schema.json#/$defs/readingRevision" },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag",
+          "description": "The resolved locale actually rendered, after exact-match then configured language fallback then locale_default."
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        },
+        "paragraphs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/readingParagraph" },
+          "description": "Never empty. A day with no eligible fact publishes the locale's reviewed universal fallback, not a blank reading."
+        },
+        "fallback_used": {
+          "type": "boolean",
+          "description": "Mirrors validationResult.fallback_used. True when no theme survived eligibility or a required validation check rejected the draft."
+        }
+      },
+      "allOf": [
+        {
+          "description": "A fallback reading is exactly one safety_fallback paragraph; a normal reading carries no safety_fallback paragraph and must open with primary_theme.",
+          "if": {
+            "properties": { "fallback_used": { "const": true } },
+            "required": ["fallback_used"]
+          },
+          "then": {
+            "properties": {
+              "paragraphs": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "properties": { "role": { "const": "safety_fallback" } }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "paragraphs": {
+                "items": {
+                  "properties": {
+                    "role": { "not": { "const": "safety_fallback" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dailyReadingResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "reading"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "reading": { "$ref": "#/$defs/dailyReading" },
+        "evidence_url": {
+          "type": ["string", "null"],
+          "description": "Relative path to GET /v1/readings/{id}/evidence. The 'Why this?' affordance is part of the product surface, not an optional extra."
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "title": "DailyReading", "$ref": "#/$defs/dailyReading" },
+    { "title": "DailyReadingResponse", "$ref": "#/$defs/dailyReadingResponse" }
+  ]
+}

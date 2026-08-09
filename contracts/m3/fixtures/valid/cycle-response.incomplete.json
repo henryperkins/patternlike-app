@@ -1,0 +1,7 @@
+{
+  "ok": false,
+  "schema_version": "0.3.0",
+  "request_id": "req_01JAMPLECYCLEREQ0001",
+  "error_class": "cycle_window_incomplete",
+  "error_message": "encounter boundaries not proven within the policy lookaround limit"
+}

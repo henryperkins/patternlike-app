@@ -10,6 +10,14 @@ import { buildUserKeyInsert, type UserIdentity } from "../src/db/users.js";
  * and makes tests pass for the wrong reason.
  */
 const TABLES = [
+  // M3, children first: reading_sources -> daily_readings -> jobs, and
+  // cycle_passes -> cycle_instances -> chart_snapshots.
+  "reading_sources",
+  "reading_feedback",
+  "daily_readings",
+  "cycle_passes",
+  "cycle_instances",
+  "timezone_changes",
   "natal_features",
   "chart_snapshots",
   "birth_profiles",
@@ -29,7 +37,15 @@ const TABLES = [
 ];
 
 export async function resetDb(): Promise<void> {
-  await env.DB.batch(TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+  await env.DB.batch([
+    // daily_readings.supersedes_reading_id self-references, so a bare DELETE
+    // can hit a predecessor while its successor still points at it. Break the
+    // chain first; ordering alone cannot solve a self-reference.
+    env.DB.prepare("UPDATE daily_readings SET supersedes_reading_id = NULL"),
+    // Same shape one level up: a reading points at the job that generated it.
+    env.DB.prepare("UPDATE daily_readings SET active_generation_job_id = NULL"),
+    ...TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
+  ]);
 }
 
 export interface ApiResponse<T = Record<string, unknown>> {

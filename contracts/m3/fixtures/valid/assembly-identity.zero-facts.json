@@ -1,0 +1,25 @@
+{
+  "identity_profile": "patternlike.assembly-id.v1",
+  "schema_version": "0.3.0",
+  "assembly_policy_id": "daily-reading-deterministic",
+  "assembly_policy_version": "1.4.0",
+  "output_schema": "daily-reading-v3",
+  "local_date": "2026-07-30",
+  "target_timezone": "America/Los_Angeles",
+  "generation_anchor": "2026-07-30T09:00:00Z",
+  "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "effective_accuracy": "exact",
+  "uncertainty": {
+    "accuracy": "exact",
+    "window_plus_minus_minutes": null,
+    "suppressed_features": [],
+    "qualified_features": []
+  },
+  "facts": [],
+  "release_version": "release-12",
+  "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+  "context": [],
+  "locale": "en-US",
+  "domain_preference": null,
+  "revision": 1
+}

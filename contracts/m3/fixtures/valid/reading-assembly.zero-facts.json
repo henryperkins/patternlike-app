@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.3.0",
+  "assembly_id": "asm_e4b87582f27da1e85666a3ca23e657b1",
+  "output_schema": "daily-reading-v3",
+  "facts": [],
+  "approved_fragments": [],
+  "context": [],
+  "locale": "en-US",
+  "domain_preference": null
+}
