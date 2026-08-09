@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canonicalJson } from "@patternlike/shared";
+import { canonicalJson, SCHEMA_VERSION } from "@patternlike/shared";
 import {
   draftBundle,
   generateSigningKey,
@@ -97,10 +97,15 @@ describe("canonical signing payload", () => {
 describe("release key configuration", () => {
   it("parses key_id -> {alg, public_key}", () => {
     const keys = parseReleaseKeys(
-      JSON.stringify({ [KEY_ID]: { alg: "Ed25519", public_key: "AAAA" } }),
+      JSON.stringify({
+        [KEY_ID]: { alg: "Ed25519", public_key: toBase64Url(new Uint8Array(32)) },
+      }),
     );
 
-    expect(keys.get(KEY_ID)).toEqual({ alg: "Ed25519", publicKey: "AAAA" });
+    expect(keys.get(KEY_ID)).toEqual({
+      alg: "Ed25519",
+      publicKey: toBase64Url(new Uint8Array(32)),
+    });
   });
 
   it.each([
@@ -110,6 +115,7 @@ describe("release key configuration", () => {
     ["a JSON array", "[]"],
     ["missing public_key", JSON.stringify({ k: { alg: "Ed25519" } })],
     ["an unsupported alg", JSON.stringify({ k: { alg: "RS256", public_key: "AAAA" } })],
+    ["a malformed raw public key", JSON.stringify({ k: { alg: "Ed25519", public_key: "AAAA" } })],
   ])("yields no usable key when %s", (_label, raw) => {
     expect(parseReleaseKeys(raw).size).toBe(0);
   });
@@ -168,10 +174,14 @@ describe("signature verification", () => {
   });
 
   it("rejects a configured key that cannot be imported", async () => {
-    const { key } = await keysFor(KEY_ID);
+    const { key } = await keysFor(KEY_ID, "ES256");
     const bundle = await signedBundle(key);
+    const invalidPoint = new Uint8Array(65);
+    invalidPoint[0] = 4;
     const keys = parseReleaseKeys(
-      JSON.stringify({ [KEY_ID]: { alg: "Ed25519", public_key: toBase64Url(new Uint8Array(3)) } }),
+      JSON.stringify({
+        [KEY_ID]: { alg: "ES256", public_key: toBase64Url(invalidPoint) },
+      }),
     );
 
     expect((await verifyBundleSignature(bundle, keys))?.class).toBe("signature_key_unusable");
@@ -199,7 +209,7 @@ describe("object hash verification", () => {
 
 describe("ingestion request validation", () => {
   const wrap = (bundle: ContentReleaseBundle, extra: Record<string, unknown> = {}) => ({
-    schema_version: "0.2.0",
+    schema_version: SCHEMA_VERSION,
     bundle,
     idempotency_key: "release-ingest-key-0001",
     ...extra,
@@ -224,6 +234,25 @@ describe("ingestion request validation", () => {
 
   it("rejects a non-boolean activate", () => {
     const result = validateIngestionRequest(wrap(draftBundle(), { activate: "yes" }));
+    expect("error" in result && result.error.class).toBe("invalid_body");
+  });
+
+  it.each([
+    ["a missing schema-required pattern evidence_requirements", (bundle: ContentReleaseBundle) => {
+      delete (bundle.objects.patterns[0] as Record<string, unknown>).evidence_requirements;
+    }],
+    ["an unsupported release status", (bundle: ContentReleaseBundle) => {
+      bundle.release.status = "draft";
+    }],
+    ["an unexpected top-level request field", (_bundle: ContentReleaseBundle, body: Record<string, unknown>) => {
+      body.unexpected = true;
+    }],
+  ])("rejects %s", (_label, mutate) => {
+    const bundle = draftBundle();
+    const body = wrap(bundle);
+    mutate(bundle, body);
+
+    const result = validateIngestionRequest(body);
     expect("error" in result && result.error.class).toBe("invalid_body");
   });
 

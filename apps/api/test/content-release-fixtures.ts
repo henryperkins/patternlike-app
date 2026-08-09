@@ -1,4 +1,5 @@
 import baseFixture from "../../../contracts/m0/fixtures/valid/content-release.bundle.json";
+import { SCHEMA_VERSION } from "@patternlike/shared";
 import {
   RELEASE_OBJECT_COLLECTIONS,
   bundleSigningPayload,
@@ -165,7 +166,7 @@ export function ingestionBody(
   options: IngestionOptions = {},
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
-    schema_version: "0.2.0",
+    schema_version: SCHEMA_VERSION,
     bundle,
     idempotency_key: options.idempotencyKey ?? "release-ingest-key-0001",
   };

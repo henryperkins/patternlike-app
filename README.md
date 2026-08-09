@@ -179,7 +179,8 @@ Accepted bundles answer `202` with one of three statuses:
 
 - `active` — verified, stored at `r2://artifacts/content-releases/<version>.json`, pointer moved, previous release marked `superseded`.
 - `accepted_pending_tests` — stored but not live, either because `activate: false` was sent or because the bundle declares eligibility `fixtures` that need the M3 assembly engine to evaluate. Activating on tests nobody ran would be a claim, not a result.
-- `duplicate` — the same bytes, already stored and already active.
+- `duplicate` — an unchanged replay of an already stored release, whether it is
+  active or still pending activation.
 
 **Rollback** needs no separate endpoint: re-post a bundle that is already stored
 and the pointer moves back to it, which is what the spec means by "rollback
@@ -199,8 +200,9 @@ CONTENT_RELEASE_KEYS='{"wp-release-key-1":{"alg":"Ed25519","public_key":"<base64
 npx wrangler r2 bucket create patternlike-artifacts
 ```
 
-Without keys the endpoint returns `503 release_keys_not_configured`; without the
-R2 binding, `503 object_storage_not_configured`. The algorithm is pinned per key
+Without keys the endpoint returns `503 release_keys_not_configured`; a malformed
+key entry returns `503 release_keys_misconfigured`; without the R2 binding it
+returns `503 object_storage_not_configured`. The algorithm is pinned per key
 rather than read from the bundle: the bundle names one too, and honouring that
 name would let a compromised CMS choose which primitive its bytes are checked
 under.

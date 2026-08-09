@@ -122,20 +122,15 @@ function insertReleaseStatement(
   status: "submitted" | "active",
   now: string,
 ) {
-  // ON CONFLICT targets `version` specifically: a bundle_hash collision under a
-  // different version must still raise rather than be quietly absorbed. The
-  // update list is deliberately short — created_at, approver_id, and
-  // last_author_id belong to the release as first seen, and a bundle whose
-  // hash matched cannot have changed them anyway.
+  // A version is immutable once reserved. In particular, do not turn this into
+  // an UPSERT: a concurrent request with a different bundle hash must fail the
+  // D1 transaction instead of leaving the row's hash pointing at one artifact
+  // while R2 contains the other request's bytes.
   return env.DB.prepare(
     `INSERT INTO content_releases
        (version, bundle_hash, status, r2_uri, approver_id, last_author_id,
         changelog, calc_contract_id, activated_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(version) DO UPDATE SET
-       status = excluded.status,
-       r2_uri = COALESCE(excluded.r2_uri, content_releases.r2_uri),
-       activated_at = COALESCE(excluded.activated_at, content_releases.activated_at)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     record.version,
     record.bundleHash,
@@ -148,6 +143,21 @@ function insertReleaseStatement(
     status === "active" ? now : null,
     now,
   );
+}
+
+/** Reactivating a stored release changes its state but never its identity. */
+function activateStoredReleaseStatement(
+  env: Env,
+  record: ReleaseRecord,
+  now: string,
+) {
+  return env.DB.prepare(
+    `UPDATE content_releases
+     SET status = 'active',
+         r2_uri = COALESCE(?, r2_uri),
+         activated_at = ?
+     WHERE version = ? AND bundle_hash = ?`,
+  ).bind(record.r2Uri, now, record.version, record.bundleHash);
 }
 
 /**
@@ -186,6 +196,7 @@ export async function activateRelease(
   env: Env,
   record: ReleaseRecord,
   audit: AuditEntry,
+  alreadyStored = false,
   now = new Date().toISOString(),
 ): Promise<void> {
   await env.DB.batch([
@@ -193,7 +204,9 @@ export async function activateRelease(
       `UPDATE content_releases SET status = 'superseded'
        WHERE status = 'active' AND version <> ?`,
     ).bind(record.version),
-    insertReleaseStatement(env, record, "active", now),
+    alreadyStored
+      ? activateStoredReleaseStatement(env, record, now)
+      : insertReleaseStatement(env, record, "active", now),
     env.DB.prepare(
       `INSERT INTO content_release_pointer (id, active_version, updated_at)
        VALUES (1, ?, ?)

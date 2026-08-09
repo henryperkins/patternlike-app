@@ -10,6 +10,7 @@ import {
   withoutFixtures,
   type ReleaseSigningKey,
 } from "../../test/content-release-fixtures.js";
+import { storeRelease, type ReleaseRecord } from "../db/content-releases.js";
 import type { ContentReleaseBundle } from "../services/content-release.js";
 
 const PATH = "http://api.test/internal/content-releases";
@@ -248,6 +249,22 @@ describe("POST /internal/content-releases — storing without activating", () =>
     expect(await pointer()).toEqual([]);
   });
 
+  it("records an activation, not a rollback, when a stored release is re-posted live", async () => {
+    const bundle = await activatable();
+    await ingest(ingestionBody(bundle, { activate: false }));
+
+    const { status, body } = await ingest(
+      ingestionBody(bundle, { idempotencyKey: "release-ingest-key-0002" }),
+    );
+
+    expect(status).toBe(202);
+    expect(body.status).toBe("active");
+    expect((await auditRows()).at(-1)).toMatchObject({
+      action: "content_release.activate",
+      detail_class: "activate",
+    });
+  });
+
   /**
    * The spec activates *after* smoke tests. A bundle that declares eligibility
    * fixtures needs the M3 assembly engine to evaluate them, so activating it
@@ -263,6 +280,20 @@ describe("POST /internal/content-releases — storing without activating", () =>
       action: "content_release.store",
       detail_class: "fixtures_unevaluated",
     });
+  });
+
+  it("treats a re-posted fixture-held bundle as duplicate until its fixtures can run", async () => {
+    const bundle = await signedBundle(key);
+    await ingest(ingestionBody(bundle));
+
+    const { status, body } = await ingest(
+      ingestionBody(bundle, { idempotencyKey: "release-ingest-key-0002" }),
+    );
+
+    expect(status).toBe(202);
+    expect(body.status).toBe("duplicate");
+    expect(await releaseRows()).toHaveLength(1);
+    expect(await auditRows()).toHaveLength(1);
   });
 });
 
@@ -288,6 +319,7 @@ describe("POST /internal/content-releases — replay and immutability", () => {
         await activatable((bundle) => {
           bundle.release.changelog = "Rewritten under the same version.";
         }),
+        { idempotencyKey: "release-ingest-key-0002" },
       ),
     );
 
@@ -295,6 +327,116 @@ describe("POST /internal/content-releases — replay and immutability", () => {
     expect(body.error.code).toBe("release_version_immutable");
     expect(await releaseRows()).toHaveLength(1);
     expect(await pointer()).toEqual([{ active_version: "release-12" }]);
+  });
+
+  it("rejects a second database record that claims an existing release version", async () => {
+    const first: ReleaseRecord = {
+      version: "release-concurrency",
+      bundleHash: `sha256:${"a".repeat(64)}`,
+      r2Uri: "r2://artifacts/content-releases/release-concurrency.json",
+      approverId: "wp_reviewer",
+      lastAuthorId: "wp_author",
+      changelog: "First release.",
+      calcContractId: null,
+    };
+    const second: ReleaseRecord = {
+      ...first,
+      bundleHash: `sha256:${"b".repeat(64)}`,
+      changelog: "Conflicting release.",
+    };
+    const audit = {
+      action: "content_release.store",
+      resourceId: first.version,
+      result: "success" as const,
+      detailClass: "activate_false",
+      actorId: "wp-release-key-1",
+    };
+
+    await storeRelease(env, first, audit);
+
+    await expect(storeRelease(env, second, audit)).rejects.toThrow();
+    expect(await releaseRows()).toEqual([
+      expect.objectContaining({ version: first.version, bundle_hash: first.bundleHash }),
+    ]);
+  });
+
+  it("does not overwrite an immutable R2 artifact when no D1 row exists yet", async () => {
+    const bundle = await activatable();
+    const key = "content-releases/release-12.json";
+    await bucket().put(key, "{\"release\":\"already-reserved\"}", {
+      customMetadata: {
+        release_version: "release-12",
+        bundle_hash: `sha256:${"c".repeat(64)}`,
+      },
+    });
+
+    const { status, body } = await ingest(ingestionBody(bundle));
+
+    expect(status).toBe(409);
+    expect(body.error.code).toBe("release_version_immutable");
+    const object = await bucket().get(key);
+    expect(object).not.toBeNull();
+    expect(await object!.text()).toBe("{\"release\":\"already-reserved\"}");
+    expect(await releaseRows()).toEqual([]);
+  });
+
+  it("returns duplicate when a concurrent identical submission wins D1 after R2 reservation", async () => {
+    const bundle = await activatable();
+    const originalDb = env.DB;
+    let injectConflict = true;
+
+    // The Worker test harness serializes SELF.fetch calls, so use a D1 wrapper
+    // to reproduce the only interleaving that matters: the request has already
+    // created its immutable R2 object, then another identical request commits
+    // the release row before this request's D1 transaction runs.
+    env.DB = {
+      prepare: originalDb.prepare.bind(originalDb),
+      batch: async (...args: Parameters<typeof originalDb.batch>) => {
+        if (!injectConflict) return originalDb.batch(...args);
+        injectConflict = false;
+
+        const now = new Date().toISOString();
+        await originalDb.batch([
+          originalDb
+            .prepare(
+              `INSERT INTO content_releases
+                 (version, bundle_hash, status, r2_uri, approver_id, last_author_id,
+                  changelog, calc_contract_id, activated_at, created_at)
+               VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              bundle.release.version,
+              bundle.release.bundle_hash,
+              "r2://artifacts/content-releases/release-12.json",
+              bundle.release.approver_id,
+              bundle.release.last_author_id,
+              bundle.release.changelog,
+              bundle.release.calc_contract_id ?? null,
+              now,
+              now,
+            ),
+          originalDb
+            .prepare(
+              `INSERT INTO content_release_pointer (id, active_version, updated_at)
+               VALUES (1, ?, ?)`,
+            )
+            .bind(bundle.release.version, now),
+        ]);
+        throw new Error(
+          "D1_ERROR: UNIQUE constraint failed: content_releases.bundle_hash: SQLITE_CONSTRAINT",
+        );
+      },
+    } as D1Database;
+
+    try {
+      const replay = await ingest(ingestionBody(bundle));
+
+      expect(replay.status).toBe(202);
+      expect(replay.body.status).toBe("duplicate");
+      expect(await releaseRows()).toHaveLength(1);
+    } finally {
+      env.DB = originalDb;
+    }
   });
 
   /**
@@ -329,6 +471,15 @@ describe("POST /internal/content-releases — refusals", () => {
 
     expect(status).toBe(400);
     expect(body.error.code).toBe("idempotency_key_required");
+    expect(await auditRows()).toEqual([
+      {
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "idempotency_key_required",
+        resource_id: null,
+        actor_id: null,
+      },
+    ]);
   });
 
   it("refuses a header and body idempotency key that disagree", async () => {
@@ -346,6 +497,15 @@ describe("POST /internal/content-releases — refusals", () => {
 
     expect(status).toBe(400);
     expect(body.error.code).toBe("invalid_json");
+    expect(await auditRows()).toEqual([
+      {
+        action: "content_release.ingest",
+        result: "denied",
+        detail_class: "invalid_json",
+        resource_id: null,
+        actor_id: null,
+      },
+    ]);
   });
 
   it.each([
@@ -399,6 +559,35 @@ describe("POST /internal/content-releases — refusals", () => {
     });
   });
 
+  it.each([
+    [
+      "a bundle hash mismatch",
+      async () => {
+        const bundle = await activatable();
+        bundle.release.bundle_hash = `sha256:${"b".repeat(64)}`;
+        return bundle;
+      },
+      "bundle_hash_mismatch",
+    ],
+    [
+      "an invalid signature",
+      async () => {
+        const bundle = await activatable();
+        bundle.objects.phases[0]!.shadow_expression = "Injected copy.";
+        return resealWithoutSigning(bundle);
+      },
+      "signature_invalid",
+    ],
+  ])("does not attribute %s to an unverified signing key", async (_label, build, expected) => {
+    const { status, body } = await ingest(ingestionBody(await build()));
+
+    expect(status).toBe(400);
+    expect(body.error.code).toBe(expected);
+    expect(await auditRows()).toEqual([
+      expect.objectContaining({ detail_class: expected, actor_id: null }),
+    ]);
+  });
+
   /**
    * Dual control is enforced on verified bytes: the bundle is properly signed
    * and only then refused, which is what proves the check is the editorial
@@ -450,6 +639,18 @@ describe("POST /internal/content-releases — refusals", () => {
 
     expect(status).toBe(503);
     expect(body.error.code).toBe("release_keys_not_configured");
+  });
+
+  it("fails closed when any configured release signing key is malformed", async () => {
+    env.CONTENT_RELEASE_KEYS = JSON.stringify({
+      [key.keyId]: { alg: key.alg, public_key: key.publicKeyB64Url },
+      "wp-release-key-malformed": { alg: "RS256", public_key: "AAAA" },
+    });
+
+    const { status, body } = await ingest(ingestionBody(await activatable()));
+
+    expect(status).toBe(503);
+    expect(body.error.code).toBe("release_keys_misconfigured");
   });
 
   it("carries a request id on every refusal", async () => {

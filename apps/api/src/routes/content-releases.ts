@@ -14,7 +14,7 @@ import {
 import {
   computeBundleHash,
   hashesEqual,
-  parseReleaseKeys,
+  parseReleaseKeyConfiguration,
   pendingFixtureIds,
   validateContentGraph,
   validateIngestionRequest,
@@ -63,6 +63,17 @@ function objectKey(version: string): string {
   return `content-releases/${version}.json`;
 }
 
+function isReleaseIdentityConstraint(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /UNIQUE constraint failed: content_releases\.(?:version|bundle_hash)/.test(error.message)
+  );
+}
+
+function activationDetailClass(status: string | undefined): "activate" | "rollback" {
+  return status === "superseded" ? "rollback" : "activate";
+}
+
 contentReleaseRoutes.post("/content-releases", async (c) => {
   const requestId = c.get("requestId");
   const receivedAt = new Date().toISOString();
@@ -103,11 +114,11 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
   // contract requires it, not because a replay could slip past without it.
   const headerKey = requireIdempotencyKey(c.req.header("idempotency-key"));
   if (!headerKey) {
-    return c.json(
-      errorBody({
+    return refuse(
+      {
         class: "idempotency_key_required",
         message: "Idempotency-Key header is required (8..256 characters)",
-      }),
+      },
       400,
     );
   }
@@ -116,8 +127,8 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
   try {
     raw = await c.req.json();
   } catch {
-    return c.json(
-      errorBody({ class: "invalid_json", message: "Request body must be valid JSON" }),
+    return refuse(
+      { class: "invalid_json", message: "Request body must be valid JSON" },
       400,
     );
   }
@@ -138,11 +149,25 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
         message: "Idempotency-Key header and body idempotency_key must match",
       },
       400,
-      { version, keyId },
+      { version },
     );
   }
 
-  const keys = parseReleaseKeys(c.env.CONTENT_RELEASE_KEYS);
+  const parsedKeys = parseReleaseKeyConfiguration(c.env.CONTENT_RELEASE_KEYS);
+  if (parsedKeys.malformed || parsedKeys.invalidKeyIds.length > 0) {
+    console.error("content_release_keys_misconfigured", {
+      malformed: parsedKeys.malformed,
+      invalid_key_ids: parsedKeys.invalidKeyIds,
+    });
+    return c.json(
+      errorBody({
+        class: "release_keys_misconfigured",
+        message: "CONTENT_RELEASE_KEYS contains an invalid signing-key entry",
+      }),
+      503,
+    );
+  }
+  const keys = parsedKeys.keys;
   if (keys.size === 0) {
     // Fails closed everywhere, development included. A branch that skipped
     // verification locally would mean the one path that must never be wrong is
@@ -166,12 +191,12 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
         message: "release.bundle_hash does not match the canonical bundle body",
       },
       400,
-      { version, keyId },
+      { version },
     );
   }
 
   const signatureError = await verifyBundleSignature(bundle, keys);
-  if (signatureError) return refuse(signatureError, 400, { version, keyId });
+  if (signatureError) return refuse(signatureError, 400, { version });
 
   // --- Smoke tests on the verified content graph. ---
 
@@ -183,8 +208,10 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
 
   // --- Immutability and replay. ---
 
-  const existingByVersion = await findReleaseByVersion(c.env, version);
   const activate = request.activate ?? true;
+  const unevaluated = pendingFixtureIds(bundle);
+  const holdForFixtures = activate && unevaluated.length > 0;
+  const existingByVersion = await findReleaseByVersion(c.env, version);
 
   if (existingByVersion) {
     if (!hashesEqual(existingByVersion.bundle_hash, computedHash)) {
@@ -212,23 +239,32 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
   }
 
   const activePointer = await getActiveVersion(c.env);
+  const response = (
+    status: IngestionResponse["status"],
+    r2Uri: string | null,
+    pointer: string | null,
+  ): IngestionResponse => ({
+    schema_version: SCHEMA_VERSION,
+    release_version: version,
+    bundle_hash: computedHash,
+    status,
+    r2_uri: r2Uri,
+    active_pointer: pointer,
+    rejection_reason_class: null,
+    received_at: receivedAt,
+  });
 
   // A re-POST of bytes already stored and already live is the retry it looks
   // like. Re-running activation would rewrite the pointer to where it already
   // points and emit a second activation audit row for an event that did not
-  // happen twice.
-  if (existingByVersion && (!activate || activePointer === version)) {
-    const response: IngestionResponse = {
-      schema_version: SCHEMA_VERSION,
-      release_version: version,
-      bundle_hash: computedHash,
-      status: RESPONSE_STATUS.duplicate,
-      r2_uri: existingByVersion.r2_uri,
-      active_pointer: activePointer,
-      rejection_reason_class: null,
-      received_at: receivedAt,
-    };
-    return c.json(response, 202);
+  // happen twice. A fixture-bearing release is similarly a retry until this
+  // milestone can evaluate the declared fixture ids; attempting to store it a
+  // second time would only trip the immutable D1 identity constraint.
+  if (existingByVersion && (!activate || activePointer === version || holdForFixtures)) {
+    return c.json(
+      response(RESPONSE_STATUS.duplicate, existingByVersion.r2_uri, activePointer),
+      202,
+    );
   }
 
   // --- Store the immutable artifact, then move the pointer. ---
@@ -249,10 +285,34 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
   // reader re-verifies, and it must hash to `bundle_hash` under the same
   // canonicalisation this Worker used rather than under the sender's
   // whitespace and key order.
-  await c.env.ARTIFACTS.put(key, canonicalJson(bundle), {
+  const serializedBundle = canonicalJson(bundle);
+  const stored = await c.env.ARTIFACTS.put(key, serializedBundle, {
+    // R2 is the first durable reservation of a release version. A conditional
+    // create prevents two verified requests from overwriting each other's
+    // immutable artifact between the D1 preflight and its transaction.
+    onlyIf: new Headers({ "if-none-match": "*" }),
     httpMetadata: { contentType: "application/json" },
     customMetadata: { release_version: version, bundle_hash: computedHash },
   });
+  if (!stored) {
+    const existingArtifact = await c.env.ARTIFACTS.get(key);
+    const matchesExisting =
+      existingArtifact &&
+      "body" in existingArtifact &&
+      existingArtifact.customMetadata?.release_version === version &&
+      hashesEqual(existingArtifact.customMetadata?.bundle_hash ?? "", computedHash) &&
+      (await existingArtifact.text()) === serializedBundle;
+    if (!matchesExisting) {
+      return refuse(
+        {
+          class: "release_version_immutable",
+          message: `Release ${version} was already reserved with different content`,
+        },
+        409,
+        { version, keyId },
+      );
+    }
+  }
 
   const record: ReleaseRecord = {
     version,
@@ -264,63 +324,86 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
     calcContractId: bundle.release.calc_contract_id ?? null,
   };
 
-  // The bundle may declare eligibility fixtures. Running them needs the M3
-  // assembly engine, so a bundle that carries them is stored and left inactive
-  // rather than activated on tests nobody ran.
-  const unevaluated = pendingFixtureIds(bundle);
-  const holdForFixtures = activate && unevaluated.length > 0;
-
-  if (!activate || holdForFixtures) {
-    if (holdForFixtures) {
-      // The response envelope has no field for this and `detail_class` is an
-      // opaque class, so without a log the only trace of *which* tests were
-      // skipped is the bundle itself. Ids, never content.
-      console.warn("content_release_held_for_fixtures", {
-        request_id: requestId,
-        release_version: version,
-        fixture_ids: unevaluated,
+  try {
+    if (!activate || holdForFixtures) {
+      if (holdForFixtures) {
+        // The response envelope has no field for this and `detail_class` is an
+        // opaque class, so without a log the only trace of *which* tests were
+        // skipped is the bundle itself. Ids, never content.
+        console.warn("content_release_held_for_fixtures", {
+          request_id: requestId,
+          release_version: version,
+          fixture_ids: unevaluated,
+        });
+      }
+      await storeRelease(c.env, record, {
+        action: "content_release.store",
+        resourceId: version,
+        result: "success",
+        detailClass: holdForFixtures ? "fixtures_unevaluated" : "activate_false",
+        actorId: keyId,
       });
+      return c.json(response(RESPONSE_STATUS.pending, r2Uri, activePointer), 202);
     }
-    await storeRelease(c.env, record, {
-      action: "content_release.store",
-      resourceId: version,
-      result: "success",
-      detailClass: holdForFixtures ? "fixtures_unevaluated" : "activate_false",
-      actorId: keyId,
-    });
 
-    const response: IngestionResponse = {
-      schema_version: SCHEMA_VERSION,
-      release_version: version,
-      bundle_hash: computedHash,
-      status: RESPONSE_STATUS.pending,
-      r2_uri: r2Uri,
-      active_pointer: activePointer,
-      rejection_reason_class: null,
-      received_at: receivedAt,
-    };
-    return c.json(response, 202);
+    await activateRelease(
+      c.env,
+      record,
+      {
+        action: "content_release.activate",
+        resourceId: version,
+        result: "success",
+        // A previously submitted release is being activated for the first
+        // time. Only moving the pointer back to a superseded release is a
+        // rollback.
+        detailClass: activationDetailClass(existingByVersion?.status),
+        actorId: keyId,
+      },
+      existingByVersion !== null,
+    );
+    return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
+  } catch (error) {
+    if (!isReleaseIdentityConstraint(error)) throw error;
+
+    // R2 conditionally reserved this version before D1. If another identical
+    // request won the database race, surface the durable state rather than a
+    // transient 500. A differing version or hash remains a refused conflict.
+    const winnerByVersion = await findReleaseByVersion(c.env, version);
+    if (winnerByVersion && hashesEqual(winnerByVersion.bundle_hash, computedHash)) {
+      const winnerPointer = await getActiveVersion(c.env);
+      if (!activate || holdForFixtures || winnerPointer === version) {
+        return c.json(
+          response(RESPONSE_STATUS.duplicate, winnerByVersion.r2_uri, winnerPointer),
+          202,
+        );
+      }
+
+      await activateRelease(
+        c.env,
+        record,
+        {
+          action: "content_release.activate",
+          resourceId: version,
+          result: "success",
+          detailClass: activationDetailClass(winnerByVersion.status),
+          actorId: keyId,
+        },
+        true,
+      );
+      return c.json(response(RESPONSE_STATUS.active, r2Uri, version), 202);
+    }
+
+    const winnerByHash = await findReleaseByBundleHash(c.env, computedHash);
+    if (winnerByHash) {
+      return refuse(
+        {
+          class: "bundle_hash_conflict",
+          message: `These bytes were already ingested as release ${winnerByHash.version}`,
+        },
+        409,
+        { version, keyId },
+      );
+    }
+    throw error;
   }
-
-  await activateRelease(c.env, record, {
-    action: "content_release.activate",
-    resourceId: version,
-    result: "success",
-    // Distinguishes a first activation from a pointer moved back to an earlier
-    // release, which is the operation the spec calls rollback.
-    detailClass: existingByVersion ? "rollback" : "activate",
-    actorId: keyId,
-  });
-
-  const response: IngestionResponse = {
-    schema_version: SCHEMA_VERSION,
-    release_version: version,
-    bundle_hash: computedHash,
-    status: RESPONSE_STATUS.active,
-    r2_uri: r2Uri,
-    active_pointer: version,
-    rejection_reason_class: null,
-    received_at: receivedAt,
-  };
-  return c.json(response, 202);
 });

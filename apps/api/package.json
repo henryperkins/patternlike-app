@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@patternlike/shared": "0.2.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "hono": "^4.12.32",
     "tz-lookup": "^6.1.25"
   },

@@ -1,4 +1,8 @@
 import { canonicalJson, contentHash, SCHEMA_VERSION } from "@patternlike/shared";
+import Ajv2020 from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
+import commonSchema from "../../../../contracts/m0/common.schema.json";
+import contentReleaseSchema from "../../../../contracts/m0/content-release.schema.json";
 
 /**
  * Verification for signed editorial release bundles.
@@ -161,6 +165,12 @@ export interface ReleasePublicKey {
   publicKey: string;
 }
 
+export interface ParsedReleaseKeyConfiguration {
+  keys: Map<string, ReleasePublicKey>;
+  invalidKeyIds: string[];
+  malformed: boolean;
+}
+
 /**
  * Parse `CONTENT_RELEASE_KEYS` — a JSON object of `key_id -> {alg, public_key}`.
  *
@@ -171,31 +181,49 @@ export interface ReleasePublicKey {
  * an algorithm too, and honouring that one would let a compromised CMS pick
  * which primitive its bytes are checked under; the two must agree instead.
  */
-export function parseReleaseKeys(
+export function parseReleaseKeyConfiguration(
   raw: string | undefined,
-): Map<string, ReleasePublicKey> {
+): ParsedReleaseKeyConfiguration {
   const keys = new Map<string, ReleasePublicKey>();
-  if (!raw || !raw.trim()) return keys;
+  const invalidKeyIds: string[] = [];
+  if (!raw || !raw.trim()) return { keys, invalidKeyIds, malformed: false };
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return keys;
+    return { keys, invalidKeyIds, malformed: true };
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return keys;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { keys, invalidKeyIds, malformed: true };
+  }
 
   for (const [keyId, value] of Object.entries(parsed as Record<string, unknown>)) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    if (!keyId.trim() || !value || typeof value !== "object" || Array.isArray(value)) {
+      invalidKeyIds.push(keyId);
+      continue;
+    }
     const entry = value as Record<string, unknown>;
     const alg = entry.alg;
     const publicKey = entry.public_key;
-    if (typeof alg !== "string" || typeof publicKey !== "string") continue;
-    if (!(SIGNATURE_ALGORITHMS as readonly string[]).includes(alg)) continue;
-    if (!publicKey.trim()) continue;
+    if (
+      typeof alg !== "string" ||
+      typeof publicKey !== "string" ||
+      !(SIGNATURE_ALGORITHMS as readonly string[]).includes(alg) ||
+      !publicKey.trim() ||
+      !hasExpectedPublicKeyEncoding(alg as SignatureAlgorithm, publicKey)
+    ) {
+      invalidKeyIds.push(keyId);
+      continue;
+    }
     keys.set(keyId, { alg: alg as SignatureAlgorithm, publicKey });
   }
-  return keys;
+  return { keys, invalidKeyIds, malformed: false };
+}
+
+/** Returns only usable entries for pure signature-verification callers. */
+export function parseReleaseKeys(raw: string | undefined): Map<string, ReleasePublicKey> {
+  return parseReleaseKeyConfiguration(raw).keys;
 }
 
 export function decodeBase64Url(value: string): Uint8Array | null {
@@ -210,6 +238,12 @@ export function decodeBase64Url(value: string): Uint8Array | null {
   } catch {
     return null;
   }
+}
+
+function hasExpectedPublicKeyEncoding(alg: SignatureAlgorithm, value: string): boolean {
+  const raw = decodeBase64Url(value);
+  if (!raw) return false;
+  return alg === "Ed25519" ? raw.length === 32 : raw.length === 65 && raw[0] === 4;
 }
 
 /**
@@ -315,16 +349,26 @@ function isStringArray(value: unknown): value is string[] {
 const HASH_RE = /^(sha256:)?[a-f0-9]{64}$/;
 const RELEASE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+const schemaValidator = new Ajv2020({ allErrors: true, strict: true });
+addFormats(schemaValidator);
+schemaValidator.addSchema(commonSchema);
+schemaValidator.addSchema(contentReleaseSchema);
+const loadedContentReleaseRequestValidator =
+  schemaValidator.getSchema<ContentReleaseIngestionRequest>(
+    `${contentReleaseSchema.$id}#/$defs/contentReleaseIngestionRequest`,
+  );
+if (!loadedContentReleaseRequestValidator) {
+  throw new Error("Could not load contentReleaseIngestionRequest schema");
+}
+const validateContentReleaseRequest = loadedContentReleaseRequestValidator;
+
 /**
  * Structural validation of an ingestion request.
  *
- * This is deliberately not a JSON Schema run: shipping a validator into the
- * Worker to re-derive `content-release.schema.json` at runtime would put a
- * second, drifting copy of a frozen contract in the hot path. What it does
- * check is everything the later stages dereference plus the contract's own
- * non-empty constraints, so nothing downstream reads a field it has not
- * proven is there. The normative validator remains
- * `contracts/m0/validate_schemas.py` in CI.
+ * The bundled Draft 2020-12 schema is the source of truth for the frozen wire
+ * contract. The focused checks below retain stable rejection classes and add
+ * operational constraints (such as the safe R2/D1 release-version grammar)
+ * without maintaining a second copy of the full contract by hand.
  */
 export function validateIngestionRequest(
   value: unknown,
@@ -356,6 +400,15 @@ export function validateIngestionRequest(
 
   const bundleError = validateBundleShape(body.bundle);
   if (bundleError) return { error: bundleError };
+
+  if (!validateContentReleaseRequest(value)) {
+    return {
+      error: reject(
+        "invalid_body",
+        "Request body must conform to content-release.schema.json",
+      ),
+    };
+  }
 
   return { request: body as unknown as ContentReleaseIngestionRequest };
 }
