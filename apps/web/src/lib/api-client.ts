@@ -34,9 +34,8 @@ export class ApiError extends Error {
   readonly code: string;
   readonly requestId: string | null;
   /**
-   * The envelope's optional `details`. Carried because some refusals are only
-   * actionable with it — `reading_not_generated` names the local date the reader
-   * is being told to wait for, which the client cannot derive on its own.
+   * The envelope's optional `details`, retained for endpoints whose recovery
+   * UI needs structured context that the browser cannot derive on its own.
    */
   readonly details: Record<string, unknown> | null;
 
@@ -310,6 +309,26 @@ export interface DailyReadingResponse {
    * that there is provenance to show.
    */
   evidence_url?: string | null;
+}
+
+export interface DailyReadingPreparation {
+  schema_version: string;
+  status: "preparing";
+  local_date: string;
+}
+
+export type EnsureTodayReadingResponse =
+  | DailyReadingResponse
+  | DailyReadingPreparation;
+
+export function ensureTodayReading(
+  signal?: AbortSignal,
+): Promise<EnsureTodayReadingResponse> {
+  return request<EnsureTodayReadingResponse>("/v1/readings/today", {
+    method: "PUT",
+    headers: requestHeaders(),
+    signal,
+  });
 }
 
 export function getTodayReading(signal?: AbortSignal): Promise<DailyReadingResponse> {
