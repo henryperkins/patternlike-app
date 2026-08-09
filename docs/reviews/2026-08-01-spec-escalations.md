@@ -15,6 +15,13 @@ Every claim below was re-confirmed against the tree at the time of writing.
 
 ## Blocking a contract revision
 
+> **Items 2, 3, and 4 have a proposed resolution** in
+> [`../superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md`](../superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md)
+> §2 (decisions D1, D2, D3, and the contract-versioning decision D4). That
+> document is a design, not an implementation — these three stay open until the
+> `contracts/m3` package and the `0001_m0_core.sql` change land. Item 6 is
+> folded into the same design's source-allowlist gate (§3, stage 4).
+
 ### 1. Crypto-shredding cannot work while the wrapped DEK shares a database with the ciphertext
 
 `user_keys.wrapped_dek` sits in the same D1 database as `chart_snapshots.birth_enc`
