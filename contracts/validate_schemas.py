@@ -44,6 +44,7 @@ FIXTURE_SCHEMA = {
     "cycle-request": "https://patternlike.app/contracts/m3/cycle-request.schema.json#/$defs/cycleRequest",
     "cycle-response": "https://patternlike.app/contracts/m3/cycle-response.schema.json#/$defs/cycleResponse",
     "content-release": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/contentReleaseBundle",
+    "daily-reading-preparation": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReadingPreparation",
     "daily-reading": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading",
 }
 

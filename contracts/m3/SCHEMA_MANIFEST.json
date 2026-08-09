@@ -110,7 +110,8 @@
         "paragraphRole",
         "readingParagraph",
         "dailyReading",
-        "dailyReadingResponse"
+        "dailyReadingResponse",
+        "dailyReadingPreparation"
       ],
       "note": "NEW. M0 pinned output_schema to the literal 'daily-reading-v2' without shipping a document for it, so the assembly identity committed to a schema nobody could validate against. v3 is that document."
     },
@@ -351,6 +352,18 @@
       "detail": "openapi.yaml documents only timezone_confirmation_required on this operation's 409; C4's locale writer postdates that wording. buildGenerationCommand withholds generation on EITHER unconfirmed source (apps/api/src/services/generation-command.ts), so a reader with a confirmed zone and a default_unconfirmed locale has no reading and never will until the locale is owned — and the documented 404 reading_not_generated tells that reader to 'check back', which is advice that can never come true. The read route therefore mirrors the generation gate so the answer names the action that unblocks it: PUT /v1/preferences/locale. Timezone is still evaluated first, matching the writer's order. ErrorResponse.error.code carries no enum and 409 was already a documented status on this operation, so no schema, enum, required field, or $id changed; the code was already in the Worker's 409 vocabulary at apps/api/src/routes/internal-generation.ts. The same route also returns details.local_date on the reading_not_generated 404, which ErrorResponse already permits, so a client can name the day it is waiting on rather than say only 'not ready'. This row records that the read surface caught up with the write surface.",
       "files": [],
       "implemented_by": "apps/api/src/routes/readings.ts"
+    },
+    {
+      "date": "2026-08-09",
+      "kind": "additive_schema",
+      "summary": "PUT /v1/readings/today can return a closed preparation response while the queue publishes the current local-day reading.",
+      "detail": "The existing GET remains read-only. The new body-less PUT is an idempotent desired-state operation whose 200 response reuses dailyReadingResponse and whose 202 response is exactly schema_version, status = preparing, and the server-resolved local_date. Adding one definition, one root-union member, one valid fixture, and one OpenAPI operation changes no existing required field, enum, schema version, or $id and touches no M0 file.",
+      "files": [
+        "daily-reading.schema.json",
+        "fixtures/valid/daily-reading-preparation.preparing.json",
+        "openapi/openapi.yaml"
+      ],
+      "implemented_by": "apps/api/src/routes/readings.ts (PUT /v1/readings/today)"
     }
   ]
 }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://patternlike.app/contracts/m3/daily-reading.schema.json",
   "title": "Daily Reading Output (daily-reading-v3)",
-  "description": "The structured artifact named by output_schema. M0 pinned the name 'daily-reading-v2' in readingAssemblyRequest without shipping a document for it, so the identity preimage committed to a schema nobody could validate against. v3 is that document: the exact shape assembleReading() returns, the shape hashed into content_hash, and the shape GET /v1/readings/today decrypts and returns.",
+  "description": "The structured artifact named by output_schema and the public response shapes for today's reading. M0 pinned the name 'daily-reading-v2' in readingAssemblyRequest without shipping a document for it, so the identity preimage committed to a schema nobody could validate against. v3 defines the exact shape assembleReading() returns, the shape hashed into content_hash, the shape GET and PUT /v1/readings/today return when published, and the preparation state PUT may return while the queue is working.",
   "$defs": {
     "paragraphRole": {
       "type": "string",
@@ -141,10 +141,23 @@
           "description": "Relative path to GET /v1/readings/{id}/evidence. The 'Why this?' affordance is part of the product surface, not an optional extra."
         }
       }
+    },
+    "dailyReadingPreparation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "status", "local_date"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "status": { "type": "string", "const": "preparing" },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        }
+      }
     }
   },
   "oneOf": [
     { "title": "DailyReading", "$ref": "#/$defs/dailyReading" },
-    { "title": "DailyReadingResponse", "$ref": "#/$defs/dailyReadingResponse" }
+    { "title": "DailyReadingResponse", "$ref": "#/$defs/dailyReadingResponse" },
+    { "title": "DailyReadingPreparation", "$ref": "#/$defs/dailyReadingPreparation" }
   ]
 }

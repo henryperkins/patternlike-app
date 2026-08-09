@@ -627,6 +627,13 @@ write(I + "generation-command.replacement-without-predecessor-job.json", bad)
 # --------------------------------------------------------------------------
 # daily-reading output
 # --------------------------------------------------------------------------
+PREPARATION_DOC = {
+    "schema_version": SV,
+    "status": "preparing",
+    "local_date": DATE,
+}
+write(V + "daily-reading-preparation.preparing.json", PREPARATION_DOC)
+
 READING_DOC = {
     "schema_version": SV,
     "output_schema": "daily-reading-v3",

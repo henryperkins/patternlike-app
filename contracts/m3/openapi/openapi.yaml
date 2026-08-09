@@ -238,6 +238,57 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
   /v1/readings/today:
+    put:
+      tags: [readings]
+      operationId: ensureTodayReading
+      summary: Ensure the user's current local-day reading exists
+      description: |
+        A body-less, idempotent desired-state operation. The authenticated user
+        and confirmed scheduling zone determine the user and local date; the
+        client cannot supply a user id, date, release, or generation command.
+
+        If no published reading exists, the Worker reserves or recovers exactly
+        that user's initial current-day generation job. Repeated requests and
+        concurrent tabs converge on the same reservation. The adjacent GET
+        remains read-only.
+      x-normative-reading-schema: 'm3:daily-reading.schema.json#/$defs/dailyReadingResponse'
+      x-normative-preparation-schema: 'm3:daily-reading.schema.json#/$defs/dailyReadingPreparation'
+      responses:
+        '200':
+          description: Published daily reading
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingResponse' }
+        '202':
+          description: The current local-day reading is being prepared
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingPreparation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: '`chart_not_found` — onboarding is incomplete.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: |
+            `timezone_confirmation_required` or
+            `locale_confirmation_required`; time zone is evaluated first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '424':
+          description: '`reading_generation_failed` — terminal or not automatically repairable.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: |
+            `release_not_active`, `calc_unavailable`, or
+            `release_unreadable` prevents generation right now.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
     get:
       tags: [readings]
       operationId: getTodayReading
@@ -688,6 +739,14 @@ components:
                        reflection, uncertainty_notice, context_label, safety_fallback]
                   order: { type: integer, minimum: 1 }
                   text: { type: string, minLength: 1 }
+    DailyReadingPreparation:
+      type: object
+      additionalProperties: false
+      required: [schema_version, status, local_date]
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        status: { type: string, const: preparing }
+        local_date: { type: string, format: date }
     ReadingEvidenceGraph:
       type: object
       additionalProperties: true
