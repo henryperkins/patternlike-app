@@ -345,9 +345,15 @@ state machine. Doing it now adds moving parts to a path that currently works.
 
 The eleven M2–M4 routes in `apps/api/src/routes/stubs.ts` return honest 501s
 and should stay that way: daily readings and evidence, feedback, pattern,
-timing, time travel, check-ins, context sources, and internal content-release
-ingestion. The web client already gates those surfaces behind milestone
-screens rather than faking them.
+timing, time travel, check-ins, and context sources. The web client already
+gates those surfaces behind milestone screens rather than faking them.
+
+**Superseded 2026-08-09:** `POST /internal/content-releases` was on this list
+and is no longer a stub — it verifies, stores, and activates signed editorial
+bundles (`apps/api/src/routes/content-releases.ts`). It was deferrable for M1
+because no M1 surface reads editorial content; it stopped being deferrable
+because M3 reading assembly cannot start without an active release to draw
+approved fragments from.
 
 ---
 

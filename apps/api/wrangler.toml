@@ -14,10 +14,11 @@ database_name = "patternlike-ops"
 database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
-# R2 placeholder for chart artifacts / content bundles
-# [[r2_buckets]]
-# binding = "ARTIFACTS"
-# bucket_name = "patternlike-artifacts"
+# Immutable artifacts: signed editorial release bundles today, chart renders and
+# exports later. Create with: wrangler r2 bucket create patternlike-artifacts
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "patternlike-artifacts"
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the
@@ -105,6 +106,19 @@ database_name = "patternlike-ops"
 database_id = "1305a75d-0a8a-4a21-b201-d94fda0aaf93"
 migrations_dir = "../../db/d1"
 
+[[env.production.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "patternlike-artifacts"
+
+# CONTENT_RELEASE_KEYS is deliberately absent from both [vars] blocks. It holds
+# the PUBLIC keys trusted to sign editorial release bundles — public material,
+# so a var rather than a secret — but there is no meaningful placeholder for it:
+# POST /internal/content-releases fails closed with 503 until real keys are set,
+# in development too. Shape:
+#   CONTENT_RELEASE_KEYS = '{"wp-release-key-1":{"alg":"Ed25519","public_key":"<base64url raw>"}}'
+# Put it in [env.production.vars] once the WordPress signing key exists, and in
+# .dev.vars for the local loop.
+#
 # Secrets (set via `wrangler secret put --env production`):
 # ROOT_KEK — envelope encryption root key. Required: every request outside
 #            development returns 503 until it is set, and it must not be the

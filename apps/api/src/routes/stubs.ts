@@ -56,19 +56,3 @@ stubRoutes.post("/v1/exports", (c) =>
 stubRoutes.delete("/v1/account", (c) =>
   notImplemented(c, "Account deletion (M1 privacy skeleton follows)"),
 );
-
-/**
- * Internal service-to-service surfaces. Paths here are relative to the
- * `/internal` mount prefix in index.ts — NOT absolute. Mounting this router at
- * "/" made its `use("*", serviceAuth)` match every path in the application, so
- * the service token gated the whole consumer API and any consumer bearer token
- * was compared against SERVICE_AUTH_TOKEN and rejected.
- */
-export const internalRoutes = new Hono<{
-  Bindings: Env;
-  Variables: AppVariables;
-}>();
-
-internalRoutes.post("/content-releases", (c) =>
-  notImplemented(c, "Content release ingestion (M2)"),
-);

@@ -90,8 +90,11 @@ describe("service auth is scoped to /internal", () => {
       { method: "POST", headers: { authorization: "Bearer svc-token-for-internal-only" } },
       prodEnv(),
     );
-    // The handler is an honest 501 stub; reaching it proves serviceAuth passed.
-    expect(res.status).toBe(501);
+    // The request carries no Idempotency-Key, so the ingestion handler's own
+    // first refusal is what comes back. That it is the handler's code and not
+    // `unauthorized` is what proves serviceAuth passed.
+    expect(res.status).toBe(400);
+    expect((await body(res)).error?.code).toBe("idempotency_key_required");
   });
 
   it("returns 503 on the internal route when the service token is unset", async () => {
