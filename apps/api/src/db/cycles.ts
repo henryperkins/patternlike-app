@@ -66,10 +66,18 @@ export async function persistCycles(
   if (cycles.length === 0) return derived;
 
   const now = new Date().toISOString();
-  const writes: D1PreparedStatement[] = [];
+  const pending: D1PreparedStatement[] = [];
+  const flush = async (): Promise<void> => {
+    if (pending.length === 0) return;
+    await env.DB.batch(pending.splice(0, PERSIST_BATCH_SIZE));
+  };
+  const append = async (statement: D1PreparedStatement): Promise<void> => {
+    pending.push(statement);
+    if (pending.length === PERSIST_BATCH_SIZE) await flush();
+  };
 
-  cycles.forEach((cycle, index) => {
-    writes.push(
+  for (const [index, cycle] of cycles.entries()) {
+    await append(
       env.DB.prepare(
         `INSERT OR IGNORE INTO cycle_instances
            (id, chart_id, user_id, technique, phase, body, target, aspect,
@@ -102,8 +110,8 @@ export async function persistCycles(
     // quietly wrong afterwards. The reading engine computes it per-day from the
     // envelope, which is the part that really is time-invariant.
 
-    cycle.passes.forEach((pass, passIndex) => {
-      writes.push(
+    for (const [passIndex, pass] of cycle.passes.entries()) {
+      await append(
         env.DB.prepare(
           `INSERT OR IGNORE INTO cycle_passes
              (id, cycle_id, user_id, pass_index, direction, exact_at,
@@ -120,15 +128,13 @@ export async function persistCycles(
           now,
         ),
       );
-    });
-  });
+    }
+  }
 
   // A scan response is not contract-bounded by cycle or pass count. Keep each
-  // D1 transaction bounded; partial progress is safe because every write is
-  // content-addressed and idempotent, and the reading is reserved only after
-  // all chunks succeed.
-  for (let start = 0; start < writes.length; start += PERSIST_BATCH_SIZE) {
-    await env.DB.batch(writes.slice(start, start + PERSIST_BATCH_SIZE));
-  }
+  // D1 transaction and the prepared statements it retains bounded; partial
+  // progress is safe because every write is content-addressed and idempotent,
+  // and the reading is reserved only after all chunks succeed.
+  await flush();
   return derived;
 }
