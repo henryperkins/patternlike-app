@@ -2,6 +2,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 .wrangler/
+# Auth0 CLI state. XDG_CONFIG_HOME resolves to a relative `.config` in some
+# shells here, so `auth0 login` writes tenant state into whatever directory it
+# was run from. No credentials land here (the CLI keeps tokens in the Windows
+# Credential Manager) but it is per-machine state and must not be committed.
+.config/
 .dev.vars
 .env
 .env.*

@@ -8,18 +8,34 @@ import { PrivacyView } from "./components/PrivacyView.js";
 import { TimeTravelView } from "./components/TimeTravelView.js";
 import { TimingView } from "./components/TimingView.js";
 import { TodayView } from "./components/TodayView.js";
+import { SignedOut } from "./components/SignedOut.js";
 import {
   ApiError,
   createBirthProfile,
+  endSession,
   getChart,
   type ChartResponse,
 } from "./lib/api-client.js";
+import { beginSignIn, completeSignIn, isRedirectCallback, signOut } from "./lib/auth.js";
 
 type ChartState =
   | { status: "loading" }
   | { status: "ready"; chart: ChartResponse }
   | { status: "missing" }
   | { status: "offline"; message: string; requestId?: string | null };
+
+/**
+ * Whether the caller holds a Worker session.
+ *
+ * Answered by calling the API and watching for a 401, never by asking Auth0.
+ * The httpOnly `pl_session` cookie is the only thing that actually grants
+ * access, so it is the only honest thing to test — and it keeps a cold load
+ * from depending on the issuer being reachable.
+ */
+type AuthState =
+  | { status: "checking" }
+  | { status: "signed-in" }
+  | { status: "signed-out"; error?: string | null };
 
 const viewIds = new Set<ViewId>(["today", "pattern", "timing", "travel", "privacy"]);
 
@@ -35,13 +51,23 @@ function wait(milliseconds: number): Promise<void> {
 export default function App() {
   const [view, setView] = useState<ViewId>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
+  const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
 
   const load = async (signal?: AbortSignal) => {
     try {
       const chart = await getChart(signal);
+      setAuthState({ status: "signed-in" });
       setChartState({ status: "ready", chart });
     } catch (error) {
       if (signal?.aborted) return;
+      if (error instanceof ApiError && error.status === 401) {
+        // No session, or one that has expired or been revoked. The API answers
+        // all three identically on purpose, so the client cannot distinguish
+        // them either.
+        setAuthState({ status: "signed-out" });
+        return;
+      }
+      setAuthState({ status: "signed-in" });
       if (error instanceof ApiError && error.status === 404) {
         setChartState({ status: "missing" });
         return;
@@ -62,9 +88,41 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
+
+    const start = async () => {
+      // Finish an Auth0 redirect before asking the API anything: the session
+      // cookie is set by that exchange, so probing /v1/chart first would 401 on
+      // every single sign-in and flash the signed-out page at a user who just
+      // authenticated successfully.
+      if (isRedirectCallback()) {
+        try {
+          await completeSignIn();
+        } catch (error) {
+          setAuthState({
+            status: "signed-out",
+            error: error instanceof Error ? error.message : "Sign-in failed.",
+          });
+          return;
+        }
+      }
+      await load(controller.signal);
+    };
+
+    void start();
     return () => controller.abort();
   }, []);
+
+  const endSessionAndSignOut = async () => {
+    await signOut(async () => {
+      try {
+        await endSession();
+      } catch {
+        // A failed revoke must not strand the user in a session they asked to
+        // leave. Auth0's logout still runs (signOut calls it from `finally`),
+        // and the cookie is cleared server-side on the next resolve attempt.
+      }
+    });
+  };
 
   const createChart = async (profile: BirthProfileRequest) => {
     try {
@@ -88,6 +146,13 @@ export default function App() {
     }
     throw new Error("The calculation was accepted but is not ready yet. Try again in a moment.");
   };
+
+  // Rendered outside AppShell on purpose: every link in that navigation leads
+  // to a view that requires a session, so showing the chrome to a signed-out
+  // caller would offer five routes that all bounce straight back here.
+  if (authState.status === "signed-out") {
+    return <SignedOut onSignIn={beginSignIn} error={authState.error} />;
+  }
 
   const shellStatus = chartState.status;
   const chart = chartState.status === "ready" ? chartState.chart : null;
@@ -134,7 +199,11 @@ export default function App() {
   }
 
   return (
-    <AppShell activeView={view} chartStatus={shellStatus}>
+    <AppShell
+      activeView={view}
+      chartStatus={shellStatus}
+      onSignOut={() => void endSessionAndSignOut()}
+    >
       {content}
     </AppShell>
   );

@@ -6,7 +6,11 @@
 # The calc service deploys separately via fly.toml (app "patternlike-calc").
 
 app = "patternlike-app"
-primary_region = "iad"
+# ord, not iad: Fly Launch created this app's machines in ord, and the primary
+# region is what autostart/autostop and `fly scale count` reason about. A value
+# naming a region with no machines makes "keep N running in the primary region"
+# mean nothing. Change this only alongside actually moving the machines.
+primary_region = "ord"
 
 [build]
   dockerfile = "apps/web/Dockerfile"

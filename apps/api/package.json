@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "db:local": "wrangler d1 execute patternlike-ops --local --file=../../db/d1/0001_m0_core.sql",
+    "//deploy": "Ships apps/web/dist as static assets. Prefer `npm run deploy:api` from the repository root, which builds the web app first.",
     "deploy": "wrangler deploy --env production"
   },
   "dependencies": {

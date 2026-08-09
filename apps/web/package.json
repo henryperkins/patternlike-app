@@ -13,6 +13,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@auth0/auth0-spa-js": "^2.24.1",
     "@patternlike/shared": "0.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

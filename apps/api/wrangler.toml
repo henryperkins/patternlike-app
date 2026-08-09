@@ -3,7 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2025-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Local / default D1 binding (create with: wrangler d1 create patternlike-ops)
+# Local / default D1 binding. The id here is a deliberate non-resolving
+# placeholder, NOT an oversight: `--local` uses it only as a state-directory key,
+# so local development works with any value, while a `wrangler d1 execute
+# --remote` that forgets `--env production` fails with a 404 instead of reaching
+# production data. The real id lives in [[env.production.d1_databases]] below.
 [[d1_databases]]
 binding = "DB"
 database_name = "patternlike-ops"
@@ -43,19 +47,62 @@ ENVIRONMENT = "production"
 CALC_SERVICE_URL = "https://patternlike-calc.fly.dev"
 SCHEMA_VERSION = "0.2.0"
 SE_LICENSE_MODE = "agpl"
-# Identity. These MUST be replaced with the real issuer before deploying:
-# configGuard returns 503 on every request while any of them is missing or
-# still points at issuer.invalid.
-OIDC_ISSUER = "https://issuer.invalid"
-OIDC_AUDIENCE = "patternlike-web"
-OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
+# Identity — Auth0 tenant dev-lqmwkyo17nm5mdjz, SPA app "Pattern/Like Web"
+# (authorization_code + PKCE, RS256, token_endpoint_auth_method=none).
+# Not secrets: the JWKS document is public and the client id of a public SPA
+# client is not a credential.
+#
+# Values copied verbatim from the tenant's discovery document
+# (/.well-known/openid-configuration), not typed by hand. OIDC_ISSUER is
+# compared with strict equality in services/identity.ts and Auth0's `iss`
+# carries a TRAILING SLASH — dropping it rejects every token as an opaque 401.
+#
+# OIDC_AUDIENCE is the SPA client id because the code verifies an ID token.
+# An Auth0 API Audience would produce an access token with a different `aud`
+# that never verifies.
+#
+# !! CHANGING OIDC_ISSUER ORPHANS EVERY EXISTING USER !!
+# db/identities.ts looks accounts up by (provider, provider_subject) where
+# provider IS this issuer string. Repointing at a production tenant or a custom
+# domain makes every returning user unrecognised, minting them a fresh user id
+# and crypto subject while their encrypted birth data stays sealed under the
+# old subject. This is a dev-prefixed Auth0 tenant; migrate to a production
+# tenant BEFORE the first real user, or plan an identities-table rewrite.
+OIDC_ISSUER = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/"
+OIDC_AUDIENCE = "bW9j2G79rWfKg2WDuAZdvi4EsS75ajcZ"
+OIDC_JWKS_URL = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/.well-known/jwks.json"
 # AUTH_STUB is deliberately absent. Setting it here re-enables auth that trusts
 # an unauthenticated X-User-Id header.
 
+# The PWA ships inside this Worker, so the app and the API share one origin.
+#
+# Why this and not a proxy: sessions ride an httpOnly cookie with
+# SameSite=Strict and Path=/v1 (routes/sessions.ts). Cross-origin would make it
+# a third-party cookie, which Safari's ITP blocks. Serving both from one Worker
+# makes same-origin structural rather than something a proxy has to preserve.
+#
+# `assets` is scoped to [env.production] on purpose: @cloudflare/vitest-pool-
+# workers loads this file, and a top-level assets.directory pointing at a
+# apps/web/dist that has not been built would break the test suite.
+#
+# run_worker_first lists EVERY path the Hono app serves. A path missing here is
+# not a 404 — static assets answer first and not_found_handling returns
+# index.html with a 200, so a forgotten route silently serves HTML to an API
+# client. Keep this in sync with src/index.ts.
+#
+# Requires wrangler >= 4.20.0 for the array form (repo is on 4.116.0).
+# Build apps/web before deploying: the directory must exist at upload time.
+[env.production.assets]
+directory = "../web/dist"
+not_found_handling = "single-page-application"
+run_worker_first = [ "/health", "/v1/*", "/internal/*" ]
+
+# Real database, created 2026-08-08 in region ENAM. Schema applied with
+# `wrangler d1 execute patternlike-ops --env production --remote --file=...`.
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "patternlike-ops"
-database_id = "00000000-0000-0000-0000-000000000001"
+database_id = "1305a75d-0a8a-4a21-b201-d94fda0aaf93"
 migrations_dir = "../../db/d1"
 
 # Secrets (set via `wrangler secret put --env production`):

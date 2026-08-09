@@ -101,5 +101,21 @@
     "Identity provider / passkey implementation",
     "Worker runtime implementation",
     "WordPress plugin PHP code"
+  ],
+  "amendments": [
+    {
+      "date": "2026-08-08",
+      "schema_version": "0.2.0",
+      "version_bump_required": false,
+      "summary": "Document the session endpoints in the OpenAPI stub.",
+      "changes": [
+        "openapi: add POST /v1/sessions and DELETE /v1/sessions/current",
+        "openapi: add SessionExchangeRequest and SessionResponse schemas",
+        "openapi: add the sessionCookie security scheme; global security now lists sessionCookie and bearerAuth as alternatives",
+        "openapi: bearerAuth description corrected — it carries the Worker-minted session token, not the identity provider's JWT"
+      ],
+      "rationale": "Identity was listed in out_of_scope_for_this_freeze, so these routes were deliberately absent rather than overlooked. They have since been implemented (apps/api/src/routes/sessions.ts) and are now the entry point to every other route, so an API description that omits them describes an API nobody can reach. Recorded here rather than by editing out_of_scope_for_this_freeze, which is a record of what the freeze covered and should not be rewritten after the fact.",
+      "no_version_bump_because": "Purely additive. No required field, enum, or $id of any *.schema.json changed, so the breaking_change_policy above is not triggered. No fixtures were added because no JSON Schema document was added — the new shapes are defined inline in the OpenAPI stub, and openapi-spec-validator covers them via smoke_check.py."
+    }
   ]
 }

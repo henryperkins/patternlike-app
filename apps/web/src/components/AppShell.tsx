@@ -14,6 +14,8 @@ const navigation: Array<{ id: ViewId; label: string; icon: IconName; stage?: str
 interface AppShellProps {
   activeView: ViewId;
   chartStatus: "loading" | "ready" | "missing" | "offline";
+  /** Omitted in tests and any surface rendered without a live session. */
+  onSignOut?: () => void;
   children: ReactNode;
 }
 
@@ -48,7 +50,7 @@ function NavItems({ activeView, mobile = false }: { activeView: ViewId; mobile?:
   ));
 }
 
-export function AppShell({ activeView, chartStatus, children }: AppShellProps) {
+export function AppShell({ activeView, chartStatus, onSignOut, children }: AppShellProps) {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -72,6 +74,11 @@ export function AppShell({ activeView, chartStatus, children }: AppShellProps) {
         <div className="sidebar__foot">
           <StatusMark status={chartStatus} />
           <p>Private by design.<br />Inspectable by default.</p>
+          {onSignOut ? (
+            <button className="sidebar__signout" type="button" onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : null}
         </div>
       </aside>
 

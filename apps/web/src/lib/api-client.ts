@@ -111,8 +111,74 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // A 200 that is not JSON means something other than the API answered —
     // an SPA fallback, a proxy, a captive portal. Surface that instead of
     // leaking a raw SyntaxError into the UI.
+    //
+    // On this origin that check earns its keep: the Worker serves the PWA and
+    // the API together, and a path missing from `run_worker_first` is answered
+    // by the static-asset handler with index.html and a 200.
     throw new Error("The API answered with something that is not JSON.");
   }
+}
+
+/**
+ * Same error handling as `request`, for endpoints that answer 204.
+ * Calling `response.json()` on an empty body throws, so the success path here
+ * deliberately never reads it.
+ */
+async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, { ...init, credentials: "include" });
+  } catch {
+    throw new Error("The Pattern/Like API could not be reached.");
+  }
+
+  if (!response.ok) {
+    let body: ErrorBody;
+    try {
+      body = (await response.json()) as ErrorBody;
+    } catch {
+      body = {
+        error: {
+          code: "unexpected_response",
+          message: `The API returned HTTP ${response.status}.`,
+        },
+      };
+    }
+    throw new ApiError(response.status, body);
+  }
+}
+
+export interface SessionResponse {
+  token: string;
+  expires_at: string;
+}
+
+/**
+ * Exchange an OIDC id_token for a session.
+ *
+ * No `Idempotency-Key`: the session endpoints are not in the frozen M0 contract
+ * (they arrived with the identity work), and the handler does not require one.
+ * Minting a second session is harmless anyway — sessions are rows, and the
+ * cookie only ever names the newest.
+ *
+ * The response body carries a bearer `token` for native clients. Browsers must
+ * ignore it and let the httpOnly cookie do the work; holding the same value in
+ * JavaScript is exactly the XSS exposure the cookie exists to prevent.
+ */
+export function createSession(idToken: string): Promise<SessionResponse> {
+  return request<SessionResponse>("/v1/sessions", {
+    method: "POST",
+    headers: requestHeaders({ json: true }),
+    body: JSON.stringify({ id_token: idToken }),
+  });
+}
+
+/** Log out. Idempotent server-side: an already-invalid session still 204s. */
+export function endSession(): Promise<void> {
+  return requestNoContent("/v1/sessions/current", {
+    method: "DELETE",
+    headers: requestHeaders(),
+  });
 }
 
 export function getChart(signal?: AbortSignal): Promise<ChartResponse> {

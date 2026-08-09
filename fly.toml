@@ -1,10 +1,20 @@
-# fly.toml app configuration file generated for patternlike-app on 2026-08-08T18:08:53Z
+# Fly.io configuration for the Swiss Ephemeris calc service (apps/calc-stub).
 #
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# See https://fly.io/docs/reference/configuration/ for information about this file.
 #
+# Deploy from the repository ROOT (the Docker build context must be the root):
+#   fly deploy
+#
+# The web PWA deploys separately via fly.web.toml (app "patternlike-app").
+#
+# `app` and `primary_region` below are load-bearing and have been clobbered
+# before: "New files from Fly.io Launch" (5e6acec) rewrote them to
+# patternlike-app / ord while leaving the calc Dockerfile in place, which aims a
+# bare `fly deploy` at the web app's hostname. If Fly Launch or the dashboard
+# regenerates this file, check these two lines first.
 
-app = 'patternlike-app'
-primary_region = 'ord'
+app = 'patternlike-calc'
+primary_region = 'iad'
 
 [build]
   dockerfile = 'apps/calc-stub/Dockerfile'
@@ -23,6 +33,11 @@ primary_region = 'ord'
   auto_start_machines = true
   min_machines_running = 2
 
+  # Declared only as an array-of-tables. Do not also add an inline
+  # `checks = [{ ... }]` key here -- TOML rejects the same key defined both
+  # ways, and flyctl fails to load this file at all. The Fly dashboard's
+  # "scale from UI" export has written that inline form before; drop it and
+  # edit the table below instead.
   [[http_service.checks]]
     interval = '30s'
     timeout = '5s'

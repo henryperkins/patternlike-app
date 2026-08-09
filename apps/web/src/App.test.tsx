@@ -1,10 +1,15 @@
 import axe from "axe-core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import type { Auth0Client } from "@auth0/auth0-spa-js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.js";
+import { __setAuthClientForTests } from "./lib/auth.js";
 
 function jsonResponse(status: number, body: unknown): Response {
+  // 204 is a null-body status; handing the Response constructor a body for one
+  // throws. DELETE /v1/sessions/current answers 204.
+  if (status === 204) return new Response(null, { status });
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json" },
@@ -133,6 +138,11 @@ const chart = {
   calculated_at: "2026-07-30T15:00:00Z",
   status: "active",
 };
+
+afterEach(() => {
+  // Leaks across files otherwise: the auth client is module-level state.
+  __setAuthClientForTests(null);
+});
 
 describe("web application shell", () => {
   it("routes a user without a chart into honest onboarding", async () => {
@@ -461,6 +471,63 @@ describe("web application shell", () => {
     });
 
     expect(results.violations).toEqual([]);
+  });
+
+  it("shows the signed-out surface, not an error, when the session is gone", async () => {
+    // 401 is the one status that is not a failure to report: it is the API
+    // saying "you are not signed in", which is a state the UI has a screen for.
+    mockApiResponses({
+      "/v1/chart": {
+        status: 401,
+        body: { error: { code: "unauthorized", message: "Authentication required" } },
+      },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Calculated, not invented/i })).toBeInTheDocument();
+    // No navigation: every route behind it needs the session that just failed.
+    expect(screen.queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/API unavailable/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the signed-out surface free of detectable structural accessibility violations", async () => {
+    mockApiResponses({
+      "/v1/chart": {
+        status: 401,
+        body: { error: { code: "unauthorized", message: "Authentication required" } },
+      },
+    });
+
+    const { container } = render(<App />);
+    await screen.findByRole("button", { name: /Sign in/i });
+
+    const results = await axe.run(container, {
+      rules: { "color-contrast": { enabled: false } },
+    });
+
+    expect(results.violations).toEqual([]);
+  });
+
+  it("revokes the Worker session before handing off to the issuer's logout", async () => {
+    const user = userEvent.setup();
+    const logout = vi.fn().mockResolvedValue(undefined);
+    __setAuthClientForTests({ logout } as unknown as Auth0Client);
+
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/sessions/current": { status: 204, body: null },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+
+    await user.click(screen.getByRole("button", { name: /Sign out/i }));
+
+    const [request] = capturedFor("/v1/sessions/current");
+    expect(request.method).toBe("DELETE");
+    expect(logout).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a future route surface free of detectable structural accessibility violations", async () => {

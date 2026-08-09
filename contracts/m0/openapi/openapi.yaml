@@ -18,6 +18,7 @@ servers:
   - url: http://localhost:8787
     description: Local Workers dev
 tags:
+  - name: sessions
   - name: birth
   - name: chart
   - name: readings
@@ -27,6 +28,65 @@ tags:
   - name: privacy
   - name: internal
 paths:
+  /v1/sessions:
+    post:
+      tags: [sessions]
+      operationId: createSession
+      summary: Exchange an OIDC ID token for a session
+      description: >
+        Unauthenticated by necessity — this is what mints the credential every
+        other route requires — but still behind the configuration guard, so a
+        development-shaped deployment answers 503 here like everywhere else.
+
+
+        No `Idempotency-Key`. Every other mutating route carries one because
+        queue delivery is at-least-once; this route enqueues nothing, and a
+        replay mints an additional session row rather than duplicating an
+        effect. Sessions are independently revocable, so that is harmless.
+
+
+        Browsers receive an httpOnly `pl_session` cookie (`SameSite=Strict`,
+        `Path=/v1`) and must ignore the `token` in the body: holding the same
+        value in JavaScript reintroduces exactly the XSS exposure the cookie
+        exists to prevent. Native clients use `token` as a bearer. Both resolve
+        the same row.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionExchangeRequest'
+      responses:
+        '201':
+          description: Session established
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+
+  /v1/sessions/current:
+    delete:
+      tags: [sessions]
+      operationId: revokeCurrentSession
+      summary: Log out — revoke the calling session
+      description: >
+        Idempotent: an absent, expired, or already-revoked credential still
+        answers 204, and the cookie is cleared either way. Revocation is a row
+        update, which is what makes "invalidate my sessions" a real control
+        rather than a wait for token expiry.
+      responses:
+        '204':
+          description: Session revoked and cookie cleared
+        '503':
+          $ref: '#/components/responses/Error'
+
   /v1/birth-profiles:
     post:
       tags: [birth]
@@ -408,8 +468,19 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
-      description: Consumer identity TBD (open decision). Placeholder bearer.
+      description: >
+        The opaque session token returned by `POST /v1/sessions`, for native
+        clients. Not a JWT and not the identity provider's token: the OIDC
+        id_token is spent once at the exchange and never presented again.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+      description: >
+        How browsers authenticate. Set httpOnly with `SameSite=Strict` and
+        `Path=/v1` by the session exchange. `Path=/v1` is why the app and the
+        API must share an origin — cross-origin makes this a third-party cookie
+        that Safari's ITP blocks.
     serviceAuth:
       type: http
       scheme: bearer
@@ -459,6 +530,41 @@ components:
             details:
               type: object
               additionalProperties: true
+
+    SessionExchangeRequest:
+      type: object
+      additionalProperties: false
+      required: [id_token]
+      properties:
+        id_token:
+          type: string
+          minLength: 1
+          description: >
+            A compact-serialisation OIDC ID token from the configured issuer.
+            The Worker verifies the signature against the issuer's published
+            key set and checks `iss`, `aud`, `exp`, and `nbf`; `iat` is
+            deliberately not checked, because issuer clock skew is not a
+            forgery signal and `exp` is what bounds the token's life.
+            Asymmetric algorithms only — a symmetric one would let the token
+            sign itself.
+
+    SessionResponse:
+      type: object
+      additionalProperties: false
+      required: [token, expires_at]
+      properties:
+        token:
+          type: string
+          description: >
+            Opaque session token for native clients. Browsers must ignore this
+            and rely on the httpOnly cookie set alongside it.
+        expires_at:
+          type: string
+          format: date-time
+          description: >
+            Absolute expiry, 30 days out. Not extended by use: sessions end on
+            a fixed horizon rather than sliding, so an abandoned session has a
+            bounded life.
 
     WorkflowAccepted:
       type: object
@@ -1134,5 +1240,10 @@ components:
       x-patternlike-contract: >-
         https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/contentReleaseIngestionResponse
 
+# Either credential satisfies the product API; the Worker reads the cookie
+# first and falls back to the bearer. A browser presenting both means something
+# is misconfigured, not that both are required — hence two alternatives rather
+# than one requirement listing both.
 security:
+  - sessionCookie: []
   - bearerAuth: []
