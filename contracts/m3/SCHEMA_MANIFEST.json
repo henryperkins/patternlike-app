@@ -343,6 +343,14 @@
       "detail": "openapi.yaml's /internal/content-releases already stated that 'a bundle must carry exactly one universal daily_fallback and at least one default timing_template for every declared supported locale', but the M2 runtime validated neither — it iterated a hardcoded six-collection list that did not include timing_templates or daily_fallbacks, and never read supported_locales. The Worker now validates both new collections, requires supported_locales/locale_default/language_fallbacks to be coherent, checks that every {token} in reviewed timing copy is declared, and enforces the per-locale fallback and default-template rules. It also narrows the accepted schema_version to 0.3.0: a 0.2.0 bundle cannot produce a reading, so accepting one would reserve an immutable release version for bytes that can never be served. Nothing has been ingested in production (CONTENT_RELEASE_KEYS is unset there and ingestion fails closed at 503), so the narrowing orphans no stored release. No contract document changed; this row records that the runtime caught up with one.",
       "files": [],
       "implemented_by": "apps/api/src/services/content-release.ts (RELEASE_OBJECT_COLLECTIONS, validateBundleShape, validateObjectShape, validateContentGraph)"
+    },
+    {
+      "date": "2026-08-09",
+      "kind": "runtime_enforcement",
+      "summary": "GET /v1/readings/today also answers 409 locale_confirmation_required when the content locale is still the unconfirmed server default.",
+      "detail": "openapi.yaml documents only timezone_confirmation_required on this operation's 409; C4's locale writer postdates that wording. buildGenerationCommand withholds generation on EITHER unconfirmed source (apps/api/src/services/generation-command.ts), so a reader with a confirmed zone and a default_unconfirmed locale has no reading and never will until the locale is owned — and the documented 404 reading_not_generated tells that reader to 'check back', which is advice that can never come true. The read route therefore mirrors the generation gate so the answer names the action that unblocks it: PUT /v1/preferences/locale. Timezone is still evaluated first, matching the writer's order. ErrorResponse.error.code carries no enum and 409 was already a documented status on this operation, so no schema, enum, required field, or $id changed; the code was already in the Worker's 409 vocabulary at apps/api/src/routes/internal-generation.ts. The same route also returns details.local_date on the reading_not_generated 404, which ErrorResponse already permits, so a client can name the day it is waiting on rather than say only 'not ready'. This row records that the read surface caught up with the write surface.",
+      "files": [],
+      "implemented_by": "apps/api/src/routes/readings.ts"
     }
   ]
 }

@@ -7,6 +7,7 @@ import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
 import { timezoneRoutes } from "./routes/timezone.js";
 import { preferenceRoutes } from "./routes/preferences.js";
+import { readingRoutes } from "./routes/readings.js";
 import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
@@ -37,6 +38,9 @@ api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", timezoneRoutes);
 api.route("/", preferenceRoutes);
+api.route("/", readingRoutes);
+// Last, deliberately. Hono answers with the first matching registration, so a
+// real route always shadows a stub rather than the other way round.
 api.route("/", stubRoutes);
 
 // Internal service-to-service API, behind the service token rather than the
