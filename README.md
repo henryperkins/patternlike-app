@@ -196,8 +196,8 @@ path that went unexercised:
 # Ed25519 (32 raw bytes) or ES256 (65-byte uncompressed point), base64url.
 CONTENT_RELEASE_KEYS='{"wp-release-key-1":{"alg":"Ed25519","public_key":"<base64url raw>"}}'
 
-# The bundle store. Create it before the first deploy that carries the binding.
-npx wrangler r2 bucket create patternlike-artifacts
+# The bundle store is pre-provisioned in production.
+# R2 bucket: pattern-artifacts
 ```
 
 Without keys the endpoint returns `503 release_keys_not_configured`; a malformed

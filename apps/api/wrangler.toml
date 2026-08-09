@@ -15,10 +15,10 @@ database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
 # Immutable artifacts: signed editorial release bundles today, chart renders and
-# exports later. Create with: wrangler r2 bucket create patternlike-artifacts
+# exports later. Production uses the pre-provisioned pattern-artifacts bucket.
 [[r2_buckets]]
 binding = "ARTIFACTS"
-bucket_name = "patternlike-artifacts"
+bucket_name = "pattern-artifacts"
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the
@@ -108,7 +108,7 @@ migrations_dir = "../../db/d1"
 
 [[env.production.r2_buckets]]
 binding = "ARTIFACTS"
-bucket_name = "patternlike-artifacts"
+bucket_name = "pattern-artifacts"
 
 # CONTENT_RELEASE_KEYS is deliberately absent from both [vars] blocks. It holds
 # the PUBLIC keys trusted to sign editorial release bundles — public material,
