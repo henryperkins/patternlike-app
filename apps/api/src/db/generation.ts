@@ -1,6 +1,13 @@
 import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
-import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
+import {
+  NoUserKeyError,
+  UnsupportedKekVersionError,
+  UserKeyDestroyedError,
+  encryptPayload,
+  loadUserKey,
+  type UserIdentity,
+} from "../db/users.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
 import type {
   CommandReplacementReason,
@@ -285,8 +292,36 @@ export async function reserveReissue(
         now,
       ),
     ]);
-  } catch {
-    return { ok: false, reason: "stale_predecessor" };
+  } catch (err) {
+    const state = await env.DB.prepare(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM daily_readings
+           WHERE id = ? AND user_id = ? AND local_date = ?
+             AND status = 'published' AND revision = ?
+         ) AS predecessor_live,
+         EXISTS (
+           SELECT 1 FROM daily_readings
+           WHERE user_id = ? AND local_date = ? AND status = 'pending'
+         ) AS successor_pending`,
+    )
+      .bind(
+        expectedLiveReadingId,
+        identity.userId,
+        command.target_local_date,
+        command.revision - 1,
+        identity.userId,
+        command.target_local_date,
+      )
+      .first<{ predecessor_live: number; successor_pending: number }>();
+    if (!state?.predecessor_live || state.successor_pending) {
+      return { ok: false, reason: "stale_predecessor" };
+    }
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: err instanceof Error ? err.message : "reissue reservation failed",
+    };
   }
 
   return { ok: true, readingId: command.reading_id, jobId };
@@ -443,21 +478,24 @@ export async function claimJob(
 
   const result = await env.DB.prepare(
     `UPDATE jobs
-     SET status = 'running', claim_token = ?, lease_expires_at = ?,
+     SET status = 'running', claim_token = ?, lease_expires_at = ?, available_at = NULL,
          started_at = COALESCE(started_at, ?), attempts = attempts + 1,
          dispatched_at = COALESCE(dispatched_at, ?)
      WHERE id = ? AND job_type = ?
+       AND (available_at IS NULL OR available_at <= ?)
        AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))`,
   )
-    .bind(claimToken, leaseExpiresAt, nowIso, nowIso, jobId, JOB_TYPE, nowIso)
+    .bind(claimToken, leaseExpiresAt, nowIso, nowIso, jobId, JOB_TYPE, nowIso, nowIso)
     .run();
 
   if (!result.meta.changes) return null;
 
   const row = await env.DB.prepare(
     `SELECT j.user_id, j.payload_enc, j.payload_key_version, j.payload_nonce,
-            u.crypto_subject
+            u.crypto_subject, r.id AS reading_id
      FROM jobs j JOIN users u ON u.id = j.user_id
+     JOIN daily_readings r
+       ON r.active_generation_job_id = j.id AND r.user_id = j.user_id
      WHERE j.id = ?`,
   )
     .bind(jobId)
@@ -467,6 +505,7 @@ export async function claimJob(
       payload_key_version: number;
       payload_nonce: string;
       crypto_subject: string;
+      reading_id: string;
     }>();
   if (!row) return null;
 
@@ -475,18 +514,64 @@ export async function claimJob(
     // Read from the row, never from a request — the only safe source.
     cryptoSubject: asCryptoSubject(row.crypto_subject),
   };
-  const { dek } = await loadUserKey(env, identity);
-  const command = await decryptJson<GenerateDailyReadingCommandV1>(
-    {
-      key_version: row.payload_key_version,
-      nonce: row.payload_nonce,
-      ciphertext: bytesToBase64(new Uint8Array(row.payload_enc)),
-    },
-    dek,
-    { subject: identity.cryptoSubject, field: "jobs.payload_enc", recordId: jobId },
-  );
+  let dek: Uint8Array;
+  try {
+    ({ dek } = await loadUserKey(env, identity));
+  } catch (err) {
+    if (
+      !(
+        err instanceof UserKeyDestroyedError ||
+        err instanceof NoUserKeyError ||
+        err instanceof UnsupportedKekVersionError
+      )
+    ) {
+      throw err;
+    }
+    return failUnreadableClaim(env, identity, row.reading_id, jobId, claimToken, err);
+  }
+
+  let command: GenerateDailyReadingCommandV1;
+  try {
+    command = await decryptJson<GenerateDailyReadingCommandV1>(
+      {
+        key_version: row.payload_key_version,
+        nonce: row.payload_nonce,
+        ciphertext: bytesToBase64(new Uint8Array(row.payload_enc)),
+      },
+      dek,
+      { subject: identity.cryptoSubject, field: "jobs.payload_enc", recordId: jobId },
+    );
+  } catch (err) {
+    return failUnreadableClaim(env, identity, row.reading_id, jobId, claimToken, err);
+  }
 
   return { jobId, claimToken, userId: row.user_id, command };
+}
+
+async function failUnreadableClaim(
+  env: Env,
+  identity: UserIdentity,
+  readingId: string,
+  jobId: string,
+  claimToken: string,
+  err: unknown,
+): Promise<null> {
+  console.error("generation_payload_undecryptable", {
+    job_id: jobId,
+    error_class: err instanceof Error ? err.name : "unknown",
+  });
+  const failed = await failReading(
+    env,
+    identity,
+    readingId,
+    jobId,
+    claimToken,
+    "payload_undecryptable",
+  );
+  if (!failed.ok) {
+    throw new Error(`unreadable command could not be failed: ${failed.reason}`);
+  }
+  return null;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -710,6 +795,30 @@ export async function failReading(
   return { ok: true };
 }
 
+/**
+ * Give a retryable dependency failure back to the outbox.
+ *
+ * Clearing `dispatched_at` makes a crash between this CAS and `message.retry()`
+ * recoverable by the sweeper. `available_at` keeps that recovery from bypassing
+ * the same backoff requested from Queues.
+ */
+export async function releaseClaimForRetry(
+  env: Env,
+  jobId: string,
+  claimToken: string,
+  availableAt: Date,
+): Promise<boolean> {
+  const result = await env.DB.prepare(
+    `UPDATE jobs
+     SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
+         dispatched_at = NULL, available_at = ?
+     WHERE id = ? AND status = 'running' AND claim_token = ?`,
+  )
+    .bind(availableAt.toISOString(), jobId, claimToken)
+    .run();
+  return result.meta.changes > 0;
+}
+
 /** Mark a job dispatched. Advisory: the outbox sweeper reads the absence of this. */
 export async function markDispatched(env: Env, jobId: string): Promise<void> {
   await env.DB.prepare(
@@ -731,16 +840,21 @@ export interface SweepCandidate {
  * the second recovers a consumer that died holding a claim. Both converge
  * through the claim CAS, so a duplicate send is harmless.
  */
-export async function findUndispatched(env: Env, limit = 50): Promise<SweepCandidate[]> {
+export async function findUndispatched(
+  env: Env,
+  limit = 50,
+  now = new Date(),
+): Promise<SweepCandidate[]> {
   const { results } = await env.DB.prepare(
     `SELECT j.id, r.id AS reading_id
      FROM jobs j
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
+       AND (j.available_at IS NULL OR j.available_at <= ?)
      ORDER BY j.created_at
      LIMIT ?`,
   )
-    .bind(JOB_TYPE, limit)
+    .bind(JOB_TYPE, now.toISOString(), limit)
     .all<SweepCandidate>();
   return results;
 }

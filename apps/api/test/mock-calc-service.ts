@@ -1,3 +1,5 @@
+import type { CycleRequest } from "@patternlike/shared";
+
 /**
  * Deterministic stand-in for the Swiss Ephemeris calculation service.
  *
@@ -78,20 +80,7 @@ export const CYCLE_FP_EMPTY = `sha256:${"e".repeat(64)}`;
 export const CYCLE_FP_REFUSED = `sha256:${"f".repeat(64)}`;
 export const CYCLE_FP_UNAVAILABLE = `sha256:${"a".repeat(64)}`;
 
-interface CycleRequestBody {
-  schema_version: string;
-  request_id: string;
-  chart_fingerprint: string;
-  natal_accuracy: "exact" | "approximate" | "unknown";
-  suppressed_features?: string[];
-  window: { from: string; to: string };
-  cycle_policy_id: string;
-  cycle_policy_version: string;
-  orb_policy_id: string;
-  orb_policy_version: string;
-  contract_id: string;
-  contract_version: string;
-}
+type CycleRequestBody = CycleRequest;
 
 /** `cyc_` + 32 hex, deterministic on the encounter rather than on the scan. */
 function mockCycleId(fingerprint: string, encounter: string): string {
@@ -162,6 +151,25 @@ function mockCycles(req: CycleRequestBody): Array<Record<string, unknown>> {
 
 async function mockCycleScan(request: Request): Promise<Response> {
   const req = (await request.json()) as CycleRequestBody;
+
+  if (
+    !Array.isArray(req.natal_positions) ||
+    req.natal_positions.length === 0 ||
+    !Array.isArray(req.techniques) ||
+    req.techniques.length !== 1 ||
+    req.techniques[0] !== "transits"
+  ) {
+    return json(
+      {
+        ok: false,
+        schema_version: req.schema_version,
+        request_id: req.request_id,
+        error_class: "invalid_cycle_request",
+        error_message: "natal_positions and the transits technique are required",
+      },
+      400,
+    );
+  }
 
   if (req.chart_fingerprint === CYCLE_FP_UNAVAILABLE) {
     // Transport envelope with a non-200, the shape the real service uses when a

@@ -66,6 +66,48 @@ function statusFor(reason: string): 409 | 424 | 503 {
   return 424;
 }
 
+function safeMessageFor(reason: string): string {
+  switch (reason) {
+    case "timezone_confirmation_required":
+      return "The scheduling time zone must be confirmed before generation";
+    case "locale_confirmation_required":
+      return "The content locale must be confirmed before generation";
+    case "chart_not_found":
+      return "No active chart is available for generation";
+    case "release_not_active":
+      return "No content release is active";
+    case "calc_unavailable":
+      return "The calculation service is unavailable";
+    case "release_unreadable":
+      return "The pinned content release is unavailable";
+    case "stale_predecessor":
+      return "The expected predecessor is no longer live";
+    case "not_replaceable":
+      return "This failure cannot be replaced by the requested actor";
+    case "budget_exhausted":
+      return "The replacement budget for this reading is exhausted";
+    case "day_too_old":
+      return "The reading is outside the automatic replacement window";
+    case "stale_job":
+      return "The failed job is no longer the active generation";
+    default:
+      return "The generation request could not be completed";
+  }
+}
+
+function logFailure(
+  operation: "generate" | "reissue" | "replace",
+  requestId: string,
+  result: { reason: string; detail: string },
+): void {
+  console.error("generation_request_failed", {
+    operation,
+    request_id: requestId,
+    reason: result.reason,
+    detail: result.detail,
+  });
+}
+
 async function readJson(c: {
   req: { json: () => Promise<unknown> };
 }): Promise<Record<string, unknown> | null> {
@@ -95,8 +137,9 @@ internalGenerationRoutes.post("/readings/generate", async (c) => {
     if (result.reason === "duplicate") {
       return c.json({ status: "duplicate", detail: result.detail }, 200);
     }
+    logFailure("generate", requestId, result);
     return c.json(
-      { error: { code: result.reason, message: result.detail, request_id: requestId } },
+      { error: { code: result.reason, message: safeMessageFor(result.reason), request_id: requestId } },
       statusFor(result.reason),
     );
   }
@@ -139,8 +182,9 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
     reason as Exclude<RevisionReason, "initial">,
   );
   if (!result.ok) {
+    logFailure("reissue", requestId, result);
     return c.json(
-      { error: { code: result.reason, message: result.detail, request_id: requestId } },
+      { error: { code: result.reason, message: safeMessageFor(result.reason), request_id: requestId } },
       statusFor(result.reason),
     );
   }
@@ -161,14 +205,15 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
   const userId = typeof body?.user_id === "string" ? body.user_id : null;
   const readingId = typeof body?.reading_id === "string" ? body.reading_id : null;
   const reason = body?.reason as CommandReplacementReason | undefined;
-  const actor = body?.actor === "scheduler" ? "scheduler" : "operator";
+  const actor =
+    body?.actor === "scheduler" || body?.actor === "operator" ? body.actor : null;
 
-  if (!userId || !readingId || !reason || !REPLACEMENT_REASONS.includes(reason)) {
+  if (!userId || !readingId || !reason || !REPLACEMENT_REASONS.includes(reason) || !actor) {
     return c.json(
       {
         error: {
           code: "invalid_body",
-          message: `user_id, reading_id, and a reason of ${REPLACEMENT_REASONS.join(", ")} are required`,
+          message: `user_id, reading_id, actor (scheduler or operator), and a reason of ${REPLACEMENT_REASONS.join(", ")} are required`,
           request_id: requestId,
         },
       },
@@ -178,8 +223,9 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
 
   const result = await replaceFailedCommand(c.env, userId, readingId, reason, actor);
   if (!result.ok) {
+    logFailure("replace", requestId, result);
     return c.json(
-      { error: { code: result.reason, message: result.detail, request_id: requestId } },
+      { error: { code: result.reason, message: safeMessageFor(result.reason), request_id: requestId } },
       statusFor(result.reason),
     );
   }

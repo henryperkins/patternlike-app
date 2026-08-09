@@ -80,6 +80,9 @@ describe("localDayWindow", () => {
   it("rejects a malformed date", () => {
     expect(() => localDayWindow("UTC", "2026-8-9")).toThrow(LocalDayError);
     expect(() => localDayWindow("UTC", "not-a-date")).toThrow(LocalDayError);
+    expect(() => localDayWindow("UTC", "2026-13-45")).toThrow(LocalDayError);
+    expect(() => localDayWindow("UTC", "2026-02-29")).toThrow(LocalDayError);
+    expect(localDayWindow("UTC", "2024-02-29").targetLocalDate).toBe("2024-02-29");
   });
 });
 

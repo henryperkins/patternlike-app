@@ -261,6 +261,22 @@ describe("ingestion request validation", () => {
     expect("error" in result && result.error.class).toBe("invalid_body");
   });
 
+  it.each(["A timing phrase with {unexpected}.", "A timing phrase with {bad-token}."])(
+    "rejects an undeclared or malformed braced placeholder in %o",
+    (templateText) => {
+      const result = validateIngestionRequest(
+        wrap(
+          draftBundle((bundle) => {
+            bundle.objects.timing_templates[0]!.template_text = templateText;
+          }),
+        ),
+      );
+      expect("error" in result && result.error.class).toBe(
+        "timing_undeclared_placeholder",
+      );
+    },
+  );
+
   const boundaryCases: Array<[
     string,
     { version?: string; idempotencyKey?: string },
@@ -426,6 +442,12 @@ describe("content graph policy", () => {
       (bundle: ContentReleaseBundle) => {
         withPattern(bundle);
         bundle.objects.patterns[0]!.prompt_ids = ["prompt.missing@1"];
+      },
+    ],
+    [
+      "fallback_locale_mismatch",
+      (bundle: ContentReleaseBundle) => {
+        bundle.objects.daily_fallbacks[0]!.locale = "de-DE";
       },
     ],
   ])("rejects a bundle with %s", (expected, mutate) => {

@@ -37,8 +37,8 @@ bucket_name = "pattern-artifacts-dev"
 # Dev-named queues for the same reason the D1 id is a placeholder and the R2
 # bucket is `-dev`: a remote command that forgets `--env production` must not
 # reach production work. Create both before the first deploy —
-# `wrangler queues create patternlike-daily-readings` and
-# `wrangler queues create patternlike-daily-readings-dlq` — or the upload fails
+# `wrangler queues create patternlike-daily-readings-dev` and
+# `wrangler queues create patternlike-daily-readings-dev-dlq` — or the upload fails
 # on an unknown queue.
 [[queues.producers]]
 binding = "READING_QUEUE"

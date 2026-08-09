@@ -84,6 +84,28 @@ describe("service auth is scoped to /internal", () => {
     expect((await body(res)).error?.code).toBe("unauthorized");
   });
 
+  it("rejects generation with a missing or wrong service token before reserving", async () => {
+    await resetDb();
+    const unauthorizedHeaders: Array<Record<string, string>> = [
+      { "content-type": "application/json" },
+      { "content-type": "application/json", authorization: "Bearer wrong-token" },
+    ];
+    for (const headers of unauthorizedHeaders) {
+      const res = await app.request(
+        "/internal/readings/generate",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ user_id: "usr_auth_probe_00001" }),
+        },
+        prodEnv(),
+      );
+      expect(res.status).toBe(401);
+      expect((await body(res)).error?.code).toBe("unauthorized");
+    }
+    expect(await rows("SELECT id FROM daily_readings")).toHaveLength(0);
+  });
+
   it("accepts the internal route with the correct service token", async () => {
     const res = await app.request(
       "/internal/content-releases",

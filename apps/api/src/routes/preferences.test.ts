@@ -45,8 +45,10 @@ async function userRow() {
     timezone_revision: number;
     locale: string;
     locale_source: string;
+    locale_updated_at: string | null;
   }>(
-    `SELECT timezone, timezone_source, timezone_revision, locale, locale_source
+    `SELECT timezone, timezone_source, timezone_revision, locale, locale_source,
+            locale_updated_at
      FROM users WHERE id = ?`,
     USER_A,
   );
@@ -144,6 +146,7 @@ describe("PUT /v1/preferences/timezone", () => {
       source: "default_unconfirmed",
     });
     expect(unconfirmable.status).toBe(400);
+    expect(unconfirmable.body.error?.code).toBe("invalid_body");
 
     expect((await userRow()).timezone_revision).toBe(0);
   });
@@ -212,6 +215,21 @@ describe("PUT /v1/preferences/locale", () => {
     expect(res.status).toBe(409);
     expect(res.body.error?.code).toBe("preference_locked");
     expect((await userRow()).locale).toBe("es-ES");
+  });
+
+  it("treats an unchanged locale repeat as a no-op", async () => {
+    await setLocale("es-ES", "device_derived");
+    const originalTimestamp = "2000-01-01T00:00:00.000Z";
+    await rows(
+      "UPDATE users SET locale_updated_at = ? WHERE id = ?",
+      originalTimestamp,
+      USER_A,
+    );
+
+    const again = await setLocale("es-ES", "device_derived");
+    expect(again.status).toBe(200);
+    expect(again.body.updated_at).toBe(originalTimestamp);
+    expect((await userRow()).locale_updated_at).toBe(originalTimestamp);
   });
 
   it("rejects a malformed tag", async () => {

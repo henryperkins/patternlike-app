@@ -1,3 +1,9 @@
+/** Opaque queue nudge; the encrypted generation command remains in D1. */
+export interface GenerationMessage {
+  job_id: string;
+  reading_id: string;
+}
+
 export interface Env {
   DB: D1Database;
   ENVIRONMENT: string;
@@ -29,5 +35,5 @@ export interface Env {
    * `jobs.payload_enc`, because a queue message is not a place to put a user's
    * frozen chart, cycle, and context state.
    */
-  READING_QUEUE: Queue<{ job_id: string; reading_id: string }>;
+  READING_QUEUE: Queue<GenerationMessage>;
 }

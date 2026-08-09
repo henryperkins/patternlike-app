@@ -69,6 +69,8 @@ interface JobRow {
   status: string;
   attempts: number;
   dispatched_at: string | null;
+  available_at: string | null;
+  lease_expires_at: string | null;
   claim_token: string | null;
   result_class: string | null;
   payload_enc: ArrayBuffer | null;
@@ -87,7 +89,8 @@ const readings = () =>
 
 const jobs = () =>
   rows<JobRow>(
-    `SELECT id, status, attempts, dispatched_at, claim_token, result_class,
+    `SELECT id, status, attempts, dispatched_at, available_at, lease_expires_at,
+            claim_token, result_class,
             payload_enc, payload_json, idempotency_key
      FROM jobs WHERE user_id = ? ORDER BY created_at, id`,
     USER_A,
@@ -222,6 +225,7 @@ describe("enqueue", () => {
 
   it("freezes a reissue command that validates too", async () => {
     const initial = await enqueueDailyReading(env, USER_A);
+    expect(initial.ok).toBe(true);
     if (!initial.ok) return;
     await deliver([{ job_id: initial.jobId, reading_id: initial.readingId }]);
 
@@ -290,6 +294,19 @@ describe("enqueue", () => {
     expect(await jobs()).toHaveLength(0);
   });
 
+  it("fails closed when the active chart JSON is unreadable", async () => {
+    await rows(
+      "UPDATE chart_snapshots SET snapshot_json = '{oops' WHERE user_id = ?",
+      USER_A,
+    );
+    await expect(enqueueDailyReading(env, USER_A)).resolves.toMatchObject({
+      ok: false,
+      reason: "chart_not_found",
+    });
+    expect(await readings()).toHaveLength(0);
+    expect(await jobs()).toHaveLength(0);
+  });
+
   it("resolves the target day in the scheduling zone, not UTC", async () => {
     // 2026-08-09T02:00Z is still 8 August in Chicago.
     const result = await enqueueDailyReading(env, USER_A, new Date("2026-08-09T02:00:00Z"));
@@ -339,6 +356,7 @@ describe("queue delivery", () => {
 
   it("publishes exactly once under duplicate delivery", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
 
@@ -358,6 +376,7 @@ describe("queue delivery", () => {
 
   it("keeps the clear columns free of anything that reconstructs the reading", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
 
@@ -387,6 +406,57 @@ describe("queue delivery", () => {
     expect(result.retryMessages).toEqual([]);
   });
 
+  it("fails an unreadable encrypted command instead of retrying it forever", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) return;
+
+    await env.DB.prepare("UPDATE jobs SET payload_enc = ? WHERE id = ?")
+      .bind(new Uint8Array([0]), enqueued.jobId)
+      .run();
+
+    const result = await deliver([
+      { job_id: enqueued.jobId, reading_id: enqueued.readingId },
+    ]);
+    expect(result.retryMessages).toEqual([]);
+    expect((await readings())[0]).toMatchObject({ status: "failed" });
+    expect((await jobs())[0]).toMatchObject({
+      status: "failed",
+      result_class: "payload_undecryptable",
+      claim_token: null,
+    });
+  });
+
+  it("releases a retryable dependency failure so the queue retry can reclaim it", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) return;
+
+    const objectKey = "content-releases/release-12.json";
+    const stored = await env.ARTIFACTS!.get(objectKey);
+    expect(stored).not.toBeNull();
+    const bundle = await stored!.text();
+    await env.ARTIFACTS!.delete(objectKey);
+
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+    const first = await deliver([message]);
+    expect(first.retryMessages).toHaveLength(1);
+    expect((await readings())[0]).toMatchObject({ status: "pending" });
+    expect((await jobs())[0]).toMatchObject({
+      status: "queued",
+      dispatched_at: null,
+      claim_token: null,
+      lease_expires_at: null,
+    });
+    expect((await jobs())[0]!.available_at).not.toBeNull();
+
+    await env.ARTIFACTS!.put(objectKey, bundle);
+    await rows("UPDATE jobs SET available_at = '2000-01-01T00:00:00Z' WHERE id = ?", enqueued.jobId);
+    const second = await deliver([message]);
+    expect(second.retryMessages).toEqual([]);
+    expect((await readings())[0]).toMatchObject({ status: "published" });
+  });
+
   it("publishes the locale's universal fallback when no cycle is in orb", async () => {
     await resetDb();
     await seedUser(IDENTITY_A);
@@ -412,6 +482,7 @@ describe("frozen inputs", () => {
 
   it("ignores a release activated after the command was frozen", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     const frozen = await decryptCommand(enqueued.jobId);
 
@@ -426,6 +497,7 @@ describe("frozen inputs", () => {
 
   it("ignores a timezone change and a midnight rollover after enqueue", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A, new Date("2026-08-09T18:00:00Z"));
+    expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     const frozen = await decryptCommand(enqueued.jobId);
     expect(frozen.target_local_date).toBe("2026-08-09");
@@ -441,6 +513,7 @@ describe("frozen inputs", () => {
 
   it("fails closed when a pinned cycle's envelope changed under it", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     const frozen = await decryptCommand(enqueued.jobId);
 
@@ -462,6 +535,24 @@ describe("frozen inputs", () => {
     expect(job!.status).toBe("failed");
     expect(job!.result_class ?? "").toBe("cycle_hash_mismatch");
   });
+
+  it("fails closed when a pinned cycle contains malformed JSON", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) return;
+    const frozen = await decryptCommand(enqueued.jobId);
+    await rows(
+      "UPDATE cycle_instances SET cycle_json = '{oops' WHERE id = ?",
+      frozen.cycle_scan.cycles[0]!.cycle_id,
+    );
+
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+    expect((await readings())[0]).toMatchObject({ status: "failed" });
+    expect((await jobs())[0]).toMatchObject({
+      status: "failed",
+      result_class: "cycle_hash_mismatch",
+    });
+  });
 });
 
 describe("claims", () => {
@@ -469,6 +560,7 @@ describe("claims", () => {
 
   it("a stale claim cannot publish", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
+    expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
 
     const first = await claimJob(env, enqueued.jobId);

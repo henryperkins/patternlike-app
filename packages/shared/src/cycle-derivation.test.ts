@@ -24,7 +24,7 @@ interface Vector {
   input: unknown;
   canonical: string;
   full_digest: string;
-  rendered_id: string;
+  rendered_id?: string;
 }
 
 const vectors: Vector[] = JSON.parse(readFileSync(VECTORS, "utf8")).vectors;
@@ -62,6 +62,7 @@ test("golden vectors reproduce byte-for-byte", () => {
 
 test("cyclePassId reproduces the pass-two vector", async () => {
   const expected = vector("cycle-pass-identity-pass-two");
+  assert.ok(expected.rendered_id);
   assert.equal(await cyclePassId(SATURN_SQUARE_SUN.id, 2), expected.rendered_id);
   assert.equal(expected.rendered_id, "cyp_ed2d8c5b7059b5b12d4131ee5d2fbb65");
 });

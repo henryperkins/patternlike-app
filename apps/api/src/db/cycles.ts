@@ -6,6 +6,8 @@ import {
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
 
+const PERSIST_BATCH_SIZE = 100;
+
 /** What a generation command needs to pin one scanned cycle. */
 export interface PersistedCycle {
   cycleId: string;
@@ -121,6 +123,12 @@ export async function persistCycles(
     });
   });
 
-  await env.DB.batch(writes);
+  // A scan response is not contract-bounded by cycle or pass count. Keep each D1
+  // transaction bounded; partial progress is safe because every write is
+  // content-addressed and idempotent, and the reading is reserved only after all
+  // chunks succeed.
+  for (let start = 0; start < writes.length; start += PERSIST_BATCH_SIZE) {
+    await env.DB.batch(writes.slice(start, start + PERSIST_BATCH_SIZE));
+  }
   return derived;
 }

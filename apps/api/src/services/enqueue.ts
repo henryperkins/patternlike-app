@@ -1,9 +1,10 @@
 import { newId } from "@patternlike/shared";
-import type { Env } from "../env.js";
+import type { Env, GenerationMessage } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
 import type { UserIdentity } from "../db/users.js";
 import { persistCycles } from "../db/cycles.js";
 import {
+  MAX_COMMAND_GENERATION,
   markDispatched,
   replaceCommand,
   reserveInitial,
@@ -20,11 +21,7 @@ import {
 import { isCurrentOrPreviousLocalDay } from "./local-day.js";
 import { loadPreferences } from "../db/preferences.js";
 
-/** The opaque queue message. Nothing about the reading travels in the clear. */
-export interface GenerationMessage {
-  job_id: string;
-  reading_id: string;
-}
+export type { GenerationMessage } from "../env.js";
 
 export type EnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }
@@ -258,7 +255,7 @@ export async function replaceFailedCommand(
   }
 
   const nextGeneration = reservation.command_generation + 1;
-  if (nextGeneration > 3) {
+  if (nextGeneration > MAX_COMMAND_GENERATION) {
     return {
       ok: false,
       reason: "budget_exhausted",

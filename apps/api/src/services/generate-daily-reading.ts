@@ -121,10 +121,21 @@ async function loadPinnedCycles(
         detail: `pinned cycle ${pin.cycle_id} is not persisted`,
       };
     }
-    const cycle = JSON.parse(row.cycle_json) as NormalizedCycle;
+    let cycle: NormalizedCycle;
+    let hash: string;
+    try {
+      cycle = JSON.parse(row.cycle_json) as NormalizedCycle;
+      hash = await cycleHash(cycle);
+    } catch {
+      return {
+        ok: false,
+        reason: "cycle_hash_mismatch",
+        detail: `pinned cycle ${pin.cycle_id} contains unreadable JSON`,
+      };
+    }
     // A rescan that would change the envelope or the pass list fails the claimed
     // job closed rather than substituting the newer row.
-    if ((await cycleHash(cycle)) !== pin.cycle_hash) {
+    if (hash !== pin.cycle_hash) {
       return {
         ok: false,
         reason: "cycle_hash_mismatch",
@@ -151,16 +162,27 @@ async function pinnedContextStillEligible(
 ): Promise<boolean> {
   for (const pin of command.context) {
     const row = await env.DB.prepare(
-      `SELECT permission_state, normalized_hash, consent_id
-       FROM context_signals WHERE id = ? AND user_id = ?`,
+      `SELECT s.permission_state, s.normalized_hash, s.consent_id,
+              c.version AS consent_version, c.status AS consent_status
+       FROM context_signals s
+       JOIN consents c ON c.id = s.consent_id AND c.user_id = s.user_id
+       WHERE s.id = ? AND s.user_id = ?`,
     )
       .bind(pin.signal_id, userId)
-      .first<{ permission_state: string; normalized_hash: string; consent_id: string | null }>();
+      .first<{
+        permission_state: string;
+        normalized_hash: string;
+        consent_id: string | null;
+        consent_version: number;
+        consent_status: string;
+      }>();
     if (
       !row ||
       row.permission_state !== pin.permission_state ||
       row.normalized_hash !== pin.normalized_hash ||
-      row.consent_id !== pin.consent_id
+      row.consent_id !== pin.consent_id ||
+      row.consent_version !== pin.consent_version ||
+      row.consent_status !== "granted"
     ) {
       return false;
     }

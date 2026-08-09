@@ -130,8 +130,19 @@ export async function setSchedulingTimezone(
         now,
       ),
     ]);
-  } catch {
-    return { ok: false, reason: "preference_conflict" };
+  } catch (err) {
+    const latest = await loadPreferences(env, userId);
+    if (!latest) throw err;
+    if (locked(latest.timezoneSource, source)) {
+      return { ok: false, reason: "preference_locked" };
+    }
+    if (latest.timezone === timezone && latest.timezoneSource === source) {
+      return { ok: true, value: latest };
+    }
+    if (latest.timezoneRevision !== current.timezoneRevision) {
+      return { ok: false, reason: "preference_conflict" };
+    }
+    throw err;
   }
 
   return {
@@ -167,13 +178,38 @@ export async function setContentLocale(
   }
 
   const now = new Date().toISOString();
-  await env.DB.prepare(
+  const result = await env.DB.prepare(
     `UPDATE users
      SET locale = ?, locale_source = ?, locale_updated_at = ?, updated_at = ?
-     WHERE id = ?`,
+     WHERE id = ? AND locale = ? AND locale_source = ?
+       AND (
+         locale_updated_at = ?
+         OR (locale_updated_at IS NULL AND ? IS NULL)
+       )`,
   )
-    .bind(locale, source, now, now, userId)
+    .bind(
+      locale,
+      source,
+      now,
+      now,
+      userId,
+      current.locale,
+      current.localeSource,
+      current.localeUpdatedAt,
+      current.localeUpdatedAt,
+    )
     .run();
+  if (!result.meta.changes) {
+    const latest = await loadPreferences(env, userId);
+    if (!latest) return { ok: false, reason: "preference_conflict" };
+    if (locked(latest.localeSource, source)) {
+      return { ok: false, reason: "preference_locked" };
+    }
+    if (latest.locale === locale && latest.localeSource === source) {
+      return { ok: true, value: latest };
+    }
+    return { ok: false, reason: "preference_conflict" };
+  }
 
   return {
     ok: true,

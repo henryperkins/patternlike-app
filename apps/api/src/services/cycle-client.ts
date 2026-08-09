@@ -31,6 +31,8 @@ export type CycleInvocation =
   | { ok: false; kind: "refused"; failure: CycleResponseFailure }
   | { ok: false; kind: "unavailable"; detail: string };
 
+const CALC_REQUEST_TIMEOUT_MS = 10_000;
+
 export interface CycleScanInputs {
   requestId: string;
   chartFingerprint: string;
@@ -102,6 +104,7 @@ export async function invokeCycles(
       method: "POST",
       headers,
       body: JSON.stringify(req),
+      signal: AbortSignal.timeout(CALC_REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     return {

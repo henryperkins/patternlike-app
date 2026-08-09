@@ -61,8 +61,9 @@ const REQUIRED_NON_EMPTY: ReleaseObjectCollection[] = [
   "daily_fallbacks",
 ];
 
-/** `{token}` occurrences inside reviewed timing copy. */
-const PLACEHOLDER_RE = /\{([a-z_]+)\}/g;
+/** Any braced interpolation plus the token grammar the contract permits. */
+const BRACED_PLACEHOLDER_RE = /\{([^{}]*)\}/g;
+const PLACEHOLDER_TOKEN_RE = /^[a-z_]+$/;
 
 export const SIGNATURE_ALGORITHMS = ["Ed25519", "ES256"] as const;
 export type SignatureAlgorithm = (typeof SIGNATURE_ALGORITHMS)[number];
@@ -677,11 +678,12 @@ function validateObjectShape(
     // undeclared token renders as a literal brace in a published paragraph, and
     // nobody reviews the string the reader actually sees.
     const declared = new Set(object.placeholders);
-    for (const match of (object.template_text as string).matchAll(PLACEHOLDER_RE)) {
-      if (!declared.has(match[1]!)) {
+    for (const match of (object.template_text as string).matchAll(BRACED_PLACEHOLDER_RE)) {
+      const token = match[1]!;
+      if (!PLACEHOLDER_TOKEN_RE.test(token) || !declared.has(token)) {
         return reject(
           "timing_undeclared_placeholder",
-          `${where}.template_text uses {${match[1]}}, which is not in placeholders`,
+          `${where}.template_text uses {${token}}, which is not a declared placeholder`,
         );
       }
     }
@@ -835,6 +837,16 @@ export function validateContentGraph(bundle: ContentReleaseBundle): RejectionRea
   // and two would make "which reviewed copy did this reader see" unanswerable.
   const approved = (object: ContentObject) =>
     object.status === undefined || object.status === "approved";
+
+  const supportedLocales = new Set(release.supported_locales);
+  for (const fallback of objects.daily_fallbacks) {
+    if (!supportedLocales.has(fallback.locale)) {
+      return reject(
+        "fallback_locale_mismatch",
+        `daily_fallback ${fallback.id} locale ${fallback.locale} is not supported`,
+      );
+    }
+  }
 
   for (const locale of release.supported_locales) {
     const fallbacks = objects.daily_fallbacks.filter(

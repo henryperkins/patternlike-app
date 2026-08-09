@@ -83,6 +83,7 @@ describe("POST /internal/readings/*", () => {
     const { status, body } = await post("/readings/generate", { user_id: USER_A });
     expect(status).toBe(503);
     expect(body.error?.code).toBe("calc_unavailable");
+    expect(body.error?.message).toBe("The calculation service is unavailable");
   });
 
   it("validates its bodies", async () => {
@@ -100,6 +101,25 @@ describe("POST /internal/readings/*", () => {
     expect(
       (await post("/readings/replace", { user_id: USER_A, reading_id: "rdg_x", reason: "nope" }))
         .status,
+    ).toBe(400);
+    expect(
+      (
+        await post("/readings/replace", {
+          user_id: USER_A,
+          reading_id: "rdg_x",
+          reason: "calc_unavailable",
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await post("/readings/replace", {
+          user_id: USER_A,
+          reading_id: "rdg_x",
+          reason: "calc_unavailable",
+          actor: "admin",
+        })
+      ).status,
     ).toBe(400);
   });
 

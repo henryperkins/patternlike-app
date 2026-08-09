@@ -20,6 +20,7 @@ import {
   type BirthTimeAccuracy,
   type LongitudePosition,
   type NormalizedCycle,
+  type SuppressedFeatureClass,
   type UncertaintyReport,
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
@@ -187,8 +188,20 @@ interface ContextRow {
   allowed_uses_json: string;
   evidence_lane: string;
   consent_id: string | null;
+  consent_version: number;
   permission_state: string;
   freshness_status: string;
+}
+
+const CYCLE_SUPPRESSED_FEATURES = new Set<SuppressedFeatureClass>([
+  "houses",
+  "angles",
+  "angle_transits",
+  "moon_time_sensitive",
+]);
+
+function isCycleSuppressedFeature(value: string): value is SuppressedFeatureClass {
+  return CYCLE_SUPPRESSED_FEATURES.has(value as SuppressedFeatureClass);
 }
 
 /**
@@ -263,15 +276,17 @@ async function readEligibleContext(env: Env, userId: string): Promise<ContextRow
   // eligible, and a later reader has to be able to tell "no signals" from "this
   // code never looked".
   const { results } = await env.DB.prepare(
-    `SELECT id, source_id, normalized_hash, allowed_uses_json, evidence_lane,
-            consent_id, permission_state, freshness_status
-     FROM context_signals
-     WHERE user_id = ?
-       AND permission_state = 'active'
-       AND conflict_status = 'none'
-       AND freshness_status = 'fresh'
-       AND consent_id IS NOT NULL
-     ORDER BY source_id, id`,
+    `SELECT s.id, s.source_id, s.normalized_hash, s.allowed_uses_json, s.evidence_lane,
+            s.consent_id, c.version AS consent_version,
+            s.permission_state, s.freshness_status
+     FROM context_signals s
+     JOIN consents c ON c.id = s.consent_id AND c.user_id = s.user_id
+     WHERE s.user_id = ?
+       AND s.permission_state = 'active'
+       AND s.conflict_status = 'none'
+       AND s.freshness_status = 'fresh'
+       AND c.status = 'granted'
+     ORDER BY s.source_id, s.id`,
   )
     .bind(userId)
     .all<ContextRow>();
@@ -296,7 +311,7 @@ function toContextPins(rows: ContextRow[]): ContextPin[] {
         allowed_use: allowedUse,
         evidence_lane: row.evidence_lane,
         consent_id: row.consent_id,
-        consent_version: 1,
+        consent_version: row.consent_version,
         permission_state: row.permission_state,
         freshness_status: row.freshness_status,
       },
@@ -424,8 +439,31 @@ export async function buildGenerationCommand(
     return { ok: false, reason: "chart_not_found", detail: "no active chart snapshot" };
   }
 
-  const uncertainty = JSON.parse(chart.uncertainty_json) as UncertaintyReport;
-  const snapshot = JSON.parse(chart.snapshot_json) as { positions: LongitudePosition[] };
+  let uncertainty: UncertaintyReport;
+  let snapshot: { positions: LongitudePosition[] };
+  try {
+    uncertainty = JSON.parse(chart.uncertainty_json) as UncertaintyReport;
+    snapshot = JSON.parse(chart.snapshot_json) as { positions: LongitudePosition[] };
+  } catch {
+    return {
+      ok: false,
+      reason: "chart_not_found",
+      detail: "active chart snapshot contains unreadable JSON",
+    };
+  }
+  if (
+    !uncertainty ||
+    !Array.isArray(uncertainty.suppressed_features) ||
+    !Array.isArray(uncertainty.qualified_features) ||
+    !snapshot ||
+    !Array.isArray(snapshot.positions)
+  ) {
+    return {
+      ok: false,
+      reason: "chart_not_found",
+      detail: "active chart snapshot is missing required calculated fields",
+    };
+  }
   // The recomputed effective accuracy, never the label the caller supplied.
   const effectiveAccuracy = uncertainty.accuracy;
 
@@ -444,9 +482,9 @@ export async function buildGenerationCommand(
       requestId: newId("req"),
       chartFingerprint: chart.fingerprint,
       natalAccuracy: effectiveAccuracy,
-      suppressedFeatures: uncertainty.suppressed_features.map(
-        (f) => f.feature_class,
-      ) as never,
+      suppressedFeatures: uncertainty.suppressed_features
+        .map((feature) => feature.feature_class)
+        .filter(isCycleSuppressedFeature),
       natalPositions: natalPositionsForScan(snapshot.positions, uncertainty),
       window: { from: day.dayStartAt, to: day.dayEndAt },
       contractId: chart.contract_id,

@@ -5,23 +5,39 @@ import {
   cyclePassId,
   type NormalizedCycle,
 } from "@patternlike/shared";
-import { IDENTITY_A, USER_A, resetDb, rows, seedChart, seedUser } from "../../test/helpers.js";
+import {
+  IDENTITY_A,
+  IDENTITY_B,
+  USER_A,
+  USER_B,
+  resetDb,
+  rows,
+  seedChart,
+  seedUser,
+} from "../../test/helpers.js";
 import {
   CYCLE_FP_EMPTY,
   CYCLE_FP_REFUSED,
   CYCLE_FP_UNAVAILABLE,
 } from "../../test/mock-calc-service.js";
-import { buildCycleRequest, invokeCycles } from "../services/cycle-client.js";
+import {
+  buildCycleRequest,
+  invokeCycles,
+  type CycleScanInputs,
+} from "../services/cycle-client.js";
 import { deriveCycle, persistCycles } from "./cycles.js";
 
 const WINDOW = { from: "2026-08-09T05:00:00Z", to: "2026-08-10T05:00:00Z" };
 
-function scanRequest(fingerprint: string, suppressed?: string[]) {
+function scanRequest(
+  fingerprint: string,
+  suppressed?: CycleScanInputs["suppressedFeatures"],
+) {
   return buildCycleRequest({
     requestId: "req_cycles_test_00001",
     chartFingerprint: fingerprint,
     natalAccuracy: suppressed?.includes("moon_time_sensitive") ? "unknown" : "exact",
-    suppressedFeatures: suppressed as never,
+    suppressedFeatures: suppressed,
     natalPositions: [
       { body: "sun", longitude_deg: 54.703 },
       { body: "moon", longitude_deg: 128.44 },
@@ -128,12 +144,18 @@ describe("persistCycles", () => {
 
   it("is idempotent: a second identical scan creates no new rows", async () => {
     await persistCycles(env, USER_A, chartId, cycles);
-    const first = await rows("SELECT id FROM cycle_passes WHERE user_id = ?", USER_A);
+    const first = await rows<{ id: string }>(
+      "SELECT id FROM cycle_passes WHERE user_id = ? ORDER BY id",
+      USER_A,
+    );
 
     await persistCycles(env, USER_A, chartId, cycles);
-    const second = await rows("SELECT id FROM cycle_passes WHERE user_id = ?", USER_A);
+    const second = await rows<{ id: string }>(
+      "SELECT id FROM cycle_passes WHERE user_id = ? ORDER BY id",
+      USER_A,
+    );
 
-    expect(second).toHaveLength(first.length);
+    expect(second).toEqual(first);
     expect(await rows("SELECT id FROM cycle_instances WHERE user_id = ?", USER_A)).toHaveLength(2);
   });
 
@@ -166,13 +188,14 @@ describe("persistCycles", () => {
 
   it("refuses a pass whose parent cycle belongs to another user", async () => {
     await persistCycles(env, USER_A, chartId, cycles);
+    await seedUser(IDENTITY_B);
     await expect(
       env.DB.prepare(
         `INSERT INTO cycle_passes
            (id, cycle_id, user_id, pass_index, direction, exact_at, speed_deg_per_day, created_at)
-         VALUES ('cyp_cross_user_0000000000000001', ?, 'usr_test_bob_000001', 9, 'direct', ?, 1.0, ?)`,
+         VALUES ('cyp_cross_user_0000000000000001', ?, ?, 9, 'direct', ?, 1.0, ?)`,
       )
-        .bind(cycles[0]!.id, cycles[0]!.exact_at, new Date().toISOString())
+        .bind(cycles[0]!.id, USER_B, cycles[0]!.exact_at, new Date().toISOString())
         .run(),
     ).rejects.toThrow();
   });
