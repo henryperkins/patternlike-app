@@ -22,11 +22,13 @@ import {
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
 import {
+  MAX_COMMAND_GENERATION,
   claimJob,
   findUndispatched,
   loadInitialGenerationState,
 } from "../db/generation.js";
 import {
+  dispatch,
   enqueueDailyReading,
   enqueueReissue,
   replaceFailedCommand,
@@ -597,6 +599,252 @@ describe("ensure today", () => {
       localDate: "2026-08-09",
     });
     expect(dispatchJob).not.toHaveBeenCalled();
+  });
+});
+
+describe("ensure today recovery", () => {
+  const now = new Date("2026-08-09T18:00:00.000Z");
+
+  beforeEach(seedEverything);
+
+  async function failCurrentDay(resultClass: string, commandGeneration = 1) {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE daily_readings
+       SET status = 'failed', command_generation = ?
+       WHERE id = ?`,
+      commandGeneration,
+      enqueued.readingId,
+    );
+    await rows(
+      `UPDATE jobs
+       SET status = 'failed', result_class = ?, claim_token = NULL,
+           lease_expires_at = NULL
+       WHERE id = ?`,
+      resultClass,
+      enqueued.jobId,
+    );
+    return enqueued;
+  }
+
+  it("redispatches only the due queued job whose outbox marker is absent", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE jobs
+       SET dispatched_at = NULL, available_at = '2026-08-09T17:59:00.000Z'
+       WHERE id = ?`,
+      enqueued.jobId,
+    );
+    const dispatchJob = vi.fn(dispatch);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now, dispatchJob })).toEqual({
+      ok: true,
+      status: "preparing",
+      localDate: "2026-08-09",
+    });
+    expect(dispatchJob).toHaveBeenCalledOnce();
+    expect(dispatchJob).toHaveBeenCalledWith(env, {
+      job_id: enqueued.jobId,
+      reading_id: enqueued.readingId,
+    });
+    expect((await jobs())[0]!.dispatched_at).not.toBeNull();
+  });
+
+  it("does not redispatch an undispatched retry before its available time", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE jobs
+       SET dispatched_at = NULL, available_at = '2026-08-09T18:01:00.000Z'
+       WHERE id = ?`,
+      enqueued.jobId,
+    );
+    const dispatchJob = vi.fn(dispatch);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now, dispatchJob })).toMatchObject({
+      ok: true,
+      status: "preparing",
+    });
+    expect(dispatchJob).not.toHaveBeenCalled();
+    expect((await jobs())[0]).toMatchObject({
+      available_at: "2026-08-09T18:01:00.000Z",
+      dispatched_at: null,
+    });
+  });
+
+  it("redispatches the active job when its running lease has expired", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    expect(await claimJob(env, enqueued.jobId, now)).not.toBeNull();
+    await rows(
+      `UPDATE jobs SET lease_expires_at = '2026-08-09T17:59:00.000Z' WHERE id = ?`,
+      enqueued.jobId,
+    );
+    const dispatchJob = vi.fn(dispatch);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now, dispatchJob })).toMatchObject({
+      ok: true,
+      status: "preparing",
+    });
+    expect(dispatchJob).toHaveBeenCalledOnce();
+    expect(dispatchJob).toHaveBeenCalledWith(env, {
+      job_id: enqueued.jobId,
+      reading_id: enqueued.readingId,
+    });
+  });
+
+  it("does not redispatch a running job while its claim lease is live", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    expect(await claimJob(env, enqueued.jobId, now)).not.toBeNull();
+    const dispatchJob = vi.fn(dispatch);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now, dispatchJob })).toMatchObject({
+      ok: true,
+      status: "preparing",
+    });
+    expect(dispatchJob).not.toHaveBeenCalled();
+  });
+
+  it.each(["calc_unavailable", "release_unreadable"] as const)(
+    "re-freezes one bounded replacement after %s",
+    async (resultClass) => {
+      const failed = await failCurrentDay(resultClass);
+
+      expect(await ensureTodayReading(env, IDENTITY_A, { now })).toEqual({
+        ok: true,
+        status: "preparing",
+        localDate: "2026-08-09",
+      });
+
+      expect(await readings()).toEqual([
+        expect.objectContaining({
+          id: failed.readingId,
+          status: "pending",
+          revision: 1,
+          command_generation: 2,
+        }),
+      ]);
+      const allJobs = await jobs();
+      expect(allJobs).toHaveLength(2);
+      expect(allJobs[0]).toMatchObject({ id: failed.jobId, status: "failed" });
+      expect(allJobs[1]).toMatchObject({ status: "queued" });
+    },
+  );
+
+  it("leaves a retryable failure terminal when its command budget is spent", async () => {
+    const failed = await failCurrentDay("calc_unavailable", MAX_COMMAND_GENERATION);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toMatchObject({
+      ok: false,
+      reason: "reading_generation_failed",
+    });
+    expect(await readings()).toEqual([
+      expect.objectContaining({
+        id: failed.readingId,
+        status: "failed",
+        command_generation: MAX_COMMAND_GENERATION,
+      }),
+    ]);
+    expect(await jobs()).toHaveLength(1);
+  });
+
+  it("does not replace a terminal result outside the scheduler allowlist", async () => {
+    await failCurrentDay("payload_undecryptable");
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toMatchObject({
+      ok: false,
+      reason: "reading_generation_failed",
+    });
+    expect(await jobs()).toHaveLength(1);
+  });
+
+  it("does not rebuild a failed reservation whose active job is not terminal", async () => {
+    const failed = await failCurrentDay("calc_unavailable");
+    await rows(`UPDATE jobs SET status = 'queued' WHERE id = ?`, failed.jobId);
+    await rows(
+      `UPDATE chart_snapshots SET fingerprint = ? WHERE user_id = ? AND status = 'active'`,
+      CYCLE_FP_UNAVAILABLE,
+      USER_A,
+    );
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toMatchObject({
+      ok: false,
+      reason: "reading_generation_failed",
+    });
+    expect(await jobs()).toHaveLength(1);
+  });
+
+  it("fails closed when a pending reservation has no active job", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE daily_readings SET active_generation_job_id = NULL WHERE id = ?`,
+      enqueued.readingId,
+    );
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toMatchObject({
+      ok: false,
+      reason: "reading_generation_failed",
+    });
+  });
+
+  it("fails closed when a terminal job is still attached to a pending reservation", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE jobs
+       SET status = 'failed', result_class = 'payload_undecryptable'
+       WHERE id = ?`,
+      enqueued.jobId,
+    );
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toMatchObject({
+      ok: false,
+      reason: "reading_generation_failed",
+    });
+  });
+
+  it("fails closed when a running job has no claim lease", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE jobs SET status = 'running', lease_expires_at = NULL WHERE id = ?`,
+      enqueued.jobId,
+    );
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toMatchObject({
+      ok: false,
+      reason: "reading_generation_failed",
+    });
+  });
+
+  it("never redispatches another user's due job", async () => {
+    const mine = await enqueueDailyReading(env, USER_A, now);
+    if (!mine.ok) throw new Error(`enqueue failed: ${mine.reason}`);
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B, "America/Chicago");
+    await seedChart(IDENTITY_B);
+    const theirs = await enqueueDailyReading(env, USER_B, now);
+    if (!theirs.ok) throw new Error(`enqueue failed: ${theirs.reason}`);
+    await rows(
+      `UPDATE jobs SET dispatched_at = NULL WHERE id = ?`,
+      theirs.jobId,
+    );
+    const dispatchJob = vi.fn(dispatch);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now, dispatchJob })).toMatchObject({
+      ok: true,
+      status: "preparing",
+    });
+    expect(dispatchJob).not.toHaveBeenCalled();
+    const [theirJob] = await rows<{ dispatched_at: string | null }>(
+      `SELECT dispatched_at FROM jobs WHERE id = ?`,
+      theirs.jobId,
+    );
+    expect(theirJob!.dispatched_at).toBeNull();
   });
 });
 
