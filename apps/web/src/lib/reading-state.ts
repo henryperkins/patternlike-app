@@ -12,15 +12,9 @@ import { isNotImplemented } from "./api-status.js";
 export type TodayFailure =
   | { kind: "unauthorized" }
   | { kind: "needs_onboarding"; requestId: string | null }
-  | { kind: "not_generated"; requestId: string | null; localDate: string | null }
   | { kind: "needs_preference"; preference: "timezone" | "locale"; requestId: string | null }
   | { kind: "not_implemented"; requestId: string | null }
   | { kind: "error"; message: string; requestId: string | null };
-
-function localDateFrom(error: ApiError): string | null {
-  const value = error.details?.local_date;
-  return typeof value === "string" ? value : null;
-}
 
 /**
  * Neither 404 code nor either 409 code is assumed to exhaust its status: an
@@ -40,13 +34,6 @@ export function classifyTodayError(error: unknown): TodayFailure {
     if (error.status === 404) {
       if (error.code === "chart_not_found") {
         return { kind: "needs_onboarding", requestId: error.requestId };
-      }
-      if (error.code === "reading_not_generated") {
-        return {
-          kind: "not_generated",
-          requestId: error.requestId,
-          localDate: localDateFrom(error),
-        };
       }
     }
 

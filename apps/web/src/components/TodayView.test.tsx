@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TodayView } from "./TodayView.js";
@@ -6,6 +6,7 @@ import { formatLocalDate } from "../lib/reading-format.js";
 import {
   NOT_BUILT,
   capturedFor,
+  deferred,
   mockApiResponses,
   notImplemented,
   type MockResponse,
@@ -30,6 +31,21 @@ function renderToday(responses: Record<string, MockResponse>) {
 }
 
 const ok = (body: unknown): MockResponse => ({ status: 200, body });
+const preparing = (localDate = "2026-08-09"): MockResponse => ({
+  status: 202,
+  body: {
+    schema_version: "0.3.0",
+    status: "preparing",
+    local_date: localDate,
+  },
+});
+
+async function flushEffects() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
 
 describe("TodayView", () => {
   it("renders every paragraph it was given, and nothing it was not", async () => {
@@ -111,28 +127,152 @@ describe("TodayView", () => {
     expect(screen.getByText(/assembled from your own chart facts/i)).toBeInTheDocument();
   });
 
-  it("explains the generation schedule without promising a time", async () => {
-    const responses: Record<string, MockResponse> = {
-      [TODAY]: {
-        status: 404,
-        body: errorBody("reading_not_generated", "No reading has been published for today", {
-          local_date: "2026-08-09",
-        }),
-      },
-    };
-    const user = userEvent.setup();
-    renderToday(responses);
+  it("starts a body-less ensure request and renders the server-resolved day", async () => {
+    renderToday({ [TODAY]: preparing() });
 
     expect(
-      await screen.findByText(new RegExp(`Nothing has been published for ${formatLocalDate("2026-08-09")}`)),
+      await screen.findByRole("heading", { name: "Preparing your reading." }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/once per local day, on a schedule/i)).toBeInTheDocument();
-    // A promise this build cannot keep is worse than no estimate: production has
-    // no active content release, so this is the launch state for everybody.
-    expect(screen.queryByText(/tomorrow|by morning|in an hour|shortly/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(formatLocalDate("2026-08-09"));
 
-    await user.click(screen.getByRole("button", { name: /Check again/i }));
-    expect(capturedFor(TODAY)).toHaveLength(2);
+    const [request] = capturedFor(TODAY);
+    expect(request!.method).toBe("PUT");
+    expect(request!.body).toBeNull();
+    expect(screen.queryByRole("button", { name: /Check again/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/once per local day, on a schedule/i)).not.toBeInTheDocument();
+  });
+
+  it("renders a reading automatically after the first 500 ms poll", async () => {
+    vi.useFakeTimers();
+    try {
+      const responses: Record<string, MockResponse> = { [TODAY]: preparing() };
+      const { unmount } = renderToday(responses);
+      await flushEffects();
+      expect(capturedFor(TODAY)).toHaveLength(1);
+
+      responses[TODAY] = ok(todayResponse);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(499);
+      });
+      expect(capturedFor(TODAY)).toHaveLength(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(capturedFor(TODAY)).toHaveLength(2);
+      expect(
+        screen.getByText(todayResponse.reading.paragraphs[0]!.text),
+      ).toBeInTheDocument();
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("caps preparation polling at five seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderToday({ [TODAY]: preparing() });
+      await flushEffects();
+      expect(capturedFor(TODAY)).toHaveLength(1);
+
+      for (const [elapsed, count] of [
+        [499, 1],
+        [1, 2],
+        [999, 2],
+        [1, 3],
+        [1_999, 3],
+        [1, 4],
+        [4_999, 4],
+        [1, 5],
+        [4_999, 5],
+        [1, 6],
+      ] as const) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(elapsed);
+        });
+        expect(capturedFor(TODAY)).toHaveLength(count);
+      }
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not poll after a published response", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderToday({ [TODAY]: ok(todayResponse) });
+      await flushEffects();
+      expect(capturedFor(TODAY)).toHaveLength(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(capturedFor(TODAY)).toHaveLength(1);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps one live-region message until preparation has taken 15 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderToday({ [TODAY]: preparing() });
+      await flushEffects();
+      const status = screen.getByRole("status");
+      const initialMessage = status.textContent;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(14_999);
+      });
+      expect(screen.getByRole("status")).toBe(status);
+      expect(status).toHaveTextContent(initialMessage ?? "");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByRole("status")).toBe(status);
+      expect(status.textContent).not.toBe(initialMessage);
+      expect(status).toHaveTextContent(/taking longer/i);
+      expect(status).not.toHaveTextContent(/minute|hour|shortly|soon/i);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("aborts an active ensure request when unmounted", async () => {
+    const held = deferred();
+    const { unmount } = renderToday({
+      [TODAY]: { ...preparing(), gate: held.promise },
+    });
+    await vi.waitFor(() => expect(capturedFor(TODAY)).toHaveLength(1));
+
+    const signal = capturedFor(TODAY)[0]!.signal;
+    expect(signal).not.toBeNull();
+    expect(signal!.aborted).toBe(false);
+    unmount();
+    expect(signal!.aborted).toBe(true);
+    held.release();
+  });
+
+  it("does not request again when unmounted during the poll delay", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderToday({ [TODAY]: preparing() });
+      await flushEffects();
+      expect(capturedFor(TODAY)).toHaveLength(1);
+      unmount();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(capturedFor(TODAY)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("collects a scheduling zone and writes it back", async () => {
@@ -163,12 +303,12 @@ describe("TodayView", () => {
     expect(write!.headers.get("content-type")).toBe("application/json");
     expect((write!.headers.get("idempotency-key") ?? "").length).toBeGreaterThanOrEqual(8);
 
-    // A saved preference is not a reading: it only affects commands enqueued
-    // afterwards, so the copy must not imply one is waiting.
+    // Saving the gate starts a fresh desired-state operation immediately.
     expect(
       await screen.findByText(/generated for your next local day/i),
     ).toBeInTheDocument();
     expect(capturedFor(TODAY)).toHaveLength(2);
+    expect(capturedFor(TODAY).map((request) => request.method)).toEqual(["PUT", "PUT"]);
   });
 
   it("asks the second preference on a blank form, not on the first one's answer", async () => {
@@ -295,6 +435,62 @@ describe("TodayView", () => {
     await vi.waitFor(() => expect(onUnauthorized).toHaveBeenCalled());
     expect(screen.queryByText(/could not be reached/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Try again/i })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      label: "a terminal generation failure",
+      response: {
+        status: 424,
+        body: errorBody(
+          "reading_generation_failed",
+          "Today's reading could not be prepared",
+        ),
+      },
+      message: "Today's reading could not be prepared",
+      requestId: "req_reading_generation_failed",
+    },
+    {
+      label: "an unavailable content release",
+      response: {
+        status: 503,
+        body: errorBody(
+          "release_unreadable",
+          "The active content release is unavailable",
+        ),
+      },
+      message: "The active content release is unavailable",
+      requestId: "req_release_unreadable",
+    },
+    {
+      label: "a network rejection",
+      response: { status: 0, body: null, unreachable: true },
+      message: "The Pattern/Like API could not be reached.",
+      requestId: null,
+    },
+  ] satisfies Array<{
+    label: string;
+    response: MockResponse;
+    message: string;
+    requestId: string | null;
+  }>)("stops polling after $label", async ({ response, message, requestId }) => {
+    vi.useFakeTimers();
+    try {
+      const { unmount, container } = renderToday({ [TODAY]: response });
+      await flushEffects();
+
+      expect(screen.getByRole("status")).toHaveTextContent(message);
+      expect(screen.getAllByRole("button", { name: /Try again/i })).toHaveLength(1);
+      if (requestId) expect(container).toHaveTextContent(`Request ${requestId}`);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(capturedFor(TODAY)).toHaveLength(1);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the retry control mounted and focused across an attempt", async () => {

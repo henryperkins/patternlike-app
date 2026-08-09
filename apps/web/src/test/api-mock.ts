@@ -37,6 +37,7 @@ export interface CapturedRequest {
   method: string;
   headers: Headers;
   body: unknown;
+  signal: AbortSignal | null;
 }
 
 let captured: CapturedRequest[] = [];
@@ -81,6 +82,7 @@ export function mockApiResponses(responses: Record<string, MockResponse>) {
         method: init?.method ?? "GET",
         headers: new Headers(init?.headers),
         body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
+        signal: init?.signal ?? null,
       });
 
       const entry = responses[url.pathname];

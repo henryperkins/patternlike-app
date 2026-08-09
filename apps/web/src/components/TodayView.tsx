@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import {
-  getTodayReading,
+  ensureTodayReading,
   type DailyReading,
   type DailyReadingResponse,
   type ReadingParagraph,
@@ -20,7 +20,11 @@ type TodayState =
   | { status: "loading" }
   | { status: "ready"; response: DailyReadingResponse }
   | { status: "needs_onboarding"; requestId: string | null }
-  | { status: "not_generated"; requestId: string | null; localDate: string | null }
+  | {
+      status: "preparing";
+      localDate: string;
+      takingLonger: boolean;
+    }
   | {
       status: "needs_preference";
       preference: "timezone" | "locale";
@@ -209,6 +213,25 @@ function TodayNotice({
 }
 
 const QUIET_LINE = "A clear day, not a horoscope feed.";
+const POLL_DELAYS_MS = [500, 1_000, 2_000, 5_000] as const;
+const SLOW_PREPARATION_MS = 15_000;
+
+function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+
+    const settle = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener("abort", settle);
+      resolve();
+    };
+    const timeoutId = setTimeout(settle, milliseconds);
+    signal.addEventListener("abort", settle, { once: true });
+  });
+}
 
 export function TodayView({ onUnauthorized }: TodayViewProps) {
   const [state, setState] = useState<TodayState>({ status: "loading" });
@@ -220,18 +243,59 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
 
   useEffect(() => {
     const controller = new AbortController();
+    let slowPreparationTimer: ReturnType<typeof setTimeout> | undefined;
+    let hasStartedPreparation = false;
+
+    const clearSlowPreparationTimer = () => {
+      if (slowPreparationTimer !== undefined) {
+        clearTimeout(slowPreparationTimer);
+        slowPreparationTimer = undefined;
+      }
+    };
+
     // Deliberately not reset to `loading`: a refresh keeps whatever is on screen
     // and only marks it busy, so the control the reader just pressed stays
     // mounted and keeps focus.
     setBusy(true);
 
     const load = async () => {
+      let pollIndex = 0;
       try {
-        const response = await getTodayReading(controller.signal);
-        if (controller.signal.aborted) return;
-        setState({ status: "ready", response });
+        while (!controller.signal.aborted) {
+          const response = await ensureTodayReading(controller.signal);
+          if (controller.signal.aborted) return;
+
+          if ("reading" in response) {
+            clearSlowPreparationTimer();
+            setState({ status: "ready", response });
+            return;
+          }
+
+          if (!hasStartedPreparation) {
+            hasStartedPreparation = true;
+            setState({
+              status: "preparing",
+              localDate: response.local_date,
+              takingLonger: false,
+            });
+            slowPreparationTimer = setTimeout(() => {
+              if (controller.signal.aborted) return;
+              setState((current) =>
+                current.status === "preparing"
+                  ? { ...current, takingLonger: true }
+                  : current,
+              );
+            }, SLOW_PREPARATION_MS);
+          }
+
+          const delay =
+            POLL_DELAYS_MS[Math.min(pollIndex, POLL_DELAYS_MS.length - 1)]!;
+          pollIndex += 1;
+          await abortableDelay(delay, controller.signal);
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
+        clearSlowPreparationTimer();
         const failure = classifyTodayError(error);
         switch (failure.kind) {
           case "unauthorized":
@@ -239,13 +303,6 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
             return;
           case "needs_onboarding":
             setState({ status: "needs_onboarding", requestId: failure.requestId });
-            return;
-          case "not_generated":
-            setState({
-              status: "not_generated",
-              requestId: failure.requestId,
-              localDate: failure.localDate,
-            });
             return;
           case "needs_preference":
             setState({
@@ -270,7 +327,10 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
     };
 
     void load();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      clearSlowPreparationTimer();
+    };
   }, [attempt, onUnauthorized]);
 
   switch (state.status) {
@@ -306,7 +366,7 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
       return (
         <TodayNotice title="Reading today.">
           <p role="status" aria-live="polite">
-            Looking for the reading published for your local day.
+            Starting your reading for today.
           </p>
         </TodayNotice>
       );
@@ -326,26 +386,13 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
         </TodayNotice>
       );
 
-    case "not_generated":
+    case "preparing":
       return (
-        <TodayNotice
-          title="Today's reading is not ready."
-          requestId={state.requestId}
-          action={{ label: "Check again", onClick: reload }}
-          busy={busy}
-        >
+        <TodayNotice title="Preparing your reading.">
           <p role="status" aria-live="polite">
-            {state.localDate
-              ? `Nothing has been published for ${formatLocalDate(state.localDate)} yet.`
-              : "Nothing has been published for your local day yet."}{" "}
-            {/*
-              Deliberately no estimate. Readings are generated on a schedule
-              against a frozen command, and this build has nothing honest to
-              promise — a reader told "by morning" and then not given one has
-              been lied to by the screen.
-            */}
-            Readings are assembled once per local day, on a schedule, from
-            reviewed content — not on demand when you open the app.
+            {state.takingLonger
+              ? `Your reading for ${formatLocalDate(state.localDate)} is still being prepared. This is taking longer than usual; you can leave this page and come back.`
+              : `Your reading for ${formatLocalDate(state.localDate)} is being assembled from reviewed content. It will appear here when it is ready.`}
           </p>
           <p className="today-empty__aside">{QUIET_LINE}</p>
         </TodayNotice>
