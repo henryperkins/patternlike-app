@@ -11,7 +11,8 @@
     "start": "tsx src/server.ts",
     "ephe:download": "node scripts/download-ephe.mjs",
     "pretest": "node scripts/download-ephe.mjs",
-    "test": "tsx --test src/**/*.test.ts",
+    "//test": "Glob QUOTED so node expands it rather than sh — see the note in packages/shared/package.json.",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "test:golden": "tsx --test src/golden.test.ts"
   },
   "dependencies": {

@@ -13,7 +13,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/**/*.test.ts"
+    "//test": "The glob is QUOTED so node expands it, not the shell. npm runs scripts under sh on Linux, where `**` is just `*` — unquoted, `src/**/*.test.ts` means `src/*/*.test.ts`. It matches nothing today (every test sits at the top of src/), so the literal falls through to node's globber and all tests run; add one test in a subdirectory and sh would match only that file and silently skip the rest.",
+    "test": "tsx --test \"src/**/*.test.ts\""
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

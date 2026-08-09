@@ -13,7 +13,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/**/*.test.ts",
+    "//test": "Glob QUOTED so node expands it rather than sh — see the note in packages/shared/package.json.",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "generate:allowlist": "python scripts/generate_source_allowlist.py"
   },
   "devDependencies": {
