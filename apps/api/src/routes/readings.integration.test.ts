@@ -51,6 +51,9 @@ for (const schema of [m0Common, m3Common, m3DailyReading, m3ReadingEvidence]) {
 const validateTodayResponse = ajv.getSchema(
   `${m3DailyReading.$id}#/$defs/dailyReadingResponse`,
 )!;
+const validatePreparation = ajv.getSchema(
+  `${m3DailyReading.$id}#/$defs/dailyReadingPreparation`,
+)!;
 const validateEvidenceGraph = ajv.getSchema(
   `${m3ReadingEvidence.$id}#/$defs/readingEvidenceGraph`,
 )!;
@@ -83,6 +86,12 @@ interface TodayBody {
   evidence_url: string | null;
 }
 
+interface PreparationBody {
+  schema_version: string;
+  status: "preparing";
+  local_date: string;
+}
+
 interface EvidenceBody {
   schema_version: string;
   reading_id: string;
@@ -98,6 +107,14 @@ interface EvidenceBody {
 
 async function get<T = unknown>(path: string, userId: string | null = USER_A) {
   const res = await SELF.fetch(`http://api.test${path}`, {
+    headers: userId ? { "x-user-id": userId } : {},
+  });
+  return { status: res.status, body: (await res.json()) as T };
+}
+
+async function putToday<T = unknown>(userId: string | null = USER_A) {
+  const res = await SELF.fetch("http://api.test/v1/readings/today", {
+    method: "PUT",
     headers: userId ? { "x-user-id": userId } : {},
   });
   return { status: res.status, body: (await res.json()) as T };
@@ -165,6 +182,146 @@ async function seedBoth() {
 
 /** The route resolves today itself; assert against the same helper it uses. */
 const today = () => localDateIn(ZONE, new Date());
+
+describe("PUT /v1/readings/today", () => {
+  beforeEach(seedBoth);
+
+  it("returns an existing published reading through the same wire projection", async () => {
+    const readingId = await publish(USER_A);
+
+    const { status, body } = await putToday<TodayBody>();
+
+    expect(status).toBe(200);
+    expect(body.reading.reading_id).toBe(readingId);
+    expect(validateTodayResponse(body)).toBe(true);
+    expect(validateTodayResponse.errors ?? []).toEqual([]);
+  });
+
+  it("reserves an absent day and returns the exact preparation contract", async () => {
+    const { status, body } = await putToday<PreparationBody>();
+
+    expect(status).toBe(202);
+    expect(body).toEqual({
+      schema_version: "0.3.0",
+      status: "preparing",
+      local_date: today(),
+    });
+    expect(validatePreparation(body)).toBe(true);
+    expect(validatePreparation.errors ?? []).toEqual([]);
+
+    const [counts] = await rows<{ reading_count: number; job_count: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM daily_readings WHERE user_id = ?) AS reading_count,
+         (SELECT COUNT(*) FROM jobs WHERE user_id = ?) AS job_count`,
+      USER_A,
+      USER_A,
+    );
+    expect(counts).toEqual({ reading_count: 1, job_count: 1 });
+  });
+
+  it("converges repeated and concurrent PUTs on one reservation and job", async () => {
+    const responses = await Promise.all([putToday(), putToday(), putToday()]);
+
+    expect(responses.map((response) => response.status)).toEqual([202, 202, 202]);
+    const [counts] = await rows<{ reading_count: number; job_count: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM daily_readings WHERE user_id = ?) AS reading_count,
+         (SELECT COUNT(*) FROM jobs WHERE user_id = ?) AS job_count`,
+      USER_A,
+      USER_A,
+    );
+    expect(counts).toEqual({ reading_count: 1, job_count: 1 });
+  });
+
+  it("refuses without an active release before reserving anything", async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    await confirmPreferences(USER_A, ZONE);
+    await seedChart(IDENTITY_A);
+
+    const { status, body } = await putToday<ErrorEnvelope>();
+
+    expect(status).toBe(503);
+    expect(body.error.code).toBe("release_not_active");
+    expect(await rows(`SELECT id FROM daily_readings`)).toEqual([]);
+    expect(await rows(`SELECT id FROM jobs`)).toEqual([]);
+  });
+
+  it("keeps chart and preference setup gates actionable and time-zone-first", async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    await confirmPreferences(USER_A, ZONE);
+    await seedActiveRelease();
+
+    expect(await putToday<ErrorEnvelope>()).toMatchObject({
+      status: 404,
+      body: { error: { code: "chart_not_found" } },
+    });
+
+    await seedChart(IDENTITY_A);
+    await rows(
+      `UPDATE users
+       SET timezone_source = 'default_unconfirmed', locale_source = 'default_unconfirmed'
+       WHERE id = ?`,
+      USER_A,
+    );
+    expect(await putToday<ErrorEnvelope>()).toMatchObject({
+      status: 409,
+      body: { error: { code: "timezone_confirmation_required" } },
+    });
+
+    await rows(
+      `UPDATE users SET timezone_source = 'user_confirmed' WHERE id = ?`,
+      USER_A,
+    );
+    expect(await putToday<ErrorEnvelope>()).toMatchObject({
+      status: 409,
+      body: { error: { code: "locale_confirmation_required" } },
+    });
+  });
+
+  it("requires authentication", async () => {
+    const { status, body } = await putToday<ErrorEnvelope>(null);
+
+    expect(status).toBe(401);
+    expect(body.error.code).toBe("unauthorized");
+  });
+
+  it("returns a reader-safe terminal failure without stored generation detail", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE daily_readings SET status = 'failed' WHERE id = ?`,
+      enqueued.readingId,
+    );
+    await rows(
+      `UPDATE jobs
+       SET status = 'failed', result_class = 'payload_undecryptable'
+       WHERE id = ?`,
+      enqueued.jobId,
+    );
+
+    const { status, body } = await putToday<ErrorEnvelope>();
+    const serialized = JSON.stringify(body);
+
+    expect(status).toBe(424);
+    expect(body.error).toMatchObject({
+      code: "reading_generation_failed",
+      message: "Today's reading could not be prepared",
+      request_id: expect.any(String),
+    });
+    for (const privateValue of [
+      "payload_undecryptable",
+      enqueued.jobId,
+      enqueued.readingId,
+      USER_A,
+      "release-12",
+      "reading_key",
+    ]) {
+      expect(serialized).not.toContain(privateValue);
+    }
+  });
+});
 
 describe("GET /v1/readings/today", () => {
   beforeEach(seedBoth);
@@ -244,6 +401,8 @@ describe("GET /v1/readings/today", () => {
     expect(envelope.error.request_id).toBeTruthy();
     // The client's only honest copy needs the date it is being told to wait for.
     expect(envelope.error.details).toEqual({ local_date: today() });
+    expect(await rows(`SELECT id FROM daily_readings WHERE user_id = ?`, USER_A)).toEqual([]);
+    expect(await rows(`SELECT id FROM jobs WHERE user_id = ?`, USER_A)).toEqual([]);
   });
 
   it("answers chart_not_found when onboarding is unfinished", async () => {

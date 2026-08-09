@@ -9,10 +9,12 @@ import {
   hasActiveChart,
   loadPublishedReadingForDate,
   loadReadingEvidence,
+  type PublishedReading,
   type ReadingEvidence,
   type ReadingRecord,
 } from "../db/readings.js";
 import type { DailyReading } from "@patternlike/reading-engine";
+import { ensureTodayReading } from "../services/ensure-today-reading.js";
 
 /**
  * The two read surfaces for a generated daily reading.
@@ -54,6 +56,18 @@ function projectReading(reading: DailyReading) {
       text: paragraph.text,
     })),
     fallback_used: reading.fallback_used,
+  };
+}
+
+function projectTodayResponse(published: PublishedReading) {
+  return {
+    schema_version: M3_SCHEMA_VERSION,
+    reading: projectReading(published.stored.reading),
+    // Never null in M3: completeReading refuses to commit a publication whose
+    // reading_sources count is wrong, and the assembler never emits zero
+    // paragraphs. The null in the contract is headroom, not a case, so this
+    // does not spend a COUNT(*) per request to rediscover it.
+    evidence_url: evidenceUrl(published.record),
   };
 }
 
@@ -126,6 +140,93 @@ function projectEvidence(evidence: ReadingEvidence) {
     created_at: header.created_at,
   };
 }
+
+readingRoutes.put("/v1/readings/today", async (c) => {
+  const requestId = c.get("requestId");
+  const identity: UserIdentity = {
+    userId: c.get("userId"),
+    cryptoSubject: c.get("cryptoSubject"),
+  };
+  const outcome = await ensureTodayReading(c.env, identity);
+
+  if (outcome.ok) {
+    if (outcome.status === "ready") {
+      return c.json(projectTodayResponse(outcome.published), 200);
+    }
+    return c.json(
+      {
+        schema_version: M3_SCHEMA_VERSION,
+        status: "preparing" as const,
+        local_date: outcome.localDate,
+      },
+      202,
+    );
+  }
+
+  console.error("ensure_today_failed", {
+    request_id: requestId,
+    reason: outcome.reason,
+    detail: outcome.detail,
+  });
+
+  const errorBody = (code: string, message: string) => ({
+    error: { code, message, request_id: requestId },
+  });
+
+  switch (outcome.reason) {
+    case "unauthorized":
+      return c.json(errorBody("unauthorized", "Authentication required"), 401);
+    case "chart_not_found":
+      return c.json(errorBody("chart_not_found", "No active chart for user"), 404);
+    case "timezone_confirmation_required":
+      return c.json(
+        errorBody(
+          "timezone_confirmation_required",
+          "Confirm your scheduling time zone before a daily reading can be generated",
+        ),
+        409,
+      );
+    case "locale_confirmation_required":
+      return c.json(
+        errorBody(
+          "locale_confirmation_required",
+          "Confirm your content locale before a daily reading can be generated",
+        ),
+        409,
+      );
+    case "release_not_active":
+      return c.json(
+        errorBody(
+          "release_not_active",
+          "No active reading release is available",
+        ),
+        503,
+      );
+    case "calc_unavailable":
+      return c.json(
+        errorBody("calc_unavailable", "The calculation service is unavailable"),
+        503,
+      );
+    case "release_unreadable":
+      return c.json(
+        errorBody(
+          "release_unreadable",
+          "The active content release is unavailable",
+        ),
+        503,
+      );
+    case "internal_error":
+      return c.json(errorBody("internal_error", "Unexpected server error"), 500);
+    default:
+      return c.json(
+        errorBody(
+          "reading_generation_failed",
+          "Today's reading could not be prepared",
+        ),
+        424,
+      );
+  }
+});
 
 readingRoutes.get("/v1/readings/today", async (c) => {
   const requestId = c.get("requestId");
@@ -214,15 +315,7 @@ readingRoutes.get("/v1/readings/today", async (c) => {
     );
   }
 
-  return c.json({
-    schema_version: M3_SCHEMA_VERSION,
-    reading: projectReading(published.stored.reading),
-    // Never null in M3: completeReading refuses to commit a publication whose
-    // reading_sources count is wrong, and the assembler never emits zero
-    // paragraphs. The null in the contract is headroom, not a case, so this
-    // does not spend a COUNT(*) per request to rediscover it.
-    evidence_url: evidenceUrl(published.record),
-  });
+  return c.json(projectTodayResponse(published));
 });
 
 readingRoutes.get("/v1/readings/:id/evidence", async (c) => {
