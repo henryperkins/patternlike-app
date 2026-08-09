@@ -9,7 +9,9 @@ import m3GenerationCommand from "../../../../contracts/m3/generation-command.sch
 import worker from "../index.js";
 import {
   IDENTITY_A,
+  IDENTITY_B,
   USER_A,
+  USER_B,
   confirmPreferences,
   resetDb,
   rows,
@@ -19,7 +21,11 @@ import {
 } from "../../test/helpers.js";
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
-import { claimJob, findUndispatched } from "../db/generation.js";
+import {
+  claimJob,
+  findUndispatched,
+  loadInitialGenerationState,
+} from "../db/generation.js";
 import {
   enqueueDailyReading,
   enqueueReissue,
@@ -453,6 +459,77 @@ describe("enqueue", () => {
     });
     expect(await readings()).toEqual([]);
     expect(await jobs()).toEqual([]);
+  });
+});
+
+describe("initial generation state", () => {
+  const now = new Date("2026-08-09T18:00:00.000Z");
+  const localDate = "2026-08-09";
+
+  beforeEach(seedEverything);
+
+  it("returns null when this user has no initial reservation for the local day", async () => {
+    expect(await loadInitialGenerationState(env, USER_A, localDate)).toBeNull();
+  });
+
+  it("projects the pending reservation and every active-job recovery timestamp", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    expect(await loadInitialGenerationState(env, USER_A, localDate)).toEqual({
+      readingId: enqueued.readingId,
+      readingStatus: "pending",
+      commandGeneration: 1,
+      activeJob: {
+        id: enqueued.jobId,
+        status: "queued",
+        resultClass: null,
+        availableAt: null,
+        dispatchedAt: expect.any(String),
+        leaseExpiresAt: null,
+      },
+    });
+  });
+
+  it("projects a failed reservation's terminal class and command generation", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await rows(
+      `UPDATE daily_readings
+       SET status = 'failed', command_generation = 2
+       WHERE id = ?`,
+      enqueued.readingId,
+    );
+    await rows(
+      `UPDATE jobs
+       SET status = 'failed', result_class = 'calc_unavailable'
+       WHERE id = ?`,
+      enqueued.jobId,
+    );
+
+    expect(await loadInitialGenerationState(env, USER_A, localDate)).toMatchObject({
+      readingId: enqueued.readingId,
+      readingStatus: "failed",
+      commandGeneration: 2,
+      activeJob: {
+        id: enqueued.jobId,
+        status: "failed",
+        resultClass: "calc_unavailable",
+      },
+    });
+  });
+
+  it("cannot return another user's reservation for the same local day", async () => {
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B, "America/Chicago");
+    await seedChart(IDENTITY_B);
+    const theirs = await enqueueDailyReading(env, USER_B, now);
+    if (!theirs.ok) throw new Error(`enqueue failed: ${theirs.reason}`);
+
+    expect(await loadInitialGenerationState(env, USER_A, localDate)).toBeNull();
+    expect(await loadInitialGenerationState(env, USER_B, localDate)).toMatchObject({
+      readingId: theirs.readingId,
+    });
   });
 });
 

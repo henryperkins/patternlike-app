@@ -41,6 +41,27 @@ export type ReserveOutcome =
   | { ok: false; reason: "stale_predecessor" }
   | { ok: false; reason: "conflict"; detail: string };
 
+export type GenerationJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+export interface InitialGenerationState {
+  readingId: string;
+  readingStatus: "pending" | "failed";
+  commandGeneration: number;
+  activeJob: {
+    id: string;
+    status: GenerationJobStatus;
+    resultClass: string | null;
+    availableAt: string | null;
+    dispatchedAt: string | null;
+    leaseExpiresAt: string | null;
+  } | null;
+}
+
 function auditStatement(
   env: Env,
   userId: string,
@@ -110,6 +131,64 @@ async function liveReadingId(
     .bind(userId, localDate)
     .first<{ id: string }>();
   return row?.id ?? null;
+}
+
+/**
+ * The initial reservation and active job for one owner's local day.
+ *
+ * This is intentionally not a sweeper query: a product request may inspect and
+ * recover only the day it authenticated for. Published rows are loaded through
+ * `db/readings.ts`; this projection names only the two states whose generation
+ * job still determines the next action.
+ */
+export async function loadInitialGenerationState(
+  env: Env,
+  userId: string,
+  localDate: string,
+): Promise<InitialGenerationState | null> {
+  const row = await env.DB.prepare(
+    `SELECT r.id AS reading_id, r.status AS reading_status, r.command_generation,
+            j.id AS job_id, j.status AS job_status, j.result_class,
+            j.available_at, j.dispatched_at, j.lease_expires_at
+     FROM daily_readings r
+     LEFT JOIN jobs j
+       ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+     WHERE r.user_id = ? AND r.local_date = ?
+       AND r.revision = 1 AND r.revision_reason = 'initial'
+       AND r.status IN ('pending', 'failed')
+     LIMIT 1`,
+  )
+    .bind(userId, localDate)
+    .first<{
+      reading_id: string;
+      reading_status: "pending" | "failed";
+      command_generation: number;
+      job_id: string | null;
+      job_status: GenerationJobStatus | null;
+      result_class: string | null;
+      available_at: string | null;
+      dispatched_at: string | null;
+      lease_expires_at: string | null;
+    }>();
+
+  if (!row) return null;
+
+  return {
+    readingId: row.reading_id,
+    readingStatus: row.reading_status,
+    commandGeneration: row.command_generation,
+    activeJob:
+      row.job_id === null || row.job_status === null
+        ? null
+        : {
+            id: row.job_id,
+            status: row.job_status,
+            resultClass: row.result_class,
+            availableAt: row.available_at,
+            dispatchedAt: row.dispatched_at,
+            leaseExpiresAt: row.lease_expires_at,
+          },
+  };
 }
 
 /**
