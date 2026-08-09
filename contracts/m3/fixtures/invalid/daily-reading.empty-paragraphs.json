@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.3.0",
+  "output_schema": "daily-reading-v3",
+  "reading_id": "rdg_01JAMPLEREADING00001",
+  "local_date": "2026-07-30",
+  "generated_at": "2026-07-30T09:00:00Z",
+  "assembly_mode": "deterministic",
+  "revision": 1,
+  "locale": "en-US",
+  "domain_preference": "work",
+  "fallback_used": false,
+  "paragraphs": []
+}

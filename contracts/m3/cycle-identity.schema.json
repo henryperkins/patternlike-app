@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/cycle-identity.schema.json",
+  "title": "Cycle Identity Preimage (patternlike.cycle-id.v1)",
+  "description": "Closed preimage for cyc_ ids. Private to the calculation service and the trusted plane: oriented_branch and winding never appear on the wire or in a clear column, because they are what makes the id reproducible rather than what a client needs. Pass timestamps are deliberately absent — complete discovery may refine them, while the epoch-anchored (branch, winding) pair names the same physical encounter across shifted scan horizons. That is what lets two overlapping request windows return one identical cycle instead of two.",
+  "$defs": {
+    "orientedBranch": {
+      "type": "string",
+      "enum": ["single", "plus", "minus"],
+      "description": "Which oriented target longitude this encounter crosses. targets(N, A) = unique(norm360(N + A), norm360(N - A)); conjunction and opposition collapse to one target ('single') and every aspect strictly between 0 and 180 has two distinct branches."
+    },
+    "cycleIdentityV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_profile",
+        "chart_fingerprint",
+        "technique",
+        "body",
+        "target",
+        "aspect",
+        "oriented_branch",
+        "winding",
+        "contract_id",
+        "contract_version",
+        "cycle_policy_id",
+        "cycle_policy_version",
+        "orb_policy_id",
+        "orb_policy_version",
+        "container_digest",
+        "ephemeris_data_version"
+      ],
+      "properties": {
+        "identity_profile": { "const": "patternlike.cycle-id.v1" },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "technique": { "type": "string", "const": "transit" },
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody",
+          "description": "The transiting body."
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The natal target: a celestial body id, or an angle id when angles are available."
+        },
+        "aspect": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+        },
+        "oriented_branch": { "$ref": "#/$defs/orientedBranch" },
+        "winding": {
+          "type": "integer",
+          "description": "Integer lift k for the unwrapped target T = T0 + 360k, measured from the policy's fixed unwrapping_epoch. A later full revolution crosses the next winding and is a new cycle, so a body returning to the same aspect years later does not collide with its earlier encounter."
+        },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "cycle_policy_id": { "type": "string", "minLength": 1 },
+        "cycle_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion",
+          "description": "Must bump whenever the ephemeris or container, the unwrapping epoch or its checkpoints, the scan grid, the station and root tolerances, or the complete-encounter lookaround can alter output. The persisted cycle_instances.horizon_version records this same value, so a threshold change re-scans into a new vintage instead of mixing vintages in one table."
+        },
+        "orb_policy_id": { "type": "string", "minLength": 1 },
+        "orb_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "oneOf": [{ "title": "CycleIdentityV1", "$ref": "#/$defs/cycleIdentityV1" }]
+}

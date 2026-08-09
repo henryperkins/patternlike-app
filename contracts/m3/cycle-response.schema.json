@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/cycle-response.schema.json",
+  "title": "Cycle Scan Response (POST /v1/cycles)",
+  "description": "Discriminated union on ok. Success echoes every policy identifier the result depends on, so a persisted cycle can prove which vintage produced it. Failure returns a payload-free error class and NO partial cycle set: a half-discovered encounter that is later completed would otherwise be stored twice under two different identities.",
+  "$defs": {
+    "cyclePass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass_index", "direction", "exact_at", "speed_deg_per_day"],
+      "properties": {
+        "pass_index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based and contiguous, in chronological order."
+        },
+        "direction": { "$ref": "common.schema.json#/$defs/passDirection" },
+        "exact_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "speed_deg_per_day": {
+          "type": "number",
+          "description": "Signed Swiss longitudinal speed at the root. Zero only at a station-on-target tangent, where the outgoing station direction supplies the two-value direction field."
+        }
+      }
+    },
+    "normalizedCycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "technique",
+        "body",
+        "target",
+        "aspect",
+        "start_at",
+        "exact_at",
+        "end_at",
+        "pass_count",
+        "passes",
+        "orb_deg"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/cycleId" },
+        "technique": { "type": "string", "const": "transit" },
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "target": { "type": "string", "minLength": 1 },
+        "aspect": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+        },
+        "start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Earliest configured-orb entry before pass 1. A calculated root of fT(t) = -O or +O, never a sample timestamp."
+        },
+        "exact_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Equals passes[0].exact_at. Stable and immutable across rescans."
+        },
+        "end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Latest configured-orb exit after the final pass. Intervening exits and re-entries stay inside the same cycle: temporarily leaving orb does not split a multi-pass encounter."
+        },
+        "pass_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Equals passes.length. A direct-retrograde-direct traversal is one cycle with three passes, not three cycles."
+        },
+        "passes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/cyclePass" }
+        },
+        "orb_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12,
+          "description": "The configured orb O this envelope was solved against."
+        },
+        "importance_score": { "type": ["number", "null"] }
+      }
+    },
+    "cycleErrorClass": {
+      "type": "string",
+      "enum": [
+        "invalid_request",
+        "unsupported_body",
+        "ephemeris_range",
+        "cycle_window_incomplete",
+        "calculation_failed"
+      ],
+      "description": "cycle_window_incomplete is returned for the WHOLE request when the versioned body-specific lookaround limit is reached without proving both outer boundaries of an encounter. It never emits a partial cycle."
+    },
+    "cycleResponseSuccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "schema_version",
+        "request_id",
+        "chart_fingerprint",
+        "cycle_policy_id",
+        "cycle_policy_version",
+        "orb_policy_id",
+        "orb_policy_version",
+        "contract_id",
+        "contract_version",
+        "container_digest",
+        "ephemeris_data_version",
+        "cycles"
+      ],
+      "properties": {
+        "ok": { "const": true },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "cycle_policy_id": { "type": "string", "minLength": 1 },
+        "cycle_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "orb_policy_id": { "type": "string", "minLength": 1 },
+        "orb_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 },
+        "cycles": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/normalizedCycle" },
+          "description": "Ordered by (exact_at, id) with unique ids. Empty is an ordinary result: most days have no cycle inside orb."
+        }
+      }
+    },
+    "cycleResponseFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "schema_version", "request_id", "error_class", "error_message"],
+      "properties": {
+        "ok": { "const": false },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "error_class": { "$ref": "#/$defs/cycleErrorClass" },
+        "error_message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "Payload-free. Upstream Swiss Ephemeris messages have leaked absolute filesystem paths, so nothing from the engine is echoed verbatim."
+        }
+      }
+    },
+    "cycleResponse": {
+      "oneOf": [
+        { "$ref": "#/$defs/cycleResponseSuccess" },
+        { "$ref": "#/$defs/cycleResponseFailure" }
+      ],
+      "$comment": "Semantic validation beyond JSON Schema, enforced in code and pinned by the invalid fixtures: contiguous pass indices from 1, pass_count == passes.length, strictly increasing pass timestamps, start_at <= exact_at <= end_at with every pass inside the envelope, exact_at == passes[0].exact_at, unique cycle ids, and response ordering by (exact_at, id)."
+    }
+  },
+  "oneOf": [{ "title": "CycleResponse", "$ref": "#/$defs/cycleResponse" }]
+}

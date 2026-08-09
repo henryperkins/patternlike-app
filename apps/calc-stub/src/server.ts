@@ -14,6 +14,7 @@ import {
 } from "./license-mode.js";
 import type { CalcRequest } from "@patternlike/shared";
 import { isServiceAuthorized } from "./service-auth.js";
+import { handleCycleScan } from "./cycles.js";
 
 const port = Number(process.env.PORT ?? 8080);
 
@@ -23,6 +24,49 @@ try {
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
+}
+
+interface ServiceAuthDenial {
+  status: 401 | 503;
+  error_class: "unauthorized" | "service_auth_not_configured";
+  error_message: string;
+}
+
+/**
+ * The shared credential policy for every computing endpoint.
+ *
+ * Same environment resolution as license-mode: outside production, a missing
+ * token leaves the endpoint open so the local calc:dev/dev:api loop needs no
+ * shared secret. A configured token is enforced anywhere. In production a
+ * missing token fails closed, mirroring the API's configGuard — a deploy that
+ * forgot the secret refuses loudly instead of serving open compute.
+ *
+ * Extracted so `/v1/cycles` cannot drift from `/v1/calculate`: the only thing
+ * that differs between the two is the shape of the body a denial is reported
+ * in, and each endpoint's body shape is fixed by its own contract.
+ */
+function serviceAuthDenial(req: http.IncomingMessage): ServiceAuthDenial | null {
+  const expectedToken = process.env.CALC_SERVICE_AUTH_TOKEN;
+  const environment = (
+    process.env.ENVIRONMENT ??
+    process.env.NODE_ENV ??
+    "development"
+  ).toLowerCase();
+  if (!expectedToken && environment === "production") {
+    return {
+      status: 503,
+      error_class: "service_auth_not_configured",
+      error_message: "Calculation service authentication is not configured",
+    };
+  }
+  if (expectedToken && !isServiceAuthorized(req.headers.authorization, expectedToken)) {
+    return {
+      status: 401,
+      error_class: "unauthorized",
+      error_message: "Valid service credentials are required",
+    };
+  }
+  return null;
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -93,40 +137,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/v1/calculate") {
-    // Same environment resolution as license-mode: outside production, a
-    // missing token leaves the endpoint open so the local calc:dev/dev:api
-    // loop needs no shared secret. A configured token is enforced anywhere.
-    const expectedToken = process.env.CALC_SERVICE_AUTH_TOKEN;
-    const environment = (
-      process.env.ENVIRONMENT ??
-      process.env.NODE_ENV ??
-      "development"
-    ).toLowerCase();
-    if (!expectedToken && environment === "production") {
-      // Fail closed, mirroring the API's configGuard: a production deploy
-      // that forgot the secret refuses loudly instead of serving open compute.
-      res.writeHead(503, { "content-type": "application/json" });
+    const denial = serviceAuthDenial(req);
+    if (denial) {
+      res.writeHead(denial.status, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
           ok: false,
           chart: null,
-          error_class: "service_auth_not_configured",
-          error_message: "Calculation service authentication is not configured",
-        }),
-      );
-      return;
-    }
-    if (
-      expectedToken &&
-      !isServiceAuthorized(req.headers.authorization, expectedToken)
-    ) {
-      res.writeHead(401, { "content-type": "application/json" });
-      res.end(
-        JSON.stringify({
-          ok: false,
-          chart: null,
-          error_class: "unauthorized",
-          error_message: "Valid service credentials are required",
+          error_class: denial.error_class,
+          error_message: denial.error_message,
         }),
       );
       return;
@@ -150,6 +169,43 @@ const server = http.createServer(async (req, res) => {
         }),
       );
     }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/cycles") {
+    const denial = serviceAuthDenial(req);
+    if (denial) {
+      // A credential failure never reached the engine, so it is reported in the
+      // transport envelope rather than as a cycleResponseFailure — the caller
+      // must be able to tell "the engine ran and refused" from "the request
+      // never arrived", and that distinction is the HTTP status.
+      res.writeHead(denial.status, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { code: denial.error_class, message: denial.error_message },
+        }),
+      );
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { code: "bad_request", message: "Request body is not valid JSON" },
+        }),
+      );
+      return;
+    }
+
+    // Everything past here is an engine-level answer: HTTP 200 with a
+    // discriminated body, including every refusal.
+    const result = handleCycleScan(parsed);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(result));
     return;
   }
 

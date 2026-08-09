@@ -1,0 +1,104 @@
+{
+  "schema_version": "0.3.0",
+  "reading_id": "rdg_01JAMPLEREADING00001",
+  "reading_key": "user:usr_01JAMPLEUSER00000001:2026-07-30:release-12:r1",
+  "user_id": "usr_01JAMPLEUSER00000001",
+  "local_date": "2026-07-30",
+  "release_version": "release-12",
+  "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "contract_id": "patternlike.chart.launch",
+  "contract_version": "0.2.0",
+  "assembly_mode": "deterministic",
+  "assembly_id": "asm_e4b87582f27da1e85666a3ca23e657b1",
+  "assembly_policy_version": "1.4.0",
+  "revision": 1,
+  "revision_reason": "initial",
+  "supersedes_reading_id": null,
+  "primary_theme": null,
+  "supporting_theme": null,
+  "content_hash": "sha256:7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+  "created_at": "2026-07-30T09:00:00Z",
+  "validation": {
+    "passed": true,
+    "fallback_used": true,
+    "checks": [
+      {
+        "check": "schema",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "provenance",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "dates",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "unsupported_facts",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "eligibility_allowlist",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "uncertainty_constraints",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "consent_freshness",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "repetition",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "source_laundering",
+        "result": "pass",
+        "detail_code": null
+      },
+      {
+        "check": "fatalism",
+        "result": "skip",
+        "detail_code": "deterministic_mode"
+      },
+      {
+        "check": "diagnosis",
+        "result": "skip",
+        "detail_code": "deterministic_mode"
+      }
+    ]
+  },
+  "paragraphs": [
+    {
+      "paragraph_id": "par_01JAMPLEFALLBACK0001",
+      "role": "safety_fallback",
+      "order": 1,
+      "evidence_lane": "operational",
+      "text_hash": "sha256:adadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad",
+      "facts": [],
+      "content": [
+        {
+          "fragment_id": "fallback.daily.en-US",
+          "content_version": "2",
+          "release_version": "release-12",
+          "content_type": "fallback_copy",
+          "bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+        }
+      ],
+      "context_signals": [],
+      "ranking_factors": [],
+      "model_output": null
+    }
+  ]
+}

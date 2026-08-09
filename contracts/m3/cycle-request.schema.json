@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/cycle-request.schema.json",
+  "title": "Cycle Scan Request (POST /v1/cycles)",
+  "description": "Additive calculation-service endpoint. POST /v1/calculate is unchanged. The request carries natal LONGITUDES, never birth data: transit-to-natal contacts need nothing else, so the calculation service never acquires a decryption path and the 'birth stays encrypted at rest' invariant survives the new surface untouched. The object is closed, which is the enforcement — a user id, birth instant, timezone, coordinate, profile id, or storage id is rejected because it is not declared.",
+  "$defs": {
+    "natalPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "longitude_deg"],
+      "properties": {
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "longitude_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        }
+      }
+    },
+    "scanWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "description": "A SELECTION interval, not permission to clip an encounter. A cycle is returned when its complete orb envelope intersects [from, to); the scanner then evaluates beyond both boundaries across adjacent stations and orb roots until the first entry, every exact pass, and the final exit are known.",
+      "properties": {
+        "from": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "to": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        }
+      }
+    },
+    "cycleRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "request_id",
+        "chart_fingerprint",
+        "natal_positions",
+        "natal_accuracy",
+        "window",
+        "techniques",
+        "cycle_policy_id",
+        "cycle_policy_version",
+        "orb_policy_id",
+        "orb_policy_version",
+        "contract_id",
+        "contract_version"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "natal_positions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/natalPosition" },
+          "description": "Under unknown effective accuracy, ascendant and midheaven must not appear: those targets are never computed rather than computed and filtered."
+        },
+        "natal_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy",
+          "description": "The EFFECTIVE accuracy the chart engine recomputed, not the label the original caller sent."
+        },
+        "suppressed_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/suppressedFeatureClass" },
+          "description": "When it contains moon_time_sensitive, natal Moon targets are omitted. A TRANSITING Moon remains valid against stable natal targets, because the transit instant is known even when the birth instant is not."
+        },
+        "window": { "$ref": "#/$defs/scanWindow" },
+        "techniques": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "type": "string", "const": "transits" },
+          "description": "Launch scope. stations_ingresses and lunations_eclipses stay declared-but-absent in the M0 calculation contract; this document does not widen that claim."
+        },
+        "cycle_policy_id": { "type": "string", "minLength": 1 },
+        "cycle_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "orb_policy_id": { "type": "string", "minLength": 1 },
+        "orb_policy_version": {
+          "$ref": "common.schema.json#/$defs/policyVersion"
+        },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        }
+      }
+    }
+  },
+  "oneOf": [{ "title": "CycleRequest", "$ref": "#/$defs/cycleRequest" }]
+}

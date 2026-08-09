@@ -1,0 +1,429 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Calculation Service API
+  version: 0.3.0
+  description: |
+    The calculation service, described separately from the public Worker origin
+    on purpose. `POST /v1/cycles` runs on Fly, not on `patternlike-api`, and
+    folding it into the public document would advertise a route that origin does
+    not serve.
+
+    The service holds no user data and has no decryption path. `POST /v1/calculate`
+    takes birth inputs; `POST /v1/cycles` takes natal LONGITUDES and nothing else,
+    because transit-to-natal contacts need nothing else. That is what keeps the
+    "birth stays encrypted at rest" invariant intact across the new surface.
+
+    AGPL-3.0-or-later (Swiss Ephemeris). The source offer in `apps/calc-stub`
+    travels with any deployment of this service.
+
+    Normative request and response shapes are `contracts/m3/cycle-request.schema.json`
+    and `contracts/m3/cycle-response.schema.json`; each operation names its
+    definition in `x-normative-schema`, and `contracts/validate_schemas.py`
+    resolves every pointer against the frozen package.
+  contact:
+    name: Pattern-Like Engineering
+  license:
+    name: AGPL-3.0-or-later
+    identifier: AGPL-3.0-or-later
+servers:
+  - url: https://patternlike-calc.fly.dev
+    description: Production (iad, always-on)
+  - url: http://127.0.0.1:8080
+    description: Local dev
+tags:
+  - name: health
+  - name: calculation
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: calcHealth
+      summary: Liveness
+      description: |
+        Deliberately public, with no authentication, so Fly health checks work
+        before `CALC_SERVICE_AUTH_TOKEN` is set. It reveals no user data.
+      security: []
+      responses:
+        '200':
+          description: Alive, with the ephemeris files resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthReport' }
+        '503':
+          description: Alive but unable to resolve its ephemeris data files
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthReport' }
+  /v1/engine:
+    get:
+      tags: [health]
+      operationId: calcEngineInfo
+      summary: Engine, ephemeris, and container versions
+      description: |
+        Public alongside `/health`. Every version here is echoed into cycle and
+        chart results so a stored artifact can prove which vintage produced it.
+
+        It deliberately does NOT report where the ephemeris data lives on disk.
+        It used to, as `ephe_path`, and that is the same absolute-filesystem-path
+        disclosure the error-envelope rule exists to prevent — served on purpose,
+        to anyone, on an unauthenticated route. Whether the files resolved is the
+        operationally useful fact; where they are is not.
+      security: []
+      responses:
+        '200':
+          description: Engine identity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EngineInfo' }
+        '503':
+          description: Ephemeris data files could not be resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [error]
+                properties:
+                  error: { type: string }
+  /v1/calculate:
+    post:
+      tags: [calculation]
+      operationId: calculateChart
+      summary: Natal chart from birth inputs
+      description: |
+        Unchanged at M3. Placidus with Porphyry fallback, true node,
+        `SEFLG_SWIEPH | SEFLG_SPEED`.
+
+        Unknown birth time uses noon as a computation epoch only. The engine
+        recomputes an effective accuracy and suppresses houses, angles, and
+        time-sensitive Moon claims whenever no real birth time was supplied,
+        regardless of the accuracy label the caller sent.
+
+        Returns 503 without `CALC_SERVICE_AUTH_TOKEN` in production, and 401 on a
+        bad token.
+      x-normative-schema: 'm0:chart-contract.schema.json#/$defs/chartSnapshot'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CalcRequest' }
+      responses:
+        '200':
+          description: 'Chart calculated, or a structured failure with `ok: false`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalcResponse' }
+        '401':
+          description: |
+            Bad or missing credentials. Reported in the CalcResponse envelope
+            rather than the ErrorResponse one, because this route's every reply
+            is a CalcResponse; `/v1/cycles` uses ErrorResponse instead, since a
+            cycleResponseFailure means the engine ran.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalcResponse' }
+        '503':
+          description: 'CALC_SERVICE_AUTH_TOKEN is not configured in production'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalcResponse' }
+  /v1/cycles:
+    post:
+      tags: [calculation]
+      operationId: scanCycles
+      summary: Transit-to-natal cycles over a window
+      description: |
+        Additive; `POST /v1/calculate` is untouched and the calc binding is
+        already plain HTTP, so nothing about the deployment shape changes.
+
+        `window` is a SELECTION interval, not permission to clip an encounter. A
+        cycle is returned when its complete orb envelope intersects
+        `[from, to)`; the scanner then evaluates beyond both boundaries across
+        adjacent stations and orb roots until the first entry, every exact pass,
+        and the final exit are known. Two overlapping windows that select the
+        same encounter therefore return the same envelope, pass list, first exact
+        time, and id. Reaching the versioned body-specific lookaround limit
+        without proving both outer boundaries returns `cycle_window_incomplete`
+        for the whole request; it never emits a partial cycle.
+
+        A direct-retrograde-direct traversal is ONE cycle with three chronological
+        passes, not three cycles: passes are grouped by oriented branch and
+        integer winding, never by temporal proximity or scan batch.
+
+        Under unknown effective accuracy, ascendant and midheaven targets are not
+        computed at all, and natal Moon targets are omitted when
+        `suppressed_features` contains `moon_time_sensitive`. A transiting Moon
+        remains valid against stable natal targets, because the transit instant
+        is known even when the birth instant is not. These facts are never
+        created and filtered later.
+      x-normative-schema: 'm3:cycle-request.schema.json#/$defs/cycleRequest'
+      x-normative-response-schema: 'm3:cycle-response.schema.json#/$defs/cycleResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CycleRequest' }
+      responses:
+        '200':
+          description: |
+            Scan complete, or a structured failure with `ok: false`. A failure is
+            a 200 with a discriminated body for the same reason `/v1/calculate`
+            does it: the caller must distinguish "the engine ran and refused"
+            from "the request never arrived".
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleResponse' }
+        '400':
+          description: Malformed request that never reached the engine
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    calcServiceAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Shared bearer token, `CALC_SERVICE_AUTH_TOKEN`, set identically on the
+        Worker and the Fly app.
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    HealthReport:
+      type: object
+      additionalProperties: false
+      required: [ok, service, engine, se_version, wrapper, container_digest, ephe_ok, license, meta]
+      properties:
+        ok: { type: boolean, description: 'False, with a 503, when the ephemeris files are missing.' }
+        service: { type: string, const: patternlike-calc }
+        engine: { type: string, const: swiss_ephemeris }
+        se_version: { type: string }
+        wrapper: { type: string }
+        container_digest: { type: string }
+        ephe_ok: { type: boolean }
+        license:
+          type: object
+          additionalProperties: true
+        meta:
+          oneOf:
+            - $ref: '#/components/schemas/EngineInfo'
+            - type: 'null'
+    EngineInfo:
+      type: object
+      additionalProperties: false
+      required:
+        [engine, se_version, library_version, wrapper, ephemeris_data_version,
+         container_digest, contract_id, contract_version, flags, houses_primary,
+         houses_fallback, node, zodiac, coordinates, license_note]
+      properties:
+        engine: { type: string, const: swiss_ephemeris }
+        se_version: { type: string, description: 'Pinned 2.10.03.' }
+        library_version: { type: string, description: 'What the sweph binding reports at runtime.' }
+        wrapper: { type: string, description: 'Pinned sweph@2.10.3-7.' }
+        ephemeris_data_version:
+          type: string
+          description: |
+            Pinned by commit and SHA-256 in `apps/calc-stub/ephemeris.lock.json`.
+            Data is valid 1800-2399; a request whose scan span leaves that range
+            is rejected as `ephemeris_range` before reaching the engine, because
+            the underlying failure embeds the ephemeris directory path in its
+            message.
+        container_digest: { type: string }
+        contract_id: { type: string }
+        contract_version: { type: string }
+        flags:
+          type: array
+          items: { type: string }
+        houses_primary: { type: string, const: placidus }
+        houses_fallback: { type: string, const: porphyry }
+        node: { type: string, const: 'true' }
+        zodiac: { type: string, const: tropical }
+        coordinates: { type: string, const: geocentric }
+        license_note: { type: string }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+    CalcRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [request_id, user_id, profile_version, accuracy, timezone, contract_id,
+         contract_version]
+      properties:
+        request_id: { type: string }
+        user_id:
+          type: string
+          description: |
+            The opaque `usr_` label, never an identity-provider subject. Present
+            here and NOT in CycleRequest because chart calculation is scoped to a
+            birth profile version; cycle scanning is scoped to longitudes.
+        profile_version: { type: integer, minimum: 1 }
+        accuracy: { type: string, enum: [exact, approximate, unknown] }
+        birth_date: { type: [string, 'null'], format: date }
+        birth_time_local: { type: [string, 'null'] }
+        timezone: { type: string }
+        latitude: { type: [number, 'null'], minimum: -90, maximum: 90 }
+        longitude: { type: [number, 'null'], minimum: -180, maximum: 180 }
+        place_label: { type: [string, 'null'] }
+        approximate_window_minutes: { type: [integer, 'null'], minimum: 0 }
+        contract_id: { type: string }
+        contract_version: { type: string }
+    CalcResponse:
+      type: object
+      additionalProperties: true
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        request_id: { type: string }
+        error_class: { type: [string, 'null'] }
+        error_message: { type: [string, 'null'] }
+    CycleRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [schema_version, request_id, chart_fingerprint, natal_positions,
+         natal_accuracy, window, techniques, cycle_policy_id, cycle_policy_version,
+         orb_policy_id, orb_policy_version, contract_id, contract_version]
+      description: |
+        Closed by design. A user id, birth instant, timezone, coordinate, profile
+        id, or storage id is rejected because it is simply not declared.
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        request_id: { type: string, minLength: 8 }
+        chart_fingerprint: { type: string }
+        natal_positions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [body, longitude_deg]
+            properties:
+              body:
+                type: string
+                enum:
+                  [sun, moon, mercury, venus, mars, jupiter, saturn, uranus,
+                   neptune, pluto, true_node, ascendant, midheaven]
+              longitude_deg: { type: number, minimum: 0, exclusiveMaximum: 360 }
+        natal_accuracy: { type: string, enum: [exact, approximate, unknown] }
+        suppressed_features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [houses, angles, angle_transits, moon_time_sensitive]
+        window:
+          type: object
+          additionalProperties: false
+          required: [from, to]
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+        techniques:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items: { type: string, const: transits }
+        cycle_policy_id: { type: string, minLength: 1 }
+        cycle_policy_version: { type: string, minLength: 1 }
+        orb_policy_id: { type: string, minLength: 1 }
+        orb_policy_version: { type: string, minLength: 1 }
+        contract_id: { type: string, minLength: 1 }
+        contract_version: { type: string, minLength: 1 }
+    CycleResponse:
+      oneOf:
+        - $ref: '#/components/schemas/CycleResponseSuccess'
+        - $ref: '#/components/schemas/CycleResponseFailure'
+    CycleResponseSuccess:
+      type: object
+      additionalProperties: false
+      required:
+        [ok, schema_version, request_id, chart_fingerprint, cycle_policy_id,
+         cycle_policy_version, orb_policy_id, orb_policy_version, contract_id,
+         contract_version, container_digest, ephemeris_data_version, cycles]
+      properties:
+        ok: { const: true }
+        schema_version: { type: string, const: '0.3.0' }
+        request_id: { type: string }
+        chart_fingerprint: { type: string }
+        cycle_policy_id: { type: string }
+        cycle_policy_version: { type: string }
+        orb_policy_id: { type: string }
+        orb_policy_version: { type: string }
+        contract_id: { type: string }
+        contract_version: { type: string }
+        container_digest: { type: string }
+        ephemeris_data_version: { type: string }
+        cycles:
+          type: array
+          description: Ordered by (exact_at, id), unique ids. Empty is an ordinary result.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              [id, technique, body, target, aspect, start_at, exact_at, end_at,
+               pass_count, passes, orb_deg]
+            properties:
+              id: { type: string, pattern: '^cyc_[a-f0-9]{32}$' }
+              technique: { type: string, const: transit }
+              body: { type: string }
+              target: { type: string }
+              aspect:
+                type: string
+                enum: [conjunction, sextile, square, trine, opposition]
+              start_at: { type: string, format: date-time }
+              exact_at:
+                type: string
+                format: date-time
+                description: Equals passes[0].exact_at.
+              end_at: { type: string, format: date-time }
+              pass_count: { type: integer, minimum: 1 }
+              orb_deg: { type: number, minimum: 0, maximum: 12 }
+              importance_score: { type: [number, 'null'] }
+              passes:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [pass_index, direction, exact_at, speed_deg_per_day]
+                  properties:
+                    pass_index: { type: integer, minimum: 1 }
+                    direction: { type: string, enum: [direct, retrograde] }
+                    exact_at: { type: string, format: date-time }
+                    speed_deg_per_day: { type: number }
+    CycleResponseFailure:
+      type: object
+      additionalProperties: false
+      required: [ok, schema_version, request_id, error_class, error_message]
+      properties:
+        ok: { const: false }
+        schema_version: { type: string, const: '0.3.0' }
+        request_id: { type: string }
+        error_class:
+          type: string
+          enum:
+            [invalid_request, unsupported_body, ephemeris_range,
+             cycle_window_incomplete, calculation_failed]
+        error_message:
+          type: string
+          maxLength: 300
+          description: Payload-free; no upstream engine text is echoed verbatim.
+security:
+  - calcServiceAuth: []

@@ -1,0 +1,270 @@
+{
+  "schema_version": "0.3.0",
+  "release": {
+    "version": "release-12",
+    "bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+    "created_at": "2026-07-01T12:00:00Z",
+    "approver_id": "wp-editor-2",
+    "last_author_id": "wp-editor-1",
+    "changelog": "Add locale-bound timing templates and universal daily fallbacks (M3).",
+    "status": "active",
+    "supported_locales": [
+      "en-US",
+      "es-ES"
+    ],
+    "locale_default": "en-US",
+    "language_fallbacks": {
+      "es-MX": "es-ES"
+    },
+    "wordpress_site_id": null,
+    "calc_contract_id": "patternlike.chart.launch"
+  },
+  "objects": {
+    "patterns": [],
+    "cycles": [
+      {
+        "id": "cycle.saturn-square-sun",
+        "content_type": "astrology_cycle",
+        "content_version": "3",
+        "title": "Saturn square Sun",
+        "locale": "en-US",
+        "object_hash": "sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+        "status": "approved",
+        "prohibited_claims": [
+          "guaranteed_prediction",
+          "diagnose_or_treat"
+        ],
+        "technique": "transit",
+        "bodies": [
+          "saturn"
+        ],
+        "targets": [
+          "sun"
+        ],
+        "aspect": "square",
+        "orb_policy_id": "orb-launch",
+        "themes": [
+          "effort",
+          "structure"
+        ],
+        "phase_ids": [
+          "phase.saturn-square-sun.building"
+        ],
+        "tags": [
+          "work"
+        ]
+      }
+    ],
+    "phases": [
+      {
+        "id": "phase.saturn-square-sun.building",
+        "content_type": "astrology_phase",
+        "content_version": "3",
+        "title": "Saturn square Sun — building",
+        "locale": "en-US",
+        "object_hash": "sha256:b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "status": "approved",
+        "parent_cycle_id": "cycle.saturn-square-sun",
+        "phase": "building",
+        "summary": "Steady pressure asks for a smaller, firmer commitment than the one you had in mind.",
+        "constructive_expression": "Choose one obligation and meet it exactly.",
+        "shadow_expression": "Grinding at something you have already outgrown.",
+        "prohibited_claims": [
+          "guaranteed_prediction"
+        ],
+        "eligibility": {
+          "required_fact_classes": [
+            "cycle_instance"
+          ],
+          "required_bodies": [
+            "saturn",
+            "sun"
+          ],
+          "required_aspects": [
+            "square"
+          ],
+          "min_birth_time_accuracy": "approximate",
+          "requires_houses": false,
+          "techniques": [
+            "transit"
+          ]
+        },
+        "tags": [
+          "work"
+        ]
+      }
+    ],
+    "modifiers": [
+      {
+        "id": "modifier.uncertainty.en-US",
+        "content_type": "astrology_modifier",
+        "content_version": "1",
+        "title": "Uncertain birth time notice (en-US)",
+        "locale": "en-US",
+        "object_hash": "sha256:d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+        "status": "approved",
+        "modifier_kind": "uncertainty",
+        "body": "Your birth time is approximate, so Moon and house claims are held loosely today.",
+        "precedence": 10,
+        "eligibility": {},
+        "allowed_combinations": [
+          "any"
+        ],
+        "life_domains": []
+      },
+      {
+        "id": "modifier.uncertainty.es-ES",
+        "content_type": "astrology_modifier",
+        "content_version": "1",
+        "title": "Uncertain birth time notice (es-ES)",
+        "locale": "es-ES",
+        "object_hash": "sha256:d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+        "status": "approved",
+        "modifier_kind": "uncertainty",
+        "body": "Tu hora de nacimiento es aproximada, así que las afirmaciones sobre la Luna y las casas se matizan.",
+        "precedence": 10,
+        "eligibility": {},
+        "allowed_combinations": [
+          "any"
+        ],
+        "life_domains": []
+      }
+    ],
+    "prompts": [
+      {
+        "id": "prompt.work.steady-effort.en-US",
+        "content_type": "astrology_prompt",
+        "content_version": "1",
+        "title": "Steady effort (en-US)",
+        "locale": "en-US",
+        "object_hash": "sha256:d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3",
+        "status": "approved",
+        "prompt_text": "What would you keep doing if no one noticed for a month?",
+        "intensity": "standard",
+        "theme": "effort",
+        "life_domains": [
+          "work",
+          "self"
+        ],
+        "exclusions": []
+      },
+      {
+        "id": "prompt.work.steady-effort.es-ES",
+        "content_type": "astrology_prompt",
+        "content_version": "1",
+        "title": "Steady effort (es-ES)",
+        "locale": "es-ES",
+        "object_hash": "sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+        "status": "approved",
+        "prompt_text": "¿Qué seguirías haciendo si nadie lo notara durante un mes?",
+        "intensity": "standard",
+        "theme": "effort",
+        "life_domains": [
+          "work",
+          "self"
+        ],
+        "exclusions": []
+      }
+    ],
+    "safety_rules": [
+      {
+        "id": "safety.no-fatalism",
+        "content_type": "astrology_safety_rule",
+        "content_version": "1",
+        "title": "No fatalistic framing",
+        "locale": "en-US",
+        "object_hash": "sha256:b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+        "status": "approved",
+        "rule_id": "SR-001",
+        "trigger_class": "fatalism",
+        "action": "replace_paragraph",
+        "fallback_fragment_id": "fallback.daily.en-US",
+        "fallback_text": null
+      }
+    ],
+    "timing_templates": [
+      {
+        "id": "timing.default.en-US",
+        "content_type": "timing_template",
+        "content_version": "1",
+        "title": "Default timing sentence (en-US)",
+        "locale": "en-US",
+        "object_hash": "sha256:c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+        "status": "approved",
+        "template_text": "Closest on {exact_date}, easing by {end_date}.",
+        "placeholders": [
+          "exact_date",
+          "end_date"
+        ],
+        "is_locale_default": true,
+        "tags": []
+      },
+      {
+        "id": "timing.default.es-ES",
+        "content_type": "timing_template",
+        "content_version": "1",
+        "title": "Default timing sentence (es-ES)",
+        "locale": "es-ES",
+        "object_hash": "sha256:c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+        "status": "approved",
+        "template_text": "Closest on {exact_date}, easing by {end_date}.",
+        "placeholders": [
+          "exact_date",
+          "end_date"
+        ],
+        "is_locale_default": true,
+        "tags": []
+      }
+    ],
+    "daily_fallbacks": [
+      {
+        "id": "fallback.daily.en-US",
+        "content_type": "daily_fallback",
+        "content_version": "2",
+        "title": "Universal daily fallback (en-US)",
+        "locale": "de-DE",
+        "object_hash": "sha256:c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "status": "approved",
+        "body": "Nothing in the sky is pressing on your chart today. A quiet day is still a day worth noticing.",
+        "eligibility_mode": "universal",
+        "prohibited_claims": [
+          "guaranteed_prediction"
+        ]
+      },
+      {
+        "id": "fallback.daily.es-ES",
+        "content_type": "daily_fallback",
+        "content_version": "2",
+        "title": "Universal daily fallback (es-ES)",
+        "locale": "es-ES",
+        "object_hash": "sha256:c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4",
+        "status": "approved",
+        "body": "Hoy nada en el cielo presiona tu carta. Un día tranquilo también merece atención.",
+        "eligibility_mode": "universal",
+        "prohibited_claims": [
+          "guaranteed_prediction"
+        ]
+      }
+    ]
+  },
+  "signature": {
+    "alg": "Ed25519",
+    "key_id": "wp-release-key-1",
+    "signature": "c2lnbmF0dXJlLXBsYWNlaG9sZGVy",
+    "signed_payload_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+  },
+  "fixtures": [
+    {
+      "fixture_id": "saturn-square-sun-building",
+      "expect": "eligible"
+    },
+    {
+      "fixture_id": "quiet-day-no-cycles",
+      "expect": "fallback"
+    },
+    {
+      "fixture_id": "unknown-time-angle-theme",
+      "expect": "ineligible"
+    }
+  ]
+}

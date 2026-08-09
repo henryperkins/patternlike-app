@@ -1,0 +1,57 @@
+{
+  "identity_profile": "patternlike.assembly-id.v1",
+  "schema_version": "0.3.0",
+  "assembly_policy_id": "daily-reading-deterministic",
+  "output_schema": "daily-reading-v3",
+  "local_date": "2026-07-30",
+  "target_timezone": "America/Los_Angeles",
+  "generation_anchor": "2026-07-30T09:00:00Z",
+  "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "effective_accuracy": "exact",
+  "uncertainty": {
+    "accuracy": "exact",
+    "window_plus_minus_minutes": null,
+    "suppressed_features": [],
+    "qualified_features": []
+  },
+  "facts": [
+    {
+      "id": "cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "fact_class": "cycle_instance",
+      "technique": "transit",
+      "body": "venus",
+      "target": "moon",
+      "aspect": "trine",
+      "phase": "peak",
+      "orb_deg": 1.1,
+      "first_exact_at": "2026-07-30T22:40:00Z",
+      "pass_count": 1
+    },
+    {
+      "id": "cyc_abababababababababababababababab",
+      "fact_class": "cycle_instance",
+      "technique": "transit",
+      "body": "saturn",
+      "target": "sun",
+      "aspect": "square",
+      "phase": "building",
+      "orb_deg": 0.42,
+      "first_exact_at": "2026-08-02T14:11:07Z",
+      "pass_count": 3
+    }
+  ],
+  "release_version": "release-12",
+  "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+  "context": [
+    {
+      "signal_id": "sig_01JAMPLESIGNAL000001",
+      "source_id": "USR-03",
+      "allowed_use": "life_domain_selection",
+      "evidence_lane": "user_and_context",
+      "normalized_hash": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e"
+    }
+  ],
+  "locale": "en-US",
+  "domain_preference": "work",
+  "revision": 1
+}
