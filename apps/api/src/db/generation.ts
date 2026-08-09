@@ -530,12 +530,14 @@ export async function claimJob(
   const result = await env.DB.prepare(
     `UPDATE jobs
      SET status = 'running', claim_token = ?, lease_expires_at = ?,
+         available_at = NULL,
          started_at = COALESCE(started_at, ?), attempts = attempts + 1,
          dispatched_at = COALESCE(dispatched_at, ?)
      WHERE id = ? AND job_type = ?
+       AND (available_at IS NULL OR available_at <= ?)
        AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))`,
   )
-    .bind(claimToken, leaseExpiresAt, nowIso, nowIso, jobId, JOB_TYPE, nowIso)
+    .bind(claimToken, leaseExpiresAt, nowIso, nowIso, jobId, JOB_TYPE, nowIso, nowIso)
     .run();
 
   if (!result.meta.changes) return null;
@@ -584,19 +586,20 @@ export async function claimJob(
   }
 }
 
-/** Return an owned running claim to the same immutable queued command. */
-export async function releaseClaim(
+/** Return an owned running claim to the same immutable command after a delay. */
+export async function releaseClaimForRetry(
   env: Env,
   jobId: string,
   claimToken: string,
+  retryAt: Date,
 ): Promise<boolean> {
   const result = await env.DB.prepare(
     `UPDATE jobs
      SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
-         available_at = NULL, dispatched_at = NULL
+         available_at = ?, dispatched_at = NULL
      WHERE id = ? AND job_type = ? AND status = 'running' AND claim_token = ?`,
   )
-    .bind(jobId, JOB_TYPE, claimToken)
+    .bind(retryAt.toISOString(), jobId, JOB_TYPE, claimToken)
     .run();
   return result.meta.changes === 1;
 }
@@ -889,16 +892,21 @@ export interface SweepCandidate {
  * the second recovers a consumer that died holding a claim. Both converge
  * through the claim CAS, so a duplicate send is harmless.
  */
-export async function findUndispatched(env: Env, limit = 50): Promise<SweepCandidate[]> {
+export async function findUndispatched(
+  env: Env,
+  limit = 50,
+  now = new Date(),
+): Promise<SweepCandidate[]> {
   const { results } = await env.DB.prepare(
     `SELECT j.id, r.id AS reading_id
      FROM jobs j
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
+       AND (j.available_at IS NULL OR j.available_at <= ?)
      ORDER BY j.created_at
      LIMIT ?`,
   )
-    .bind(JOB_TYPE, limit)
+    .bind(JOB_TYPE, now.toISOString(), limit)
     .all<SweepCandidate>();
   return results;
 }

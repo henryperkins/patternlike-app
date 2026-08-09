@@ -61,8 +61,9 @@ const REQUIRED_NON_EMPTY: ReleaseObjectCollection[] = [
   "daily_fallbacks",
 ];
 
-/** Any brace-delimited token inside reviewed timing copy. */
-const PLACEHOLDER_RE = /\{([^{}]+)\}/g;
+/** Any brace-delimited token inside reviewed timing copy, including an empty one. */
+const PLACEHOLDER_RE = /\{([^{}]*)\}/g;
+const PLACEHOLDER_TOKEN_RE = /^[a-z_]+$/;
 
 export const SIGNATURE_ALGORITHMS = ["Ed25519", "ES256"] as const;
 export type SignatureAlgorithm = (typeof SIGNATURE_ALGORITHMS)[number];
@@ -678,10 +679,11 @@ function validateObjectShape(
     // nobody reviews the string the reader actually sees.
     const declared = new Set(object.placeholders);
     for (const match of (object.template_text as string).matchAll(PLACEHOLDER_RE)) {
-      if (!declared.has(match[1]!)) {
+      const token = match[1]!;
+      if (!PLACEHOLDER_TOKEN_RE.test(token) || !declared.has(token)) {
         return reject(
           "timing_undeclared_placeholder",
-          `${where}.template_text uses {${match[1]}}, which is not in placeholders`,
+          `${where}.template_text uses malformed or undeclared placeholder {${token}}`,
         );
       }
     }

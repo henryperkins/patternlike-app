@@ -1096,6 +1096,10 @@ bad["objects"]["timing_templates"][0]["template_text"] = "Closest on {exact_date
 write(I + "content-release.timing-undeclared-placeholder.json", bad)
 
 bad = copy.deepcopy(BUNDLE)
+bad["objects"]["timing_templates"][0]["template_text"] = "Closest on {}, easing by {end_date}."
+write(I + "content-release.timing-malformed-placeholder.json", bad)
+
+bad = copy.deepcopy(BUNDLE)
 bad["release"]["approver_id"] = bad["release"]["last_author_id"]
 write(I + "content-release.same-author.json", bad)
 

@@ -1,4 +1,4 @@
-import type { Env } from "./env.js";
+import type { Env, GenerationMessage } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import {
   CLAIM_LEASE_MS,
@@ -6,10 +6,9 @@ import {
   ClaimLoadError,
   claimJob,
   failClaimedJob,
-  releaseClaim,
+  releaseClaimForRetry,
 } from "./db/generation.js";
 import { generateDailyReading } from "./services/generate-daily-reading.js";
-import type { GenerationMessage } from "./services/enqueue.js";
 
 /**
  * The daily-reading consumer.
@@ -54,7 +53,8 @@ async function retryOrFail(
   }
 
   try {
-    if (await releaseClaim(env, claim.jobId, claim.claimToken)) {
+    const retryAt = new Date(Date.now() + RETRY_DELAY_SECONDS * 1000);
+    if (await releaseClaimForRetry(env, claim.jobId, claim.claimToken, retryAt)) {
       message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
       return;
     }
@@ -88,7 +88,10 @@ export async function queue(
     if (!jobId || !readingId) {
       // Nothing to claim and nothing to retry into. Acking stops an unparseable
       // message from cycling until it reaches the dead-letter queue.
-      console.error("generation_message_malformed", { queue: batch.queue });
+      console.error("generation_message_malformed", {
+        queue: batch.queue,
+        message_id: message.id,
+      });
       message.ack();
       continue;
     }

@@ -68,6 +68,7 @@ interface JobRow {
   id: string;
   status: string;
   attempts: number;
+  available_at: string | null;
   dispatched_at: string | null;
   claim_token: string | null;
   result_class: string | null;
@@ -87,7 +88,7 @@ const readings = () =>
 
 const jobs = () =>
   rows<JobRow>(
-    `SELECT id, status, attempts, dispatched_at, claim_token, result_class,
+    `SELECT id, status, attempts, available_at, dispatched_at, claim_token, result_class,
             payload_enc, payload_json, idempotency_key
      FROM jobs WHERE user_id = ? ORDER BY created_at, id`,
     USER_A,
@@ -580,7 +581,7 @@ describe("queue delivery", () => {
     }
   });
 
-  it("releases a retryable claim so the next delivery can finish it", async () => {
+  it("holds a retryable claim out of the sweeper until its retry is due", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
     expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
@@ -598,18 +599,28 @@ describe("queue delivery", () => {
     const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
     const first = await deliver([message]);
     expect(first.retryMessages).toHaveLength(1);
-    expect((await jobs())[0]).toMatchObject({
+    const [released] = await jobs();
+    expect(released).toMatchObject({
       status: "queued",
       claim_token: null,
       dispatched_at: null,
     });
-    expect(await findUndispatched(env)).toContainEqual({
+    expect(released!.available_at).not.toBeNull();
+    expect(await findUndispatched(env)).not.toContainEqual({
       id: enqueued.jobId,
       reading_id: enqueued.readingId,
     });
     expect((await readings())[0]!.status).toBe("pending");
 
     await env.ARTIFACTS!.put(key, bytes, options);
+    await rows(
+      "UPDATE jobs SET available_at = '2000-01-01T00:00:00Z' WHERE id = ?",
+      enqueued.jobId,
+    );
+    expect(await findUndispatched(env)).toContainEqual({
+      id: enqueued.jobId,
+      reading_id: enqueued.readingId,
+    });
     const second = await deliver([message], 2);
     expect(second.retryMessages).toEqual([]);
     expect((await jobs())[0]!.status).toBe("succeeded");
@@ -634,6 +645,12 @@ describe("queue delivery", () => {
     expect(first.retryMessages).toHaveLength(1);
     expect((await jobs())[0]).toMatchObject({ status: "queued", claim_token: null });
 
+    // Queue's second delivery occurs after the persisted retry deadline; make
+    // that time explicit rather than letting this direct harness bypass it.
+    await rows(
+      "UPDATE jobs SET available_at = '2000-01-01T00:00:00Z' WHERE id = ?",
+      enqueued.jobId,
+    );
     const final = await deliver([message], 4);
     expect(final.retryMessages).toEqual([]);
     expect((await jobs())[0]).toMatchObject({

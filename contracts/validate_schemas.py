@@ -65,10 +65,12 @@ POLICY_ONLY = {
     "content-release.fallback-locale-mismatch",
     "content-release.timing-template-missing-for-locale",
     "content-release.timing-undeclared-placeholder",
+    "content-release.timing-malformed-placeholder",
     "content-release.same-author",
 }
 
-placeholder_re = re.compile(r"\{([^{}]+)\}")
+braced_placeholder_re = re.compile(r"\{([^{}]*)\}")
+placeholder_token_re = re.compile(r"^[a-z_]+$")
 
 # Tokens that must never appear in a serialized assembly request. Spec section 10
 # forbids stable direct identifiers at the assembly boundary; this is the
@@ -225,12 +227,16 @@ def content_release_policy(bundle: dict, catalogue: set[str]) -> list[str]:
         if tpl.get("is_locale_default"):
             defaults[loc] = defaults.get(loc, 0) + 1
         declared = set(tpl.get("placeholders") or [])
-        used = set(placeholder_re.findall(tpl.get("template_text") or ""))
-        undeclared = used - declared
-        if undeclared:
+        used = set(braced_placeholder_re.findall(tpl.get("template_text") or ""))
+        malformed_or_undeclared = {
+            token
+            for token in used
+            if not placeholder_token_re.fullmatch(token) or token not in declared
+        }
+        if malformed_or_undeclared:
             errs.append(
-                f"timing_template {tpl.get('id')!r} uses undeclared placeholders "
-                f"{sorted(undeclared)}"
+                f"timing_template {tpl.get('id')!r} uses malformed or undeclared placeholders "
+                f"{sorted(malformed_or_undeclared)}"
             )
     for loc in supported:
         if defaults.get(loc, 0) == 0:
@@ -282,9 +288,14 @@ def check_golden_vectors(path: Path) -> list[str]:
         digest = sha256(canonical.encode("utf-8")).hexdigest()
         if digest != vec["full_digest"]:
             errs.append(f"vector {name}: full_digest does not match SHA-256 of canonical")
-        prefix = vec["rendered_id"].split("_")[0] + "_"
-        if vec["rendered_id"] != prefix + vec["full_digest"][:32]:
-            errs.append(f"vector {name}: rendered_id is not prefix + digest[:32]")
+        rendered_id = vec.get("rendered_id")
+        if rendered_id is not None:
+            if not isinstance(rendered_id, str) or "_" not in rendered_id:
+                errs.append(f"vector {name}: rendered_id is not a prefixed string")
+            else:
+                prefix = rendered_id.split("_")[0] + "_"
+                if rendered_id != prefix + vec["full_digest"][:32]:
+                    errs.append(f"vector {name}: rendered_id is not prefix + digest[:32]")
         if json.loads(canonical) != vec["input"]:
             errs.append(f"vector {name}: canonical does not parse back to input")
         seen[name] = canonical
