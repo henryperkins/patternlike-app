@@ -28,6 +28,10 @@ export default defineConfig({
     }),
   ],
   test: {
+    // The pool's D1 binding is shared while these integration suites explicitly
+    // clear tables in their setup. Running files concurrently lets one suite
+    // erase another suite's fixture between a request and its assertion.
+    fileParallelism: false,
     include: ["src/**/*.test.ts"],
     setupFiles: ["./test/apply-migrations.ts"],
   },
