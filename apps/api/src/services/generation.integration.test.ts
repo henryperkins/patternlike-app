@@ -606,6 +606,13 @@ describe("queue delivery", () => {
       dispatched_at: null,
     });
     expect(released!.available_at).not.toBeNull();
+    const attemptsBeforeDeadline = released!.attempts;
+    expect(await claimJob(env, enqueued.jobId)).toBeNull();
+    expect((await jobs())[0]).toMatchObject({
+      status: "queued",
+      attempts: attemptsBeforeDeadline,
+      available_at: released!.available_at,
+    });
     expect(await findUndispatched(env)).not.toContainEqual({
       id: enqueued.jobId,
       reading_id: enqueued.readingId,

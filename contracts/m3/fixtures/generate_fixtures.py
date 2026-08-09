@@ -1099,6 +1099,15 @@ bad = copy.deepcopy(BUNDLE)
 bad["objects"]["timing_templates"][0]["template_text"] = "Closest on {}, easing by {end_date}."
 write(I + "content-release.timing-malformed-placeholder.json", bad)
 
+for suffix, template_text in (
+    ("nested-placeholder", "Closest on {{exact_date}}."),
+    ("residual-closing-brace", "Closest on {exact_date} }."),
+    ("unmatched-opening-brace", "Closest on {exact_date."),
+):
+    bad = copy.deepcopy(BUNDLE)
+    bad["objects"]["timing_templates"][0]["template_text"] = template_text
+    write(I + f"content-release.timing-{suffix}.json", bad)
+
 bad = copy.deepcopy(BUNDLE)
 bad["release"]["approver_id"] = bad["release"]["last_author_id"]
 write(I + "content-release.same-author.json", bad)
@@ -1229,6 +1238,22 @@ vectors = {
     ],
 }
 write("fixtures/canonicalization/jcs-golden-vectors.json", vectors)
+
+identity_without_rendered_id = copy.deepcopy(vectors)
+identity_without_rendered_id["vectors"] = [
+    copy.deepcopy(
+        next(
+            vector
+            for vector in vectors["vectors"]
+            if vector["name"] == "assembly-identity-daily"
+        )
+    )
+]
+del identity_without_rendered_id["vectors"][0]["rendered_id"]
+write(
+    "fixtures/canonicalization/invalid/identity-missing-rendered-id.json",
+    identity_without_rendered_id,
+)
 
 print()
 print("assembly_id daily       :", ASM_DAILY)

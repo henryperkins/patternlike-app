@@ -66,6 +66,9 @@ POLICY_ONLY = {
     "content-release.timing-template-missing-for-locale",
     "content-release.timing-undeclared-placeholder",
     "content-release.timing-malformed-placeholder",
+    "content-release.timing-nested-placeholder",
+    "content-release.timing-residual-closing-brace",
+    "content-release.timing-unmatched-opening-brace",
     "content-release.same-author",
 }
 
@@ -227,16 +230,22 @@ def content_release_policy(bundle: dict, catalogue: set[str]) -> list[str]:
         if tpl.get("is_locale_default"):
             defaults[loc] = defaults.get(loc, 0) + 1
         declared = set(tpl.get("placeholders") or [])
-        used = set(braced_placeholder_re.findall(tpl.get("template_text") or ""))
+        template_text = tpl.get("template_text") or ""
+        used = set(braced_placeholder_re.findall(template_text))
         malformed_or_undeclared = {
             token
             for token in used
             if not placeholder_token_re.fullmatch(token) or token not in declared
         }
-        if malformed_or_undeclared:
+        residual_text = braced_placeholder_re.sub("", template_text)
+        has_residual_brace = "{" in residual_text or "}" in residual_text
+        if malformed_or_undeclared or has_residual_brace:
+            details = sorted(malformed_or_undeclared)
+            if has_residual_brace:
+                details.append("residual brace")
             errs.append(
                 f"timing_template {tpl.get('id')!r} uses malformed or undeclared placeholders "
-                f"{sorted(malformed_or_undeclared)}"
+                f"{details}"
             )
     for loc in supported:
         if defaults.get(loc, 0) == 0:
@@ -289,7 +298,14 @@ def check_golden_vectors(path: Path) -> list[str]:
         if digest != vec["full_digest"]:
             errs.append(f"vector {name}: full_digest does not match SHA-256 of canonical")
         rendered_id = vec.get("rendered_id")
-        if rendered_id is not None:
+        is_cycle_hash_vector = (
+            "cycleHashPreimageV1" in (doc.get("profiles") or [])
+            and name.startswith("cycle-hash-")
+        )
+        if rendered_id is None:
+            if not is_cycle_hash_vector:
+                errs.append(f"vector {name}: rendered_id is required for non-cycle-hash vectors")
+        else:
             if not isinstance(rendered_id, str) or "_" not in rendered_id:
                 errs.append(f"vector {name}: rendered_id is not a prefixed string")
             else:
@@ -550,6 +566,14 @@ def main() -> int:
             print(f"FAIL vectors      {vectors.name}: {e}")
         if not ve:
             print(f"OK  vectors       {vectors.name}")
+
+    for vectors in sorted((vector_dir / "invalid").glob("*.json")):
+        ve = check_golden_vectors(vectors)
+        if not ve:
+            errors.append(f"INVALID vector fixture unexpectedly passed {vectors.name}")
+            print(f"FAIL invalid vector {vectors.name} (expected a vector failure)")
+        else:
+            print(f"OK  invalid vector {vectors.name}: {ve[0]}")
 
     if errors:
         print(f"\n{len(errors)} error(s)")

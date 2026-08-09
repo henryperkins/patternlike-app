@@ -1,0 +1,71 @@
+{
+  "profile": "patternlike.assembly-id.v1",
+  "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
+  "note": "canonical is the exact UTF-8 byte string; full_digest is SHA-256 of those bytes; rendered_id is the prefix plus the first 32 lowercase hex characters. An implementation that produces different bytes for any input here is not interoperable, even if its digest happens to round-trip.",
+  "vectors": [
+    {
+      "name": "assembly-identity-daily",
+      "description": "The canonical daily identity preimage.",
+      "input": {
+        "identity_profile": "patternlike.assembly-id.v1",
+        "schema_version": "0.3.0",
+        "assembly_policy_id": "daily-reading-deterministic",
+        "assembly_policy_version": "1.4.0",
+        "output_schema": "daily-reading-v3",
+        "local_date": "2026-07-30",
+        "target_timezone": "America/Los_Angeles",
+        "generation_anchor": "2026-07-30T09:00:00Z",
+        "chart_fingerprint": "sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+        "effective_accuracy": "exact",
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "facts": [
+          {
+            "id": "cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "venus",
+            "target": "moon",
+            "aspect": "trine",
+            "phase": "peak",
+            "orb_deg": 1.1,
+            "first_exact_at": "2026-07-30T22:40:00Z",
+            "pass_count": 1
+          },
+          {
+            "id": "cyc_abababababababababababababababab",
+            "fact_class": "cycle_instance",
+            "technique": "transit",
+            "body": "saturn",
+            "target": "sun",
+            "aspect": "square",
+            "phase": "building",
+            "orb_deg": 0.42,
+            "first_exact_at": "2026-08-02T14:11:07Z",
+            "pass_count": 3
+          }
+        ],
+        "release_version": "release-12",
+        "release_bundle_hash": "sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+        "context": [
+          {
+            "signal_id": "sig_01JAMPLESIGNAL000001",
+            "source_id": "USR-03",
+            "allowed_use": "life_domain_selection",
+            "evidence_lane": "user_and_context",
+            "normalized_hash": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e"
+          }
+        ],
+        "locale": "en-US",
+        "domain_preference": "work",
+        "revision": 1
+      },
+      "canonical": "{\"assembly_policy_id\":\"daily-reading-deterministic\",\"assembly_policy_version\":\"1.4.0\",\"chart_fingerprint\":\"sha256:1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a\",\"context\":[{\"allowed_use\":\"life_domain_selection\",\"evidence_lane\":\"user_and_context\",\"normalized_hash\":\"5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e\",\"signal_id\":\"sig_01JAMPLESIGNAL000001\",\"source_id\":\"USR-03\"}],\"domain_preference\":\"work\",\"effective_accuracy\":\"exact\",\"facts\":[{\"aspect\":\"trine\",\"body\":\"venus\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-07-30T22:40:00Z\",\"id\":\"cyc_cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\",\"orb_deg\":1.1,\"pass_count\":1,\"phase\":\"peak\",\"target\":\"moon\",\"technique\":\"transit\"},{\"aspect\":\"square\",\"body\":\"saturn\",\"fact_class\":\"cycle_instance\",\"first_exact_at\":\"2026-08-02T14:11:07Z\",\"id\":\"cyc_abababababababababababababababab\",\"orb_deg\":0.42,\"pass_count\":3,\"phase\":\"building\",\"target\":\"sun\",\"technique\":\"transit\"}],\"generation_anchor\":\"2026-07-30T09:00:00Z\",\"identity_profile\":\"patternlike.assembly-id.v1\",\"local_date\":\"2026-07-30\",\"locale\":\"en-US\",\"output_schema\":\"daily-reading-v3\",\"release_bundle_hash\":\"sha256:2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b\",\"release_version\":\"release-12\",\"revision\":1,\"schema_version\":\"0.3.0\",\"target_timezone\":\"America/Los_Angeles\",\"uncertainty\":{\"accuracy\":\"exact\",\"qualified_features\":[],\"suppressed_features\":[],\"window_plus_minus_minutes\":null}}",
+      "full_digest": "97e0e939b208250aecdde02747d367aff78ca33fb3bde7dfeeb330efef908367"
+    }
+  ]
+}

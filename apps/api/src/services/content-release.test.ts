@@ -412,6 +412,22 @@ describe("ingestion request validation", () => {
       "timing_undeclared_placeholder",
     );
   });
+
+  it.each(["{{exact_date}}", "{exact_date} }", "{exact_date"])(
+    "rejects malformed timing-template brace structure: %s",
+    (templateText) => {
+      const result = validateIngestionRequest(
+        wrap(
+          draftBundle((bundle) => {
+            bundle.objects.timing_templates[0]!.template_text = templateText;
+          }),
+        ),
+      );
+      expect("error" in result && result.error.class).toBe(
+        "timing_undeclared_placeholder",
+      );
+    },
+  );
 });
 
 describe("content graph policy", () => {

@@ -687,6 +687,13 @@ function validateObjectShape(
         );
       }
     }
+    const residualText = (object.template_text as string).replace(PLACEHOLDER_RE, "");
+    if (residualText.includes("{") || residualText.includes("}")) {
+      return reject(
+        "timing_undeclared_placeholder",
+        `${where}.template_text uses malformed placeholder braces`,
+      );
+    }
   }
 
   if (collection === "daily_fallbacks") {
