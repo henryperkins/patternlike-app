@@ -1,5 +1,5 @@
 import { env, createMessageBatch, createExecutionContext, getQueueResult } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import m0Common from "../../../../contracts/m0/common.schema.json";
@@ -33,6 +33,7 @@ import {
   type GenerationMessage,
 } from "./enqueue.js";
 import { generateDailyReading } from "./generate-daily-reading.js";
+import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
 import type { StoredReading } from "./generate-daily-reading.js";
 
@@ -530,6 +531,72 @@ describe("initial generation state", () => {
     expect(await loadInitialGenerationState(env, USER_B, localDate)).toMatchObject({
       readingId: theirs.readingId,
     });
+  });
+});
+
+describe("ensure today", () => {
+  const now = new Date("2026-08-09T18:00:00.000Z");
+
+  beforeEach(seedEverything);
+
+  it("returns the published reading without reserving another command", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    const outcome = await ensureTodayReading(env, IDENTITY_A, { now });
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      status: "ready",
+      published: { record: { id: enqueued.readingId } },
+    });
+    expect(await readings()).toHaveLength(1);
+    expect(await jobs()).toHaveLength(1);
+  });
+
+  it("reserves one pending reading and encrypted job when the day is absent", async () => {
+    expect(await ensureTodayReading(env, IDENTITY_A, { now })).toEqual({
+      ok: true,
+      status: "preparing",
+      localDate: "2026-08-09",
+    });
+
+    const allReadings = await readings();
+    const allJobs = await jobs();
+    expect(allReadings).toHaveLength(1);
+    expect(allReadings[0]).toMatchObject({ status: "pending", local_date: "2026-08-09" });
+    expect(allJobs).toHaveLength(1);
+    expect(allJobs[0]).toMatchObject({ status: "queued", payload_json: null });
+    expect(allJobs[0]!.payload_enc).not.toBeNull();
+  });
+
+  it("converges concurrent ensures on one initial reservation and job", async () => {
+    const outcomes = await Promise.all([
+      ensureTodayReading(env, IDENTITY_A, { now }),
+      ensureTodayReading(env, IDENTITY_A, { now }),
+    ]);
+
+    for (const outcome of outcomes) {
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) continue;
+      expect(["ready", "preparing"]).toContain(outcome.status);
+    }
+    expect(await readings()).toHaveLength(1);
+    expect(await jobs()).toHaveLength(1);
+  });
+
+  it("does not redispatch a pending queued job already handed to Queues", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A, now);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    const dispatchJob = vi.fn(async () => true);
+
+    expect(await ensureTodayReading(env, IDENTITY_A, { now, dispatchJob })).toEqual({
+      ok: true,
+      status: "preparing",
+      localDate: "2026-08-09",
+    });
+    expect(dispatchJob).not.toHaveBeenCalled();
   });
 });
 
