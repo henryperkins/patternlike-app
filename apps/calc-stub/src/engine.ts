@@ -40,6 +40,14 @@ export const ORB_POLICY_ID = "orb-launch-default";
 export const ORB_POLICY_VERSION = "0.2.0";
 export const STUB_TZDB_VERSION = "2026a";
 
+/**
+ * Pinned by commit and SHA-256 in `apps/calc-stub/ephemeris.lock.json`; the
+ * range is the coverage of sepl_18.se1 / semo_18.se1. Echoed into every cycle
+ * result and hashed into every cycle id, so a stored artifact can prove which
+ * data produced it.
+ */
+export const EPHEMERIS_DATA_VERSION = "se-2.10.03-1800-2399";
+
 /** Pinned OCI digest placeholder until image build pipeline stamps it. */
 export const STUB_CONTAINER_DIGEST =
   process.env.CONTAINER_DIGEST ??
@@ -79,6 +87,10 @@ const PLANET_SE_IDS: Array<{ body: CelestialBody; seId: number }> = [
   { body: "true_node", seId: C.SE_TRUE_NODE },
 ];
 
+/** Swiss Ephemeris body id by launch body. Angles are not here: they come from swe_houses. */
+export const SE_ID_BY_BODY: Readonly<Partial<Record<CelestialBody, number>>> =
+  Object.fromEntries(PLANET_SE_IDS.map(({ body, seId }) => [body, seId]));
+
 const ORB_DEFAULTS: Record<AspectType, number> = {
   conjunction: 8,
   sextile: 4,
@@ -117,7 +129,7 @@ function signOf(longitude: number): (typeof ZODIAC)[number] {
   return ZODIAC[idx]!;
 }
 
-function norm360(x: number): number {
+export function norm360(x: number): number {
   let v = x % 360;
   if (v < 0) v += 360;
   return v;
@@ -402,7 +414,14 @@ function buildUncertainty(input: UncertaintyInputs): UncertaintyReport {
   };
 }
 
-function calcBody(jdUt: number, seId: number): {
+/**
+ * Exported for the cycle scanner, which needs the same body call with the same
+ * flags and the same refusal to accept a silent Moshier fallback: `r.error` is
+ * non-empty when Swiss Ephemeris could not read its data files, and a cycle
+ * solved against a different ephemeris would be a different vintage wearing
+ * this one's `ephemeris_data_version`.
+ */
+export function calcBody(jdUt: number, seId: number): {
   lon: number;
   lat: number;
   dist: number;
@@ -792,6 +811,17 @@ export async function goldenExactFixture(): Promise<ChartSnapshot> {
   return res.chart;
 }
 
+/**
+ * Engine identity for `/health` and `/v1/engine`, both of which are deliberately
+ * unauthenticated so Fly's health checks work before the shared secret is set.
+ *
+ * That is exactly why the absolute ephemeris directory is not in here. It used
+ * to be, as `ephe_path`, and it is the same disclosure the error-envelope rule
+ * exists to prevent — "upstream calc messages have leaked absolute filesystem
+ * paths" — except served deliberately, to anyone, on a public route. Whether the
+ * data files resolved is the operationally useful fact; where they live on the
+ * container's disk is not.
+ */
 export function engineMeta() {
   ensureInit();
   return {
@@ -799,7 +829,10 @@ export function engineMeta() {
     se_version: SE_VERSION,
     library_version: typeof sweph.version === "function" ? sweph.version() : SE_VERSION,
     wrapper: SE_WRAPPER,
-    ephe_path: resolveEphePath(),
+    ephemeris_data_version: EPHEMERIS_DATA_VERSION,
+    container_digest: STUB_CONTAINER_DIGEST,
+    contract_id: CALC_CONTRACT_ID,
+    contract_version: CALC_CONTRACT_VERSION,
     flags: ["SEFLG_SWIEPH", "SEFLG_SPEED"],
     houses_primary: "placidus",
     houses_fallback: "porphyry",

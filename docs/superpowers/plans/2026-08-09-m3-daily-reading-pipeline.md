@@ -1,9 +1,16 @@
 # M3 Daily Reading Pipeline — Design
 
-> **Status: DESIGN, not implemented.** Scope: what to build and why, and the
-> five contract decisions that have to land before any of it compiles honestly.
-> Not a task list — each phase in §7 still needs its own plan per
-> `superpowers:writing-plans`.
+> **Status: phases 0–3 implemented; 4–7 still design.** Scope: what to build and
+> why, and the five contract decisions that have to land before any of it
+> compiles honestly. Not a task list — each remaining phase in §7 still needs its
+> own plan per `superpowers:writing-plans`.
+>
+> This document has been reconciled with the code as of 2026-08-09. Where a
+> section describes something the implementation decided differently, the
+> section now says what the code does and why — the nine review corrections and
+> the implementation divergences are folded in rather than appended.
+> [`2026-08-09-m3-implementation-handoff.md`](./2026-08-09-m3-implementation-handoff.md)
+> remains the record of *how* that reconciliation happened.
 
 **Goal:** one user, one local date, one published reading, traceable paragraph
 by paragraph to calculated facts and a reviewed editorial release — produced by
@@ -228,9 +235,17 @@ rows so a threshold change re-scans rather than mixing vintages.
 
 **Decision.** Replace it, do not merely document it.
 
+The object itself is also renamed and moved. In M0 it lived inside
+`reading-evidence.schema.json` as a `$def` called `readingAssemblyRequest`;
+M3 gives it its own document, `reading-assembly.schema.json`, under the name
+`assemblyRequest`. A model-boundary object nested inside the evidence graph
+reads as a detail of provenance rather than as the contract that decides what
+crosses into a prompt, and the whole point of this decision is that it is the
+latter.
+
 **Why not "document it".** Escalation §4 offers two ways out: state that the key
 never crosses into a prompt, or make it opaque. The first is unenforceable —
-`readingAssemblyRequest` is the model-boundary object (it carries
+`assemblyRequest` is the model-boundary object (it carries
 `output_schema` and `approved_fragments` and says the model "may not introduce
 fragments outside this set"), and its `reading_key` is *required*, with a
 canonical fixture reading literally
@@ -248,6 +263,9 @@ interface AssemblyIdentityInputV1 {
   schema_version: "0.3.0";
   assembly_policy_id: "daily-reading-deterministic";
   assembly_policy_version: string;
+  // Defined by contracts/m3/daily-reading.schema.json. M0 named this schema in
+  // three places and never shipped it, so the preimage was pinning a document
+  // nobody could validate against; M3 ships it.
   output_schema: "daily-reading-v3";
   local_date: string;
   target_timezone: string;
@@ -502,7 +520,17 @@ the same recomputed value or it reintroduces the bug one layer up.
    continuity, repetition penalty. Every component is recorded with its weight.
    No engagement signal exists as an input — the registry's note is "no hidden
    engagement-only ranking", and the way to keep that true is to give the
-   function nowhere to put one. Tie-breaks are total and terminate on cycle id.
+   function nowhere to put one. `resonance_feedback` and `user_priority` were
+   dropped from the M3 enum for exactly that reason: leaving them declared makes
+   the prohibition a convention, and `reading-evidence.engagement-ranking.json`
+   pins the rejection. Tie-breaks are total and terminate on cycle id.
+
+   **Phase is timestamp-driven, not orb-driven.** DER-01 specifies a state
+   machine over event timestamps, and the engine is pure — it has no ephemeris
+   with which to evaluate an instantaneous orb, and giving it one would cost the
+   property that the whole core runs with no mocks. Thresholds live in one
+   versioned block in `phase.ts`. Where `peak` and `reconsidering` both apply,
+   `peak` wins; the design left that undefined and a test now pins it.
 6. **Selection.** One primary, at most one supporting. A supporting influence is
    suppressed unless it is *distinct* — different `(body, target, aspect)` and a
    different parent cycle — so the reading cannot say the same thing twice.
@@ -540,8 +568,24 @@ the same recomputed value or it reintroduces the bug one layer up.
    arrays. A missing fallback is an impossible active-release state, not a reason
    to select an unrelated safety rule or publish blank, unprovenanced text.
 
+   The zero-fact day is the *commonest* day, not an edge case, which is why
+   `facts` and `approved_fragments` carry `minItems: 0` in the assembly request
+   rather than the `minItems: 1` the design first specified. A `minItems: 1`
+   there makes the ordinary day structurally unrepresentable, and
+   `reading-assembly.zero-facts.json` is the fixture that keeps it that way.
+
+   **A locale with no eligible reflection prompt is a rejection, not a shorter
+   reading.** The role order treats `reflection` as part of the daily chapter, so
+   the engine emits `no_reflection_prompt_for_locale` and the gap surfaces in the
+   evidence drawer. Silently dropping the paragraph would make a content gap
+   indistinguishable from an editorial choice.
+
 **Second entry point:** `evaluateFixture(bundle, fixtureCatalogue, fixtureId) →
-"eligible" | "ineligible" | "fallback"`. This is what lets
+"eligible" | "ineligible" | "fallback"`. `ineligible` and `fallback` are
+deliberately distinct even though both publish the reviewed fallback: "a
+candidate existed and was ruled out" is a different editorial fact from "nothing
+was offered", and collapsing them would hide which one a release is producing.
+This is what lets
 `POST /internal/content-releases` stop returning `accepted_pending_tests` for
 fixture-bearing bundles (`routes/content-releases.ts:425-440`). It is a pure
 call over the same core, which is why it costs nothing extra.
@@ -613,6 +657,33 @@ limit without proving both outer boundaries returns
 `cycle_window_incomplete` for the whole request; it never emits or persists a
 partial cycle. Overlapping request windows that select the same encounter must
 therefore return the same complete pass list, envelope, `exact_at`, and id.
+
+**What "proven" has to mean.** Being outside orb at the edge of the scanned span
+does *not* prove an encounter has ended, and treating it that way is a real bug
+rather than a conservative approximation: a body can exit through `+O`, station
+a degree later, and come straight back in — which is precisely the multi-pass
+case this endpoint exists to describe. A scanner that stopped at "outside orb at
+the edge" would answer a truncated window with a confident single-pass cycle and
+a narrow envelope, and it would look right.
+
+What does prove it is a bound on how far a body can travel against its own net
+motion. `max_retrograde_arc_deg` is that bound, per body, versioned with the
+cycle policy: once `|fT| > O + max_retrograde_arc_deg`, the body cannot return
+to within `O` of that lifted target, because doing so would take more retrograde
+travel than it has. So the search for the earliest entry is bounded on the left
+by the last such point before the first pass, and the search for the latest exit
+on the right by the first one after the last pass. Every `lookaround_days` in
+the table is derived from that inequality — the time the body needs to cover
+`2(O + arc)` of net motion at its widest orb, plus margin — which is why Pluto's
+is eight years and the Moon's is six days.
+
+An encounter near the edge of the span is routinely unprovable and routinely
+irrelevant, so the cheap bound is applied first: if the proven-left point already
+falls after the window closes, or the proven-right point before it opens, the
+encounter cannot touch the window and is dropped without being proven. Only an
+encounter that could actually intersect the window has to be proven, and only
+its failure fails the request. Without that ordering every scan would fail,
+because every span has edges.
 
 Transit-to-natal contacts need natal longitudes and nothing else. Sending them
 instead of the birth instant means the calculation service never needs a
@@ -735,7 +806,111 @@ omitted when `uncertainty.suppressed_features` contains `moon_time_sensitive`;
 the transiting Moon remains valid against stable natal targets because the
 transit instant is known. These facts are never created and filtered later.
 
-**Done when all of the following pass on fixed, deterministic fixtures:**
+**What the implementation pinned.** These are decisions the design left open and
+Phase 3 had to make; each is now a versioned constant or an explicit rejection.
+
+- **Where the numbers live.** `apps/calc-stub/src/cycle-policy.ts` holds every
+  value that can alter output — the unwrapping epoch, the scan and checkpoint
+  grids, the root/station/dedupe tolerances, the boundary-classification probe,
+  the lookarounds, the retrograde bounds, and the transit orb table. A diff there
+  is a diff that must bump `cycle_policy_version`, which is easier to enforce
+  when there is one file to look at.
+- **The policies are named and matched, not assumed.** This build implements
+  `transit-scan-launch@1.4.0` and `orb-launch@1.0.0`, the identifiers the frozen
+  fixtures already carry. A request naming any other policy is rejected as
+  `invalid_request` rather than answered under a substitute, because the policy
+  identifiers are hashed into every cycle id — answering would mint ids claiming
+  a vintage the scan did not use.
+- **Transit orbs are not natal orbs.** `orb-launch` is a body-class table
+  (6°/5°/4°/3° at conjunction from luminaries to outer planets, tighter for
+  every other aspect), deliberately not the natal `orb-launch-default` table in
+  `engine.ts`. Natal orbs say how wide an aspect may be and still be reported;
+  transit orbs say how long an encounter is claimed to *last*, and a natal-width
+  orb on Pluto is a decade-long "cycle" that means nothing to a reader.
+- **The checkpoint chain is anchored, not accumulated.** Lifted longitude at any
+  instant is `checkpoint.lift + wrap180(λ − checkpoint.lon)` against the nearest
+  epoch-anchored checkpoint, and root brackets re-anchor at their own start
+  sample. That makes every evaluation independent of scan order, which is a
+  stronger property than the running recurrence the design sketched and gives the
+  same values.
+- **The ephemeris is injectable.** `EphemerisSource` is an interface; production
+  passes Swiss Ephemeris and the tests pass analytic longitude functions. A
+  station-on-target tangent and a controlled 0°/360° unwrap are not reachable by
+  waiting for the real sky to produce one on cue, and the acceptance list below
+  requires both.
+- **`importance_score` is not computed here.** The response schema permits it,
+  but ranking is `packages/reading-engine`'s job and must not land in the AGPL
+  service. The field is omitted rather than filled with a placeholder.
+- **Three semantic rules the contract left to code**, each a decision rather than
+  a reading of the schema: `window.from` must precede `window.to`; a body may
+  appear at most once in `natal_positions` (duplicates would mint two cycles with
+  byte-identical identities, and the response requires unique ids); and an angle
+  must not be *sent* when angles are suppressed, whereas a natal Moon under
+  `moon_time_sensitive` is *omitted*. The asymmetry is the contract's own: it
+  phrases the angle rule as a caller obligation and the Moon rule as service
+  behaviour. `angles` and `angle_transits` in `suppressed_features` are treated
+  as independent triggers for the angle rule alongside unknown accuracy, which
+  the contract does not state — it is the safe direction, since it can only ever
+  suppress more.
+- **Transport versus engine.** Unparseable JSON, a bad token, and missing
+  production configuration are HTTP 400/401/503 with the `{error:{code,message}}`
+  envelope, because they never reached the engine. Everything else is HTTP 200
+  with a discriminated `ok:false` body, so a caller can tell "the engine ran and
+  refused" from "the request never arrived".
+
+**What an adversarial review of the implementation changed.** Six of these were
+found by reviewing the finished scanner against this document and the contract,
+and each was reproduced before it was believed. They are recorded because every
+one of them is a class of mistake that would recur.
+
+- **`window` needs a duration cap, and the contract does not give it one.** The
+  handler is synchronous inside a single-threaded server, so a contract-valid
+  ten-year window blocks it for ~17 s — past the Fly health check, so the machine
+  leaves rotation while it works — and a century-scale one reaches ~450 MB
+  against a 256 MB VM. `MAX_WINDOW_DAYS` is 92, a quarter, which is far more than
+  the daily reading needs. Raising it should come with making the handler yield,
+  not just with moving the number.
+- **`Date.parse` is not `format: date-time`.** It accepts `2026-07-30`,
+  `Aug 9, 2026`, even `1.4.0`, and — worst — an offset-less instant, which
+  ECMAScript resolves in the *host* timezone. The same request answered in
+  `America/Chicago` and in UTC returned different cycles. The window instants are
+  now gated on an RFC 3339 pattern with a mandatory offset, and the calendar
+  fields are checked individually, because `Date.parse` rolls `2026-02-30`
+  silently into March rather than rejecting it.
+- **Retrograde arcs and lookarounds have to be measured, not reasoned about.**
+  Every textbook-shaped estimate was wrong in the dangerous direction: Mercury's
+  real arc over 1800–2399 is 16.3° against an assumed 12°, and Pluto near
+  aphelion needs a seventeen-year lookaround where its mean rate suggested nine.
+  An underestimated arc makes the scanner declare an encounter proven-over while
+  the body can still return, dropping whole cycles silently. The requirement is
+  also `2(O + arc)` of net travel, not `(O + arc)`: the window can sit at either
+  end of the encounter, so one side may have to cover the whole span.
+- **The checkpoint anchor can leave the data files even when the scan cannot.**
+  Anchoring at the *nearest* epoch-anchored index reaches up to
+  `lift_step_days / 2` — 600 days for Neptune and Pluto — beyond the validated
+  span, where Swiss Ephemeris substitutes Moshier and the strict `calcBody`
+  throws. Requests in 1820 and 2380 failed with `calculation_failed` on a range
+  the service declares it supports. The anchor is now clamped to the measured
+  Julian-day coverage of the pinned files.
+- **A speed-sign comparison cannot tell zero reversals from two.** The true node
+  has brief direct episodes — some ten minutes long, about twice a year — so a
+  retrograde–direct–retrograde pair hides inside one grid interval, leaves the
+  bracket non-monotonic, and silently drops the exact passes it contains. A finer
+  fixed grid does not fix it; the episodes are shorter than any grid worth
+  paying for. The same-signed case is now a proof obligation: with a measured
+  bound on `|d(speed)/dt|`, no zero can lie between two same-signed endpoints
+  while `min(|v_a|, |v_b|) > maxSlope · width / 2`, and where that fails the
+  interval is halved until it is narrower than the shortest span that can hold
+  two stations.
+- **`/v1/engine` was serving an absolute filesystem path.** `ephe_path` on a
+  deliberately unauthenticated route is the same disclosure the error-envelope
+  rule exists to prevent, except on purpose and to anyone. It is replaced by the
+  version identifiers a caller actually needs, and `calc.openapi.yaml` now
+  describes what `/health` and `/v1/engine` really return rather than a shape
+  neither has ever matched.
+
+**Done when all of the following pass on fixed, deterministic fixtures**
+(all satisfied; `apps/calc-stub/src/cycles.test.ts`, 50 tests):
 
 - forward and retrograde 0°/360° unwrap cases produce continuous lifted
   longitude;
@@ -787,6 +962,13 @@ user-confirmed override (which wins over device-derived DEV-01 state), increment
 not overwrite a user override. Scheduled generation is withheld while the
 default is unconfirmed. A timezone change affects only commands enqueued after
 the change; an already reserved local day never moves.
+
+**Locale has exactly the same defect and gets exactly the same treatment.**
+`users.locale` is initialized to a server default in the same way, and locale
+selects the reviewed fallback and the timing template — so an unowned default
+silently decides which reviewed prose a reader is shown. M3 therefore also adds
+`PUT /v1/preferences/locale` and `users.locale_source`, on the same
+`default_unconfirmed` / `device_derived` / `user_confirmed` rules.
 
 ### Enqueue freezes the generation command
 
@@ -843,6 +1025,50 @@ replacement reason. A stale job id, nonterminal job, or stale reissue
 predecessor aborts the batch. It never overwrites the earlier command or creates
 a competing artifact revision.
 
+### The scheduler may replace its own terminal failure, within a budget
+
+Without this, a terminal failure permanently bricks a user-day. The reservation
+sits at `status = 'failed'` with `revision = 1`, and
+`UNIQUE (user_id, local_date, revision)` blocks any fresh initial enqueue
+forever. Replacement is the only recovery, and describing it as an operator
+action does not survive contact with a surface that runs unattended, daily, for
+every user: one bad afternoon on the calculation service would leave a silent
+hole in a reader's history that only a human ticket could fill.
+
+**Decision: the scheduler performs the replacement CAS itself, under a bounded
+budget, and only for failures that are infrastructural.** The split falls
+exactly along `commandReplacementReason`, which already distinguishes the two
+kinds:
+
+| Reason | Who may replace | Why |
+| --- | --- | --- |
+| `calc_unavailable` | scheduler | The inputs were fine; a dependency was down. Re-freezing the same day against a working dependency is the obvious repair, and no human judgement is involved. |
+| `release_unreadable` | scheduler | Same shape: the R2 bundle or its hash was unreachable, not wrong. |
+| `context_minimized` | operator only | Deciding that a reading should be re-frozen with less context is a privacy judgement about a specific person. |
+| `policy_upgraded` | operator only | Choosing to re-generate a day under a new policy version is an editorial decision about which vintage a reader should have seen. |
+| `defect_repair` | operator only | By definition someone has diagnosed a defect. |
+
+The budget is `command_generation`: auto-replacement is permitted only while
+`command_generation < 3`, giving at most two automatic attempts after the
+initial command. Two, not more, because each replacement re-freezes a *new*
+command — a wider budget turns a persistent dependency outage into a
+per-user amplification of load against the thing that is already failing. The
+CAS conditions are unchanged; the scheduler simply becomes an allowed caller of
+the same guarded batch, and every automatic replacement writes the same audit
+event an operator's would, with its reason.
+
+Auto-replacement is additionally scoped to a day that is still current: the
+reservation's `target_local_date` must be the user's present or immediately
+preceding local date in the confirmed scheduling zone. A failure from three
+weeks ago is history, and silently regenerating it would publish a reading
+dated to a day the reader has already moved past.
+
+Budget exhaustion is a terminal, visible state: the reservation stays `failed`,
+an audit event records that the budget was spent, and the day has no reading.
+That is a worse outcome than a reading and a better one than an unbounded retry
+loop against a broken dependency — and unlike today's behaviour, it is a state
+an operator can see and act on rather than one nobody notices.
+
 D1 and Queue delivery cannot share a transaction, so the D1 job row is also a
 durable outbox. Only after the reservation batch commits does a dispatcher send
 the opaque `{ job_id, reading_id }` message. `dispatched_at` is advisory: an
@@ -881,6 +1107,14 @@ Output-derived metadata capable of identifying the deterministic result — the
 moves inside that encrypted envelope rather than remaining as a dictionary
 oracle. The M3 response reconstructs those fields only after decryption.
 
+Concretely, the `daily_readings` rebuild **drops** `content_hash`,
+`primary_cycle_id`, `supporting_cycle_id`, and `validation_json`; all four now
+live inside `reading_enc`. Naming them matters because a rebuild that discussed
+the new columns and left the old ones standing would have kept exactly the
+oracle this paragraph exists to remove — a clear digest of the day's facts, plus
+the two cycle ids that produced it, is a reconstruction path that survives DEK
+destruction.
+
 `reading_sources` gains `user_id` and a composite
 `FOREIGN KEY (reading_id, user_id) REFERENCES daily_readings(id, user_id)`;
 `daily_readings` gains the corresponding composite unique key. This both rejects
@@ -914,19 +1148,36 @@ Successful completion is one ordered `DB.batch()`:
 6. transition the same claimed job from `running` to `succeeded`; and
 7. delete the transient guard.
 
-The migration installs `BEFORE INSERT` / `BEFORE DELETE` triggers on that guard.
-Insertion `RAISE(ABORT, ...)`s unless the pending reservation, exact live
-predecessor/revision (or initial no-predecessor state), and associated running
-job with the presented claim token all match
-`active_generation_job_id` / `command_generation`. Deletion raises unless the
-reading is published, the exact predecessor is superseded when applicable, the
-evidence count matches, and that same job is succeeded. A guarded `UPDATE` that merely
-affects zero rows is insufficient because later statements could otherwise
-commit; the closing assertion catches that case. [D1 executes `batch()`
-statements as one
+The guard is expressed with `assertion_probe`, not with triggers. 0002 ships a
+table whose only column is constrained `CHECK (id = 0)` and which therefore can
+never hold a row, so
+
+```sql
+INSERT INTO assertion_probe (id, reason)
+SELECT 1, '<reason>' WHERE <bad condition>;
+```
+
+is a no-op when the condition is false and aborts the enclosing transaction when
+it is true — a conditional abort in pure SQL, built from a CHECK constraint and
+nothing else. The opening assertion aborts unless the pending reservation, exact
+live predecessor/revision (or initial no-predecessor state), and associated
+running job with the presented claim token all match
+`active_generation_job_id` / `command_generation`. The closing assertion aborts
+unless the reading is published, the exact predecessor is superseded when
+applicable, the evidence count matches, and that same job is succeeded. A guarded
+`UPDATE` that merely affects zero rows is insufficient because later statements
+could otherwise commit; the closing assertion catches that case. [D1 executes
+`batch()` statements as one
 transaction](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch),
-so any raised assertion or failed evidence insert rolls the guard and the entire
-publication/job transition back.
+so any aborted assertion or failed evidence insert rolls the guard and the
+entire publication/job transition back.
+
+The design originally specified `BEFORE INSERT` / `BEFORE DELETE` triggers on a
+transient guard table, and 0002 does not use them. Two reasons, both concrete:
+SQLite's `ALTER TABLE … RENAME` rewrites table references *inside trigger
+bodies*, which collides with the table rebuilds this same migration performs;
+and D1's trigger support on the remote path is not something a migration needs
+to depend on when a CHECK constraint does the same job.
 
 Failure moves the pending reservation to `failed` and closes the same active
 claimed job in an equivalent guarded batch; it never supersedes the live
@@ -948,12 +1199,28 @@ constraint and command linkage; extends `jobs` with encrypted immutable command,
 outbox, and lease fields; rebuilds `reading_sources` with constrained user
 ownership and encrypted evidence; and adds revision/replacement guards, stable
 cycle branch/winding identity, ownership-safe cycle passes, timezone
-revision/history, partial indexes, and publication guards. Referenced table
-rebuilds use `PRAGMA defer_foreign_keys = ON` and are tested both as a fresh
-ordered migration set and as an upgrade of a populated, production-shaped 0001
-database. If production contains an unexpected reading/evidence row that cannot
-be converted without its DEK, migration stops for an application-layer
-encrypted backfill; it never discards the row.
+revision/history, partial indexes, and publication guards. It is tested both as
+a fresh ordered migration set and as an upgrade of a populated,
+production-shaped 0001 database. If production contains an unexpected
+reading/evidence row that cannot be converted without its DEK, migration stops
+for an application-layer encrypted backfill; it never discards the row.
+
+`daily_readings` and `reading_sources` are **dropped and recreated under their
+final names**, not renamed. SQLite only rewrites `REFERENCES` clauses on rename
+while foreign-key enforcement is on *at that moment*, so a rename-based rebuild
+silently produces a dangling reference wherever that does not hold — and whether
+it holds depends on connection state the migration does not own. Pre-flight
+assertions prove `daily_readings`, `reading_sources`, and `reading_feedback` are
+empty, which is both what makes dropping safe and what implements the
+"never discards the row" requirement: a non-empty table aborts the migration
+rather than losing anything. Because the rebuild no longer depends on rename
+semantics, `PRAGMA defer_foreign_keys` is not needed either.
+
+Two further details the migration has to respect, both discovered the hard way.
+Wrangler's SQL splitter understands `BEGIN…END`, but its `isCompoundStatementEnd`
+test is `/\sEND[;\s]$/` with **no `i` flag** — a lowercase `end;` breaks
+splitting. And every semicolon inside a SQL string literal was removed
+deliberately, so that any naive splitter which ever reads this file is safe.
 
 The root/API `db:local` script stops executing only 0001 and instead applies the
 ordered migration directory with `wrangler d1 migrations apply
@@ -1009,9 +1276,18 @@ cron is last.
   evidence, audit, or succeeded job;
 - success leaves exactly one published row, the expected predecessor
   superseded, complete encrypted evidence, and the same job succeeded;
-- clear-column inspection cannot recover paragraph text, fragment/content refs,
-  assembly ids, per-paragraph hashes, context/source refs, ranking reasons,
-  model linkage, or selected-cycle/validation detail after DEK destruction;
+- clear-column inspection of the reading tables cannot recover paragraph text,
+  fragment/content refs, assembly ids, per-paragraph hashes, context/source
+  refs, ranking reasons, model linkage, or selected-cycle/validation detail
+  after DEK destruction — **which is not the same as the prose being
+  unrecoverable.** `cycle_instances`, `chart_snapshots.snapshot_json`, and the
+  R2 release bundle all survive DEK destruction in clear, and §3's assembler is
+  a pure function of exactly those inputs. Anyone holding the surviving rows can
+  recompute the reading. Destroying the DEK removes the *stored* artifact and
+  its provenance; it does not remove the ability to derive the artifact again,
+  and the acceptance criterion must not be read as claiming otherwise. Closing
+  that gap means shredding or minimizing the calculated inputs too, which is a
+  separate decision this milestone does not make;
 - DEK rotation re-encrypts `jobs.payload_enc`, `daily_readings.reading_enc`, and
   every `reading_sources.evidence_enc` through their user-ownership paths, and
   all remain decryptable under the new key;
@@ -1053,23 +1329,36 @@ Both routes come off `stubs.ts` (`:32-37`), and `run_worker_first` in
 
 ## 7. Order of work
 
-| Phase | Lands | Unblocks |
-| --- | --- | --- |
-| 0 | D1–D5; complete M3 schemas, both OpenAPI documents, JCS vectors, locale fixtures, a package validator, and zero-diff proof for `contracts/m0/` | everything |
-| 1 | `packages/reading-engine` + fixture evaluation | release activation of fixture-bearing bundles |
-| 2 | Forward `0002_m3_daily_reading_pipeline.sql`; reservation/reissue/replacement guards; ownership FKs; authenticated timezone writer/history; encrypted commands/evidence; `ENCRYPTED_COLUMNS`; local upgrade/runbook proof | 3, 4 |
-| 3 | Calc `POST /v1/cycles` + oriented complete-encounter scan/refine + shifted-window goldens; versioned cycle persistence | 4, `/v1/timing` |
-| 4 | Immutable enqueue, durable outbox dispatch, explicit reissue/command replacement, claim leases, and atomic `GenerateDailyReading` completion | 5 |
-| 5 | `GET /v1/readings/today` and decrypted `GET /v1/readings/{id}/evidence` | 6 |
-| 6 | Real Today page (`apps/web/src/components/TodayView.tsx`) | 7 |
-| 7 | DEV-01 foreground/system-change sync; `[triggers]` + `scheduled` enqueue; production cron enablement after manual proof | — |
+| Phase | Lands | Unblocks | State |
+| --- | --- | --- | --- |
+| 0 | D1–D5; complete M3 schemas, both OpenAPI documents, JCS vectors, locale fixtures, a package validator, and zero-diff proof for `contracts/m0/` | everything | **done** |
+| 1 | `packages/reading-engine` + fixture evaluation | release activation of fixture-bearing bundles | **done** |
+| 2 | Forward `0002_m3_daily_reading_pipeline.sql`; reservation/reissue/replacement guards; ownership FKs; authenticated timezone writer/history; encrypted commands/evidence; `ENCRYPTED_COLUMNS`; local upgrade/runbook proof | 3, 4 | **done** |
+| 3 | Calc `POST /v1/cycles` + oriented complete-encounter scan/refine + shifted-window goldens | 4, `/v1/timing` | **done** (endpoint only; versioned cycle persistence moved to 4, where the writer lives) |
+| 4 | Immutable enqueue, durable outbox dispatch, explicit reissue/command replacement, bounded scheduler auto-replacement, claim leases, cycle persistence, and atomic `GenerateDailyReading` completion | 5 | next |
+| 5 | `GET /v1/readings/today` and decrypted `GET /v1/readings/{id}/evidence` | 6 | |
+| 6 | Real Today page (`apps/web/src/components/TodayView.tsx`) | 7 | |
+| 7 | DEV-01 foreground/system-change sync; `[triggers]` + `scheduled` enqueue; production cron enablement after manual proof | — | |
 
-Phase 0 is documents and schemas — no runtime code, and it is the phase that
-unsticks the other six. Phase 1 has value on its own even if nothing after it
-ships this quarter: it turns `accepted_pending_tests` from a permanent state
-into a transient one.
+Phase 4 also carries the Worker-side client. `POST /v1/cycles` runs on the calc
+service and nothing in `apps/api` calls it yet; an `invokeCycles` beside
+`invokeCalc`, and its counterpart in `apps/api/test/mock-calc-service.ts`,
+belong with the writer that needs them rather than with the endpoint.
 
-Phase 0 is accepted only when:
+Two things Phase 4 must settle before it can persist a pass: the `cyp_`
+cycle-pass id has no preimage document, no golden vector, and no wire field —
+only the prose "derived from the parent cycle identity plus `pass_index`" — yet
+`generation-command.schema.json` requires `pass_ids`. `cyclePin.cycle_hash` is
+likewise specified only as a hash "of the normalized cycle row as scanned", with
+no stated normalization. Both need pinning the way `cyc_` was pinned, or two
+implementations will mint different ids for the same pass.
+
+Phase 0 was documents and schemas — no runtime code, and the phase that unstuck
+the other six. Phase 1 had value on its own even if nothing after it ships this
+quarter: it turns `accepted_pending_tests` from a permanent state into a
+transient one.
+
+Phase 0 was accepted only when:
 
 - exact JCS bytes, full digests, and rendered ids match golden vectors; a retry
   with the same persisted command reproduces its id; changing effective
@@ -1110,7 +1399,12 @@ Named so they are not mistaken for handled:
 
 - **§1 crypto-shredding vs D1 Time Travel** — M3 encrypts both prose and every
   reconstructive evidence field, but wrapped DEK and ciphertext still share a
-  database. That pre-existing recovery-window question remains.
+  database. That pre-existing recovery-window question remains. M3 also *widens*
+  the gap rather than closing it: `cycle_instances`, `snapshot_json`, and the R2
+  bundle stay in clear, and the pure assembler turns them back into the prose.
+  Encrypting the reading is therefore a control over the stored artifact, not
+  over the derivable content, and the M3 manifest's `unresolved_escalations`
+  scopes the claim that way.
 - **§5 cascading revocation** — there is still no `derived_features` table and
   no `invalidated_at`. D1's revision model gives revocation somewhere to *land*
   for readings specifically (a `consent_revoked` reissue), which is narrower
@@ -1122,6 +1416,12 @@ Named so they are not mistaken for handled:
   reinterpret them as JCS. Naming/versioning that legacy profile is still open.
 - **§11 `snapshot_json` precision** — unresolved, and the cycle scan inherits
   whatever it settles on.
-- **§9 `techniques_enabled` overstates the engine** — phase 3 implements
-  `transits`, closing one of the five. `stations_ingresses` and
+- **§9 `techniques_enabled` overstates the engine** — phase 3 implemented
+  `transits`, closing one of the five, and `POST /v1/cycles` rejects any other
+  value rather than accepting it silently. `stations_ingresses` and
   `lunations_eclipses` stay declared-but-absent.
+- **Timezone changes can strand a day** — a user who changes zone can land on a
+  "today" that was never reserved. §5's reservation model does not cover it, and
+  `users.next_due_at` is still unused even though it is the natural scheduling
+  column. Both belong to phase 7, along with the sub-hourly cron that
+  `:45`-offset zones need.
