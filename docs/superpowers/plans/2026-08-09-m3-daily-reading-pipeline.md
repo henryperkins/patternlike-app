@@ -1335,10 +1335,10 @@ Both routes come off `stubs.ts` (`:32-37`), and `run_worker_first` in
 | 1 | `packages/reading-engine` + fixture evaluation | release activation of fixture-bearing bundles | **done** |
 | 2 | Forward `0002_m3_daily_reading_pipeline.sql`; reservation/reissue/replacement guards; ownership FKs; authenticated timezone writer/history; encrypted commands/evidence; `ENCRYPTED_COLUMNS`; local upgrade/runbook proof | 3, 4 | **done** |
 | 3 | Calc `POST /v1/cycles` + oriented complete-encounter scan/refine + shifted-window goldens | 4, `/v1/timing` | **done** (endpoint only; versioned cycle persistence moved to 4, where the writer lives) |
-| 4 | Immutable enqueue, durable outbox dispatch, explicit reissue/command replacement, bounded scheduler auto-replacement, claim leases, cycle persistence, and atomic `GenerateDailyReading` completion | 5 | next |
-| 5 | `GET /v1/readings/today` and decrypted `GET /v1/readings/{id}/evidence` | 6 | |
-| 6 | Real Today page (`apps/web/src/components/TodayView.tsx`) | 7 | |
-| 7 | DEV-01 foreground/system-change sync; `[triggers]` + `scheduled` enqueue; production cron enablement after manual proof | — | |
+| 4 | Immutable enqueue, durable outbox dispatch, explicit reissue/command replacement, bounded scheduler auto-replacement, claim leases, cycle persistence, and atomic `GenerateDailyReading` completion | 5 | **done** |
+| 5 | `GET /v1/readings/today` and decrypted `GET /v1/readings/{id}/evidence` | 6 | **done** (`apps/api/src/db/readings.ts`, `apps/api/src/routes/readings.ts`; also answers `409 locale_confirmation_required`, recorded in the m3 manifest's `amendments`) |
+| 6 | Real Today page (`apps/web/src/components/TodayView.tsx`) | 7 | **done** (paragraph rendering, the four non-200 affordances, `PreferenceConfirm` for both 409s, and `WhyThisDrawer`) |
+| 7 | DEV-01 foreground/system-change sync; `[triggers]` + `scheduled` enqueue; production cron enablement after manual proof | — | next |
 
 Phase 4 also carries the Worker-side client. `POST /v1/cycles` runs on the calc
 service and nothing in `apps/api` calls it yet; an `invokeCycles` beside

@@ -894,7 +894,10 @@ summary:focus-visible {
 /* Chart */
 .chart-page,
 .privacy-page,
-.unavailable-page {
+.unavailable-page,
+.today-page,
+.today-empty,
+.today-gate {
   width: min(100%, 1540px);
   margin: 0 auto;
   padding: 64px clamp(34px, 5vw, 88px) 96px;
@@ -1389,6 +1392,327 @@ summary:focus-visible {
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Today */
+.today-page__header {
+  align-items: end;
+}
+
+.today-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 8px;
+}
+
+.today-chip {
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.today-chip--revised {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+
+.today-chip--code {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.today-fallback-note {
+  width: min(620px, 100%);
+  margin: 32px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.today-body {
+  display: flex;
+  width: min(660px, 100%);
+  flex-direction: column;
+  gap: 34px;
+  margin-top: 44px;
+}
+
+.today-body .kicker {
+  margin-bottom: 10px;
+}
+
+.reading-paragraph {
+  margin: 0;
+  font-family: var(--serif);
+  color: var(--ink);
+}
+
+/* The lede carries the reading. Everything else is subordinate to it. */
+.reading-paragraph--lede {
+  font-size: clamp(21px, 2.3vw, 26px);
+  line-height: 1.42;
+  letter-spacing: -0.015em;
+}
+
+.reading-paragraph--body {
+  font-size: 17px;
+  line-height: 1.62;
+  color: var(--ink-soft);
+}
+
+.reading-reflection {
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.reading-reflection .reading-paragraph {
+  font-size: 19px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+.reading-notice {
+  display: flex;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  background: var(--paper-light);
+}
+
+.reading-notice svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 2px;
+  color: var(--ink-faint);
+}
+
+.reading-notice .reading-paragraph {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.reading-notice--context_label svg {
+  color: var(--coral);
+}
+
+/* Today: the states that are not a reading */
+.today-empty__panel {
+  display: flex;
+  width: min(560px, 100%);
+  flex-direction: column;
+  align-items: start;
+  gap: 18px;
+  margin-top: 40px;
+  padding: 32px;
+}
+
+.today-empty__panel p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+.today-empty__aside {
+  font-style: italic;
+  color: var(--ink-faint) !important;
+}
+
+.today-empty__request,
+.today-gate__request {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+/* Today: the preference gates */
+.today-gate__form {
+  display: flex;
+  width: min(560px, 100%);
+  flex-direction: column;
+  align-items: start;
+  gap: 14px;
+  margin-top: 40px;
+  padding: 32px;
+}
+
+.today-gate__body {
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+.today-gate__form label {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.today-gate__form input {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--line-dark);
+  background: var(--paper-light);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+}
+
+.today-gate__form input:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 1px;
+}
+
+.today-gate__form input[aria-invalid="true"] {
+  border-color: var(--coral);
+}
+
+.today-gate__form small {
+  margin-top: -6px;
+  color: var(--ink-faint);
+  font-family: var(--sans);
+  font-size: 12px;
+}
+
+.today-gate__status:empty {
+  display: none;
+}
+
+.today-gate__status {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Today: the "Why this?" drawer body */
+.evidence-paragraph {
+  padding: 22px 28px;
+  border-top: 1px solid var(--line);
+}
+
+.evidence-paragraph__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.evidence-lane {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.evidence-paragraph__note {
+  margin: 0 0 14px;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.evidence-list {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-list li {
+  padding: 5px 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.evidence-list code,
+.evidence-reasons code {
+  margin-left: 8px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+/* The ranking reasons are the part of the drawer the product rests on. */
+.evidence-reasons {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-reasons li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px dotted var(--line);
+}
+
+.evidence-reasons li:last-child {
+  border-bottom: none;
+}
+
+.evidence-reasons span {
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.evidence-paragraph .evidence-grid {
+  border-top: none;
+  border-left: 1px solid var(--line);
+}
+
+.today-evidence__problem {
+  padding: 22px 28px;
+  border-top: 1px solid var(--line);
+}
+
+.today-evidence__problem p {
+  margin: 0 0 14px;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.today-evidence > [role="status"] > p {
+  margin: 0;
+  padding: 22px 28px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.today-evidence > [role="status"]:empty {
+  display: none;
 }
 
 /* Privacy */
@@ -2100,8 +2424,27 @@ summary:focus-visible {
 
   .chart-page,
   .privacy-page,
-  .unavailable-page {
+  .unavailable-page,
+  .today-page,
+  .today-empty,
+  .today-gate {
     padding: 36px 18px 62px;
+  }
+
+  /* .page-header goes display:block here, so the chips fall under the date. */
+  .today-meta {
+    justify-content: start;
+    margin-top: 22px;
+  }
+
+  .evidence-paragraph,
+  .today-evidence__problem,
+  .today-evidence > [role="status"] > p {
+    padding-inline: 18px;
+  }
+
+  .evidence-paragraph .evidence-grid {
+    border-left: none;
   }
 
   .page-header h1,
