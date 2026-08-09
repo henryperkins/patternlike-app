@@ -13,12 +13,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - name: Install python deps
         run: pip install pyyaml jsonschema referencing openapi-spec-validator
-      - name: Validate M0 contracts
-        run: |
-          python contracts/m0/validate_schemas.py
-          python contracts/m0/smoke_check.py
+      # Delegates to the root script rather than restating its steps. This job
+      # used to run contracts/m0/{validate_schemas,smoke_check}.py, a subset
+      # that drifted: it never validated contracts/m3 (schema_version 0.3.0)
+      # and never ran contracts/smoke_check.py, the D1 SQL smoke apply that
+      # covers the 0002 migration. No `npm install` — these are python scripts
+      # and npm only needs package.json to resolve the script name.
+      - name: Validate contracts and migrations
+        run: npm run test:contracts
 
   monorepo:
     runs-on: ubuntu-latest
@@ -26,12 +33,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          # Tracks .nvmrc, which Workers Builds also reads, so CI and the
+          # deploy build run the same Node. They had drifted to 22 and 24.
+          node-version-file: .nvmrc
           cache: npm
-      - run: npm install
+      # `npm ci`, not `npm install`: Workers Builds runs `npm clean-install`,
+      # which fails on a lockfile that disagrees with package.json. `npm install`
+      # silently repairs that drift, so CI could pass while the deploy build
+      # failed on the same commit.
+      - run: npm ci
       - run: npm run ephe:download -w @patternlike/calc-stub
       - run: npm run typecheck
       - run: npm run test -w @patternlike/shared
+      # @patternlike/reading-engine landed with M3 and was never added here, so
+      # the whole workspace shipped with no test coverage in CI.
+      - run: npm run test -w @patternlike/reading-engine
       - run: npm run test -w @patternlike/calc-stub
       - run: npm run test -w @patternlike/api
       - run: npm run test -w @patternlike/web
+      # Gates the deploy configuration. `npm run build` ends in
+      # `wrangler deploy --dry-run --env production`, the only check that reads
+      # the config block Workers Builds actually ships — a broken
+      # [env.production] otherwise surfaced for the first time during deploy.
+      # --dry-run contacts no API, so this needs no Cloudflare credentials.
+      - run: npm run build
