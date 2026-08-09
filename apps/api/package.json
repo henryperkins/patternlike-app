@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir=dist",
+    "//build": "Dry-runs the SAME environment `deploy` ships. Without --env production this validated the top-level dev block (AUTH_STUB=1, issuer.invalid, the placeholder D1 id) and so could never catch a production-only config error; it also tripped Workers Builds' Worker-name check, whose remedy is a PR renaming the top-level worker to patternlike-api-production. Requires apps/web/dist to exist — see the root //build note.",
+    "build": "wrangler deploy --dry-run --outdir=dist --env production",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "db:local": "wrangler d1 migrations apply patternlike-ops --local",

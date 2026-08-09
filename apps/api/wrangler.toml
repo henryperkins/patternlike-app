@@ -77,8 +77,16 @@ SE_LICENSE_MODE = "agpl"
 OIDC_ISSUER = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/"
 OIDC_AUDIENCE = "bW9j2G79rWfKg2WDuAZdvi4EsS75ajcZ"
 OIDC_JWKS_URL = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/.well-known/jwks.json"
-# AUTH_STUB is deliberately absent. Setting it here re-enables auth that trusts
-# an unauthenticated X-User-Id header.
+# Explicitly OFF rather than absent. Every read is `AUTH_STUB === "1"`
+# (middleware/auth.ts, middleware/config-guard.ts, routes/health.ts), so "0" is
+# functionally identical to omitting it — but omitting it made wrangler warn
+# `vars exist at the top level, but not on "env.production.vars"` on EVERY
+# production deploy, which trains the reader to ignore the one channel that
+# would report a genuinely forgotten var.
+#
+# Only "1" re-enables auth that trusts an unauthenticated X-User-Id header, and
+# configGuard turns that value into a hard 503 on every request here regardless.
+AUTH_STUB = "0"
 
 # The PWA ships inside this Worker, so the app and the API share one origin.
 #
@@ -114,6 +122,44 @@ migrations_dir = "../../db/d1"
 [[env.production.r2_buckets]]
 binding = "ARTIFACTS"
 bucket_name = "pattern-artifacts"
+
+# Workers Logs / Traces. Declared here so a deploy cannot silently reset what
+# the dashboard currently has: observability is part of the uploaded metadata,
+# so whatever this file says (or omits) wins on every `npm run deploy:api`.
+#
+# The shape mirrors the live production settings verbatim, so applying it is a
+# no-op today. It reads oddly on purpose: the parent `enabled = false` does not
+# turn logging off, because the nested [.logs] and [.traces] tables govern their
+# own signals independently. Logs on, traces off.
+#
+# persist = true means the signal is stored in the Cloudflare dashboard (billed
+# separately) rather than only forwarded to an export destination — and there
+# are no OTel destinations configured, so persist is the only reason anything is
+# queryable at all. head_sampling_rate = 1 logs 100% of requests; drop it toward
+# 0.1 if volume ever becomes a cost problem.
+#
+# Scoped to [env.production] to match every other binding in this file: the
+# default environment is local development, where these settings do nothing.
+[env.production.observability]
+enabled = false
+head_sampling_rate = 1
+
+[env.production.observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+# Adds the per-request invocation summary (status, CPU time, wall time) beside
+# whatever the Worker console.log()s. Worth keeping: the error envelope logs the
+# real rejection reason server-side and returns a generic code, so the log is
+# the only place a 401/calc_failed cause is visible.
+invocation_logs = true
+
+# Traces are in open beta and free during the beta. Flipping enabled = true is
+# the whole change if the calc round-trip ever needs latency attribution.
+[env.production.observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
 
 # CONTENT_RELEASE_KEYS is deliberately absent from both [vars] blocks. It holds
 # the PUBLIC keys trusted to sign editorial release bundles — public material,
