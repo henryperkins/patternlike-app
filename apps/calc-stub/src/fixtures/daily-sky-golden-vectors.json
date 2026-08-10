@@ -1,0 +1,1490 @@
+{
+  "note": "Recorded from the pinned Swiss Ephemeris data files, then cross-checked in daily-sky-golden.test.ts by recomputing each claimed root directly from the ephemeris rather than from the root finder. The 2026-08-22 vector's Sun ingress is additionally checkable against any published ephemeris: the Sun enters Virgo on 2026-08-23 at 02:19 UTC.",
+  "natal_positions": [
+    {
+      "body": "sun",
+      "longitude_deg": 54.700087
+    },
+    {
+      "body": "moon",
+      "longitude_deg": 301.068921
+    },
+    {
+      "body": "mercury",
+      "longitude_deg": 37.978268
+    },
+    {
+      "body": "venus",
+      "longitude_deg": 13.178013
+    },
+    {
+      "body": "mars",
+      "longitude_deg": 348.567993
+    },
+    {
+      "body": "jupiter",
+      "longitude_deg": 99.601456
+    },
+    {
+      "body": "saturn",
+      "longitude_deg": 295.244003
+    },
+    {
+      "body": "uranus",
+      "longitude_deg": 279.176094
+    },
+    {
+      "body": "neptune",
+      "longitude_deg": 284.348218
+    },
+    {
+      "body": "pluto",
+      "longitude_deg": 226.158662
+    },
+    {
+      "body": "true_node",
+      "longitude_deg": 310.252157
+    }
+  ],
+  "natal_house_cusps": {
+    "house_system": "placidus",
+    "cusps_deg": [
+      145.292763,
+      169.546194,
+      198.31697,
+      230.956615,
+      264.65125,
+      296.455998,
+      325.292763,
+      349.546194,
+      18.31697,
+      50.956615,
+      84.65125,
+      116.455998
+    ]
+  },
+  "days": [
+    {
+      "label": "every fact kind in one day",
+      "request": {
+        "schema_version": "0.5.0",
+        "request_id": "req_golden_daily_sky_0001",
+        "day_start_at": "2026-09-13T07:00:00Z",
+        "day_end_at": "2026-09-14T07:00:00Z",
+        "anchor_at": "2026-09-13T19:00:00Z",
+        "anchor_resolution": "unique",
+        "natal_positions": [
+          {
+            "body": "sun",
+            "longitude_deg": 54.700087
+          },
+          {
+            "body": "moon",
+            "longitude_deg": 301.068921
+          },
+          {
+            "body": "mercury",
+            "longitude_deg": 37.978268
+          },
+          {
+            "body": "venus",
+            "longitude_deg": 13.178013
+          },
+          {
+            "body": "mars",
+            "longitude_deg": 348.567993
+          },
+          {
+            "body": "jupiter",
+            "longitude_deg": 99.601456
+          },
+          {
+            "body": "saturn",
+            "longitude_deg": 295.244003
+          },
+          {
+            "body": "uranus",
+            "longitude_deg": 279.176094
+          },
+          {
+            "body": "neptune",
+            "longitude_deg": 284.348218
+          },
+          {
+            "body": "pluto",
+            "longitude_deg": 226.158662
+          },
+          {
+            "body": "true_node",
+            "longitude_deg": 310.252157
+          }
+        ],
+        "natal_house_cusps": {
+          "house_system": "placidus",
+          "cusps_deg": [
+            145.292763,
+            169.546194,
+            198.31697,
+            230.956615,
+            264.65125,
+            296.455998,
+            325.292763,
+            349.546194,
+            18.31697,
+            50.956615,
+            84.65125,
+            116.455998
+          ]
+        },
+        "effective_accuracy": "exact",
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "suppressed_features": [],
+        "zodiac": "tropical",
+        "node": "true",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "tzdb_version": "2026c",
+        "local_day_resolution_policy_version": "1.0.0",
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "contract_id": "patternlike.chart.launch",
+        "contract_version": "0.2.0"
+      },
+      "response": {
+        "ok": true,
+        "schema_version": "0.5.0",
+        "request_id": "req_golden_daily_sky_0001",
+        "day_start_at": "2026-09-13T07:00:00Z",
+        "day_end_at": "2026-09-14T07:00:00Z",
+        "anchor_at": "2026-09-13T19:00:00Z",
+        "anchor_resolution": "unique",
+        "effective_accuracy": "exact",
+        "suppressed_features": [],
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "contract_id": "patternlike.chart.launch",
+        "contract_version": "0.2.0",
+        "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "tzdb_version": "2026c",
+        "facts": [
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Neptune at 3.34 degrees Aries, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "neptune",
+              "longitude_deg": 3.335928,
+              "sign": "aries",
+              "sign_degree_deg": 3.335928,
+              "speed_deg_per_day": -0.026963,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_0f77f5a1589d026e12e137d8553e2c57",
+            "content_digest": "sha256:0f77f5a1589d026e12e137d8553e2c57c1761f14a2c8383fc6fa7b661dc063bb"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Jupiter at 16.32 degrees Leo",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "jupiter",
+              "longitude_deg": 136.323897,
+              "sign": "leo",
+              "sign_degree_deg": 16.323897,
+              "speed_deg_per_day": 0.199514,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_1f69b6e015b1a8cebd5b6abf9410186a",
+            "content_digest": "sha256:1f69b6e015b1a8cebd5b6abf9410186ae66530305fe5e0d5f3d880c630db10cb"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Saturn at 12.87 degrees Aries, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "saturn",
+              "longitude_deg": 12.869337,
+              "sign": "aries",
+              "sign_degree_deg": 12.869337,
+              "speed_deg_per_day": -0.069765,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_5b21b72443b5af2589cb9270fefbe4c7",
+            "content_digest": "sha256:5b21b72443b5af2589cb9270fefbe4c748521537e2f5237b61d3fa6ba9da8497"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Mars at 21.38 degrees Cancer",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mars",
+              "longitude_deg": 111.382903,
+              "sign": "cancer",
+              "sign_degree_deg": 21.382903,
+              "speed_deg_per_day": 0.614181,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_74ff25d38100dc5713cfd73ff2235119",
+            "content_digest": "sha256:74ff25d38100dc5713cfd73ff223511911d769cdeb3781bf90751a81c261b15e"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Venus at 2.15 degrees Scorpio",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "venus",
+              "longitude_deg": 212.152507,
+              "sign": "scorpio",
+              "sign_degree_deg": 2.152507,
+              "speed_deg_per_day": 0.588875,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_77f761c8c2a44ca884e0d977bcc790b5",
+            "content_digest": "sha256:77f761c8c2a44ca884e0d977bcc790b5db87444f5d02f1c3c69f8aa8511fca21"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Pluto at 3.30 degrees Aquarius, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "pluto",
+              "longitude_deg": 303.304906,
+              "sign": "aquarius",
+              "sign_degree_deg": 3.304906,
+              "speed_deg_per_day": -0.014024,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_80bac89cf59d1380f0538f5e8551be90",
+            "content_digest": "sha256:80bac89cf59d1380f0538f5e8551be9096474575d41f711227476da0cce574ac"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Uranus at 5.69 degrees Gemini, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "uranus",
+              "longitude_deg": 65.693068,
+              "sign": "gemini",
+              "sign_degree_deg": 5.693068,
+              "speed_deg_per_day": -0.002574,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_850d1bb6cf702eacb60ba5d65134dc89",
+            "content_digest": "sha256:850d1bb6cf702eacb60ba5d65134dc89a8cb9cbbf2f6f69bf0c93877508c5f73"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Mercury at 5.17 degrees Libra",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mercury",
+              "longitude_deg": 185.171683,
+              "sign": "libra",
+              "sign_degree_deg": 5.171683,
+              "speed_deg_per_day": 1.633908,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_9b2522e640e329e06b0288af669006ea",
+            "content_digest": "sha256:9b2522e640e329e06b0288af669006ea7ba863df965f2a5cdaaf8982f5b1f60f"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Sun at 21.01 degrees Virgo",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "sun",
+              "longitude_deg": 171.008841,
+              "sign": "virgo",
+              "sign_degree_deg": 21.008841,
+              "speed_deg_per_day": 0.97388,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_e63a06e7b1af851a2fc38edea8a803f7",
+            "content_digest": "sha256:e63a06e7b1af851a2fc38edea8a803f732126f5a4d61b3a70af03074f5bb40b2"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Moon at 23.72 degrees Libra",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "moon",
+              "longitude_deg": 203.724952,
+              "sign": "libra",
+              "sign_degree_deg": 23.724952,
+              "speed_deg_per_day": 12.914593,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_fe741a7653f7b9e0e5f042567fb9ebea",
+            "content_digest": "sha256:fe741a7653f7b9e0e5f042567fb9ebea5a3d9e972ed39e3554269d79b6f3f0c5"
+          },
+          {
+            "kind": "lunar_phase",
+            "scope": "collective",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Waxing crescent Moon",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "phase": "waxing_crescent",
+              "elongation_deg": 32.716111,
+              "illuminated_fraction": 0.079321
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_bc94fdff65bf0e18a3b8707fd473a95e",
+            "content_digest": "sha256:bc94fdff65bf0e18a3b8707fd473a95e6d487f2796159d89801df9693fd7c477"
+          },
+          {
+            "kind": "transit_natal_contact",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T21:49:37Z",
+            "label": "Transiting Moon exactly square natal Saturn",
+            "precision": {
+              "longitude_decimals": null,
+              "instant_resolution_seconds": 1
+            },
+            "detail": {
+              "transiting_body": "moon",
+              "natal_target": "saturn",
+              "aspect": "square",
+              "direction": "direct",
+              "speed_deg_per_day": 12.877402
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_70b3c4357553ca869cdb8cbc84704cac",
+            "content_digest": "sha256:70b3c4357553ca869cdb8cbc84704caca82b95ca71dc7a7dc55ae9a28bfcc883"
+          },
+          {
+            "kind": "sign_ingress",
+            "scope": "collective",
+            "effective_at": "2026-09-14T06:43:52Z",
+            "label": "Moon enters Scorpio",
+            "precision": {
+              "longitude_decimals": null,
+              "instant_resolution_seconds": 1
+            },
+            "detail": {
+              "body": "moon",
+              "from_sign": "libra",
+              "to_sign": "scorpio",
+              "direction": "direct"
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_7bc7a867572ca2a6fe20f2593e461645",
+            "content_digest": "sha256:7bc7a867572ca2a6fe20f2593e46164577965c2abc246db0210c8289fb6e6947"
+          },
+          {
+            "kind": "collective_exact_aspect",
+            "scope": "collective",
+            "effective_at": "2026-09-14T02:39:34Z",
+            "label": "Mercury exactly trine Uranus",
+            "precision": {
+              "longitude_decimals": null,
+              "instant_resolution_seconds": 1
+            },
+            "detail": {
+              "body": "mercury",
+              "other_body": "uranus",
+              "aspect": "trine",
+              "direction": "direct"
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_7fd74bed589c0afe58fb1de5a0d5fc75",
+            "content_digest": "sha256:7fd74bed589c0afe58fb1de5a0d5fc75f8163c7cc1725188e368c11440a85c70"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Mercury in the second house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mercury",
+              "house": 2,
+              "house_system": "placidus",
+              "longitude_deg": 185.171683
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_0757d425fa91c715a3bd6084dbea342d",
+            "content_digest": "sha256:0757d425fa91c715a3bd6084dbea342d62d059eb8e11a4a3c3b97927f6faa53b"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Neptune in the eighth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "neptune",
+              "house": 8,
+              "house_system": "placidus",
+              "longitude_deg": 3.335928
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_08435084c04cc0abeaf21d0b9a6e1a53",
+            "content_digest": "sha256:08435084c04cc0abeaf21d0b9a6e1a5399e7c6f0f5eb33cebb2f3856f70a47be"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Venus in the third house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "venus",
+              "house": 3,
+              "house_system": "placidus",
+              "longitude_deg": 212.152507
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_4227c2346a88bfff90354bb31e2c6271",
+            "content_digest": "sha256:4227c2346a88bfff90354bb31e2c6271b8ccbd0fdab1cac0744611992137db39"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Sun in the second house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "sun",
+              "house": 2,
+              "house_system": "placidus",
+              "longitude_deg": 171.008841
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_42fdb3a023ff8d004b5328d52d89bb30",
+            "content_digest": "sha256:42fdb3a023ff8d004b5328d52d89bb3051ca23227fd13f2ec511a769527c47b3"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Jupiter in the twelfth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "jupiter",
+              "house": 12,
+              "house_system": "placidus",
+              "longitude_deg": 136.323897
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_46c71023236683fe3f3670187a436fdf",
+            "content_digest": "sha256:46c71023236683fe3f3670187a436fdf9846d1f8a383ed09a1fd118e6e9b7699"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Moon in the third house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "moon",
+              "house": 3,
+              "house_system": "placidus",
+              "longitude_deg": 203.724952
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_6839961cfc9ce1260e20b3b411732241",
+            "content_digest": "sha256:6839961cfc9ce1260e20b3b411732241a3f65787f2c8a8898117318c0b5d0304"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Pluto in the sixth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "pluto",
+              "house": 6,
+              "house_system": "placidus",
+              "longitude_deg": 303.304906
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_87a14e36bf2641b910003e92400756c0",
+            "content_digest": "sha256:87a14e36bf2641b910003e92400756c07bc90dff5e1d7d2345f0ac37eb55d267"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Uranus in the tenth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "uranus",
+              "house": 10,
+              "house_system": "placidus",
+              "longitude_deg": 65.693068
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_8ee6bdd1fc1a8385edba921126f12222",
+            "content_digest": "sha256:8ee6bdd1fc1a8385edba921126f1222298b46aa3db5903cf27ab9bb4d92f7ce2"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Mars in the eleventh house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mars",
+              "house": 11,
+              "house_system": "placidus",
+              "longitude_deg": 111.382903
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_c15c15e8b8f9e24ea0e230047484b247",
+            "content_digest": "sha256:c15c15e8b8f9e24ea0e230047484b24726cb271c5250d6c12787d5d0ab9a9948"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-09-13T19:00:00Z",
+            "label": "Transiting Saturn in the eighth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "saturn",
+              "house": 8,
+              "house_system": "placidus",
+              "longitude_deg": 12.869337
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_cf7a7e85b331f990d4725bf98bb1a0fe",
+            "content_digest": "sha256:cf7a7e85b331f990d4725bf98bb1a0fe2af88d97d848f30cb14ae1e265aa4a34"
+          }
+        ]
+      }
+    },
+    {
+      "label": "the Sun's Virgo ingress",
+      "request": {
+        "schema_version": "0.5.0",
+        "request_id": "req_golden_daily_sky_0002",
+        "day_start_at": "2026-08-22T07:00:00Z",
+        "day_end_at": "2026-08-23T07:00:00Z",
+        "anchor_at": "2026-08-22T19:00:00Z",
+        "anchor_resolution": "unique",
+        "natal_positions": [
+          {
+            "body": "sun",
+            "longitude_deg": 54.700087
+          },
+          {
+            "body": "moon",
+            "longitude_deg": 301.068921
+          },
+          {
+            "body": "mercury",
+            "longitude_deg": 37.978268
+          },
+          {
+            "body": "venus",
+            "longitude_deg": 13.178013
+          },
+          {
+            "body": "mars",
+            "longitude_deg": 348.567993
+          },
+          {
+            "body": "jupiter",
+            "longitude_deg": 99.601456
+          },
+          {
+            "body": "saturn",
+            "longitude_deg": 295.244003
+          },
+          {
+            "body": "uranus",
+            "longitude_deg": 279.176094
+          },
+          {
+            "body": "neptune",
+            "longitude_deg": 284.348218
+          },
+          {
+            "body": "pluto",
+            "longitude_deg": 226.158662
+          },
+          {
+            "body": "true_node",
+            "longitude_deg": 310.252157
+          }
+        ],
+        "natal_house_cusps": {
+          "house_system": "placidus",
+          "cusps_deg": [
+            145.292763,
+            169.546194,
+            198.31697,
+            230.956615,
+            264.65125,
+            296.455998,
+            325.292763,
+            349.546194,
+            18.31697,
+            50.956615,
+            84.65125,
+            116.455998
+          ]
+        },
+        "effective_accuracy": "exact",
+        "uncertainty": {
+          "accuracy": "exact",
+          "window_plus_minus_minutes": null,
+          "suppressed_features": [],
+          "qualified_features": []
+        },
+        "suppressed_features": [],
+        "zodiac": "tropical",
+        "node": "true",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "tzdb_version": "2026c",
+        "local_day_resolution_policy_version": "1.0.0",
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "contract_id": "patternlike.chart.launch",
+        "contract_version": "0.2.0"
+      },
+      "response": {
+        "ok": true,
+        "schema_version": "0.5.0",
+        "request_id": "req_golden_daily_sky_0002",
+        "day_start_at": "2026-08-22T07:00:00Z",
+        "day_end_at": "2026-08-23T07:00:00Z",
+        "anchor_at": "2026-08-22T19:00:00Z",
+        "anchor_resolution": "unique",
+        "effective_accuracy": "exact",
+        "suppressed_features": [],
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "contract_id": "patternlike.chart.launch",
+        "contract_version": "0.2.0",
+        "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "tzdb_version": "2026c",
+        "facts": [
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Mercury at 24.65 degrees Leo",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mercury",
+              "longitude_deg": 144.648655,
+              "sign": "leo",
+              "sign_degree_deg": 24.648655,
+              "speed_deg_per_day": 2.012782,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_0427b3e2a3eeb2a4ddce5b0effaa9537",
+            "content_digest": "sha256:0427b3e2a3eeb2a4ddce5b0effaa9537c1d52ab0432adddb5395ebd2a3f5fc00"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Saturn at 14.14 degrees Aries, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "saturn",
+              "longitude_deg": 14.143095,
+              "sign": "aries",
+              "sign_degree_deg": 14.143095,
+              "speed_deg_per_day": -0.043837,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_04b47ed6f75999cf7bf673d025792f43",
+            "content_digest": "sha256:04b47ed6f75999cf7bf673d025792f43981c7874cb3065a4fd8907cce03899c9"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Mars at 7.49 degrees Cancer",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mars",
+              "longitude_deg": 97.492941,
+              "sign": "cancer",
+              "sign_degree_deg": 7.492941,
+              "speed_deg_per_day": 0.647274,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_2f68772cc43ed61fc6423729ca87f4c0",
+            "content_digest": "sha256:2f68772cc43ed61fc6423729ca87f4c0645a9aa34ad9eedce9ba35ae928d2ce0"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Uranus at 5.54 degrees Gemini",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "uranus",
+              "longitude_deg": 65.543755,
+              "sign": "gemini",
+              "sign_degree_deg": 5.543755,
+              "speed_deg_per_day": 0.015995,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_572341748e2b72c6985d528dff392607",
+            "content_digest": "sha256:572341748e2b72c6985d528dff392607b79cd984e5b5f0a6146b198ff0000dac"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Neptune at 3.88 degrees Aries, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "neptune",
+              "longitude_deg": 3.878917,
+              "sign": "aries",
+              "sign_degree_deg": 3.878917,
+              "speed_deg_per_day": -0.021661,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_65c0e9b03e8bfd0df6f59ebfb2f281c8",
+            "content_digest": "sha256:65c0e9b03e8bfd0df6f59ebfb2f281c8b017109a87fc1b4ec100ea9f24dbc927"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Jupiter at 11.74 degrees Leo",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "jupiter",
+              "longitude_deg": 131.739471,
+              "sign": "leo",
+              "sign_degree_deg": 11.739471,
+              "speed_deg_per_day": 0.215461,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_6d1f3fa69bbb0be20c9b77bc5b92b411",
+            "content_digest": "sha256:6d1f3fa69bbb0be20c9b77bc5b92b411e31ddba57092ef7515291aa84ef5106e"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Moon at 29.02 degrees Sagittarius",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "moon",
+              "longitude_deg": 269.017721,
+              "sign": "sagittarius",
+              "sign_degree_deg": 29.017721,
+              "speed_deg_per_day": 11.875781,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_af5289838259baa92ac8f3be4ffa3409",
+            "content_digest": "sha256:af5289838259baa92ac8f3be4ffa340934760e5c96e60844786151b7aa3b4d08"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Sun at 29.71 degrees Leo",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "sun",
+              "longitude_deg": 149.70642,
+              "sign": "leo",
+              "sign_degree_deg": 29.70642,
+              "speed_deg_per_day": 0.963355,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_c4132de1bffc1af0ab9f6b8ea520519b",
+            "content_digest": "sha256:c4132de1bffc1af0ab9f6b8ea520519b17725907e0cfc86e9f0597ee518fc1b9"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Pluto at 3.69 degrees Aquarius, retrograde",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "pluto",
+              "longitude_deg": 303.690464,
+              "sign": "aquarius",
+              "sign_degree_deg": 3.690464,
+              "speed_deg_per_day": -0.020471,
+              "retrograde": true
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_d48543f81bab25fd59081b33829ed6be",
+            "content_digest": "sha256:d48543f81bab25fd59081b33829ed6be7c60e99138b09caae00536893da6c79d"
+          },
+          {
+            "kind": "anchor_position",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Venus at 15.34 degrees Libra",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "venus",
+              "longitude_deg": 195.33762,
+              "sign": "libra",
+              "sign_degree_deg": 15.33762,
+              "speed_deg_per_day": 0.898134,
+              "retrograde": false
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_f259d13e9016a0cd674488661f1f438a",
+            "content_digest": "sha256:f259d13e9016a0cd674488661f1f438a6b7e8afb627924011f9e297a5038d53e"
+          },
+          {
+            "kind": "lunar_phase",
+            "scope": "collective",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Waxing gibbous Moon",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "phase": "waxing_gibbous",
+              "elongation_deg": 119.311301,
+              "illuminated_fraction": 0.744777
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_700ab71f163dc94d570e193ca25fbf3b",
+            "content_digest": "sha256:700ab71f163dc94d570e193ca25fbf3b5e0b4ee45a37c5682b624b8ad9390105"
+          },
+          {
+            "kind": "transit_natal_contact",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:36:48Z",
+            "label": "Transiting Mercury exactly square natal Sun",
+            "precision": {
+              "longitude_decimals": null,
+              "instant_resolution_seconds": 1
+            },
+            "detail": {
+              "transiting_body": "mercury",
+              "natal_target": "sun",
+              "aspect": "square",
+              "direction": "direct",
+              "speed_deg_per_day": 2.012703
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_427d2a4f7a72005f98b5af8c05301247",
+            "content_digest": "sha256:427d2a4f7a72005f98b5af8c05301247c456bff5d468efd6e671bd67c796a9b0"
+          },
+          {
+            "kind": "sign_ingress",
+            "scope": "collective",
+            "effective_at": "2026-08-22T20:59:05Z",
+            "label": "Moon enters Capricorn",
+            "precision": {
+              "longitude_decimals": null,
+              "instant_resolution_seconds": 1
+            },
+            "detail": {
+              "body": "moon",
+              "from_sign": "sagittarius",
+              "to_sign": "capricorn",
+              "direction": "direct"
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_e2d36d55dac1222a5f72477e9e8b2993",
+            "content_digest": "sha256:e2d36d55dac1222a5f72477e9e8b29936c8fddc1fcb52b8f1012a4b4cc8b425d"
+          },
+          {
+            "kind": "sign_ingress",
+            "scope": "collective",
+            "effective_at": "2026-08-23T02:18:49Z",
+            "label": "Sun enters Virgo",
+            "precision": {
+              "longitude_decimals": null,
+              "instant_resolution_seconds": 1
+            },
+            "detail": {
+              "body": "sun",
+              "from_sign": "leo",
+              "to_sign": "virgo",
+              "direction": "direct"
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_ad95d6d30f37dd8024a171827aa8a906",
+            "content_digest": "sha256:ad95d6d30f37dd8024a171827aa8a906937906405cb1dd155a0a72e970fb0055"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Saturn in the eighth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "saturn",
+              "house": 8,
+              "house_system": "placidus",
+              "longitude_deg": 14.143095
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_00615ccf41dd6d7aa66f4433ce334a24",
+            "content_digest": "sha256:00615ccf41dd6d7aa66f4433ce334a248420bb7815c40a02db199fd2928c8278"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Mercury in the twelfth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mercury",
+              "house": 12,
+              "house_system": "placidus",
+              "longitude_deg": 144.648655
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_564322a12e27bee23ea36021b88cfdab",
+            "content_digest": "sha256:564322a12e27bee23ea36021b88cfdab3657eb87649a8e1d9b9864990070043c"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Jupiter in the twelfth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "jupiter",
+              "house": 12,
+              "house_system": "placidus",
+              "longitude_deg": 131.739471
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_94bb4bef324eacb5d887f65f555aad09",
+            "content_digest": "sha256:94bb4bef324eacb5d887f65f555aad09cbb2ffd35ea107d0ce056d6bc6d0c0b8"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Mars in the eleventh house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "mars",
+              "house": 11,
+              "house_system": "placidus",
+              "longitude_deg": 97.492941
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_a75ab75b6e25cca18b315a182c8a0ea5",
+            "content_digest": "sha256:a75ab75b6e25cca18b315a182c8a0ea5f942a601ef8eae9ed87c519264174691"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Uranus in the tenth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "uranus",
+              "house": 10,
+              "house_system": "placidus",
+              "longitude_deg": 65.543755
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_bc4f6b308bb1d435be4509e912a4c4e3",
+            "content_digest": "sha256:bc4f6b308bb1d435be4509e912a4c4e35a034e47b4b09fb542caf8454cd2d046"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Venus in the second house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "venus",
+              "house": 2,
+              "house_system": "placidus",
+              "longitude_deg": 195.33762
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_c5af7f6dab3e68818fed8c05d8abf635",
+            "content_digest": "sha256:c5af7f6dab3e68818fed8c05d8abf635ee60d28ad0e54f6d39f24d50df774b18"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Sun in the first house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "sun",
+              "house": 1,
+              "house_system": "placidus",
+              "longitude_deg": 149.70642
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_cdb0859839e065c522d50ce35469d767",
+            "content_digest": "sha256:cdb0859839e065c522d50ce35469d7676089501e2d8018fa4d57644afde5d36e"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Neptune in the eighth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "neptune",
+              "house": 8,
+              "house_system": "placidus",
+              "longitude_deg": 3.878917
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_d9f9f21c2b9fc7217a057b5589d2fa9b",
+            "content_digest": "sha256:d9f9f21c2b9fc7217a057b5589d2fa9bd462f64c36309df84e5bbb0ba7e15047"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Moon in the fifth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "moon",
+              "house": 5,
+              "house_system": "placidus",
+              "longitude_deg": 269.017721
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_dcdb0b12600e740cc0f296db968d56ad",
+            "content_digest": "sha256:dcdb0b12600e740cc0f296db968d56ad1295a2367dc52a570f6d727e7f0bd368"
+          },
+          {
+            "kind": "house_placement",
+            "scope": "personalized",
+            "effective_at": "2026-08-22T19:00:00Z",
+            "label": "Transiting Pluto in the sixth house",
+            "precision": {
+              "longitude_decimals": 6,
+              "instant_resolution_seconds": null
+            },
+            "detail": {
+              "body": "pluto",
+              "house": 6,
+              "house_system": "placidus",
+              "longitude_deg": 303.690464
+            },
+            "daily_sky_policy_id": "daily-sky-launch",
+            "daily_sky_policy_version": "1.0.0",
+            "calculation_policy_id": "swiss-ephemeris-launch",
+            "calculation_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:f37b75d642dce800e7568e33644238de95eee84993d29c2b97fed1e48ab50e0d",
+            "fact_id": "dsf_f3125e293b0ff7da8b5b7bfe6379604f",
+            "content_digest": "sha256:f3125e293b0ff7da8b5b7bfe6379604f19b3f3656bdc9dab9fa8926327cc5542"
+          }
+        ]
+      }
+    }
+  ]
+}

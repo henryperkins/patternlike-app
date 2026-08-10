@@ -65,6 +65,21 @@ function json(body: unknown, status = 200): Response {
 }
 
 /**
+ * The hosts `CALC_SERVICE_URL` can name across wrangler's dev and production
+ * blocks.
+ *
+ * Listed rather than inferred from the path, because inferring would defeat the
+ * point: the dispatcher fails closed on an unknown host, and a rule that read
+ * "anything asking for /v1/cycles is the calculation service" would let any host
+ * in through a familiar-looking URL.
+ */
+const CALCULATION_HOSTS = new Set(["127.0.0.1", "localhost", "patternlike-calc.fly.dev"]);
+
+function isCalculationHost(url: URL): boolean {
+  return CALCULATION_HOSTS.has(url.hostname);
+}
+
+/**
  * Sentinel chart fingerprints that drive `/v1/cycles` failure paths.
  *
  * Fingerprints rather than a place label, because the cycle request carries no
@@ -225,9 +240,229 @@ async function mockCycleScan(request: Request): Promise<Response> {
   });
 }
 
+/**
+ * Sentinel request ids that drive `/v1/daily-sky` failure paths.
+ *
+ * Request ids rather than a place label or a fingerprint, because the daily-sky
+ * request carries neither: it holds natal longitudes, a resolved day, and policy
+ * versions, and nothing in it names a chart or a user. That is the property that
+ * keeps a decryption path out of the calculation service, so the test seam has
+ * to respect it too.
+ */
+export const DAILY_SKY_REQ_REFUSED = "req_mock_daily_sky_refused";
+export const DAILY_SKY_REQ_UNAVAILABLE = "req_mock_daily_sky_unavail";
+export const DAILY_SKY_REQ_ZERO_EVENTS = "req_mock_daily_sky_zeroevt";
+
+interface DailySkyRequestBody {
+  schema_version: string;
+  request_id: string;
+  day_start_at: string;
+  day_end_at: string;
+  anchor_at: string;
+  anchor_resolution: string;
+  natal_positions: Array<{ body: string; longitude_deg: number }>;
+  natal_house_cusps: { house_system: string; cusps_deg: number[] } | null;
+  effective_accuracy: "exact" | "approximate" | "unknown";
+  suppressed_features: string[];
+  ephemeris_data_version: string;
+  tzdb_version: string;
+  daily_sky_policy_id: string;
+  daily_sky_policy_version: string;
+  calculation_policy_id: string;
+  calculation_policy_version: string;
+  contract_id: string;
+  contract_version: string;
+}
+
+/**
+ * `dsf_` + 32 hex over the fact's own content, mirroring the real derivation
+ * closely enough that a caller can still check `fact_id === content_digest[0:32]`.
+ */
+function mockFact(
+  req: DailySkyRequestBody,
+  kind: string,
+  effectiveAt: string,
+  label: string,
+  detail: Record<string, unknown>,
+): Record<string, unknown> {
+  const anchored = kind === "anchor_position" || kind === "lunar_phase" || kind === "house_placement";
+  const core = {
+    kind,
+    scope: kind === "transit_natal_contact" || kind === "house_placement" ? "personalized" : "collective",
+    effective_at: effectiveAt,
+    label,
+    precision: anchored
+      ? { longitude_decimals: 6, instant_resolution_seconds: null }
+      : { longitude_decimals: null, instant_resolution_seconds: 1 },
+    detail,
+    daily_sky_policy_id: req.daily_sky_policy_id,
+    daily_sky_policy_version: req.daily_sky_policy_version,
+    calculation_policy_id: req.calculation_policy_id,
+    calculation_policy_version: req.calculation_policy_version,
+    ephemeris_data_version: req.ephemeris_data_version,
+    container_digest: `sha256:${"7e".repeat(32)}`,
+  };
+  const digest = stableHash(JSON.stringify(core));
+  return { ...core, fact_id: `dsf_${digest.slice(0, 32)}`, content_digest: `sha256:${digest}` };
+}
+
+async function mockDailySky(request: Request): Promise<Response> {
+  const req = (await request.json()) as DailySkyRequestBody;
+
+  if (req.request_id === DAILY_SKY_REQ_UNAVAILABLE) {
+    // Transport envelope with a non-200: the request never reached the engine.
+    return json(
+      { error: { code: "unauthorized", message: "Valid service credentials are required" } },
+      401,
+    );
+  }
+  if (req.request_id === DAILY_SKY_REQ_REFUSED) {
+    return json({
+      ok: false,
+      schema_version: req.schema_version,
+      request_id: req.request_id,
+      error_class: "calculation_failed",
+      error_message: "the daily-sky scan did not complete",
+    });
+  }
+
+  const suppressed = new Set(req.suppressed_features ?? []);
+  const facts: Array<Record<string, unknown>> = [
+    mockFact(req, "anchor_position", req.anchor_at, "Sun at 7.42 degrees Leo", {
+      body: "sun",
+      longitude_deg: 127.423118,
+      sign: "leo",
+      sign_degree_deg: 7.423118,
+      speed_deg_per_day: 0.955214,
+      retrograde: false,
+    }),
+    mockFact(req, "anchor_position", req.anchor_at, "Moon at 19.88 degrees Scorpio", {
+      body: "moon",
+      longitude_deg: 229.882407,
+      sign: "scorpio",
+      sign_degree_deg: 19.882407,
+      speed_deg_per_day: 12.114903,
+      retrograde: false,
+    }),
+    // Always present, on every success: an empty EVENT list must never look
+    // like an empty FACTUAL day, or the publisher has nothing to be grounded in.
+    mockFact(req, "lunar_phase", req.anchor_at, "Waxing gibbous Moon", {
+      phase: "waxing_gibbous",
+      elongation_deg: 102.459289,
+      illuminated_fraction: 0.606,
+    }),
+  ];
+
+  if (req.request_id !== DAILY_SKY_REQ_ZERO_EVENTS) {
+    const natalTarget = req.natal_positions.find((p) => p.body === "sun");
+    if (natalTarget) {
+      facts.push(
+        mockFact(
+          req,
+          "transit_natal_contact",
+          "2026-07-30T14:11:07Z",
+          "Transiting Saturn exactly square natal Sun",
+          {
+            transiting_body: "saturn",
+            natal_target: "sun",
+            aspect: "square",
+            direction: "retrograde",
+            speed_deg_per_day: -0.028812,
+          },
+        ),
+      );
+    }
+    facts.push(
+      mockFact(req, "sign_ingress", "2026-07-30T22:05:31Z", "Mercury enters Virgo", {
+        body: "mercury",
+        from_sign: "leo",
+        to_sign: "virgo",
+        direction: "direct",
+      }),
+    );
+  }
+
+  if (req.natal_house_cusps && !suppressed.has("houses")) {
+    facts.push(
+      mockFact(req, "house_placement", req.anchor_at, "Transiting Saturn in the tenth house", {
+        body: "saturn",
+        house: 10,
+        house_system: req.natal_house_cusps.house_system,
+        longitude_deg: 1.774002,
+      }),
+    );
+  }
+
+  const rank = [
+    "anchor_position",
+    "lunar_phase",
+    "transit_natal_contact",
+    "sign_ingress",
+    "collective_exact_aspect",
+    "house_placement",
+  ];
+  facts.sort((a, b) => {
+    const kindDelta = rank.indexOf(String(a.kind)) - rank.indexOf(String(b.kind));
+    if (kindDelta !== 0) return kindDelta;
+    if (a.effective_at !== b.effective_at) return String(a.effective_at) < String(b.effective_at) ? -1 : 1;
+    return String(a.fact_id) < String(b.fact_id) ? -1 : 1;
+  });
+
+  return json({
+    ok: true,
+    schema_version: req.schema_version,
+    request_id: req.request_id,
+    day_start_at: req.day_start_at,
+    day_end_at: req.day_end_at,
+    anchor_at: req.anchor_at,
+    anchor_resolution: req.anchor_resolution,
+    effective_accuracy: req.effective_accuracy,
+    suppressed_features: [...(req.suppressed_features ?? [])].sort(),
+    daily_sky_policy_id: req.daily_sky_policy_id,
+    daily_sky_policy_version: req.daily_sky_policy_version,
+    calculation_policy_id: req.calculation_policy_id,
+    calculation_policy_version: req.calculation_policy_version,
+    contract_id: req.contract_id,
+    contract_version: req.contract_version,
+    container_digest: `sha256:${"7e".repeat(32)}`,
+    ephemeris_data_version: req.ephemeris_data_version,
+    tzdb_version: req.tzdb_version,
+    facts,
+  });
+}
+
+/** The provider host. Reached only by the OpenAI publisher adapter. */
+export const OPENAI_HOST = "api.openai.com";
+
+/**
+ * The single outbound interceptor, dispatching BY HOST first.
+ *
+ * One seam rather than two: a parallel fetch interceptor installed alongside
+ * this one would mean the calculation path and the provider path could each
+ * think they had covered the network while the other quietly reached it. Host
+ * first, then path, and an unknown host is a hard failure — a test that
+ * accidentally addresses a real service should break loudly here rather than
+ * make a request.
+ */
 export async function mockCalcService(request: Request): Promise<Response> {
   const url = new URL(request.url);
+
+  if (url.hostname === OPENAI_HOST) {
+    // Task 7 installs the Responses fake behind this seam. Until then the host
+    // is routed but unimplemented, which is still a refusal rather than a
+    // network call.
+    return json(
+      { error: { message: "the OpenAI test seam is not installed", type: "not_implemented" } },
+      501,
+    );
+  }
+
+  if (!isCalculationHost(url)) {
+    return json({ error: { code: "unmocked_host", message: `no test seam for ${url.hostname}` } }, 502);
+  }
+
   if (url.pathname.endsWith("/v1/cycles")) return mockCycleScan(request);
+  if (url.pathname.endsWith("/v1/daily-sky")) return mockDailySky(request);
   if (!url.pathname.endsWith("/v1/calculate")) {
     return json({ ok: false, chart: null, error_class: "not_found" }, 404);
   }

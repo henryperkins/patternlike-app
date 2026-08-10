@@ -11,9 +11,10 @@
     "start": "tsx src/server.ts",
     "ephe:download": "node scripts/download-ephe.mjs",
     "pretest": "node scripts/download-ephe.mjs",
-    "//test": "Glob QUOTED so node expands it rather than sh — see the note in packages/shared/package.json.",
+    "//test": "Glob QUOTED so node expands it rather than sh \u2014 see the note in packages/shared/package.json.",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "test:golden": "tsx --test src/golden.test.ts"
+    "test:golden": "tsx --test src/golden.test.ts src/daily-sky-golden.test.ts",
+    "//test:golden": "The focused calculation-authority lane. Both golden suites, because a lane that ran only the chart goldens would report green while the daily-sky vectors \u2014 the ones a reading is actually grounded in \u2014 went unchecked."
   },
   "dependencies": {
     "@patternlike/shared": "0.2.0",
