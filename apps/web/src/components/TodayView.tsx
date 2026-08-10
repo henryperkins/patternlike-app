@@ -134,27 +134,29 @@ function TodayReading({
         </p>
       ) : null}
 
-      <div className="today-body">
-        {paragraphs.map((paragraph) => (
-          <Paragraph key={paragraph.paragraph_id} paragraph={paragraph} />
-        ))}
-      </div>
+      <div className="today-reading">
+        <div className="today-body">
+          {paragraphs.map((paragraph) => (
+            <Paragraph key={paragraph.paragraph_id} paragraph={paragraph} />
+          ))}
+        </div>
 
-      {response.evidence_url ? (
-        // Keyed for the same reason the preference form is: the drawer caches
-        // its fetch for the reading it was opened against, and its 404 branch
-        // deliberately does not re-arm. "Reload Today" after a reissue answers
-        // with a different reading id into the same mounted instance, which
-        // would leave the drawer reporting the old reading as missing and
-        // refusing to fetch the new one. Same id keeps the cache.
-        <WhyThisDrawer
-          key={reading.reading_id}
-          readingId={reading.reading_id}
-          paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
-          onReload={onReload}
-          onUnauthorized={onUnauthorized}
-        />
-      ) : null}
+        {response.evidence_url ? (
+          // Keyed for the same reason the preference form is: the drawer caches
+          // its fetch for the reading it was opened against, and its 404 branch
+          // deliberately does not re-arm. "Reload Today" after a reissue answers
+          // with a different reading id into the same mounted instance, which
+          // would leave the drawer reporting the old reading as missing and
+          // refusing to fetch the new one. Same id keeps the cache.
+          <WhyThisDrawer
+            key={reading.reading_id}
+            readingId={reading.reading_id}
+            paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
+            onReload={onReload}
+            onUnauthorized={onUnauthorized}
+          />
+        ) : null}
+      </div>
     </article>
   );
 }

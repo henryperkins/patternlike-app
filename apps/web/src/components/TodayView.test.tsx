@@ -79,6 +79,25 @@ describe("TodayView", () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
+  it("keeps the lead and provenance in one editorial column", async () => {
+    const { container } = renderToday({
+      [TODAY]: ok(todayResponse),
+      [EVIDENCE]: ok(evidenceGraph),
+    });
+    await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
+
+    const column = container.querySelector<HTMLElement>(".today-reading");
+    expect(column).not.toBeNull();
+
+    const body = column!.querySelector<HTMLElement>(".today-body");
+    const lead = column!.querySelector<HTMLElement>(".reading-block--primary_theme");
+    const evidence = column!.querySelector<HTMLDetailsElement>(".today-evidence");
+
+    expect(body).not.toBeNull();
+    expect(lead).toBe(body!.firstElementChild);
+    expect(evidence).toBe(body!.nextElementSibling);
+  });
+
   it("labels a fallback reading without dressing it as a failure", async () => {
     renderToday({ [TODAY]: ok(fallbackResponse) });
 
