@@ -468,25 +468,91 @@ export function setContentLocale(
   });
 }
 
+export type TimingPhase =
+  | "emerging"
+  | "building"
+  | "peak"
+  | "reconsidering"
+  | "integrating";
+export type TimingPhaseFilter = TimingPhase | "upcoming";
+export type TimingDurationFilter = "short" | "medium" | "long";
+export type TimingBody =
+  | "sun"
+  | "moon"
+  | "mercury"
+  | "venus"
+  | "mars"
+  | "jupiter"
+  | "saturn"
+  | "uranus"
+  | "neptune"
+  | "pluto"
+  | "true_node"
+  | "ascendant"
+  | "midheaven";
+export type TimingAspect =
+  | "conjunction"
+  | "sextile"
+  | "square"
+  | "trine"
+  | "opposition";
+
 export interface TimingFilters {
-  phase?: string;
-  domain?: string;
-  duration?: string;
+  phase?: TimingPhaseFilter;
+  duration?: TimingDurationFilter;
+}
+
+export interface TimingPass {
+  pass_index: number;
+  direction: "direct" | "retrograde";
+  exact_at: string;
+}
+
+export interface TimingCycle {
+  cycle_id: string;
+  technique: "transit";
+  body: TimingBody;
+  target: string;
+  aspect: TimingAspect;
+  status: "active" | "upcoming";
+  phase: TimingPhase | null;
+  start_at: string;
+  exact_at: string;
+  end_at: string;
+  duration_days: number;
+  orb_deg: number;
+  passes: TimingPass[];
+}
+
+export interface TimingResponse {
+  schema_version: "0.3.0";
+  as_of: string;
+  calculation_status: {
+    mode: "persisted_daily_reading_scan";
+    state: "current" | "stale" | "not_scanned";
+    last_refresh_at: string | null;
+    last_refresh_local_date: string | null;
+  };
+  applied_filters: {
+    phase: TimingPhaseFilter | null;
+    duration: TimingDurationFilter | null;
+  };
+  unreadable_cycle_count: number;
+  cycles: TimingCycle[];
 }
 
 export function getTiming(
   filters: TimingFilters = {},
   signal?: AbortSignal,
-): Promise<unknown> {
+): Promise<TimingResponse> {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
-    if (value) query.set(key, value);
-  }
+  if (filters.phase) query.set("phase", filters.phase);
+  if (filters.duration) query.set("duration", filters.duration);
   // `URLSearchParams.size` only landed in Safari 17; serialising is universal.
   const serialized = query.toString();
   const suffix = serialized ? `?${serialized}` : "";
 
-  return request<unknown>(`/v1/timing${suffix}`, {
+  return request<TimingResponse>(`/v1/timing${suffix}`, {
     method: "GET",
     headers: requestHeaders(),
     signal,
