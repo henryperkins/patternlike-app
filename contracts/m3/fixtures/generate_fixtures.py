@@ -529,6 +529,107 @@ def _invert_envelope(c):
 mutate_cycle("cycle-response.inverted-envelope.json", _invert_envelope)
 
 # --------------------------------------------------------------------------
+# timing-response
+# --------------------------------------------------------------------------
+
+TIMING_CURRENT_EMPTY = {
+    "schema_version": SV,
+    "as_of": "2026-08-10T05:15:00Z",
+    "calculation_status": {
+        "mode": "persisted_daily_reading_scan",
+        "state": "current",
+        "last_refresh_at": "2026-08-10T05:01:12Z",
+        "last_refresh_local_date": "2026-08-10",
+    },
+    "applied_filters": {
+        "phase": None,
+        "duration": None,
+    },
+    "unreadable_cycle_count": 0,
+    "cycles": [],
+}
+write(V + "timing-response.current-empty.json", TIMING_CURRENT_EMPTY)
+
+TIMING_NOT_SCANNED = copy.deepcopy(TIMING_CURRENT_EMPTY)
+TIMING_NOT_SCANNED["calculation_status"] = {
+    "mode": "persisted_daily_reading_scan",
+    "state": "not_scanned",
+    "last_refresh_at": None,
+    "last_refresh_local_date": None,
+}
+write(V + "timing-response.not-scanned.json", TIMING_NOT_SCANNED)
+
+TIMING_ACTIVE_MULTI_PASS = copy.deepcopy(TIMING_CURRENT_EMPTY)
+TIMING_ACTIVE_MULTI_PASS["unreadable_cycle_count"] = 1
+TIMING_ACTIVE_MULTI_PASS["cycles"] = [
+    {
+        "cycle_id": "cyc_0123456789abcdef0123456789abcdef",
+        "technique": "transit",
+        "body": "saturn",
+        "target": "sun",
+        "aspect": "square",
+        "status": "active",
+        "phase": "reconsidering",
+        "start_at": "2026-07-19T05:22:10Z",
+        "exact_at": "2026-08-02T14:11:07Z",
+        "end_at": "2027-01-26T18:44:02Z",
+        "duration_days": 191.55685185185186,
+        "orb_deg": 3,
+        "passes": [
+            {
+                "pass_index": 1,
+                "direction": "direct",
+                "exact_at": "2026-08-02T14:11:07Z",
+            },
+            {
+                "pass_index": 2,
+                "direction": "retrograde",
+                "exact_at": "2026-10-19T03:52:44Z",
+            },
+            {
+                "pass_index": 3,
+                "direction": "direct",
+                "exact_at": "2027-01-11T21:07:19Z",
+            },
+        ],
+    },
+]
+write(V + "timing-response.active-multi-pass.json", TIMING_ACTIVE_MULTI_PASS)
+
+bad = copy.deepcopy(TIMING_ACTIVE_MULTI_PASS)
+bad["cycles"][0]["phase"] = None
+write(I + "timing-response.active-null-phase.json", bad)
+
+bad = copy.deepcopy(TIMING_ACTIVE_MULTI_PASS)
+bad_cycle = bad["cycles"][0]
+bad_cycle["status"] = "upcoming"
+bad_cycle["start_at"] = "2027-02-01T00:00:00Z"
+bad_cycle["exact_at"] = "2027-02-10T00:00:00Z"
+bad_cycle["end_at"] = "2027-03-01T00:00:00Z"
+bad_cycle["duration_days"] = 28.0
+bad_cycle["passes"] = [
+    {
+        "pass_index": 1,
+        "direction": "direct",
+        "exact_at": "2027-02-10T00:00:00Z",
+    },
+]
+write(I + "timing-response.upcoming-with-phase.json", bad)
+
+bad = copy.deepcopy(TIMING_CURRENT_EMPTY)
+bad["calculation_status"]["last_refresh_at"] = None
+bad["calculation_status"]["last_refresh_local_date"] = None
+write(I + "timing-response.current-null-receipt.json", bad)
+
+bad = copy.deepcopy(TIMING_ACTIVE_MULTI_PASS)
+bad["cycles"][0]["passes"][1]["pass_index"] = 3
+write(I + "timing-response.noncontiguous-passes.json", bad)
+
+bad = copy.deepcopy(TIMING_CURRENT_EMPTY)
+bad["applied_filters"]["duration"] = "annual"
+write(I + "timing-response.unsupported-filter.json", bad)
+
+# --------------------------------------------------------------------------
 # generation-command
 # --------------------------------------------------------------------------
 COMMAND = {

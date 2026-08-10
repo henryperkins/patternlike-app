@@ -116,6 +116,21 @@
       "note": "NEW. M0 pinned output_schema to the literal 'daily-reading-v2' without shipping a document for it, so the assembly identity committed to a schema nobody could validate against. v3 is that document."
     },
     {
+      "file": "timing-response.schema.json",
+      "id": "https://patternlike.app/contracts/m3/timing-response.schema.json",
+      "defines": [
+        "timingPhaseFilter",
+        "durationFilter",
+        "calculationStatus",
+        "appliedFilters",
+        "timingPass",
+        "timingCycle",
+        "timingResponse"
+      ],
+      "supersedes": "m0:openapi/openapi.yaml#/components/schemas/TimingResponse",
+      "note": "ADDED additively — see the 2026-08-10 amendment. This is the first successful Timing body in M3; it explicitly supersedes rather than claims compatibility with M0's frozen placeholder."
+    },
+    {
       "file": "assembly-identity.schema.json",
       "id": "https://patternlike.app/contracts/m3/assembly-identity.schema.json",
       "defines": [
@@ -287,7 +302,7 @@
   },
   "out_of_scope_for_this_freeze": [
     "Constrained-model editing (M5). assembly_mode stays deterministic; nothing calls a model in M3.",
-    "GET /v1/pattern, /v1/timing, /v1/time-travel, /v1/check-ins response bodies",
+    "GET /v1/pattern, /v1/time-travel, /v1/check-ins response bodies",
     "Notification delivery vendor",
     "Relationship data (M5)"
   ],
@@ -364,6 +379,25 @@
         "openapi/openapi.yaml"
       ],
       "implemented_by": "apps/api/src/routes/readings.ts (PUT /v1/readings/today)"
+    },
+    {
+      "date": "2026-08-10",
+      "kind": "additive_schema",
+      "summary": "GET /v1/timing gains the first implemented M3 success body and explicitly supersedes M0's frozen placeholder.",
+      "detail": "M0 already documented a TimingResponse shaped as {items, calculation_status:{last_refresh_at, stale}} plus phase, domain, and duration query parameters. That frozen document cannot represent the implemented read model. M3 replaces items with modelled cycles carrying active/upcoming state and exact passes; replaces the stale boolean with current | stale | not_scanned backed by a persisted scan receipt; adds schema_version, as_of, applied filters, and unreadable-cycle reporting; and removes domain because neither package supplies an authoritative cycle-to-domain mapping. The new response is therefore an honest supersession, not a compatible extension. M0 remains byte-frozen and M3 already carries the successor 0.3.0 schema version, so adding this new M3 document, fixtures, and operation changes no existing M3 required field, enum, or $id.",
+      "files": [
+        "timing-response.schema.json",
+        "fixtures/valid/timing-response.current-empty.json",
+        "fixtures/valid/timing-response.not-scanned.json",
+        "fixtures/valid/timing-response.active-multi-pass.json",
+        "fixtures/invalid/timing-response.active-null-phase.json",
+        "fixtures/invalid/timing-response.upcoming-with-phase.json",
+        "fixtures/invalid/timing-response.current-null-receipt.json",
+        "fixtures/invalid/timing-response.noncontiguous-passes.json",
+        "fixtures/invalid/timing-response.unsupported-filter.json",
+        "openapi/openapi.yaml"
+      ],
+      "implemented_by": "apps/api/src/routes/timing.ts (GET /v1/timing)"
     }
   ]
 }

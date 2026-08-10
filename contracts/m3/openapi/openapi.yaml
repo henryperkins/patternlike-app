@@ -14,10 +14,12 @@ info:
     names a definition nobody ships is a build failure, which is the property a
     `$ref` to an unfetchable URL would not have given us.
 
-    Two routes change substantively from M0 because they have never had a
-    successful implementation to be compatible with: `GET /v1/readings/today` and
-    `GET /v1/readings/{id}/evidence` now return real M3 shapes at
-    `schema_version: 0.3.0`.
+    Three routes change substantively from M0 because they have never had a
+    successful implementation to be compatible with: `GET /v1/readings/today`,
+    `GET /v1/readings/{id}/evidence`, and `GET /v1/timing` now return real M3
+    shapes at `schema_version: 0.3.0`. Timing intentionally supersedes M0's
+    incompatible placeholder response rather than claiming wire compatibility
+    with it.
 
     Two routes are new: `PUT /v1/preferences/timezone` and
     `PUT /v1/preferences/locale`. Identity creation writes `timezone: 'UTC'` and
@@ -384,14 +386,56 @@ paths:
       tags: [timing]
       operationId: getTiming
       summary: Active and upcoming cycles
+      x-normative-schema: 'm3:timing-response.schema.json#/$defs/timingResponse'
       description: |
-        Not implemented. Becomes nearly free once cycle persistence lands, but is
-        not on the daily loop's critical path. When it ships, phase is recomputed
-        from `cycle_passes` for display: the stored `phase` column is a scan-time
-        cache for filtering, not the authority.
+        Read-only projection of the authenticated reader's persisted first-scan
+        `cycle_instances.cycle_json` artifacts. The Worker does not call the
+        calculation service, refresh a scan, enqueue work, or write D1. It
+        validates each artifact independently and recomputes active phase at one
+        response-scoped `as_of`; neither the stored phase column nor
+        `cycle_passes` is a read authority. An unreadable cycle is omitted and
+        counted without hiding valid sibling cycles.
+
+        `calculation_status` is derived from the user-owned `daily_readings` row
+        with the greatest local date and newest creation time within that date,
+        without filtering reading status. This receipt can prove that a scan
+        reached persistence, including an empty scan; it does not promise a
+        scheduled refresh or complete future horizon. A receipt for a later
+        local date is current, which is a legal result after a time-zone change.
+
+        Only one `phase` and one `duration` parameter are accepted. Unknown
+        parameters, duplicate parameters, the removed M0 `domain` parameter,
+        and invalid values return `400 invalid_filter`.
+      parameters:
+        - name: phase
+          in: query
+          required: false
+          description: Recomputed phase, or `upcoming` for a cycle whose start is after `as_of`.
+          schema:
+            type: string
+            enum: [emerging, building, peak, reconsidering, integrating, upcoming]
+        - name: duration
+          in: query
+          required: false
+          description: |
+            Elapsed envelope duration. `short` is under 90 days, `medium` is at
+            least 90 and under 365 days, and `long` is at least 365 days.
+          schema:
+            type: string
+            enum: [short, medium, long]
       responses:
-        '501': { $ref: '#/components/responses/NotImplemented' }
+        '200':
+          description: Persisted cycle facts; an empty cycles array is an ordinary result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimingResponse' }
+        '400':
+          description: '`invalid_filter` for unknown, duplicate, removed, or invalid query filters.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '401': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
   /v1/time-travel:
     get:
       tags: [timing]
@@ -747,6 +791,104 @@ components:
         schema_version: { type: string, const: '0.3.0' }
         status: { type: string, const: preparing }
         local_date: { type: string, format: date }
+    TimingResponse:
+      type: object
+      additionalProperties: false
+      required:
+        [schema_version, as_of, calculation_status, applied_filters,
+         unreadable_cycle_count, cycles]
+      description: |
+        Wire projection of
+        `m3:timing-response.schema.json#/$defs/timingResponse`. It deliberately
+        omits pass speed, life domain, stored phase, and storage timestamps.
+      properties:
+        schema_version: { type: string, const: '0.3.0' }
+        as_of: { type: string, format: date-time }
+        calculation_status:
+          type: object
+          additionalProperties: false
+          required: [mode, state, last_refresh_at, last_refresh_local_date]
+          properties:
+            mode: { type: string, const: persisted_daily_reading_scan }
+            state: { type: string, enum: [current, stale, not_scanned] }
+            last_refresh_at: { type: [string, 'null'], format: date-time }
+            last_refresh_local_date: { type: [string, 'null'], format: date }
+          allOf:
+            - if:
+                properties: { state: { const: not_scanned } }
+                required: [state]
+              then:
+                properties:
+                  last_refresh_at: { type: 'null' }
+                  last_refresh_local_date: { type: 'null' }
+              else:
+                properties:
+                  last_refresh_at: { type: string, format: date-time }
+                  last_refresh_local_date: { type: string, format: date }
+        applied_filters:
+          type: object
+          additionalProperties: false
+          required: [phase, duration]
+          properties:
+            phase:
+              type: [string, 'null']
+              enum: [emerging, building, peak, reconsidering, integrating, upcoming, null]
+            duration:
+              type: [string, 'null']
+              enum: [short, medium, long, null]
+        unreadable_cycle_count: { type: integer, minimum: 0 }
+        cycles:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              [cycle_id, technique, body, target, aspect, status, phase, start_at,
+               exact_at, end_at, duration_days, orb_deg, passes]
+            properties:
+              cycle_id: { type: string, pattern: '^cyc_[a-f0-9]{32}$' }
+              technique: { type: string, const: transit }
+              body:
+                type: string
+                enum:
+                  [sun, moon, mercury, venus, mars, jupiter, saturn, uranus,
+                   neptune, pluto, true_node, ascendant, midheaven]
+              target: { type: string, minLength: 1 }
+              aspect:
+                type: string
+                enum: [conjunction, sextile, square, trine, opposition]
+              status: { type: string, enum: [active, upcoming] }
+              phase:
+                type: [string, 'null']
+                enum: [emerging, building, peak, reconsidering, integrating, null]
+              start_at: { type: string, format: date-time }
+              exact_at: { type: string, format: date-time }
+              end_at: { type: string, format: date-time }
+              duration_days: { type: number, minimum: 0 }
+              orb_deg: { type: number, minimum: 0, maximum: 12 }
+              passes:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [pass_index, direction, exact_at]
+                  properties:
+                    pass_index: { type: integer, minimum: 1 }
+                    direction: { type: string, enum: [direct, retrograde] }
+                    exact_at: { type: string, format: date-time }
+            allOf:
+              - if:
+                  properties: { status: { const: active } }
+                  required: [status]
+                then:
+                  properties:
+                    phase:
+                      type: string
+                      enum: [emerging, building, peak, reconsidering, integrating]
+                else:
+                  properties:
+                    phase: { type: 'null' }
     ReadingEvidenceGraph:
       type: object
       additionalProperties: true

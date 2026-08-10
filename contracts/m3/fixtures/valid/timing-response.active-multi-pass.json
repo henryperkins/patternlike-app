@@ -1,0 +1,48 @@
+{
+  "schema_version": "0.3.0",
+  "as_of": "2026-08-10T05:15:00Z",
+  "calculation_status": {
+    "mode": "persisted_daily_reading_scan",
+    "state": "current",
+    "last_refresh_at": "2026-08-10T05:01:12Z",
+    "last_refresh_local_date": "2026-08-10"
+  },
+  "applied_filters": {
+    "phase": null,
+    "duration": null
+  },
+  "unreadable_cycle_count": 1,
+  "cycles": [
+    {
+      "cycle_id": "cyc_0123456789abcdef0123456789abcdef",
+      "technique": "transit",
+      "body": "saturn",
+      "target": "sun",
+      "aspect": "square",
+      "status": "active",
+      "phase": "reconsidering",
+      "start_at": "2026-07-19T05:22:10Z",
+      "exact_at": "2026-08-02T14:11:07Z",
+      "end_at": "2027-01-26T18:44:02Z",
+      "duration_days": 191.55685185185186,
+      "orb_deg": 3,
+      "passes": [
+        {
+          "pass_index": 1,
+          "direction": "direct",
+          "exact_at": "2026-08-02T14:11:07Z"
+        },
+        {
+          "pass_index": 2,
+          "direction": "retrograde",
+          "exact_at": "2026-10-19T03:52:44Z"
+        },
+        {
+          "pass_index": 3,
+          "direction": "direct",
+          "exact_at": "2027-01-11T21:07:19Z"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m3/timing-response.schema.json",
+  "title": "Timing Response (GET /v1/timing)",
+  "description": "Read-only projection of persisted first-scan cycle artifacts. Phase is recomputed at as_of; the response does not calculate, refresh, or promise complete future coverage.",
+  "$defs": {
+    "timingPhaseFilter": {
+      "type": "string",
+      "enum": [
+        "emerging",
+        "building",
+        "peak",
+        "reconsidering",
+        "integrating",
+        "upcoming"
+      ]
+    },
+    "durationFilter": {
+      "type": "string",
+      "enum": ["short", "medium", "long"],
+      "description": "Elapsed envelope duration: short is under 90 days, medium is at least 90 and under 365 days, and long is at least 365 days."
+    },
+    "calculationStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "state",
+        "last_refresh_at",
+        "last_refresh_local_date"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "persisted_daily_reading_scan"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["current", "stale", "not_scanned"]
+        },
+        "last_refresh_at": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ]
+        },
+        "last_refresh_local_date": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "state": { "const": "not_scanned" } },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "last_refresh_at": { "type": "null" },
+              "last_refresh_local_date": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "last_refresh_at": {
+                "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+              },
+              "last_refresh_local_date": {
+                "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "appliedFilters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "duration"],
+      "properties": {
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/timingPhaseFilter" }
+          ]
+        },
+        "duration": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/durationFilter" }
+          ]
+        }
+      }
+    },
+    "timingPass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass_index", "direction", "exact_at"],
+      "properties": {
+        "pass_index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based and contiguous in chronological order."
+        },
+        "direction": { "$ref": "common.schema.json#/$defs/passDirection" },
+        "exact_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        }
+      }
+    },
+    "timingCycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycle_id",
+        "technique",
+        "body",
+        "target",
+        "aspect",
+        "status",
+        "phase",
+        "start_at",
+        "exact_at",
+        "end_at",
+        "duration_days",
+        "orb_deg",
+        "passes"
+      ],
+      "properties": {
+        "cycle_id": { "$ref": "common.schema.json#/$defs/cycleId" },
+        "technique": { "type": "string", "const": "transit" },
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "target": { "type": "string", "minLength": 1 },
+        "aspect": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+        },
+        "status": { "type": "string", "enum": ["active", "upcoming"] },
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            }
+          ]
+        },
+        "start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "exact_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Equals passes[0].exact_at."
+        },
+        "end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "duration_days": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Elapsed milliseconds from start_at through end_at divided by 86,400,000."
+        },
+        "orb_deg": { "type": "number", "minimum": 0, "maximum": 12 },
+        "passes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/timingPass" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "active" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "phase": {
+                "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+              }
+            }
+          },
+          "else": {
+            "properties": { "phase": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "timingResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "as_of",
+        "calculation_status",
+        "applied_filters",
+        "unreadable_cycle_count",
+        "cycles"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "as_of": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "calculation_status": { "$ref": "#/$defs/calculationStatus" },
+        "applied_filters": { "$ref": "#/$defs/appliedFilters" },
+        "unreadable_cycle_count": { "type": "integer", "minimum": 0 },
+        "cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/timingCycle" }
+        }
+      },
+      "$comment": "Semantic validation beyond JSON Schema, enforced in code and pinned by fixtures: contiguous chronological passes, exact_at equals pass 1, every pass lies inside an ordered envelope, duration_days matches elapsed time, status agrees with as_of, and cycles use the documented active/upcoming total order."
+    }
+  },
+  "$ref": "#/$defs/timingResponse"
+}

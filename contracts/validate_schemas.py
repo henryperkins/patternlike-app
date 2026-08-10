@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 
@@ -43,6 +44,7 @@ FIXTURE_SCHEMA = {
     "cycle-hash": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json#/$defs/cycleHashPreimageV1",
     "cycle-request": "https://patternlike.app/contracts/m3/cycle-request.schema.json#/$defs/cycleRequest",
     "cycle-response": "https://patternlike.app/contracts/m3/cycle-response.schema.json#/$defs/cycleResponse",
+    "timing-response": "https://patternlike.app/contracts/m3/timing-response.schema.json#/$defs/timingResponse",
     "content-release": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/contentReleaseBundle",
     "daily-reading-preparation": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReadingPreparation",
     "daily-reading": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading",
@@ -71,6 +73,7 @@ POLICY_ONLY = {
     "content-release.timing-residual-closing-brace",
     "content-release.timing-unmatched-opening-brace",
     "content-release.same-author",
+    "timing-response.noncontiguous-passes",
 }
 
 braced_placeholder_re = re.compile(r"\{([^{}]*)\}")
@@ -183,6 +186,79 @@ def cycle_response_policy(doc: dict) -> list[str]:
         for t in times:
             if start and end and not (start <= t <= end):
                 errs.append(f"cycle {cid}: pass {t} lies outside the orb envelope")
+    return errs
+
+
+def timing_response_policy(doc: dict) -> list[str]:
+    errs: list[str] = []
+
+    def instant(value: str) -> datetime:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    try:
+        as_of = instant(doc["as_of"])
+    except (KeyError, TypeError, ValueError) as exc:
+        return [f"as_of is not a parseable instant: {exc}"]
+
+    cycles = doc.get("cycles") or []
+    parsed: list[tuple[dict, datetime, datetime, list[datetime]]] = []
+    for cycle in cycles:
+        cid = cycle.get("cycle_id")
+        passes = cycle.get("passes") or []
+        indices = [p.get("pass_index") for p in passes]
+        if indices != list(range(1, len(passes) + 1)):
+            errs.append(f"cycle {cid}: pass indices {indices} are not contiguous from 1")
+
+        try:
+            start = instant(cycle["start_at"])
+            exact = instant(cycle["exact_at"])
+            end = instant(cycle["end_at"])
+            pass_times = [instant(p["exact_at"]) for p in passes]
+        except (KeyError, TypeError, ValueError) as exc:
+            errs.append(f"cycle {cid}: timestamp is not parseable: {exc}")
+            continue
+
+        if pass_times != sorted(pass_times) or len(set(pass_times)) != len(pass_times):
+            errs.append(f"cycle {cid}: pass timestamps are not strictly chronological")
+        if pass_times and exact != pass_times[0]:
+            errs.append(
+                f"cycle {cid}: exact_at {cycle.get('exact_at')} != "
+                f"passes[0].exact_at {passes[0].get('exact_at')}"
+            )
+        if start > end:
+            errs.append(f"cycle {cid}: start_at is after end_at")
+        for pass_time, pass_doc in zip(pass_times, passes, strict=True):
+            if not (start <= pass_time <= end):
+                errs.append(
+                    f"cycle {cid}: pass {pass_doc.get('exact_at')} lies outside the orb envelope"
+                )
+
+        status = cycle.get("status")
+        if status == "active" and not (start <= as_of <= end):
+            errs.append(f"cycle {cid}: active status disagrees with as_of")
+        if status == "upcoming" and not start > as_of:
+            errs.append(f"cycle {cid}: upcoming status does not begin after as_of")
+
+        elapsed_days = (end - start).total_seconds() / 86_400
+        duration_days = cycle.get("duration_days")
+        if not isinstance(duration_days, (int, float)) or abs(duration_days - elapsed_days) > 1e-9:
+            errs.append(
+                f"cycle {cid}: duration_days {duration_days!r} != elapsed days {elapsed_days}"
+            )
+        parsed.append((cycle, start, end, pass_times))
+
+    def order_key(item: tuple[dict, datetime, datetime, list[datetime]]):
+        cycle, start, end, pass_times = item
+        if cycle.get("status") == "active":
+            next_pass = min((value for value in pass_times if value >= as_of), default=end)
+            return (0, next_pass, cycle.get("cycle_id") or "")
+        return (1, start, cycle.get("cycle_id") or "")
+
+    if parsed != sorted(parsed, key=order_key):
+        errs.append(
+            "cycles are not ordered by active next pass/fallback end, then upcoming start, "
+            "with cycle_id as tie-breaker"
+        )
     return errs
 
 
@@ -348,6 +424,8 @@ def validate_package(registry: Registry, package: Path, catalogue: set[str]) -> 
             return assembly_identity_policy(instance)
         if name.startswith("cycle-response"):
             return cycle_response_policy(instance)
+        if name.startswith("timing-response"):
+            return timing_response_policy(instance)
         if name.startswith("reading-assembly"):
             return assembly_request_policy(instance)
         return []
