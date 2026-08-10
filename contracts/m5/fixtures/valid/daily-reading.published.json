@@ -1,0 +1,45 @@
+{
+  "schema_version": "0.5.0",
+  "output_schema": "daily-reading-v5",
+  "reading_id": "rdg_01JAMPLEREADING00001",
+  "local_date": "2026-07-30",
+  "generated_at": "2026-07-30T06:15:00Z",
+  "assembly_mode": "constrained_model",
+  "revision": 1,
+  "locale": "en-US",
+  "domain_preference": null,
+  "headline": "A smaller promise",
+  "disclosure": "Generated with OpenAI from your calculated chart and enabled context.",
+  "paragraphs": [
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH001",
+      "role": "primary_theme",
+      "order": 1,
+      "text": "Saturn is exactly square your Sun today, and the pressure is not asking for more effort — only for a promise small enough that you can actually keep it."
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH002",
+      "role": "supporting_theme",
+      "order": 2,
+      "text": "The migration you have been carrying is the obvious place this lands. Choose the one obligation inside it you can meet exactly, and let the rest wait a day."
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH003",
+      "role": "timing",
+      "order": 3,
+      "text": "The square is exact at 2026-07-30T14:11:07Z; the wider cycle closes on 2027-01-26."
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH004",
+      "role": "collective_context",
+      "order": 4,
+      "text": "Mercury enters Virgo tonight and the Moon is waxing gibbous. Neither of those is about you in particular; both favour tidying a detail rather than opening a new front."
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH005",
+      "role": "reflection",
+      "order": 5,
+      "text": "What would you still finish this week if nobody was waiting on it?"
+    }
+  ]
+}

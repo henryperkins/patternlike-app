@@ -1,0 +1,59 @@
+{
+  "schema_version": "0.5.0",
+  "request_id": "req_01JAMPLEDAILYSKY0001",
+  "day_start_at": "2026-07-30T07:00:00Z",
+  "day_end_at": "2026-07-31T07:00:00Z",
+  "anchor_at": "2026-07-30T19:00:00Z",
+  "anchor_resolution": "unique",
+  "natal_positions": [
+    {
+      "body": "sun",
+      "longitude_deg": 271.774002
+    },
+    {
+      "body": "moon",
+      "longitude_deg": 12.004311
+    },
+    {
+      "body": "saturn",
+      "longitude_deg": 301.774002
+    }
+  ],
+  "natal_house_cusps": {
+    "house_system": "placidus",
+    "cusps_deg": [
+      14.201,
+      41.882,
+      72.004,
+      104.551,
+      136.118,
+      163.909,
+      194.201,
+      221.882,
+      252.004,
+      284.551,
+      316.118,
+      343.909
+    ]
+  },
+  "effective_accuracy": "exact",
+  "uncertainty": {
+    "accuracy": "exact",
+    "window_plus_minus_minutes": null,
+    "suppressed_features": [],
+    "qualified_features": []
+  },
+  "suppressed_features": [],
+  "zodiac": "tropical",
+  "node": "true",
+  "ephemeris_data_version": "se-2.10.03-1800-2399",
+  "tzdb_version": "2026a",
+  "local_day_resolution_policy_version": "1.0.0",
+  "daily_sky_policy_id": "daily-sky-launch",
+  "daily_sky_policy_version": "1.0.0",
+  "calculation_policy_id": "swiss-ephemeris-launch",
+  "calculation_policy_version": "1.0.0",
+  "contract_id": "patternlike.chart.launch",
+  "contract_version": "0.2.0",
+  "birth_time_local": "07:42"
+}

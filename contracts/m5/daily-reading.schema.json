@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/daily-reading.schema.json",
+  "title": "Daily Reading Output (daily-reading-v5)",
+  "description": "The published artifact and the public response shapes for a constrained-model reading. Supersedes daily-reading-v3 for new readings; stored v3 records remain readable through their own versioned reader and are never rewritten to look new. The reader-facing composition is deliberately the incumbent one — a quiet kicker over a focal lead, then supporting paragraphs — because the publisher changed, not the product. What v5 removes is what v5 no longer has: there is no editorial release behind it, so release_version is gone; there is no reviewed fallback copy, so fallback_used and the safety_fallback role are gone; and because a model wrote the prose, the disclosure that says so is required rather than optional.",
+  "$defs": {
+    "paragraphRoleV5": {
+      "type": "string",
+      "enum": [
+        "primary_theme",
+        "supporting_theme",
+        "phase_context",
+        "timing",
+        "collective_context",
+        "reflection",
+        "uncertainty_notice"
+      ],
+      "description": "Fixed order. primary_theme is always first and always present: it is the lead the model was asked for, and a reading without one has nothing to be about. safety_fallback is absent by design — v5 has no reviewed copy to fall back to, and an unavailable reading says so honestly instead."
+    },
+    "readingParagraphV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paragraph_id", "role", "order", "text"],
+      "properties": {
+        "paragraph_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "role": { "$ref": "#/$defs/paragraphRoleV5" },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based, contiguous, strictly increasing across the paragraph list."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Model-written prose that passed every deterministic check. Every astrological claim in it resolves to a calculated fact through this paragraph's evidence."
+        }
+      }
+    },
+    "dailyReadingV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "output_schema",
+        "reading_id",
+        "local_date",
+        "generated_at",
+        "assembly_mode",
+        "revision",
+        "locale",
+        "headline",
+        "disclosure",
+        "paragraphs"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "output_schema": { "$ref": "common.schema.json#/$defs/outputSchemaName" },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "generated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "The command's frozen generation_anchor, not the attempt time. A pre-generated edition therefore reports the instant it was frozen, which is before its own local day starts."
+        },
+        "assembly_mode": { "$ref": "common.schema.json#/$defs/assemblyMode" },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/readingRevision"
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Rendered as the quiet primary-theme kicker so the lead stays the visual focal point. Never a heading: it labels the paragraph below it."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The visible statement that a model wrote this prose. Required, not optional: a reader cannot consent to something the product then declines to mention."
+        },
+        "paragraphs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/readingParagraphV5" },
+          "description": "Never empty, and always opens with primary_theme."
+        }
+      }
+    },
+    "dailyReadingResponseV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "reading", "evidence_url"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "reading": { "$ref": "#/$defs/dailyReadingV5" },
+        "evidence_url": {
+          "type": ["string", "null"],
+          "description": "Relative path to GET /v1/readings/{id}/evidence. Required on v5 rather than optional: when a model wrote the prose, 'why this?' is part of the artifact, not an extra."
+        }
+      }
+    },
+    "dailyReadingPreparationV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "status", "local_date"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "status": { "type": "string", "const": "preparing" },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "title": "DailyReadingV5", "$ref": "#/$defs/dailyReadingV5" },
+    { "title": "DailyReadingResponseV5", "$ref": "#/$defs/dailyReadingResponseV5" },
+    { "title": "DailyReadingPreparationV5", "$ref": "#/$defs/dailyReadingPreparationV5" }
+  ]
+}

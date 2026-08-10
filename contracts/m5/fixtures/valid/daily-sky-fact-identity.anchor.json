@@ -1,0 +1,26 @@
+{
+  "identity_profile": "patternlike.daily-sky-fact-id.v1",
+  "schema_version": "0.5.0",
+  "kind": "anchor_position",
+  "scope": "collective",
+  "effective_at": "2026-07-30T19:00:00Z",
+  "label": "Sun at 7.42 degrees Leo",
+  "precision": {
+    "longitude_decimals": 6,
+    "instant_resolution_seconds": null
+  },
+  "detail": {
+    "body": "sun",
+    "longitude_deg": 127.423118,
+    "sign": "leo",
+    "sign_degree_deg": 7.423118,
+    "speed_deg_per_day": 0.955214,
+    "retrograde": false
+  },
+  "daily_sky_policy_id": "daily-sky-launch",
+  "daily_sky_policy_version": "1.0.0",
+  "calculation_policy_id": "swiss-ephemeris-launch",
+  "calculation_policy_version": "1.0.0",
+  "ephemeris_data_version": "se-2.10.03-1800-2399",
+  "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+}

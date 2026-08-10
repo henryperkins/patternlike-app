@@ -1,0 +1,220 @@
+{
+  "ok": true,
+  "schema_version": "0.5.0",
+  "request_id": "req_01JAMPLEDAILYSKY0001",
+  "day_start_at": "2026-07-30T07:00:00Z",
+  "day_end_at": "2026-07-31T07:00:00Z",
+  "anchor_at": "2026-07-30T19:00:00Z",
+  "anchor_resolution": "unique",
+  "effective_accuracy": "exact",
+  "suppressed_features": [],
+  "daily_sky_policy_id": "daily-sky-launch",
+  "daily_sky_policy_version": "1.0.0",
+  "calculation_policy_id": "swiss-ephemeris-launch",
+  "calculation_policy_version": "1.0.0",
+  "contract_id": "patternlike.chart.launch",
+  "contract_version": "0.2.0",
+  "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+  "ephemeris_data_version": "se-2.10.03-1800-2399",
+  "tzdb_version": "2026a",
+  "facts": [
+    {
+      "kind": "house_placement",
+      "scope": "personalized",
+      "effective_at": "2026-07-30T19:00:00Z",
+      "label": "Transiting Saturn in the tenth house",
+      "precision": {
+        "longitude_decimals": 6,
+        "instant_resolution_seconds": null
+      },
+      "detail": {
+        "body": "saturn",
+        "house": 10,
+        "house_system": "placidus",
+        "longitude_deg": 1.774002
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_450ef598ef00c4c37ff47c1a8005a509",
+      "content_digest": "sha256:450ef598ef00c4c37ff47c1a8005a5094486b27a6938f009e79fa4a26d3115c0"
+    },
+    {
+      "kind": "collective_exact_aspect",
+      "scope": "collective",
+      "effective_at": "2026-07-30T11:47:12Z",
+      "label": "Venus exactly trine Saturn",
+      "precision": {
+        "longitude_decimals": null,
+        "instant_resolution_seconds": 1
+      },
+      "detail": {
+        "body": "venus",
+        "other_body": "saturn",
+        "aspect": "trine",
+        "direction": "direct"
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_190c95ccbc7c74fcac83f9c97e9aa981",
+      "content_digest": "sha256:190c95ccbc7c74fcac83f9c97e9aa98138d0776e7336cd52b990eac34de22e50"
+    },
+    {
+      "kind": "sign_ingress",
+      "scope": "collective",
+      "effective_at": "2026-07-30T22:05:31Z",
+      "label": "Mercury enters Virgo",
+      "precision": {
+        "longitude_decimals": null,
+        "instant_resolution_seconds": 1
+      },
+      "detail": {
+        "body": "mercury",
+        "from_sign": "leo",
+        "to_sign": "virgo",
+        "direction": "direct"
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_dc924a24d6db1344a2656081c38afa29",
+      "content_digest": "sha256:dc924a24d6db1344a2656081c38afa29e55ef32cd85863f226d8b8e6d50c67d6"
+    },
+    {
+      "kind": "transit_natal_contact",
+      "scope": "personalized",
+      "effective_at": "2026-07-30T14:11:07Z",
+      "label": "Transiting Saturn exactly square natal Sun",
+      "precision": {
+        "longitude_decimals": null,
+        "instant_resolution_seconds": 1
+      },
+      "detail": {
+        "transiting_body": "saturn",
+        "natal_target": "sun",
+        "aspect": "square",
+        "direction": "retrograde",
+        "speed_deg_per_day": -0.028812
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_30fb5019e8d3f789e29ea7a9babf94ae",
+      "content_digest": "sha256:30fb5019e8d3f789e29ea7a9babf94ae6c4d63652f1ef5713c84e011b6520f25"
+    },
+    {
+      "kind": "lunar_phase",
+      "scope": "collective",
+      "effective_at": "2026-07-30T19:00:00Z",
+      "label": "Waxing gibbous Moon",
+      "precision": {
+        "longitude_decimals": 6,
+        "instant_resolution_seconds": null
+      },
+      "detail": {
+        "phase": "waxing_gibbous",
+        "elongation_deg": 102.459289,
+        "illuminated_fraction": 0.606
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_b8e8e65324e38c0f4d2419b7a941ebd9",
+      "content_digest": "sha256:b8e8e65324e38c0f4d2419b7a941ebd9a87217774f5c612f0ab7545524efd921"
+    },
+    {
+      "kind": "anchor_position",
+      "scope": "collective",
+      "effective_at": "2026-07-30T19:00:00Z",
+      "label": "Saturn at 1.77 degrees Aries, retrograde",
+      "precision": {
+        "longitude_decimals": 6,
+        "instant_resolution_seconds": null
+      },
+      "detail": {
+        "body": "saturn",
+        "longitude_deg": 1.774002,
+        "sign": "aries",
+        "sign_degree_deg": 1.774002,
+        "speed_deg_per_day": -0.028812,
+        "retrograde": true
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_f2b878970be923e37c12e8cacaea515f",
+      "content_digest": "sha256:f2b878970be923e37c12e8cacaea515f3c1bdfb59cb33f976c2fe917bc5fd482"
+    },
+    {
+      "kind": "anchor_position",
+      "scope": "collective",
+      "effective_at": "2026-07-30T19:00:00Z",
+      "label": "Moon at 19.88 degrees Scorpio",
+      "precision": {
+        "longitude_decimals": 6,
+        "instant_resolution_seconds": null
+      },
+      "detail": {
+        "body": "moon",
+        "longitude_deg": 229.882407,
+        "sign": "scorpio",
+        "sign_degree_deg": 19.882407,
+        "speed_deg_per_day": 12.114903,
+        "retrograde": false
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_c1b2f8ca04dcf02ff382a477e08e0e07",
+      "content_digest": "sha256:c1b2f8ca04dcf02ff382a477e08e0e0746e3dabea5a61ee6ac73476df81c69d5"
+    },
+    {
+      "kind": "anchor_position",
+      "scope": "collective",
+      "effective_at": "2026-07-30T19:00:00Z",
+      "label": "Sun at 7.42 degrees Leo",
+      "precision": {
+        "longitude_decimals": 6,
+        "instant_resolution_seconds": null
+      },
+      "detail": {
+        "body": "sun",
+        "longitude_deg": 127.423118,
+        "sign": "leo",
+        "sign_degree_deg": 7.423118,
+        "speed_deg_per_day": 0.955214,
+        "retrograde": false
+      },
+      "daily_sky_policy_id": "daily-sky-launch",
+      "daily_sky_policy_version": "1.0.0",
+      "calculation_policy_id": "swiss-ephemeris-launch",
+      "calculation_policy_version": "1.0.0",
+      "ephemeris_data_version": "se-2.10.03-1800-2399",
+      "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "fact_id": "dsf_9fcfa4928876e1a9ce9dc48bc5f71877",
+      "content_digest": "sha256:9fcfa4928876e1a9ce9dc48bc5f71877b0a458b434ee8134fb5f6f48c8942542"
+    }
+  ]
+}

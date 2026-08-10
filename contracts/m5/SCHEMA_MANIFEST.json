@@ -1,0 +1,316 @@
+{
+  "package": "contracts/m5",
+  "schema_version": "0.5.0",
+  "document_date": "2026-08-10",
+  "status": "frozen",
+  "milestone": "M5 — constrained-model daily reading publisher",
+  "predecessors": [
+    {
+      "package": "contracts/m0",
+      "schema_version": "0.2.0",
+      "manifest_sha256": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
+      "relationship": "base_vocabulary",
+      "note": "M5 references M0's frozen definitions by absolute $id and narrows exactly one of them — allowedUse — through m5AllowedUse. It restates none of them and changes none of them. The digest is recorded twice, here and in contracts/m3/SCHEMA_MANIFEST.json; contracts/validate_schemas.py checks both and additionally fails when the two successors disagree about the same frozen bytes."
+    },
+    {
+      "package": "contracts/m3",
+      "schema_version": "0.3.0",
+      "manifest_sha256": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
+      "relationship": "successor",
+      "note": "Recorded forward-only. No file under contracts/m3 changes — including its manifest, fixtures, OpenAPI, and golden vectors. M3 froze itself against contracts/m0 with a hash check and a git check; M5 gives contracts/m3 exactly the same standing, because a manual promise to leave a directory alone is not a check. The digest is over the file with newlines normalised to LF, which is what git stores: there is no .gitattributes, so a raw-byte digest would record whichever platform generated it and fail on the other."
+    }
+  ],
+  "why_a_package_and_not_an_amendment": [
+    "V5 REMOVES required fields: dailyReading.fallback_used and the release pointer behind it. That is squarely inside the M0 breaking_change_policy M3 inherited — 'Any change to required fields, enums, or $id requires a schema_version bump and a new freeze note.'",
+    "V5 REMOVES an enum member: paragraphRole.safety_fallback. There is no reviewed copy behind a constrained-model reading, so the role names something that cannot exist.",
+    "V5 makes an optional member required: readingEvidenceGraph.model. Tightening a frozen document is still an edit to it, and the amendment precedent in M0 and M3 covers additive changes only.",
+    "M3's own manifest already reserved this: 'Constrained-model editing (M5). assembly_mode stays deterministic; nothing calls a model in M3.' Versioning the package is the promise that sentence was making."
+  ],
+  "supersedes": [
+    {
+      "family": "daily-reading",
+      "documents": [
+        "m3:daily-reading.schema.json#/$defs/dailyReading",
+        "m3:daily-reading.schema.json#/$defs/dailyReadingResponse",
+        "m3:daily-reading.schema.json#/$defs/dailyReadingPreparation",
+        "m3:reading-evidence.schema.json#/$defs/readingEvidenceGraph",
+        "m3:generation-command.schema.json#/$defs/generateDailyReadingCommandV1"
+      ],
+      "note": "Supersession is forward-only and applies to NEW readings. Stored v3 artifacts remain valid under their own frozen document, are projected by their own versioned reader, and are never rewritten to look new. A historical v3 reading that used the reviewed fallback is a truthful record of how it was made; erasing that would be the only dishonest option available.",
+      "not_superseded": [
+        "m3:common.schema.json — generic reading vocabulary M5 reuses by reference: policyVersion, readingRevision, commandGeneration, revisionReason, suppressedFeatureClass, suppressionReason, timezoneSource, localeSource, passDirection, cycleId, cyclePassId.",
+        "m3:assembly-identity.schema.json#/$defs/assemblyUncertaintyInput — the normalized uncertainty projection, unchanged.",
+        "m3:cycle-request.schema.json and m3:cycle-response.schema.json — POST /v1/cycles is untouched and is NOT widened by the daily-sky endpoint.",
+        "m3:timing-response.schema.json and m3:content-release.schema.json — Timing and editorial ingestion are unchanged."
+      ]
+    }
+  ],
+  "breaking_changes": [
+    {
+      "id": "constrained_model_only",
+      "summary": "daily-reading-v5 fixes assembly_mode to constrained_model and can never claim deterministic.",
+      "detail": "A v5 artifact was written by a model against frozen calculated facts. M3's assembly_mode const was 'deterministic' and its assemblyPolicyId const was 'daily-reading-deterministic'; both are absent here rather than widened, so a stored record cannot be ambiguous about which publisher produced it. output_schema moves from 'daily-reading-v3' to 'daily-reading-v5' for the same reason: the identity preimage pins the name, and reusing a name for different bytes is how two different artifacts acquire one identity."
+    },
+    {
+      "id": "model_evidence_required",
+      "summary": "readingEvidenceGraphV5.model is required, and names the provider, the exact model, and every prompt, selection, and validation version.",
+      "detail": "M3's evidence carried an optional per-paragraph model_output because nothing called a model. When a model writes the prose, the reader is owed the exact one that did — and an operator investigating a bad reading needs to know which prompt and validation vintage let it through. Optional metadata is metadata nobody can rely on, so it is required. Token counts and the provider request id are recorded; the prompt packet, the response bytes, and the reasoning are not stored and are not recoverable from this record."
+    },
+    {
+      "id": "release_pointer_removed",
+      "summary": "release_version, release_bundle_hash, and every editorial content reference are gone from the v5 reading, evidence, and command.",
+      "detail": "An active signed content release is no longer a prerequisite for a reading, so a v5 record has no release to point at. Keeping a nullable field would invite a projection that reports 'release: none' as though a release were merely missing, when in fact the concept does not apply. contentRef disappears from the evidence graph for the same reason: there are no reviewed fragments behind the prose. The content-release tables, R2 objects, ingestion routes, and historical audit records remain intact and readable; they simply cannot influence a V2 command."
+    },
+    {
+      "id": "reviewed_fallback_removed",
+      "summary": "fallback_used and the safety_fallback paragraph role are removed; an unavailable reading is an honest unavailable state.",
+      "detail": "M3's fallback_used mirrored a reviewed universal fallback that a zero-cycle day or a rejected draft fell back to. V5 has no reviewed copy, and the design explicitly forbids a previous-day, deterministic, editorial-release, or alternate-model substitute. The two ways a day could have had nothing to say are both answered instead of papered over: the calculated daily-sky layer guarantees an anchor and a phase, so a zero-cycle day still has facts; and a candidate that fails one deterministic check is not partially published or repaired, it produces 424 or 503 and the surface says so."
+    }
+  ],
+  "canonicalization": {
+    "profiles": {
+      "patternlike.daily-sky-fact-id.v1": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "'dsf_' + lowercaseHex(digest)[0:32]",
+        "preimage": "daily-sky-response.schema.json#/$defs/dailySkyFactIdentityV1",
+        "note": "The full digest is ALSO carried on the wire as the fact's content_digest, so fact_id and content_digest are two views of one value and their agreement is mechanically checkable without recomputing the preimage. The preimage deliberately excludes request_id: the digest names the fact, not the request that asked for it, so the same sky produces the same handle in every reading containing it."
+      },
+      "patternlike.generation-input.v1": {
+        "scheme": "RFC 8785 JSON Canonicalization Scheme",
+        "hash": "SHA-256",
+        "rendering": "'gin_sha256_' + lowercaseHex(digest)",
+        "preimage": "identity_canonical returned by prepareConstrainedReadingInput() in packages/reading-engine",
+        "note": "The full 64-character digest, not a 128-bit handle: this value gates publication rather than addressing a row, so truncating it would trade a real integrity margin for cosmetics. It identifies the frozen eligible INPUT and policy, never the prose — OpenAI is nondeterministic, and two legitimate deliveries against one frozen command may return different candidates. content_hash and provider_response_hash identify the candidate that actually won publication."
+      }
+    },
+    "rules": [
+      "Identical to the M3 rules and deliberately not restated as a new procedure: validated I-JSON only; ECMAScript number serialization; recursive UTF-16 property-name ordering; UTF-8 output; no implicit Unicode normalization.",
+      "Arrays are put into their contractually defined total order BEFORE canonicalization. For daily-sky facts that order is (kind rank, effective_at, fact_id), where kind rank is the declaration order of common.schema.json#/$defs/dailySkyFactKind.",
+      "SCOPE: JCS applies to the two profiles above and to nothing else. M0 release, object, and signature hashes remain byte-frozen on the repository's legacy canonicalJson behaviour, and M3's patternlike.assembly-id.v1, patternlike.cycle-id.v1, patternlike.cycle-pass-id.v1, and cycleHashPreimageV1 profiles are unchanged."
+    ],
+    "vectors": "fixtures/canonicalization/daily-sky-fact-golden-vectors.json"
+  },
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m5/common.schema.json",
+      "defines": [
+        "aiConsentDataCategory",
+        "aiConsentPin",
+        "anchorResolution",
+        "assemblyMode",
+        "calculationPin",
+        "commandReplacementReasonV2",
+        "contextRef",
+        "dailySkyErrorClass",
+        "dailySkyFactId",
+        "dailySkyFactKind",
+        "dailySkyPolicyId",
+        "factScope",
+        "generationInputId",
+        "houseNumber",
+        "localDayResolutionPolicyVersion",
+        "lunarPhaseName",
+        "m5AllowedUse",
+        "outputSchemaName",
+        "publisherConfigPin",
+        "publisherProvider",
+        "readingKeyV5",
+        "reasoningEffort",
+        "reservationReason",
+        "schemaVersion",
+        "zodiacSign"
+      ],
+      "reuses_from_m0": [
+        "allowedUse",
+        "aspectType",
+        "birthTimeAccuracy",
+        "celestialBody",
+        "contentHash",
+        "cyclePhase",
+        "evidenceLane",
+        "houseSystem",
+        "ianaTimeZone",
+        "ingestibleSourceId",
+        "isoDate",
+        "isoDateTime",
+        "lifeDomain",
+        "localeTag",
+        "opaqueId",
+        "semanticVersion",
+        "sha256Hex"
+      ],
+      "reuses_from_m3": [
+        "commandGeneration",
+        "cycleId",
+        "cyclePassId",
+        "localeSource",
+        "passDirection",
+        "policyVersion",
+        "readingRevision",
+        "revisionReason",
+        "suppressedFeatureClass",
+        "timezoneSource"
+      ]
+    },
+    {
+      "file": "daily-reading.schema.json",
+      "id": "https://patternlike.app/contracts/m5/daily-reading.schema.json",
+      "defines": [
+        "dailyReadingPreparationV5",
+        "dailyReadingResponseV5",
+        "dailyReadingV5",
+        "paragraphRoleV5",
+        "readingParagraphV5"
+      ],
+      "supersedes": "m3:daily-reading.schema.json#/$defs/dailyReading"
+    },
+    {
+      "file": "daily-sky-request.schema.json",
+      "id": "https://patternlike.app/contracts/m5/daily-sky-request.schema.json",
+      "defines": ["dailySkyRequest", "natalHouseCusps", "natalPositionInput"],
+      "note": "NEW. Additive calculation surface; POST /v1/cycles is untouched."
+    },
+    {
+      "file": "daily-sky-response.schema.json",
+      "id": "https://patternlike.app/contracts/m5/daily-sky-response.schema.json",
+      "defines": [
+        "anchorPositionDetail",
+        "collectiveExactAspectDetail",
+        "dailySkyFact",
+        "dailySkyFactCore",
+        "dailySkyFactIdentityV1",
+        "dailySkyResponse",
+        "dailySkyResponseFailure",
+        "dailySkyResponseSuccess",
+        "factPrecision",
+        "housePlacementDetail",
+        "lunarPhaseDetail",
+        "signIngressDetail",
+        "transitNatalContactDetail"
+      ],
+      "note": "NEW. dailySkyFact and dailySkyFactIdentityV1 both compose dailySkyFactCore, so the digest cannot cover a different member set than the wire does."
+    },
+    {
+      "file": "generation-command.schema.json",
+      "id": "https://patternlike.app/contracts/m5/generation-command.schema.json",
+      "defines": [
+        "chartPinV5",
+        "contextPinV2",
+        "contextSnapshot",
+        "cyclePinV2",
+        "cycleScanPinV2",
+        "dailySkyFactPin",
+        "dailySkyPinV2",
+        "generateDailyReadingCommandV2",
+        "priorReadingPin"
+      ],
+      "supersedes": "m3:generation-command.schema.json#/$defs/generateDailyReadingCommandV1"
+    },
+    {
+      "file": "reading-evidence.schema.json",
+      "id": "https://patternlike.app/contracts/m5/reading-evidence.schema.json",
+      "defines": [
+        "calculationRecordV5",
+        "contextRefV5",
+        "factRefV5",
+        "modelRecordV5",
+        "paragraphEvidenceV5",
+        "readingEvidenceGraphV5",
+        "validationResultV5"
+      ],
+      "supersedes": "m3:reading-evidence.schema.json#/$defs/readingEvidenceGraph"
+    },
+    {
+      "file": "reading-generation-output.schema.json",
+      "id": "https://patternlike.app/contracts/m5/reading-generation-output.schema.json",
+      "defines": ["generatedParagraph", "generatedParagraphRole", "groundedUnit"],
+      "note": "NEW, and the only document in the repository whose ROOT is the validated object rather than a titled oneOf. OpenAI strict mode requires a self-contained root-object schema, so this file is sent verbatim as text.format.json_schema.schema and cannot hide behind a $defs pointer or reach for an external $ref."
+    },
+    {
+      "file": "reading-generation-request.schema.json",
+      "id": "https://patternlike.app/contracts/m5/reading-generation-request.schema.json",
+      "defines": [
+        "factAttributes",
+        "priorReadingExcerpt",
+        "readingComposition",
+        "requestContext",
+        "requestFact",
+        "readingGenerationRequest"
+      ],
+      "note": "NEW. The provider boundary. factAttributes is the complete astrology vocabulary a fact licenses, which is what makes 'the model stated a degree nobody calculated' a mechanical check rather than an editorial judgement."
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.5.0",
+      "describes": "Public Worker origin — an AMENDMENT covering only the AI-synthesis consent surface, the two Today operations, the evidence operation, and internal fact invalidation. Everything else is still described by m3:openapi/openapi.yaml."
+    },
+    {
+      "file": "openapi/calc.openapi.yaml",
+      "version": "0.5.0",
+      "describes": "Calculation service on Fly — an AMENDMENT adding exactly POST /v1/daily-sky. POST /v1/calculate and POST /v1/cycles are unchanged."
+    }
+  ],
+  "changes_from_m3": [
+    {
+      "id": "E1",
+      "summary": "A calculated daily-sky layer, because a daily promise needs a daily fact.",
+      "detail": "The frozen M3 cycle contract permits an empty result and says most days have no cycle inside orb. Under M3 that day published the locale's reviewed universal fallback. With the fallback gone, the same day would have nothing calculated to say — and a publisher with a daily promise and no facts invents a premise. POST /v1/daily-sky guarantees anchor positions and one lunar phase on every success, so an empty EVENT list never means an empty FACTUAL day."
+    },
+    {
+      "id": "E2",
+      "summary": "Local noon is the day's anchor, and the resolution rule is versioned.",
+      "detail": "The local day is a half-open UTC interval spanning 23, 24, or 25 hours. Noon is the anchor because it exists on ordinary DST transition days, and because using the instant a scheduler happened to fire would make a reading depend on infrastructure timing. An ambiguous nominal noon takes the earlier offset; a nonexistent noon shifts forward to the first valid instant; a wholly unrepresentable local date is skipped and recorded rather than approximated. All four decisions sit inside the request identity through tzdb_version and local_day_resolution_policy_version, because a tzdb update that moves a local day produces a different reading."
+    },
+    {
+      "id": "E3",
+      "summary": "One identity for the frozen INPUT, separate identities for the winning OUTPUT.",
+      "detail": "M3's assembly_id could name both, because deterministic assembly reproduces its prose. A nondeterministic publisher cannot: two legitimate deliveries against one frozen command may return different candidates, and a single id would have to be wrong about one of them. generation_input_id therefore names the eligible input and policy; content_hash and provider_response_hash name the candidate that won. The guarded completeReading claim compare-and-swap is what makes 'won' meaningful — a late or duplicate response that loses any assertion is discarded without textual comparison and never overwrites the winner."
+    },
+    {
+      "id": "E4",
+      "summary": "ai_synthesis becomes a hard prerequisite with a closed, ordered category list.",
+      "detail": "Every personal section of a provider packet maps to exactly one of seven disclosed categories, and a section whose category is absent from the grant cannot be sent. Adding a category requires a new consent policy version and a fresh grant, because a user who agreed to seven has not agreed to an eighth. ai_synthesis remains distinct from research and model_training, and it is NOT an allowed_use: it is the outer purpose consent, and it can never make an otherwise ineligible signal eligible."
+    },
+    {
+      "id": "E5",
+      "summary": "The M0 allowedUse enum is narrowed, never extended.",
+      "detail": "m5AllowedUse references the frozen M0 definition and constrains it to seventeen values. M5 adds no lane — 'daily-reading synthesis' is not an allowed_use. Eligibility is the exact intersection of the signal's allowed uses, the active source consent's allowed uses, and that subset, pinned per signal/use pair and rechecked after the claim. A signal eligible for two lanes is pinned twice; nothing is upgraded, aliased, or silently substituted."
+    },
+    {
+      "id": "E6",
+      "summary": "The provider boundary carries pre-rendered labels and a closed vocabulary, not raw identity.",
+      "detail": "The request has no reading key, user id, chart fingerprint, storage key, queue id, consent record id, birth instant, coordinate, or timezone name. Fact handles are content-addressed and context handles are positional and valid only inside one packet. factAttributes enumerates every body, sign, house, degree, phase, timestamp, and date a fact licenses, so a candidate stating something no fact supplied is detectable mechanically. User-authored text is a VALUE inside a closed object; it can add no instruction, change no output contract, enable no tool, and override no system policy."
+    },
+    {
+      "id": "E7",
+      "summary": "Scope is a field, not a tone.",
+      "detail": "Every fact declares personalized or collective, and the response's own kind determines which. A paragraph carried only by collective sky is labelled collective in evidence and may not imply the configuration is unique to the reader. Under M3 that distinction lived in reviewed editorial copy; with a model writing the prose it has to be checkable, and a field is checkable."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "breaking_change_policy": "Any change to required fields, enums, or $id requires a schema_version bump and a new freeze note. Purely additive changes (a new OpenAPI path, a new inline schema) are recorded in `amendments` instead.",
+    "wire_format": "snake_case on the wire even though TypeScript is camelCase.",
+    "dual_read": "The product decodes both v3 and v5 stored records for as long as any v3 record exists. New reservations use V2/v5 only once the rollout configuration permits it. A legacy record is never rewritten merely to make it look new."
+  },
+  "out_of_scope_for_this_freeze": [
+    "M4 context-source ingestion: check-ins, journal import, and connectors. The publisher consumes every eligible source actually present when it runs, and manufactures none. When M4 registers a source it becomes eligible through the same permission, allowed-use, freshness, and consent checks, with no provider-specific ingestion path.",
+    "Time Travel (M4).",
+    "Stations, eclipses, exact lunations, and seasonal points. The collective vocabulary is sign ingress plus exact major conjunction, sextile, square, trine, and opposition; an unimplemented event class is never silently inferred.",
+    "A second model acting as editor, judge, or fallback, and automatic provider or model failover.",
+    "Removal of the content-release tables, R2 objects, ingestion routes, or historical audit records. That is a later migration with its own retention and rollback review.",
+    "Relationship data. relationship_interpretation is inside M5_SUPPORTED_USES so a future source can reach that lane, but no source supplies it today."
+  ],
+  "unresolved_escalations": [
+    "§1 crypto-shredding vs D1 Time Travel: unchanged and still open. M5 additionally does NOT claim that encrypting a reading makes it unrecoverable.",
+    "§5 cascading revocation: M5 adds an explicit invalidated state and invalidated_at for the FACTUAL case only, which is narrower than the general derived-feature problem M0 raised. Consent revocation still does not retroactively rewrite a published artifact.",
+    "§8 legacy canonicalJson has no named standard: unchanged. M5 pins JCS only for its own two profiles.",
+    "§11 snapshot_json precision: unresolved. The daily-sky layer states its own precision per fact rather than inventing a fourth policy.",
+    "OpenAI's default abuse-monitoring retention may hold customer content for up to 30 days. `store: false` avoids persisted Responses application state but is NOT Zero Data Retention and is not treated as a substitute for product-side minimization or consent. Raw birth instant and coordinates therefore stay inside the encrypted product boundary; any proposal to cross it is a new privacy design requiring explicit review and ZDR eligibility first."
+  ],
+  "amendments": []
+}

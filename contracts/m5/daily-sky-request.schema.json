@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/daily-sky-request.schema.json",
+  "title": "Daily Sky Request (POST /v1/daily-sky)",
+  "description": "Additive calculation-service endpoint. POST /v1/calculate and the frozen M3 POST /v1/cycles are unchanged and are not widened. Like the cycle request, this object carries natal LONGITUDES and optional house cusps, never birth data: transit-to-natal contacts and transit house placements need nothing else, so the calculation service still has no decryption path and 'birth stays encrypted at rest' survives the new surface. The object is closed, which is the enforcement — a user id, chart id, birth instant, timezone name, coordinate, or storage id is rejected because it is not declared.",
+  "$defs": {
+    "natalPositionInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "longitude_deg"],
+      "properties": {
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "longitude_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        }
+      }
+    },
+    "natalHouseCusps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["house_system", "cusps_deg"],
+      "description": "Supplied ONLY when the effective birth-time accuracy permits houses. Absent is the normal case, not a degraded one: with no cusps the response carries no house_placement fact at all, rather than a house computed from a noon epoch and then labelled uncertain.",
+      "properties": {
+        "house_system": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/houseSystem"
+        },
+        "cusps_deg": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+          "description": "Twelve cusp longitudes in house order starting at the first house."
+        }
+      }
+    },
+    "dailySkyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "request_id",
+        "day_start_at",
+        "day_end_at",
+        "anchor_at",
+        "anchor_resolution",
+        "natal_positions",
+        "effective_accuracy",
+        "uncertainty",
+        "suppressed_features",
+        "zodiac",
+        "node",
+        "ephemeris_data_version",
+        "tzdb_version",
+        "local_day_resolution_policy_version",
+        "daily_sky_policy_id",
+        "daily_sky_policy_version",
+        "calculation_policy_id",
+        "calculation_policy_version",
+        "contract_id",
+        "contract_version"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId",
+          "description": "Opaque per-request handle. Not derived from any user, chart, reading, or job identifier."
+        },
+        "day_start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "First instant of the reader's local day, in UTC."
+        },
+        "day_end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Half-open upper bound. The interval spans 23, 24, or 25 hours across daylight-saving transitions; an event exactly at this instant belongs to the NEXT local day and must not be returned."
+        },
+        "anchor_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Local noon, resolved by the pinned local-day policy. Noon rather than the scheduler's invocation instant: noon exists on ordinary DST transition days, and using the instant a cron happened to fire would make the reading depend on infrastructure timing."
+        },
+        "anchor_resolution": { "$ref": "common.schema.json#/$defs/anchorResolution" },
+        "natal_positions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/natalPositionInput" },
+          "description": "Under unknown effective accuracy, ascendant and midheaven must not appear: those targets are never computed rather than computed and filtered."
+        },
+        "natal_house_cusps": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/natalHouseCusps" }]
+        },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy",
+          "description": "The EFFECTIVE accuracy the chart engine recomputed, never the label the original caller sent."
+        },
+        "uncertainty": {
+          "$ref": "https://patternlike.app/contracts/m3/assembly-identity.schema.json#/$defs/assemblyUncertaintyInput"
+        },
+        "suppressed_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/suppressedFeatureClass"
+          },
+          "description": "Must equal the set of feature_class values inside uncertainty.suppressed_features. Restated at the top level because the engine reads this list directly, and two disagreeing copies of one decision is how a suppressed feature reappears as a fact."
+        },
+        "zodiac": { "type": "string", "const": "tropical" },
+        "node": { "type": "string", "const": "true" },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 },
+        "tzdb_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The IANA database version that resolved the day boundaries and anchor. Part of the request identity because a tzdb update can move a local day, and a reading whose day silently moved is a different reading."
+        },
+        "local_day_resolution_policy_version": {
+          "$ref": "common.schema.json#/$defs/localDayResolutionPolicyVersion"
+        },
+        "daily_sky_policy_id": { "$ref": "common.schema.json#/$defs/dailySkyPolicyId" },
+        "daily_sky_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "calculation_policy_id": { "type": "string", "minLength": 1 },
+        "calculation_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        }
+      },
+      "$comment": "Three cross-field rules JSON Schema 2020-12 cannot express, enforced in code and pinned by fixtures: effective_accuracy must equal uncertainty.accuracy; suppressed_features must equal the projected uncertainty suppression set; and day_start_at <= anchor_at < day_end_at. A suppressed class additionally forbids its own inputs — no house cusps with 'houses', no angle targets with 'angles', no natal moon with 'moon_time_sensitive'."
+    }
+  },
+  "oneOf": [{ "title": "DailySkyRequest", "$ref": "#/$defs/dailySkyRequest" }]
+}
