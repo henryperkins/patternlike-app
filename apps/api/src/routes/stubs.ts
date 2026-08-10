@@ -39,7 +39,6 @@ stubRoutes.post("/v1/readings/:id/feedback", (c) =>
 stubRoutes.get("/v1/pattern", (c) =>
   notImplemented(c, "Your Pattern chapters (M3)"),
 );
-stubRoutes.get("/v1/timing", (c) => notImplemented(c, "Timing cycles (M3)"));
 stubRoutes.get("/v1/time-travel", (c) => notImplemented(c, "Time Travel (M4)"));
 stubRoutes.post("/v1/check-ins", (c) => notImplemented(c, "Check-ins (M4)"));
 stubRoutes.get("/v1/context-sources", (c) =>
