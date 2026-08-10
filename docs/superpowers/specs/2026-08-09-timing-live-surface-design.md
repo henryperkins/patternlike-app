@@ -4,7 +4,7 @@
 
 **Revised:** 2026-08-10
 
-**Status:** Revised after repository review; awaiting implementation-plan approval
+**Status:** Approved for implementation planning
 
 **Scope:** Authenticated `GET /v1/timing`, its additive M3 response contract,
 and the responsive Timing screen that renders persisted cycle facts
