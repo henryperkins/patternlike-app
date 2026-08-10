@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-10
 
-**Status:** Approved for implementation planning
+**Status:** Revised after repository review; awaiting implementation-planning
+approval
 
 **Scope:** Replace the active-editorial-release dependency in per-user daily
 reading generation with an autonomous, configured OpenAI publisher; add the
@@ -30,8 +31,9 @@ The approved choices are:
   first-open ensure path as an idempotent fallback;
 - configure the provider and exact model in the Worker environment, with the
   OpenAI API key held only as a Worker secret;
-- use all consented, reading-relevant information while always excluding
-  identity, security, and operational fields that cannot improve a reading;
+- use all consented, reading-relevant information while excluding direct
+  account identifiers, raw birth data, security material, and operational
+  fields that cannot improve a reading;
 - keep calculated astrology facts authoritative and allow personal context to
   affect emphasis, tone, and reflection only;
 - publish only output that passes deterministic validation; and
@@ -135,9 +137,25 @@ The Worker environment gains these bindings:
 - `READING_CONTEXT_MAX_BYTES=98304` — a hard serialized context-packet ceiling;
 - `READING_PREGEN_ACTIVE_DAYS=30` — the initial recently-active window;
 - `READING_PREGEN_LEAD_MINUTES=30` — generate the next edition thirty minutes
-  before its local day; and
+  before its local day;
+- `READING_PREGEN_SPREAD_MINUTES=45` — deterministically advance reservations
+  into one of four 15-minute buckets from zero through forty-five additional
+  minutes, spreading common `:00` zones without cron-rounding away the lead;
+- `READING_SCHEDULER_BATCH_LIMIT=100` — the maximum users examined by one cron
+  invocation;
+- `READING_DAILY_PROVIDER_CALL_LIMIT=<approved positive integer>` — a required
+  UTC-day ceiling shared by scheduled, first-open, and retry calls; production
+  configuration is invalid until an operator approves and sets the number; and
 - `OPENAI_API_KEY` — a secret, populated from the already-authorized existing
   key through `wrangler secret put`, never a checked-in var.
+
+`gpt-5.6-sol` was verified on 2026-08-10 both against the
+[official model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+and in the authorized account's live `/v1/models` list. The implementation
+must repeat the live account check before a model value is allowed to gate
+production configuration, and again for every later model change. Runtime
+`checkSecureConfig` then checks the exact preflight-approved value; consent copy
+names the provider, while the exact model ID belongs in the Generation record.
 
 The provider request uses the Responses API with:
 
@@ -149,10 +167,9 @@ The provider request uses the Responses API with:
 - the configured timeout, context-packet, and output-token ceilings.
 
 The adapter does not silently change models, retry on another model, or relax
-the output schema. Provider timeouts, 429s, retryable 5xx responses, and transient
-network failures are typed as retryable. Authentication failure, an unknown
-model, invalid configuration, refusal, and a response that cannot pass the
-contract are terminal for that immutable command.
+the output schema. It returns a typed provider result; the shared generation
+failure policy below, rather than the adapter, decides queue retry and command
+replacement. No queue delivery makes more than one provider call.
 
 OpenAI states that API data is not used to train models unless the customer
 opts in, while default abuse-monitoring logs may retain customer content for up
@@ -196,18 +213,22 @@ categories that are genuinely implemented and stored.
 
 ### Included information
 
-The context compiler may consider the entire consented, reading-relevant corpus:
+The local context compiler may consider the entire consented,
+reading-relevant corpus, but the provider projection contains only what is
+needed to write the reading:
 
-- exact birth date, time, place, accuracy, and uncertainty when permitted;
-- the active natal chart and its calculation fingerprint;
+- birth-accuracy label, the derived uncertainty report, and the suppression
+  list; never the birth instant, birthplace, or coordinates;
+- eligible calculated natal facts, without the chart's storage fingerprint;
 - longer transit cycles and the new calculated daily-sky facts;
-- confirmed local date, scheduling zone, locale, and domain preference;
+- confirmed local date, locale, and domain preference, without the IANA
+  scheduling-zone name;
 - enabled journal entries, check-ins, saved reflections, and life-context
   signals;
 - prior readings and feedback used to reduce repetition and learn preferred
   framing; and
 - any later source that has an active source permission whose declared allowed
-  uses include daily-reading synthesis.
+  uses intersect the closed M5 lane set below.
 
 “Consider” does not mean blindly serialize the whole account into every prompt.
 The compiler evaluates the complete eligible corpus, then creates a bounded,
@@ -217,11 +238,46 @@ metadata, and a repetition manifest. It does not use a hidden model-generated
 summary step. Selection policy and packet-budget changes are versioned because
 they can change the output for identical source records.
 
+Raw birth instant and coordinates are the account's most identifying fields and
+remain inside the envelope-encrypted product/calculation boundary. `store:
+false` is not treated as a mitigation for sending them. Any future proposal to
+cross that boundary is a new privacy design requiring explicit review and Zero
+Data Retention eligibility before implementation.
+
+### Allowed-use composition
+
+M5 does not add `daily-reading synthesis` or any other value to the byte-frozen
+M0 `allowedUse` enum. `ai_synthesis` is the outer account-level purpose consent;
+it is not an `allowed_use` value and cannot make an otherwise ineligible signal
+eligible.
+
+For each possible use, the compiler computes this exact intersection:
+
+`signal.allowed_uses ∩ active source-consent.allowed_uses ∩ M5_SUPPORTED_USES`
+
+It then freezes one `pin.allowed_use` per selected signal/use pair. Execute must
+again prove that exact value is still present in both the signal and consent
+arrays before it calls the shared eligibility partition.
+
+`M5_SUPPORTED_USES` is this existing M0 subset:
+`annual_context`, `environment_context`, `life_domain_selection`,
+`narrative_continuity`, `optional_recommendations`, `pattern_profile`,
+`reflection_prompt`, `relationship_interpretation`, `repetition_control`,
+`routine_context`, `theme_eligibility`, `theme_filtering`, `theme_ranking`,
+`tone`, `travel_context`, `user_memory`, and `workload_context`. Theme tokens
+control admission and emphasis; context/profile tokens may frame relevance;
+continuity/memory tokens may connect or de-duplicate; and recommendation,
+reflection, and tone tokens may affect only those response forms. A source may
+affect only its exact intersecting lanes. Each lane is pinned and rechecked; M5
+never upgrades, aliases, or silently substitutes an allowed-use value.
+
 ### Always-excluded information
 
 The provider request never contains:
 
 - email, name, raw application user ID, provider account ID, or session ID;
+- raw birth date, time, instant, place, coordinates, timezone name, or birth
+  payload;
 - authentication tokens, API keys, connector credentials, cookies, encryption
   material, or password-equivalent values;
 - audit events, request logs, exception details, queue leases, device history,
@@ -231,14 +287,19 @@ The provider request never contains:
 
 User-authored text is serialized as untrusted data inside a closed context
 object. It cannot add instructions, change the output contract, enable tools,
-or override the system policy. Logs record only request ID, provider/model
+or override the system policy. Because enabled user-authored text may itself
+mention a person or place, the product does not claim that free text is
+de-identified; the consent UI names that category plainly. Logs record only
+request ID, provider/model
 version, timing, token counts, typed result class, and hashes. They never record
 the prompt packet, birth data, journal text, or generated prose.
 
 The immutable command and any retained context manifest remain encrypted with
-the user's DEK. New encrypted columns must be registered in
-`ENCRYPTED_COLUMNS` before their first writer, and their AAD identity must be
-covered by the existing rotation tests.
+the user's DEK. Before the compiler gains its first context-signal writer,
+`context_signals.value_enc` moves from `UNWRITTEN_ENCRYPTED_COLUMNS` to
+`ENCRYPTED_COLUMNS`; this is a list move, not a new-column registration. Any
+other new encrypted column must be registered before its first writer, and all
+AAD identities remain covered by rotation tests.
 
 ## Calculated daily-sky layer
 
@@ -264,6 +325,15 @@ interval is represented as a half-open UTC range `[day_start, day_end)` and may
 span 23, 24, or 25 hours across daylight-saving transitions. Local noon is the
 stable anchor because it exists on ordinary DST transition days and avoids
 using the instant the scheduler happened to run as a reading fact.
+
+The resolver uses the pinned IANA database and a closed disambiguation rule.
+For an ambiguous nominal noon it selects the earlier offset; for a missing noon
+on an otherwise representable date it selects the first valid instant after
+noon and records that resolution in the calculation request. If an entire local
+date is unrepresentable after a date-line change, no reading is generated for
+that date: the scheduler records `skipped_local_date` and advances to the next
+representable date. These decisions are golden-tested and are part of the
+daily-sky request identity.
 
 The request contains:
 
@@ -310,8 +380,7 @@ and time-sensitive natal Moon claims under the existing uncertainty policy.
 ## Context compiler and immutable command
 
 `GenerateDailyReadingCommandV2` supersedes V1 for new reservations. The
-encrypted command pins everything that could make a retry produce a different
-reading:
+encrypted command pins everything that defines the eligible input:
 
 - reading ID, opaque generation ID, local date, revision, reason, and command
   generation;
@@ -324,7 +393,41 @@ reading:
   normalized hashes, and encrypted text/value snapshots;
 - model provider, exact model ID, reasoning level, prompt version, output schema,
   selection policy, and validation policy; and
-- input-manifest and assembly-identity hashes.
+- the canonical input-manifest hash and `generation_input_id`.
+
+### One eligibility-and-identity entry point
+
+V5 removes deterministic prose assembly, not deterministic eligibility. Add one
+pure exported `prepareConstrainedReadingInput()` entry point in
+`packages/reading-engine`. It must call the existing
+`packages/reading-engine/src/eligibility.ts` partition internally, apply fact
+suppression and deterministic context/fact selection, and return the selected
+sets, the closed model projection, `input_manifest_canonical`, and
+`identity_canonical`. Callers must not call a lower-level identity builder or
+recreate the eligibility partition.
+
+The enqueue path runs the complete entry point and hashes
+`input_manifest_canonical` into `input_manifest_hash` and
+`identity_canonical` into a domain-separated `gin_sha256_...`
+`generation_input_id`. After claim, the execute path reconstructs the frozen
+inputs, rechecks their live eligibility, runs the same complete entry point,
+and compares both hashes before any provider call. A mismatch is
+`generation_input_id_mismatch`, a terminal integrity defect. The existing v3
+path retains its assembler-derived `assembly_id`; v5 does not overload that
+name.
+
+`generation_input_id` identifies the frozen eligible input and policy, not the
+prose. OpenAI is nondeterministic: two legitimate deliveries against one frozen
+command may return different candidates. The encrypted artifact's
+`content_hash` and provider-response hash identify the candidate that actually
+won publication.
+
+That makes the existing guarded `completeReading` claim compare-and-swap
+load-bearing. Publication must assert the active job ID, claim token, command
+generation, running job state, and pending reading state in the same D1 batch
+that stores evidence and marks the reading published. At most one candidate can
+win. A late or duplicate response that loses any assertion is discarded; it is
+never compared for textual equality and never overwrites the winner.
 
 The model-bound request is a smaller closed projection of that command. It uses
 opaque fact and context references and carries no reading key, user ID, chart
@@ -336,6 +439,22 @@ path. If consent or a context source is no longer eligible, the source is not
 silently dropped from an already-frozen prompt; the command is rejected and a
 new command may be built only if the automatic replacement policy explicitly
 permits it.
+
+### Reservation and Worker integration changes
+
+The reservation layer must use a discriminated V1/V2 command union. For V2,
+both initial and reissue INSERTs bind `assembly_mode = 'constrained_model'` and
+`release_version = NULL`; they must stop hardcoding `deterministic`.
+`replaceCommand` updates `assembly_mode`, nullable `release_version`, v5
+`reading_key`, chart/contract identity, and the active job consistently when it
+installs a later command generation. V1 continues to bind `deterministic` and a
+release version.
+
+The Worker default export gains `scheduled` alongside `fetch` and `queue`.
+Because cron and Queue do not pass through Hono, `scheduled()` must call
+`checkSecureConfig` directly before reading a due row or reserving a command,
+exactly as `queue()` does. `run_worker_first` needs no change: the new entry
+point is not an HTTP route, and existing product routes remain under `/v1/*`.
 
 ## Model input and output contract
 
@@ -419,6 +538,9 @@ The M5 package defines at least:
 - a manifest that identifies the frozen predecessors and the intentional
   breaking changes.
 
+M5 context references reuse the frozen M0 `allowedUse` definition and constrain
+it to `M5_SUPPORTED_USES`; they do not copy or extend the closed enum.
+
 `daily-reading-v5` keeps the reader-facing paragraph composition familiar but:
 
 - fixes `assembly_mode` to `constrained_model`;
@@ -432,22 +554,58 @@ opaque private references, provider and exact model, prompt/selection/validation
 versions, calculation versions, hashes, token usage, provider request ID, and
 the validation result. It does not store the raw prompt or repeat journal text.
 
+`contracts/validate_schemas.py` is part of the contract change. It must add M5
+paths, the M5 per-file `$defs` map, fixture base-URI mappings, the `m5` package
+registry entry, OpenAPI validation, and the third manifest. The existing M0
+automated freeze proof remains. M5 also adds an automated M3 predecessor proof
+outside the frozen directory: pin the M3 manifest digest and fail when
+`contracts/m3/` is dirty. The final gate therefore validates three manifests
+and automatically proves both frozen predecessor directories unchanged; it
+must not describe today's manual M3 check as if it already existed.
+
 ## D1 migration and stored compatibility
 
-Add a forward-only `0003_m5_openai_reading_publisher.sql` migration. It must
-preserve non-empty v3 data rather than assume the reading tables are empty.
+Add a forward-only `0003_m5_openai_reading_publisher.sql` migration, but choose
+its path from measured production state. Before applying it, record counts for
+`content_releases`, `daily_readings`, `reading_sources`, and
+`reading_feedback`. Because `daily_readings.release_version` is currently
+`NOT NULL REFERENCES content_releases(version)` and production has no content
+release, the expected reading-table counts are zero; the deployment gate proves
+that expectation rather than assuming it.
 
-The migration rebuilds `daily_readings` and its dependent constraints so:
+When `daily_readings`, `reading_sources`, and `reading_feedback` are all empty,
+0003 reuses 0002's safe shape:
 
-- `release_version` becomes nullable and remains populated for legacy rows;
-- new rows use `assembly_mode = 'constrained_model'` and a null
-  `release_version`;
-- the existing per-user/local-day live and pending uniqueness rules remain;
-- the reading key no longer requires a release version for new rows;
-- the status model can distinguish an input-invalidated historical reading from
-  a currently publishable one; and
-- encrypted reading and evidence blobs remain byte-for-byte unchanged with the
-  same record IDs and AAD identity.
+1. `assertion_probe` preflights abort if any dependent reading row exists;
+2. drop `reading_sources` and `daily_readings` under the same documented foreign
+   key procedure as 0002; and
+3. create the final table names and dependent indexes directly.
+
+It must not build side tables and rename them: SQLite rewrites REFERENCES on
+rename only under the relevant foreign-key setting, and
+`reading_sources(reading_id, user_id)` is a composite child. If any dependent
+reading row is present, the migration stops before a DROP. A separately
+authorized application-layer export/decrypt/re-encrypt/copy and verification
+plan is then required; the design does not pretend generic D1 SQL can preserve
+those encrypted, AAD-bound rows.
+
+The empty-table rebuild defines:
+
+- nullable `release_version`, populated only for legacy-format rows;
+- `assembly_mode = 'constrained_model'` with null `release_version` for v5;
+- status values `pending | published | failed | superseded | invalidated`;
+- nullable `invalidated_at`, required exactly when status is `invalidated`;
+- the existing per-user/local-day revision, live, pending, successor, and
+  composite-ownership constraints; and
+- the existing encrypted reading/evidence column names and AAD identities.
+
+V5 `reading_key` has the closed shape
+`reading-v5:<user_id>:<YYYY-MM-DD>:r<positive-revision>`. It is stable across
+command-generation replacements and never enters the model packet. Legacy keys
+start with `user:` and contain the release field, so the literal
+`reading-v5:` namespace makes the two grammars disjoint under the retained
+global `UNIQUE (reading_key)` constraint; a three-value v5 key cannot collide
+with a legacy four-value key.
 
 Provider, prompt, calculation, context, and validation metadata stay inside the
 encrypted reading/evidence envelopes unless a clear field is required for a
@@ -460,24 +618,48 @@ infrastructure and cannot influence V2 command construction or v5 Today reads.
 Their complete removal is a later migration with its own retention and rollback
 review.
 
-The migration proof must start from a populated M3 database, apply through the
-normal Wrangler migration ledger, and demonstrate unchanged row counts,
-readable legacy ciphertext, valid composite ownership foreign keys, empty
-`PRAGMA foreign_key_check`, and `PRAGMA quick_check = ok`.
+Migration tests start with an empty M3-shaped reading schema and prove final
+constraints, `PRAGMA foreign_key_check`, and `PRAGMA quick_check = ok`. A second
+fixture inserts a dependent row and proves the preflight aborts before any table
+is dropped. Production proof records the counts, migration ledger, final schema,
+foreign-key check, and quick check. The earlier populated-M3 proof claim is
+removed unless production counts actually force the separately authorized
+backfill path.
 
 ## Scheduling and reading lifecycle
 
 ### Hybrid generation
 
 Add a Worker `scheduled` handler and a sub-hourly cron. A 15-minute cadence is
-required because IANA zones include quarter-hour and half-hour offsets.
+required because IANA zones include quarter-hour and half-hour offsets. Cadence
+does not solve load concentration: most users share `:00` zones. For target date
+`D`, due time is the first instant of `D` in the confirmed zone, minus the
+30-minute lead, minus `15 × (SHA-256(user_id, D) mod 4)` minutes. Readings are
+therefore reserved in four aligned buckets 30, 45, 60, or 75 minutes early
+without changing their factual day.
 
-`users.next_due_at` is the scheduling cursor. After every successful reservation
-or evaluated no-op, the scheduler resolves and stores the next pre-generation
-instant as thirty minutes before the next local day in the user's confirmed
-zone. Timezone changes recompute it. The
-scheduler selects bounded rows by `next_due_at`, never scans and converts every
-user timezone on each invocation.
+`users.next_due_at` is the scheduling cursor. 0003 adds
+`idx_users_next_due_at` over `(next_due_at, id)` for active non-null rows and
+`idx_users_unseeded_due` over `(created_at, id)` for active null rows. Each cron
+uses one shared `READING_SCHEDULER_BATCH_LIMIT` in this order: repair eligible
+failed commands for the current/next local day, reserve due readings, then seed
+null cursors with the remaining quota. 0003 adds
+`idx_daily_readings_failed_generation` on `(updated_at, user_id)` for failed
+rows below `MAX_COMMAND_GENERATION`, and `idx_jobs_failed_result_class` on
+`(result_class, finished_at, id)` for failed jobs; advancing
+`next_due_at` after the original reservation therefore cannot hide a 23:30
+provider failure from automatic repair. Account creation, timezone
+confirmation/change, chart activation, consent change, and qualifying activity
+also recompute the cursor. An ineligible account still receives the next daily
+check time, so a null value never becomes an unbounded rescan sentinel.
+
+After every successful reservation or evaluated no-op, the scheduler advances
+the cursor. It derives a local-day start as an instant and subtracts real elapsed
+minutes, rather than constructing an ambiguous wall-clock `23:30`. If a cron
+gap leaves a cursor in an older local date, it records skipped dates and
+considers only the user's current day and next pre-generation target; it never
+backfills stale prose. If an IANA date is wholly unrepresentable, it records
+`skipped_local_date` and advances to the next representable date.
 
 Pre-generation applies only when all of these are true:
 
@@ -492,6 +674,18 @@ Inactive but otherwise eligible users are generated on first open. Scheduler
 and first open call the same reservation service and converge on the same
 user/local-day/generation identity.
 
+Wrangler keeps `max_batch_size = 1` and sets the Queue consumer's
+`max_concurrency = 4`; it may be raised only after queue-age, OpenAI tier, and
+cost canaries. The scheduler dispatch cap is 100 reservations per invocation.
+0003 also adds a non-user-keyed `reading_provider_daily_usage` counter. Before
+each provider call, D1 atomically consumes one unit from the configured UTC-day
+budget; retries and first-open calls use the same counter. Budget exhaustion is
+`publisher_budget_exhausted` and makes no provider call. Because request bytes
+and output tokens are separately capped, the required call limit gives a
+computable worst-case daily spend; rollout records that bound using the then
+current model price and refuses scheduler activation until the numeric ceiling
+is approved. There is no unlimited or unset production mode.
+
 ### Stable daily edition
 
 A successfully published reading is stable for that local day. New journals,
@@ -499,26 +693,72 @@ check-ins, ordinary preference changes, and feedback affect the next day's
 context rather than silently rewriting prose already seen.
 
 A birth-profile correction, chart correction, calculation defect, or other
-change that invalidates factual inputs is different. The read path must not
-serve the old reading as current once its chart/calculation fingerprint is known
-to be invalid. The old encrypted artifact remains in revision history, while a
-replacement is generated as a new revision. If the replacement fails, Today is
-unavailable rather than showing the factually invalid predecessor.
+change that invalidates factual inputs uses a new, explicit path. As soon as the
+invalidation is accepted, `invalidatePublishedReading` compare-and-swaps the
+live row from `published` to `invalidated`, sets `invalidated_at`, and writes the
+reason to the encrypted/audit record. It does not wait for a successor to
+succeed. Product reads select only `published`, so the invalid artifact remains
+in encrypted revision history but immediately stops being live.
+
+`reserveFactRepair` then creates revision `r+1` against that named invalidated
+predecessor. Its assertions, `replaceCommand`, and `completeReading` accept the
+predecessor only in `invalidated`; completion leaves that status unchanged and
+publishes the successor. A failed successor also leaves it invalidated, so
+Today is unavailable. The existing ordinary reissue path is deliberately
+different: for a safety or non-factual defect correction, its predecessor
+stays published until `completeReading` atomically marks it `superseded`. Thus
+M5 changes the incumbent “failed successor leaves the live reading alone” rule
+only for the explicitly fact-invalidating path.
 
 Consent revocation does not retroactively rewrite a valid published reading. It
 prevents all later provider calls and is reflected in future source selection.
 
 ### Failure and retries
 
-The queue retains its platform retry budget and adds typed application policy:
+V5 centralizes failure codes and predicates in one shared module imported by
+generation, `queue.ts`, enqueue replacement, `ensure-today-reading.ts`, and the
+internal replacement-route validator. Those consumers must not maintain
+parallel string sets.
 
-- transient calculation/provider/network failures retry with bounded
-  exponential delay and jitter;
-- invalid model output may receive one fresh provider attempt under the same
-  frozen command, never a prompt relaxation;
-- configuration, consent, integrity, policy, or exhausted-budget failures are
-  terminal; and
-- a terminal initial reading remains failed and unpublished.
+| Failure class | Same-command Queue handling | Automatic command replacement |
+| --- | --- | --- |
+| `calc_unavailable`, `daily_sky_unavailable`, `publisher_unavailable` | Retry after the existing `RETRY_DELAY_SECONDS = 60` while `jobs.attempts < MAX_JOB_ATTEMPTS` | Yes after job exhaustion |
+| `publisher_output_invalid`, `publisher_refused` | One fresh delivery only; retry only when the first provider result occurred at `jobs.attempts = 1` | Yes after terminal job failure |
+| `publisher_budget_exhausted` | No provider call and no Queue retry | No; operator/configuration gate |
+| `publisher_not_configured`, `publisher_auth_failed`, `publisher_model_unavailable`, `ai_synthesis_consent_required`, `context_ineligible`, `generation_input_id_mismatch`, `policy_unsupported` | Terminal | No |
+
+The exact v5 scheduler-replaceable set is therefore
+`calc_unavailable | daily_sky_unavailable | publisher_unavailable |
+publisher_output_invalid | publisher_refused`. `release_unreadable` remains a
+legacy v3 code and is impossible on v5. `MAX_COMMAND_GENERATION = 3` means an
+initial command has at most two automatic replacement commands.
+
+`MAX_JOB_ATTEMPTS = 4` remains one initial delivery plus three delivery retries
+for the infrastructure classes. The stricter output-invalid/refusal row above
+stops after its second provider-bearing delivery even though unused Queue
+attempt capacity remains.
+
+`publisher_unavailable` covers provider timeout, 429, retryable 5xx, and
+transient network failure. Authentication/authorization responses map to
+`publisher_auth_failed`; an unavailable configured model maps to
+`publisher_model_unavailable`.
+
+There is no in-invocation provider retry. A claim increments durable
+`jobs.attempts`, performs bounded calculation, and makes at most one 90-second
+OpenAI call. For output-invalid/refusal, that existing attempts field is also
+the durable “one fresh attempt” counter; earlier infrastructure retries may
+conservatively consume the allowance rather than adding another counter. Before
+calling OpenAI, execution requires enough claim time for the configured timeout
+plus a 60-second D1/publication margin; otherwise it releases for the existing
+`LEASE_RETRY_DELAY_SECONDS = 305` without a provider call. The five-minute
+`CLAIM_LEASE_MS` is never asked to hold two 90-second calls.
+
+While a scheduler-replaceable failure has remaining command generations,
+ensure/scheduler reserve the next command and Today remains `202`. After `g3`
+fails, the reading is `424` for that local day; calling the same ensure endpoint
+cannot re-enter a repair branch, so the terminal UI does not offer a retry
+control that can never succeed. A retry control remains appropriate only for a
+pre-command `503` where a new request can make progress.
 
 There is no automatic model downgrade, previous-reading reuse, deterministic
 copy, or editorial-release fallback. Operational rollback may disable new
@@ -542,10 +782,12 @@ New v5 results use the existing success/preparation rhythm:
 - `409 timezone_confirmation_required` or
   `locale_confirmation_required`: existing preference gates;
 - `404 chart_not_found`: onboarding is incomplete;
-- `424 reading_generation_failed`: the immutable attempt is terminal; and
+- `424 reading_generation_failed`: automatic command repair is exhausted, or a
+  fact-invalidated day has no publishable successor; and
 - `503 publisher_not_configured`, `publisher_unavailable`, or
-  `calc_unavailable`: a safe infrastructure response before a terminal command
-  result exists.
+  `calc_unavailable`, `daily_sky_unavailable`, or
+  `publisher_budget_exhausted`: a safe infrastructure response before a
+  terminal command result exists.
 
 `release_not_active` and `release_unreadable` are not possible on the v5 path.
 All errors use the existing safe envelope and request ID. Product responses do
@@ -567,7 +809,7 @@ visual world.
 Before the first OpenAI reading, Today renders a focused consent state that
 names:
 
-- OpenAI as the processor and `gpt-5.6-sol` as the configured model family;
+- OpenAI as the processor, without coupling consent copy to an exact model ID;
 - the enabled data categories;
 - the purpose—generating the user's daily reading;
 - the fact that API processing is not product model-training consent;
@@ -586,9 +828,10 @@ consent.
   is taking longer and that the user may leave and return.
 - **Ready:** preserve the editorial column and add a restrained disclosure:
   “Generated with OpenAI from your calculated chart and enabled context.”
-- **Failed:** say today's reading could not be generated, offer the existing
-  stable retry control, and show the request ID. Never mention an active release
-  or suggest that generic copy is being substituted.
+- **Failed:** say today's reading could not be generated and show the request
+  ID. Offer the stable retry control only for a pre-command `503`; omit it for
+  exhausted `424`, where the same action cannot make progress. Never mention an
+  active release or suggest that generic copy is being substituted.
 - **Revised:** preserve the revision chip and disclose why in provenance.
 - **Unauthorized, onboarding, timezone, and locale:** retain their dedicated
   flows.
@@ -643,9 +886,14 @@ focus, announce status changes, and meet the existing WCAG 2.2 AA target.
 - explicit AI-synthesis consent is mandatory and separate from training or
   research consent;
 - revocation after enqueue prevents any provider fetch;
-- disabled, stale, or purpose-ineligible sources are excluded;
-- all allowed source categories can participate in deterministic selection;
+- disabled, stale, or purpose-ineligible sources are excluded, and the exact
+  frozen M0 allowed-use intersection controls every lane;
+- enqueue and execute both run `prepareConstrainedReadingInput()`, including
+  the existing eligibility partition, and a changed input produces
+  `generation_input_id_mismatch` before fetch;
 - identifiers, credentials, logs, and encryption material never serialize;
+- raw birth time/place/coordinates never serialize; only accuracy,
+  uncertainty, suppression, and calculated facts cross the provider boundary;
 - user text that resembles a prompt remains inert data;
 - OpenAI requests set `store: false`, contain no tools, and pin the configured
   model and prompt version;
@@ -666,28 +914,39 @@ focus, announce status changes, and meet the existing WCAG 2.2 AA target.
 - require any model, prompt, selection, or validation-policy change to pass the
   corpus and increment its version.
 
-The ordinary test suite uses a deterministic fake OpenAI server. A live API
-evaluation is an explicit, separately invoked lane using synthetic profiles
-only; it never sends real user data from development or production.
+The ordinary test suite extends `apps/api/test/mock-calc-service.ts`, which
+already intercepts all outbound fetch. Its dispatcher routes by URL host:
+calculation hosts retain existing behavior, `api.openai.com` reaches the fake
+OpenAI responses, and unknown hosts fail closed. It is not installed as a
+parallel fetch interceptor. A live API evaluation is an explicit, separately
+invoked lane using synthetic profiles only; it never sends real user data from
+development or production.
 
 ### D1 and queue integration
 
-- migrate a populated v3 database without losing or rewriting encrypted rows;
-- validate legacy v3 reads and new v5 writes side by side;
+- migrate an empty M3-shaped reading database through the final-name
+  DROP/CREATE path and prove a non-empty fixture aborts before DROP;
+- validate legacy v3 decoding in application tests and new v5 writes without
+  claiming production contains legacy rows;
 - prove scheduler/first-open races create one reservation and job;
-- prove duplicate delivery and expired-lease recovery remain safe;
+- prove duplicate delivery, nondeterministic competing candidates,
+  publication-CAS loss, and expired-lease recovery remain safe;
 - cover consent revocation, chart invalidation, timezone rollover, provider
   timeout/refusal/429/5xx, malformed output, exhausted retries, and atomic
   publication;
 - prove a failed fact-invalidating replacement does not expose the invalidated
   predecessor as today's current reading; and
-- prove no release pointer or R2 content bundle is read by a V2 generation job.
+- prove no release pointer or R2 content bundle is read by a V2 generation job;
+- exercise every shared retry/replacement class through generation, Queue,
+  ensure, and the `MAX_COMMAND_GENERATION = 3` ceiling; and
+- prove the due indexes, null seeding, `:00` spreading, skipped-date rules,
+  Queue concurrency, and atomic daily provider-call ceiling.
 
 ### Web
 
 - consent gate content and keyboard flow;
-- preparing, delayed, terminal failure, retry, ready, revised, and unauthorized
-  states;
+- preparing, delayed, retryable pre-command failure, exhausted terminal failure
+  without an ineffective retry, ready, revised, and unauthorized states;
 - automatic polling without repeated live-region announcements;
 - visible OpenAI disclosure and the three provenance layers;
 - no raw journal excerpts or technical identifiers in reader-facing evidence;
@@ -699,8 +958,9 @@ only; it never sends real user data from development or production.
 ### Full candidate gate
 
 Run focused tests through TDD, then fresh root `npm run typecheck`, `npm test`,
-and `npm run build`. Validate both contract manifests and prove
-`contracts/m0/` and `contracts/m3/` are unchanged. Run the Impeccable detector
+and `npm run build`. Validate all three contract manifests and use the extended
+validator to prove `contracts/m0/` and `contracts/m3/` unchanged. Assert that
+`run_worker_first` is unchanged. Run the Impeccable detector
 once over the final changed UI targets, inspect desktop and mobile together in
 one bounded browser pass, apply one batched correction if required, and confirm
 once.
@@ -712,17 +972,26 @@ and production acceptance are separate gates.
 
 The production sequence is:
 
-1. back up D1 and record the time-travel bookmark;
-2. deploy dual v3/v5 readers and the forward-only migration while v5 generation
-   remains disabled;
-3. prove schema, ledger, row counts, foreign keys, integrity, and legacy reads;
-4. set the existing authorized OpenAI key as `OPENAI_API_KEY` and configure the
-   exact publisher/model/prompt variables;
-5. run synthetic calculation and OpenAI canaries without real user context;
-6. enable v5 generation for an internal consented account and prove one complete
+1. back up D1, record the time-travel bookmark, and capture counts for
+   `content_releases`, `daily_readings`, `reading_sources`, and
+   `reading_feedback`;
+2. if any dependent reading table is non-empty, stop before migration and open
+   the separately authorized encrypted-backfill design;
+3. deploy dual v3/v5 readers and the assertion-guarded forward-only migration
+   while v5 generation remains disabled;
+4. prove schema, ledger, expected zero row counts, foreign keys, and integrity;
+5. with the already-authorized key, verify the exact model through the live
+   OpenAI model endpoint, then set `OPENAI_API_KEY` and the approved
+   publisher/model/prompt variables;
+6. approve the numeric daily call ceiling, record its conservative maximum
+   daily spend at current model pricing, set Queue `max_concurrency = 4`, and
+   prove `checkSecureConfig` rejects missing limits;
+7. run synthetic calculation and OpenAI canaries without real user context;
+8. enable v5 generation for an internal consented account and prove one complete
    queue-to-publication-to-evidence flow;
-7. enable first-open v5 generation; and
-8. enable the 15-minute hybrid scheduler only after first-open production proof.
+9. enable first-open v5 generation; and
+10. enable the 15-minute hybrid scheduler only after first-open production
+    proof and a bounded due-row load probe.
 
 Operational metrics are limited to generation counts, queue age, latency,
 attempts, token use, validation and failure classes, model/prompt versions, and
