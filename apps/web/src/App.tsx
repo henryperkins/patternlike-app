@@ -199,7 +199,7 @@ export default function App() {
   } else if (view === "today") {
     content = <TodayView onUnauthorized={handleSignedOut} />;
   } else if (view === "timing") {
-    content = <TimingView />;
+    content = <TimingView onUnauthorized={handleSignedOut} />;
   } else if (view === "travel") {
     content = <TimeTravelView />;
   } else if (chart) {

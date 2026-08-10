@@ -112,27 +112,21 @@ describe("web application shell", () => {
     expect(results.violations).toEqual([]);
   });
 
-  // Today no longer belongs here: it has a modelled payload and its own six-way
-  // error taxonomy, so it renders its own surface rather than the generic route
-  // panel. Its cases live in components/TodayView.test.tsx.
-  it("navigates the remaining future routes through hash links and reports honest route state", async () => {
+  // Today and Timing now have modelled payloads and dedicated state owners.
+  // Time Travel remains the one generic future-route surface.
+  it("navigates the remaining future route through its hash link and reports honest route state", async () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/timing": notImplemented("Timing cycles (M3)", "req_timing"),
       "/v1/time-travel": notImplemented("Time Travel (M4)", "req_travel"),
     });
 
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
 
-    await user.click(screen.getAllByRole("link", { name: "Timing" })[0]);
-    expect(await screen.findByText(`${NOT_BUILT} (Request req_timing)`)).toBeInTheDocument();
-    expect(screen.getByText("Not active")).toBeInTheDocument();
-    expect(window.location.hash).toBe("#timing");
-
     await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
     expect(await screen.findByText(`${NOT_BUILT} (Request req_travel)`)).toBeInTheDocument();
+    expect(screen.getByText("Not active")).toBeInTheDocument();
     expect(window.location.hash).toBe("#travel");
 
     // `date` is required:true on GET /v1/time-travel; omitting it is a 400 the
@@ -146,13 +140,13 @@ describe("web application shell", () => {
     const user = userEvent.setup();
     const responses: Record<string, MockResponse> = {
       "/v1/chart": { status: 200, body: chart },
-      "/v1/timing": { status: 0, body: null, unreachable: true },
+      "/v1/time-travel": { status: 0, body: null, unreachable: true },
     };
     mockApiResponses(responses);
 
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
-    await user.click(screen.getAllByRole("link", { name: "Timing" })[0]);
+    await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
 
     expect(
       await screen.findByText("The Pattern/Like API could not be reached."),
@@ -161,43 +155,36 @@ describe("web application shell", () => {
 
     const retryButton = screen.getByRole("button", { name: /Try again/i });
     retryButton.focus();
-    responses["/v1/timing"] = { status: 0, body: null, unreachable: true };
+    responses["/v1/time-travel"] = { status: 0, body: null, unreachable: true };
     await user.click(retryButton);
 
     // The button must survive the reload it triggers; rendering it on "error"
     // alone unmounted it mid-click and dumped focus to <body> every attempt.
     expect(document.activeElement).toBe(retryButton);
 
-    responses["/v1/timing"] = notImplemented("Timing cycles (M3)", "req_timing");
+    responses["/v1/time-travel"] = notImplemented("Time Travel (M4)", "req_travel");
     await user.click(screen.getByRole("button", { name: /Try again/i }));
 
-    expect(await screen.findByText(`${NOT_BUILT} (Request req_timing)`)).toBeInTheDocument();
-    expect(capturedFor("/v1/timing")).toHaveLength(3);
+    expect(await screen.findByText(`${NOT_BUILT} (Request req_travel)`)).toBeInTheDocument();
+    expect(capturedFor("/v1/time-travel")).toHaveLength(3);
   });
 
   it("reports a live route without leaking the payload and without offering a retry", async () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/timing": {
+      "/v1/time-travel": {
         status: 200,
         body: { items: [], calculation_status: { stale: false } },
       },
-      "/v1/time-travel": notImplemented("Time Travel (M4)", "req_travel"),
     });
 
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
 
-    await user.click(screen.getAllByRole("link", { name: "Timing" })[0]);
+    await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
     expect(await screen.findByText(/This route is returning data/i)).toBeInTheDocument();
     expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Try again/i })).not.toBeInTheDocument();
-
-    // A 501 is a roadmap answer, not a transient failure: retrying it would only
-    // ask the same question again.
-    await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
-    await screen.findByText(`${NOT_BUILT} (Request req_travel)`);
     expect(screen.queryByRole("button", { name: /Try again/i })).not.toBeInTheDocument();
   });
 
@@ -449,13 +436,13 @@ describe("web application shell", () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/timing": notImplemented("Timing cycles (M3)", "req_timing"),
+      "/v1/time-travel": notImplemented("Time Travel (M4)", "req_travel"),
     });
 
     const { container } = render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
-    await user.click(screen.getAllByRole("link", { name: "Timing" })[0]);
-    await screen.findByText(`${NOT_BUILT} (Request req_timing)`);
+    await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
+    await screen.findByText(`${NOT_BUILT} (Request req_travel)`);
 
     const results = await axe.run(container, {
       rules: { "color-contrast": { enabled: false } },
@@ -481,6 +468,30 @@ describe("web application shell", () => {
     // A session can expire between the mount probe and a view's own fetch.
     // Rendering "Unreachable with a retry" would be wrong about a state the app
     // already has a screen for.
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
+  });
+
+  it("shows the signed-out surface when Timing alone finds the session gone", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/timing": {
+        status: 401,
+        body: {
+          error: {
+            code: "unauthorized",
+            message: "Authentication required",
+            request_id: "req_timing_unauthorized",
+          },
+        },
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Timing" })[0]);
+
     expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
   });
