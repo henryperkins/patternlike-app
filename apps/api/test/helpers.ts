@@ -377,3 +377,61 @@ export async function seedChart(
 
   return { chartId, fingerprint, profileVersion };
 }
+
+export interface SeedTimingReceiptOptions {
+  id: string;
+  userId: string;
+  localDate: string;
+  releaseVersion: string;
+  status?: "pending" | "failed" | "superseded";
+  revision?: number;
+  revisionReason?: "initial" | "defect_repair";
+  supersedesReadingId?: string | null;
+  createdAt: string;
+}
+
+/** Insert a clear, non-published scan receipt for Timing read-model tests. */
+export async function seedTimingReceipt(
+  options: SeedTimingReceiptOptions,
+): Promise<void> {
+  const revision = options.revision ?? 1;
+  const revisionReason =
+    options.revisionReason ?? (revision === 1 ? "initial" : undefined);
+  const supersedesReadingId = options.supersedesReadingId ?? null;
+
+  if (revision === 1) {
+    if (revisionReason !== "initial" || supersedesReadingId !== null) {
+      throw new Error("revision 1 Timing receipts must be initial without a predecessor");
+    }
+  } else if (
+    revisionReason === undefined ||
+    revisionReason === "initial" ||
+    !supersedesReadingId
+  ) {
+    throw new Error("later Timing receipts require a non-initial reason and predecessor");
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO daily_readings
+       (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+        contract_id, assembly_mode, status, revision, revision_reason,
+        supersedes_reading_id, command_generation, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'deterministic', ?, ?, ?, ?, 1, ?, ?)`,
+  )
+    .bind(
+      options.id,
+      options.userId,
+      options.localDate,
+      options.releaseVersion,
+      `user:${options.userId}:${options.localDate}:${options.releaseVersion}:r${revision}:${options.id}`,
+      `sha256:${"1a".repeat(32)}`,
+      CALC_CONTRACT_ID,
+      options.status ?? "pending",
+      revision,
+      revisionReason,
+      supersedesReadingId,
+      options.createdAt,
+      options.createdAt,
+    )
+    .run();
+}
