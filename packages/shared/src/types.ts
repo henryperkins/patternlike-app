@@ -36,3 +36,30 @@ export type AspectType =
   | "square"
   | "trine"
   | "opposition";
+
+/**
+ * Evidence lane governing what a signal may influence and what it must never do.
+ *
+ * Frozen M0 vocabulary. `packages/reading-engine` still declares a structurally
+ * identical copy; the two are assignable, and the engine's copy is retired in
+ * favour of this one when it takes a dependency on this package.
+ */
+export type EvidenceLane = "celestial_facts" | "user_and_context" | "operational";
+
+/**
+ * User-facing life domains used for ranking and prompts. Not a clinical
+ * taxonomy. Frozen M0 vocabulary; see the note on {@link EvidenceLane}.
+ */
+export type LifeDomain =
+  | "self"
+  | "relationships"
+  | "work"
+  | "creativity"
+  | "home"
+  | "body_energy"
+  | "money_resources"
+  | "learning"
+  | "community"
+  | "caregiving"
+  | "spirituality_meaning"
+  | "unspecified";
