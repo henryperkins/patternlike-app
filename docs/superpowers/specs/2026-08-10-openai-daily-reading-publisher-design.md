@@ -2,8 +2,7 @@
 
 **Date:** 2026-08-10
 
-**Status:** Revised after repository review; awaiting implementation-planning
-approval
+**Status:** Approved for implementation planning on 2026-08-10
 
 **Scope:** Replace the active-editorial-release dependency in per-user daily
 reading generation with an autonomous, configured OpenAI publisher; add the
