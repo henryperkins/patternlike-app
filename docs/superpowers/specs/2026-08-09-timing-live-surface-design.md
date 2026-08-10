@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-09
 
-**Status:** Approved for implementation planning
+**Revised:** 2026-08-10
+
+**Status:** Revised after repository review; awaiting implementation-plan approval
 
 **Scope:** Authenticated `GET /v1/timing`, its additive M3 response contract,
 and the responsive Timing screen that renders persisted cycle facts
@@ -28,10 +30,17 @@ or assign a life domain that the data model cannot support.
 
 ### Selected: read persisted cycles
 
-`GET /v1/timing` reads user-owned `cycle_instances` and `cycle_passes`, rebuilds
-each cycle from those relational facts, and calls the existing
-`computePhase(cycle, asOf)` function for the response instant. The stored
-`cycle_instances.phase` column is never read as authority.
+`GET /v1/timing` reads the authenticated user's immutable first-scan artifact
+from `cycle_instances.cycle_json`, parses it as a `NormalizedCycle`, and calls
+the existing `computePhase(cycle, asOf)` function for the response instant. The
+stored `cycle_instances.phase` column is never read as authority.
+
+`cycle_passes` is not a Timing read source. A refined scan may keep the same
+cycle identity while moving a pass timestamp, and both tables use
+`INSERT OR IGNORE` under different uniqueness rules. Reconstructing a cycle from
+the pass table could therefore combine a first-scan envelope with a different
+pass list and make Timing disagree with the exact `cycle_json` artifact Today
+assembled from.
 
 The route is deterministic for one database snapshot and one `as_of` instant.
 It returns active cycles first and any already-persisted upcoming cycles second.
@@ -54,15 +63,35 @@ explicit.
    Recomputing with the versioned reading-engine state machine is the only
    authoritative option.
 
-## Additive M3 contract
+## M3 contract and M0 supersession
 
 Add `contracts/m3/timing-response.schema.json`, valid and invalid fixtures, a
 validator mapping, an additive manifest amendment, and a `200` response in
 `contracts/m3/openapi/openapi.yaml`. Remove only `/v1/timing` from the
 manifest's list of response bodies left outside the original freeze. Nothing
-under `contracts/m0/` changes, and the M3 schema version remains `0.3.0` because
-this is a new response document for a path whose success body was deliberately
-unspecified.
+under `contracts/m0/` changes.
+
+M0 did specify a `TimingResponse`, a `200`, and `phase`, `domain`, and `duration`
+query parameters in `contracts/m0/openapi/openapi.yaml`. Its response is
+`{items, calculation_status:{last_refresh_at, stale}}` and cannot represent the
+M3 design below. The M3 amendment must therefore say explicitly that
+`timing-response.schema.json` supersedes the frozen M0 placeholder for
+`GET /v1/timing`, including these incompatibilities:
+
+- `items` becomes the modelled `cycles` collection with exact passes and
+  active/upcoming state;
+- the boolean `stale` becomes `current | stale | not_scanned` with a scan
+  receipt date;
+- `schema_version`, `as_of`, applied filters, and unreadable-cycle reporting are
+  added; and
+- `domain` is removed because neither M0 nor M3 supplies an authoritative
+  cycle-to-domain mapping.
+
+The M3 schema version remains `0.3.0`: M3 is already the versioned successor to
+M0, and its current OpenAPI deliberately carries no Timing success body. Adding
+the new M3 document is additive within that package even though it supersedes an
+incompatible M0 placeholder. `check_m0_frozen()` continues to prove both the M0
+manifest hash and a clean `contracts/m0/` working tree.
 
 The response shape is:
 
@@ -80,6 +109,7 @@ The response shape is:
     "phase": null,
     "duration": null
   },
+  "unreadable_cycle_count": 0,
   "cycles": [
     {
       "cycle_id": "cyc_0123456789abcdef0123456789abcdef",
@@ -120,40 +150,56 @@ The response shape is:
 
 - `as_of` is one server instant captured once per request and used for every
   inclusion, phase, ordering, and filter decision.
-- A row is eligible when it belongs to the authenticated user, has
-  `status = active`, and has not ended before `as_of`.
+- Eligibility is pushed into SQL with
+  `WHERE user_id = ? AND status = 'active' AND end_at >= ?`. The time predicate
+  does the real lifecycle work: `persistCycles` hardcodes `active`, and no
+  production writer currently changes it to `completed`.
 - `status` is `active` when `start_at <= as_of <= end_at`; it is `upcoming` when
   `start_at > as_of`.
 - `phase` is the exact value returned by `computePhase` for an active cycle and
   is null only for an upcoming cycle.
 - `duration_days` is `(end_at - start_at) / 86_400_000`, without calendar-month
   arithmetic.
-- Passes are ordered by `pass_index`, indices are contiguous from one, and the
-  count equals the stored `pass_count`. A malformed stored cycle fails the
-  request closed instead of emitting a partial or misleading cycle.
+- Each eligible row's `cycle_json` is parsed and checked against the closed
+  `NormalizedCycle` shape and semantic rules: row/blob identity, envelope,
+  first-exact consistency, ordered contiguous passes, and
+  `pass_count === passes.length`. The pass list comes only from that artifact.
+- An unreadable stored artifact is omitted without taking down the reader's
+  other valid cycles. `unreadable_cycle_count` reports how many eligible rows
+  were omitted before filters were applied, and the Worker logs their cycle IDs
+  with the request ID. A D1 query failure still fails the whole request.
 - Active cycles sort by their next exact pass, falling back to `end_at` after
   the final pass. Upcoming cycles follow, sorted by `start_at`. `cycle_id` is
   the final tie-breaker.
-- The response projects named fields. It does not spread `cycle_json`, expose
-  `speed_deg_per_day`, or return storage timestamps as cycle facts.
+- The response projects named fields from the validated artifact. It does not
+  spread `cycle_json`, expose `speed_deg_per_day`, or return storage timestamps
+  as cycle facts. Reading the artifact is distinct from putting the blob on the
+  wire.
 
 ### Calculation status
 
 Cycle persistence completes immediately before a daily-reading reservation is
-created. The latest user-owned `daily_readings` row is therefore the existing
-receipt that a complete scan reached the persistence boundary, including an
-empty scan. `last_refresh_at` is that row's `created_at`, and
-`last_refresh_local_date` is its `local_date`.
+created. A user-owned `daily_readings` row is therefore the existing receipt
+that a complete scan reached the persistence boundary, including an empty scan.
+
+The selected receipt is the greatest `local_date`, then the newest `created_at`
+within that date: `ORDER BY local_date DESC, created_at DESC LIMIT 1`. It is not
+filtered by reading `status`. Pending, failed, superseded, and published rows
+all follow a successful `persistCycles` call, while filtering to the latest
+creation time alone would let a reissue for yesterday make a current receipt
+look stale. `last_refresh_at` and `last_refresh_local_date` come from this
+selected row.
 
 The state is:
 
-- `current` when the latest scan receipt names the reader's current local date;
+- `current` when the latest scan receipt names the reader's current local date
+  or a later date;
 - `stale` when a receipt exists but names an earlier local date; or
 - `not_scanned` when no receipt exists.
 
-A malformed receipt timestamp, malformed local date, or receipt dated after the
-reader's current local date is an invariant failure and produces the safe `500`
-response. The route never relabels corrupt or future-dated state as current.
+A later receipt is legal: a reader can prepare Today in an ahead time zone and
+then change to a behind time zone. A malformed receipt timestamp or malformed
+local date remains an invariant failure and produces the safe `500` response.
 
 Both refresh fields are required strings for `current` and `stale`, and both
 are null for `not_scanned`. The mode is always
@@ -195,8 +241,9 @@ sends it receives `400 invalid_filter` rather than an apparently filtered 200.
   `cycles` array;
 - `400 application/json`: invalid or duplicate filters;
 - `401 application/json`: the existing authentication error; and
-- `500 application/json`: the standard safe error envelope when persisted data
-  cannot be reconstructed consistently.
+- `500 application/json`: the standard safe error envelope for a D1 query
+  failure or unreadable global scan-receipt state. One unreadable cycle is a
+  counted omission in a 200, not a surface-wide 500.
 
 The former `501` is removed from the Timing operation and remains on the other
 stubs.
@@ -206,17 +253,28 @@ stubs.
 Create `apps/api/src/db/timing.ts` as the read side of cycle persistence. Keep
 `apps/api/src/db/cycles.ts` focused on derivation and writes.
 
-The reader performs bounded set queries rather than one pass query per cycle:
+The reader performs two user-scoped queries:
 
-1. select eligible cycle-instance columns with `WHERE user_id = ?`;
-2. select pass rows through an owner-constrained join on both `cycle_id` and
-   `user_id`;
-3. select the latest daily-reading scan receipt with `WHERE user_id = ?`; and
-4. rebuild, validate, phase, filter, and sort in TypeScript.
+1. select `id`, `end_at`, and `cycle_json` from `cycle_instances` with
+   `WHERE user_id = ? AND status = 'active' AND end_at >= ?`; and
+2. select the scan receipt from `daily_readings` with `WHERE user_id = ? ORDER
+   BY local_date DESC, created_at DESC LIMIT 1`, without a status predicate.
 
-Ownership is always a query predicate. No cycle or pass from another user can
-be loaded and filtered after the fact. A foreign cycle identifier and an
-unknown one therefore never become distinguishable through this endpoint.
+The first query uses the existing `(user_id, status, ...)` index prefix and does
+not load every historical cycle into the Worker just to age it out in
+TypeScript. The selected row ID and `end_at` must agree with the parsed artifact
+used for projection.
+
+Each artifact is validated independently. Timing does not call `cycleHash` as a
+pseudo-integrity check: there is no clear stored expected digest on this read
+path, and `cycleHash` hashes an explicit projection but does not itself enforce
+the schema's enums or semantic rules. Closed-shape and semantic validation are
+what determine readability. Generation retains its stronger pin-to-digest
+comparison for the encrypted command it executes.
+
+Ownership is always a query predicate. No cycle from another user is loaded and
+filtered after the fact. A foreign cycle identifier and an unknown one therefore
+never become distinguishable through this endpoint.
 
 No migration is needed. The implementation neither repopulates
 `cycle_instances.phase` nor changes the idempotent first-write-wins behavior of
@@ -247,7 +305,8 @@ surface for Time Travel and other unmodelled responses.
    tense to factual present tense. The copy explains that cycle windows are not
    promises about events or outcomes.
 2. Show a compact calculation-status strip with persisted-scan mode, current /
-   stale / not-scanned state, and the last refresh time when known.
+   stale / not-scanned state, the last refresh time when known, and an explicit
+   warning when `unreadable_cycle_count` is nonzero.
 3. Present two square selects: phase and duration. Labels name exactly the
    server semantics; changing one issues an abortable filtered request.
 4. Render cycles in an editorial list, not a generic dashboard-card grid. Each
@@ -268,16 +327,26 @@ paper-and-rule system.
 
 - **Loading:** retain a mounted polite status region and a stable page heading.
 - **Current with cycles:** render the status, filters, and cycle list.
-- **Current with no cycles:** say that no stored cycles overlap the current scan
-  window; do not claim the user has no astrological activity beyond that window.
+- **Current with no cycles:** when `unreadable_cycle_count` is zero, say that no
+  stored cycles overlap the current scan window; do not claim the user has no
+  astrological activity beyond that window. When it is nonzero, say instead
+  that no stored cycles could be displayed and name the omitted count.
 - **Stale:** keep the latest facts visible, add a clear stale notice, and link to
   Today to prepare the current local day.
 - **Not scanned:** explain that Timing has no persisted scan yet and link to
-  Today. Do not offer an in-place refresh button.
-- **Filtered empty:** retain filters and status, state that no persisted cycles
-  match the selected filters, and offer a reset control.
-- **Older deployment (`501`):** preserve the honest not-active message and
-  request ID during rollout or rollback.
+  Today as the place where preparation begins. Say that Today may first require
+  chart, time-zone, locale, or release setup; do not promise that following the
+  link will immediately populate Timing. Do not offer an in-place refresh
+  button.
+- **Filtered empty:** retain filters and status. With no unreadable rows, state
+  that no persisted cycles match the selected filters. With unreadable rows,
+  state only that no readable cycles match and that omitted rows could not be
+  evaluated against the filters. Offer a reset control in both cases.
+- **Unreadable cycles:** keep valid cycles visible and state the exact number of
+  stored cycles omitted because their artifacts could not be read.
+- **Older Worker (`501`):** preserve the honest not-active message and request
+  ID for a cached or installed PWA that outlives a Worker rollback. The API and
+  web assets otherwise ship together, so an ordinary rollout is not the reason.
 - **Network or server error:** show the existing reader-safe message, request ID
   when present, and a retry button that remains mounted through the retry so
   focus is preserved.
@@ -297,6 +366,15 @@ with deterministic fallbacks for future open-enum values.
 No interpretive phase prose is authored in application code. The UI may
 humanize a contract token and describe a date's mechanical role, but long-form
 cycle meaning remains reviewed editorial content outside this change.
+
+### Impeccable surface brief
+
+Create
+`apps/web/.impeccable/surfaces/apps-web-src-components-timingview-tsx.md` as a
+named deliverable before editing the Timing UI. It records the approved
+Operate-mode job, data ranges, states, exclusions, incumbent visual authority,
+and responsive evidence requirements. The existing Today surface brief is not
+silently reused for a different page.
 
 ## Deliberate exclusions
 
@@ -322,22 +400,28 @@ These exclusions are visible product limitations, not silently empty fields.
 - reject an active cycle with null phase, an upcoming cycle with a non-null
   phase, inconsistent calculation-status nullability, noncontiguous passes, and
   unsupported filter values;
+- validate zero and nonzero `unreadable_cycle_count` values;
 - validate the OpenAPI `200`, `400`, `401`, and `500` shapes; and
-- prove `contracts/m0/` remains byte-for-byte unchanged.
+- prove the M3 amendment names its supersession of M0 while `contracts/m0/`
+  remains byte-for-byte unchanged.
 
 ### D1 and API
 
 - current, stale, and not-scanned calculation status, including a current empty
   scan receipt;
-- active and upcoming inclusion with completed rows excluded;
+- receipt ordering by greatest local date then newest creation time, with no
+  reading-status filter;
+- a legal ahead-date receipt remains current after a time-zone change;
+- SQL excludes ended rows and non-active hand-seeded rows before parsing;
 - phase recomputation at fixed instants for all five phases and a multi-pass
   retrograde cycle;
 - exact duration-boundary behavior at 90 and 365 days;
-- deterministic ordering and pass reconstruction;
+- deterministic ordering from the pass list inside `cycle_json`;
+- deliberately divergent `cycle_passes` rows do not change Timing output;
 - phase, upcoming, and duration filters plus duplicate/unknown query rejection;
-- another user's cycles and passes never appear;
-- malformed nullable instance fields, pass gaps, and count mismatches fail
-  closed;
+- another user's cycles never appear;
+- one malformed artifact is omitted and counted while sibling cycles still
+  render;
 - authenticated `200`, unauthenticated `401`, and removal of the Timing 501 stub;
   and
 - no calculation-service, queue, or write operation occurs during the request.
@@ -370,20 +454,29 @@ the repository root with `npm run deploy:api`. Confirm the new production Worker
 deployment reaches 100% traffic and preserve version
 `24742282-6531-49c7-905a-47370bef4004` as the rollback target.
 
-Production acceptance is separate from local verification:
+Production acceptance is separate from local verification. At this design
+review, production has no active signed M3 release, so Today cannot create a scan
+receipt or persisted cycles. Unless that operational precondition changes, the
+honest post-deploy result is `not_scanned` with an empty `cycles` array.
+
+The immediately reachable production checks are:
 
 1. make an authenticated unfiltered request and validate its 200 body against
-   the new schema;
-2. make phase and duration requests and verify their returned cycles obey the
-   documented predicates;
-3. use a second authenticated account and prove it receives only its own cycle
-   IDs;
-4. open the production Timing UI and confirm real cycle data, exact passes,
-   status, filters, empty/stale handling, and responsive layout; and
-5. confirm rollback readiness without changing D1, noting that Worker rollback
+   the new schema, including the expected not-scanned/empty state when no
+   receipt exists;
+2. open the production Timing UI and confirm the honest not-scanned state,
+   filters, and responsive layout; and
+3. confirm rollback readiness without changing D1, noting that Worker rollback
    never rewinds database data.
 
-If the configured environment does not expose both authenticated test sessions,
-stop at that acceptance gate and report the missing proof explicitly. Do not
-manufacture users, extract credentials, or treat local ownership tests as
-production evidence.
+Live-cycle certification requires all of these additional preconditions: a
+configured release signing key, an ingested and activated signed M3 bundle, a
+successful Today preparation for the test account, at least one persisted cycle
+that survives the as-of predicate, and two authenticated test sessions. Only
+then make phase and duration requests, prove the second account cannot see the
+first account's cycle IDs, and confirm real cycle/pass rendering in production.
+
+If any precondition is absent, stop at that acceptance gate and report the
+missing proof explicitly. Do not manufacture users, extract credentials, treat
+vacuous empty-filter results as cycle-filter proof, or treat local ownership
+tests as production evidence.
