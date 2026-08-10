@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T19:57:57.193Z",
+  "title": "Design System: Pattern/Like",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Observatory Green",
+        "canonical": "#173f35",
+        "tonalRamp": ["oklch(15% 0.0486 174.3)", "oklch(25% 0.0486 174.3)", "oklch(35% 0.0486 174.3)", "oklch(45% 0.0486 174.3)", "oklch(55% 0.0486 174.3)", "oklch(65% 0.0486 174.3)", "oklch(80% 0.0486 174.3)", "oklch(95% 0.0486 174.3)"]
+      },
+      "primary-deep": {
+        "role": "primary",
+        "displayName": "Deep Observatory Green",
+        "canonical": "#0f3028",
+        "tonalRamp": ["oklch(15% 0.0414 174.7)", "oklch(25% 0.0414 174.7)", "oklch(35% 0.0414 174.7)", "oklch(45% 0.0414 174.7)", "oklch(55% 0.0414 174.7)", "oklch(65% 0.0414 174.7)", "oklch(80% 0.0414 174.7)", "oklch(95% 0.0414 174.7)"]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Washed Observatory Green",
+        "canonical": "#dce7df",
+        "tonalRamp": ["oklch(15% 0.0159 154.5)", "oklch(25% 0.0159 154.5)", "oklch(35% 0.0159 154.5)", "oklch(45% 0.0159 154.5)", "oklch(55% 0.0159 154.5)", "oklch(65% 0.0159 154.5)", "oklch(80% 0.0159 154.5)", "oklch(95% 0.0159 154.5)"]
+      },
+      "accent": {
+        "role": "secondary",
+        "displayName": "Signal Coral",
+        "canonical": "#c76043",
+        "tonalRamp": ["oklch(15% 0.1386 36.6)", "oklch(25% 0.1386 36.6)", "oklch(35% 0.1386 36.6)", "oklch(45% 0.1386 36.6)", "oklch(55% 0.1386 36.6)", "oklch(65% 0.1386 36.6)", "oklch(80% 0.1386 36.6)", "oklch(95% 0.1386 36.6)"]
+      },
+      "accent-soft": {
+        "role": "secondary",
+        "displayName": "Soft Signal Coral",
+        "canonical": "#e59a7f",
+        "tonalRamp": ["oklch(15% 0.0983 40.6)", "oklch(25% 0.0983 40.6)", "oklch(35% 0.0983 40.6)", "oklch(45% 0.0983 40.6)", "oklch(55% 0.0983 40.6)", "oklch(65% 0.0983 40.6)", "oklch(80% 0.0983 40.6)", "oklch(95% 0.0983 40.6)"]
+      },
+      "focus": {
+        "role": "tertiary",
+        "displayName": "Focus Cobalt",
+        "canonical": "#234c9f",
+        "tonalRamp": ["oklch(15% 0.1429 262.4)", "oklch(25% 0.1429 262.4)", "oklch(35% 0.1429 262.4)", "oklch(45% 0.1429 262.4)", "oklch(55% 0.1429 262.4)", "oklch(65% 0.1429 262.4)", "oklch(80% 0.1429 262.4)", "oklch(95% 0.1429 262.4)"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Drafting Paper",
+        "canonical": "#f2efe6",
+        "tonalRamp": ["oklch(15% 0.0124 91.5)", "oklch(25% 0.0124 91.5)", "oklch(35% 0.0124 91.5)", "oklch(45% 0.0124 91.5)", "oklch(55% 0.0124 91.5)", "oklch(65% 0.0124 91.5)", "oklch(80% 0.0124 91.5)", "oklch(95% 0.0124 91.5)"]
+      },
+      "surface-light": {
+        "role": "neutral",
+        "displayName": "Clean Drafting Paper",
+        "canonical": "#faf8f2",
+        "tonalRamp": ["oklch(15% 0.0082 91.5)", "oklch(25% 0.0082 91.5)", "oklch(35% 0.0082 91.5)", "oklch(45% 0.0082 91.5)", "oklch(55% 0.0082 91.5)", "oklch(65% 0.0082 91.5)", "oklch(80% 0.0082 91.5)", "oklch(95% 0.0082 91.5)"]
+      },
+      "surface-deep": {
+        "role": "neutral",
+        "displayName": "Layered Drafting Paper",
+        "canonical": "#e5dfd1",
+        "tonalRamp": ["oklch(15% 0.0199 87.5)", "oklch(25% 0.0199 87.5)", "oklch(35% 0.0199 87.5)", "oklch(45% 0.0199 87.5)", "oklch(55% 0.0199 87.5)", "oklch(65% 0.0199 87.5)", "oklch(80% 0.0199 87.5)", "oklch(95% 0.0199 87.5)"]
+      },
+      "surface-evidence": {
+        "role": "neutral",
+        "displayName": "Evidence Paper",
+        "canonical": "#e8e3d8",
+        "tonalRamp": ["oklch(15% 0.0157 86.4)", "oklch(25% 0.0157 86.4)", "oklch(35% 0.0157 86.4)", "oklch(45% 0.0157 86.4)", "oklch(55% 0.0157 86.4)", "oklch(65% 0.0157 86.4)", "oklch(80% 0.0157 86.4)", "oklch(95% 0.0157 86.4)"]
+      },
+      "panel-surface": {
+        "role": "neutral",
+        "displayName": "Vellum Panel",
+        "canonical": "rgba(250, 248, 242, 0.72)",
+        "tonalRamp": ["oklch(15% 0.0082 91.5 / 0.72)", "oklch(25% 0.0082 91.5 / 0.72)", "oklch(35% 0.0082 91.5 / 0.72)", "oklch(45% 0.0082 91.5 / 0.72)", "oklch(55% 0.0082 91.5 / 0.72)", "oklch(65% 0.0082 91.5 / 0.72)", "oklch(80% 0.0082 91.5 / 0.72)", "oklch(95% 0.0082 91.5 / 0.72)"]
+      },
+      "on-surface": {
+        "role": "neutral",
+        "displayName": "Ink Green",
+        "canonical": "#17312a",
+        "tonalRamp": ["oklch(15% 0.0349 174.3)", "oklch(25% 0.0349 174.3)", "oklch(35% 0.0349 174.3)", "oklch(45% 0.0349 174.3)", "oklch(55% 0.0349 174.3)", "oklch(65% 0.0349 174.3)", "oklch(80% 0.0349 174.3)", "oklch(95% 0.0349 174.3)"]
+      },
+      "on-surface-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink Green",
+        "canonical": "#4e625b",
+        "tonalRamp": ["oklch(15% 0.0267 171.8)", "oklch(25% 0.0267 171.8)", "oklch(35% 0.0267 171.8)", "oklch(45% 0.0267 171.8)", "oklch(55% 0.0267 171.8)", "oklch(65% 0.0267 171.8)", "oklch(80% 0.0267 171.8)", "oklch(95% 0.0267 171.8)"]
+      },
+      "on-surface-faint": {
+        "role": "neutral",
+        "displayName": "Faint Ink Green",
+        "canonical": "#7a8781",
+        "tonalRamp": ["oklch(15% 0.0176 166.4)", "oklch(25% 0.0176 166.4)", "oklch(35% 0.0176 166.4)", "oklch(45% 0.0176 166.4)", "oklch(55% 0.0176 166.4)", "oklch(65% 0.0176 166.4)", "oklch(80% 0.0176 166.4)", "oklch(95% 0.0176 166.4)"]
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Graphite Rule",
+        "canonical": "#cec7b8",
+        "tonalRamp": ["oklch(15% 0.0219 86.0)", "oklch(25% 0.0219 86.0)", "oklch(35% 0.0219 86.0)", "oklch(45% 0.0219 86.0)", "oklch(55% 0.0219 86.0)", "oklch(65% 0.0219 86.0)", "oklch(80% 0.0219 86.0)", "oklch(95% 0.0219 86.0)"]
+      },
+      "outline-strong": {
+        "role": "neutral",
+        "displayName": "Strong Graphite Rule",
+        "canonical": "#9fa89f",
+        "tonalRamp": ["oklch(15% 0.0164 145.4)", "oklch(25% 0.0164 145.4)", "oklch(35% 0.0164 145.4)", "oklch(45% 0.0164 145.4)", "oklch(55% 0.0164 145.4)", "oklch(65% 0.0164 145.4)", "oklch(80% 0.0164 145.4)", "oklch(95% 0.0164 145.4)"]
+      },
+      "on-primary": {
+        "role": "neutral",
+        "displayName": "Button Paper",
+        "canonical": "#fffdf6",
+        "tonalRamp": ["oklch(15% 0.0095 93.6)", "oklch(25% 0.0095 93.6)", "oklch(35% 0.0095 93.6)", "oklch(45% 0.0095 93.6)", "oklch(55% 0.0095 93.6)", "oklch(65% 0.0095 93.6)", "oklch(80% 0.0095 93.6)", "oklch(95% 0.0095 93.6)"]
+      },
+      "on-dark": {
+        "role": "neutral",
+        "displayName": "Dark-Surface Paper",
+        "canonical": "#f5f0e4",
+        "tonalRamp": ["oklch(15% 0.0168 88.0)", "oklch(25% 0.0168 88.0)", "oklch(35% 0.0168 88.0)", "oklch(45% 0.0168 88.0)", "oklch(55% 0.0168 88.0)", "oklch(65% 0.0168 88.0)", "oklch(80% 0.0168 88.0)", "oklch(95% 0.0168 88.0)"]
+      }
+    },
+    "typographyMeta": {
+      "display-lg": {"displayName": "Display Large", "purpose": "Maximum desktop page statements and dates."},
+      "display-sm": {"displayName": "Display Small", "purpose": "Minimum display size and compact page statements."},
+      "headline": {"displayName": "Headline", "purpose": "Panel and section headings."},
+      "title": {"displayName": "Title", "purpose": "Compact editorial and evidence summaries."},
+      "reading-lead": {"displayName": "Reading Lead", "purpose": "Primary interpretive paragraph in the daily chapter."},
+      "body": {"displayName": "Body", "purpose": "Operational copy, helper text, and controls."},
+      "body-serif": {"displayName": "Body Serif", "purpose": "Reflective and explanatory prose."},
+      "label-caps": {"displayName": "Label Caps", "purpose": "Eyebrows, field labels, and compact states."},
+      "control": {"displayName": "Control", "purpose": "Buttons and high-confidence actions."},
+      "evidence": {"displayName": "Evidence", "purpose": "Identifiers, versions, provenance, and technical state."}
+    },
+    "shadows": [
+      {"name": "status-halo", "value": "0 0 0 3px rgba(23, 63, 53, 0.1)", "purpose": "State emphasis around a ready-status dot; never card elevation."}
+    ],
+    "motion": [
+      {"name": "state-fast", "value": "160ms ease", "purpose": "Button, navigation, color, border, and transform feedback."},
+      {"name": "selection-fast", "value": "150ms ease", "purpose": "Option border and background selection."},
+      {"name": "form-step", "value": "260ms ease", "purpose": "Short horizontal entrance between onboarding steps."},
+      {"name": "progress", "value": "300ms ease", "purpose": "Onboarding progress-line width."},
+      {"name": "page-enter", "value": "500ms cubic-bezier(0.2, 0.7, 0.2, 1)", "purpose": "Subtle page opacity and vertical entrance."},
+      {"name": "spinner", "value": "700ms linear infinite", "purpose": "Compact loading indicators."}
+    ],
+    "breakpoints": [
+      {"name": "wide-stack", "value": "1180px"},
+      {"name": "mobile-shell", "value": "960px"},
+      {"name": "single-column", "value": "700px"},
+      {"name": "compact-mobile", "value": "420px"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single high-authority action in a region.",
+      "html": "<button class=\"ds-button-primary\" type=\"button\">TRY AGAIN</button>",
+      "css": ".ds-button-primary { display:inline-flex; min-height:50px; align-items:center; justify-content:center; gap:12px; padding:0 20px; color:var(--on-primary, #fffdf6); border:1px solid transparent; border-radius:0; background:var(--forest, #173f35); font:750 12px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.035em; cursor:pointer; transition:color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease; } .ds-button-primary:hover { background:#0f3028; } .ds-button-primary:active { transform:translateY(1px); } .ds-button-primary:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A bordered supporting action that stays visually subordinate.",
+      "html": "<button class=\"ds-button-secondary\" type=\"button\">VIEW EVIDENCE</button>",
+      "css": ".ds-button-secondary { display:inline-flex; min-height:50px; align-items:center; justify-content:center; padding:0 20px; color:var(--forest, #173f35); border:1px solid var(--line-dark, #9fa89f); border-radius:0; background:transparent; font:750 12px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.035em; cursor:pointer; transition:color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease; } .ds-button-secondary:hover { border-color:var(--forest, #173f35); background:var(--forest-light, #dce7df); } .ds-button-secondary:active { transform:translateY(1px); } .ds-button-secondary:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "A consequential action signaled by coral text and rule, not a filled alarm surface.",
+      "html": "<button class=\"ds-button-danger\" type=\"button\">DELETE ACCOUNT</button>",
+      "css": ".ds-button-danger { display:inline-flex; min-height:50px; align-items:center; justify-content:center; padding:0 20px; color:var(--coral, #c76043); border:1px solid rgba(199, 96, 67, 0.5); border-radius:0; background:transparent; font:750 12px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.035em; cursor:pointer; transition:background-color 160ms ease, transform 160ms ease; } .ds-button-danger:hover { background:rgba(199, 96, 67, 0.08); } .ds-button-danger:active { transform:translateY(1px); } .ds-button-danger:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "A square, paper-backed field with an explicit uppercase label.",
+      "html": "<label class=\"ds-field\"><span>BIRTH DATE</span><input type=\"text\" placeholder=\"YYYY-MM-DD\"></label>",
+      "css": ".ds-field { display:grid; gap:8px; color:var(--ink-soft, #4e625b); font-family:var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); } .ds-field span { font-size:10px; font-weight:750; letter-spacing:0.08em; } .ds-field input { box-sizing:border-box; width:100%; height:49px; padding:0 14px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:var(--paper-light, #faf8f2); font:400 14px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); } .ds-field input:hover { border-color:var(--line-dark, #9fa89f); } .ds-field input:focus-visible { border-color:var(--forest, #173f35); outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; } .ds-field input::placeholder { color:#9a9e96; }"
+    },
+    {
+      "name": "Active Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "The active shell destination with a quiet green field and coral edge marker.",
+      "html": "<a class=\"ds-nav-item ds-nav-item-active\" href=\"#\"><span class=\"ds-nav-icon\" aria-hidden=\"true\">◎</span><span>YOUR PATTERN</span></a>",
+      "css": ".ds-nav-item { position:relative; display:grid; grid-template-columns:24px 1fr; min-height:48px; align-items:center; gap:13px; padding:0 12px; color:var(--ink-soft, #4e625b); border-radius:2px; font:600 13px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.01em; text-decoration:none; transition:color 160ms ease, background-color 160ms ease; } .ds-nav-item-active { color:var(--forest, #173f35); background:var(--forest-light, #dce7df); } .ds-nav-item-active::before { position:absolute; left:-18px; width:3px; height:24px; background:var(--coral, #c76043); content:\"\"; } .ds-nav-icon { font-size:20px; } .ds-nav-item:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+    },
+    {
+      "name": "Metadata Chip",
+      "kind": "chip",
+      "refersTo": "metadata-chip",
+      "description": "A square state or locale label that never becomes a pill.",
+      "html": "<span class=\"ds-chip\">REVISED TODAY</span>",
+      "css": ".ds-chip { display:inline-flex; padding:6px 11px; color:var(--coral, #c76043); border:1px solid var(--coral, #c76043); border-radius:0; background:transparent; font:600 10px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.08em; text-transform:uppercase; white-space:nowrap; }"
+    },
+    {
+      "name": "Vellum Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "The default flat container, separated by warm transparency and a fine rule.",
+      "html": "<section class=\"ds-panel\"><small>INSPECTABLE EVIDENCE</small><h3>Calculation map</h3><p>Facts stay visible without becoming visual noise.</p></section>",
+      "css": ".ds-panel { box-sizing:border-box; padding:30px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:rgba(250, 248, 242, 0.72); box-shadow:none; } .ds-panel small { color:var(--ink-faint, #7a8781); font:800 10px var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); letter-spacing:0.13em; } .ds-panel h3 { margin:7px 0 0; font:500 27px/1.1 var(--serif, \"Iowan Old Style\", Georgia, serif); letter-spacing:-0.035em; } .ds-panel p { margin:18px 0 0; color:var(--ink-soft, #4e625b); font:400 14px/1.6 var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); }"
+    },
+    {
+      "name": "Accuracy Option",
+      "kind": "custom",
+      "refersTo": "selector-active",
+      "description": "The selected birth-time accuracy row, with one meaningful circular indicator.",
+      "html": "<label class=\"ds-accuracy-option ds-accuracy-option-selected\"><input type=\"radio\" checked><span class=\"ds-radio\"></span><span><strong>I KNOW ROUGHLY</strong><small>Record a best estimate and make uncertainty visible.</small></span></label>",
+      "css": ".ds-accuracy-option { position:relative; display:flex; box-sizing:border-box; min-height:74px; align-items:center; gap:12px; padding:18px; color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:var(--paper, #f2efe6); font-family:var(--sans, \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif); cursor:pointer; transition:border-color 150ms ease, background-color 150ms ease; } .ds-accuracy-option-selected { border-color:var(--forest, #173f35); background:var(--forest-light, #dce7df); } .ds-accuracy-option input { position:absolute; opacity:0; } .ds-radio { display:grid; width:15px; height:15px; flex:0 0 15px; place-items:center; border:1px solid var(--line-dark, #9fa89f); border-radius:50%; } .ds-accuracy-option-selected .ds-radio::after { width:7px; height:7px; border-radius:50%; background:var(--forest, #173f35); content:\"\"; } .ds-accuracy-option strong, .ds-accuracy-option small { display:block; } .ds-accuracy-option strong { margin-bottom:9px; font-size:12px; } .ds-accuracy-option small { color:var(--ink-soft, #4e625b); font:400 12px/1.45 var(--serif, \"Iowan Old Style\", Georgia, serif); } .ds-accuracy-option input:focus-visible + .ds-radio { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+    },
+    {
+      "name": "Evidence Drawer",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "The signature disclosure for provenance and reproducibility details.",
+      "html": "<details class=\"ds-evidence\"><summary><span><small>TECHNICAL EVIDENCE</small>Reproduce this calculation</span><span class=\"ds-evidence-toggle\">Open</span></summary><dl><div><dt>CONTRACT</dt><dd>chart@0.2.0</dd></div><div><dt>PROFILE</dt><dd>version 3</dd></div><div><dt>STATUS</dt><dd>verified</dd></div></dl></details>",
+      "css": ".ds-evidence { color:var(--ink, #17312a); border:1px solid var(--line, #cec7b8); border-radius:0; background:#e8e3d8; } .ds-evidence summary { display:flex; min-height:82px; align-items:center; justify-content:space-between; gap:30px; padding:18px 28px; cursor:pointer; list-style:none; font:600 17px var(--serif, \"Iowan Old Style\", Georgia, serif); } .ds-evidence summary::-webkit-details-marker { display:none; } .ds-evidence summary small { display:block; margin-bottom:5px; color:var(--ink-faint, #7a8781); font:500 8px var(--mono, Consolas, monospace); letter-spacing:0.1em; } .ds-evidence-toggle { font:500 9px var(--mono, Consolas, monospace); letter-spacing:0.08em; text-transform:uppercase; } .ds-evidence[open] .ds-evidence-toggle { font-size:0; } .ds-evidence[open] .ds-evidence-toggle::after { font-size:9px; content:\"Close\"; } .ds-evidence dl { display:grid; grid-template-columns:repeat(3, 1fr); margin:0; border-top:1px solid var(--line, #cec7b8); } .ds-evidence dl div { padding:20px 28px; border-right:1px solid var(--line, #cec7b8); } .ds-evidence dt { margin-bottom:8px; color:var(--ink-faint, #7a8781); font:500 8px var(--mono, Consolas, monospace); letter-spacing:0.07em; } .ds-evidence dd { margin:0; font:500 10px var(--mono, Consolas, monospace); } .ds-evidence summary:focus-visible { outline:2px solid var(--cobalt, #234c9f); outline-offset:3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Private Observatory",
+    "overview": "Pattern/Like feels like a calm reading room joined to a precise observational instrument. Warm drafting paper, fine rules, an almost imperceptible grid, and ink-green type create privacy and permanence; the orbital mark and technical annotations make calculation visible without turning the product into cosmic spectacle.\n\nThe system is quiet, exacting, and humane. Spacious editorial composition gives interpretation room to breathe, while square controls, monospaced evidence, and explicit states keep every action accountable. Expression comes from typographic scale and disciplined contrast rather than decoration, gloss, or novelty.",
+    "keyCharacteristics": [
+      "Warm paper fields with fine structural rules and no decorative shadow stack.",
+      "Large, lightly weighted serif headlines paired with compact sans-serif controls.",
+      "Monospaced labels and evidence reserved for calculation, provenance, and status.",
+      "Observatory Green carries authority; Signal Coral marks consequential change.",
+      "Square, deliberate, restrained components with circles reserved for true indicators."
+    ],
+    "rules": [
+      {"name": "The Signal, Not Decoration Rule", "body": "Signal Coral marks a state, boundary, revision, or consequential action; it does not become a large ambient fill.", "section": "colors"},
+      {"name": "The Paper Before White Rule", "body": "Build hierarchy with warm paper tones and transparency. Pure white is not the default canvas.", "section": "colors"},
+      {"name": "The Focus Is Functional Rule", "body": "Focus Cobalt exists to make keyboard location unmistakable and must not compete as a second decorative accent.", "section": "colors"},
+      {"name": "The Three Voices Rule", "body": "Serif explains meaning, sans-serif operates the product, and mono proves what happened. Do not swap their jobs for variety.", "section": "typography"},
+      {"name": "The Quiet Scale Rule", "body": "Display type may be large, but it stays lightly weighted and tightly tracked; hierarchy comes from measure and spacing rather than heavy boldness.", "section": "typography"},
+      {"name": "The Instrument Grid Rule", "body": "Align content to shared rules, gutters, and baselines so every surface feels observed within the same apparatus.", "section": "layout"},
+      {"name": "The Collapse by Comprehension Rule", "body": "Stack a complex region before labels, charts, or controls become too small to understand; never preserve columns merely to preserve a desktop composition.", "section": "layout"},
+      {"name": "The Flat and Structural Rule", "body": "A surface earns hierarchy through tone, rule, and placement—not through a floating shadow.", "section": "elevation"},
+      {"name": "The Meaning Earns the Circle Rule", "body": "Use a circle only for an indicator, orbit, point, or continuous action; never round a rectangular component merely to make it friendlier.", "section": "shapes"},
+      {"name": "The State Must Read Before It Moves Rule", "body": "Color, label, border, and status copy establish a state first; motion only confirms the transition.", "section": "components"}
+    ],
+    "dos": [
+      "Do build from Drafting Paper, warm tonal layers, and fine Graphite Rules.",
+      "Do use serif for interpretation, sans-serif for operation, and mono for evidence.",
+      "Do reserve Signal Coral for active edges, revisions, destructive actions, and consequential annotations.",
+      "Do keep visible Focus Cobalt outlines and meet the product's WCAG 2.2 AA target.",
+      "Do stack dense regions at the established breakpoints before content becomes cramped or illegible.",
+      "Do respect reduced-motion preferences by collapsing animation and transition durations."
+    ],
+    "donts": [
+      "Don't introduce zodiac kitsch, neon cosmic gradients, or decorative celestial spectacle.",
+      "Don't use glossy dashboard cards, ambient drop shadows, glassmorphic layers, or floating surfaces.",
+      "Don't turn controls, chips, fields, cards, or navigation rows into pills.",
+      "Don't use Focus Cobalt as decorative color or Signal Coral as a broad background wash.",
+      "Don't replace inspectable rules and evidence with generic wellness imagery or sign-based filler.",
+      "Don't shrink complex charts, grids, or evidence merely to preserve a multi-column layout."
+    ]
+  }
+}
