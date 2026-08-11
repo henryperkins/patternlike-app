@@ -110,18 +110,26 @@ const V5_REPLACEMENT_REASONS: ReadonlySet<V5ReplacementReason> = new Set([
   "consent_regranted",
 ]);
 
-const V1_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V1FailureCode> = new Set([
+export const V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
   "calc_unavailable",
   "release_unreadable",
-]);
+] as const satisfies readonly V1FailureCode[];
 
-const V5_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V5FailureCode> = new Set([
+export const V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
   "calc_unavailable",
   "daily_sky_unavailable",
   "publisher_unavailable",
   "publisher_output_invalid",
   "publisher_refused",
-]);
+] as const satisfies readonly V5FailureCode[];
+
+const V1_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V1FailureCode> = new Set(
+  V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+);
+
+const V5_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V5FailureCode> = new Set(
+  V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+);
 
 export function isGenerationFailureCode(code: string): code is GenerationFailureCode {
   return V1_FAILURE_CODES.has(code as V1FailureCode) || V5_FAILURE_CODES.has(code as V5FailureCode);

@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "//publisher:model:verify": "PRODUCTION GATE, not part of any test lane. Calls the authorized account's model endpoint with OPENAI_API_KEY and proves the pinned model exists. Required before initial enablement and before every later model change.",
     "publisher:model:verify": "tsx scripts/verify-openai-reading-model.ts",
+    "test:wrangler-config": "tsx --test scripts/wrangler-config.test.ts",
     "test": "vitest run",
     "db:local": "wrangler d1 migrations apply patternlike-ops --local",
     "//deploy": "Ships apps/web/dist as static assets. Prefer `npm run deploy:api` from the repository root, which builds the web app first.",

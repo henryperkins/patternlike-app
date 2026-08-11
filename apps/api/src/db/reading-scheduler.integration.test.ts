@@ -9,6 +9,7 @@ import {
 import { linkIdentity } from "./identities.js";
 import {
   findExpiredSchedulerCandidates,
+  findStalePublishedCandidates,
   invalidatedOrphanDiscoverySql,
   INVALIDATED_ORPHAN_BACKOFF_MS,
 } from "./reading-scheduler.js";
@@ -156,14 +157,18 @@ async function seedSchedulerAccount(
   if (session === "revoked") await seedRecentSession(identityValue, { revoked: true });
 }
 
-function storedReading(readingId: string, invalidated: boolean): StoredReadingV5 {
+function storedReading(
+  readingId: string,
+  invalidated: boolean,
+  localDate = "2026-08-11",
+): StoredReadingV5 {
   return {
     schema_version: "0.5.0",
     reading: {
       schema_version: "0.5.0",
       output_schema: "daily-reading-v5",
       reading_id: readingId,
-      local_date: "2026-08-11",
+      local_date: localDate,
       generated_at: "2026-08-11T13:00:00.000Z",
       assembly_mode: "constrained_model",
       revision: 1,
@@ -229,34 +234,41 @@ async function seedFactualArtifact(
   identityValue: UserIdentity,
   status: "published" | "invalidated",
   fingerprint: string,
+  options: {
+    localDate?: string;
+    suffix?: string;
+    updatedAt?: string;
+  } = {},
 ): Promise<string> {
-  const readingId = `rdg_${status}_${identityValue.userId.slice(-5)}`;
+  const localDate = options.localDate ?? "2026-08-11";
+  const readingId = `rdg_${status}_${identityValue.userId.slice(-5)}${options.suffix ?? ""}`;
   const sealed = await encryptPayload(
     env,
     identityValue,
-    storedReading(readingId, status === "invalidated"),
+    storedReading(readingId, status === "invalidated", localDate),
     {
       subject: identityValue.cryptoSubject,
       field: "daily_readings.reading_enc",
       recordId: readingId,
     },
   );
-  const updatedAt = status === "invalidated"
+  const updatedAt = options.updatedAt ?? (status === "invalidated"
     ? new Date(SCHEDULED_AT.getTime() - 7 * 60 * 60 * 1000).toISOString()
-    : SCHEDULED_AT.toISOString();
+    : SCHEDULED_AT.toISOString());
   await env.DB.prepare(
     `INSERT INTO daily_readings
        (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
         contract_id, assembly_mode, status, revision, revision_reason,
         supersedes_reading_id, command_generation, invalidated_at,
         reading_enc, reading_key_version, reading_nonce, created_at, updated_at)
-     VALUES (?, ?, '2026-08-11', NULL, ?, ?, 'calc-contract-launch',
+     VALUES (?, ?, ?, NULL, ?, ?, 'calc-contract-launch',
              'constrained_model', ?, 1, 'initial', NULL, 1, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       readingId,
       identityValue.userId,
-      `reading-v5:${identityValue.userId}:2026-08-11:r1`,
+      localDate,
+      `reading-v5:${identityValue.userId}:${localDate}:r1`,
       fingerprint,
       status,
       status === "invalidated" ? "2026-08-11T07:00:00.000Z" : null,
@@ -418,6 +430,167 @@ describe("bounded ordered repair", () => {
     ).toEqual([{ command_generation: 2, status: "pending" }]);
   });
 
+  it("does not let an older nonreplaceable failure hide a later replaceable failure", async () => {
+    const account = identity(22);
+    await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+    const envValue = hybridEnv();
+    const currentLocalDate = resolveV5TargetDate(ZONE, SCHEDULED_AT)!;
+    const nextDate = new Date(`${currentLocalDate}T12:00:00.000Z`);
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    const terminal = await enqueueConstrainedReading(envValue, account.userId, {
+      entry: "scheduled",
+      reservationReason: "scheduled",
+      targetLocalDate: currentLocalDate,
+      now: SCHEDULED_AT,
+    });
+    const replaceable = await enqueueConstrainedReading(envValue, account.userId, {
+      entry: "scheduled",
+      reservationReason: "scheduled",
+      targetLocalDate: nextDate.toISOString().slice(0, 10),
+      now: SCHEDULED_AT,
+    });
+    expect(terminal.ok && replaceable.ok).toBe(true);
+    if (!terminal.ok || !replaceable.ok) return;
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE daily_readings SET status = 'failed', updated_at = ? WHERE id = ?",
+      ).bind("2026-08-11T07:00:00.000Z", terminal.readingId),
+      env.DB.prepare(
+        "UPDATE jobs SET status = 'failed', result_class = 'publisher_auth_failed' WHERE id = ?",
+      ).bind(terminal.jobId),
+      env.DB.prepare(
+        "UPDATE daily_readings SET status = 'failed', updated_at = ? WHERE id = ?",
+      ).bind("2026-08-11T08:00:00.000Z", replaceable.readingId),
+      env.DB.prepare(
+        "UPDATE jobs SET status = 'failed', result_class = 'publisher_unavailable' WHERE id = ?",
+      ).bind(replaceable.jobId),
+    ]);
+
+    const summary = await runReadingScheduler(envValue, SCHEDULED_AT);
+
+    expect(summary.repair.failedReplacements).toBe(1);
+    expect(
+      await rows<{ id: string; command_generation: number; status: string }>(
+        `SELECT id, command_generation, status FROM daily_readings
+         WHERE id IN (?, ?) ORDER BY id`,
+        terminal.readingId,
+        replaceable.readingId,
+      ),
+    ).toEqual([
+      { id: replaceable.readingId, command_generation: 2, status: "pending" },
+      { id: terminal.readingId, command_generation: 1, status: "failed" },
+    ].sort((a, b) => a.id.localeCompare(b.id)));
+  });
+
+  it("does not let a prior-day stale row hide the same user's current-day stale row", async () => {
+    const account = identity(23);
+    await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+    const prior = await seedFactualArtifact(
+      account,
+      "published",
+      `sha256:${"2b".repeat(32)}`,
+      {
+        localDate: "2026-08-10",
+        suffix: "_prior",
+        updatedAt: "2026-08-10T07:00:00.000Z",
+      },
+    );
+    const current = await seedFactualArtifact(
+      account,
+      "published",
+      `sha256:${"2b".repeat(32)}`,
+      { suffix: "_current", updatedAt: "2026-08-11T08:00:00.000Z" },
+    );
+
+    const summary = await runReadingScheduler(hybridEnv(), SCHEDULED_AT);
+
+    expect(summary.repair.factRepairs).toBe(1);
+    expect(
+      await rows<{ id: string; status: string }>(
+        "SELECT id, status FROM daily_readings WHERE id IN (?, ?) ORDER BY id",
+        prior,
+        current,
+      ),
+    ).toEqual([
+      { id: current, status: "invalidated" },
+      { id: prior, status: "published" },
+    ].sort((a, b) => a.id.localeCompare(b.id)));
+    expect(
+      await rows<{ supersedes_reading_id: string }>(
+        "SELECT supersedes_reading_id FROM daily_readings WHERE supersedes_reading_id = ?",
+        current,
+      ),
+    ).toEqual([{ supersedes_reading_id: current }]);
+  });
+
+  it("applies the stale candidate limit after exact owner-local-date filtering", async () => {
+    const priorOnly = identity(25);
+    const current = identity(26);
+    await seedSchedulerAccount(priorOnly, { nextDueAt: FUTURE });
+    await seedSchedulerAccount(current, { nextDueAt: FUTURE });
+    await seedFactualArtifact(
+      priorOnly,
+      "published",
+      `sha256:${"2b".repeat(32)}`,
+      {
+        localDate: "2026-08-10",
+        updatedAt: "2026-08-10T07:00:00.000Z",
+      },
+    );
+    const currentReading = await seedFactualArtifact(
+      current,
+      "published",
+      `sha256:${"2b".repeat(32)}`,
+      { updatedAt: "2026-08-11T08:00:00.000Z" },
+    );
+
+    const candidates = await findStalePublishedCandidates(
+      hybridEnv(),
+      SCHEDULED_AT,
+      1,
+      new Set(),
+    );
+
+    expect(candidates).toEqual([{
+      readingId: currentReading,
+      userId: current.userId,
+      localDate: "2026-08-11",
+    }]);
+  });
+
+  it("does not let a prior-day orphan hide the same user's current-day orphan", async () => {
+    const account = identity(24);
+    await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+    const prior = await seedFactualArtifact(
+      account,
+      "invalidated",
+      `sha256:${"1a".repeat(32)}`,
+      {
+        localDate: "2026-08-10",
+        suffix: "_prior",
+        updatedAt: "2026-08-10T07:00:00.000Z",
+      },
+    );
+    const current = await seedFactualArtifact(
+      account,
+      "invalidated",
+      `sha256:${"1a".repeat(32)}`,
+      { suffix: "_current", updatedAt: "2026-08-11T08:00:00.000Z" },
+    );
+
+    const summary = await runReadingScheduler(hybridEnv(), SCHEDULED_AT);
+
+    expect(summary.repair.factRepairs).toBe(1);
+    expect(
+      await rows<{ supersedes_reading_id: string }>(
+        `SELECT supersedes_reading_id FROM daily_readings
+         WHERE supersedes_reading_id IN (?, ?) ORDER BY supersedes_reading_id`,
+        prior,
+        current,
+      ),
+    ).toEqual([{ supersedes_reading_id: current }]);
+  });
+
   it("recovers both chart-activation and invalidation/reservation crash boundaries", async () => {
     const stale = identity(30);
     const orphan = identity(31);
@@ -489,6 +662,42 @@ describe("bounded ordered repair", () => {
     expect(await rows("SELECT id FROM daily_readings WHERE supersedes_reading_id = ?", readingId)).toEqual([]);
   });
 
+  it("invalidates and backs off an ineligible stale artifact without constructing repair prose", async () => {
+    const account = identity(43);
+    await seedSchedulerAccount(account, { consent: false });
+    const readingId = await seedFactualArtifact(
+      account,
+      "published",
+      `sha256:${"2b".repeat(32)}`,
+      { updatedAt: "2026-08-11T07:00:00.000Z" },
+    );
+
+    const first = await runReadingScheduler(hybridEnv(), SCHEDULED_AT);
+    const second = await runReadingScheduler(
+      hybridEnv(),
+      new Date(SCHEDULED_AT.getTime() + INVALIDATED_ORPHAN_BACKOFF_MS - 1),
+    );
+
+    expect(first.repair.ineligibleOrphansBackedOff).toBe(1);
+    expect(first.due.evaluated).toBe(0);
+    expect(second.repair.factRepairs).toBe(0);
+    expect(second.repair.ineligibleOrphansBackedOff).toBe(0);
+    expect(second.due.evaluated).toBe(1);
+    expect(
+      await rows<{ status: string; invalidated_at: string | null }>(
+        "SELECT status, invalidated_at FROM daily_readings WHERE id = ?",
+        readingId,
+      ),
+    ).toEqual([{
+      status: "invalidated",
+      invalidated_at: SCHEDULED_AT.toISOString(),
+    }]);
+    expect(await rows("SELECT id FROM jobs WHERE user_id = ?", account.userId)).toEqual([]);
+    expect(
+      await rows("SELECT id FROM daily_readings WHERE supersedes_reading_id = ?", readingId),
+    ).toEqual([]);
+  });
+
   it("does not spend repair quota on a historical factual orphan", async () => {
     const historical = identity(41);
     const due = identity(42);
@@ -530,6 +739,7 @@ describe("bounded ordered repair", () => {
         new Date(SCHEDULED_AT.getTime() - INVALIDATED_ORPHAN_BACKOFF_MS).toISOString(),
         "2026-08-10",
         "2026-08-12",
+        JSON.stringify({ UTC: "2026-08-11" }),
         17,
       )
       .all<{ detail: string }>();

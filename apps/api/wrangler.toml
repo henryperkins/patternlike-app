@@ -59,9 +59,9 @@ max_concurrency = 4
 max_retries = 3
 dead_letter_queue = "patternlike-daily-readings-dev-dlq"
 
-# Exercise the exported scheduled handler in local/default deployments. Wrangler
-# does not inherit triggers into named environments, so production has no cron
-# until the separately approved production activation step adds one there.
+# Exercise the exported scheduled handler in local/default deployments. Triggers
+# are inheritable, so production explicitly overrides this with an empty list
+# until the separately approved production activation step replaces it.
 [triggers]
 crons = ["*/15 * * * *"]
 
@@ -99,6 +99,9 @@ READING_V5_ROLLOUT = "off"
 # Named environments do not inherit top-level bindings, so D1 is redeclared.
 [env.production]
 name = "patternlike-api-production"
+
+[env.production.triggers]
+crons = []
 
 [env.production.vars]
 ENVIRONMENT = "production"

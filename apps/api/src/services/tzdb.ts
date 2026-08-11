@@ -171,3 +171,21 @@ export function pinnedLocalDate(zone: string, utcMillis: number): string {
   const day = String(local.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * A compact SQLite JSON lookup for exact owner-local-day predicates.
+ *
+ * The scheduler cannot ask SQLite to apply pinned IANA rules, so it binds this
+ * finite map and joins `users.timezone` to the already-resolved local date.
+ * Aliases are included because `hasZone()` accepts them as stored preferences.
+ */
+export function pinnedLocalDateIndexJson(utcMillis: number): string {
+  const dates: Record<string, string> = {};
+  for (const zone of packedByName.keys()) {
+    dates[zone] = pinnedLocalDate(zone, utcMillis);
+  }
+  for (const [alias, target] of linkTargets) {
+    dates[alias] = dates[target] ?? pinnedLocalDate(alias, utcMillis);
+  }
+  return JSON.stringify(dates);
+}

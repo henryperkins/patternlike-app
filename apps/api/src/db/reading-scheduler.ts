@@ -7,6 +7,11 @@ import {
   selectReadingScheduleTarget,
 } from "../services/reading-schedule.js";
 import { nextLocalDate, previousLocalDate } from "../services/local-day.js";
+import {
+  V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+  V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+} from "../services/generation-failures.js";
+import { pinnedLocalDateIndexJson } from "../services/tzdb.js";
 import { AI_SYNTHESIS_POLICY_VERSION } from "./consents.js";
 
 export const INVALIDATED_ORPHAN_BACKOFF_VERSION = "invalidated-orphan-backoff-v1";
@@ -50,6 +55,12 @@ export interface SchedulerEligibility {
   hasRecentSession: boolean;
 }
 
+interface FactualSchedulerRow {
+  reading_id: string;
+  user_id: string;
+  local_date: string;
+}
+
 function excludedSql(excludedCount: number, column = "u.id"): string {
   return excludedCount > 0
     ? ` AND ${column} NOT IN (${Array.from({ length: excludedCount }, () => "?").join(", ")})`
@@ -74,6 +85,65 @@ function failureDateBounds(scheduledAt: Date): readonly [string, string] {
   return [previousLocalDate(factualStart), nextLocalDate(factualEnd)];
 }
 
+function placeholders(values: readonly unknown[]): string {
+  return values.map(() => "?").join(", ");
+}
+
+const automaticFailureSql = `(
+  (r.assembly_mode = 'deterministic'
+    AND j.result_class IN (${placeholders(V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES)}))
+  OR
+  (r.assembly_mode = 'constrained_model'
+    AND j.result_class IN (${placeholders(V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES)}))
+)`;
+
+const automaticFailureValues = [
+  ...V1_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+  ...V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES,
+] as const;
+
+interface FailedSchedulerRow {
+  reading_id: string;
+  user_id: string;
+  assembly_mode: "deterministic" | "constrained_model";
+  result_class: string;
+}
+
+function failedCandidate(row: FailedSchedulerRow): FailedSchedulerCandidate {
+  return {
+    readingId: row.reading_id,
+    userId: row.user_id,
+    assemblyMode: row.assembly_mode,
+    resultClass: row.result_class,
+  };
+}
+
+function factualCandidate(row: FactualSchedulerRow): FactualSchedulerCandidate {
+  return {
+    readingId: row.reading_id,
+    userId: row.user_id,
+    localDate: row.local_date,
+  };
+}
+
+const exactCurrentLocalDateSql = `EXISTS (
+  SELECT 1 FROM json_each(?) AS owner_dates
+  WHERE owner_dates.key = u.timezone
+    AND owner_dates.value = r.local_date
+)`;
+
+const exactFailureLocalDateSql = `EXISTS (
+  SELECT 1 FROM json_each(?) AS owner_dates
+  WHERE owner_dates.key = u.timezone
+    AND (
+      (r.assembly_mode = 'deterministic'
+        AND r.local_date IN (owner_dates.value, date(owner_dates.value, '-1 day')))
+      OR
+      (r.assembly_mode = 'constrained_model'
+        AND r.local_date IN (owner_dates.value, date(owner_dates.value, '+1 day')))
+    )
+)`;
+
 export function invalidatedOrphanDiscoverySql(excludedCount: number): string {
   return `WITH ranked AS (
             SELECT r.id AS reading_id, r.user_id, r.local_date, r.updated_at,
@@ -89,7 +159,8 @@ export function invalidatedOrphanDiscoverySql(excludedCount: number): string {
                 SELECT 1 FROM daily_readings successor
                 WHERE successor.supersedes_reading_id = r.id
                   AND successor.user_id = r.user_id
-              )${excludedSql(excludedCount, "r.user_id")}
+              )
+              AND ${exactCurrentLocalDateSql}${excludedSql(excludedCount, "r.user_id")}
           )
           SELECT reading_id, user_id, local_date
           FROM ranked
@@ -107,6 +178,7 @@ export async function findFailedSchedulerCandidates(
   if (limit <= 0) return [];
   const excludedIds = excludedValues(excluded);
   const [earliestLocalDate, latestLocalDate] = failureDateBounds(scheduledAt);
+  const ownerLocalDates = pinnedLocalDateIndexJson(scheduledAt.getTime());
   const sql = `WITH ranked AS (
                  SELECT r.id AS reading_id, r.user_id, r.assembly_mode,
                         j.result_class, r.updated_at,
@@ -120,6 +192,8 @@ export async function findFailedSchedulerCandidates(
                  WHERE r.status = 'failed' AND r.command_generation < 3
                    AND r.local_date BETWEEN ? AND ?
                    AND j.result_class IS NOT NULL
+                   AND ${automaticFailureSql}
+                   AND ${exactFailureLocalDateSql}
                    ${excludedSql(excludedIds.length, "r.user_id")}
                )
                SELECT reading_id, user_id, assembly_mode, result_class
@@ -128,24 +202,16 @@ export async function findFailedSchedulerCandidates(
                ORDER BY updated_at, user_id, reading_id
                LIMIT ?`;
   const result = await env.DB.prepare(sql)
-    .bind(earliestLocalDate, latestLocalDate, ...excludedIds, limit)
-    .all<{
-      reading_id: string;
-      user_id: string;
-      assembly_mode: "deterministic" | "constrained_model";
-      result_class: string;
-    }>();
-  const seen = new Set<string>();
-  return result.results.flatMap((row) => {
-    if (seen.has(row.user_id)) return [];
-    seen.add(row.user_id);
-    return [{
-      readingId: row.reading_id,
-      userId: row.user_id,
-      assemblyMode: row.assembly_mode,
-      resultClass: row.result_class,
-    }];
-  });
+    .bind(
+      earliestLocalDate,
+      latestLocalDate,
+      ...automaticFailureValues,
+      ownerLocalDates,
+      ...excludedIds,
+      limit,
+    )
+    .all<FailedSchedulerRow>();
+  return result.results.map(failedCandidate);
 }
 
 export async function findStalePublishedCandidates(
@@ -157,6 +223,7 @@ export async function findStalePublishedCandidates(
   if (limit <= 0) return [];
   const excludedIds = excludedValues(excluded);
   const [earliestLocalDate, latestLocalDate] = factualDateBounds(scheduledAt);
+  const ownerLocalDates = pinnedLocalDateIndexJson(scheduledAt.getTime());
   const sql = `WITH ranked AS (
                  SELECT r.id AS reading_id, r.user_id, r.local_date, r.updated_at,
                         ROW_NUMBER() OVER (
@@ -171,7 +238,8 @@ export async function findStalePublishedCandidates(
                      WHERE c.user_id = r.user_id AND c.status = 'active'
                        AND c.fingerprint = r.chart_fingerprint
                        AND c.contract_id = r.contract_id
-                   )${excludedSql(excludedIds.length, "r.user_id")}
+                   )
+                   AND ${exactCurrentLocalDateSql}${excludedSql(excludedIds.length, "r.user_id")}
                )
                SELECT reading_id, user_id, local_date
                FROM ranked
@@ -179,13 +247,9 @@ export async function findStalePublishedCandidates(
                ORDER BY updated_at, reading_id
                LIMIT ?`;
   const result = await env.DB.prepare(sql)
-    .bind(earliestLocalDate, latestLocalDate, ...excludedIds, limit)
-    .all<{ reading_id: string; user_id: string; local_date: string }>();
-  return result.results.map((row) => ({
-    readingId: row.reading_id,
-    userId: row.user_id,
-    localDate: row.local_date,
-  }));
+    .bind(earliestLocalDate, latestLocalDate, ownerLocalDates, ...excludedIds, limit)
+    .all<FactualSchedulerRow>();
+  return result.results.map(factualCandidate);
 }
 
 export async function findInvalidatedOrphanCandidates(
@@ -200,19 +264,11 @@ export async function findInvalidatedOrphanCandidates(
     scheduledAt.getTime() - INVALIDATED_ORPHAN_BACKOFF_MS,
   ).toISOString();
   const [earliestLocalDate, latestLocalDate] = factualDateBounds(scheduledAt);
+  const ownerLocalDates = pinnedLocalDateIndexJson(scheduledAt.getTime());
   const result = await env.DB.prepare(invalidatedOrphanDiscoverySql(excludedIds.length))
-    .bind(cutoff, earliestLocalDate, latestLocalDate, ...excludedIds, limit)
-    .all<{ reading_id: string; user_id: string; local_date: string }>();
-  const seen = new Set<string>();
-  return result.results.flatMap((row) => {
-    if (seen.has(row.user_id)) return [];
-    seen.add(row.user_id);
-    return [{
-      readingId: row.reading_id,
-      userId: row.user_id,
-      localDate: row.local_date,
-    }];
-  });
+    .bind(cutoff, earliestLocalDate, latestLocalDate, ownerLocalDates, ...excludedIds, limit)
+    .all<FactualSchedulerRow>();
+  return result.results.map(factualCandidate);
 }
 
 export async function findExpiredSchedulerCandidates(

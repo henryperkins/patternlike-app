@@ -26,6 +26,7 @@ import {
   resolveV5TargetDate,
 } from "./enqueue.js";
 import {
+  invalidatePublishedReading,
   reconcileCurrentFactRepair,
   reserveFactRepair,
 } from "./reading-invalidation.js";
@@ -162,13 +163,36 @@ export async function runReadingScheduler(
       continue;
     }
     if (!claimUser(candidate.userId)) continue;
-    if (!eligibility?.eligible) continue;
+    const identity = {
+      userId: candidate.userId,
+      cryptoSubject: await cryptoSubjectFor(env, candidate.userId),
+    };
+    if (!eligibility.eligible) {
+      const invalidated = await invalidatePublishedReading(env, {
+        identity,
+        readingId: candidate.readingId,
+        reason: "chart_correction",
+        now: scheduledAt,
+      });
+      if (
+        invalidated.ok &&
+        await backoffIneligibleInvalidatedOrphan(
+          env,
+          candidate.readingId,
+          candidate.userId,
+          scheduledAt,
+        )
+      ) {
+        summary.repair.ineligibleOrphansBackedOff += 1;
+      }
+      if (invalidated.ok) {
+        await recomputeUserNextDueAt(env, candidate.userId, scheduledAt);
+      }
+      continue;
+    }
     const repaired = await reconcileCurrentFactRepair(
       env,
-      {
-        userId: candidate.userId,
-        cryptoSubject: await cryptoSubjectFor(env, candidate.userId),
-      },
+      identity,
       "chart_correction",
       scheduledAt,
     );
