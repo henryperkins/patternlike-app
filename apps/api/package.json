@@ -8,7 +8,10 @@
     "dev": "wrangler dev",
     "//build": "Dry-runs the SAME environment `deploy` ships. Without --env production this validated the top-level dev block (AUTH_STUB=1, issuer.invalid, the placeholder D1 id) and so could never catch a production-only config error; it also tripped Workers Builds' Worker-name check, whose remedy is a PR renaming the top-level worker to patternlike-api-production. Requires apps/web/dist to exist — see the root //build note.",
     "build": "wrangler deploy --dry-run --outdir=dist --env production",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "//typecheck": "BOTH configs. Worker sources compile without Node types on purpose; scripts/ needs them. One command so a script cannot drift out of the gate.",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
+    "//publisher:model:verify": "PRODUCTION GATE, not part of any test lane. Calls the authorized account's model endpoint with OPENAI_API_KEY and proves the pinned model exists. Required before initial enablement and before every later model change.",
+    "publisher:model:verify": "tsx scripts/verify-openai-reading-model.ts",
     "test": "vitest run",
     "db:local": "wrangler d1 migrations apply patternlike-ops --local",
     "//deploy": "Ships apps/web/dist as static assets. Prefer `npm run deploy:api` from the repository root, which builds the web app first.",
@@ -28,7 +31,9 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.19.1",
     "@cloudflare/workers-types": "^4.20250525.0",
+    "@types/node": "^22.15.21",
     "@types/tz-lookup": "^6.1.2",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vitest": "^4.1.10",
     "wrangler": "^4.16.1"

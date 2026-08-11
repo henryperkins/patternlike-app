@@ -36,4 +36,40 @@ export interface Env {
    * frozen chart, cycle, and context state.
    */
   READING_QUEUE: Queue<GenerationMessage>;
+
+  // -------------------------------------------------------------------------
+  // M5 constrained-model publisher
+  // -------------------------------------------------------------------------
+
+  /**
+   * Staged rollout: `off` | `internal` | `first_open` | `hybrid`.
+   *
+   * Declared in every wrangler block, for the same reason AUTH_STUB is written
+   * out as "0" rather than omitted. `off` is the kill switch and the default.
+   */
+  READING_V5_ROLLOUT?: string;
+  /** Explicit route selection. Must be "openai" whenever the rollout is not off. */
+  READING_PUBLISHER?: string;
+  /** The exact production model, verified against the account before deployment. */
+  OPENAI_READING_MODEL?: string;
+  OPENAI_READING_REASONING?: string;
+  OPENAI_READING_PROMPT_VERSION?: string;
+  /** One provider-call deadline, in milliseconds. */
+  OPENAI_READING_TIMEOUT_MS?: string;
+  OPENAI_READING_MAX_OUTPUT_TOKENS?: string;
+  /** Hard ceiling on the serialized provider packet, in UTF-8 bytes. */
+  READING_CONTEXT_MAX_BYTES?: string;
+  READING_PREGEN_ACTIVE_DAYS?: string;
+  READING_PREGEN_LEAD_MINUTES?: string;
+  READING_PREGEN_SPREAD_MINUTES?: string;
+  READING_SCHEDULER_BATCH_LIMIT?: string;
+  /**
+   * The operator-approved UTC-day ceiling on provider calls. There is no
+   * unlimited or unset production mode: request bytes and output tokens are
+   * separately capped, so this number is what makes the worst-case daily spend
+   * computable.
+   */
+  READING_DAILY_PROVIDER_CALL_LIMIT?: string;
+  /** Secret. Never a var, and never written to wrangler.toml. */
+  OPENAI_API_KEY?: string;
 }

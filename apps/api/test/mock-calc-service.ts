@@ -435,6 +435,199 @@ async function mockDailySky(request: Request): Promise<Response> {
 export const OPENAI_HOST = "api.openai.com";
 
 /**
+ * Sentinel model ids that drive `POST /v1/responses` failure paths.
+ *
+ * The MODEL rather than a header, because the model is the one field the
+ * adapter is required to send verbatim from the frozen pin. Keying the fake on
+ * anything the adapter does not already send would mean testing a request shape
+ * the real one never produces — and the adapter deliberately sends the Worker
+ * no correlation header at all.
+ */
+export const OPENAI_MOCK_TIMEOUT = "mock-openai-timeout";
+export const OPENAI_MOCK_NETWORK_ERROR = "mock-openai-network-error";
+export const OPENAI_MOCK_RATE_LIMITED = "mock-openai-429";
+export const OPENAI_MOCK_SERVER_ERROR = "mock-openai-5xx";
+export const OPENAI_MOCK_AUTH_FAILED = "mock-openai-401";
+export const OPENAI_MOCK_FORBIDDEN = "mock-openai-403";
+export const OPENAI_MOCK_MODEL_MISSING = "mock-openai-model-missing";
+export const OPENAI_MOCK_REFUSAL = "mock-openai-refusal";
+export const OPENAI_MOCK_NO_TEXT = "mock-openai-no-text";
+export const OPENAI_MOCK_TWO_TEXTS = "mock-openai-two-texts";
+export const OPENAI_MOCK_INVALID_JSON = "mock-openai-invalid-json";
+export const OPENAI_MOCK_WRONG_SHAPE = "mock-openai-wrong-shape";
+export const OPENAI_MOCK_ECHO_WRONG_DATE = "mock-openai-wrong-date";
+export const OPENAI_MOCK_UNGROUNDED = "mock-openai-ungrounded";
+
+interface ResponsesBody {
+  model: string;
+  store: boolean;
+  instructions: string;
+  input: Array<{ role: string; content: Array<{ type: string; text: string }> }>;
+  reasoning: { effort: string };
+  text: { verbosity: string; format: { type: string; name: string; strict: boolean } };
+  max_output_tokens: number;
+}
+
+interface PacketFact {
+  fact_id: string;
+  scope: string;
+  label: string;
+}
+
+interface Packet {
+  local_date: string;
+  locale: string;
+  facts: PacketFact[];
+  composition: { allowed_paragraph_roles: string[]; uncertainty_note_required: boolean };
+}
+
+/** One Responses envelope, shaped as the real API shapes it. */
+function responsesEnvelope(model: string, content: unknown[]): unknown {
+  return {
+    id: "resp_mock_0000000000000001",
+    object: "response",
+    model,
+    status: "completed",
+    output: [
+      { id: "rs_mock_reasoning", type: "reasoning", summary: [] },
+      { id: "msg_mock_0001", type: "message", role: "assistant", status: "completed", content },
+    ],
+    usage: { input_tokens: 4210, output_tokens: 512, total_tokens: 4722 },
+  };
+}
+
+function outputText(value: unknown): unknown[] {
+  return [
+    {
+      type: "output_text",
+      text: typeof value === "string" ? value : JSON.stringify(value),
+      annotations: [],
+    },
+  ];
+}
+
+/**
+ * A grounded candidate for the packet that was actually sent.
+ *
+ * It reads the packet rather than returning a fixture so the fake cannot drift
+ * away from the request: the echoed date and locale, the cited fact ids, and the
+ * allowed roles all come from what the Worker asked for.
+ */
+function groundedCandidate(packet: Packet, options: { wrongDate?: boolean; ungrounded?: boolean }) {
+  const personalized = packet.facts.find((fact) => fact.scope === "personalized");
+  const collective = packet.facts.find((fact) => fact.scope === "collective");
+  const lead = personalized ?? collective ?? packet.facts[0]!;
+  const paragraphs: unknown[] = [];
+  if (collective && packet.composition.allowed_paragraph_roles.includes("collective_context")) {
+    paragraphs.push({
+      role: "collective_context",
+      text: "The sky is doing the same thing for everyone tonight, and it is worth noticing.",
+      fact_ids: [collective.fact_id],
+      context_refs: [],
+    });
+  }
+  return {
+    schema_version: "0.5.0",
+    output_schema: "daily-reading-v5",
+    local_date: options.wrongDate ? "2999-01-01" : packet.local_date,
+    locale: packet.locale,
+    headline: "A narrower commitment",
+    lead: {
+      text: "The pressure is not asking for more effort, only for a smaller promise you can keep.",
+      fact_ids: options.ungrounded ? [] : [lead.fact_id],
+      context_refs: [],
+    },
+    paragraphs,
+    reflection_prompt: {
+      text: "Which promise would you keep if nobody was watching?",
+      fact_ids: [],
+      context_refs: [],
+    },
+    uncertainty_note: packet.composition.uncertainty_note_required
+      ? {
+          text: "Without a confirmed birth time this reading leaves houses out entirely.",
+          fact_ids: [],
+          context_refs: [],
+        }
+      : null,
+  };
+}
+
+async function mockOpenAiResponses(request: Request): Promise<Response> {
+  const body = (await request.json()) as ResponsesBody;
+  const model = body.model;
+
+  if (model === OPENAI_MOCK_NETWORK_ERROR) {
+    // A rejected fetch, not a response. The adapter must not read this as a
+    // refusal: nothing reached the provider.
+    throw new Error("connection reset by peer");
+  }
+  if (model === OPENAI_MOCK_TIMEOUT) {
+    // Long enough that any realistic test deadline fires first, short enough
+    // that a suite which forgets the deadline still finishes.
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    return json(responsesEnvelope(model, outputText("{}")));
+  }
+  if (model === OPENAI_MOCK_RATE_LIMITED) {
+    return new Response(
+      JSON.stringify({ error: { message: "Rate limit reached", type: "rate_limit_error" } }),
+      { status: 429, headers: { "content-type": "application/json", "retry-after": "17" } },
+    );
+  }
+  if (model === OPENAI_MOCK_SERVER_ERROR) {
+    return json({ error: { message: "The server had an error", type: "server_error" } }, 503);
+  }
+  if (model === OPENAI_MOCK_AUTH_FAILED) {
+    return json({ error: { message: "Incorrect API key provided: sk-live-REDACTED" } }, 401);
+  }
+  if (model === OPENAI_MOCK_FORBIDDEN) {
+    return json({ error: { message: "Project does not have access" } }, 403);
+  }
+  if (model === OPENAI_MOCK_MODEL_MISSING) {
+    return json(
+      { error: { message: `The model \`${model}\` does not exist`, code: "model_not_found" } },
+      404,
+    );
+  }
+  if (model === OPENAI_MOCK_REFUSAL) {
+    return json(
+      responsesEnvelope(model, [{ type: "refusal", refusal: "I cannot help with that." }]),
+    );
+  }
+  if (model === OPENAI_MOCK_NO_TEXT) {
+    return json(responsesEnvelope(model, []));
+  }
+  if (model === OPENAI_MOCK_TWO_TEXTS) {
+    return json(
+      responsesEnvelope(model, [
+        { type: "output_text", text: "{}", annotations: [] },
+        { type: "output_text", text: "{}", annotations: [] },
+      ]),
+    );
+  }
+  if (model === OPENAI_MOCK_INVALID_JSON) {
+    return json(responsesEnvelope(model, outputText("{ this is not json")));
+  }
+  if (model === OPENAI_MOCK_WRONG_SHAPE) {
+    return json(responsesEnvelope(model, outputText({ headline: "no schema_version here" })));
+  }
+
+  const packet = JSON.parse(body.input[0]!.content[0]!.text) as Packet;
+  return json(
+    responsesEnvelope(
+      model,
+      outputText(
+        groundedCandidate(packet, {
+          wrongDate: model === OPENAI_MOCK_ECHO_WRONG_DATE,
+          ungrounded: model === OPENAI_MOCK_UNGROUNDED,
+        }),
+      ),
+    ),
+  );
+}
+
+
+/**
  * The single outbound interceptor, dispatching BY HOST first.
  *
  * One seam rather than two: a parallel fetch interceptor installed alongside
@@ -448,12 +641,12 @@ export async function mockCalcService(request: Request): Promise<Response> {
   const url = new URL(request.url);
 
   if (url.hostname === OPENAI_HOST) {
-    // Task 7 installs the Responses fake behind this seam. Until then the host
-    // is routed but unimplemented, which is still a refusal rather than a
-    // network call.
+    if (url.pathname === "/v1/responses" && request.method === "POST") {
+      return mockOpenAiResponses(request);
+    }
     return json(
-      { error: { message: "the OpenAI test seam is not installed", type: "not_implemented" } },
-      501,
+      { error: { message: `no OpenAI seam for ${request.method} ${url.pathname}` } },
+      404,
     );
   }
 

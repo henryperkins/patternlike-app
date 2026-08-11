@@ -2,6 +2,7 @@ import type { Context, Next } from "hono";
 import type { Env } from "../env.js";
 import type { AppVariables } from "./auth.js";
 import { DEV_ROOT_KEK, isDevEnvironment } from "../crypto.js";
+import { resolvePublisherConfiguration } from "../services/reading-publisher.js";
 
 export interface ConfigFailure {
   code: string;
@@ -40,6 +41,16 @@ export function checkSecureConfig(
       >
     | Partial<Env>,
 ): ConfigFailure | null {
+  // Before the development short-circuit, deliberately. The local canary runs
+  // with ENVIRONMENT=development and a real key, so a half-configured local run
+  // would otherwise reach a provider with values no frozen command described.
+  // While the rollout is off this costs nothing: every publisher value may be
+  // absent, and only a value that is PRESENT and malformed is rejected.
+  const publisher = resolvePublisherConfiguration(env);
+  if (!publisher.ok) {
+    return { code: publisher.code, message: publisher.message };
+  }
+
   if (isDevEnvironment(env.ENVIRONMENT)) return null;
 
   if (env.AUTH_STUB === "1") {

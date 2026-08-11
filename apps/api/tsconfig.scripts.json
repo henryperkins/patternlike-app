@@ -1,0 +1,12 @@
+{
+  "//": "Operator scripts run under Node, not workerd. They are kept out of tsconfig.json on purpose: adding \"node\" to the Worker compilation would put process, Buffer, and the Node globals in scope for every Worker source file, and the one thing stopping a Worker module from reaching for them is that they do not typecheck. `npm run typecheck -w @patternlike/api` runs BOTH configs, so a script is checked without widening what the Worker can see.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "@cloudflare/workers-types"],
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.ts"]
+}

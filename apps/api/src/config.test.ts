@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import { DEV_ROOT_KEK, resolveRootKey, isDevEnvironment } from "./crypto.js";
+import {
+  OPENAI_READING_MODEL,
+  resolvePublisherConfiguration,
+} from "./services/reading-publisher.js";
 
 const STRONG_KEK = "a-real-root-kek-with-enough-entropy-32+";
 
@@ -154,5 +158,137 @@ describe("root key derivation", () => {
       await crypto.subtle.encrypt({ name: "AES-GCM", iv }, b, pt),
     );
     expect(Array.from(ctA)).not.toEqual(Array.from(ctB));
+  });
+});
+
+/**
+ * Publisher configuration, checked in every environment.
+ *
+ * `off` has to be a real state, not a half-configured one: the schema-compatible
+ * deploy that lands the dual readers runs with no publisher variables and no key
+ * at all, and it must serve every existing surface. Everything else is pinned to
+ * the exact value the code was written for, because "the model is whatever the
+ * var says" is how a deployment silently starts publishing prose the frozen
+ * input never described.
+ */
+describe("publisher configuration", () => {
+  const enabled = {
+    ENVIRONMENT: "production",
+    ROOT_KEK: STRONG_KEK,
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+    READING_V5_ROLLOUT: "internal",
+    READING_PUBLISHER: "openai",
+    OPENAI_READING_MODEL: OPENAI_READING_MODEL,
+    OPENAI_READING_REASONING: "high",
+    OPENAI_READING_PROMPT_VERSION: "1.0.0",
+    OPENAI_READING_TIMEOUT_MS: "90000",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "1800",
+    READING_CONTEXT_MAX_BYTES: "98304",
+    READING_PREGEN_ACTIVE_DAYS: "30",
+    READING_PREGEN_LEAD_MINUTES: "30",
+    READING_PREGEN_SPREAD_MINUTES: "45",
+    READING_SCHEDULER_BATCH_LIMIT: "100",
+    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
+    OPENAI_API_KEY: "sk-test-key",
+  };
+
+  it("accepts a complete enabled configuration", () => {
+    expect(checkSecureConfig(enabled)).toBeNull();
+    const resolved = resolvePublisherConfiguration(enabled);
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(resolved.rollout).toBe("internal");
+    expect(resolved.config?.pin.model).toBe(OPENAI_READING_MODEL);
+    expect(resolved.config?.pin.reasoning_effort).toBe("high");
+    expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
+    expect(resolved.config?.timeoutMs).toBe(90_000);
+    expect(resolved.config?.dailyCallLimit).toBe(250);
+    expect(resolved.config?.apiKey).toBe("sk-test-key");
+  });
+
+  it("permits every publisher value and the key to be absent while off", () => {
+    const off = {
+      ENVIRONMENT: "production",
+      ROOT_KEK: STRONG_KEK,
+      OIDC_ISSUER: "https://issuer.example.com",
+      OIDC_AUDIENCE: "patternlike-web",
+      OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+      READING_V5_ROLLOUT: "off",
+    };
+    expect(checkSecureConfig(off)).toBeNull();
+    const resolved = resolvePublisherConfiguration(off);
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(resolved.rollout).toBe("off");
+    // Not a degraded config: there is nothing to configure until a mode needs it.
+    expect(resolved.config).toBeNull();
+  });
+
+  it("still rejects a malformed optional value while off", () => {
+    const off = {
+      ENVIRONMENT: "production",
+      ROOT_KEK: STRONG_KEK,
+      OIDC_ISSUER: "https://issuer.example.com",
+      OIDC_AUDIENCE: "patternlike-web",
+      OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+      READING_V5_ROLLOUT: "off",
+      OPENAI_READING_TIMEOUT_MS: "not-a-number",
+    };
+    expect(checkSecureConfig(off)?.code).toBe("reading_publisher_misconfigured");
+  });
+
+  it("rejects an unknown rollout mode in every environment", () => {
+    expect(checkSecureConfig({ ENVIRONMENT: "development", READING_V5_ROLLOUT: "on" })?.code).toBe(
+      "reading_rollout_invalid",
+    );
+    expect(checkSecureConfig({ ...enabled, READING_V5_ROLLOUT: "of" })?.code).toBe(
+      "reading_rollout_invalid",
+    );
+  });
+
+  it.each([
+    ["READING_PUBLISHER", undefined],
+    ["READING_PUBLISHER", "anthropic"],
+    ["OPENAI_READING_MODEL", undefined],
+    ["OPENAI_READING_MODEL", "gpt-4o"],
+    ["OPENAI_READING_REASONING", "medium"],
+    ["OPENAI_READING_REASONING", undefined],
+    ["OPENAI_READING_PROMPT_VERSION", undefined],
+    ["OPENAI_READING_TIMEOUT_MS", "60000"],
+    ["OPENAI_READING_TIMEOUT_MS", "90000.5"],
+    ["OPENAI_READING_MAX_OUTPUT_TOKENS", "4000"],
+    ["READING_CONTEXT_MAX_BYTES", "65536"],
+    ["READING_PREGEN_ACTIVE_DAYS", "90"],
+    ["READING_PREGEN_LEAD_MINUTES", "15"],
+    ["READING_PREGEN_SPREAD_MINUTES", "60"],
+    ["READING_SCHEDULER_BATCH_LIMIT", "500"],
+    ["READING_DAILY_PROVIDER_CALL_LIMIT", "0"],
+    ["READING_DAILY_PROVIDER_CALL_LIMIT", "-5"],
+    ["READING_DAILY_PROVIDER_CALL_LIMIT", "12.5"],
+    ["READING_DAILY_PROVIDER_CALL_LIMIT", undefined],
+    ["OPENAI_API_KEY", undefined],
+  ] as const)("refuses an enabled rollout when %s is %s", (key, value) => {
+    const failure = checkSecureConfig({ ...enabled, [key]: value });
+    expect(failure?.code).toBe("reading_publisher_misconfigured");
+  });
+
+  it("names no secret value in the message it returns to a caller", () => {
+    const failure = checkSecureConfig({ ...enabled, OPENAI_API_KEY: undefined });
+    expect(failure?.message ?? "").not.toContain("sk-");
+  });
+
+  it("requires the publisher in development too once the rollout leaves off", () => {
+    // isDevEnvironment short-circuits the identity and key checks, and must not
+    // short-circuit this one: the local canary runs with ENVIRONMENT=development
+    // and a real key, and a half-configured local run would reach a provider
+    // with values the frozen command never described.
+    const failure = checkSecureConfig({
+      ENVIRONMENT: "development",
+      AUTH_STUB: "1",
+      READING_V5_ROLLOUT: "internal",
+    });
+    expect(failure?.code).toBe("reading_publisher_misconfigured");
   });
 });
