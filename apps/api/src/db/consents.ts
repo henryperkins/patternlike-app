@@ -31,6 +31,20 @@ export const AI_SYNTHESIS_CATEGORIES_BY_POLICY: Readonly<
   [AI_SYNTHESIS_POLICY_VERSION]: AI_CONSENT_DATA_CATEGORIES,
 });
 
+/**
+ * Cursor hook for the grant/revoke primitives introduced with the product
+ * routes in Task 13. Kept beside the consent owner so neither route can forget
+ * the scheduling consequence of changing the current grant.
+ */
+export async function refreshReadingCursorAfterAiConsentChange(
+  env: Env,
+  userId: string,
+  now = new Date(),
+): Promise<string | null> {
+  const { recomputeUserNextDueAt } = await import("./reading-scheduler.js");
+  return recomputeUserNextDueAt(env, userId, now);
+}
+
 export interface AiSynthesisGrant {
   consentId: string;
   policyVersion: string;

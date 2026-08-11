@@ -15,6 +15,7 @@ import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { invokeCalc } from "../services/calc-client.js";
 import { resolveTimezone } from "../services/timezone.js";
 import { reconcileCurrentFactRepair } from "../services/reading-invalidation.js";
+import { recomputeUserNextDueAt } from "../db/reading-scheduler.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -455,6 +456,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       `UPDATE jobs SET status = 'succeeded', result_class = ?, finished_at = ? WHERE id = ?`,
     ).bind(chart.id, now, jobId),
   ]);
+
+  await recomputeUserNextDueAt(c.env, userId, new Date(now));
 
   // Chart activation commits first. If the process dies here, Today's read
   // guard already hides prose pinned to the superseded chart; the same

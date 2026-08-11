@@ -50,11 +50,20 @@ queue = "patternlike-daily-readings-dev"
 # a guarded batch. Batching would only widen the blast radius of a retry.
 max_batch_size = 1
 max_batch_timeout = 5
+# Bound local/default queue fan-out to the publisher's intended concurrency.
+# Production remains absent until the separate activation gate approves it.
+max_concurrency = 4
 # Three attempts, then the dead-letter queue. Beyond that a retry is no longer
 # waiting out an outage, and the replacement path — which re-freezes a NEW
 # command against working dependencies — is the correct repair.
 max_retries = 3
 dead_letter_queue = "patternlike-daily-readings-dev-dlq"
+
+# Exercise the exported scheduled handler in local/default deployments. Wrangler
+# does not inherit triggers into named environments, so production has no cron
+# until the separately approved production activation step adds one there.
+[triggers]
+crons = ["*/15 * * * *"]
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the

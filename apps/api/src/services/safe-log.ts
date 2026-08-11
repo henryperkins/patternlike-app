@@ -43,6 +43,7 @@ export type SafeLogEvent =
   | { event: "local_day_unresolvable" }
   | { event: "generation_dispatch_failed" }
   | { event: "fact_repair_reconciliation_failed" }
+  | { event: "scheduler_repair_quota_exhausted" }
   | { event: "timing_local_day_unresolvable" }
   | { event: "timing_cycles_unreadable"; unreadable_count: number }
   | { event: "jwks_refresh_failed_using_stale" }
@@ -133,6 +134,7 @@ export function safeLog(input: SafeLogEvent): string {
     case "local_day_unresolvable":
     case "generation_dispatch_failed":
     case "fact_repair_reconciliation_failed":
+    case "scheduler_repair_quota_exhausted":
     case "timing_local_day_unresolvable":
     case "jwks_refresh_failed_using_stale":
       console.error(input.event, { trace_id });

@@ -14,6 +14,7 @@ import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
+import { scheduled } from "./scheduled.js";
 import { safeLog } from "./services/safe-log.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -111,4 +112,5 @@ export { app };
 export default {
   fetch: app.fetch,
   queue,
+  scheduled,
 };

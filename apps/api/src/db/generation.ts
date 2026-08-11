@@ -1289,7 +1289,7 @@ export async function findUndispatched(
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
        AND (j.available_at IS NULL OR j.available_at <= ?)
-     ORDER BY j.created_at
+     ORDER BY j.created_at, j.id
      LIMIT ?`,
   )
     .bind(JOB_TYPE, now.toISOString(), limit)
@@ -1307,7 +1307,7 @@ export async function findExpiredLeases(
      FROM jobs j
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'running' AND j.lease_expires_at < ?
-     ORDER BY j.lease_expires_at
+     ORDER BY j.lease_expires_at, j.id
      LIMIT ?`,
   )
     .bind(JOB_TYPE, now.toISOString(), limit)

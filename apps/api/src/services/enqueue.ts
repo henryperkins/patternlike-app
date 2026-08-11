@@ -16,7 +16,7 @@ import {
   type CommandBuildFailure,
   type RevisionReason,
 } from "./generation-command.js";
-import { isCurrentOrPreviousLocalDay } from "./local-day.js";
+import { isCurrentOrPreviousLocalDay, nextLocalDate } from "./local-day.js";
 import { pinnedLocalDate } from "./tzdb.js";
 import { loadPreferences } from "../db/preferences.js";
 import { readReadingV5Rollout, rolloutAllows, type RolloutEntry } from "./reading-rollout.js";
@@ -302,14 +302,22 @@ export async function replaceFailedCommand(
 
   if (actor === "scheduler") {
     const preferences = await loadPreferences(env, userId);
+    const currentLocalDate = preferences
+      ? resolveV5TargetDate(preferences.timezone, now)
+      : null;
+    const isReplaceableLocalDate = commandVersion === "v2"
+      ? currentLocalDate !== null &&
+        (reservation.local_date === currentLocalDate ||
+          reservation.local_date === nextLocalDate(currentLocalDate))
+      : preferences !== null &&
+        isCurrentOrPreviousLocalDay(preferences.timezone, reservation.local_date, now);
     if (
-      !preferences ||
-      !isCurrentOrPreviousLocalDay(preferences.timezone, reservation.local_date, now)
+      !isReplaceableLocalDate
     ) {
       return {
         ok: false,
         reason: "day_too_old",
-        detail: `${reservation.local_date} is no longer the current or preceding local day`,
+        detail: `${reservation.local_date} is outside the automatic replacement window`,
       };
     }
   }

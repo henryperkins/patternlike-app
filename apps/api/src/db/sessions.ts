@@ -2,6 +2,7 @@ import { newId, sha256Hex } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
 import type { UserIdentity } from "./users.js";
+import { recomputeUserNextDueAt } from "./reading-scheduler.js";
 
 /**
  * 30 days, absolute — not sliding. A sliding window on a bearer that unlocks
@@ -27,17 +28,26 @@ function mintToken(): string {
 export async function createSession(
   env: Env,
   userId: string,
+  now = new Date(),
 ): Promise<{ token: string; expiresAt: string }> {
   const token = mintToken();
-  const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000).toISOString();
 
   await env.DB.prepare(
-    `INSERT INTO sessions (id, user_id, token_sha256, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO sessions
+       (id, user_id, token_sha256, created_at, expires_at, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(newId("ses"), userId, await sha256Hex(token), now.toISOString(), expiresAt)
+    .bind(
+      newId("ses"),
+      userId,
+      await sha256Hex(token),
+      now.toISOString(),
+      expiresAt,
+      now.toISOString(),
+    )
     .run();
+  await recomputeUserNextDueAt(env, userId, now);
 
   return { token, expiresAt };
 }
@@ -52,6 +62,7 @@ export async function createSession(
 export async function resolveSession(
   env: Env,
   token: string,
+  now = new Date(),
 ): Promise<SessionPrincipal | null> {
   const row = await env.DB.prepare(
     `SELECT s.id AS session_id, u.id AS user_id, u.crypto_subject AS crypto_subject,
@@ -62,7 +73,7 @@ export async function resolveSession(
        AND s.revoked_at IS NULL
        AND s.expires_at > ?`,
   )
-    .bind(await sha256Hex(token), new Date().toISOString())
+    .bind(await sha256Hex(token), now.toISOString())
     .first<{
       session_id: string;
       user_id: string;
@@ -78,6 +89,35 @@ export async function resolveSession(
     cryptoSubject: asCryptoSubject(row.crypto_subject),
     status: row.status,
   };
+}
+
+export const SESSION_ACTIVITY_TOUCH_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Persist qualifying activity at most once per hour per session.
+ *
+ * The cursor recompute happens only when the guarded write lands, so a hot API
+ * session cannot turn every authenticated request into two extra D1 writes.
+ */
+export async function touchSessionActivity(
+  env: Env,
+  sessionId: string,
+  userId: string,
+  now = new Date(),
+): Promise<boolean> {
+  const cutoff = new Date(
+    now.getTime() - SESSION_ACTIVITY_TOUCH_INTERVAL_MS,
+  ).toISOString();
+  const result = await env.DB.prepare(
+    `UPDATE sessions SET last_seen_at = ?
+     WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
+       AND (last_seen_at IS NULL OR last_seen_at < ?)`,
+  )
+    .bind(now.toISOString(), sessionId, userId, now.toISOString(), cutoff)
+    .run();
+  if (result.meta.changes !== 1) return false;
+  await recomputeUserNextDueAt(env, userId, now);
+  return true;
 }
 
 export async function revokeSession(env: Env, sessionId: string): Promise<void> {

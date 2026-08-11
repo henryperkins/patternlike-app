@@ -6,6 +6,7 @@ import {
   loadUserIdentity,
   type UserIdentity,
 } from "./users.js";
+import { recomputeUserNextDueAt } from "./reading-scheduler.js";
 
 /**
  * Scheduling timezone and content locale as *owned* values.
@@ -58,6 +59,16 @@ export type PreferenceWrite<T> =
   | { ok: false; reason: "preference_conflict" };
 
 type PreferenceJobType = "preference_timezone" | "preference_locale";
+
+async function finishPreferenceWrite<T>(
+  env: Env,
+  userId: string,
+  result: PreferenceWrite<T>,
+  now = new Date(),
+): Promise<PreferenceWrite<T>> {
+  if (result.ok) await recomputeUserNextDueAt(env, userId, now);
+  return result;
+}
 
 interface StoredPreferenceMutation {
   input: {
@@ -276,7 +287,7 @@ export async function setSchedulingTimezone(
       timezone,
       source,
     );
-    if (replay) return replay;
+    if (replay) return finishPreferenceWrite(env, userId, replay);
   }
 
   const current = await loadPreferences(env, userId);
@@ -370,7 +381,7 @@ export async function setSchedulingTimezone(
         timezone,
         source,
       );
-      if (replay) return replay;
+      if (replay) return finishPreferenceWrite(env, userId, replay);
     }
     const latest = await loadPreferences(env, userId);
     if (latest && locked(latest.timezoneSource, source)) {
@@ -381,7 +392,7 @@ export async function setSchedulingTimezone(
     }
     throw error;
   }
-  return { ok: true, value };
+  return finishPreferenceWrite(env, userId, { ok: true, value }, new Date(now));
 }
 
 /**
@@ -407,7 +418,7 @@ export async function setContentLocale(
       locale,
       source,
     );
-    if (replay) return replay;
+    if (replay) return finishPreferenceWrite(env, userId, replay);
   }
 
   const current = await loadPreferences(env, userId);
@@ -495,7 +506,7 @@ export async function setContentLocale(
         locale,
         source,
       );
-      if (replay) return replay;
+      if (replay) return finishPreferenceWrite(env, userId, replay);
     }
     const latest = await loadPreferences(env, userId);
     if (latest && locked(latest.localeSource, source)) {
@@ -512,5 +523,5 @@ export async function setContentLocale(
     throw error;
   }
 
-  return { ok: true, value };
+  return finishPreferenceWrite(env, userId, { ok: true, value }, new Date(now));
 }
