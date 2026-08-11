@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import {
   ensureTodayReading,
-  type DailyReading,
+  isDailyReadingV5,
   type DailyReadingResponse,
-  type ReadingParagraph,
+  type DailyReadingResponseV3,
+  type DailyReadingResponseV5,
 } from "../lib/api-client.js";
 import { NOT_IMPLEMENTED_MESSAGE, withRequestId } from "../lib/api-status.js";
 import { classifyTodayError } from "../lib/reading-state.js";
 import {
   ROLE_PRESENTATION,
+  ROLE_PRESENTATION_V5,
   domainPreferenceLabel,
   formatLocalDate,
+  type RolePresentation,
 } from "../lib/reading-format.js";
+import { AiConsentGate } from "./AiConsentGate.js";
 import { PreferenceConfirm } from "./PreferenceConfirm.js";
 import { WhyThisDrawer } from "./WhyThisDrawer.js";
 import { Icon } from "./icons.js";
@@ -24,14 +28,22 @@ type TodayState =
       status: "preparing";
       localDate: string;
       takingLonger: boolean;
+      /** Which publisher is preparing it, so the wait can say what it is doing. */
+      schemaVersion: string;
     }
   | {
       status: "needs_preference";
       preference: "timezone" | "locale";
       requestId: string | null;
     }
+  | { status: "needs_ai_consent"; requestId: string | null }
   | { status: "not_implemented"; requestId: string | null }
-  | { status: "error"; message: string; requestId: string | null };
+  | {
+      status: "error";
+      message: string;
+      requestId: string | null;
+      retryable: boolean;
+    };
 
 interface TodayViewProps {
   /**
@@ -51,7 +63,7 @@ interface TodayViewProps {
  * response ever disagrees, rendering what is actually there beats assuming an
  * element that is not.
  */
-function isFallbackShape(reading: DailyReading): boolean {
+function isFallbackShape(reading: DailyReadingResponseV3["reading"]): boolean {
   return (
     reading.fallback_used &&
     reading.paragraphs.length === 1 &&
@@ -59,15 +71,32 @@ function isFallbackShape(reading: DailyReading): boolean {
   );
 }
 
-function Paragraph({ paragraph }: { paragraph: ReadingParagraph }) {
-  const presentation = ROLE_PRESENTATION[paragraph.role];
-  const kicker = presentation?.kicker;
+/**
+ * One prose unit, in whichever publisher's role vocabulary wrote it.
+ *
+ * The presentation is passed rather than looked up: the two publishers have
+ * different closed role sets, and a lookup inside here would need a table
+ * spanning both, which is the drift the two `Record`s in reading-format exist to
+ * prevent. `kicker` may be supplied — v5 puts its own headline in that slot.
+ */
+function Paragraph({
+  role,
+  text,
+  presentation,
+  kicker,
+}: {
+  role: string;
+  text: string;
+  presentation: RolePresentation | undefined;
+  kicker?: string | null;
+}) {
+  const label = kicker ?? presentation?.kicker;
   const tone = presentation?.tone ?? "body";
 
   const body = (
     <>
-      {kicker ? <p className="kicker">{kicker}</p> : null}
-      <p className={`reading-paragraph reading-paragraph--${tone}`}>{paragraph.text}</p>
+      {label ? <p className="kicker">{label}</p> : null}
+      <p className={`reading-paragraph reading-paragraph--${tone}`}>{text}</p>
     </>
   );
 
@@ -76,13 +105,182 @@ function Paragraph({ paragraph }: { paragraph: ReadingParagraph }) {
   }
   if (tone === "notice") {
     return (
-      <div className={`reading-notice reading-notice--${paragraph.role}`}>
+      <div className={`reading-notice reading-notice--${role}`}>
         <Icon name="shield" aria-hidden="true" />
         <div>{body}</div>
       </div>
     );
   }
-  return <div className={`reading-block reading-block--${paragraph.role}`}>{body}</div>;
+  return <div className={`reading-block reading-block--${role}`}>{body}</div>;
+}
+
+/**
+ * The header both publishers share: the date is the title, and everything about
+ * the artifact that is not prose lives in the meta strip.
+ */
+function TodayHeader({
+  headingId,
+  localDate,
+  locale,
+  revision,
+  domainPreference,
+}: {
+  headingId: string;
+  localDate: string;
+  locale: string;
+  revision: number;
+  domainPreference?: string | null;
+}) {
+  return (
+    <header className="page-header today-page__header">
+      <div>
+        <p className="eyebrow">Today / Daily chapter</p>
+        <h1 id={headingId}>{formatLocalDate(localDate)}</h1>
+      </div>
+      {/*
+        The meta strip, never the prose. `revision_reason` lives only on the
+        evidence graph, so the chip can say a reading was revised and only the
+        drawer can say why.
+      */}
+      <div className="today-meta">
+        {domainPreference ? (
+          <span className="today-chip">{domainPreferenceLabel(domainPreference)}</span>
+        ) : null}
+        {revision > 1 ? (
+          <span className="today-chip today-chip--revised">Revised · r{revision}</span>
+        ) : null}
+        <span className="today-chip today-chip--code">{locale}</span>
+      </div>
+    </header>
+  );
+}
+
+/*
+ * The drawer below is keyed for the same reason the preference form is: it
+ * caches its fetch for the reading it was opened against, and its 404 branch
+ * deliberately does not re-arm. "Reload Today" after a reissue answers with a
+ * different reading id into the same mounted instance, which would leave the
+ * drawer reporting the old reading as missing and refusing to fetch the new
+ * one. Same id keeps the cache.
+ */
+function TodayReadingV3({
+  response,
+  headingId,
+  onReload,
+  onUnauthorized,
+}: {
+  response: DailyReadingResponseV3;
+  headingId: string;
+  onReload: () => void;
+  onUnauthorized: () => void;
+}) {
+  const { reading } = response;
+  const paragraphs = [...reading.paragraphs].sort((a, b) => a.order - b.order);
+
+  return (
+    <article className="today-page page-enter" aria-labelledby={headingId}>
+      <TodayHeader
+        headingId={headingId}
+        localDate={reading.local_date}
+        locale={reading.locale}
+        revision={reading.revision}
+        domainPreference={reading.domain_preference}
+      />
+
+      {isFallbackShape(reading) ? (
+        <p className="today-fallback-note">
+          Nothing in your chart was eligible to be written about today, so what
+          follows is a reviewed passage shown in its place. It is not tailored to
+          your chart.
+        </p>
+      ) : null}
+
+      <div className="today-reading">
+        <div className="today-body">
+          {paragraphs.map((paragraph) => (
+            <Paragraph
+              key={paragraph.paragraph_id}
+              role={paragraph.role}
+              text={paragraph.text}
+              presentation={ROLE_PRESENTATION[paragraph.role]}
+            />
+          ))}
+        </div>
+
+        {response.evidence_url ? (
+          <WhyThisDrawer
+            key={reading.reading_id}
+            readingId={reading.reading_id}
+            paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
+            onReload={onReload}
+            onUnauthorized={onUnauthorized}
+          />
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+/**
+ * The v5 reading.
+ *
+ * Two differences that matter, and no third. The headline takes the quiet kicker
+ * slot above the lead, so the lead stays the page's typographic statement rather
+ * than competing with a second heading. And the disclosure is always rendered:
+ * it closes the chapter and introduces the provenance beneath it, because a
+ * reader who agreed to model synthesis is owed the sentence saying when it
+ * happened. There is no fallback note here — v5 has no reviewed copy to fall
+ * back to, and an unavailable reading says so instead.
+ */
+function TodayReadingV5({
+  response,
+  headingId,
+  onReload,
+  onUnauthorized,
+}: {
+  response: DailyReadingResponseV5;
+  headingId: string;
+  onReload: () => void;
+  onUnauthorized: () => void;
+}) {
+  const { reading } = response;
+  const paragraphs = [...reading.paragraphs].sort((a, b) => a.order - b.order);
+
+  return (
+    <article className="today-page page-enter" aria-labelledby={headingId}>
+      <TodayHeader
+        headingId={headingId}
+        localDate={reading.local_date}
+        locale={reading.locale}
+        revision={reading.revision}
+        domainPreference={reading.domain_preference}
+      />
+
+      <div className="today-reading">
+        <div className="today-body">
+          {paragraphs.map((paragraph, index) => (
+            <Paragraph
+              key={paragraph.paragraph_id}
+              role={paragraph.role}
+              text={paragraph.text}
+              presentation={ROLE_PRESENTATION_V5[paragraph.role]}
+              kicker={index === 0 ? reading.headline : undefined}
+            />
+          ))}
+        </div>
+
+        <p className="today-disclosure">{reading.disclosure}</p>
+
+        <WhyThisDrawer
+          key={reading.reading_id}
+          readingId={reading.reading_id}
+          paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
+          onReload={onReload}
+          onUnauthorized={onUnauthorized}
+        />
+      </div>
+    </article>
+  );
 }
 
 function TodayReading({
@@ -96,68 +294,20 @@ function TodayReading({
   onReload: () => void;
   onUnauthorized: () => void;
 }) {
-  const { reading } = response;
-  const paragraphs = [...reading.paragraphs].sort((a, b) => a.order - b.order);
-
-  return (
-    <article className="today-page page-enter" aria-labelledby={headingId}>
-      <header className="page-header today-page__header">
-        <div>
-          <p className="eyebrow">Today / Daily chapter</p>
-          <h1 id={headingId}>{formatLocalDate(reading.local_date)}</h1>
-        </div>
-        {/*
-          The meta strip, never the prose. `revision_reason` lives only on the
-          evidence graph, so the chip can say a reading was revised and only the
-          drawer can say why.
-        */}
-        <div className="today-meta">
-          {reading.domain_preference ? (
-            <span className="today-chip">
-              {domainPreferenceLabel(reading.domain_preference)}
-            </span>
-          ) : null}
-          {reading.revision > 1 ? (
-            <span className="today-chip today-chip--revised">
-              Revised · r{reading.revision}
-            </span>
-          ) : null}
-          <span className="today-chip today-chip--code">{reading.locale}</span>
-        </div>
-      </header>
-
-      {isFallbackShape(reading) ? (
-        <p className="today-fallback-note">
-          Nothing in your chart was eligible to be written about today, so what
-          follows is a reviewed passage shown in its place. It is not tailored to
-          your chart.
-        </p>
-      ) : null}
-
-      <div className="today-reading">
-        <div className="today-body">
-          {paragraphs.map((paragraph) => (
-            <Paragraph key={paragraph.paragraph_id} paragraph={paragraph} />
-          ))}
-        </div>
-
-        {response.evidence_url ? (
-          // Keyed for the same reason the preference form is: the drawer caches
-          // its fetch for the reading it was opened against, and its 404 branch
-          // deliberately does not re-arm. "Reload Today" after a reissue answers
-          // with a different reading id into the same mounted instance, which
-          // would leave the drawer reporting the old reading as missing and
-          // refusing to fetch the new one. Same id keeps the cache.
-          <WhyThisDrawer
-            key={reading.reading_id}
-            readingId={reading.reading_id}
-            paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
-            onReload={onReload}
-            onUnauthorized={onUnauthorized}
-          />
-        ) : null}
-      </div>
-    </article>
+  return isDailyReadingV5(response) ? (
+    <TodayReadingV5
+      response={response}
+      headingId={headingId}
+      onReload={onReload}
+      onUnauthorized={onUnauthorized}
+    />
+  ) : (
+    <TodayReadingV3
+      response={response}
+      headingId={headingId}
+      onReload={onReload}
+      onUnauthorized={onUnauthorized}
+    />
   );
 }
 
@@ -215,6 +365,16 @@ function TodayNotice({
 }
 
 const QUIET_LINE = "A clear day, not a horoscope feed.";
+
+/**
+ * A preparation response carries only its package version, so that is what
+ * chooses the wait copy. Anything that is not the v5 package is described as the
+ * reviewed-content assembly it is; a later package that still generates is told
+ * apart by its own version, not by guessing from the shape.
+ */
+function isV5Preparation(schemaVersion: string): boolean {
+  return schemaVersion.startsWith("0.5.");
+}
 const POLL_DELAYS_MS = [500, 1_000, 2_000, 5_000] as const;
 const SLOW_PREPARATION_MS = 15_000;
 
@@ -279,6 +439,7 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
               status: "preparing",
               localDate: response.local_date,
               takingLonger: false,
+              schemaVersion: response.schema_version,
             });
             slowPreparationTimer = setTimeout(() => {
               if (controller.signal.aborted) return;
@@ -313,6 +474,9 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
               requestId: failure.requestId,
             });
             return;
+          case "needs_ai_consent":
+            setState({ status: "needs_ai_consent", requestId: failure.requestId });
+            return;
           case "not_implemented":
             setState({ status: "not_implemented", requestId: failure.requestId });
             return;
@@ -321,6 +485,7 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
               status: "error",
               message: failure.message,
               requestId: failure.requestId,
+              retryable: failure.retryable,
             });
         }
       } finally {
@@ -364,6 +529,15 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
         />
       );
 
+    case "needs_ai_consent":
+      return (
+        <AiConsentGate
+          requestId={state.requestId}
+          onGranted={reload}
+          onUnauthorized={onUnauthorized}
+        />
+      );
+
     case "loading":
       return (
         <TodayNotice title="Reading today.">
@@ -394,7 +568,9 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
           <p role="status" aria-live="polite">
             {state.takingLonger
               ? `Your reading for ${formatLocalDate(state.localDate)} is still being prepared. This is taking longer than usual; you can leave this page and come back.`
-              : `Your reading for ${formatLocalDate(state.localDate)} is being assembled from reviewed content. It will appear here when it is ready.`}
+              : isV5Preparation(state.schemaVersion)
+                ? `Your reading for ${formatLocalDate(state.localDate)} is being grounded in your calculated chart, today's calculated sky, and the context you have enabled. It will appear here when it is ready.`
+                : `Your reading for ${formatLocalDate(state.localDate)} is being assembled from reviewed content. It will appear here when it is ready.`}
           </p>
           <p className="today-empty__aside">{QUIET_LINE}</p>
         </TodayNotice>
@@ -415,7 +591,12 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
       return (
         <TodayNotice
           title="Today could not load."
-          action={{ label: "Try again", onClick: reload }}
+          // Offered only where the server said asking again can make progress.
+          // An exhausted generation and an unconfigured publisher both end here,
+          // and a control that cannot succeed is worse than no control.
+          action={
+            state.retryable ? { label: "Try again", onClick: reload } : undefined
+          }
           busy={busy}
         >
           <p role="status" aria-live="polite">

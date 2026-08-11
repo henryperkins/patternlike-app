@@ -2,14 +2,20 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ApiError,
   deleteAccount,
+  getAiSynthesisConsent,
+  grantAiSynthesisConsent,
   newIdempotencyKey,
   requestAccountExport,
+  revokeAiSynthesisConsent,
+  type AiSynthesisConsent,
 } from "../lib/api-client.js";
 import {
   NOT_IMPLEMENTED_MESSAGE,
   isNotImplemented,
   withRequestId,
 } from "../lib/api-status.js";
+import { formatInstant } from "../lib/reading-format.js";
+import { AiConsentTerms } from "./AiConsent.js";
 import { Icon } from "./icons.js";
 
 type PrivacyActionState =
@@ -104,6 +110,138 @@ function PrivacyActionStatus({ id, state }: { id: string; state: PrivacyActionSt
   );
 }
 
+type ConsentPanelState =
+  | { status: "loading" }
+  | { status: "ready"; consent: AiSynthesisConsent }
+  | { status: "unreadable"; message: string };
+
+/**
+ * The account-level AI-synthesis permission, shown where every other data
+ * control lives.
+ *
+ * The same terms the Today gate shows, so reviewing a decision here and making
+ * it there are the same disclosure. There are no per-category switches: the
+ * categories belong to the policy version as one indivisible grant, and a
+ * control that appeared to switch one off while the server still permitted it
+ * would be worse than no control. Source-level switches arrive with the sources
+ * themselves.
+ */
+function AiSynthesisConsentPanel() {
+  const [state, setState] = useState<ConsentPanelState>({ status: "loading" });
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const consent = await getAiSynthesisConsent(controller.signal);
+        if (controller.signal.aborted) return;
+        setState({ status: "ready", consent });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setState({
+          status: "unreadable",
+          message:
+            error instanceof Error
+              ? error.message
+              : "The consent record could not be read in this session.",
+        });
+      }
+    })();
+    return () => controller.abort();
+  }, []);
+
+  // One key per intent, minted at the press and held until it succeeds, so a
+  // retry after a transient failure resumes the same mutation rather than
+  // recording a second one.
+  const keys = useRef<{ grant: string | null; revoke: string | null }>({
+    grant: null,
+    revoke: null,
+  });
+
+  const mutate = async (intent: "grant" | "revoke", consent: AiSynthesisConsent) => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      if (intent === "grant") {
+        keys.current.grant ??= newIdempotencyKey("web-ai-synthesis");
+        const next = await grantAiSynthesisConsent(
+          consent.policy_version,
+          keys.current.grant,
+        );
+        keys.current.grant = null;
+        keys.current.revoke = null;
+        setState({ status: "ready", consent: next });
+      } else {
+        keys.current.revoke ??= newIdempotencyKey("web-ai-synthesis");
+        const next = await revokeAiSynthesisConsent(keys.current.revoke);
+        keys.current.revoke = null;
+        keys.current.grant = null;
+        setState({ status: "ready", consent: next });
+      }
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError
+          ? withRequestId(error.message, error.requestId)
+          : error instanceof Error
+            ? error.message
+            : "That could not be saved in this session.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const granted = state.status === "ready" && state.consent.status === "granted";
+
+  return (
+    <section className="ai-consent panel" aria-labelledby="ai-consent-heading">
+      <div className="panel-heading">
+        <div>
+          <p className="kicker">Reading generation</p>
+          <h2 id="ai-consent-heading">Who writes your reading</h2>
+        </div>
+        <span className={`source-state${granted ? " source-state--active" : ""}`}>
+          <i /> {granted ? "Granted" : "Not granted"}
+        </span>
+      </div>
+
+      {state.status === "ready" ? (
+        <>
+          {granted && state.consent.granted_at ? (
+            <p className="ai-consent__since">
+              Granted {formatInstant(state.consent.granted_at)}.
+            </p>
+          ) : null}
+
+          <AiConsentTerms consent={state.consent} />
+
+          <button
+            className={`button ${granted ? "button--secondary" : "button--primary"}`}
+            type="button"
+            onClick={() => void mutate(granted ? "revoke" : "grant", state.consent)}
+            disabled={busy}
+            aria-busy={busy}
+            aria-describedby="ai-consent-status"
+          >
+            {granted ? "Withdraw permission" : "Grant permission"}{" "}
+            <Icon name={granted ? "shield" : "check"} />
+          </button>
+        </>
+      ) : null}
+
+      <p className="privacy-action__status" id="ai-consent-status" role="status" aria-live="polite">
+        {state.status === "loading"
+          ? "Reading your current permission."
+          : state.status === "unreadable"
+            ? state.message
+            : (problem ?? "")}
+      </p>
+    </section>
+  );
+}
+
 export function PrivacyView({ hasChart }: { hasChart: boolean }) {
   const [exportState, setExportState] = useState<PrivacyActionState>({ status: "idle" });
   const [deleteState, setDeleteState] = useState<PrivacyActionState>({ status: "idle" });
@@ -190,6 +328,8 @@ export function PrivacyView({ hasChart }: { hasChart: boolean }) {
           </blockquote>
         </article>
       </section>
+
+      <AiSynthesisConsentPanel />
 
       <section className="source-ledger panel" aria-labelledby="source-heading">
         <div className="panel-heading">

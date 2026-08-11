@@ -13,8 +13,30 @@ export type TodayFailure =
   | { kind: "unauthorized" }
   | { kind: "needs_onboarding"; requestId: string | null }
   | { kind: "needs_preference"; preference: "timezone" | "locale"; requestId: string | null }
+  | { kind: "needs_ai_consent"; requestId: string | null }
   | { kind: "not_implemented"; requestId: string | null }
-  | { kind: "error"; message: string; requestId: string | null };
+  | {
+      kind: "error";
+      message: string;
+      requestId: string | null;
+      /**
+       * Whether the screen may offer a retry. Read from the envelope, not
+       * inferred from the status: `publisher_budget_exhausted` and
+       * `publisher_not_configured` are both 503 and neither improves by asking
+       * again, while `calc_unavailable` is a 503 that does.
+       */
+      retryable: boolean;
+    };
+
+/**
+ * The envelope's own answer, or the honest default for a response that predates
+ * the flag: everything except an exhausted generation is worth one more press.
+ * A 424 means automatic repair already ran out of command generations for this
+ * local day, so the same request cannot produce a different answer.
+ */
+function isRetryable(error: ApiError): boolean {
+  return error.retryable ?? error.status !== 424;
+}
 
 /**
  * Neither 404 code nor either 409 code is assumed to exhaust its status: an
@@ -44,9 +66,19 @@ export function classifyTodayError(error: unknown): TodayFailure {
       if (error.code === "locale_confirmation_required") {
         return { kind: "needs_preference", preference: "locale", requestId: error.requestId };
       }
+      // The one gate the reader answers on Today itself rather than through a
+      // form: nothing may be sent to the publisher until it is granted.
+      if (error.code === "ai_synthesis_consent_required") {
+        return { kind: "needs_ai_consent", requestId: error.requestId };
+      }
     }
 
-    return { kind: "error", message: error.message, requestId: error.requestId };
+    return {
+      kind: "error",
+      message: error.message,
+      requestId: error.requestId,
+      retryable: isRetryable(error),
+    };
   }
 
   return {
@@ -54,5 +86,8 @@ export function classifyTodayError(error: unknown): TodayFailure {
     // Where "The Pattern/Like API could not be reached." arrives from.
     message: error instanceof Error ? error.message : "Today could not load in this session.",
     requestId: null,
+    // A transport failure is the retryable case by definition: nothing reached
+    // the API, so nothing about the account state has been established.
+    retryable: true,
   };
 }

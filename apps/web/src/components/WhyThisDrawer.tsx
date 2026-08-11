@@ -1,13 +1,21 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   ApiError,
   getReadingEvidence,
+  isReadingEvidenceV5,
   type ParagraphEvidence,
+  type ParagraphEvidenceV5,
   type ReadingEvidence,
+  type ReadingEvidenceV3,
+  type ReadingEvidenceV5,
 } from "../lib/api-client.js";
 import { NOT_IMPLEMENTED_MESSAGE, isNotImplemented, withRequestId } from "../lib/api-status.js";
 import {
   ROLE_PRESENTATION,
+  ROLE_PRESENTATION_V5,
+  allowedUseLabel,
+  aiConsentCategoryLabel,
+  factScopeLabel,
   formatInstant,
   formatOrb,
   humanFactType,
@@ -33,6 +41,11 @@ interface WhyThisDrawerProps {
 
 function roleLabel(paragraph: ParagraphEvidence): string {
   const presentation = ROLE_PRESENTATION[paragraph.role];
+  return presentation?.kicker ?? "Primary theme";
+}
+
+function roleLabelV5(paragraph: ParagraphEvidenceV5): string {
+  const presentation = ROLE_PRESENTATION_V5[paragraph.role];
   return presentation?.kicker ?? "Primary theme";
 }
 
@@ -122,6 +135,210 @@ function ParagraphPanel({ paragraph }: { paragraph: ParagraphEvidence }) {
   );
 }
 
+function EvidenceBodyV3({ evidence, ordered }: { evidence: ReadingEvidenceV3; ordered: ParagraphEvidence[] }) {
+  return (
+    <>
+      {ordered.map((paragraph) => (
+        <ParagraphPanel key={paragraph.paragraph_id} paragraph={paragraph} />
+      ))}
+
+      <dl className="evidence-grid" aria-label="Assembly record">
+        <div>
+          <dt>Assembly</dt>
+          <dd>{evidence.assembly_id}</dd>
+        </div>
+        <div>
+          <dt>Revision</dt>
+          <dd>
+            {evidence.revision}
+            {evidence.revision_reason
+              ? ` · ${evidence.revision_reason.replace(/_/g, " ")}`
+              : ""}
+          </dd>
+        </div>
+        {evidence.release_version ? (
+          <div>
+            <dt>Content release</dt>
+            <dd>{evidence.release_version}</dd>
+          </div>
+        ) : null}
+        {evidence.created_at ? (
+          <div>
+            <dt>Assembled</dt>
+            <dd>{formatInstant(evidence.created_at)}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </>
+  );
+}
+
+/**
+ * One paragraph's calculated grounding.
+ *
+ * The label is the readable rendering the calculation service produced, not the
+ * opaque handle — a reader learns nothing from `dsf_9f2c…`, and the whole point
+ * of this layer is that they can check the claim. `scope` is stated in words
+ * because a fact true for everyone must never read as a private discovery.
+ *
+ * An empty fact list is rendered rather than hidden. A paragraph carried
+ * entirely by permitted context is a legal reading — the candidate validator
+ * requires grounding of the lead and of anything making an astrological claim —
+ * and silently omitting the panel would suggest the prose had evidence the
+ * drawer chose not to show.
+ */
+function FactPanelV5({ paragraph }: { paragraph: ParagraphEvidenceV5 }) {
+  return (
+    <article className="evidence-paragraph">
+      <div className="evidence-paragraph__head">
+        <p className="kicker">{roleLabelV5(paragraph)}</p>
+      </div>
+
+      {paragraph.fact_refs.length ? (
+        <ul className="evidence-list" aria-label="Calculated facts behind this paragraph">
+          {paragraph.fact_refs.map((fact) => (
+            <li key={fact.fact_id}>
+              {fact.label}
+              <span className="evidence-scope">{factScopeLabel(fact.scope)}</span>
+              {import.meta.env.DEV ? <code>{fact.fact_id}</code> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="evidence-paragraph__note">
+          No calculated fact stands behind this paragraph. It was written from the
+          context you enabled, and it claims nothing about the sky.
+        </p>
+      )}
+    </article>
+  );
+}
+
+/**
+ * The v5 graph, in three progressively technical layers.
+ *
+ * Layer one is what was calculated, layer two is which categories of private
+ * context were permitted and in which lane, layer three is the exact generation
+ * configuration. No raw journal text, no check-in values, and no opaque handles
+ * in reader copy — the second layer deliberately carries the category and the
+ * lane and nothing else, because the reader already has their own writing; what
+ * they cannot otherwise see is what it was allowed to influence.
+ */
+function EvidenceBodyV5({
+  evidence,
+  ordered,
+  headingIds,
+}: {
+  evidence: ReadingEvidenceV5;
+  ordered: ParagraphEvidenceV5[];
+  headingIds: { facts: string; context: string; generation: string };
+}) {
+  // Grouped by category and deduplicated across paragraphs. The same category
+  // permitted for three lanes is one permission with three lanes, not three
+  // permissions; repeating the category as three identical terms would say the
+  // opposite of what the reader needs to understand.
+  const lanes = new Map<string, Set<string>>();
+  for (const paragraph of ordered) {
+    for (const reference of paragraph.context_refs) {
+      const uses = lanes.get(reference.category) ?? new Set<string>();
+      uses.add(reference.allowed_use);
+      lanes.set(reference.category, uses);
+    }
+  }
+
+  return (
+    <>
+      <section className="evidence-layer" aria-labelledby={headingIds.facts}>
+        <h2 id={headingIds.facts}>Calculated facts</h2>
+        {ordered.map((paragraph) => (
+          <FactPanelV5 key={paragraph.paragraph_id} paragraph={paragraph} />
+        ))}
+      </section>
+
+      <section className="evidence-layer" aria-labelledby={headingIds.context}>
+        <h2 id={headingIds.context}>Personal context</h2>
+        {lanes.size ? (
+          <dl
+            className="evidence-lanes"
+            aria-label="Context categories and what each was allowed to do"
+          >
+            {[...lanes.entries()].map(([category, uses]) => (
+              <div key={category}>
+                <dt>{aiConsentCategoryLabel(category)}</dt>
+                <dd>{[...uses].map(allowedUseLabel).join(" · ")}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="evidence-paragraph__note">
+            No personal context was used in this reading.
+          </p>
+        )}
+      </section>
+
+      <section className="evidence-layer" aria-labelledby={headingIds.generation}>
+        <h2 id={headingIds.generation}>Generation record</h2>
+        <dl className="evidence-grid" aria-label="How this reading was generated">
+          <div>
+            <dt>Written by</dt>
+            <dd>
+              {evidence.model.provider} · {evidence.model.model}
+            </dd>
+          </div>
+          <div>
+            <dt>Generated</dt>
+            <dd>{formatInstant(evidence.generated_at)}</dd>
+          </div>
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              {evidence.revision} · {evidence.revision_reason.replace(/_/g, " ")}
+            </dd>
+          </div>
+          <div>
+            <dt>Prompt</dt>
+            <dd>v{evidence.model.prompt_version}</dd>
+          </div>
+          <div>
+            <dt>Selection</dt>
+            <dd>v{evidence.model.selection_policy_version}</dd>
+          </div>
+          <div>
+            <dt>Validation</dt>
+            <dd>
+              v{evidence.model.validation_policy_version} · {evidence.validation.status}
+            </dd>
+          </div>
+          <div>
+            <dt>Ephemeris</dt>
+            <dd>{evidence.calculation.ephemeris_data_version}</dd>
+          </div>
+          <div>
+            <dt>Cycle policy</dt>
+            <dd>v{evidence.calculation.cycle_policy_version}</dd>
+          </div>
+          <div>
+            <dt>Daily sky policy</dt>
+            <dd>v{evidence.calculation.daily_sky_policy_version}</dd>
+          </div>
+          <div>
+            <dt>Time zone data</dt>
+            <dd>{evidence.calculation.tzdb_version}</dd>
+          </div>
+          <div>
+            <dt>Input identity</dt>
+            <dd>{evidence.generation_input_id}</dd>
+          </div>
+          <div>
+            <dt>Content hash</dt>
+            <dd>{evidence.content_hash}</dd>
+          </div>
+        </dl>
+      </section>
+    </>
+  );
+}
+
 /**
  * The "Why this?" surface.
  *
@@ -138,6 +355,7 @@ export function WhyThisDrawer({
 }: WhyThisDrawerProps) {
   const [state, setState] = useState<DrawerState>({ status: "idle" });
   const requested = useRef(false);
+  const layerId = useId();
 
   const load = async () => {
     if (requested.current) return;
@@ -172,13 +390,11 @@ export function WhyThisDrawer({
     }
   };
 
-  const ordered =
-    state.status === "ready"
-      ? [...state.evidence.paragraphs].sort(
-          (a, b) =>
-            paragraphOrder.indexOf(a.paragraph_id) - paragraphOrder.indexOf(b.paragraph_id),
-        )
-      : [];
+  const inProseOrder = <T extends { paragraph_id: string }>(paragraphs: T[]): T[] =>
+    [...paragraphs].sort(
+      (a, b) =>
+        paragraphOrder.indexOf(a.paragraph_id) - paragraphOrder.indexOf(b.paragraph_id),
+    );
 
   return (
     <details
@@ -225,39 +441,22 @@ export function WhyThisDrawer({
       </div>
 
       {state.status === "ready" ? (
-        <>
-          {ordered.map((paragraph) => (
-            <ParagraphPanel key={paragraph.paragraph_id} paragraph={paragraph} />
-          ))}
-
-          <dl className="evidence-grid" aria-label="Assembly record">
-            <div>
-              <dt>Assembly</dt>
-              <dd>{state.evidence.assembly_id}</dd>
-            </div>
-            <div>
-              <dt>Revision</dt>
-              <dd>
-                {state.evidence.revision}
-                {state.evidence.revision_reason
-                  ? ` · ${state.evidence.revision_reason.replace(/_/g, " ")}`
-                  : ""}
-              </dd>
-            </div>
-            {state.evidence.release_version ? (
-              <div>
-                <dt>Content release</dt>
-                <dd>{state.evidence.release_version}</dd>
-              </div>
-            ) : null}
-            {state.evidence.created_at ? (
-              <div>
-                <dt>Assembled</dt>
-                <dd>{formatInstant(state.evidence.created_at)}</dd>
-              </div>
-            ) : null}
-          </dl>
-        </>
+        isReadingEvidenceV5(state.evidence) ? (
+          <EvidenceBodyV5
+            evidence={state.evidence}
+            ordered={inProseOrder(state.evidence.paragraphs)}
+            headingIds={{
+              facts: `${layerId}-facts`,
+              context: `${layerId}-context`,
+              generation: `${layerId}-generation`,
+            }}
+          />
+        ) : (
+          <EvidenceBodyV3
+            evidence={state.evidence}
+            ordered={inProseOrder(state.evidence.paragraphs)}
+          />
+        )
       ) : null}
     </details>
   );

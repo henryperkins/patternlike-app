@@ -2,7 +2,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TodayView } from "./TodayView.js";
-import { formatLocalDate } from "../lib/reading-format.js";
+import { aiConsentCategoryLabel, formatLocalDate } from "../lib/reading-format.js";
 import {
   NOT_BUILT,
   capturedFor,
@@ -13,15 +13,22 @@ import {
 } from "../test/api-mock.js";
 import {
   READING_ID,
+  V5_READING_ID,
+  consentGranted,
+  consentNotGranted,
   errorBody,
   evidenceGraph,
+  evidenceGraphV5,
   fallbackEvidenceGraph,
   fallbackResponse,
   todayResponse,
+  todayResponseV5,
 } from "../test/reading-fixture.js";
 
 const TODAY = "/v1/readings/today";
 const EVIDENCE = `/v1/readings/${READING_ID}/evidence`;
+const EVIDENCE_V5 = `/v1/readings/${V5_READING_ID}/evidence`;
+const CONSENT = "/v1/consents/ai-synthesis";
 
 function renderToday(responses: Record<string, MockResponse>) {
   mockApiResponses(responses);
@@ -458,16 +465,58 @@ describe("TodayView", () => {
 
   it.each([
     {
+      // Automatic repair has already spent every command generation for this
+      // local day, so the same request cannot produce a different answer.
       label: "a terminal generation failure",
       response: {
         status: 424,
-        body: errorBody(
-          "reading_generation_failed",
-          "Today's reading could not be prepared",
-        ),
+        body: {
+          error: {
+            ...errorBody(
+              "reading_generation_failed",
+              "Today's reading could not be prepared",
+            ).error,
+            retryable: false,
+          },
+        },
       },
       message: "Today's reading could not be prepared",
       requestId: "req_reading_generation_failed",
+      retry: false,
+    },
+    {
+      label: "an exhausted provider budget",
+      response: {
+        status: 503,
+        body: {
+          error: {
+            ...errorBody(
+              "publisher_budget_exhausted",
+              "Daily reading capacity is temporarily exhausted",
+            ).error,
+            retryable: false,
+          },
+        },
+      },
+      message: "Daily reading capacity is temporarily exhausted",
+      requestId: "req_publisher_budget_exhausted",
+      retry: false,
+    },
+    {
+      label: "a retryable calculation outage",
+      response: {
+        status: 503,
+        body: {
+          error: {
+            ...errorBody("calc_unavailable", "The calculation service is unavailable")
+              .error,
+            retryable: true,
+          },
+        },
+      },
+      message: "The calculation service is unavailable",
+      requestId: "req_calc_unavailable",
+      retry: true,
     },
     {
       label: "an unavailable content release",
@@ -480,26 +529,31 @@ describe("TodayView", () => {
       },
       message: "The active content release is unavailable",
       requestId: "req_release_unreadable",
+      retry: true,
     },
     {
       label: "a network rejection",
       response: { status: 0, body: null, unreachable: true },
       message: "The Pattern/Like API could not be reached.",
       requestId: null,
+      retry: true,
     },
   ] satisfies Array<{
     label: string;
     response: MockResponse;
     message: string;
     requestId: string | null;
-  }>)("stops polling after $label", async ({ response, message, requestId }) => {
+    retry: boolean;
+  }>)("stops polling after $label", async ({ response, message, requestId, retry }) => {
     vi.useFakeTimers();
     try {
       const { unmount, container } = renderToday({ [TODAY]: response });
       await flushEffects();
 
       expect(screen.getByRole("status")).toHaveTextContent(message);
-      expect(screen.getAllByRole("button", { name: /Try again/i })).toHaveLength(1);
+      expect(screen.queryAllByRole("button", { name: /Try again/i })).toHaveLength(
+        retry ? 1 : 0,
+      );
       if (requestId) expect(container).toHaveTextContent(`Request ${requestId}`);
 
       await act(async () => {
@@ -741,4 +795,248 @@ describe("the Today surface", () => {
     expect(article).not.toBeNull();
     expect(within(article as HTMLElement).getAllByRole("heading")).toHaveLength(1);
   });
+
+  describe("a v5 reading", () => {
+    const v5 = (): Record<string, MockResponse> => ({
+      [TODAY]: ok(todayResponseV5),
+      [EVIDENCE_V5]: ok(evidenceGraphV5),
+    });
+
+    it("renders the headline as the lead's quiet kicker, not a second heading", async () => {
+      const { container } = renderToday(v5());
+      const lead = todayResponseV5.reading.paragraphs[0]!;
+      await screen.findByText(lead.text);
+
+      const headline = screen.getByText(todayResponseV5.reading.headline);
+      expect(headline).toHaveClass("kicker");
+      expect(headline.tagName).toBe("P");
+
+      // Still exactly one page title, and it is still the date.
+      const headings = screen.getAllByRole("heading", { level: 1 });
+      expect(headings).toHaveLength(1);
+      expect(headings[0]).toHaveTextContent(
+        formatLocalDate(todayResponseV5.reading.local_date),
+      );
+
+      // The headline introduces the lead, in the same block.
+      const block = container.querySelector(".reading-block--primary_theme");
+      expect(block).toContainElement(headline);
+      expect(block!.firstElementChild).toBe(headline);
+    });
+
+    it("shows the provider disclosure and no reviewed-fallback language", async () => {
+      renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
+
+      expect(
+        screen.getByText(todayResponseV5.reading.disclosure),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/not tailored to your chart/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Reviewed standing guidance/i)).not.toBeInTheDocument();
+    });
+
+    it("names a collective paragraph as everyone's, in the prose column and the drawer", async () => {
+      const user = userEvent.setup();
+      renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[1]!.text);
+
+      expect(screen.getByText("The sky everyone shares")).toBeInTheDocument();
+
+      await user.click(screen.getByText("Why this reading?"));
+      expect(await screen.findByText("Full moon")).toBeInTheDocument();
+      expect(screen.getByText("Everyone's sky")).toBeInTheDocument();
+      expect(screen.getByText("Your chart")).toBeInTheDocument();
+    });
+
+    it("keeps evidence unfetched until the drawer is opened, then caches it", async () => {
+      const user = userEvent.setup();
+      renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
+      expect(capturedFor(EVIDENCE_V5)).toHaveLength(0);
+
+      const summary = screen.getByText("Why this reading?");
+      await user.click(summary);
+      expect(await screen.findByText("Generation record")).toBeInTheDocument();
+      expect(capturedFor(EVIDENCE_V5)).toHaveLength(1);
+
+      await user.click(summary);
+      await user.click(summary);
+      expect(capturedFor(EVIDENCE_V5)).toHaveLength(1);
+    });
+
+    it("presents three provenance layers, ending in the exact generation record", async () => {
+      const user = userEvent.setup();
+      renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
+      await user.click(screen.getByText("Why this reading?"));
+
+      const layers = await screen.findAllByRole("heading", { level: 2 });
+      expect(layers.map((heading) => heading.textContent)).toEqual([
+        "Calculated facts",
+        "Personal context",
+        "Generation record",
+      ]);
+
+      // Layer three names the model exactly; the consent copy never does.
+      expect(screen.getByText(/gpt-5\.6-sol/)).toBeInTheDocument();
+      expect(screen.getByText(evidenceGraphV5.generation_input_id)).toBeInTheDocument();
+    });
+
+    it("shows context categories and their permitted lane, never a raw value", async () => {
+      const user = userEvent.setup();
+      renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
+      await user.click(screen.getByText("Why this reading?"));
+      await screen.findByText("Personal context");
+
+      // One row per category, carrying every lane it was permitted - not the
+      // same category repeated once per lane, which would read as three
+      // separate permissions.
+      const rows = [...document.querySelectorAll(".evidence-lanes > div")].map(
+        (row) => [
+          row.querySelector("dt")?.textContent,
+          row.querySelector("dd")?.textContent,
+        ],
+      );
+      expect(rows).toEqual([
+        ["Personal context you have enabled", "Tone · The reflection question"],
+      ]);
+      // The opaque handle is technical detail, not reader copy.
+      expect(document.body.textContent).not.toContain("ctx_1");
+    });
+
+    it("says plainly when a paragraph rests on context rather than on a fact", async () => {
+      const user = userEvent.setup();
+      renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
+      await user.click(screen.getByText("Why this reading?"));
+
+      expect(
+        await screen.findByText(/No calculated fact stands behind this paragraph/i),
+      ).toBeInTheDocument();
+    });
+
+    it("names the calculated chart, sky, and context while it prepares", async () => {
+      renderToday({
+        [TODAY]: {
+          status: 202,
+          body: { schema_version: "0.5.0", status: "preparing", local_date: "2026-08-11" },
+        },
+      });
+
+      const status = await screen.findByText(/being grounded/i);
+      expect(status).toHaveAttribute("role", "status");
+      expect(status).toHaveTextContent(/calculated chart/i);
+      expect(status).toHaveTextContent(/calculated sky/i);
+      expect(status).toHaveTextContent(/context you have enabled/i);
+      expect(status).not.toHaveTextContent(/reviewed content/i);
+    });
+  });
+
+  describe("the AI-synthesis consent gate", () => {
+    const gate = (
+      consent: MockResponse = ok(consentNotGranted),
+    ): Record<string, MockResponse> => ({
+      [TODAY]: {
+        status: 409,
+        body: errorBody(
+          "ai_synthesis_consent_required",
+          "Grant AI synthesis consent before a daily reading can be generated",
+        ),
+      },
+      [`GET ${CONSENT}`]: consent,
+      [`PUT ${CONSENT}`]: ok(consentGranted),
+    });
+
+    it("states the processor, purpose, categories, and every qualification", async () => {
+      const { container } = renderToday(gate());
+      await screen.findByRole("heading", { name: /Your reading needs your say-so/i });
+
+      expect(await screen.findByText("OpenAI")).toBeInTheDocument();
+      // The exact model is a generation-record detail, never consent copy: a
+      // version bump must not silently invalidate an agreement.
+      expect(document.body.textContent).not.toContain("gpt-5.6-sol");
+
+      expect(screen.getByText(/Writing your daily reading/i)).toBeInTheDocument();
+      expect(screen.getByText("v1.0.0")).toBeInTheDocument();
+
+      // Every category the server declared, in the server's order, and no
+      // eighth invented locally.
+      const listed = [...container.querySelectorAll(".ai-consent-categories li")].map(
+        (item) => item.textContent,
+      );
+      expect(listed).toEqual(
+        consentNotGranted.enabled_categories.map(aiConsentCategoryLabel),
+      );
+
+      expect(screen.getByText(/not consent to train a model/i)).toBeInTheDocument();
+      expect(screen.getByText(/can name people and places/i)).toBeInTheDocument();
+      expect(screen.getByText(/not zero retention/i)).toBeInTheDocument();
+      expect(screen.getByText(/withdraw this at any time/i)).toBeInTheDocument();
+    });
+
+    it("offers a keyboard-reachable link to the full privacy details", async () => {
+      const user = userEvent.setup();
+      renderToday(gate());
+      await screen.findByRole("heading", { name: /Your reading needs your say-so/i });
+
+      const link = await screen.findByRole("link", { name: /full privacy details/i });
+      expect(link).toHaveAttribute("href", "#privacy");
+      await user.tab();
+      // Reachable by keyboard rather than only by pointer.
+      expect(document.activeElement?.tagName).toBe("A");
+    });
+
+    it("grants under the displayed policy version and re-runs Today", async () => {
+      const user = userEvent.setup();
+      const responses = gate();
+      renderToday(responses);
+      const grant = await screen.findByRole("button", { name: /Agree and generate/i });
+
+      responses[TODAY] = ok(todayResponseV5);
+      responses[EVIDENCE_V5] = ok(evidenceGraphV5);
+      await user.click(grant);
+
+      const [request] = capturedFor(CONSENT).filter((call) => call.method === "PUT");
+      expect(request!.body).toEqual({ policy_version: consentNotGranted.policy_version });
+      expect(request!.headers.get("idempotency-key")).toMatch(/^web-ai-synthesis-/);
+
+      expect(
+        await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text),
+      ).toBeInTheDocument();
+    });
+
+    it("offers nothing to agree to when the terms cannot be read", async () => {
+      renderToday(
+        gate({ status: 503, body: errorBody("configuration_error", "Unavailable") }),
+      );
+      await screen.findByRole("heading", { name: /Your reading needs your say-so/i });
+
+      expect(
+        screen.queryByRole("button", { name: /Agree and generate/i }),
+      ).not.toBeInTheDocument();
+      expect(await screen.findByRole("status")).toHaveTextContent("Unavailable");
+    });
+
+    it("reports a refused grant without claiming it succeeded", async () => {
+      const user = userEvent.setup();
+      const responses = gate();
+      responses[`PUT ${CONSENT}`] = {
+        status: 409,
+        body: errorBody(
+          "consent_policy_version_stale",
+          "Re-read the current AI synthesis policy and grant again",
+        ),
+      };
+      renderToday(responses);
+
+      await user.click(await screen.findByRole("button", { name: /Agree and generate/i }));
+
+      expect(await screen.findByRole("status")).toHaveTextContent(
+        /Re-read the current AI synthesis policy/i,
+      );
+      expect(capturedFor(TODAY)).toHaveLength(1);
+    });
+  });
+
 });
