@@ -4,9 +4,7 @@ import {
   assembleReading,
   finalizeReading,
   renderAssemblyId,
-  type DailyReading,
   type ParagraphEvidence,
-  type ReadingEvidenceDraft,
 } from "@patternlike/reading-engine";
 import {
   canonicalJson,
@@ -30,6 +28,7 @@ import {
   buildAssemblyInput,
   type GenerateDailyReadingCommandV1,
 } from "./generation-command.js";
+import type { StoredReadingV3 } from "./stored-reading.js";
 
 /**
  * Execute exactly the frozen reservation.
@@ -42,7 +41,7 @@ import {
  */
 
 /**
- * What is stored inside `daily_readings.reading_enc`.
+ * What is stored inside `daily_readings.reading_enc` for a v3 reading.
  *
  * The prose plus every output-derived value capable of identifying the
  * deterministic result. M0 kept `content_hash`, the selected cycle ids, and the
@@ -50,16 +49,11 @@ import {
  * the day's facts: a digest of the day plus the two cycles that produced it is a
  * reconstruction path that survives DEK destruction. 0002 dropped those columns
  * and they live here instead.
+ *
+ * The declaration moved to `stored-reading.ts` when M5 made the stored envelope
+ * a union; this alias keeps the v3 execution path reading the way it always did.
  */
-export interface StoredReading {
-  reading: DailyReading;
-  assembly_id: string;
-  content_hash: string;
-  primary_cycle_id: string | null;
-  supporting_cycle_id: string | null;
-  validation: ReadingEvidenceDraft["validation"];
-  evidence_header: Omit<ReadingEvidenceDraft, "paragraphs">;
-}
+export type { StoredReadingV3 as StoredReading };
 
 export type ExecutionOutcome =
   | { ok: true; readingId: string; fallbackUsed: boolean }
@@ -362,7 +356,7 @@ export async function generateDailyReading(
   });
 
   const { paragraphs, ...evidenceHeader } = evidence;
-  const stored: StoredReading = {
+  const stored: StoredReadingV3 = {
     reading: outcome.reading,
     assembly_id: assemblyId,
     content_hash: await contentHash(canonicalJson(outcome.reading)),
@@ -402,7 +396,12 @@ export async function generateDailyReading(
     jobId,
     claimToken,
     commandGeneration: command.command_generation,
-    supersedesReadingId: command.supersedes_reading_id,
+    // V1 has one predecessor rule: an ordinary reissue leaves the live reading
+    // published until its successor commits. The invalidation path is a v5
+    // concept and cannot reach this executor.
+    predecessor: command.supersedes_reading_id
+      ? { kind: "supersede_published", readingId: command.supersedes_reading_id }
+      : { kind: "none" },
     reading: {
       ciphertext: bytes(sealedReading.ciphertext),
       keyVersion: sealedReading.keyVersion,

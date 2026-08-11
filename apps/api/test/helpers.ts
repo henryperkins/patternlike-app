@@ -25,6 +25,10 @@ const TABLES = [
   "reading_sources",
   "reading_feedback",
   "daily_readings",
+  // 0003. Not user-scoped, so it is not caught by any per-user cleanup: a
+  // leaked row makes the next suite's first provider call look like the
+  // hundredth.
+  "reading_provider_daily_usage",
   "cycle_passes",
   "cycle_instances",
   "timezone_changes",

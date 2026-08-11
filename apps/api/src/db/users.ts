@@ -280,6 +280,19 @@ export const ENCRYPTED_COLUMNS = [
     keyVersionColumn: "evidence_key_version",
     nonceColumn: "evidence_nonce",
   },
+  // M5. Registered BEFORE the context compiler becomes its first writer: a
+  // column written while it is still listed as unwritten is left under a
+  // destroyed key at the next rotation, and nothing reports that until a reader
+  // asks for a value that no longer decrypts. Rows with
+  // `value_encoding = 'structured'` carry a NULL here and the rotation walk
+  // skips them.
+  {
+    table: "context_signals",
+    idColumn: "id",
+    encColumn: "value_enc",
+    keyVersionColumn: "value_key_version",
+    nonceColumn: "value_nonce",
+  },
 ] as const;
 
 /**
@@ -292,7 +305,6 @@ export const ENCRYPTED_COLUMNS = [
  */
 export const UNWRITTEN_ENCRYPTED_COLUMNS = [
   { table: "chart_snapshots", encColumn: "snapshot_enc", keyVersionColumn: "snapshot_key_version" },
-  { table: "context_signals", encColumn: "value_enc", keyVersionColumn: "value_key_version" },
   { table: "reading_feedback", encColumn: "notes_enc", keyVersionColumn: "notes_key_version" },
 ] as const;
 

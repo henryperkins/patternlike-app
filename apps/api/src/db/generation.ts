@@ -698,13 +698,30 @@ export interface EvidenceRow {
   nonce: string;
 }
 
+/**
+ * What publication must do to the predecessor it replaces.
+ *
+ * The two non-empty cases are genuinely different rules, not two spellings of
+ * one. An ORDINARY reissue — a safety correction, a defect repair — leaves the
+ * predecessor `published` until the successor commits, so a failed successor
+ * leaves the reader with the reading they already had. A FACT repair follows an
+ * invalidation that already happened: the predecessor stopped being live the
+ * moment its inputs were found to be wrong, and completion must leave it
+ * `invalidated` rather than quietly marking it superseded as though it had been
+ * a valid edition.
+ */
+export type PredecessorTransition =
+  | { kind: "none" }
+  | { kind: "supersede_published"; readingId: string }
+  | { kind: "retain_invalidated"; readingId: string };
+
 export interface PublicationInput {
   identity: UserIdentity;
   readingId: string;
   jobId: string;
   claimToken: string;
   commandGeneration: number;
-  supersedesReadingId: string | null;
+  predecessor: PredecessorTransition;
   reading: { ciphertext: Uint8Array; keyVersion: number; nonce: string };
   evidence: EvidenceRow[];
 }
@@ -744,7 +761,8 @@ export async function completeReading(
     ).bind(readingId, identity.userId, input.commandGeneration, jobId, claimToken),
   ];
 
-  if (input.supersedesReadingId) {
+  const predecessor = input.predecessor;
+  if (predecessor.kind === "supersede_published") {
     statements.push(
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -753,11 +771,25 @@ export async function completeReading(
            SELECT 1 FROM daily_readings
            WHERE id = ? AND user_id = ? AND status = 'published'
          )`,
-      ).bind(input.supersedesReadingId, identity.userId),
+      ).bind(predecessor.readingId, identity.userId),
       env.DB.prepare(
         `UPDATE daily_readings SET status = 'superseded', updated_at = ?
          WHERE id = ? AND user_id = ? AND status = 'published'`,
-      ).bind(now, input.supersedesReadingId, identity.userId),
+      ).bind(now, predecessor.readingId, identity.userId),
+    );
+  } else if (predecessor.kind === "retain_invalidated") {
+    // Assert and change nothing. The predecessor was invalidated before this
+    // successor was reserved, and a successor that quietly re-published or
+    // superseded it would be claiming the invalid edition had been fine.
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'expected predecessor is not invalidated'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM daily_readings
+           WHERE id = ? AND user_id = ? AND status = 'invalidated'
+         )`,
+      ).bind(predecessor.readingId, identity.userId),
     );
   }
 
@@ -819,7 +851,7 @@ export async function completeReading(
     ).bind(readingId, jobId, readingId, input.evidence.length),
   );
 
-  if (input.supersedesReadingId) {
+  if (predecessor.kind === "supersede_published") {
     statements.push(
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -827,7 +859,17 @@ export async function completeReading(
          WHERE NOT EXISTS (
            SELECT 1 FROM daily_readings WHERE id = ? AND status = 'superseded'
          )`,
-      ).bind(input.supersedesReadingId),
+      ).bind(predecessor.readingId),
+    );
+  } else if (predecessor.kind === "retain_invalidated") {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'predecessor did not stay invalidated'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM daily_readings WHERE id = ? AND status = 'invalidated'
+         )`,
+      ).bind(predecessor.readingId),
     );
   }
 

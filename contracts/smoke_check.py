@@ -50,16 +50,25 @@ def split_statements(sql: str) -> list[str]:
     return statements
 
 
-def apply_migrations(con: sqlite3.Connection, upto: int | None = None) -> None:
+def apply_migrations(
+    con: sqlite3.Connection, upto: int | None = None, start: int = 1
+) -> None:
     """Apply each migration as ONE transaction, as D1's batch() does.
 
     That is what makes the abort assertions meaningful: a failure must roll the
     whole migration back rather than leave a half-converted schema.
+
+    `start` exists because the migrations are not individually idempotent past
+    0001: 0002 and 0003 both ALTER TABLE ... ADD COLUMN, which fails outright on
+    a second application. A test that has already reached 0002 therefore asks
+    for 0003 alone rather than replaying the directory.
     """
     con.execute("PRAGMA foreign_keys = ON")
     for path in migration_files():
         number = int(path.name.split("_")[0])
         if upto is not None and number > upto:
+            continue
+        if number < start:
             continue
         statements = split_statements(path.read_text(encoding="utf-8"))
         try:
@@ -114,19 +123,50 @@ def insert_reading(
     reason: str = "initial",
     supersedes: str | None = None,
     job: str | None = None,
+    mode: str = "deterministic",
+    release: str | None = "release-12",
+    reading_key: str | None = None,
+    invalidated_at: str | None = None,
 ) -> None:
-    enc = (b"\x00", 1, "nonce") if status == "published" else (None, None, None)
+    # An invalidated row was published before it was invalidated, so it keeps
+    # its ciphertext: 0003 requires the encrypted history to survive.
+    sealed = status in ("published", "invalidated")
+    enc = (b"\x00", 1, "nonce") if sealed else (None, None, None)
+    if reading_key is None:
+        reading_key = (
+            f"reading-v5:{uid}:{date}:r{revision}"
+            if mode == "constrained_model"
+            else f"user:{uid}:{date}:{release}:r{revision}"
+        )
     con.execute(
         "INSERT INTO daily_readings (id, user_id, local_date, release_version, reading_key, "
         "chart_fingerprint, contract_id, assembly_mode, status, revision, revision_reason, "
-        "supersedes_reading_id, command_generation, active_generation_job_id, "
+        "supersedes_reading_id, command_generation, active_generation_job_id, invalidated_at, "
         "reading_enc, reading_key_version, reading_nonce, created_at, updated_at) "
-        "VALUES (?, ?, ?, 'release-12', ?, 'sha256:f', 'c', 'deterministic', ?, ?, ?, ?, 1, ?, "
+        "VALUES (?, ?, ?, ?, ?, 'sha256:f', 'c', ?, ?, ?, ?, ?, 1, ?, ?, "
         "?, ?, ?, ?, ?)",
         (
-            rid, uid, date, f"user:{uid}:{date}:release-12:r{revision}",
-            status, revision, reason, supersedes, job, *enc, NOW, NOW,
+            rid, uid, date, release, reading_key, mode,
+            status, revision, reason, supersedes, job, invalidated_at, *enc, NOW, NOW,
         ),
+    )
+
+
+def insert_m3_reading(con: sqlite3.Connection, rid: str, uid: str, date: str) -> None:
+    """A published row in the 0002 shape, before 0003 adds `invalidated_at`.
+
+    Separate from `insert_reading` on purpose: the pre-0003 column list is what
+    a production row would actually look like when the migration refuses to
+    drop it, so writing it through the post-0003 helper would test nothing.
+    """
+    con.execute(
+        "INSERT INTO daily_readings (id, user_id, local_date, release_version, reading_key, "
+        "chart_fingerprint, contract_id, assembly_mode, status, revision, revision_reason, "
+        "command_generation, reading_enc, reading_key_version, reading_nonce, "
+        "created_at, updated_at) "
+        "VALUES (?, ?, ?, 'release-12', ?, 'sha256:f', 'c', 'deterministic', 'published', "
+        "1, 'initial', 1, X'00', 1, 'n', ?, ?)",
+        (rid, uid, date, f"user:{uid}:{date}:release-12:r1", NOW, NOW),
     )
 
 
@@ -151,10 +191,11 @@ def check_fresh_schema() -> None:
     expected = {
         "assertion_probe", "timezone_changes", "cycle_passes",
         "daily_readings", "reading_sources", "jobs",
+        "reading_provider_daily_usage",
     }
     missing = expected - tables
     if missing:
-        raise SystemExit(f"Missing tables after 0002: {sorted(missing)}")
+        raise SystemExit(f"Missing tables after 0003: {sorted(missing)}")
     print(f"D1 OK  fresh apply of {len(migration_files())} migration(s), {len(tables)} tables")
 
     indexes = {
@@ -167,6 +208,13 @@ def check_fresh_schema() -> None:
         "uq_jobs_id_user",
         "uq_cycle_instances_id_user",
         "uq_jobs_scope_key",
+        # 0003. Every bounded scheduler and repair query reads one of these; a
+        # missing partial index turns a capped sweep into a table scan.
+        "idx_users_next_due_at",
+        "idx_users_unseeded_due",
+        "idx_daily_readings_failed_generation",
+        "idx_daily_readings_invalidated_repair",
+        "idx_jobs_failed_result_class",
     ):
         if name not in indexes:
             raise SystemExit(f"Missing index {name}")
@@ -176,7 +224,18 @@ def check_fresh_schema() -> None:
     for name in ("timezone_source", "timezone_revision", "locale_source"):
         if name not in columns:
             raise SystemExit(f"users.{name} missing")
-    print("D1 OK  users carries timezone/locale provenance")
+    if "next_due_at" not in columns:
+        raise SystemExit("users.next_due_at missing")
+    print("D1 OK  users carries timezone/locale provenance and a scheduling cursor")
+
+    reading_columns = {r[1]: r for r in con.execute("PRAGMA table_info(daily_readings)")}
+    if "invalidated_at" not in reading_columns:
+        raise SystemExit("daily_readings.invalidated_at missing")
+    # notnull is column 3 of PRAGMA table_info. A v5 reading has no editorial
+    # release behind it, so NOT NULL would make the row unrepresentable.
+    if reading_columns["release_version"][3] != 0:
+        raise SystemExit("daily_readings.release_version is still NOT NULL")
+    print("D1 OK  daily_readings carries invalidation and a nullable release")
 
     # The M0 uniqueness key must be GONE: scoped by release_version, it allowed
     # two published readings for one user-day whenever a release activated
@@ -419,10 +478,217 @@ def check_assertion_primitive() -> None:
     )
 
 
+def check_0003_over_empty_m3() -> None:
+    """0003 upgrades a real M3 database whose reading tables happen to be empty.
+
+    That is the measured production state the rollout gate proves before the
+    migration is allowed to run: `daily_readings.release_version` is
+    `NOT NULL REFERENCES content_releases(version)` and production has no
+    content release, so it can hold no rows.
+    """
+    con = fresh(upto=2)
+    seed_user(con, USER_A, SUBJ_A)
+    seed_release(con)
+    seed_job(con, "job_keep", USER_A, "daily:2026-07-30:initial:g1")
+    con.commit()
+
+    apply_migrations(con, start=3)
+
+    kept = {r[0] for r in con.execute("SELECT id FROM jobs")}
+    if kept != {"job_keep"}:
+        raise SystemExit(f"0003 lost job rows: {kept}")
+    releases = con.execute("SELECT COUNT(*) FROM content_releases").fetchone()[0]
+    if releases != 1:
+        raise SystemExit("0003 discarded the legacy content release catalogue")
+    cursor = con.execute("SELECT next_due_at FROM users WHERE id = ?", (USER_A,)).fetchone()[0]
+    if cursor is not None:
+        raise SystemExit("an existing user backfilled to a scheduling cursor rather than null")
+    print("D1 OK  0003 over an empty M3 preserves jobs, releases, and seeds a null cursor")
+
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("foreign_key_check reported violations after 0003")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("quick_check failed after 0003")
+    print("D1 OK  0003 leaves foreign keys and integrity clean")
+
+
+def check_0003_refuses_dependent_rows() -> None:
+    """A dependent reading row stops 0003 BEFORE either table is dropped.
+
+    Those rows are AAD-bound ciphertext. Only an application layer holding the
+    per-user DEK can re-shape them, so the migration refuses rather than
+    discarding a reader's history.
+    """
+    for table, insert in (
+        (
+            "daily_readings",
+            lambda con: insert_m3_reading(con, "rdg_x", USER_A, "2026-07-30"),
+        ),
+        (
+            "reading_sources",
+            lambda con: (
+                insert_m3_reading(con, "rdg_y", USER_A, "2026-07-30"),
+                con.execute(
+                    "INSERT INTO reading_sources (id, reading_id, user_id, paragraph_id, "
+                    "paragraph_order, evidence_enc, evidence_key_version, evidence_nonce, "
+                    "created_at) VALUES ('rs_x', 'rdg_y', ?, 'p1', 1, X'00', 1, 'n', ?)",
+                    (USER_A, NOW),
+                ),
+            ),
+        ),
+        (
+            "reading_feedback",
+            lambda con: (
+                insert_m3_reading(con, "rdg_z", USER_A, "2026-07-30"),
+                con.execute(
+                    "INSERT INTO reading_feedback (id, reading_id, user_id, resonance, "
+                    "created_at) VALUES ('fb_x', 'rdg_z', ?, 'helpful', ?)",
+                    (USER_A, NOW),
+                ),
+            ),
+        ),
+    ):
+        con = fresh(upto=2)
+        seed_user(con, USER_A, SUBJ_A)
+        seed_release(con)
+        insert(con)
+        con.commit()
+
+        try:
+            apply_migrations(con, start=3)
+        except sqlite3.IntegrityError:
+            pass
+        else:
+            raise SystemExit(f"0003 destroyed an unconvertible {table} row")
+
+        columns = {r[1] for r in con.execute("PRAGMA table_info(daily_readings)")}
+        if "invalidated_at" in columns:
+            raise SystemExit("0003 left a partially applied schema after aborting")
+        if con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] != 1:
+            raise SystemExit(f"the unconvertible {table} row did not survive the abort")
+        print(f"D1 OK  0003 aborts before DROP when {table} holds a row")
+
+
+def check_v5_reading_rows() -> None:
+    con = fresh()
+    seed_user(con, USER_A, SUBJ_A)
+    seed_release(con)
+
+    insert_reading(
+        con, "rdg_v5", USER_A, "2026-07-30", "published",
+        mode="constrained_model", release=None,
+    )
+    print("D1 OK  a constrained_model reading with no editorial release is accepted")
+
+    expect_integrity_error(
+        lambda: insert_reading(
+            con, "rdg_bad1", USER_A, "2026-07-31", "pending",
+            mode="constrained_model", release="release-12",
+        ),
+        "a constrained_model reading cannot carry an editorial release",
+    )
+    expect_integrity_error(
+        lambda: insert_reading(
+            con, "rdg_bad2", USER_A, "2026-08-01", "pending",
+            mode="deterministic", release=None,
+        ),
+        "a deterministic reading still requires its editorial release",
+    )
+    expect_integrity_error(
+        lambda: insert_reading(
+            con, "rdg_bad3", USER_A, "2026-08-02", "pending",
+            mode="constrained_model", release=None,
+            reading_key=f"user:{USER_A}:2026-08-02:release-12:r1",
+        ),
+        "a v5 reading cannot borrow the legacy reading_key grammar",
+    )
+    expect_integrity_error(
+        lambda: insert_reading(
+            con, "rdg_bad4", USER_A, "2026-08-03", "pending",
+            reading_key=f"reading-v5:{USER_A}:2026-08-03:r1",
+        ),
+        "a legacy reading cannot borrow the v5 reading_key namespace",
+    )
+
+    expect_integrity_error(
+        lambda: insert_reading(
+            con, "rdg_bad5", USER_A, "2026-08-04", "invalidated",
+            mode="constrained_model", release=None,
+        ),
+        "an invalidated reading must record when it was invalidated",
+    )
+    expect_integrity_error(
+        lambda: insert_reading(
+            con, "rdg_bad6", USER_A, "2026-08-05", "published",
+            mode="constrained_model", release=None, invalidated_at=NOW,
+        ),
+        "a live reading cannot carry an invalidation timestamp",
+    )
+
+    # The whole point of the state: it stops being live immediately, and its
+    # successor may be reserved for the same user-day without violating the
+    # one-live-reading index.
+    con.execute(
+        "UPDATE daily_readings SET status = 'invalidated', invalidated_at = ? WHERE id = 'rdg_v5'",
+        (NOW,),
+    )
+    insert_reading(
+        con, "rdg_v5b", USER_A, "2026-07-30", "pending", revision=2,
+        reason="chart_recalculated", supersedes="rdg_v5",
+        mode="constrained_model", release=None,
+    )
+    live = con.execute(
+        "SELECT COUNT(*) FROM daily_readings WHERE user_id = ? AND local_date = '2026-07-30' "
+        "AND status = 'published'",
+        (USER_A,),
+    ).fetchone()[0]
+    if live != 0:
+        raise SystemExit("an invalidated reading is still selected as live")
+    still_sealed = con.execute(
+        "SELECT reading_enc IS NOT NULL FROM daily_readings WHERE id = 'rdg_v5'"
+    ).fetchone()[0]
+    if not still_sealed:
+        raise SystemExit("invalidation discarded the encrypted artifact")
+    print("D1 OK  invalidation hides a reading from Today and preserves its ciphertext")
+
+
+def check_provider_budget_table() -> None:
+    con = fresh()
+    con.execute(
+        "INSERT INTO reading_provider_daily_usage (utc_date, used_calls, created_at, updated_at) "
+        "VALUES ('2026-08-10', 0, ?, ?)",
+        (NOW, NOW),
+    )
+    con.execute(
+        "UPDATE reading_provider_daily_usage SET used_calls = used_calls + 1 "
+        "WHERE utc_date = '2026-08-10'"
+    )
+    used = con.execute(
+        "SELECT used_calls FROM reading_provider_daily_usage WHERE utc_date = '2026-08-10'"
+    ).fetchone()[0]
+    if used != 1:
+        raise SystemExit("the provider call counter did not increment")
+
+    columns = {r[1] for r in con.execute("PRAGMA table_info(reading_provider_daily_usage)")}
+    if "user_id" in columns:
+        raise SystemExit("the provider budget must not be keyed by user")
+    expect_integrity_error(
+        lambda: con.execute(
+            "UPDATE reading_provider_daily_usage SET used_calls = -1 WHERE utc_date = '2026-08-10'"
+        ),
+        "a negative provider call count is rejected",
+    )
+    print("D1 OK  the UTC-day provider budget counts up from zero and never below it")
+
+
 def main() -> int:
     check_fresh_schema()
     check_upgrade_over_populated_0001()
     check_refuses_to_destroy_rows()
+    check_0003_over_empty_m3()
+    check_0003_refuses_dependent_rows()
+    check_v5_reading_rows()
+    check_provider_budget_table()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

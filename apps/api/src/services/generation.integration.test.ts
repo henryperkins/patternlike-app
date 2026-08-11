@@ -24,6 +24,7 @@ import { decryptPayload } from "../db/users.js";
 import {
   MAX_COMMAND_GENERATION,
   claimJob,
+  completeReading,
   findUndispatched,
   loadInitialGenerationState,
 } from "../db/generation.js";
@@ -1249,6 +1250,46 @@ describe("claims", () => {
     const winner = await generateDailyReading(env, second!);
     expect(winner.ok).toBe(true);
     expect((await readings())[0]!.status).toBe("published");
+  });
+
+  it("a losing claim cannot overwrite the winner's published artifact", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    const loser = await claimJob(env, enqueued.jobId);
+    await rows(
+      `UPDATE jobs SET lease_expires_at = '2000-01-01T00:00:00Z' WHERE id = ?`,
+      enqueued.jobId,
+    );
+    const winner = await claimJob(env, enqueued.jobId);
+    expect(await generateDailyReading(env, winner!)).toMatchObject({ ok: true });
+
+    const published = await decryptReading(enqueued.readingId);
+
+    // OpenAI is nondeterministic, so two deliveries against one frozen command
+    // can legitimately produce different prose. The claim CAS is the only
+    // publication authority: the loser's candidate is discarded without any
+    // textual comparison, and nothing about the winner changes.
+    const outcome = await completeReading(env, {
+      identity: IDENTITY_A,
+      readingId: enqueued.readingId,
+      jobId: enqueued.jobId,
+      claimToken: loser!.claimToken,
+      commandGeneration: 1,
+      predecessor: { kind: "none" },
+      reading: { ciphertext: new Uint8Array([1, 2, 3]), keyVersion: 1, nonce: "loser" },
+      evidence: [],
+    });
+
+    expect(outcome).toMatchObject({ ok: false, reason: "stale_claim" });
+    expect(await decryptReading(enqueued.readingId)).toEqual(published);
+
+    const [row] = await rows<{ status: string; reading_nonce: string }>(
+      "SELECT status, reading_nonce FROM daily_readings WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(row!.status).toBe("published");
+    expect(row!.reading_nonce).not.toBe("loser");
   });
 });
 

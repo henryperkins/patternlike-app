@@ -6,6 +6,9 @@ import m0Common from "../../../../contracts/m0/common.schema.json";
 import m3Common from "../../../../contracts/m3/common.schema.json";
 import m3DailyReading from "../../../../contracts/m3/daily-reading.schema.json";
 import m3ReadingEvidence from "../../../../contracts/m3/reading-evidence.schema.json";
+import m5Common from "../../../../contracts/m5/common.schema.json";
+import m5DailyReading from "../../../../contracts/m5/daily-reading.schema.json";
+import m5ReadingEvidence from "../../../../contracts/m5/reading-evidence.schema.json";
 import worker from "../index.js";
 import {
   IDENTITY_A,
@@ -45,7 +48,15 @@ const ZONE = "America/Chicago";
  */
 const ajv = new Ajv2020({ strict: false });
 addFormats(ajv);
-for (const schema of [m0Common, m3Common, m3DailyReading, m3ReadingEvidence]) {
+for (const schema of [
+  m0Common,
+  m3Common,
+  m3DailyReading,
+  m3ReadingEvidence,
+  m5Common,
+  m5DailyReading,
+  m5ReadingEvidence,
+]) {
   ajv.addSchema(schema);
 }
 const validateTodayResponse = ajv.getSchema(
@@ -56,6 +67,12 @@ const validatePreparation = ajv.getSchema(
 )!;
 const validateEvidenceGraph = ajv.getSchema(
   `${m3ReadingEvidence.$id}#/$defs/readingEvidenceGraph`,
+)!;
+const validateTodayResponseV5 = ajv.getSchema(
+  `${m5DailyReading.$id}#/$defs/dailyReadingResponseV5`,
+)!;
+const validateEvidenceGraphV5 = ajv.getSchema(
+  `${m5ReadingEvidence.$id}#/$defs/readingEvidenceGraphV5`,
 )!;
 
 interface ErrorEnvelope {
@@ -513,9 +530,10 @@ describe("GET /v1/readings/today", () => {
 
     // A row this repo cannot otherwise author: sealed by a future engine. It
     // decrypts perfectly and still cannot be represented under 0.3.0.
+    const v3 = stored.stored as StoredReading;
     const drifted: StoredReading = {
-      ...stored.stored,
-      reading: { ...stored.stored.reading, schema_version: "0.4.0" as "0.3.0" },
+      ...v3,
+      reading: { ...v3.reading, schema_version: "0.4.0" as "0.3.0" },
     };
     const sealed = await encryptPayload(env, IDENTITY_A, drifted, {
       subject: IDENTITY_A.cryptoSubject,
@@ -756,6 +774,268 @@ describe("GET /v1/readings/:id/evidence", () => {
     );
 
     const { status, body } = await get(`/v1/readings/${readingId}/evidence`);
+    expect(status).toBe(500);
+    expect((body as ErrorEnvelope).error.code).toBe("internal_error");
+  });
+});
+
+/**
+ * The v5 storage envelope, before anything writes one.
+ *
+ * Task 10 is what publishes these; this suite seeds one directly, because the
+ * migration and the readers have to be right before the publisher exists. A
+ * stored artifact is written once and never rewritten, so "fix the reader
+ * later" is not an option: whatever the first row is sealed with is what every
+ * later reader has to understand.
+ */
+describe("v5 stored readings", () => {
+  beforeEach(seedBoth);
+
+  const HEX32 = "a".repeat(32);
+  const HEX64 = "b".repeat(64);
+
+  async function seedV5Reading(options: { status?: "published" | "invalidated" } = {}) {
+    const status = options.status ?? "published";
+    const localDate = today();
+    const readingId = "rdg_v5_fixture_0001";
+    const paragraphId = "par_v5_fixture_0001";
+    const sourceId = "rsr_v5_fixture_0001";
+
+    const reading = {
+      schema_version: "0.5.0" as const,
+      output_schema: "daily-reading-v5" as const,
+      reading_id: readingId,
+      local_date: localDate,
+      generated_at: "2026-08-09T23:30:00Z",
+      assembly_mode: "constrained_model" as const,
+      revision: 1,
+      locale: "en-US",
+      domain_preference: null,
+      headline: "A narrower commitment",
+      disclosure: "Generated with OpenAI from your calculated chart and enabled context.",
+      paragraphs: [
+        {
+          paragraph_id: paragraphId,
+          role: "primary_theme" as const,
+          order: 1,
+          text: "Saturn is square your Sun today, and the pressure asks for a smaller promise.",
+        },
+      ],
+    };
+
+    const stored = {
+      schema_version: "0.5.0" as const,
+      reading,
+      evidence_header: {
+        schema_version: "0.5.0" as const,
+        reading_id: readingId,
+        revision: 1,
+        revision_reason: "initial" as const,
+        generated_at: "2026-08-09T23:30:00Z",
+        generation_input_id: `gin_sha256_${HEX64}`,
+        input_manifest_hash: `sha256:${HEX64}`,
+        content_hash: `sha256:${HEX64}`,
+        provider_response_hash: `sha256:${HEX64}`,
+        calculation: {
+          chart_contract_id: "calc-contract-launch",
+          cycle_policy_version: "1.4.0",
+          daily_sky_policy_version: "1.0.0",
+          ephemeris_data_version: "swisseph-2.10.03",
+          container_digest: `sha256:${HEX64}`,
+          tzdb_version: "2025b",
+          local_day_resolution_policy_version: "1.0.0",
+        },
+        model: {
+          provider: "openai" as const,
+          model: "gpt-5.6-sol",
+          prompt_version: "1.0.0",
+          selection_policy_version: "1.0.0",
+          validation_policy_version: "1.0.0",
+          provider_request_id: "resp_fixture_0001",
+          input_tokens: 4210,
+          output_tokens: 512,
+        },
+        validation: {
+          status: "passed" as const,
+          policy_version: "1.0.0",
+          checks: [{ code: "grounding", passed: true as const }],
+        },
+      },
+      invalidation:
+        status === "invalidated"
+          ? {
+              reason: "chart_correction" as const,
+              actor_class: "user_change" as const,
+              invalidated_at: "2026-08-10T09:00:00Z",
+            }
+          : null,
+    };
+
+    const sealedReading = await encryptPayload(env, IDENTITY_A, stored, {
+      subject: IDENTITY_A.cryptoSubject,
+      field: "daily_readings.reading_enc",
+      recordId: readingId,
+    });
+    const sealedEvidence = await encryptPayload(
+      env,
+      IDENTITY_A,
+      {
+        paragraph_id: paragraphId,
+        role: "primary_theme",
+        order: 1,
+        fact_refs: [
+          {
+            fact_id: `cyc_${HEX32}`,
+            fact_class: "cycle_instance",
+            label: "Saturn square your Sun, building",
+            scope: "personalized",
+          },
+        ],
+        context_refs: [
+          { private_ref: "ctx_1", category: "enabled_personal_context", allowed_use: "tone" },
+        ],
+      },
+      {
+        subject: IDENTITY_A.cryptoSubject,
+        field: "reading_sources.evidence_enc",
+        recordId: sourceId,
+      },
+    );
+
+    await rows(
+      `INSERT INTO daily_readings
+         (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+          contract_id, assembly_mode, status, revision, revision_reason,
+          command_generation, invalidated_at, reading_enc, reading_key_version,
+          reading_nonce, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, ?, 'sha256:f', 'calc-contract-launch',
+               'constrained_model', ?, 1, 'initial', 1, ?, ?, ?, ?, ?, ?)`,
+      readingId,
+      USER_A,
+      localDate,
+      `reading-v5:${USER_A}:${localDate}:r1`,
+      status,
+      status === "invalidated" ? "2026-08-10T09:00:00Z" : null,
+      fromB64(sealedReading.ciphertext),
+      sealedReading.keyVersion,
+      sealedReading.nonce,
+      "2026-08-09T23:30:00Z",
+      "2026-08-10T00:00:00Z",
+    );
+    await rows(
+      `INSERT INTO reading_sources
+         (id, reading_id, user_id, paragraph_id, paragraph_order,
+          evidence_enc, evidence_key_version, evidence_nonce, created_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+      sourceId,
+      readingId,
+      USER_A,
+      paragraphId,
+      fromB64(sealedEvidence.ciphertext),
+      sealedEvidence.keyVersion,
+      sealedEvidence.nonce,
+      "2026-08-09T23:30:00Z",
+    );
+
+    return { readingId, localDate };
+  }
+
+  it("round-trips a v5 envelope through the same loader that reads a v3 one", async () => {
+    const { readingId, localDate } = await seedV5Reading();
+
+    const published = await loadPublishedReadingForDate(env, IDENTITY_A, localDate);
+    expect(published).not.toBeNull();
+    expect(published!.record.releaseVersion).toBeNull();
+    expect(published!.record.assemblyMode).toBe("constrained_model");
+    expect(published!.record.readingKey.startsWith("reading-v5:")).toBe(true);
+    expect(published!.stored.reading.reading_id).toBe(readingId);
+    expect("fallback_used" in published!.stored.reading).toBe(false);
+  });
+
+  it("serves the v5 artifact against its own frozen response contract", async () => {
+    await seedV5Reading();
+
+    const { status, body } = await get<Record<string, unknown>>("/v1/readings/today");
+    expect(status).toBe(200);
+    expect(body.schema_version).toBe("0.5.0");
+    expect(validateTodayResponseV5(body)).toBe(true);
+    expect(validateTodayResponseV5.errors ?? []).toEqual([]);
+    expect(JSON.stringify(body)).not.toContain("release_version");
+    expect(JSON.stringify(body)).not.toContain("fallback_used");
+  });
+
+  it("serves the v5 provenance graph with its model record", async () => {
+    const { readingId } = await seedV5Reading();
+
+    const { status, body } = await get<Record<string, unknown>>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(200);
+    expect(validateEvidenceGraphV5(body)).toBe(true);
+    expect(validateEvidenceGraphV5.errors ?? []).toEqual([]);
+    expect((body.model as Record<string, unknown>).provider).toBe("openai");
+    // Trusted-plane fields the v3 graph inherited from M0 and v5 never had.
+    expect(body).not.toHaveProperty("user_id");
+    expect(body).not.toHaveProperty("reading_key");
+  });
+
+  it("hides an invalidated reading from Today while keeping its ciphertext", async () => {
+    const { readingId, localDate } = await seedV5Reading({ status: "invalidated" });
+
+    expect(await loadPublishedReadingForDate(env, IDENTITY_A, localDate)).toBeNull();
+
+    const { status, body } = await get("/v1/readings/today");
+    expect(status).toBe(404);
+    expect((body as ErrorEnvelope).error.code).toBe("reading_not_generated");
+
+    const [row] = await rows<{ status: string; invalidated_at: string; sealed: number }>(
+      `SELECT status, invalidated_at, reading_enc IS NOT NULL AS sealed
+       FROM daily_readings WHERE id = ?`,
+      readingId,
+    );
+    expect(row!.status).toBe("invalidated");
+    expect(row!.invalidated_at).toBe("2026-08-10T09:00:00Z");
+    expect(row!.sealed).toBe(1);
+  });
+
+  it("still answers the evidence drawer for an invalidated reading", async () => {
+    // The reader may hold the id from a session that started before the
+    // invalidation. Hiding the provenance would leave them with prose they can
+    // no longer explain.
+    const { readingId } = await seedV5Reading({ status: "invalidated" });
+    const { status } = await get(`/v1/readings/${readingId}/evidence`);
+    expect(status).toBe(200);
+  });
+
+  it("refuses a v5 envelope whose evidence cannot name the model that wrote it", async () => {
+    const { readingId, localDate } = await seedV5Reading();
+    const published = await loadPublishedReadingForDate(env, IDENTITY_A, localDate);
+    if (!published) throw new Error("expected a published reading");
+
+    const header = (published.stored as { evidence_header: Record<string, unknown> })
+      .evidence_header;
+    const withoutModel: Record<string, unknown> = { ...header };
+    delete withoutModel.model;
+    const sealed = await encryptPayload(
+      env,
+      IDENTITY_A,
+      { ...published.stored, evidence_header: withoutModel },
+      {
+        subject: IDENTITY_A.cryptoSubject,
+        field: "daily_readings.reading_enc",
+        recordId: readingId,
+      },
+    );
+    await rows(
+      `UPDATE daily_readings SET reading_enc = ?, reading_key_version = ?, reading_nonce = ?
+       WHERE id = ?`,
+      fromB64(sealed.ciphertext),
+      sealed.keyVersion,
+      sealed.nonce,
+      readingId,
+    );
+
+    const { status, body } = await get("/v1/readings/today");
     expect(status).toBe(500);
     expect((body as ErrorEnvelope).error.code).toBe("internal_error");
   });
