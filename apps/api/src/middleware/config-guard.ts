@@ -3,9 +3,15 @@ import type { Env } from "../env.js";
 import type { AppVariables } from "./auth.js";
 import { DEV_ROOT_KEK, isDevEnvironment } from "../crypto.js";
 import { resolvePublisherConfiguration } from "../services/reading-publisher.js";
+import { safeLog } from "../services/safe-log.js";
 
 export interface ConfigFailure {
-  code: string;
+  code:
+    | "reading_rollout_invalid"
+    | "reading_publisher_misconfigured"
+    | "auth_stub_in_production"
+    | "root_kek_not_configured"
+    | "identity_not_configured";
   message: string;
 }
 
@@ -101,7 +107,7 @@ export async function configGuard(
     c.set("requestId", requestId);
     // The specific code goes to logs, not to the client: which secret is
     // missing is not something an unauthenticated caller needs to learn.
-    console.error("insecure_configuration", { code: failure.code });
+    safeLog({ event: "insecure_configuration", config_code: failure.code });
     return c.json(
       {
         error: {

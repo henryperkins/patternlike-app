@@ -27,6 +27,7 @@ export type EnsureTodayFailureReason =
   | "unauthorized"
   | "reading_generation_failed"
   | "rollout_disabled"
+  | "publisher_budget_exhausted"
   | "internal_error";
 
 export type EnsureTodayOutcome =
@@ -168,6 +169,13 @@ export async function ensureTodayReading(
         ok: false,
         reason: "reading_generation_failed",
         detail: "the failed reservation does not point at a terminal generation job",
+      };
+    }
+    if (failedJob.resultClass === "publisher_budget_exhausted") {
+      return {
+        ok: false,
+        reason: "publisher_budget_exhausted",
+        detail: "the UTC provider call budget is exhausted",
       };
     }
     const reading = await env.DB.prepare(

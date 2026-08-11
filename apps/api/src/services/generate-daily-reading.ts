@@ -28,8 +28,12 @@ import {
   buildAssemblyInput,
   type GenerateDailyReadingCommandV1,
 } from "./generation-command.js";
-import { isCommandV2 } from "./generation-command-v2.js";
-import type { V1FailureCode } from "./generation-failures.js";
+import {
+  isCommandV2,
+  type GenerateDailyReadingCommandV2,
+} from "./generation-command-v2.js";
+import { generateDailyReadingV5 } from "./generate-daily-reading-v5.js";
+import type { V1FailureCode, V5FailureCode } from "./generation-failures.js";
 import type { StoredReadingV3 } from "./stored-reading.js";
 
 /**
@@ -61,7 +65,9 @@ export type ExecutionOutcome =
   | { ok: true; readingId: string; fallbackUsed: boolean }
   /** Another claim already committed this reading. Ack and move on. */
   | { ok: false; reason: "duplicate"; detail: string }
-  | { ok: false; reason: V1FailureCode; detail: string };
+  | { ok: false; reason: V1FailureCode | V5FailureCode; detail: string }
+  /** Internal Queue disposition; never stored as a generation failure class. */
+  | { ok: false; reason: "insufficient_lease"; detail: "execution_window_exhausted" };
 
 export type ExecutionFailure = Exclude<V1FailureCode, "calc_unavailable" | "release_unreadable">;
 
@@ -215,11 +221,7 @@ export async function dispatchGeneration(
   claim: Claim,
 ): Promise<ExecutionOutcome> {
   if (isCommandV2(claim.command)) {
-    return {
-      ok: false,
-      reason: "policy_unsupported",
-      detail: "no registered implementation for command_version v2",
-    };
+    return generateDailyReadingV5(env, claim as Claim & { command: GenerateDailyReadingCommandV2 });
   }
   return generateDailyReading(env, claim as Claim & { command: GenerateDailyReadingCommandV1 });
 }

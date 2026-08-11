@@ -35,6 +35,7 @@ import {
   type GenerationReplacementReason,
   type V5ReplacementReason,
 } from "./generation-failures.js";
+import { safeLog } from "./safe-log.js";
 
 export type { GenerationMessage } from "../env.js";
 
@@ -79,10 +80,7 @@ export async function dispatch(
   try {
     await env.READING_QUEUE.send(message);
   } catch (err) {
-    console.error("generation_dispatch_failed", {
-      job_id: message.job_id,
-      message: err instanceof Error ? err.message : String(err),
-    });
+    safeLog({ event: "generation_dispatch_failed" });
     return false;
   }
   await markDispatched(env, message.job_id);

@@ -112,10 +112,10 @@ const REQUIRED_CANDIDATE_KEYS = [
   "uncertainty_note",
 ] as const;
 
-function readUsage(body: unknown, key: "input_tokens" | "output_tokens"): number {
+function readUsage(body: unknown, key: "input_tokens" | "output_tokens"): number | null {
   const usage = (body as { usage?: Record<string, unknown> })?.usage;
   const value = usage?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 export function createOpenAiReadingPublisher(
@@ -149,6 +149,7 @@ export function createOpenAiReadingPublisher(
           body: JSON.stringify(buildResponsesRequest(request, options.configuration)),
         });
       } catch (err) {
+        clearTimeout(deadline);
         // The distinction that matters to an operator: a deadline this Worker
         // set, or a network that did not carry the request.
         const aborted = controller.signal.aborted || (err as { name?: string })?.name === "AbortError";
@@ -156,11 +157,10 @@ export function createOpenAiReadingPublisher(
           "publisher_unavailable",
           aborted ? "request_timeout" : "network_error",
         );
-      } finally {
-        clearTimeout(deadline);
       }
 
       if (!response.ok) {
+        clearTimeout(deadline);
         const retryAfter = retryAfterSeconds(response);
         if (response.status === 401 || response.status === 403) {
           return failure("publisher_auth_failed", "authentication_failed");
@@ -184,8 +184,14 @@ export function createOpenAiReadingPublisher(
       let raw: string;
       try {
         raw = await response.text();
-      } catch {
-        return failure("publisher_unavailable", "network_error");
+      } catch (err) {
+        const aborted = controller.signal.aborted || (err as { name?: string })?.name === "AbortError";
+        return failure(
+          "publisher_unavailable",
+          aborted ? "request_timeout" : "network_error",
+        );
+      } finally {
+        clearTimeout(deadline);
       }
 
       // Hashed BEFORE anything is parsed out of it, and the bytes are not kept.
@@ -218,6 +224,17 @@ export function createOpenAiReadingPublisher(
       }
 
       const responseId = (body as { id?: unknown })?.id;
+      const inputTokens = readUsage(body, "input_tokens");
+      const outputTokens = readUsage(body, "output_tokens");
+      if (
+        typeof responseId !== "string" ||
+        responseId.length === 0 ||
+        responseId.length > 200 ||
+        inputTokens === null ||
+        outputTokens === null
+      ) {
+        return failure("publisher_output_invalid", "schema_mismatch");
+      }
       return {
         ok: true,
         // Returned exactly as sent. An adapter that repaired an echoed date
@@ -226,9 +243,9 @@ export function createOpenAiReadingPublisher(
         metadata: {
           provider: READING_PUBLISHER_PROVIDER,
           model: options.configuration.model,
-          provider_request_id: typeof responseId === "string" ? responseId : "",
-          input_tokens: readUsage(body, "input_tokens"),
-          output_tokens: readUsage(body, "output_tokens"),
+          provider_request_id: responseId,
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
           provider_response_hash,
         },
       };

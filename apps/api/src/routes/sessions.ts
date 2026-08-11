@@ -14,6 +14,7 @@ import {
   revokeSession,
   SESSION_TTL_SECONDS,
 } from "../db/sessions.js";
+import { safeLog } from "../services/safe-log.js";
 
 export const sessionRoutes = new Hono<{
   Bindings: Env;
@@ -58,8 +59,8 @@ sessionRoutes.post("/v1/sessions", async (c) => {
     verified = await verifyIdToken(c.env, body.id_token);
   } catch (err) {
     // The reason is a log-only detail; the caller gets one flat 401.
-    console.error("id_token_rejected", {
-      request_id: rid,
+    safeLog({
+      event: "id_token_rejected",
       reason: err instanceof TokenVerificationError ? err.reason : "unknown",
     });
     return c.json(

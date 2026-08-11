@@ -15,6 +15,7 @@ import {
   isGenerationReplacementReason,
   type GenerationReplacementReason,
 } from "../services/generation-failures.js";
+import { safeLog } from "../services/safe-log.js";
 
 /**
  * Operator and scheduler entry points for daily-reading generation.
@@ -70,17 +71,12 @@ const PRIVATE_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
 };
 
 function publicFailureDetail(
-  requestId: string | null,
   reason: string,
   detail: string,
 ): string {
   const message = PRIVATE_FAILURE_MESSAGES[reason];
   if (!message) return detail;
-  console.error("internal_generation_failed", {
-    request_id: requestId,
-    reason,
-    detail,
-  });
+  safeLog({ event: "internal_generation_failed" });
   return message;
 }
 
@@ -117,7 +113,7 @@ internalGenerationRoutes.post("/readings/generate", async (c) => {
       {
         error: {
           code: result.reason,
-          message: publicFailureDetail(requestId, result.reason, result.detail),
+          message: publicFailureDetail(result.reason, result.detail),
           request_id: requestId,
         },
       },
@@ -167,7 +163,7 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
       {
         error: {
           code: result.reason,
-          message: publicFailureDetail(requestId, result.reason, result.detail),
+          message: publicFailureDetail(result.reason, result.detail),
           request_id: requestId,
         },
       },
@@ -224,7 +220,7 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
       {
         error: {
           code: result.reason,
-          message: publicFailureDetail(requestId, result.reason, result.detail),
+          message: publicFailureDetail(result.reason, result.detail),
           request_id: requestId,
         },
       },

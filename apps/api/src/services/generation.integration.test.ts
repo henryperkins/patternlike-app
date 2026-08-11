@@ -35,6 +35,7 @@ import {
   enqueueDailyReading,
   enqueueReissue,
   replaceFailedCommand,
+  resolveV5TargetDate,
   type GenerationMessage,
 } from "./enqueue.js";
 import { OPENAI_READING_MODEL } from "./reading-publisher.js";
@@ -1261,6 +1262,31 @@ describe("frozen inputs", () => {
 describe("claims", () => {
   beforeEach(seedEverything);
 
+  it("dispatches a V2 claim through its executor without changing the V1 seam", async () => {
+    await grantAiSynthesis();
+    const targetLocalDate = resolveV5TargetDate("America/Chicago", new Date());
+    if (!targetLocalDate) throw new Error("target day did not resolve");
+    const enqueued = await enqueueConstrainedReading(enabledV5Env() as typeof env, USER_A, {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate,
+    });
+    if (!enqueued.ok) throw new Error(`V2 enqueue failed: ${enqueued.reason}`);
+
+    const claim = await claimJob(env, enqueued.jobId);
+    expect(claim?.command.command_version).toBe("v2");
+    expect(await dispatchGeneration(enabledV5Env() as typeof env, claim!)).toMatchObject({
+      ok: true,
+      readingId: enqueued.readingId,
+    });
+
+    const [reading] = await rows<{ status: string; assembly_mode: string }>(
+      "SELECT status, assembly_mode FROM daily_readings WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(reading).toEqual({ status: "published", assembly_mode: "constrained_model" });
+  });
+
   it("a stale claim cannot publish", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
     if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
@@ -1520,15 +1546,19 @@ describe("command replacement", () => {
     const stored = await env.ARTIFACTS!.get(key);
     expect(stored).not.toBeNull();
     await env.ARTIFACTS!.delete(key);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
       await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
-      expect(warn).toHaveBeenCalledWith("generation_retryable_failure", {
-        reason: "release_unreadable",
-      });
+      expect(error).toHaveBeenCalledWith(
+        "generation_retryable_failure",
+        expect.objectContaining({
+          trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+          failure_class: "release_unreadable",
+        }),
+      );
     } finally {
-      warn.mockRestore();
+      error.mockRestore();
       await env.ARTIFACTS!.put(key, await stored!.arrayBuffer(), {
         httpMetadata: stored!.httpMetadata,
         customMetadata: stored!.customMetadata,

@@ -3,6 +3,7 @@ import type { Env } from "../env.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
 import {
+  LEASE_RETRY_DELAY_SECONDS,
   MAX_COMMAND_GENERATION,
   type GenerationReplacementReason,
 } from "../services/generation-failures.js";
@@ -731,6 +732,88 @@ export async function releaseClaimForRetry(
   return result.meta.changes === 1;
 }
 
+export type RolloutPauseOutcome = "paused" | "already_paused" | "not_v2";
+
+/**
+ * Durably pause one opaque Queue nudge while the V5 kill switch is off.
+ *
+ * The decision uses only clear trusted-plane columns. No user key or encrypted
+ * command is loaded, and the guarded update leaves attempts untouched.
+ */
+export async function pauseQueuedV2ForRolloutOff(
+  env: Env,
+  jobId: string,
+  now = new Date(),
+): Promise<RolloutPauseOutcome> {
+  const availableAt = new Date(now.getTime() + LEASE_RETRY_DELAY_SECONDS * 1000).toISOString();
+  const paused = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, dispatched_at = NULL, result_class = 'rollout_paused'
+     WHERE id = ? AND job_type = ? AND status = 'queued'
+       AND result_class IS NOT 'rollout_paused'
+       AND EXISTS (
+         SELECT 1 FROM daily_readings r
+         WHERE r.active_generation_job_id = jobs.id
+           AND r.user_id = jobs.user_id AND r.status = 'pending'
+           AND r.assembly_mode = 'constrained_model'
+       )
+     RETURNING id`,
+  )
+    .bind(availableAt, jobId, JOB_TYPE)
+    .first<{ id: string }>();
+  if (paused) return "paused";
+
+  const existing = await env.DB.prepare(
+    `SELECT 1 AS present
+     FROM jobs j JOIN daily_readings r
+       ON r.active_generation_job_id = j.id AND r.user_id = j.user_id
+     WHERE j.id = ? AND j.job_type = ?
+       AND j.status = 'queued' AND j.result_class = 'rollout_paused'
+       AND r.status = 'pending' AND r.assembly_mode = 'constrained_model'`,
+  )
+    .bind(jobId, JOB_TYPE)
+    .first<{ present: number }>();
+  return existing ? "already_paused" : "not_v2";
+}
+
+/**
+ * Owner-scoped first-open resume for an already-reserved V5 day.
+ *
+ * Only a row explicitly marked by the rollout pause is advanced; an ordinary
+ * provider retry or dispatch failure retains its own schedule.
+ */
+export async function resumePausedV2ForFirstOpen(
+  env: Env,
+  userId: string,
+  localDate: string,
+  now = new Date(),
+): Promise<{ jobId: string; readingId: string } | null> {
+  const row = await env.DB.prepare(
+    `SELECT j.id AS job_id, r.id AS reading_id
+     FROM daily_readings r JOIN jobs j
+       ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+     WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'pending'
+       AND r.assembly_mode = 'constrained_model'
+       AND j.status = 'queued' AND j.result_class = 'rollout_paused'
+     LIMIT 1`,
+  )
+    .bind(userId, localDate)
+    .first<{ job_id: string; reading_id: string }>();
+  if (!row) return null;
+
+  const advanced = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, dispatched_at = NULL, result_class = NULL
+     WHERE id = ? AND user_id = ? AND status = 'queued'
+       AND result_class = 'rollout_paused'`,
+  )
+    .bind(now.toISOString(), row.job_id, userId)
+    .run();
+  return advanced.meta.changes === 1
+    ? { jobId: row.job_id, readingId: row.reading_id }
+    : null;
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -1043,7 +1126,9 @@ export async function failClaimedJob(
 /** Mark a job dispatched. Advisory: the outbox sweeper reads the absence of this. */
 export async function markDispatched(env: Env, jobId: string): Promise<void> {
   await env.DB.prepare(
-    `UPDATE jobs SET dispatched_at = ? WHERE id = ? AND dispatched_at IS NULL`,
+    `UPDATE jobs SET dispatched_at = ?
+     WHERE id = ? AND status = 'queued' AND dispatched_at IS NULL
+       AND result_class IS NOT 'rollout_paused'`,
   )
     .bind(new Date().toISOString(), jobId)
     .run();

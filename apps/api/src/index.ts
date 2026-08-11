@@ -14,6 +14,7 @@ import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
+import { safeLog } from "./services/safe-log.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -61,18 +62,12 @@ app.route("/", api);
 
 // Without this, Hono's default handler returns 500 as text/plain, so the
 // documented error envelope never appeared on any uncaught path.
-app.onError((err, c) => {
+app.onError((_err, c) => {
   const requestId =
     c.get("requestId") ?? c.req.header("x-request-id") ?? crypto.randomUUID();
-  // Log the detail; never return it. Upstream messages have carried the
-  // calculation service's absolute filesystem path.
-  console.error("unhandled_error", {
-    request_id: requestId,
-    path: c.req.path,
-    method: c.req.method,
-    message: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
-  });
+  // The safe boundary records an internal trace only. Error text, stacks, the
+  // raw route, and the caller's request id may all contain private material.
+  safeLog({ event: "unhandled_error" });
   return c.json(
     {
       error: {

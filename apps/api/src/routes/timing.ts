@@ -8,6 +8,7 @@ import {
   type CyclePhase,
 } from "@patternlike/reading-engine";
 import type { Env } from "../env.js";
+import { safeLog } from "../services/safe-log.js";
 import type { AppVariables } from "../middleware/auth.js";
 import {
   loadTimingSnapshot,
@@ -255,10 +256,7 @@ timingRoutes.get("/v1/timing", async (c) => {
   try {
     currentLocalDate = localDateIn(preferences.timezone, now);
   } catch (error) {
-    console.error("timing_local_day_unresolvable", {
-      request_id: requestId,
-      error_class: error instanceof Error ? error.name : "unknown",
-    });
+    safeLog({ event: "timing_local_day_unresolvable" });
     return c.json(
       {
         error: {
@@ -273,9 +271,9 @@ timingRoutes.get("/v1/timing", async (c) => {
 
   const snapshot = await loadTimingSnapshot(c.env, userId, asOf);
   if (snapshot.unreadableCycleIds.length > 0) {
-    console.error("timing_cycles_unreadable", {
-      request_id: requestId,
-      cycle_ids: snapshot.unreadableCycleIds,
+    safeLog({
+      event: "timing_cycles_unreadable",
+      unreadable_count: snapshot.unreadableCycleIds.length,
     });
   }
   return c.json(

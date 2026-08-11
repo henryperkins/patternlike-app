@@ -225,6 +225,63 @@ describe("OpenAI reading publisher", () => {
     }
   });
 
+  it("keeps the timeout active until the response body finishes", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal;
+      return {
+        ok: true,
+        status: 200,
+        text: () =>
+          new Promise<string>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              const aborted = new Error("body aborted");
+              aborted.name = "AbortError";
+              reject(aborted);
+            });
+            setTimeout(() => reject(new Error("body watchdog expired")), 150);
+          }),
+      } as Response;
+    }) as typeof fetch;
+    try {
+      const result = await publish(OPENAI_READING_MODEL, 40);
+      expect(result).toMatchObject({
+        ok: false,
+        code: "publisher_unavailable",
+        safe_detail_code: "request_timeout",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("rejects provider metadata that cannot satisfy the evidence contract", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await originalFetch(input, init);
+      const body = (await response.json()) as {
+        id: string;
+        usage: { input_tokens: number; output_tokens: number };
+      };
+      body.id = "";
+      body.usage.input_tokens = -1;
+      body.usage.output_tokens = 0.5;
+      return new Response(JSON.stringify(body), {
+        status: response.status,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      expect(await publish(OPENAI_READING_MODEL)).toMatchObject({
+        ok: false,
+        code: "publisher_output_invalid",
+        safe_detail_code: "schema_mismatch",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("reads a numeric retry-after and nothing else from a rate-limit response", async () => {
     const result = await publish(OPENAI_MOCK_RATE_LIMITED);
     expect(result.ok).toBe(false);

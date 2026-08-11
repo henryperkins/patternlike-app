@@ -9,6 +9,7 @@ import {
   type BirthProfileRequest,
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import { safeLog } from "../services/safe-log.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { invokeCalc } from "../services/calc-client.js";
@@ -336,12 +337,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
         400,
       );
     }
-    console.error("calc_failed", {
-      request_id: requestId,
-      job_id: jobId,
-      error_class: calcClass,
-      error_message: calc.error_message,
-    });
+    safeLog({ event: "calc_failed" });
     return c.json(
       errorBody("calc_failed", "Calculation service could not produce a chart"),
       502,

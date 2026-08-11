@@ -17,6 +17,10 @@ import {
 import type { DailyReading } from "@patternlike/reading-engine";
 import { isStoredReadingV5 } from "../services/stored-reading.js";
 import { ensureTodayReading } from "../services/ensure-today-reading.js";
+import { resumePausedV2ForFirstOpen } from "../db/generation.js";
+import { dispatch, resolveV5TargetDate } from "../services/enqueue.js";
+import { readReadingV5Rollout, rolloutAllows } from "../services/reading-rollout.js";
+import { safeLog } from "../services/safe-log.js";
 
 /**
  * The two read surfaces for a generated daily reading.
@@ -259,6 +263,30 @@ readingRoutes.put("/v1/readings/today", async (c) => {
     userId: c.get("userId"),
     cryptoSubject: c.get("cryptoSubject"),
   };
+
+  // A first-open request may advance only this authenticated owner's durable
+  // rollout pause. It never claims or decrypts here; dispatch remains an opaque
+  // nudge and the Queue consumer rechecks the rollout before execution.
+  const rollout = readReadingV5Rollout(c.env);
+  if (rollout && rolloutAllows(rollout, "first_open")) {
+    const preferences = await loadPreferences(c.env, identity.userId);
+    const localDate = preferences
+      ? resolveV5TargetDate(preferences.timezone, new Date())
+      : null;
+    if (localDate) {
+      const resumed = await resumePausedV2ForFirstOpen(
+        c.env,
+        identity.userId,
+        localDate,
+      );
+      if (resumed) {
+        await dispatch(c.env, {
+          job_id: resumed.jobId,
+          reading_id: resumed.readingId,
+        });
+      }
+    }
+  }
   const outcome = await ensureTodayReading(c.env, identity);
 
   if (outcome.ok) {
@@ -275,11 +303,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
     );
   }
 
-  console.error("ensure_today_failed", {
-    request_id: requestId,
-    reason: outcome.reason,
-    detail: outcome.detail,
-  });
+  safeLog({ event: "ensure_today_failed" });
 
   const errorBody = (code: string, message: string) => ({
     error: { code, message, request_id: requestId },
@@ -324,6 +348,14 @@ readingRoutes.put("/v1/readings/today", async (c) => {
         errorBody(
           "release_unreadable",
           "The active content release is unavailable",
+        ),
+        503,
+      );
+    case "publisher_budget_exhausted":
+      return c.json(
+        errorBody(
+          "publisher_budget_exhausted",
+          "Daily reading capacity is temporarily exhausted",
         ),
         503,
       );
@@ -389,10 +421,7 @@ readingRoutes.get("/v1/readings/today", async (c) => {
     // this to the 409 would tell the client to rewrite what it already wrote and
     // would hide the regression. Logged here rather than in onError because
     // LocalDayError interpolates the zone, which is location-adjacent.
-    console.error("local_day_unresolvable", {
-      request_id: requestId,
-      code: err instanceof Error ? err.name : "unknown",
-    });
+    safeLog({ event: "local_day_unresolvable" });
     return c.json(errorBody("internal_error", "Unexpected server error"), 500);
   }
 
