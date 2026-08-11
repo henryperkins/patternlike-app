@@ -126,6 +126,10 @@ interface StoredConsentMutation {
   operation: "grant" | "revoke";
   policyVersion: string;
   state: AiSynthesisConsentState;
+  cursorRefresh?: {
+    required: boolean;
+    mutationAt: string;
+  };
 }
 
 interface ConsentMutationJobRow {
@@ -133,6 +137,13 @@ interface ConsentMutationJobRow {
   payload_enc: ArrayBuffer | null;
   payload_key_version: number | null;
   payload_nonce: string | null;
+  result_class: string | null;
+}
+
+interface StoredConsentMutationRecord {
+  jobId: string;
+  resultClass: string | null;
+  mutation: StoredConsentMutation;
 }
 
 export type AiConsentMutationOutcome =
@@ -148,12 +159,21 @@ function bytesToBase64(bytes: ArrayBuffer): string {
 function isStoredConsentMutation(value: unknown): value is StoredConsentMutation {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Partial<StoredConsentMutation>;
+  const cursorRefresh = record.cursorRefresh;
+  const validCursorRefresh =
+    cursorRefresh === undefined ||
+    (!!cursorRefresh &&
+      typeof cursorRefresh === "object" &&
+      typeof cursorRefresh.required === "boolean" &&
+      typeof cursorRefresh.mutationAt === "string" &&
+      Number.isFinite(Date.parse(cursorRefresh.mutationAt)));
   return (
     (record.operation === "grant" || record.operation === "revoke") &&
     typeof record.policyVersion === "string" &&
     !!record.state &&
     (record.state.status === "granted" || record.state.status === "not_granted") &&
-    (record.state.grantedAt === null || typeof record.state.grantedAt === "string")
+    (record.state.grantedAt === null || typeof record.state.grantedAt === "string") &&
+    validCursorRefresh
   );
 }
 
@@ -162,9 +182,9 @@ async function loadStoredConsentMutation(
   identity: UserIdentity,
   jobType: string,
   idempotencyKey: string,
-): Promise<StoredConsentMutation | null> {
+): Promise<StoredConsentMutationRecord | null> {
   const row = await env.DB.prepare(
-    `SELECT id, payload_enc, payload_key_version, payload_nonce
+    `SELECT id, payload_enc, payload_key_version, payload_nonce, result_class
      FROM jobs
      WHERE job_type = ? AND user_id = ? AND idempotency_key = ?
        AND status = 'succeeded'`,
@@ -192,7 +212,11 @@ async function loadStoredConsentMutation(
   if (!isStoredConsentMutation(stored)) {
     throw new Error("AI consent idempotency record is invalid");
   }
-  return stored;
+  return {
+    jobId: row.id,
+    resultClass: row.result_class,
+    mutation: stored,
+  };
 }
 
 async function mutationInsert(
@@ -209,12 +233,15 @@ async function mutationInsert(
     field: "jobs.payload_enc",
     recordId: jobId,
   });
+  const resultClass = stored.cursorRefresh?.required
+    ? "consent_cursor_pending"
+    : "consent_no_cursor_change";
   return env.DB.prepare(
     `INSERT INTO jobs
        (id, job_type, user_id, idempotency_key, status, payload_enc,
         payload_key_version, payload_nonce, result_class, attempts,
         finished_at, created_at)
-     VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, 'consent_saved', 1, ?, ?)`,
+     VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, ?, 1, ?, ?)`,
   ).bind(
     jobId,
     jobType,
@@ -223,9 +250,32 @@ async function mutationInsert(
     Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
     sealed.keyVersion,
     sealed.nonce,
+    resultClass,
     now,
     now,
   );
+}
+
+async function finishStoredCursorRefresh(
+  env: Env,
+  identity: UserIdentity,
+  record: StoredConsentMutationRecord,
+): Promise<void> {
+  const refresh = record.mutation.cursorRefresh;
+  if (!refresh?.required || record.resultClass !== "consent_cursor_pending") return;
+
+  await refreshReadingCursorAfterAiConsentChange(
+    env,
+    identity.userId,
+    new Date(refresh.mutationAt),
+  );
+  await env.DB.prepare(
+    `UPDATE jobs SET result_class = 'consent_cursor_refreshed'
+     WHERE id = ? AND user_id = ? AND status = 'succeeded'
+       AND result_class = 'consent_cursor_pending'`,
+  )
+    .bind(record.jobId, identity.userId)
+    .run();
 }
 
 function latestConsentAssertion(
@@ -275,26 +325,41 @@ async function writeAiConsentMutation(
   const jobType = input.operation === "grant" ? GRANT_JOB_TYPE : REVOKE_JOB_TYPE;
   const replay = await loadStoredConsentMutation(env, identity, jobType, input.idempotencyKey);
   if (replay) {
-    return replay.operation === input.operation && replay.policyVersion === input.policyVersion
-      ? { ok: true, state: replay.state, changed: false }
-      : { ok: false, reason: "idempotency_conflict" };
+    if (
+      replay.mutation.operation !== input.operation ||
+      replay.mutation.policyVersion !== input.policyVersion
+    ) {
+      return { ok: false, reason: "idempotency_conflict" };
+    }
+    await finishStoredCursorRefresh(env, identity, replay);
+    return { ok: true, state: replay.mutation.state, changed: false };
   }
 
   const latest = await loadLatestAiConsent(env, identity.userId);
-  const current = activeGrant(latest, input.now);
   const now = input.now.toISOString();
-  const changed = input.operation === "grant" ? current === null : current !== null;
+  const latestIsLiveGrant =
+    latest?.status === "granted" &&
+    !!latest.granted_at &&
+    (latest.expires_at === null || latest.expires_at > now);
+  const changed =
+    input.operation === "grant"
+      ? !latestIsLiveGrant || latest.policy_version !== input.policyVersion
+      : latest?.status === "granted";
   const nextConsentId = changed ? newId("cns") : null;
   const state: AiSynthesisConsentState =
     input.operation === "grant"
-      ? current
-        ? { status: "granted", grantedAt: current.grantedAt }
-        : { status: "granted", grantedAt: now }
+      ? changed
+        ? { status: "granted", grantedAt: now }
+        : { status: "granted", grantedAt: latest!.granted_at }
       : { status: "not_granted", grantedAt: null };
   const stored: StoredConsentMutation = {
     operation: input.operation,
     policyVersion: input.policyVersion,
     state,
+    cursorRefresh: {
+      required: changed,
+      mutationAt: now,
+    },
   };
   const statements: D1PreparedStatement[] = [
     latestConsentAssertion(env, identity.userId, latest),
@@ -354,15 +419,34 @@ async function writeAiConsentMutation(
   } catch {
     const raced = await loadStoredConsentMutation(env, identity, jobType, input.idempotencyKey);
     if (raced) {
-      return raced.operation === input.operation && raced.policyVersion === input.policyVersion
-        ? { ok: true, state: raced.state, changed: false }
-        : { ok: false, reason: "idempotency_conflict" };
+      if (
+        raced.mutation.operation !== input.operation ||
+        raced.mutation.policyVersion !== input.policyVersion
+      ) {
+        return { ok: false, reason: "idempotency_conflict" };
+      }
+      await finishStoredCursorRefresh(env, identity, raced);
+      return { ok: true, state: raced.mutation.state, changed: false };
     }
     return { ok: false, reason: "conflict" };
   }
 
   if (changed) {
     await refreshReadingCursorAfterAiConsentChange(env, identity.userId, input.now);
+    const inserted = await loadStoredConsentMutation(
+      env,
+      identity,
+      jobType,
+      input.idempotencyKey,
+    );
+    if (!inserted) throw new Error("AI consent idempotency record disappeared");
+    await env.DB.prepare(
+      `UPDATE jobs SET result_class = 'consent_cursor_refreshed'
+       WHERE id = ? AND user_id = ? AND status = 'succeeded'
+         AND result_class = 'consent_cursor_pending'`,
+    )
+      .bind(inserted.jobId, identity.userId)
+      .run();
   }
   return { ok: true, state, changed };
 }

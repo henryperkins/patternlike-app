@@ -21,6 +21,10 @@ import { resumePausedV2ForFirstOpen } from "../db/generation.js";
 import { dispatch, resolveV5TargetDate } from "../services/enqueue.js";
 import { readReadingV5Rollout, rolloutAllows } from "../services/reading-rollout.js";
 import { safeLog } from "../services/safe-log.js";
+import {
+  assertM5EvidenceResponse,
+  assertM5TodayResponse,
+} from "../services/m5-product-contract.js";
 
 /**
  * The two read surfaces for a generated daily reading.
@@ -102,11 +106,13 @@ function projectTodayResponse(published: PublishedReading) {
   // not spend a COUNT(*) per request to rediscover it.
   const evidence_url = evidenceUrl(published.record);
   if (isStoredReadingV5(published.stored)) {
-    return {
+    const response = {
       schema_version: M5_SCHEMA_VERSION,
       reading: projectReadingV5(published.stored.reading),
       evidence_url,
     };
+    assertM5TodayResponse(response);
+    return response;
   }
   return {
     schema_version: M3_SCHEMA_VERSION,
@@ -252,9 +258,12 @@ function projectEvidenceV3(evidence: Extract<ReadingEvidence, { schemaVersion: "
 }
 
 function projectEvidence(evidence: ReadingEvidence) {
-  return evidence.schemaVersion === "0.5.0"
-    ? projectEvidenceV5(evidence)
-    : projectEvidenceV3(evidence);
+  if (evidence.schemaVersion === "0.5.0") {
+    const response = projectEvidenceV5(evidence);
+    assertM5EvidenceResponse(response);
+    return response;
+  }
+  return projectEvidenceV3(evidence);
 }
 
 readingRoutes.put("/v1/readings/today", async (c) => {

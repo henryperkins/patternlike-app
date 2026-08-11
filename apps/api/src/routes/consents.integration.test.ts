@@ -7,10 +7,12 @@ import {
 import {
   AI_CONSENT_DATA_CATEGORIES,
 } from "@patternlike/shared";
+import m5ReadingGenerationRequest from "../../../../contracts/m5/reading-generation-request.schema.json";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker, { app } from "../index.js";
 import {
   AI_SYNTHESIS_POLICY_VERSION,
+  grantAiSynthesisConsent,
 } from "../db/consents.js";
 import type { GenerationMessage } from "../env.js";
 import { OPENAI_READING_MODEL } from "../services/reading-publisher.js";
@@ -68,6 +70,46 @@ function publisherEnv(
     OPENAI_API_KEY: "sk-test-key",
     ...overrides,
   };
+}
+
+function failNextCursorWrite(database: D1Database): D1Database {
+  let pending = true;
+
+  function wrapStatement(statement: D1PreparedStatement): D1PreparedStatement {
+    return new Proxy(statement, {
+      get(target, property) {
+        if (property === "bind") {
+          return (...values: unknown[]) => wrapStatement(target.bind(...values));
+        }
+        if (property === "run") {
+          return async () => {
+            if (pending) {
+              pending = false;
+              throw new Error("injected cursor write failure");
+            }
+            return target.run();
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "prepare") {
+        return (query: string) => {
+          const statement = target.prepare(query);
+          return query.includes("UPDATE users SET next_due_at = ?")
+            ? wrapStatement(statement)
+            : statement;
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
 }
 
 async function requestConsent(
@@ -151,21 +193,59 @@ describe("AI-synthesis consent routes", () => {
       expect(serialized).not.toContain(forbidden);
     }
 
-    // Every personal provider-packet section is disclosed by one of the seven
-    // ordered categories. Source-specific M4 controls remain absent.
-    const packetSections = {
+    // This inventory is checked against the actual frozen provider-request
+    // properties. Adding a request section without classifying it here fails;
+    // fact classes are likewise checked against the schema enum rather than a
+    // second imagined packet shape.
+    const operationalSections = [
+      "schema_version",
+      "prompt_version",
+      "selection_policy_version",
+      "output_schema",
+      "local_date",
+      "locale",
+      "composition",
+    ] as const;
+    const disclosedSections = {
       birth_time_accuracy: "birth_accuracy_and_uncertainty",
       suppressed_features: "birth_accuracy_and_uncertainty",
-      natal_facts: "calculated_natal_facts",
-      cycles: "active_calculated_cycles",
-      daily_sky: "calculated_daily_sky",
-      context: "enabled_personal_context",
+      domain_preference: "enabled_personal_context",
+      facts: null,
+      context: null,
       prior_readings: "prior_reading_excerpts",
-      feedback: "reading_feedback",
     } as const;
-    expect(new Set(Object.values(packetSections))).toEqual(
-      new Set(AI_CONSENT_DATA_CATEGORIES),
+    const requestDefinition = m5ReadingGenerationRequest.$defs.readingGenerationRequest;
+    expect(
+      [...operationalSections, ...Object.keys(disclosedSections)].sort(),
+    ).toEqual(Object.keys(requestDefinition.properties).sort());
+
+    const factCategoryByClass = {
+      cycle_instance: "active_calculated_cycles",
+      transit_natal_contact: "calculated_daily_sky",
+      house_placement: "calculated_daily_sky",
+      anchor_position: "calculated_daily_sky",
+      lunar_phase: "calculated_daily_sky",
+      sign_ingress: "calculated_daily_sky",
+      collective_exact_aspect: "calculated_daily_sky",
+      natal_position: "calculated_natal_facts",
+      natal_aspect: "calculated_natal_facts",
+    } as const;
+    expect(Object.keys(factCategoryByClass).sort()).toEqual(
+      [...m5ReadingGenerationRequest.$defs.requestFact.properties.fact_class.enum].sort(),
     );
+    const disclosedCategories = new Set(AI_CONSENT_DATA_CATEGORIES);
+    for (const category of Object.values(factCategoryByClass)) {
+      expect(disclosedCategories.has(category)).toBe(true);
+    }
+    for (const category of Object.values(disclosedSections)) {
+      if (category !== null) expect(disclosedCategories.has(category)).toBe(true);
+    }
+    // Each actual context item carries exactly one category on the wire. These
+    // are the only two compiler lanes eligible to populate that section.
+    expect(m5ReadingGenerationRequest.$defs.requestContext.required).toContain("category");
+    expect(["enabled_personal_context", "reading_feedback"].every(
+      (category) => disclosedCategories.has(category as (typeof AI_CONSENT_DATA_CATEGORIES)[number]),
+    )).toBe(true);
     expect(current.body).not.toHaveProperty("context_sources");
 
     const m4Stub = await app.request(
@@ -306,6 +386,158 @@ describe("AI-synthesis consent routes", () => {
     ).toEqual([
       { kind: "model_training", status: "denied" },
       { kind: "research", status: "granted" },
+    ]);
+  });
+
+  it("repairs the consent-owned cursor when the durable mutation outlives the first response", async () => {
+    await rows("UPDATE users SET next_due_at = NULL WHERE id = ?", USER_A);
+    const key = "web-ai-synthesis-cursor-crash";
+    const failed = await requestConsent("PUT", {
+      key,
+      requestEnv: {
+        ...env,
+        READING_V5_ROLLOUT: "off",
+        DB: failNextCursorWrite(env.DB),
+      },
+    });
+    expect(failed).toMatchObject({
+      status: 500,
+      body: { error: { code: "internal_error" } },
+    });
+    expect(
+      await rows(
+        `SELECT c.status, c.granted_at, u.next_due_at
+         FROM consents c JOIN users u ON u.id = c.user_id
+         WHERE c.user_id = ? AND c.kind = 'ai_synthesis'`,
+        USER_A,
+      ),
+    ).toEqual([
+      {
+        status: "granted",
+        granted_at: expect.any(String),
+        next_due_at: null,
+      },
+    ]);
+
+    const repaired = await requestConsent("PUT", { key });
+    expect(repaired).toMatchObject({
+      status: 200,
+      body: { status: "granted", granted_at: expect.any(String) },
+    });
+    const [durable] = await rows<{ granted_at: string }>(
+      "SELECT granted_at FROM consents WHERE user_id = ? AND kind = 'ai_synthesis'",
+      USER_A,
+    );
+    expect((repaired.body as ConsentBody).granted_at).toBe(durable!.granted_at);
+    expect(
+      await rows(
+        `SELECT
+           (SELECT COUNT(*) FROM consents WHERE user_id = ? AND kind = 'ai_synthesis') AS consent_count,
+           (SELECT COUNT(*) FROM jobs WHERE user_id = ? AND idempotency_key = ?) AS job_count,
+           (SELECT next_due_at IS NOT NULL FROM users WHERE id = ?) AS scheduled`,
+        USER_A,
+        USER_A,
+        key,
+        USER_A,
+      ),
+    ).toEqual([{ consent_count: 1, job_count: 1, scheduled: 1 }]);
+
+    const repairedDueAt = (
+      await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", USER_A)
+    )[0]!.next_due_at;
+    await rows("UPDATE users SET next_due_at = ? WHERE id = ?", "2099-01-01T00:00:00.000Z", USER_A);
+    expect(await requestConsent("PUT", { key })).toEqual(repaired);
+    expect(
+      await rows<{ next_due_at: string }>("SELECT next_due_at FROM users WHERE id = ?", USER_A),
+    ).toEqual([{ next_due_at: "2099-01-01T00:00:00.000Z" }]);
+    expect(repairedDueAt).not.toBe("2099-01-01T00:00:00.000Z");
+  });
+
+  it.each([
+    {
+      name: "expired",
+      policyVersion: AI_SYNTHESIS_POLICY_VERSION,
+      expiresAt: "2026-01-01T00:00:00.000Z",
+    },
+    { name: "old-policy", policyVersion: "0.9.0", expiresAt: null },
+  ])("appends revocation for a latest $name grant", async ({ policyVersion, expiresAt }) => {
+    const grantedAt = "2025-12-01T00:00:00.000Z";
+    await rows(
+      `INSERT INTO consents
+         (id, user_id, kind, status, policy_version, granted_at, expires_at,
+          version, created_at, updated_at)
+       VALUES ('cns_historical_grant', ?, 'ai_synthesis', 'granted', ?, ?, ?, 1, ?, ?)`,
+      USER_A,
+      policyVersion,
+      grantedAt,
+      expiresAt,
+      grantedAt,
+      grantedAt,
+    );
+
+    expect(await requestConsent("DELETE", { key: `web-ai-revoke-${policyVersion}` })).toMatchObject({
+      status: 200,
+      body: { status: "not_granted" },
+    });
+    expect(
+      await rows(
+        `SELECT status, version, supersedes_consent_id
+         FROM consents WHERE user_id = ? AND kind = 'ai_synthesis' ORDER BY version`,
+        USER_A,
+      ),
+    ).toEqual([
+      { status: "granted", version: 1, supersedes_consent_id: null },
+      { status: "revoked", version: 2, supersedes_consent_id: "cns_historical_grant" },
+    ]);
+  });
+
+  it("records a fresh grant when the displayed policy changes while the prior grant is active", async () => {
+    const firstAt = "2026-08-10T10:00:00.000Z";
+    await rows(
+      `INSERT INTO consents
+         (id, user_id, kind, status, policy_version, granted_at,
+          version, created_at, updated_at)
+       VALUES ('cns_prior_displayed_policy', ?, 'ai_synthesis', 'granted', ?, ?, 1, ?, ?)`,
+      USER_A,
+      AI_SYNTHESIS_POLICY_VERSION,
+      firstAt,
+      firstAt,
+      firstAt,
+    );
+
+    const nextDisplayedPolicy = "1.1.0";
+    const nextAt = new Date("2026-08-11T10:00:00.000Z");
+    const result = await grantAiSynthesisConsent(
+      env,
+      IDENTITY_A,
+      nextDisplayedPolicy,
+      "web-ai-next-displayed-policy",
+      nextAt,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      changed: true,
+      state: { status: "granted", grantedAt: nextAt.toISOString() },
+    });
+    expect(
+      await rows(
+        `SELECT policy_version, granted_at, version, supersedes_consent_id
+         FROM consents WHERE user_id = ? AND kind = 'ai_synthesis' ORDER BY version`,
+        USER_A,
+      ),
+    ).toEqual([
+      {
+        policy_version: AI_SYNTHESIS_POLICY_VERSION,
+        granted_at: firstAt,
+        version: 1,
+        supersedes_consent_id: null,
+      },
+      {
+        policy_version: nextDisplayedPolicy,
+        granted_at: nextAt.toISOString(),
+        version: 2,
+        supersedes_consent_id: "cns_prior_displayed_policy",
+      },
     ]);
   });
 

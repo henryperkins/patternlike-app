@@ -1185,12 +1185,24 @@ describe("v5 stored readings", () => {
   const HEX32 = "a".repeat(32);
   const HEX64 = "b".repeat(64);
 
-  async function seedV5Reading(options: { status?: "published" | "invalidated" } = {}) {
+  async function seedV5Reading(options: {
+    status?: "published" | "invalidated";
+    headline?: string;
+    factLabel?: string;
+    paragraphRole?: string;
+    duplicateFactRef?: boolean;
+    emptyFactRefs?: boolean;
+    contextOnlyParagraph?: boolean;
+    contextCategory?: string;
+    allowedUse?: string;
+  } = {}) {
     const status = options.status ?? "published";
     const localDate = today();
     const readingId = "rdg_v5_fixture_0001";
     const paragraphId = "par_v5_fixture_0001";
     const sourceId = "rsr_v5_fixture_0001";
+    const contextOnlyParagraphId = "par_v5_fixture_0002";
+    const contextOnlySourceId = "rsr_v5_fixture_0002";
     const [activeChart] = await rows<{ fingerprint: string }>(
       "SELECT fingerprint FROM chart_snapshots WHERE user_id = ? AND status = 'active'",
       USER_A,
@@ -1207,15 +1219,30 @@ describe("v5 stored readings", () => {
       revision: 1,
       locale: "en-US",
       domain_preference: null,
-      headline: "A narrower commitment",
+      headline: options.headline ?? "A narrower commitment",
       disclosure: "Generated with OpenAI from your calculated chart and enabled context.",
       paragraphs: [
         {
           paragraph_id: paragraphId,
-          role: "primary_theme" as const,
+          role: options.paragraphRole ?? "primary_theme",
           order: 1,
           text: "Saturn is square your Sun today, and the pressure asks for a smaller promise.",
         },
+        // A supporting paragraph that names no body, sign, aspect, phase,
+        // house, or degree and cites no fact. validateReadingCandidate accepts
+        // exactly this: it demands grounding of the lead and of any unit that
+        // makes an astrological claim, and lets personal context shape the
+        // rest. The reader has to serve what its own writer may publish.
+        ...(options.contextOnlyParagraph
+          ? [
+              {
+                paragraph_id: contextOnlyParagraphId,
+                role: "supporting_theme",
+                order: 2,
+                text: "Your note about the deadline suggests keeping the promise small this week.",
+              },
+            ]
+          : []),
       ],
     };
 
@@ -1277,18 +1304,22 @@ describe("v5 stored readings", () => {
       IDENTITY_A,
       {
         paragraph_id: paragraphId,
-        role: "primary_theme",
+        role: options.paragraphRole ?? "primary_theme",
         order: 1,
-        fact_refs: [
-          {
-            fact_id: `cyc_${HEX32}`,
-            fact_class: "cycle_instance",
-            label: "Saturn square your Sun, building",
-            scope: "personalized",
-          },
-        ],
+        fact_refs: options.emptyFactRefs
+          ? []
+          : Array.from({ length: options.duplicateFactRef ? 2 : 1 }, () => ({
+              fact_id: `cyc_${HEX32}`,
+              fact_class: "cycle_instance",
+              label: options.factLabel ?? "Saturn square your Sun, building",
+              scope: "personalized",
+            })),
         context_refs: [
-          { private_ref: "ctx_1", category: "enabled_personal_context", allowed_use: "tone" },
+          {
+            private_ref: "ctx_1",
+            category: options.contextCategory ?? "enabled_personal_context",
+            allowed_use: options.allowedUse ?? "tone",
+          },
         ],
       },
       {
@@ -1333,6 +1364,45 @@ describe("v5 stored readings", () => {
       sealedEvidence.nonce,
       "2026-08-09T23:30:00Z",
     );
+
+    if (options.contextOnlyParagraph) {
+      const sealedContextOnly = await encryptPayload(
+        env,
+        IDENTITY_A,
+        {
+          paragraph_id: contextOnlyParagraphId,
+          role: "supporting_theme",
+          order: 2,
+          fact_refs: [],
+          context_refs: [
+            {
+              private_ref: "ctx_2",
+              category: "enabled_personal_context",
+              allowed_use: "tone",
+            },
+          ],
+        },
+        {
+          subject: IDENTITY_A.cryptoSubject,
+          field: "reading_sources.evidence_enc",
+          recordId: contextOnlySourceId,
+        },
+      );
+      await rows(
+        `INSERT INTO reading_sources
+           (id, reading_id, user_id, paragraph_id, paragraph_order,
+            evidence_enc, evidence_key_version, evidence_nonce, created_at)
+         VALUES (?, ?, ?, ?, 2, ?, ?, ?, ?)`,
+        contextOnlySourceId,
+        readingId,
+        USER_A,
+        contextOnlyParagraphId,
+        fromB64(sealedContextOnly.ciphertext),
+        sealedContextOnly.keyVersion,
+        sealedContextOnly.nonce,
+        "2026-08-09T23:30:00Z",
+      );
+    }
 
     return { readingId, localDate };
   }
@@ -1393,6 +1463,86 @@ describe("v5 stored readings", () => {
     expect(row!.status).toBe("invalidated");
     expect(row!.invalidated_at).toBe("2026-08-10T09:00:00Z");
     expect(row!.sealed).toBe(1);
+  });
+
+  it.each([
+    {
+      name: "unknown context category",
+      options: { contextCategory: "private_journal_entry" },
+      forbidden: "private_journal_entry",
+    },
+    {
+      name: "unsupported allowed use",
+      options: { allowedUse: "content_quality" },
+      forbidden: "content_quality",
+    },
+    {
+      name: "oversized fact label",
+      options: { factLabel: "x".repeat(201) },
+      forbidden: "x".repeat(201),
+    },
+  ])("fails closed for V5 evidence with an $name", async ({ options, forbidden }) => {
+    const { readingId } = await seedV5Reading(options);
+    const { status, body } = await get<ErrorEnvelope>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+    expect(JSON.stringify(body)).not.toContain(forbidden);
+  });
+
+  it("fails closed when a V5 Today projection violates a frozen wire constraint", async () => {
+    const oversizedHeadline = "h".repeat(201);
+    await seedV5Reading({ headline: oversizedHeadline });
+
+    const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+    expect(JSON.stringify(body)).not.toContain(oversizedHeadline);
+  });
+
+  it("fails closed when a V5 Today projection does not open with its primary lead", async () => {
+    await seedV5Reading({ paragraphRole: "supporting_theme" });
+
+    const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+  });
+
+  it("serves a context-only supporting paragraph its own validator accepts", async () => {
+    const { readingId } = await seedV5Reading({ contextOnlyParagraph: true });
+
+    const today = await get<Record<string, unknown>>("/v1/readings/today");
+    expect(today.status).toBe(200);
+    expect(validateTodayResponseV5(today.body)).toBe(true);
+
+    const { status, body } = await get<Record<string, unknown>>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(200);
+    expect(validateEvidenceGraphV5(body)).toBe(true);
+    expect(
+      (body.paragraphs as Array<Record<string, unknown>>).map((paragraph) => [
+        paragraph.role,
+        (paragraph.fact_refs as unknown[]).length,
+        (paragraph.context_refs as unknown[]).length,
+      ]),
+    ).toEqual([
+      ["primary_theme", 1, 1],
+      ["supporting_theme", 0, 1],
+    ]);
+  });
+
+  it.each([
+    { name: "duplicate fact references", options: { duplicateFactRef: true } },
+    { name: "an ungrounded lead", options: { emptyFactRefs: true } },
+  ])("fails closed for V5 evidence with $name", async ({ options }) => {
+    const { readingId } = await seedV5Reading(options);
+    const { status, body } = await get<ErrorEnvelope>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
   });
 
   it("hides published prose when its chart pin no longer matches the active chart", async () => {
