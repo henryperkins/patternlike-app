@@ -7,6 +7,7 @@ import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
 import { timezoneRoutes } from "./routes/timezone.js";
 import { preferenceRoutes } from "./routes/preferences.js";
+import { consentRoutes } from "./routes/consents.js";
 import { readingRoutes } from "./routes/readings.js";
 import { timingRoutes } from "./routes/timing.js";
 import { stubRoutes } from "./routes/stubs.js";
@@ -14,6 +15,8 @@ import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
+import { scheduled } from "./scheduled.js";
+import { safeLog } from "./services/safe-log.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -39,6 +42,7 @@ api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", timezoneRoutes);
 api.route("/", preferenceRoutes);
+api.route("/", consentRoutes);
 api.route("/", readingRoutes);
 api.route("/", timingRoutes);
 // Last, deliberately. Hono answers with the first matching registration, so a
@@ -61,18 +65,12 @@ app.route("/", api);
 
 // Without this, Hono's default handler returns 500 as text/plain, so the
 // documented error envelope never appeared on any uncaught path.
-app.onError((err, c) => {
+app.onError((_err, c) => {
   const requestId =
     c.get("requestId") ?? c.req.header("x-request-id") ?? crypto.randomUUID();
-  // Log the detail; never return it. Upstream messages have carried the
-  // calculation service's absolute filesystem path.
-  console.error("unhandled_error", {
-    request_id: requestId,
-    path: c.req.path,
-    method: c.req.method,
-    message: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
-  });
+  // The safe boundary records an internal trace only. Error text, stacks, the
+  // raw route, and the caller's request id may all contain private material.
+  safeLog({ event: "unhandled_error" });
   return c.json(
     {
       error: {
@@ -116,4 +114,5 @@ export { app };
 export default {
   fetch: app.fetch,
   queue,
+  scheduled,
 };

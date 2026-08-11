@@ -38,6 +38,16 @@ export class ApiError extends Error {
    * UI needs structured context that the browser cannot derive on its own.
    */
   readonly details: Record<string, unknown> | null;
+  /**
+   * Whether asking again can make progress, as the server says it.
+   *
+   * Only the v5 reading envelope sets it. A 503 is not uniformly retryable
+   * there — an exhausted provider budget and a missing publisher configuration
+   * both answer 503 and neither improves by pressing a button — so the screen
+   * reads the flag instead of inferring an answer from the status. Absent means
+   * absent: `null`, never a guessed `true`.
+   */
+  readonly retryable: boolean | null;
 
   constructor(status: number, body: ErrorBody) {
     super(body.error.message);
@@ -46,6 +56,8 @@ export class ApiError extends Error {
     this.code = body.error.code;
     this.requestId = body.error.request_id ?? null;
     this.details = body.error.details ?? null;
+    const retryable = (body.error as { retryable?: unknown }).retryable;
+    this.retryable = typeof retryable === "boolean" ? retryable : null;
   }
 }
 
@@ -273,6 +285,23 @@ export type ParagraphRole =
   | "context_label"
   | "safety_fallback";
 
+/**
+ * The roles a v5 candidate may carry.
+ *
+ * `safety_fallback` and `context_label` are absent because v5 has no reviewed
+ * copy to fall back to and no separate context paragraph; `collective_context`
+ * is new, and marking it is the whole point — a fact true for everyone must not
+ * read as a private discovery.
+ */
+export type ParagraphRoleV5 =
+  | "primary_theme"
+  | "supporting_theme"
+  | "phase_context"
+  | "timing"
+  | "collective_context"
+  | "reflection"
+  | "uncertainty_notice";
+
 export interface ReadingParagraph {
   paragraph_id: string;
   role: ParagraphRole;
@@ -281,7 +310,14 @@ export interface ReadingParagraph {
   text: string;
 }
 
-export interface DailyReading {
+export interface ReadingParagraphV5 {
+  paragraph_id: string;
+  role: ParagraphRoleV5;
+  order: number;
+  text: string;
+}
+
+export interface DailyReadingV3 {
   schema_version: string;
   output_schema: "daily-reading-v3";
   reading_id: string;
@@ -301,14 +337,62 @@ export interface DailyReading {
   fallback_used: boolean;
 }
 
-export interface DailyReadingResponse {
+/**
+ * The v5 artifact.
+ *
+ * No `fallback_used` and no `release_version`. `headline` and `disclosure` are
+ * both required: the headline is the quiet kicker the lead sits under, and the
+ * disclosure is the sentence that says a model wrote the prose — a reader
+ * cannot consent to model synthesis and then not be told when it happened.
+ */
+export interface DailyReadingV5 {
   schema_version: string;
-  reading: DailyReading;
+  output_schema: "daily-reading-v5";
+  reading_id: string;
+  /** Same rule as the v3 field: a bare calendar date, never `new Date()`. */
+  local_date: string;
+  generated_at: string;
+  assembly_mode: "constrained_model";
+  revision: number;
+  locale: string;
+  domain_preference?: string | null;
+  headline: string;
+  disclosure: string;
+  paragraphs: ReadingParagraphV5[];
+}
+
+export type DailyReading = DailyReadingV3 | DailyReadingV5;
+
+export interface DailyReadingResponseV3 {
+  schema_version: string;
+  reading: DailyReadingV3;
   /**
    * Optional *and* nullable in the contract. Its presence is the only signal
    * that there is provenance to show.
    */
   evidence_url?: string | null;
+}
+
+/** `evidence_url` is required here: every v5 reading has a provenance graph. */
+export interface DailyReadingResponseV5 {
+  schema_version: string;
+  reading: DailyReadingV5;
+  evidence_url: string;
+}
+
+export type DailyReadingResponse = DailyReadingResponseV3 | DailyReadingResponseV5;
+
+/**
+ * Which publisher wrote this reading.
+ *
+ * Keyed on `output_schema` rather than `schema_version`: it is a `const` in both
+ * frozen schemas and names the artifact rather than the package it shipped in,
+ * so a later package version that still emits a v5 reading still renders.
+ */
+export function isDailyReadingV5(
+  response: DailyReadingResponse,
+): response is DailyReadingResponseV5 {
+  return response.reading.output_schema === "daily-reading-v5";
 }
 
 export interface DailyReadingPreparation {
@@ -390,7 +474,7 @@ export interface ParagraphEvidence {
   ranking_factors?: EvidenceRankingFactor[];
 }
 
-export interface ReadingEvidence {
+export interface ReadingEvidenceV3 {
   schema_version: string;
   reading_id: string;
   revision: number;
@@ -399,6 +483,92 @@ export interface ReadingEvidence {
   release_version?: string;
   created_at?: string;
   paragraphs: ParagraphEvidence[];
+}
+
+/**
+ * The v5 provenance graph: what was calculated, which categories of private
+ * context were permitted where, and exactly which model wrote the prose.
+ *
+ * `fact_refs` carries a readable `label` because the drawer must be able to say
+ * what a fact *is* without printing an opaque handle at a reader. `context_refs`
+ * deliberately carries no value — the reader already has their own journal; what
+ * they cannot otherwise see is which lane it was allowed to influence.
+ */
+export interface EvidenceFactRefV5 {
+  fact_id: string;
+  fact_class: string;
+  label: string;
+  scope: "personalized" | "collective";
+}
+
+export interface EvidenceContextRefV5 {
+  private_ref: string;
+  category: string;
+  allowed_use: string;
+}
+
+export interface ParagraphEvidenceV5 {
+  paragraph_id: string;
+  role: ParagraphRoleV5;
+  order: number;
+  fact_refs: EvidenceFactRefV5[];
+  context_refs: EvidenceContextRefV5[];
+}
+
+export interface EvidenceCalculationRecordV5 {
+  chart_contract_id: string;
+  cycle_policy_version: string;
+  daily_sky_policy_version: string;
+  ephemeris_data_version: string;
+  container_digest: string;
+  tzdb_version: string;
+  local_day_resolution_policy_version: string;
+}
+
+export interface EvidenceModelRecordV5 {
+  provider: string;
+  model: string;
+  prompt_version: string;
+  selection_policy_version: string;
+  validation_policy_version: string;
+  provider_request_id: string;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface ReadingEvidenceV5 {
+  schema_version: string;
+  reading_id: string;
+  revision: number;
+  revision_reason: string;
+  generated_at: string;
+  generation_input_id: string;
+  input_manifest_hash: string;
+  content_hash: string;
+  provider_response_hash: string;
+  calculation: EvidenceCalculationRecordV5;
+  model: EvidenceModelRecordV5;
+  paragraphs: ParagraphEvidenceV5[];
+  validation: {
+    status: string;
+    policy_version: string;
+    checks: Array<{ code: string; passed: boolean }>;
+  };
+}
+
+export type ReadingEvidence = ReadingEvidenceV3 | ReadingEvidenceV5;
+
+/**
+ * Keyed on the model record rather than on `schema_version`.
+ *
+ * The record is required in v5 and has no v3 counterpart, so it is the field
+ * that actually separates the two graphs — and it is the field the drawer needs
+ * in order to render the v5 layer at all. A graph it can render as v5, it does.
+ */
+export function isReadingEvidenceV5(
+  evidence: ReadingEvidence,
+): evidence is ReadingEvidenceV5 {
+  return "model" in evidence && evidence.model !== null;
 }
 
 /**
@@ -417,6 +587,61 @@ export function getReadingEvidence(
     `/v1/readings/${encodeURIComponent(readingId)}/evidence`,
     { method: "GET", headers: requestHeaders(), signal },
   );
+}
+
+/**
+ * The account-level AI-synthesis consent.
+ *
+ * Every field except `status` and `granted_at` is server-owned: the provider,
+ * the purpose, the policy version, and the exact category list belong to the
+ * policy the reader is being shown, and a client that supplied its own would be
+ * asking for agreement to something the server never described. `PUT` echoes
+ * back the version it was shown, which is how a stale page is refused rather
+ * than silently granted under a policy the reader never read.
+ */
+export interface AiSynthesisConsent {
+  kind: "ai_synthesis";
+  status: "granted" | "not_granted";
+  provider: string;
+  purpose: string;
+  policy_version: string;
+  enabled_categories: string[];
+  granted_at: string | null;
+}
+
+export function getAiSynthesisConsent(
+  signal?: AbortSignal,
+): Promise<AiSynthesisConsent> {
+  return request<AiSynthesisConsent>("/v1/consents/ai-synthesis", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function grantAiSynthesisConsent(
+  policyVersion: string,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<AiSynthesisConsent> {
+  return request<AiSynthesisConsent>("/v1/consents/ai-synthesis", {
+    method: "PUT",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({ policy_version: policyVersion }),
+    signal,
+  });
+}
+
+/** No body: the route rejects one, and the server owns what is being revoked. */
+export function revokeAiSynthesisConsent(
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<AiSynthesisConsent> {
+  return request<AiSynthesisConsent>("/v1/consents/ai-synthesis", {
+    method: "DELETE",
+    headers: requestHeaders({ idempotencyKey }),
+    signal,
+  });
 }
 
 export type PreferenceWriteSource = "user_confirmed" | "device_derived";

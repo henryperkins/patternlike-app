@@ -63,6 +63,17 @@ describe("encrypted column registration", () => {
     expect(rotated).toContain("reading_sources.evidence_enc");
   });
 
+  it("rotates context_signals.value_enc, which M5 is about to write", async () => {
+    // Moved BEFORE the context compiler acquires its first writer. The other
+    // order — write first, register later — leaves whatever was written between
+    // the two changes under a destroyed key, and nothing reports it until a
+    // reader asks for a value that no longer decrypts.
+    const rotated = ENCRYPTED_COLUMNS.map((c) => `${c.table}.${c.encColumn}`);
+    const unwritten = UNWRITTEN_ENCRYPTED_COLUMNS.map((c) => `${c.table}.${c.encColumn}`);
+    expect(rotated).toContain("context_signals.value_enc");
+    expect(unwritten).not.toContain("context_signals.value_enc");
+  });
+
   it("every registered column names a real key-version and nonce column", async () => {
     const { results } = await env.DB.prepare(
       "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql IS NOT NULL",

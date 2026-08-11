@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { M3_SCHEMA_VERSION } from "@patternlike/shared";
+import { M3_SCHEMA_VERSION, M5_SCHEMA_VERSION } from "@patternlike/shared";
+import type { DailyReadingV5 } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import type { UserIdentity } from "../db/users.js";
@@ -14,7 +15,16 @@ import {
   type ReadingRecord,
 } from "../db/readings.js";
 import type { DailyReading } from "@patternlike/reading-engine";
+import { isStoredReadingV5 } from "../services/stored-reading.js";
 import { ensureTodayReading } from "../services/ensure-today-reading.js";
+import { resumePausedV2ForFirstOpen } from "../db/generation.js";
+import { dispatch, resolveV5TargetDate } from "../services/enqueue.js";
+import { readReadingV5Rollout, rolloutAllows } from "../services/reading-rollout.js";
+import { safeLog } from "../services/safe-log.js";
+import {
+  assertM5EvidenceResponse,
+  assertM5TodayResponse,
+} from "../services/m5-product-contract.js";
 
 /**
  * The two read surfaces for a generated daily reading.
@@ -59,19 +69,125 @@ function projectReading(reading: DailyReading) {
   };
 }
 
-function projectTodayResponse(published: PublishedReading) {
+/**
+ * The v5 artifact.
+ *
+ * No `release_version` and no `fallback_used`: v5 has neither, and a projection
+ * that emitted them would be describing an editorial pipeline that did not
+ * produce this reading. `disclosure` is required rather than optional — a reader
+ * cannot consent to model synthesis and then not be told when it happened.
+ */
+function projectReadingV5(reading: DailyReadingV5) {
   return {
-    schema_version: M3_SCHEMA_VERSION,
-    reading: projectReading(published.stored.reading),
-    // Never null in M3: completeReading refuses to commit a publication whose
-    // reading_sources count is wrong, and the assembler never emits zero
-    // paragraphs. The null in the contract is headroom, not a case, so this
-    // does not spend a COUNT(*) per request to rediscover it.
-    evidence_url: evidenceUrl(published.record),
+    schema_version: reading.schema_version,
+    output_schema: reading.output_schema,
+    reading_id: reading.reading_id,
+    local_date: reading.local_date,
+    generated_at: reading.generated_at,
+    assembly_mode: reading.assembly_mode,
+    revision: reading.revision,
+    locale: reading.locale,
+    domain_preference: reading.domain_preference ?? null,
+    headline: reading.headline,
+    disclosure: reading.disclosure,
+    paragraphs: reading.paragraphs.map((paragraph) => ({
+      paragraph_id: paragraph.paragraph_id,
+      role: paragraph.role,
+      order: paragraph.order,
+      text: paragraph.text,
+    })),
   };
 }
 
-function projectEvidence(evidence: ReadingEvidence) {
+function projectTodayResponse(published: PublishedReading) {
+  // Never null in either format: completeReading refuses to commit a publication
+  // whose reading_sources count is wrong, and neither publisher emits zero
+  // paragraphs. The null in the contract is headroom, not a case, so this does
+  // not spend a COUNT(*) per request to rediscover it.
+  const evidence_url = evidenceUrl(published.record);
+  if (isStoredReadingV5(published.stored)) {
+    const response = {
+      schema_version: M5_SCHEMA_VERSION,
+      reading: projectReadingV5(published.stored.reading),
+      evidence_url,
+    };
+    assertM5TodayResponse(response);
+    return response;
+  }
+  return {
+    schema_version: M3_SCHEMA_VERSION,
+    reading: projectReading(published.stored.reading),
+    evidence_url,
+  };
+}
+
+/**
+ * The v5 provenance graph.
+ *
+ * Smaller than the v3 one, and deliberately so: it carries no reading key and no
+ * user id. Those are trusted-plane fields the v3 graph inherited from M0, and a
+ * new document had no reason to reintroduce them.
+ */
+function projectEvidenceV5(evidence: Extract<ReadingEvidence, { schemaVersion: "0.5.0" }>) {
+  const { header, paragraphs } = evidence;
+  return {
+    schema_version: header.schema_version,
+    reading_id: header.reading_id,
+    revision: header.revision,
+    revision_reason: header.revision_reason,
+    generated_at: header.generated_at,
+    generation_input_id: header.generation_input_id,
+    input_manifest_hash: header.input_manifest_hash,
+    content_hash: header.content_hash,
+    provider_response_hash: header.provider_response_hash,
+    calculation: {
+      chart_contract_id: header.calculation.chart_contract_id,
+      cycle_policy_version: header.calculation.cycle_policy_version,
+      daily_sky_policy_version: header.calculation.daily_sky_policy_version,
+      ephemeris_data_version: header.calculation.ephemeris_data_version,
+      container_digest: header.calculation.container_digest,
+      tzdb_version: header.calculation.tzdb_version,
+      local_day_resolution_policy_version:
+        header.calculation.local_day_resolution_policy_version,
+    },
+    model: {
+      provider: header.model.provider,
+      model: header.model.model,
+      prompt_version: header.model.prompt_version,
+      selection_policy_version: header.model.selection_policy_version,
+      validation_policy_version: header.model.validation_policy_version,
+      provider_request_id: header.model.provider_request_id,
+      input_tokens: header.model.input_tokens,
+      output_tokens: header.model.output_tokens,
+    },
+    paragraphs: paragraphs.map((paragraph) => ({
+      paragraph_id: paragraph.paragraph_id,
+      role: paragraph.role,
+      order: paragraph.order,
+      fact_refs: paragraph.fact_refs.map((ref) => ({
+        fact_id: ref.fact_id,
+        fact_class: ref.fact_class,
+        label: ref.label,
+        scope: ref.scope,
+      })),
+      context_refs: paragraph.context_refs.map((ref) => ({
+        private_ref: ref.private_ref,
+        category: ref.category,
+        allowed_use: ref.allowed_use,
+      })),
+    })),
+    validation: {
+      status: header.validation.status,
+      policy_version: header.validation.policy_version,
+      checks: header.validation.checks.map((check) => ({
+        code: check.code,
+        passed: check.passed,
+      })),
+    },
+  };
+}
+
+function projectEvidenceV3(evidence: Extract<ReadingEvidence, { schemaVersion: "0.3.0" }>) {
   const { record, header, paragraphs } = evidence;
   return {
     schema_version: header.schema_version,
@@ -141,13 +257,49 @@ function projectEvidence(evidence: ReadingEvidence) {
   };
 }
 
+function projectEvidence(evidence: ReadingEvidence) {
+  if (evidence.schemaVersion === "0.5.0") {
+    const response = projectEvidenceV5(evidence);
+    assertM5EvidenceResponse(response);
+    return response;
+  }
+  return projectEvidenceV3(evidence);
+}
+
 readingRoutes.put("/v1/readings/today", async (c) => {
   const requestId = c.get("requestId");
   const identity: UserIdentity = {
     userId: c.get("userId"),
     cryptoSubject: c.get("cryptoSubject"),
   };
-  const outcome = await ensureTodayReading(c.env, identity);
+
+  // A first-open request may advance only this authenticated owner's durable
+  // rollout pause. It never claims or decrypts here; dispatch remains an opaque
+  // nudge and the Queue consumer rechecks the rollout before execution.
+  const rollout = readReadingV5Rollout(c.env);
+  if (rollout && rolloutAllows(rollout, "first_open")) {
+    const preferences = await loadPreferences(c.env, identity.userId);
+    const localDate = preferences
+      ? resolveV5TargetDate(preferences.timezone, new Date())
+      : null;
+    if (localDate) {
+      const resumed = await resumePausedV2ForFirstOpen(
+        c.env,
+        identity.userId,
+        localDate,
+      );
+      if (resumed) {
+        await dispatch(c.env, {
+          job_id: resumed.jobId,
+          reading_id: resumed.readingId,
+        });
+      }
+    }
+  }
+  const outcome = await ensureTodayReading(c.env, identity, {
+    generationMode: "v5",
+    rolloutEntry: "first_open",
+  });
 
   if (outcome.ok) {
     if (outcome.status === "ready") {
@@ -155,7 +307,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
     }
     return c.json(
       {
-        schema_version: M3_SCHEMA_VERSION,
+        schema_version: outcome.schemaVersion ?? M5_SCHEMA_VERSION,
         status: "preparing" as const,
         local_date: outcome.localDate,
       },
@@ -163,11 +315,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
     );
   }
 
-  console.error("ensure_today_failed", {
-    request_id: requestId,
-    reason: outcome.reason,
-    detail: outcome.detail,
-  });
+  safeLog({ event: "ensure_today_failed" });
 
   const errorBody = (code: string, message: string) => ({
     error: { code, message, request_id: requestId },
@@ -194,35 +342,93 @@ readingRoutes.put("/v1/readings/today", async (c) => {
         ),
         409,
       );
-    case "release_not_active":
+    case "ai_synthesis_consent_required":
       return c.json(
         errorBody(
-          "release_not_active",
-          "No active reading release is available",
+          "ai_synthesis_consent_required",
+          "Grant AI synthesis consent before a daily reading can be generated",
         ),
+        409,
+      );
+    case "rollout_disabled":
+    case "publisher_not_configured":
+      return c.json(
+        {
+          error: {
+            ...errorBody(
+              "publisher_not_configured",
+              "Daily reading generation is not configured",
+            ).error,
+            retryable: false,
+          },
+        },
         503,
       );
     case "calc_unavailable":
       return c.json(
-        errorBody("calc_unavailable", "The calculation service is unavailable"),
+        {
+          error: {
+            ...errorBody(
+              "calc_unavailable",
+              "The calculation service is unavailable",
+            ).error,
+            retryable: true,
+          },
+        },
         503,
       );
-    case "release_unreadable":
+    case "daily_sky_unavailable":
       return c.json(
-        errorBody(
-          "release_unreadable",
-          "The active content release is unavailable",
-        ),
+        {
+          error: {
+            ...errorBody(
+              "daily_sky_unavailable",
+              "The daily sky calculation is unavailable",
+            ).error,
+            retryable: true,
+          },
+        },
+        503,
+      );
+    case "policy_unsupported":
+      return c.json(
+        {
+          error: {
+            ...errorBody(
+              "policy_unsupported",
+              "The configured calculation policy is unsupported",
+            ).error,
+            retryable: false,
+          },
+        },
+        503,
+      );
+    case "publisher_budget_exhausted":
+      return c.json(
+        {
+          error: {
+            ...errorBody(
+              "publisher_budget_exhausted",
+              "Daily reading capacity is temporarily exhausted",
+            ).error,
+            retryable: false,
+          },
+        },
         503,
       );
     case "internal_error":
       return c.json(errorBody("internal_error", "Unexpected server error"), 500);
     default:
       return c.json(
-        errorBody(
-          "reading_generation_failed",
-          "Today's reading could not be prepared",
-        ),
+        {
+          error: {
+            ...errorBody(
+              "reading_generation_failed",
+              "Today's reading could not be prepared",
+            ).error,
+            retryable: false,
+          },
+        },
         424,
       );
   }
@@ -277,10 +483,7 @@ readingRoutes.get("/v1/readings/today", async (c) => {
     // this to the 409 would tell the client to rewrite what it already wrote and
     // would hide the regression. Logged here rather than in onError because
     // LocalDayError interpolates the zone, which is location-adjacent.
-    console.error("local_day_unresolvable", {
-      request_id: requestId,
-      code: err instanceof Error ? err.name : "unknown",
-    });
+    safeLog({ event: "local_day_unresolvable" });
     return c.json(errorBody("internal_error", "Unexpected server error"), 500);
   }
 

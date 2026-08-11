@@ -1,0 +1,55 @@
+{
+  "schema_version": "0.5.0",
+  "output_schema": "daily-reading-v5",
+  "local_date": "2026-07-30",
+  "locale": "en-US",
+  "headline": "A smaller promise",
+  "lead": {
+    "text": "Saturn is exactly square your Sun today, and the pressure is not asking for more effort — only for a promise small enough that you can actually keep it.",
+    "fact_ids": [
+      "cyc_abababababababababababababababab",
+      "dsf_30fb5019e8d3f789e29ea7a9babf94ae"
+    ],
+    "context_refs": [
+      "ctx_1"
+    ]
+  },
+  "paragraphs": [
+    {
+      "role": "supporting_theme",
+      "text": "The migration you have been carrying is the obvious place this lands. Choose the one obligation inside it you can meet exactly, and let the rest wait a day.",
+      "fact_ids": [
+        "cyc_abababababababababababababababab"
+      ],
+      "context_refs": [
+        "ctx_1"
+      ]
+    },
+    {
+      "role": "timing",
+      "text": "The square is exact at 2026-07-30T14:11:07Z; the wider cycle closes on 2027-01-26.",
+      "fact_ids": [
+        "dsf_30fb5019e8d3f789e29ea7a9babf94ae",
+        "cyc_abababababababababababababababab"
+      ],
+      "context_refs": []
+    },
+    {
+      "role": "collective_context",
+      "text": "Mercury enters Virgo tonight and the Moon is waxing gibbous. Neither of those is about you in particular; both favour tidying a detail rather than opening a new front.",
+      "fact_ids": [
+        "dsf_dc924a24d6db1344a2656081c38afa29",
+        "dsf_b8e8e65324e38c0f4d2419b7a941ebd9"
+      ],
+      "context_refs": []
+    }
+  ],
+  "reflection_prompt": {
+    "text": "What would you still finish this week if nobody was waiting on it?",
+    "fact_ids": [],
+    "context_refs": [
+      "ctx_1"
+    ]
+  },
+  "uncertainty_note": null
+}

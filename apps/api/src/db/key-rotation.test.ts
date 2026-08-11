@@ -25,7 +25,7 @@ import {
 } from "../../test/helpers.js";
 import { claimJob } from "./generation.js";
 import { enqueueDailyReading } from "../services/enqueue.js";
-import { generateDailyReading } from "../services/generate-daily-reading.js";
+import { dispatchGeneration } from "../services/generate-daily-reading.js";
 
 const NEW_ROOT_KEK = "a-rotated-root-kek-with-enough-entropy-01";
 
@@ -240,7 +240,7 @@ describe("DEK rotation over the M3 pipeline columns", () => {
     expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     const claim = await claimJob(env, enqueued.jobId);
-    expect(await generateDailyReading(env, claim!)).toMatchObject({ ok: true });
+    expect(await dispatchGeneration(env, claim!)).toMatchObject({ ok: true });
 
     const before = await rows<{ n: number }>(
       `SELECT
@@ -302,5 +302,87 @@ describe("DEK rotation over the M3 pipeline columns", () => {
       },
     );
     expect(stored.assembly_id).toMatch(/^asm_[a-f0-9]{32}$/);
+  });
+});
+
+/**
+ * `context_signals.value_enc`, registered before its first writer exists.
+ *
+ * The column has been declared since 0001 and nothing has ever written it. M5's
+ * context compiler is the first writer, so the registration has to land first:
+ * a column written while it sits in UNWRITTEN_ENCRYPTED_COLUMNS is left under a
+ * destroyed key at the next rotation, and nothing reports that until a reader
+ * asks for a value that no longer decrypts.
+ *
+ * A version bump alone would not prove it. This writes real ciphertext, rotates,
+ * and reads the plaintext back under the new key.
+ */
+describe("DEK rotation over context_signals.value_enc", () => {
+  it("decrypts and re-encrypts a stored context value under the new key", async () => {
+    const signalId = "sig_ctx_rotation_01";
+    const sealed = await encryptPayload(
+      env,
+      IDENTITY_A,
+      { text: "Third week of the migration." },
+      {
+        subject: SUBJECT_A,
+        field: "context_signals.value_enc",
+        recordId: signalId,
+      },
+    );
+
+    await env.DB.prepare(
+      `INSERT INTO context_signals
+         (id, user_id, source_id, evidence_lane, allowed_uses_json, confidence,
+          sensitivity, permission_state, freshness_status, observed_at, ingested_at,
+          value_encoding, value_enc, value_key_version, value_nonce, normalized_hash,
+          created_at, updated_at)
+       VALUES (?, ?, 'USR-02', 'user_and_context', '["life_domain_selection"]', 'high',
+               'normal', 'active', 'fresh', ?, ?, 'encrypted', ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        signalId,
+        USER_A,
+        "2026-08-09T10:00:00Z",
+        "2026-08-09T10:00:01Z",
+        Uint8Array.from(atob(sealed.ciphertext), (c) => c.charCodeAt(0)),
+        sealed.keyVersion,
+        sealed.nonce,
+        "a".repeat(64),
+        "2026-08-09T10:00:01Z",
+        "2026-08-09T10:00:01Z",
+      )
+      .run();
+
+    const result = await rotateUserDek(env, IDENTITY_A);
+    expect(result.keyVersion).toBe(2);
+
+    const [row] = await rows<{
+      value_enc: ArrayBuffer;
+      value_key_version: number;
+      value_nonce: string;
+    }>(
+      "SELECT value_enc, value_key_version, value_nonce FROM context_signals WHERE id = ?",
+      signalId,
+    );
+    expect(row?.value_key_version).toBe(2);
+
+    let binary = "";
+    for (const byte of new Uint8Array(row!.value_enc)) binary += String.fromCharCode(byte);
+    const plain = await decryptPayload<{ text: string }>(
+      env,
+      IDENTITY_A,
+      {
+        key_version: row!.value_key_version,
+        nonce: row!.value_nonce,
+        ciphertext: btoa(binary),
+      },
+      {
+        subject: SUBJECT_A,
+        field: "context_signals.value_enc",
+        recordId: signalId,
+      },
+    );
+    expect(plain.text).toBe("Third week of the migration.");
   });
 });

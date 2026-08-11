@@ -1,0 +1,300 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Calculation Service API (M5 amendment)
+  version: 0.5.0
+  description: |
+    An AMENDMENT to `contracts/m3/openapi/calc.openapi.yaml`, not a replacement
+    for it. `POST /v1/calculate` and `POST /v1/cycles` are unchanged and are
+    still described by the M3 document; this file adds exactly one operation,
+    `POST /v1/daily-sky`.
+
+    The endpoint exists because the frozen M3 cycle contract correctly permits an
+    empty result, and states that most days contain no cycle inside orb. Once the
+    reviewed editorial fallback stops supplying language, a zero-cycle day has no
+    factual substrate at all — and a publisher with no facts and a daily promise
+    is a publisher that invents a premise. This route is the substrate: anchor
+    positions and one lunar phase are always present when calculation succeeds,
+    so an empty event list never means an empty factual day.
+
+    The service still holds no user data and has no decryption path. The request
+    carries natal LONGITUDES and optional house cusps and nothing else — no user
+    id, chart id, birth instant, birthplace, coordinate, timezone name, or
+    storage id — which is what keeps "birth stays encrypted at rest" intact
+    across the new surface.
+
+    Normative shapes are `contracts/m5/daily-sky-request.schema.json` and
+    `contracts/m5/daily-sky-response.schema.json`; the operation names each in
+    `x-normative-schema` and `x-normative-response-schema`, and
+    `contracts/validate_schemas.py` resolves both pointers against the shipped
+    package.
+
+    AGPL-3.0-or-later (Swiss Ephemeris). The source offer in `apps/calc-stub`
+    travels with any deployment of this service.
+  contact:
+    name: Pattern-Like Engineering
+  license:
+    name: AGPL-3.0-or-later
+    identifier: AGPL-3.0-or-later
+servers:
+  - url: https://patternlike-calc.fly.dev
+    description: Production (iad, always-on)
+  - url: http://127.0.0.1:8080
+    description: Local dev
+tags:
+  - name: calculation
+paths:
+  /v1/daily-sky:
+    post:
+      tags: [calculation]
+      operationId: calculateDailySky
+      summary: Calculated sky facts for one resolved local day
+      description: |
+        The caller resolves the local day before calling: `day_start_at` and
+        `day_end_at` are a half-open UTC interval spanning 23, 24, or 25 hours,
+        and `anchor_at` is local noon under the pinned IANA database. Noon rather
+        than the caller's invocation instant, because noon exists on ordinary DST
+        transition days and the instant a scheduler happened to fire is not a
+        fact about anybody's sky.
+
+        Anchor positions, lunar phase, and house placements are sampled AT
+        `anchor_at`. Every other fact is a solved exact root inside
+        `[day_start_at, day_end_at)`; an event at exactly `day_end_at` belongs to
+        the NEXT local day and is not returned.
+
+        Facts are ordered by (kind rank, `effective_at`, `fact_id`) with unique
+        ids, where kind rank is the declaration order of the fact-kind enum. Each
+        `fact_id` is `dsf_` plus the first 32 hex characters of its own
+        `content_digest`, which is SHA-256 over the RFC 8785 canonical bytes of
+        the fact minus those two derived members. Identical inputs therefore
+        produce byte-identical output, which is what lets an execution-time
+        replay prove the frozen calculation has not moved.
+
+        Suppression is applied by never computing the fact. With `houses`
+        suppressed there is no house fact; with `angles` suppressed there is no
+        angle target; with `moon_time_sensitive` suppressed there is no natal
+        Moon target. A transiting Moon remains valid against stable natal
+        targets, because the transit instant is known even when the birth instant
+        is not.
+
+        Returns 503 without `CALC_SERVICE_AUTH_TOKEN` in production, and 401 on a
+        bad token.
+      x-normative-schema: 'm5:daily-sky-request.schema.json#/$defs/dailySkyRequest'
+      x-normative-response-schema: 'm5:daily-sky-response.schema.json#/$defs/dailySkyResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DailySkyRequest' }
+      responses:
+        '200':
+          description: |
+            Scan complete, or a structured refusal with `ok: false`. A refusal is
+            a 200 with a discriminated body for the same reason `/v1/cycles` does
+            it: the caller must distinguish "the engine ran and refused" from
+            "the request never arrived", because only one of those is worth
+            retrying.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailySkyResponse' }
+        '400':
+          description: Malformed request that never reached the engine
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    calcServiceAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Shared bearer token, `CALC_SERVICE_AUTH_TOKEN`, set identically on the
+        Worker and the Fly app. Unchanged from M3.
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+    DailySkyRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        Closed by design. A user id, chart id, birth instant, birthplace,
+        coordinate, timezone name, profile id, or storage id is rejected because
+        it is simply not declared.
+      required:
+        [schema_version, request_id, day_start_at, day_end_at, anchor_at,
+         anchor_resolution, natal_positions, effective_accuracy, uncertainty,
+         suppressed_features, zodiac, node, ephemeris_data_version, tzdb_version,
+         local_day_resolution_policy_version, daily_sky_policy_id,
+         daily_sky_policy_version, calculation_policy_id,
+         calculation_policy_version, contract_id, contract_version]
+      properties:
+        schema_version: { type: string, const: '0.5.0' }
+        request_id: { type: string, minLength: 8 }
+        day_start_at: { type: string, format: date-time }
+        day_end_at: { type: string, format: date-time }
+        anchor_at: { type: string, format: date-time }
+        anchor_resolution:
+          type: string
+          enum: [unique, ambiguous_earlier, nonexistent_shift_forward]
+        natal_positions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [body, longitude_deg]
+            properties:
+              body:
+                type: string
+                enum:
+                  [sun, moon, mercury, venus, mars, jupiter, saturn, uranus,
+                   neptune, pluto, true_node, ascendant, midheaven]
+              longitude_deg: { type: number, minimum: 0, exclusiveMaximum: 360 }
+        natal_house_cusps:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [house_system, cusps_deg]
+              properties:
+                house_system: { type: string }
+                cusps_deg:
+                  type: array
+                  minItems: 12
+                  maxItems: 12
+                  items: { type: number, minimum: 0, exclusiveMaximum: 360 }
+        effective_accuracy: { type: string, enum: [exact, approximate, unknown] }
+        uncertainty:
+          type: object
+          description: The normalized UncertaintyReport projection shared with M3.
+        suppressed_features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [houses, angles, angle_transits, moon_time_sensitive]
+        zodiac: { type: string, const: tropical }
+        node: { type: string, const: 'true' }
+        ephemeris_data_version: { type: string, minLength: 1 }
+        tzdb_version: { type: string, minLength: 1 }
+        local_day_resolution_policy_version: { type: string, const: '1.0.0' }
+        daily_sky_policy_id: { type: string, const: daily-sky-launch }
+        daily_sky_policy_version: { type: string, minLength: 1 }
+        calculation_policy_id: { type: string, minLength: 1 }
+        calculation_policy_version: { type: string, minLength: 1 }
+        contract_id: { type: string, minLength: 1 }
+        contract_version: { type: string, minLength: 1 }
+    DailySkyResponse:
+      oneOf:
+        - $ref: '#/components/schemas/DailySkyResponseSuccess'
+        - $ref: '#/components/schemas/DailySkyResponseFailure'
+    DailySkyResponseSuccess:
+      type: object
+      additionalProperties: false
+      required:
+        [ok, schema_version, request_id, day_start_at, day_end_at, anchor_at,
+         anchor_resolution, effective_accuracy, suppressed_features,
+         daily_sky_policy_id, daily_sky_policy_version, calculation_policy_id,
+         calculation_policy_version, contract_id, contract_version,
+         container_digest, ephemeris_data_version, tzdb_version, facts]
+      properties:
+        ok: { const: true }
+        schema_version: { type: string, const: '0.5.0' }
+        request_id: { type: string }
+        day_start_at: { type: string, format: date-time }
+        day_end_at: { type: string, format: date-time }
+        anchor_at: { type: string, format: date-time }
+        anchor_resolution: { type: string }
+        effective_accuracy: { type: string, enum: [exact, approximate, unknown] }
+        suppressed_features:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+        daily_sky_policy_id: { type: string }
+        daily_sky_policy_version: { type: string }
+        calculation_policy_id: { type: string }
+        calculation_policy_version: { type: string }
+        contract_id: { type: string }
+        contract_version: { type: string }
+        container_digest: { type: string }
+        ephemeris_data_version: { type: string }
+        tzdb_version: { type: string }
+        facts:
+          type: array
+          minItems: 2
+          description: |
+            Ordered by (kind rank, effective_at, fact_id), unique ids. Always
+            carries at least one anchor_position and exactly one lunar_phase.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              [fact_id, kind, scope, effective_at, label, precision, detail,
+               daily_sky_policy_id, daily_sky_policy_version,
+               calculation_policy_id, calculation_policy_version,
+               ephemeris_data_version, container_digest, content_digest]
+            properties:
+              fact_id: { type: string, pattern: '^dsf_[a-f0-9]{32}$' }
+              kind:
+                type: string
+                enum:
+                  [anchor_position, lunar_phase, transit_natal_contact,
+                   sign_ingress, collective_exact_aspect, house_placement]
+              scope: { type: string, enum: [personalized, collective] }
+              effective_at: { type: string, format: date-time }
+              label: { type: string, minLength: 1, maxLength: 200 }
+              precision:
+                type: object
+                additionalProperties: false
+                required: [longitude_decimals, instant_resolution_seconds]
+                properties:
+                  longitude_decimals: { type: [integer, 'null'] }
+                  instant_resolution_seconds: { type: [number, 'null'] }
+              detail: { type: object }
+              daily_sky_policy_id: { type: string }
+              daily_sky_policy_version: { type: string }
+              calculation_policy_id: { type: string }
+              calculation_policy_version: { type: string }
+              ephemeris_data_version: { type: string }
+              container_digest: { type: string }
+              content_digest: { type: string }
+    DailySkyResponseFailure:
+      type: object
+      additionalProperties: false
+      required: [ok, schema_version, request_id, error_class, error_message]
+      properties:
+        ok: { const: false }
+        schema_version: { type: string, const: '0.5.0' }
+        request_id: { type: string }
+        error_class:
+          type: string
+          enum:
+            [invalid_request, unsupported_body, ephemeris_range,
+             calculation_failed]
+          description: |
+            No cycle_window_incomplete: a daily-sky scan solves a bounded
+            interval and never has to prove the outer boundaries of an encounter.
+        error_message:
+          type: string
+          maxLength: 300
+          description: Payload-free; no upstream engine text is echoed verbatim.
+security:
+  - calcServiceAuth: []

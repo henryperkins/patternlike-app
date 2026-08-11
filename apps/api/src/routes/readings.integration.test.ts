@@ -6,7 +6,10 @@ import m0Common from "../../../../contracts/m0/common.schema.json";
 import m3Common from "../../../../contracts/m3/common.schema.json";
 import m3DailyReading from "../../../../contracts/m3/daily-reading.schema.json";
 import m3ReadingEvidence from "../../../../contracts/m3/reading-evidence.schema.json";
-import worker from "../index.js";
+import m5Common from "../../../../contracts/m5/common.schema.json";
+import m5DailyReading from "../../../../contracts/m5/daily-reading.schema.json";
+import m5ReadingEvidence from "../../../../contracts/m5/reading-evidence.schema.json";
+import worker, { app } from "../index.js";
 import {
   IDENTITY_A,
   IDENTITY_B,
@@ -19,17 +22,28 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
-import { CYCLE_FP_EMPTY } from "../../test/mock-calc-service.js";
+import {
+  CYCLE_FP_EMPTY,
+  CYCLE_FP_REFUSED,
+  CYCLE_FP_UNAVAILABLE,
+} from "../../test/mock-calc-service.js";
 import { encryptPayload } from "../db/users.js";
 import { fromB64 } from "../crypto.js";
 import { localDateIn } from "../services/local-day.js";
 import { loadPublishedReadingForDate } from "../db/readings.js";
 import {
+  enqueueConstrainedReading,
   enqueueDailyReading,
   enqueueReissue,
   type GenerationMessage,
 } from "../services/enqueue.js";
 import type { StoredReading } from "../services/generate-daily-reading.js";
+import {
+  invalidatePublishedReading,
+  reconcileCurrentFactRepair,
+} from "../services/reading-invalidation.js";
+import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
+import { OPENAI_READING_MODEL } from "../services/reading-publisher.js";
 
 const QUEUE = "patternlike-daily-readings-dev";
 const ZONE = "America/Chicago";
@@ -45,17 +59,28 @@ const ZONE = "America/Chicago";
  */
 const ajv = new Ajv2020({ strict: false });
 addFormats(ajv);
-for (const schema of [m0Common, m3Common, m3DailyReading, m3ReadingEvidence]) {
+for (const schema of [
+  m0Common,
+  m3Common,
+  m3DailyReading,
+  m3ReadingEvidence,
+  m5Common,
+  m5DailyReading,
+  m5ReadingEvidence,
+]) {
   ajv.addSchema(schema);
 }
 const validateTodayResponse = ajv.getSchema(
   `${m3DailyReading.$id}#/$defs/dailyReadingResponse`,
 )!;
-const validatePreparation = ajv.getSchema(
-  `${m3DailyReading.$id}#/$defs/dailyReadingPreparation`,
-)!;
 const validateEvidenceGraph = ajv.getSchema(
   `${m3ReadingEvidence.$id}#/$defs/readingEvidenceGraph`,
+)!;
+const validateTodayResponseV5 = ajv.getSchema(
+  `${m5DailyReading.$id}#/$defs/dailyReadingResponseV5`,
+)!;
+const validateEvidenceGraphV5 = ajv.getSchema(
+  `${m5ReadingEvidence.$id}#/$defs/readingEvidenceGraphV5`,
 )!;
 
 interface ErrorEnvelope {
@@ -63,6 +88,7 @@ interface ErrorEnvelope {
     code: string;
     message: string;
     request_id: string | null;
+    retryable?: boolean;
     details?: Record<string, unknown>;
   };
 }
@@ -118,6 +144,66 @@ async function putToday<T = unknown>(userId: string | null = USER_A) {
     headers: userId ? { "x-user-id": userId } : {},
   });
   return { status: res.status, body: (await res.json()) as T };
+}
+
+function enabledEnv(
+  overrides: Partial<typeof env> = {},
+): typeof env {
+  return {
+    ...env,
+    READING_V5_ROLLOUT: "first_open",
+    READING_PUBLISHER: "openai",
+    OPENAI_READING_MODEL,
+    OPENAI_READING_REASONING: "high",
+    OPENAI_READING_PROMPT_VERSION: "1.0.1",
+    OPENAI_READING_TIMEOUT_MS: "90000",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
+    READING_CONTEXT_MAX_BYTES: "98304",
+    READING_PREGEN_ACTIVE_DAYS: "30",
+    READING_PREGEN_LEAD_MINUTES: "30",
+    READING_PREGEN_SPREAD_MINUTES: "45",
+    READING_SCHEDULER_BATCH_LIMIT: "100",
+    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
+    OPENAI_API_KEY: "sk-test-key",
+    ...overrides,
+  };
+}
+
+async function putTodayWithEnv<T = unknown>(
+  requestEnv: typeof env,
+  userId = USER_A,
+) {
+  const response = await app.request(
+    "/v1/readings/today",
+    { method: "PUT", headers: { "x-user-id": userId } },
+    requestEnv,
+  );
+  return { status: response.status, body: (await response.json()) as T };
+}
+
+async function getTodayWithEnv<T = unknown>(requestEnv: typeof env, userId = USER_A) {
+  const response = await app.request(
+    "/v1/readings/today",
+    { headers: { "x-user-id": userId } },
+    requestEnv,
+  );
+  return { status: response.status, body: (await response.json()) as T };
+}
+
+async function grantAiSynthesis(userId = USER_A, suffix = "route") {
+  const now = new Date().toISOString();
+  await rows(
+    `INSERT INTO consents
+       (id, user_id, kind, status, policy_version, allowed_uses_json,
+        scopes_json, granted_at, version, created_at, updated_at)
+     VALUES (?, ?, 'ai_synthesis', 'granted', ?, '[]', '[]', ?, 1, ?, ?)`,
+    `cns_ai_synthesis_${suffix}`,
+    userId,
+    AI_SYNTHESIS_POLICY_VERSION,
+    now,
+    now,
+    now,
+  );
 }
 
 /** Drive the real queue handler the way the platform does. */
@@ -197,54 +283,79 @@ describe("PUT /v1/readings/today", () => {
     expect(validateTodayResponse.errors ?? []).toEqual([]);
   });
 
-  it("reserves an absent day and returns the exact preparation contract", async () => {
-    const { status, body } = await putToday<PreparationBody>();
+  it("reserves an absent day only as V2 and returns the V5 preparation contract", async () => {
+    await grantAiSynthesis();
+    const requestEnv = enabledEnv();
+    const { status, body } = await putTodayWithEnv<PreparationBody>(requestEnv);
 
     expect(status).toBe(202);
     expect(body).toEqual({
-      schema_version: "0.3.0",
+      schema_version: "0.5.0",
       status: "preparing",
       local_date: today(),
     });
-    expect(validatePreparation(body)).toBe(true);
-    expect(validatePreparation.errors ?? []).toEqual([]);
 
-    const [counts] = await rows<{ reading_count: number; job_count: number }>(
+    const [counts] = await rows<{
+      reading_count: number;
+      job_count: number;
+      release_count: number;
+      constrained_count: number;
+    }>(
       `SELECT
          (SELECT COUNT(*) FROM daily_readings WHERE user_id = ?) AS reading_count,
-         (SELECT COUNT(*) FROM jobs WHERE user_id = ?) AS job_count`,
+         (SELECT COUNT(*) FROM jobs WHERE user_id = ? AND job_type = 'generate_daily_reading') AS job_count,
+         (SELECT COUNT(*) FROM daily_readings WHERE user_id = ? AND release_version IS NOT NULL) AS release_count,
+         (SELECT COUNT(*) FROM daily_readings WHERE user_id = ? AND assembly_mode = 'constrained_model') AS constrained_count`,
+      USER_A,
+      USER_A,
       USER_A,
       USER_A,
     );
-    expect(counts).toEqual({ reading_count: 1, job_count: 1 });
+    expect(counts).toEqual({
+      reading_count: 1,
+      job_count: 1,
+      release_count: 0,
+      constrained_count: 1,
+    });
   });
 
   it("converges repeated and concurrent PUTs on one reservation and job", async () => {
-    const responses = await Promise.all([putToday(), putToday(), putToday()]);
+    await grantAiSynthesis();
+    const requestEnv = enabledEnv();
+    const responses = await Promise.all([
+      putTodayWithEnv(requestEnv),
+      putTodayWithEnv(requestEnv),
+      putTodayWithEnv(requestEnv),
+    ]);
 
     expect(responses.map((response) => response.status)).toEqual([202, 202, 202]);
     const [counts] = await rows<{ reading_count: number; job_count: number }>(
       `SELECT
          (SELECT COUNT(*) FROM daily_readings WHERE user_id = ?) AS reading_count,
-         (SELECT COUNT(*) FROM jobs WHERE user_id = ?) AS job_count`,
+         (SELECT COUNT(*) FROM jobs WHERE user_id = ? AND job_type = 'generate_daily_reading') AS job_count`,
       USER_A,
       USER_A,
     );
     expect(counts).toEqual({ reading_count: 1, job_count: 1 });
   });
 
-  it("refuses without an active release before reserving anything", async () => {
+  it("does not consult an active release or R2 on the V2 public path", async () => {
     await resetDb();
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A, ZONE);
     await seedChart(IDENTITY_A);
+    await grantAiSynthesis();
 
-    const { status, body } = await putToday<ErrorEnvelope>();
+    const { status, body } = await putTodayWithEnv<PreparationBody>(enabledEnv());
 
-    expect(status).toBe(503);
-    expect(body.error.code).toBe("release_not_active");
-    expect(await rows(`SELECT id FROM daily_readings`)).toEqual([]);
-    expect(await rows(`SELECT id FROM jobs`)).toEqual([]);
+    expect(status).toBe(202);
+    expect(body.schema_version).toBe("0.5.0");
+    expect(
+      await rows(
+        "SELECT assembly_mode, release_version FROM daily_readings WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toEqual([{ assembly_mode: "constrained_model", release_version: null }]);
   });
 
   it("keeps chart and preference setup gates actionable and time-zone-first", async () => {
@@ -323,6 +434,243 @@ describe("PUT /v1/readings/today", () => {
   });
 });
 
+describe("V5 Today rollout and status projection", () => {
+  async function seedV5Ready(options: { fingerprint?: string } = {}) {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    await confirmPreferences(USER_A, ZONE);
+    await seedChart(IDENTITY_A, { fingerprint: options.fingerprint });
+    await grantAiSynthesis();
+  }
+
+  function capturedEnv(mode: "off" | "internal" | "first_open" | "hybrid") {
+    const messages: GenerationMessage[] = [];
+    return {
+      messages,
+      requestEnv: enabledEnv({
+        READING_V5_ROLLOUT: mode,
+        READING_QUEUE: {
+          send: async (message: GenerationMessage) => {
+            messages.push(message);
+          },
+        } as unknown as typeof env.READING_QUEUE,
+      }),
+    };
+  }
+
+  it("enforces off/internal/first_open/hybrid without a V1 or release fallback", async () => {
+    for (const mode of ["off", "internal"] as const) {
+      await seedV5Ready();
+      const { requestEnv, messages } = capturedEnv(mode);
+      const blocked = await putTodayWithEnv<ErrorEnvelope>(requestEnv);
+      expect(blocked).toMatchObject({
+        status: 503,
+        body: {
+          error: { code: "publisher_not_configured", retryable: false },
+        },
+      });
+      expect(messages).toEqual([]);
+      expect(
+        await rows(
+          "SELECT id FROM jobs WHERE user_id = ? AND job_type = 'generate_daily_reading'",
+          USER_A,
+        ),
+      ).toEqual([]);
+      expect(await rows("SELECT id FROM daily_readings WHERE user_id = ?", USER_A)).toEqual([]);
+    }
+
+    for (const mode of ["first_open", "hybrid"] as const) {
+      await seedV5Ready();
+      const { requestEnv, messages } = capturedEnv(mode);
+      const accepted = await putTodayWithEnv<PreparationBody>(requestEnv);
+      expect(accepted).toMatchObject({
+        status: 202,
+        body: { schema_version: "0.5.0", status: "preparing" },
+      });
+      expect(messages).toHaveLength(1);
+      expect(
+        await rows(
+          "SELECT assembly_mode, release_version FROM daily_readings WHERE user_id = ?",
+          USER_A,
+        ),
+      ).toEqual([{ assembly_mode: "constrained_model", release_version: null }]);
+    }
+  });
+
+  it("keeps GET read-only with zero reservation or enqueue in every rollout mode", async () => {
+    for (const mode of ["off", "internal", "first_open", "hybrid"] as const) {
+      await seedV5Ready();
+      const { requestEnv, messages } = capturedEnv(mode);
+      const response = await getTodayWithEnv<ErrorEnvelope>(requestEnv);
+      expect(response).toMatchObject({
+        status: 404,
+        body: { error: { code: "reading_not_generated" } },
+      });
+      expect(messages).toEqual([]);
+      expect(await rows("SELECT id FROM daily_readings WHERE user_id = ?", USER_A)).toEqual([]);
+      expect(
+        await rows(
+          "SELECT id FROM jobs WHERE user_id = ? AND job_type = 'generate_daily_reading'",
+          USER_A,
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it("maps missing consent and deterministic/transient pre-command failures safely", async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    await confirmPreferences(USER_A, ZONE);
+    await seedChart(IDENTITY_A);
+    expect(await putTodayWithEnv<ErrorEnvelope>(enabledEnv())).toMatchObject({
+      status: 409,
+      body: { error: { code: "ai_synthesis_consent_required" } },
+    });
+
+    await seedV5Ready({ fingerprint: CYCLE_FP_UNAVAILABLE });
+    expect(await putTodayWithEnv<ErrorEnvelope>(enabledEnv())).toMatchObject({
+      status: 503,
+      body: { error: { code: "calc_unavailable", retryable: true } },
+    });
+
+    await seedV5Ready({ fingerprint: CYCLE_FP_REFUSED });
+    expect(await putTodayWithEnv<ErrorEnvelope>(enabledEnv())).toMatchObject({
+      status: 503,
+      body: { error: { code: "policy_unsupported", retryable: false } },
+    });
+
+    await seedV5Ready();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname.endsWith("/v1/daily-sky")) {
+        return new Response(
+          JSON.stringify({ error: { code: "unavailable", message: "safe fixture" } }),
+          { status: 503, headers: { "content-type": "application/json" } },
+        );
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    try {
+      expect(await putTodayWithEnv<ErrorEnvelope>(enabledEnv())).toMatchObject({
+        status: 503,
+        body: { error: { code: "daily_sky_unavailable", retryable: true } },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("projects queued/running as V5 preparation and terminal command states without internals", async () => {
+    await seedV5Ready();
+    const { requestEnv } = capturedEnv("first_open");
+    const enqueued = await enqueueConstrainedReading(requestEnv, USER_A, {
+      entry: "first_open",
+      reservationReason: "first_open",
+      targetLocalDate: today(),
+    });
+    if (!enqueued.ok) throw new Error(`V5 enqueue failed: ${enqueued.reason}`);
+
+    expect(await putTodayWithEnv<PreparationBody>(requestEnv)).toMatchObject({
+      status: 202,
+      body: { schema_version: "0.5.0", status: "preparing" },
+    });
+    await rows(
+      `UPDATE jobs SET status = 'running', claim_token = 'claim-status-test',
+                       lease_expires_at = ? WHERE id = ?`,
+      new Date(Date.now() + 60_000).toISOString(),
+      enqueued.jobId,
+    );
+    expect(await putTodayWithEnv<PreparationBody>(requestEnv)).toMatchObject({
+      status: 202,
+      body: { schema_version: "0.5.0", status: "preparing" },
+    });
+
+    for (const testCase of [
+      {
+        code: "generation_input_id_mismatch",
+        generation: 1,
+        status: 424,
+        wire: "reading_generation_failed",
+        retryable: false,
+      },
+      {
+        code: "publisher_unavailable",
+        generation: 3,
+        status: 424,
+        wire: "reading_generation_failed",
+        retryable: false,
+      },
+      {
+        code: "publisher_budget_exhausted",
+        generation: 1,
+        status: 503,
+        wire: "publisher_budget_exhausted",
+        retryable: false,
+      },
+    ] as const) {
+      await rows(
+        `UPDATE daily_readings SET status = 'failed', command_generation = ? WHERE id = ?`,
+        testCase.generation,
+        enqueued.readingId,
+      );
+      await rows(
+        `UPDATE jobs SET status = 'failed', result_class = ?, claim_token = NULL,
+                         lease_expires_at = NULL WHERE id = ?`,
+        testCase.code,
+        enqueued.jobId,
+      );
+      const response = await putTodayWithEnv<ErrorEnvelope>(requestEnv);
+      expect(response.status).toBe(testCase.status);
+      expect(response.body.error).toMatchObject({
+        code: testCase.wire,
+        retryable: testCase.retryable,
+        request_id: expect.any(String),
+      });
+      expect(JSON.stringify(response.body)).not.toContain(enqueued.jobId);
+    }
+  });
+
+  it("owner-scoped PUT redrives only an undispatched or expired pending job", async () => {
+    await seedV5Ready();
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B, ZONE);
+    await seedChart(IDENTITY_B);
+    await grantAiSynthesis(USER_B, "owner-b");
+    const { requestEnv, messages } = capturedEnv("first_open");
+    const alice = await enqueueConstrainedReading(requestEnv, USER_A, {
+      entry: "first_open",
+      reservationReason: "first_open",
+      targetLocalDate: today(),
+    });
+    const bob = await enqueueConstrainedReading(requestEnv, USER_B, {
+      entry: "first_open",
+      reservationReason: "first_open",
+      targetLocalDate: today(),
+    });
+    if (!alice.ok || !bob.ok) throw new Error("owner recovery setup failed");
+    messages.length = 0;
+    await rows("UPDATE jobs SET dispatched_at = NULL WHERE id IN (?, ?)", alice.jobId, bob.jobId);
+
+    expect((await putTodayWithEnv(requestEnv, USER_A)).status).toBe(202);
+    expect(messages).toEqual([{ job_id: alice.jobId, reading_id: alice.readingId }]);
+
+    messages.length = 0;
+    await rows(
+      `UPDATE jobs SET status = 'running', claim_token = 'expired-owner-claim',
+                       lease_expires_at = ?, dispatched_at = ? WHERE id = ?`,
+      new Date(Date.now() - 1_000).toISOString(),
+      new Date().toISOString(),
+      alice.jobId,
+    );
+    expect((await putTodayWithEnv(requestEnv, USER_A)).status).toBe(202);
+    expect(messages).toEqual([{ job_id: alice.jobId, reading_id: alice.readingId }]);
+    expect(
+      await rows("SELECT dispatched_at FROM jobs WHERE id = ?", bob.jobId),
+    ).toEqual([{ dispatched_at: null }]);
+  });
+});
+
 describe("GET /v1/readings/today", () => {
   beforeEach(seedBoth);
 
@@ -349,6 +697,66 @@ describe("GET /v1/readings/today", () => {
       expect(paragraph.order).toBe(index + 1);
       expect(paragraph.text.length).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps an immutable V3 reading readable after the active chart changes", async () => {
+    const readingId = await publish(USER_A);
+    const [before] = await rows<{
+      reading_enc: ArrayBuffer;
+      reading_key_version: number;
+      reading_nonce: string;
+    }>(
+      `SELECT reading_enc, reading_key_version, reading_nonce
+       FROM daily_readings WHERE id = ? AND user_id = ?`,
+      readingId,
+      USER_A,
+    );
+
+    await rows(
+      `UPDATE chart_snapshots SET fingerprint = ?
+       WHERE user_id = ? AND status = 'active'`,
+      `sha256:${"9c".repeat(32)}`,
+      USER_A,
+    );
+    expect(
+      await invalidatePublishedReading(env, {
+        identity: IDENTITY_A,
+        readingId,
+        reason: "chart_correction",
+        now: new Date("2026-08-10T15:00:00.000Z"),
+      }),
+    ).toMatchObject({ ok: false, reason: "not_supported" });
+    expect(
+      await reconcileCurrentFactRepair(env, IDENTITY_A, "chart_correction", new Date()),
+    ).toEqual({ ok: true, status: "current" });
+    expect(
+      await rows(
+        "SELECT id FROM daily_readings WHERE supersedes_reading_id = ?",
+        readingId,
+      ),
+    ).toEqual([]);
+
+    const { status, body } = await get<TodayBody>("/v1/readings/today");
+    expect(status).toBe(200);
+    expect(body.reading).toMatchObject({
+      output_schema: "daily-reading-v3",
+      assembly_mode: "deterministic",
+      reading_id: readingId,
+    });
+
+    const [after] = await rows<{
+      reading_enc: ArrayBuffer;
+      reading_key_version: number;
+      reading_nonce: string;
+    }>(
+      `SELECT reading_enc, reading_key_version, reading_nonce
+       FROM daily_readings WHERE id = ? AND user_id = ?`,
+      readingId,
+      USER_A,
+    );
+    expect(new Uint8Array(after!.reading_enc)).toEqual(new Uint8Array(before!.reading_enc));
+    expect(after!.reading_key_version).toBe(before!.reading_key_version);
+    expect(after!.reading_nonce).toBe(before!.reading_nonce);
   });
 
   it("conforms to the frozen daily-reading response schema", async () => {
@@ -513,9 +921,10 @@ describe("GET /v1/readings/today", () => {
 
     // A row this repo cannot otherwise author: sealed by a future engine. It
     // decrypts perfectly and still cannot be represented under 0.3.0.
+    const v3 = stored.stored as StoredReading;
     const drifted: StoredReading = {
-      ...stored.stored,
-      reading: { ...stored.stored.reading, schema_version: "0.4.0" as "0.3.0" },
+      ...v3,
+      reading: { ...v3.reading, schema_version: "0.4.0" as "0.3.0" },
     };
     const sealed = await encryptPayload(env, IDENTITY_A, drifted, {
       subject: IDENTITY_A.cryptoSubject,
@@ -756,6 +1165,515 @@ describe("GET /v1/readings/:id/evidence", () => {
     );
 
     const { status, body } = await get(`/v1/readings/${readingId}/evidence`);
+    expect(status).toBe(500);
+    expect((body as ErrorEnvelope).error.code).toBe("internal_error");
+  });
+});
+
+/**
+ * The v5 storage envelope, before anything writes one.
+ *
+ * Task 10 is what publishes these; this suite seeds one directly, because the
+ * migration and the readers have to be right before the publisher exists. A
+ * stored artifact is written once and never rewritten, so "fix the reader
+ * later" is not an option: whatever the first row is sealed with is what every
+ * later reader has to understand.
+ */
+describe("v5 stored readings", () => {
+  beforeEach(seedBoth);
+
+  const HEX32 = "a".repeat(32);
+  const HEX64 = "b".repeat(64);
+
+  async function seedV5Reading(options: {
+    status?: "published" | "invalidated";
+    headline?: string;
+    factLabel?: string;
+    paragraphRole?: string;
+    duplicateFactRef?: boolean;
+    emptyFactRefs?: boolean;
+    contextOnlyParagraph?: boolean;
+    contextCategory?: string;
+    allowedUse?: string;
+  } = {}) {
+    const status = options.status ?? "published";
+    const localDate = today();
+    const readingId = "rdg_v5_fixture_0001";
+    const paragraphId = "par_v5_fixture_0001";
+    const sourceId = "rsr_v5_fixture_0001";
+    const contextOnlyParagraphId = "par_v5_fixture_0002";
+    const contextOnlySourceId = "rsr_v5_fixture_0002";
+    const [activeChart] = await rows<{ fingerprint: string }>(
+      "SELECT fingerprint FROM chart_snapshots WHERE user_id = ? AND status = 'active'",
+      USER_A,
+    );
+    if (!activeChart) throw new Error("active chart fixture missing");
+
+    const reading = {
+      schema_version: "0.5.0" as const,
+      output_schema: "daily-reading-v5" as const,
+      reading_id: readingId,
+      local_date: localDate,
+      generated_at: "2026-08-09T23:30:00Z",
+      assembly_mode: "constrained_model" as const,
+      revision: 1,
+      locale: "en-US",
+      domain_preference: null,
+      headline: options.headline ?? "A narrower commitment",
+      disclosure: "Generated with OpenAI from your calculated chart and enabled context.",
+      paragraphs: [
+        {
+          paragraph_id: paragraphId,
+          role: options.paragraphRole ?? "primary_theme",
+          order: 1,
+          text: "Saturn is square your Sun today, and the pressure asks for a smaller promise.",
+        },
+        // A supporting paragraph that names no body, sign, aspect, phase,
+        // house, or degree and cites no fact. validateReadingCandidate accepts
+        // exactly this: it demands grounding of the lead and of any unit that
+        // makes an astrological claim, and lets personal context shape the
+        // rest. The reader has to serve what its own writer may publish.
+        ...(options.contextOnlyParagraph
+          ? [
+              {
+                paragraph_id: contextOnlyParagraphId,
+                role: "supporting_theme",
+                order: 2,
+                text: "Your note about the deadline suggests keeping the promise small this week.",
+              },
+            ]
+          : []),
+      ],
+    };
+
+    const stored = {
+      schema_version: "0.5.0" as const,
+      reading,
+      evidence_header: {
+        schema_version: "0.5.0" as const,
+        reading_id: readingId,
+        revision: 1,
+        revision_reason: "initial" as const,
+        generated_at: "2026-08-09T23:30:00Z",
+        generation_input_id: `gin_sha256_${HEX64}`,
+        input_manifest_hash: `sha256:${HEX64}`,
+        content_hash: `sha256:${HEX64}`,
+        provider_response_hash: `sha256:${HEX64}`,
+        calculation: {
+          chart_contract_id: "calc-contract-launch",
+          cycle_policy_version: "1.4.0",
+          daily_sky_policy_version: "1.0.0",
+          ephemeris_data_version: "swisseph-2.10.03",
+          container_digest: `sha256:${HEX64}`,
+          tzdb_version: "2025b",
+          local_day_resolution_policy_version: "1.0.0",
+        },
+        model: {
+          provider: "openai" as const,
+          model: "gpt-5.6-sol",
+          prompt_version: "1.0.1",
+          selection_policy_version: "1.0.0",
+          validation_policy_version: "1.0.0",
+          provider_request_id: "resp_fixture_0001",
+          input_tokens: 4210,
+          output_tokens: 512,
+        },
+        validation: {
+          status: "passed" as const,
+          policy_version: "1.0.0",
+          checks: [{ code: "grounding", passed: true as const }],
+        },
+      },
+      invalidation:
+        status === "invalidated"
+          ? {
+              reason: "chart_correction" as const,
+              actor_class: "user_change" as const,
+              invalidated_at: "2026-08-10T09:00:00Z",
+            }
+          : null,
+    };
+
+    const sealedReading = await encryptPayload(env, IDENTITY_A, stored, {
+      subject: IDENTITY_A.cryptoSubject,
+      field: "daily_readings.reading_enc",
+      recordId: readingId,
+    });
+    const sealedEvidence = await encryptPayload(
+      env,
+      IDENTITY_A,
+      {
+        paragraph_id: paragraphId,
+        role: options.paragraphRole ?? "primary_theme",
+        order: 1,
+        fact_refs: options.emptyFactRefs
+          ? []
+          : Array.from({ length: options.duplicateFactRef ? 2 : 1 }, () => ({
+              fact_id: `cyc_${HEX32}`,
+              fact_class: "cycle_instance",
+              label: options.factLabel ?? "Saturn square your Sun, building",
+              scope: "personalized",
+            })),
+        context_refs: [
+          {
+            private_ref: "ctx_1",
+            category: options.contextCategory ?? "enabled_personal_context",
+            allowed_use: options.allowedUse ?? "tone",
+          },
+        ],
+      },
+      {
+        subject: IDENTITY_A.cryptoSubject,
+        field: "reading_sources.evidence_enc",
+        recordId: sourceId,
+      },
+    );
+
+    await rows(
+      `INSERT INTO daily_readings
+         (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+          contract_id, assembly_mode, status, revision, revision_reason,
+          command_generation, invalidated_at, reading_enc, reading_key_version,
+          reading_nonce, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, ?, ?, 'calc-contract-launch',
+               'constrained_model', ?, 1, 'initial', 1, ?, ?, ?, ?, ?, ?)`,
+      readingId,
+      USER_A,
+      localDate,
+      `reading-v5:${USER_A}:${localDate}:r1`,
+      activeChart.fingerprint,
+      status,
+      status === "invalidated" ? "2026-08-10T09:00:00Z" : null,
+      fromB64(sealedReading.ciphertext),
+      sealedReading.keyVersion,
+      sealedReading.nonce,
+      "2026-08-09T23:30:00Z",
+      "2026-08-10T00:00:00Z",
+    );
+    await rows(
+      `INSERT INTO reading_sources
+         (id, reading_id, user_id, paragraph_id, paragraph_order,
+          evidence_enc, evidence_key_version, evidence_nonce, created_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+      sourceId,
+      readingId,
+      USER_A,
+      paragraphId,
+      fromB64(sealedEvidence.ciphertext),
+      sealedEvidence.keyVersion,
+      sealedEvidence.nonce,
+      "2026-08-09T23:30:00Z",
+    );
+
+    if (options.contextOnlyParagraph) {
+      const sealedContextOnly = await encryptPayload(
+        env,
+        IDENTITY_A,
+        {
+          paragraph_id: contextOnlyParagraphId,
+          role: "supporting_theme",
+          order: 2,
+          fact_refs: [],
+          context_refs: [
+            {
+              private_ref: "ctx_2",
+              category: "enabled_personal_context",
+              allowed_use: "tone",
+            },
+          ],
+        },
+        {
+          subject: IDENTITY_A.cryptoSubject,
+          field: "reading_sources.evidence_enc",
+          recordId: contextOnlySourceId,
+        },
+      );
+      await rows(
+        `INSERT INTO reading_sources
+           (id, reading_id, user_id, paragraph_id, paragraph_order,
+            evidence_enc, evidence_key_version, evidence_nonce, created_at)
+         VALUES (?, ?, ?, ?, 2, ?, ?, ?, ?)`,
+        contextOnlySourceId,
+        readingId,
+        USER_A,
+        contextOnlyParagraphId,
+        fromB64(sealedContextOnly.ciphertext),
+        sealedContextOnly.keyVersion,
+        sealedContextOnly.nonce,
+        "2026-08-09T23:30:00Z",
+      );
+    }
+
+    return { readingId, localDate };
+  }
+
+  it("round-trips a v5 envelope through the same loader that reads a v3 one", async () => {
+    const { readingId, localDate } = await seedV5Reading();
+
+    const published = await loadPublishedReadingForDate(env, IDENTITY_A, localDate);
+    expect(published).not.toBeNull();
+    expect(published!.record.releaseVersion).toBeNull();
+    expect(published!.record.assemblyMode).toBe("constrained_model");
+    expect(published!.record.readingKey.startsWith("reading-v5:")).toBe(true);
+    expect(published!.stored.reading.reading_id).toBe(readingId);
+    expect("fallback_used" in published!.stored.reading).toBe(false);
+  });
+
+  it("serves the v5 artifact against its own frozen response contract", async () => {
+    await seedV5Reading();
+
+    const { status, body } = await get<Record<string, unknown>>("/v1/readings/today");
+    expect(status).toBe(200);
+    expect(body.schema_version).toBe("0.5.0");
+    expect(validateTodayResponseV5(body)).toBe(true);
+    expect(validateTodayResponseV5.errors ?? []).toEqual([]);
+    expect(JSON.stringify(body)).not.toContain("release_version");
+    expect(JSON.stringify(body)).not.toContain("fallback_used");
+  });
+
+  it("serves the v5 provenance graph with its model record", async () => {
+    const { readingId } = await seedV5Reading();
+
+    const { status, body } = await get<Record<string, unknown>>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(200);
+    expect(validateEvidenceGraphV5(body)).toBe(true);
+    expect(validateEvidenceGraphV5.errors ?? []).toEqual([]);
+    expect((body.model as Record<string, unknown>).provider).toBe("openai");
+    // Trusted-plane fields the v3 graph inherited from M0 and v5 never had.
+    expect(body).not.toHaveProperty("user_id");
+    expect(body).not.toHaveProperty("reading_key");
+  });
+
+  it("hides an invalidated reading from Today while keeping its ciphertext", async () => {
+    const { readingId, localDate } = await seedV5Reading({ status: "invalidated" });
+
+    expect(await loadPublishedReadingForDate(env, IDENTITY_A, localDate)).toBeNull();
+
+    const { status, body } = await get("/v1/readings/today");
+    expect(status).toBe(404);
+    expect((body as ErrorEnvelope).error.code).toBe("reading_not_generated");
+
+    const [row] = await rows<{ status: string; invalidated_at: string; sealed: number }>(
+      `SELECT status, invalidated_at, reading_enc IS NOT NULL AS sealed
+       FROM daily_readings WHERE id = ?`,
+      readingId,
+    );
+    expect(row!.status).toBe("invalidated");
+    expect(row!.invalidated_at).toBe("2026-08-10T09:00:00Z");
+    expect(row!.sealed).toBe(1);
+  });
+
+  it.each([
+    {
+      name: "unknown context category",
+      options: { contextCategory: "private_journal_entry" },
+      forbidden: "private_journal_entry",
+    },
+    {
+      name: "unsupported allowed use",
+      options: { allowedUse: "content_quality" },
+      forbidden: "content_quality",
+    },
+    {
+      name: "oversized fact label",
+      options: { factLabel: "x".repeat(201) },
+      forbidden: "x".repeat(201),
+    },
+  ])("fails closed for V5 evidence with an $name", async ({ options, forbidden }) => {
+    const { readingId } = await seedV5Reading(options);
+    const { status, body } = await get<ErrorEnvelope>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+    expect(JSON.stringify(body)).not.toContain(forbidden);
+  });
+
+  it("fails closed when a V5 Today projection violates a frozen wire constraint", async () => {
+    const oversizedHeadline = "h".repeat(201);
+    await seedV5Reading({ headline: oversizedHeadline });
+
+    const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+    expect(JSON.stringify(body)).not.toContain(oversizedHeadline);
+  });
+
+  it("fails closed when a V5 Today projection does not open with its primary lead", async () => {
+    await seedV5Reading({ paragraphRole: "supporting_theme" });
+
+    const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+  });
+
+  it("serves a context-only supporting paragraph its own validator accepts", async () => {
+    const { readingId } = await seedV5Reading({ contextOnlyParagraph: true });
+
+    const today = await get<Record<string, unknown>>("/v1/readings/today");
+    expect(today.status).toBe(200);
+    expect(validateTodayResponseV5(today.body)).toBe(true);
+
+    const { status, body } = await get<Record<string, unknown>>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(200);
+    expect(validateEvidenceGraphV5(body)).toBe(true);
+    expect(
+      (body.paragraphs as Array<Record<string, unknown>>).map((paragraph) => [
+        paragraph.role,
+        (paragraph.fact_refs as unknown[]).length,
+        (paragraph.context_refs as unknown[]).length,
+      ]),
+    ).toEqual([
+      ["primary_theme", 1, 1],
+      ["supporting_theme", 0, 1],
+    ]);
+  });
+
+  it.each([
+    { name: "duplicate fact references", options: { duplicateFactRef: true } },
+    { name: "an ungrounded lead", options: { emptyFactRefs: true } },
+  ])("fails closed for V5 evidence with $name", async ({ options }) => {
+    const { readingId } = await seedV5Reading(options);
+    const { status, body } = await get<ErrorEnvelope>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(status).toBe(500);
+    expect(body.error.code).toBe("internal_error");
+  });
+
+  it("hides published prose when its chart pin no longer matches the active chart", async () => {
+    const { readingId } = await seedV5Reading();
+    await rows(
+      `UPDATE daily_readings
+       SET chart_fingerprint = (SELECT fingerprint FROM chart_snapshots WHERE user_id = ?) || '-stale'
+       WHERE id = ?`,
+      USER_A,
+      readingId,
+    );
+
+    const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
+    expect(status).toBe(404);
+    expect(body.error.code).toBe("reading_not_generated");
+  });
+
+  it("uses explicit PUT to invalidate a stale current-day V5 row and reserve one fact repair", async () => {
+    const { readingId } = await seedV5Reading();
+    await grantAiSynthesis();
+    await rows(
+      `UPDATE chart_snapshots SET fingerprint = ?
+       WHERE user_id = ? AND status = 'active'`,
+      `sha256:${"7d".repeat(32)}`,
+      USER_A,
+    );
+
+    const response = await putTodayWithEnv<PreparationBody>(enabledEnv());
+    expect(response).toMatchObject({
+      status: 202,
+      body: { schema_version: "0.5.0", status: "preparing" },
+    });
+    expect(
+      await rows(
+        `SELECT status, revision, revision_reason, supersedes_reading_id
+         FROM daily_readings WHERE user_id = ? ORDER BY revision`,
+        USER_A,
+      ),
+    ).toEqual([
+      {
+        status: "invalidated",
+        revision: 1,
+        revision_reason: "initial",
+        supersedes_reading_id: null,
+      },
+      {
+        status: "pending",
+        revision: 2,
+        revision_reason: "chart_recalculated",
+        supersedes_reading_id: readingId,
+      },
+    ]);
+  });
+
+  it("recovers an invalidated current-day orphan once and maps an exhausted repair to 424", async () => {
+    const { readingId } = await seedV5Reading({ status: "invalidated" });
+    await grantAiSynthesis();
+    const requestEnv = enabledEnv();
+
+    expect(await putTodayWithEnv<PreparationBody>(requestEnv)).toMatchObject({
+      status: 202,
+      body: { schema_version: "0.5.0", status: "preparing" },
+    });
+    const [successor] = await rows<{ id: string; active_generation_job_id: string }>(
+      `SELECT id, active_generation_job_id FROM daily_readings
+       WHERE supersedes_reading_id = ?`,
+      readingId,
+    );
+    expect(successor).toBeTruthy();
+    expect((await putTodayWithEnv<PreparationBody>(requestEnv)).status).toBe(202);
+    expect(
+      await rows("SELECT id FROM daily_readings WHERE supersedes_reading_id = ?", readingId),
+    ).toHaveLength(1);
+
+    await rows(
+      "UPDATE daily_readings SET status = 'failed', command_generation = 3 WHERE id = ?",
+      successor!.id,
+    );
+    await rows(
+      "UPDATE jobs SET status = 'failed', result_class = 'publisher_unavailable' WHERE id = ?",
+      successor!.active_generation_job_id,
+    );
+    expect(await putTodayWithEnv<ErrorEnvelope>(requestEnv)).toMatchObject({
+      status: 424,
+      body: {
+        error: {
+          code: "reading_generation_failed",
+          retryable: false,
+        },
+      },
+    });
+  });
+
+  it("still answers the evidence drawer for an invalidated reading", async () => {
+    // The reader may hold the id from a session that started before the
+    // invalidation. Hiding the provenance would leave them with prose they can
+    // no longer explain.
+    const { readingId } = await seedV5Reading({ status: "invalidated" });
+    const { status } = await get(`/v1/readings/${readingId}/evidence`);
+    expect(status).toBe(200);
+  });
+
+  it("refuses a v5 envelope whose evidence cannot name the model that wrote it", async () => {
+    const { readingId, localDate } = await seedV5Reading();
+    const published = await loadPublishedReadingForDate(env, IDENTITY_A, localDate);
+    if (!published) throw new Error("expected a published reading");
+
+    const header = (published.stored as { evidence_header: Record<string, unknown> })
+      .evidence_header;
+    const withoutModel: Record<string, unknown> = { ...header };
+    delete withoutModel.model;
+    const sealed = await encryptPayload(
+      env,
+      IDENTITY_A,
+      { ...published.stored, evidence_header: withoutModel },
+      {
+        subject: IDENTITY_A.cryptoSubject,
+        field: "daily_readings.reading_enc",
+        recordId: readingId,
+      },
+    );
+    await rows(
+      `UPDATE daily_readings SET reading_enc = ?, reading_key_version = ?, reading_nonce = ?
+       WHERE id = ?`,
+      fromB64(sealed.ciphertext),
+      sealed.keyVersion,
+      sealed.nonce,
+      readingId,
+    );
+
+    const { status, body } = await get("/v1/readings/today");
     expect(status).toBe(500);
     expect((body as ErrorEnvelope).error.code).toBe("internal_error");
   });

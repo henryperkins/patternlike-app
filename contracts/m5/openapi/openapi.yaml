@@ -1,0 +1,404 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API (M5 amendment)
+  version: 0.5.0
+  description: |
+    An AMENDMENT to `contracts/m3/openapi/openapi.yaml`, not a whole-origin
+    successor. Sessions, birth, chart, preferences, pattern, timing, and
+    content-release ingestion are unchanged and are still described by the M3
+    document. This file describes only what the OpenAI publisher changes: the
+    AI-synthesis consent surface, the two Today operations, the evidence
+    operation, and the internal fact-invalidation route.
+
+    The three consent operations are fixed to GET, PUT, and DELETE
+    `/v1/consents/ai-synthesis`. The server owns the provider, purpose, policy
+    version, and category list; PUT grants exactly the displayed policy version
+    and DELETE revokes the current grant. Neither can touch `research` or
+    `model_training` — a product reading is not a training corpus, and a consent
+    API that could blur that would make the distinction unenforceable no matter
+    what the copy said.
+
+    Today gains one status it did not have and one field it did not have.
+    `409 ai_synthesis_consent_required` is the new status: without an explicit
+    grant there is no provider call, so there is no reading, and saying so is
+    more useful than a generic 404. The new field is `error.retryable`. A `503`
+    used to be uniformly worth retrying; it no longer is, because
+    `publisher_budget_exhausted` is a `503` that no amount of retrying will
+    resolve today. A client that inferred retryability from the status code
+    would offer a control that cannot work, so the envelope states it instead.
+
+    `424 reading_generation_failed` means automatic command repair is exhausted
+    for that local day, or a fact-invalidated day has no publishable successor.
+    It is deliberately NOT retryable: calling the same endpoint again cannot
+    re-enter a repair branch, and a retry control that can never succeed is worse
+    than no control.
+
+    `release_not_active` and `release_unreadable` are not possible on this path.
+
+    Normative body shapes live in `contracts/m5/*.schema.json`; each operation
+    names its definition in `x-normative-schema`, and
+    `contracts/validate_schemas.py` resolves every pointer against the shipped
+    package.
+  contact:
+    name: Pattern-Like Engineering
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+    description: Production (API and PWA share this origin by requirement, not preference)
+  - url: http://localhost:8787
+    description: Local Workers dev
+tags:
+  - name: readings
+  - name: privacy
+  - name: internal
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/consents/ai-synthesis:
+    get:
+      tags: [privacy]
+      operationId: getAiSynthesisConsent
+      summary: Current AI-synthesis consent state
+      description: |
+        Read-only. Reports the server-owned provider, purpose, policy version,
+        and the ordered category list the user would be agreeing to, plus whether
+        a current grant exists. Naming the provider without pinning an exact
+        model is deliberate: consent is to OpenAI processing a stated set of
+        categories for a stated purpose, and a model version bump is not a new
+        disclosure to re-collect. The exact model belongs in the Generation
+        record, where a reader can check what actually wrote their reading.
+      responses:
+        '200':
+          description: Consent state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSynthesisConsentResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [privacy]
+      operationId: grantAiSynthesisConsent
+      summary: Grant AI-synthesis consent at the displayed policy version
+      description: |
+        Idempotent. The body names the policy version the user was actually
+        shown; a stale version is rejected rather than upgraded, because a grant
+        against copy the user never read is not a grant. Adding a data category
+        requires a new policy version and therefore a fresh grant.
+
+        Granting never enqueues a reading. The next explicit Today request or
+        scheduled reservation does that, so a re-grant cannot silently revive a
+        revoked packet.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiSynthesisConsentGrant' }
+      responses:
+        '200':
+          description: Granted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSynthesisConsentResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409':
+          description: '`consent_policy_version_stale` — re-read the current policy and grant again.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    delete:
+      tags: [privacy]
+      operationId: revokeAiSynthesisConsent
+      summary: Revoke AI-synthesis consent
+      description: |
+        Revocation is append-only history, not deletion. It prevents every later
+        provider call — including one for a job already sitting in the queue,
+        which rechecks consent after its claim and before any private content
+        leaves the Worker — and it removes those sources from future selection.
+
+        It does not retroactively rewrite or hide an already published,
+        factually valid reading. Export and account deletion remain the controls
+        for stored artifacts; pretending revocation erases what a user already
+        read would be a claim the storage cannot honour.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSynthesisConsentResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/readings/today:
+    get:
+      tags: [readings]
+      operationId: getTodayReadingV5
+      summary: Today's reading, read-only
+      description: |
+        Strictly read-only in every rollout state: it reserves nothing, enqueues
+        nothing, and calls no provider. A published v3 or v5 record is projected
+        through its own versioned reader. An invalidated row, or a published row
+        whose pinned chart is no longer the active one, is never returned.
+      x-normative-schema: 'm5:daily-reading.schema.json#/$defs/dailyReadingResponseV5'
+      responses:
+        '200':
+          description: Published reading
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: '`reading_not_generated` or `chart_not_found`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [readings]
+      operationId: ensureTodayReadingV5
+      summary: Ensure the server-resolved current local-day reading
+      description: |
+        Idempotent desired-state operation. It enqueues when required and returns
+        immediately; it never waits synchronously for OpenAI. Tying Today's
+        latency and availability to one long provider request would also discard
+        the durable retry semantics the D1 outbox already provides.
+
+        While a scheduler-replaceable failure still has command generations left,
+        this stays `202`. After the third generation fails it becomes `424` for
+        that local day, and the client stops offering a retry control, because
+        calling this endpoint again cannot re-enter the repair branch.
+      x-normative-schema: 'm5:daily-reading.schema.json#/$defs/dailyReadingPreparationV5'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Already published
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingResponse' }
+        '202':
+          description: Preparation queued or running
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingPreparation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: '`chart_not_found` — onboarding is unfinished.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: |
+            `ai_synthesis_consent_required`, `timezone_confirmation_required`, or
+            `locale_confirmation_required`. Each names the action that unblocks
+            it rather than telling the reader to check back.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '424':
+          description: |
+            `reading_generation_failed` — automatic repair is exhausted for this
+            local day, or a fact-invalidated day has no publishable successor.
+            `retryable` is false.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: |
+            A safe infrastructure answer before any terminal command result
+            exists: `publisher_not_configured`, `publisher_unavailable`,
+            `calc_unavailable`, `daily_sky_unavailable`, or
+            `publisher_budget_exhausted`. Read `retryable`: budget exhaustion and
+            a deterministic policy refusal are false, the rest are true.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /v1/readings/{reading_id}/evidence:
+    get:
+      tags: [readings]
+      operationId: getReadingEvidenceV5
+      summary: Owner-scoped provenance graph
+      description: |
+        Three progressively technical layers: the calculated facts behind each
+        paragraph with readable labels and a personalized/collective marker; the
+        context categories and permitted lanes, never raw journal or check-in
+        text; and the generation record naming OpenAI, the exact model, and every
+        prompt, selection, validation, and calculation version.
+      x-normative-schema: 'm5:reading-evidence.schema.json#/$defs/readingEvidenceGraphV5'
+      parameters:
+        - name: reading_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Evidence graph
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingEvidence' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404':
+          description: 'Unknown or not owned by the caller.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /internal/readings/invalidate:
+    post:
+      tags: [internal]
+      operationId: invalidatePublishedReading
+      summary: Withdraw a factually stale published reading
+      description: |
+        Service-token authenticated. The ONLY path that may remove a published
+        reading from Today before a successor exists, and it exists because the
+        alternative is worse: when a corrected chart makes the pinned facts wrong,
+        leaving the artifact live until a replacement succeeds means serving prose
+        the product knows is false.
+
+        It compare-and-swaps `published` to `invalidated`, records the reason in
+        the encrypted envelope, and does not wait for a successor. The repair
+        reservation that follows creates revision r+1 against that named
+        invalidated predecessor; if the successor also fails, the predecessor
+        stays invalidated and Today is honestly unavailable.
+
+        An ordinary safety or non-factual defect reissue is deliberately
+        different: its predecessor stays published until the successor is
+        atomically superseded.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvalidateReadingRequest' }
+      responses:
+        '202':
+          description: Invalidated and a repair reserved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvalidateReadingResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+            retryable:
+              type: boolean
+              description: |
+                Whether calling the same operation again can make progress. Added
+                at M5 because status alone stopped being sufficient: a
+                budget-exhausted 503 and an exhausted-generation 424 are both
+                permanent for the day, while a provider-unavailable 503 is not.
+            details:
+              type: object
+              additionalProperties: true
+              description: |
+                Never carries a job id, provider error, prompt content, private
+                source identifier, or raw upstream message.
+    AiSynthesisConsentResponse:
+      type: object
+      additionalProperties: false
+      required:
+        [kind, status, provider, purpose, policy_version, enabled_categories,
+         granted_at]
+      properties:
+        kind: { type: string, const: ai_synthesis }
+        status: { type: string, enum: [granted, not_granted] }
+        provider: { type: string, const: OpenAI }
+        purpose: { type: string, const: daily_reading_generation }
+        policy_version: { type: string, minLength: 1 }
+        enabled_categories:
+          type: array
+          uniqueItems: true
+          description: In the frozen display order.
+          items:
+            type: string
+            enum:
+              [birth_accuracy_and_uncertainty, calculated_natal_facts,
+               active_calculated_cycles, calculated_daily_sky,
+               enabled_personal_context, prior_reading_excerpts, reading_feedback]
+        granted_at: { type: [string, 'null'], format: date-time }
+    AiSynthesisConsentGrant:
+      type: object
+      additionalProperties: false
+      required: [policy_version]
+      properties:
+        policy_version:
+          type: string
+          minLength: 1
+          description: The exact version the user was shown.
+    DailyReadingResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, reading]
+      description: |
+        A V3/V5 union on the wire. Each stored schema is projected by its own
+        closed reader; a v5 body carries `headline` and `disclosure` and carries
+        neither `fallback_used` nor a release pointer.
+      properties:
+        schema_version: { type: string, enum: ['0.3.0', '0.5.0'] }
+        reading: { type: object }
+        evidence_url: { type: [string, 'null'] }
+    DailyReadingPreparation:
+      type: object
+      additionalProperties: false
+      required: [schema_version, status, local_date]
+      properties:
+        schema_version: { type: string, enum: ['0.3.0', '0.5.0'] }
+        status: { type: string, const: preparing }
+        local_date: { type: string, format: date }
+    ReadingEvidence:
+      type: object
+      additionalProperties: true
+      required: [schema_version, reading_id]
+      description: A V3/V5 union, projected by the stored record's own reader.
+      properties:
+        schema_version: { type: string, enum: ['0.3.0', '0.5.0'] }
+        reading_id: { type: string }
+    InvalidateReadingRequest:
+      type: object
+      additionalProperties: false
+      required: [reading_id, reason]
+      properties:
+        reading_id: { type: string, minLength: 8 }
+        reason: { type: string, enum: [chart_correction, calculation_defect] }
+    InvalidateReadingResponse:
+      type: object
+      additionalProperties: false
+      required: [reading_id, status, repair_reserved]
+      properties:
+        reading_id: { type: string }
+        status: { type: string, const: invalidated }
+        repair_reserved: { type: boolean }

@@ -1,4 +1,4 @@
-import type { ParagraphRole } from "./api-client.js";
+import type { ParagraphRole, ParagraphRoleV5 } from "./api-client.js";
 
 /**
  * Presentation for a machine-assigned paragraph role.
@@ -26,6 +26,26 @@ export const ROLE_PRESENTATION: Record<ParagraphRole, RolePresentation> = {
   uncertainty_notice: { kicker: "What this reading cannot say", tone: "notice" },
   context_label: { kicker: "Context, not astrology", tone: "notice" },
   safety_fallback: { kicker: "Reviewed standing guidance", tone: "lede" },
+};
+
+/**
+ * The same table for a v5 reading, and a separate `Record` for the same reason
+ * the v3 one is one: a role added to the v5 contract must be a compile error
+ * here rather than a paragraph that renders with no label.
+ *
+ * `primary_theme` still has no static kicker — v5 supplies its own headline into
+ * that slot, so a fixed word there would displace the model's own.
+ * `collective_context` names the collective in the label itself, because a fact
+ * true for everyone must not be read as a private discovery.
+ */
+export const ROLE_PRESENTATION_V5: Record<ParagraphRoleV5, RolePresentation> = {
+  primary_theme: { kicker: null, tone: "lede" },
+  supporting_theme: { kicker: "Supporting influence", tone: "body" },
+  phase_context: { kicker: "Where this is in its cycle", tone: "body" },
+  timing: { kicker: "Timing", tone: "body" },
+  collective_context: { kicker: "The sky everyone shares", tone: "body" },
+  reflection: { kicker: "A question to sit with", tone: "aside" },
+  uncertainty_notice: { kicker: "What this reading cannot say", tone: "notice" },
 };
 
 /**
@@ -75,6 +95,60 @@ function humanize(value: string): string {
   const words = value.replace(/[_.-]+/g, " ").trim();
   if (!words) return value;
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Reader words for the seven server-owned consent categories.
+ *
+ * A map with a `humanize` fallback, not a closed `Record`: the list is owned by
+ * the consent policy version the server displays, so a category added by a later
+ * policy shows its own name rather than disappearing from a screen whose whole
+ * job is to be complete about what may be sent.
+ */
+const AI_CONSENT_CATEGORY_LABELS: Record<string, string> = {
+  birth_accuracy_and_uncertainty: "Birth-time accuracy and what it rules out",
+  calculated_natal_facts: "Calculated facts from your natal chart",
+  active_calculated_cycles: "Your active calculated cycles",
+  calculated_daily_sky: "The calculated sky for your day",
+  enabled_personal_context: "Personal context you have enabled",
+  prior_reading_excerpts: "Recent readings, so today does not repeat them",
+  reading_feedback: "Feedback you have given on readings",
+};
+
+export function aiConsentCategoryLabel(category: string): string {
+  return AI_CONSENT_CATEGORY_LABELS[category] ?? humanize(category);
+}
+
+/** What a permitted lane means in reader words, with the same open fallback. */
+const ALLOWED_USE_LABELS: Record<string, string> = {
+  annual_context: "Yearly framing",
+  environment_context: "Surroundings",
+  life_domain_selection: "Which area of life",
+  narrative_continuity: "Continuity with earlier readings",
+  optional_recommendations: "Optional suggestions",
+  pattern_profile: "Long-run pattern",
+  reflection_prompt: "The reflection question",
+  relationship_interpretation: "Relationship framing",
+  repetition_control: "Avoiding repetition",
+  routine_context: "Routine",
+  theme_eligibility: "Which themes are eligible",
+  theme_filtering: "Which themes are set aside",
+  theme_ranking: "Which theme leads",
+  tone: "Tone",
+  travel_context: "Travel",
+  user_memory: "What the product remembers",
+  workload_context: "Workload",
+};
+
+export function allowedUseLabel(use: string): string {
+  return ALLOWED_USE_LABELS[use] ?? humanize(use);
+}
+
+/** Personalized or collective, said in words rather than left as a code. */
+export function factScopeLabel(scope: string): string {
+  if (scope === "collective") return "Everyone's sky";
+  if (scope === "personalized") return "Your chart";
+  return humanize(scope);
 }
 
 const FACT_TYPE_LABELS: Record<string, string> = {

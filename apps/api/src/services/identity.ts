@@ -1,5 +1,6 @@
 import { Jwt } from "hono/utils/jwt";
 import type { Env } from "../env.js";
+import { safeLog } from "./safe-log.js";
 
 export interface VerifiedToken {
   /** The issuer, stored as identities.provider. */
@@ -18,7 +19,11 @@ export interface VerifiedToken {
 export class TokenVerificationError extends Error {
   readonly code = "unauthorized";
   constructor(
-    readonly reason: string,
+    readonly reason:
+      | "jwks_unavailable"
+      | "signature_or_claims"
+      | "missing_expiry"
+      | "missing_subject",
     options?: { cause?: unknown },
   ) {
     super("Token verification failed", options);
@@ -78,9 +83,7 @@ async function loadJwks(url: string): Promise<JsonWebKey[]> {
     // because the issuer had a bad minute. Keys are long-lived; staleness here
     // is far less harmful than a total auth outage.
     if (jwksCache) {
-      console.error("jwks_refresh_failed_using_stale", {
-        message: err instanceof Error ? err.message : String(err),
-      });
+      safeLog({ event: "jwks_refresh_failed_using_stale" });
       return jwksCache.keys;
     }
     throw new TokenVerificationError("jwks_unavailable", { cause: err });

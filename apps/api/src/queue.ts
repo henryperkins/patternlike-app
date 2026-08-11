@@ -1,14 +1,23 @@
 import type { Env, GenerationMessage } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import {
-  CLAIM_LEASE_MS,
-  MAX_JOB_ATTEMPTS,
   ClaimLoadError,
   claimJob,
   failClaimedJob,
+  pauseQueuedV2ForRolloutOff,
   releaseClaimForRetry,
 } from "./db/generation.js";
-import { generateDailyReading } from "./services/generate-daily-reading.js";
+import { dispatchGeneration } from "./services/generate-daily-reading.js";
+import {
+  LEASE_RETRY_DELAY_SECONDS,
+  MAX_JOB_ATTEMPTS,
+  RETRY_DELAY_SECONDS,
+  queueDisposition,
+  type GenerationFailureCode,
+} from "./services/generation-failures.js";
+import { isCommandV2 } from "./services/generation-command-v2.js";
+import { readReadingV5Rollout } from "./services/reading-rollout.js";
+import { safeLog } from "./services/safe-log.js";
 
 /**
  * The daily-reading consumer.
@@ -21,10 +30,6 @@ import { generateDailyReading } from "./services/generate-daily-reading.js";
  * still run.
  */
 
-/** Backoff for a dependency that was down rather than wrong. */
-const RETRY_DELAY_SECONDS = 60;
-const LEASE_RETRY_DELAY_SECONDS = Math.ceil(CLAIM_LEASE_MS / 1000) + 5;
-
 interface ClaimReference {
   jobId: string;
   claimToken: string;
@@ -36,9 +41,10 @@ async function retryOrFail(
   env: Env,
   claim: ClaimReference,
   resultClass: string,
+  disposition?: "retry_60s" | "terminal",
 ): Promise<void> {
   const attempts = Math.max(message.attempts, claim.attempts ?? 0);
-  if (attempts >= MAX_JOB_ATTEMPTS) {
+  if (disposition === "terminal" || attempts >= MAX_JOB_ATTEMPTS) {
     const failed = await failClaimedJob(env, claim.jobId, claim.claimToken, resultClass);
     if (failed.ok) {
       message.ack();
@@ -59,10 +65,7 @@ async function retryOrFail(
       return;
     }
   } catch (err) {
-    console.error("generation_claim_release_failed", {
-      job_id: claim.jobId,
-      message: err instanceof Error ? err.message : String(err),
-    });
+    safeLog({ event: "generation_claim_release_failed" });
   }
 
   // If D1 could not prove the release, wait beyond the original lease. A
@@ -75,23 +78,37 @@ export async function queue(
   batch: MessageBatch<GenerationMessage>,
   env: Env,
 ): Promise<void> {
+  const rollout = readReadingV5Rollout(env);
+  const rolloutPaused = new Set<string>();
+  if (rollout === "off") {
+    for (const message of batch.messages) {
+      const { job_id: jobId } = message.body ?? {};
+      if (!jobId) continue;
+      const paused = await pauseQueuedV2ForRolloutOff(env, jobId);
+      if (paused !== "not_v2") {
+        // D1 committed the pause (or a duplicate delivery observed it) before
+        // the Queue nudge is acknowledged. No command decryption or claim.
+        message.ack();
+        rolloutPaused.add(message.id);
+      }
+    }
+  }
+
   const failure = checkSecureConfig(env);
   if (failure) {
-    console.error("insecure_configuration", { code: failure.code, queue: batch.queue });
+    safeLog({ event: "insecure_configuration", config_code: failure.code });
     // Retry rather than ack: the messages are valid and the deployment is not.
     batch.retryAll({ delaySeconds: RETRY_DELAY_SECONDS });
     return;
   }
 
   for (const message of batch.messages) {
+    if (rolloutPaused.has(message.id)) continue;
     const { job_id: jobId, reading_id: readingId } = message.body ?? {};
     if (!jobId || !readingId) {
       // Nothing to claim and nothing to retry into. Acking stops an unparseable
       // message from cycling until it reaches the dead-letter queue.
-      console.error("generation_message_malformed", {
-        queue: batch.queue,
-        message_id: message.id,
-      });
+      safeLog({ event: "generation_message_malformed" });
       message.ack();
       continue;
     }
@@ -108,7 +125,7 @@ export async function queue(
       }
       claimed = claim;
 
-      const outcome = await generateDailyReading(env, claim);
+      const outcome = await dispatchGeneration(env, claim);
       if (outcome.ok) {
         message.ack();
         continue;
@@ -119,22 +136,50 @@ export async function queue(
         continue;
       }
 
-      if (outcome.reason === "calc_unavailable" || outcome.reason === "release_unreadable") {
+      if (outcome.reason === "insufficient_lease") {
+        const retryAt = new Date(Date.now() + LEASE_RETRY_DELAY_SECONDS * 1000);
+        try {
+          await releaseClaimForRetry(env, claim.jobId, claim.claimToken, retryAt);
+        } finally {
+          // If D1 did not prove the release, waiting beyond the lease is still
+          // the safe disposition. A short retry could be mistaken for a
+          // duplicate while this claim remains live.
+          message.retry({ delaySeconds: LEASE_RETRY_DELAY_SECONDS });
+        }
+        continue;
+      }
+
+      const commandVersion = isCommandV2(claim.command) ? "v2" : "v1";
+      const failureCode = outcome.reason as GenerationFailureCode;
+      const disposition = queueDisposition(
+        commandVersion,
+        failureCode,
+        Math.max(message.attempts, claim.attempts ?? 0),
+      );
+      if (disposition === "retry_60s") {
         // Infrastructural. Release the claim before asking Queue for a delayed
         // redelivery; after the bounded delivery budget, fail the reservation
         // so the scheduler's guarded replacement path can re-freeze the day.
-        console.warn("generation_retryable_failure", {
-          job_id: jobId,
-          reason: outcome.reason,
+        safeLog({
+          event: "generation_retryable_failure",
+          failure_class: outcome.reason,
         });
-        await retryOrFail(message, env, claim, outcome.reason);
+        await retryOrFail(message, env, claim, outcome.reason, disposition);
+        continue;
+      }
+
+      if (
+        commandVersion === "v2" ||
+        queueDisposition(commandVersion, failureCode, 1) === "retry_60s"
+      ) {
+        await retryOrFail(message, env, claim, outcome.reason, disposition);
         continue;
       }
 
       // Terminal: generateDailyReading has already moved the reservation and the
       // job to a failed state, so the message is acked. The day is now visible
       // to an operator as a failed reading rather than cycling invisibly.
-      console.error("generation_failed", { job_id: jobId, reason: outcome.reason });
+      safeLog({ event: "generation_failed", failure_class: outcome.reason });
       message.ack();
     } catch (err) {
       const loadFailure = err instanceof ClaimLoadError ? err : null;
@@ -145,10 +190,9 @@ export async function queue(
             attempts: loadFailure.attempts,
           }
         : claimed;
-      console.error("generation_threw", {
-        job_id: jobId,
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
+      safeLog({
+        event: "generation_threw",
+        failure_class: loadFailure ? "payload_undecryptable" : "execution_error",
       });
       if (claim) {
         await retryOrFail(

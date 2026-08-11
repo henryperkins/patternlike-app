@@ -4,28 +4,55 @@ import { asCryptoSubject } from "../crypto.js";
 import type { UserIdentity } from "../db/users.js";
 import { persistCycles } from "../db/cycles.js";
 import {
-  MAX_COMMAND_GENERATION,
   markDispatched,
   replaceCommand,
   reserveInitial,
+  reserveInvalidatedSuccessor,
   reserveReissue,
   type ReserveOutcome,
 } from "../db/generation.js";
 import {
   buildGenerationCommand,
   type CommandBuildFailure,
-  type CommandReplacementReason,
-  type GenerateDailyReadingCommandV1,
   type RevisionReason,
 } from "./generation-command.js";
-import { isCurrentOrPreviousLocalDay } from "./local-day.js";
+import { isCurrentOrPreviousLocalDay, nextLocalDate } from "./local-day.js";
+import { pinnedLocalDate } from "./tzdb.js";
 import { loadPreferences } from "../db/preferences.js";
+import { readReadingV5Rollout, rolloutAllows, type RolloutEntry } from "./reading-rollout.js";
+import {
+  buildGenerationCommandV2,
+  type CommandBuildFailureV2,
+  type ReservationReason,
+  type RevisionReasonV2,
+} from "./generation-command-v2.js";
+import {
+  MAX_COMMAND_GENERATION,
+  type CommandReplacementReason,
+  isAutomaticReplacementFailure,
+  isGenerationFailureCode,
+  isV1ReplacementReason,
+  isV5ReplacementReason,
+  type GenerationReplacementReason,
+  type V5ReplacementReason,
+} from "./generation-failures.js";
+import { safeLog } from "./safe-log.js";
 
 export type { GenerationMessage } from "../env.js";
 
 export type EnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }
-  | { ok: false; reason: CommandBuildFailure | "duplicate" | "stale_predecessor" | "conflict"; detail: string };
+  | {
+      ok: false;
+      reason:
+        | CommandBuildFailure
+        | CommandBuildFailureV2
+        | "duplicate"
+        | "stale_predecessor"
+        | "conflict"
+        | "rollout_disabled";
+      detail: string;
+    };
 
 async function loadIdentity(env: Env, userId: string): Promise<UserIdentity | null> {
   const row = await env.DB.prepare(
@@ -54,10 +81,7 @@ export async function dispatch(
   try {
     await env.READING_QUEUE.send(message);
   } catch (err) {
-    console.error("generation_dispatch_failed", {
-      job_id: message.job_id,
-      message: err instanceof Error ? err.message : String(err),
-    });
+    safeLog({ event: "generation_dispatch_failed" });
     return false;
   }
   await markDispatched(env, message.job_id);
@@ -182,18 +206,13 @@ export async function enqueueReissue(
   return { ok: true, readingId: reserved.readingId, jobId: reserved.jobId, dispatched };
 }
 
-/** Reasons the scheduler may act on unattended. Everything else needs a person. */
-const SCHEDULER_REPLACEABLE: ReadonlySet<CommandReplacementReason> = new Set([
-  "calc_unavailable",
-  "release_unreadable",
-]);
-
 export type ReplaceEnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }
   | {
       ok: false;
       reason:
         | CommandBuildFailure
+        | CommandBuildFailureV2
         | "not_replaceable"
         | "budget_exhausted"
         | "stale_job"
@@ -221,25 +240,20 @@ export async function replaceFailedCommand(
   env: Env,
   userId: string,
   readingId: string,
-  reason: CommandReplacementReason,
-  actor: "scheduler" | "operator",
+  reason: GenerationReplacementReason,
+  actor: "scheduler" | "operator" | "first_open",
   now = new Date(),
 ): Promise<ReplaceEnqueueOutcome> {
   const identity = await loadIdentity(env, userId);
   if (!identity) {
     return { ok: false, reason: "chart_not_found", detail: "no active user" };
   }
-  if (actor === "scheduler" && !SCHEDULER_REPLACEABLE.has(reason)) {
-    return {
-      ok: false,
-      reason: "not_replaceable",
-      detail: `${reason} is an operator decision, not an automatic repair`,
-    };
-  }
-
   const reservation = await env.DB.prepare(
     `SELECT id, local_date, status, revision, revision_reason, supersedes_reading_id,
-            command_generation, active_generation_job_id
+            command_generation, active_generation_job_id, assembly_mode,
+            (SELECT status FROM daily_readings predecessor
+             WHERE predecessor.id = daily_readings.supersedes_reading_id
+               AND predecessor.user_id = daily_readings.user_id) AS predecessor_status
      FROM daily_readings WHERE id = ? AND user_id = ?`,
   )
     .bind(readingId, userId)
@@ -252,12 +266,30 @@ export async function replaceFailedCommand(
       supersedes_reading_id: string | null;
       command_generation: number;
       active_generation_job_id: string | null;
+      assembly_mode: "deterministic" | "constrained_model";
+      predecessor_status: string | null;
     }>();
   if (!reservation || reservation.status !== "failed" || !reservation.active_generation_job_id) {
     return {
       ok: false,
       reason: "stale_job",
       detail: "reservation is not a failed reading with an active terminal job",
+    };
+  }
+
+  const commandVersion = reservation.assembly_mode === "constrained_model" ? "v2" : "v1";
+  if (
+    (commandVersion === "v1" && !isV1ReplacementReason(reason)) ||
+    (commandVersion === "v2" && !isV5ReplacementReason(reason)) ||
+    (actor === "scheduler" &&
+      (!isGenerationFailureCode(reason) || !isAutomaticReplacementFailure(commandVersion, reason))) ||
+    (actor === "first_open" &&
+      (commandVersion !== "v2" || reason !== "consent_regranted"))
+  ) {
+    return {
+      ok: false,
+      reason: "not_replaceable",
+      detail: `${reason} is an operator decision, not an automatic repair`,
     };
   }
 
@@ -270,36 +302,66 @@ export async function replaceFailedCommand(
     };
   }
 
-  if (actor === "scheduler") {
+  if (actor === "scheduler" || actor === "first_open") {
     const preferences = await loadPreferences(env, userId);
+    const currentLocalDate = preferences
+      ? resolveV5TargetDate(preferences.timezone, now)
+      : null;
+    const isReplaceableLocalDate = commandVersion === "v2"
+      ? currentLocalDate !== null &&
+        (reservation.local_date === currentLocalDate ||
+          reservation.local_date === nextLocalDate(currentLocalDate))
+      : preferences !== null &&
+        isCurrentOrPreviousLocalDay(preferences.timezone, reservation.local_date, now);
     if (
-      !preferences ||
-      !isCurrentOrPreviousLocalDay(preferences.timezone, reservation.local_date, now)
+      !isReplaceableLocalDate
     ) {
       return {
         ok: false,
         reason: "day_too_old",
-        detail: `${reservation.local_date} is no longer the current or preceding local day`,
+        detail: `${reservation.local_date} is outside the automatic replacement window`,
       };
     }
   }
 
-  const build = await buildGenerationCommand(env, userId, {
-    readingId,
-    revision: reservation.revision,
-    revisionReason: reservation.revision_reason,
-    supersedesReadingId: reservation.supersedes_reading_id,
-    commandGeneration: nextGeneration,
-    replacesJobId: reservation.active_generation_job_id,
-    commandReplacementReason: reason,
-    now,
-  });
+  const build =
+    commandVersion === "v1"
+      ? await buildGenerationCommand(env, userId, {
+          readingId,
+          revision: reservation.revision,
+          revisionReason: reservation.revision_reason,
+          supersedesReadingId: reservation.supersedes_reading_id,
+          commandGeneration: nextGeneration,
+          replacesJobId: reservation.active_generation_job_id,
+          commandReplacementReason: reason as CommandReplacementReason,
+          now,
+        })
+      : await buildGenerationCommandV2(env, identity, {
+          readingId,
+          revision: reservation.revision,
+          revisionReason: reservation.revision_reason as RevisionReasonV2,
+          supersedesReadingId: reservation.supersedes_reading_id,
+          reservationReason:
+            reservation.supersedes_reading_id &&
+            reservation.predecessor_status === "invalidated"
+              ? "fact_repair"
+              : actor === "scheduler"
+                ? "automatic_replacement"
+                : actor === "first_open"
+                  ? "first_open"
+                  : "manual_reissue",
+          commandGeneration: nextGeneration,
+          replacesJobId: reservation.active_generation_job_id,
+          commandReplacementReason: reason as V5ReplacementReason,
+          targetLocalDate: reservation.local_date,
+          now,
+        });
   if (!build.ok) return { ok: false, reason: build.reason, detail: build.detail };
 
   // The replacement must land on the same local day the reservation reserved.
   // A midnight rollover between the failure and the repair would otherwise
   // rewrite which day this reading is for.
-  const command: GenerateDailyReadingCommandV1 = build.command;
+  const command = build.command;
   if (command.target_local_date !== reservation.local_date) {
     return {
       ok: false,
@@ -323,4 +385,118 @@ export async function replaceFailedCommand(
 
   const dispatched = await dispatch(env, { job_id: replaced.jobId, reading_id: readingId });
   return { ok: true, readingId, jobId: replaced.jobId, dispatched };
+}
+
+
+// ---------------------------------------------------------------------------
+// Constrained-model reservations
+// ---------------------------------------------------------------------------
+
+export interface EnqueueV5Options {
+  /** Which surface is asking. Checked against the rollout before anything else. */
+  entry: RolloutEntry;
+  reservationReason: ReservationReason;
+  /**
+   * The local day to reserve, resolved by the SERVER.
+   *
+   * Explicit because the scheduler reserves tomorrow's edition before its local
+   * day begins. The public first-open path passes what `resolveV5TargetDate`
+   * returns, which is today in the reader's confirmed zone — never a client
+   * value.
+   */
+  targetLocalDate: string;
+  revision?: number;
+  revisionReason?: RevisionReasonV2;
+  supersedesReadingId?: string | null;
+  now?: Date;
+}
+
+/**
+ * Today, in the reader's confirmed scheduling zone, under the pinned tz
+ * database.
+ *
+ * `Intl` carries whatever database the platform shipped; a Worker deployment
+ * that silently updated it would move a reader's day boundary without changing
+ * any value the command records. Returns null when the account has no usable
+ * zone, which the caller reports as the ordinary confirmation gate.
+ */
+export function resolveV5TargetDate(zone: string, now: Date): string | null {
+  try {
+    return pinnedLocalDate(zone, now.getTime());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reserve a constrained-model reading for one user and local day.
+ *
+ * The rollout gate runs FIRST, before the command is built and therefore before
+ * any calculation call, any context decryption, and any consent read. `off` must
+ * cost nothing at all — not a scan, not a DEK load — or the kill switch is only
+ * a switch for the provider rather than for the feature.
+ */
+export async function enqueueConstrainedReading(
+  env: Env,
+  userId: string,
+  options: EnqueueV5Options,
+): Promise<EnqueueOutcome> {
+  const rollout = readReadingV5Rollout(env);
+  if (rollout === null || !rolloutAllows(rollout, options.entry)) {
+    return {
+      ok: false,
+      reason: "rollout_disabled",
+      detail: `constrained-model generation is not enabled for the ${options.entry} entry point`,
+    };
+  }
+
+  const identity = await loadIdentity(env, userId);
+  if (!identity) {
+    return { ok: false, reason: "chart_not_found", detail: "no active user" };
+  }
+
+  const now = options.now ?? new Date();
+  const revision = options.revision ?? 1;
+  const build = await buildGenerationCommandV2(env, identity, {
+    readingId: newId("rdg"),
+    revision,
+    revisionReason: options.revisionReason ?? "initial",
+    supersedesReadingId: options.supersedesReadingId ?? null,
+    reservationReason: options.reservationReason,
+    commandGeneration: 1,
+    replacesJobId: null,
+    commandReplacementReason: null,
+    targetLocalDate: options.targetLocalDate,
+    now,
+  });
+  if (!build.ok) return { ok: false, reason: build.reason, detail: build.detail };
+
+  // Cycles are persisted BEFORE the reservation, for the same reason the V1 path
+  // does it: a crash between the two leaves content-addressed rows the next
+  // attempt reuses, while the reverse order would leave a reservation whose
+  // pinned cycles were never stored.
+  await persistCycles(env, userId, build.chartId, build.cycles);
+
+  const reserved = build.command.supersedes_reading_id
+    ? build.command.reservation_reason === "fact_repair"
+      ? await reserveInvalidatedSuccessor(
+          env,
+          identity,
+          build.command,
+          build.command.supersedes_reading_id,
+        )
+      : await reserveReissue(
+          env,
+          identity,
+          build.command,
+          build.command.supersedes_reading_id,
+        )
+    : await reserveInitial(env, identity, build.command);
+  if (!reserved.ok) return reserveFailure(reserved);
+
+  const dispatched = await dispatch(env, {
+    job_id: reserved.jobId,
+    reading_id: reserved.readingId,
+  });
+  return { ok: true, readingId: reserved.readingId, jobId: reserved.jobId, dispatched };
 }

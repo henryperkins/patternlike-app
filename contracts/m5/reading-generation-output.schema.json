@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/reading-generation-output.schema.json",
+  "title": "Reading Generation Output (strict OpenAI candidate)",
+  "description": "The exact structured candidate the publisher must return, sent verbatim as text.format.json_schema.schema with strict: true. Written to the strict-mode subset on purpose: the root is an object, every object closes with additionalProperties false, every declared property is required, an absent value is expressed as an explicit null rather than an omitted key, and every $ref is local — a schema that reached for another document would not resolve at the provider. Length bounds, vocabulary, grounding, safety, and echo checks are deliberately NOT here: a strict schema proves shape, and shape is the cheapest of the checks a candidate has to pass. It carries no provider metadata, raw reasoning, storage identifier, HTML, Markdown link, executable content, or instruction for the application.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "output_schema",
+    "local_date",
+    "locale",
+    "headline",
+    "lead",
+    "paragraphs",
+    "reflection_prompt",
+    "uncertainty_note"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "enum": ["0.5.0"] },
+    "output_schema": { "type": "string", "enum": ["daily-reading-v5"] },
+    "local_date": {
+      "type": "string",
+      "description": "Echo the supplied local_date exactly, as YYYY-MM-DD. Do not compute, adjust, or reformat it."
+    },
+    "locale": {
+      "type": "string",
+      "description": "Echo the supplied locale tag exactly."
+    },
+    "headline": {
+      "type": "string",
+      "description": "A short, quiet label for the day's primary theme. Rendered as a kicker above the lead, never as the focal sentence."
+    },
+    "lead": { "$ref": "#/$defs/groundedUnit" },
+    "paragraphs": {
+      "type": "array",
+      "description": "Zero to four supporting paragraphs, each role used at most once and in the declared order: supporting_theme, phase_context, timing, collective_context.",
+      "items": { "$ref": "#/$defs/generatedParagraph" }
+    },
+    "reflection_prompt": { "$ref": "#/$defs/groundedUnit" },
+    "uncertainty_note": {
+      "description": "Required when the request declares uncertainty_note_required; otherwise exactly null. Names what the reading cannot say, never apologises for it.",
+      "anyOf": [{ "$ref": "#/$defs/groundedUnit" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "generatedParagraphRole": {
+      "type": "string",
+      "enum": ["supporting_theme", "phase_context", "timing", "collective_context"],
+      "description": "The declaration order is the frozen paragraph order. collective_context exists so a day carried by collective sky can say so in its own voice rather than borrowing the personalized one."
+    },
+    "groundedUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "fact_ids", "context_refs"],
+      "description": "One prose unit and the exact evidence behind it. fact_ids and context_refs are always present; an ungrounded unit sends empty arrays and is rejected by validation rather than by omission.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Plain prose. No HTML, no Markdown links, no code, no instructions to the application."
+        },
+        "fact_ids": {
+          "type": "array",
+          "description": "Handles copied verbatim from the supplied facts. Every degree, timestamp, date, body, sign, aspect, house, and phase name in the text must come from one of these facts.",
+          "items": { "type": "string" }
+        },
+        "context_refs": {
+          "type": "array",
+          "description": "Handles copied verbatim from the supplied context. Context may shape relevance, tone, questions, and suggestions; it can never be evidence for an astrological assertion.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "generatedParagraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "text", "fact_ids", "context_refs"],
+      "properties": {
+        "role": { "$ref": "#/$defs/generatedParagraphRole" },
+        "text": { "type": "string" },
+        "fact_ids": { "type": "array", "items": { "type": "string" } },
+        "context_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

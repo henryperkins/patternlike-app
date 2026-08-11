@@ -70,6 +70,13 @@ export function notImplemented(feature: string, requestId: string): MockResponse
 
 export const NOT_BUILT = "Not built yet. The API answered with a not-implemented response.";
 
+/**
+ * Keys are a path, or `"METHOD /path"` when one path answers differently per
+ * method. The consent surface is three verbs on one path, and a path-only table
+ * cannot express "granted after the PUT" without also changing what the GET
+ * before it returned. The method-qualified key wins; the bare path remains the
+ * default for every other route.
+ */
 export function mockApiResponses(responses: Record<string, MockResponse>) {
   captured = [];
   vi.stubGlobal(
@@ -85,7 +92,9 @@ export function mockApiResponses(responses: Record<string, MockResponse>) {
         signal: init?.signal ?? null,
       });
 
-      const entry = responses[url.pathname];
+      const method = init?.method ?? "GET";
+      const entry =
+        responses[`${method} ${url.pathname}`] ?? responses[url.pathname];
       if (!entry) {
         return jsonResponse(500, {
           error: {

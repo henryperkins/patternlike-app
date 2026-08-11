@@ -56,7 +56,10 @@ describe("invokeCycles", () => {
     const incomplete = { ...scanRequest(FINGERPRINT) } as Record<string, unknown>;
     delete incomplete.natal_positions;
     const response = await mockCalcService(
-      new Request("http://calc.test/v1/cycles", {
+      // The host the Worker actually calls. The interceptor dispatches by host
+      // first and fails closed on anything else, so a made-up host here would
+      // pass through the wrong branch and prove nothing about /v1/cycles.
+      new Request("http://127.0.0.1:8080/v1/cycles", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(incomplete),

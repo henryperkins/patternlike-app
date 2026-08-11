@@ -15,6 +15,7 @@ import {
 import type { CalcRequest } from "@patternlike/shared";
 import { isServiceAuthorized } from "./service-auth.js";
 import { handleCycleScan } from "./cycles.js";
+import { handleDailySky } from "./daily-sky.js";
 
 const port = Number(process.env.PORT ?? 8080);
 
@@ -204,6 +205,40 @@ const server = http.createServer(async (req, res) => {
     // Everything past here is an engine-level answer: HTTP 200 with a
     // discriminated body, including every refusal.
     const result = handleCycleScan(parsed);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/daily-sky") {
+    const denial = serviceAuthDenial(req);
+    if (denial) {
+      // Same rule as `/v1/cycles`: a credential failure never reached the
+      // engine, so it is a transport envelope with a non-200 status rather than
+      // a dailySkyResponse with `ok: false`.
+      res.writeHead(denial.status, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { code: denial.error_class, message: denial.error_message },
+        }),
+      );
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { code: "bad_request", message: "Request body is not valid JSON" },
+        }),
+      );
+      return;
+    }
+
+    const result = handleDailySky(parsed);
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify(result));
     return;

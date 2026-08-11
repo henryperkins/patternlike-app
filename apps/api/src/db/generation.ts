@@ -2,10 +2,15 @@ import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
-import type {
-  CommandReplacementReason,
-  GenerateDailyReadingCommandV1,
-} from "../services/generation-command.js";
+import {
+  LEASE_RETRY_DELAY_SECONDS,
+  MAX_COMMAND_GENERATION,
+  type GenerationReplacementReason,
+} from "../services/generation-failures.js";
+import {
+  isCommandV2,
+  type GenerateDailyReadingCommand,
+} from "../services/generation-command-v2.js";
 
 /**
  * Reservation, claim, and publication — every one a single guarded `DB.batch()`.
@@ -24,14 +29,10 @@ import type {
 
 export const JOB_TYPE = "generate_daily_reading";
 
-/** Two automatic attempts after the initial command, then the day stays failed. */
-export const MAX_COMMAND_GENERATION = 3;
+export { MAX_COMMAND_GENERATION, MAX_JOB_ATTEMPTS } from "../services/generation-failures.js";
 
 /** How long a consumer may hold a claim before another may reclaim it. */
 export const CLAIM_LEASE_MS = 5 * 60 * 1000;
-
-/** One initial Queue delivery plus the three retries configured in wrangler.toml. */
-export const MAX_JOB_ATTEMPTS = 4;
 
 export type ReserveOutcome =
   | { ok: true; readingId: string; jobId: string }
@@ -62,6 +63,10 @@ export interface InitialGenerationState {
   } | null;
 }
 
+export interface CurrentGenerationState extends InitialGenerationState {
+  assemblyMode: "deterministic" | "constrained_model";
+}
+
 function auditStatement(
   env: Env,
   userId: string,
@@ -88,7 +93,7 @@ async function encryptedJobInsert(
   env: Env,
   identity: UserIdentity,
   jobId: string,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
   idempotencyKey: string,
   now: string,
 ): Promise<D1PreparedStatement> {
@@ -114,8 +119,34 @@ async function encryptedJobInsert(
   );
 }
 
-export function idempotencyKeyFor(command: GenerateDailyReadingCommandV1): string {
-  return `daily-reading:${command.target_local_date}:r${command.revision}:g${command.command_generation}`;
+/**
+ * The per-user idempotency key for one command.
+ *
+ * The two families are namespaced apart. A user-day can only ever hold one
+ * reservation, so a collision is not reachable through the product — but the key
+ * is what a replay is matched on, and two different command shapes answering to
+ * one key would make "the same request" mean two different readings.
+ */
+export function idempotencyKeyFor(command: GenerateDailyReadingCommand): string {
+  const family = isCommandV2(command) ? "daily-reading-v5" : "daily-reading";
+  return `${family}:${command.target_local_date}:r${command.revision}:g${command.command_generation}`;
+}
+
+/**
+ * The clear reservation columns a command implies.
+ *
+ * One place, because these were hardcoded at three call sites. `deterministic`
+ * with a non-null release and `constrained_model` with a null one are the two
+ * shapes 0003's CHECK admits, and deriving them from the command is what stops a
+ * V2 reservation from claiming an editorial release it does not have.
+ */
+function reservationColumns(command: GenerateDailyReadingCommand): {
+  assemblyMode: "deterministic" | "constrained_model";
+  releaseVersion: string | null;
+} {
+  return isCommandV2(command)
+    ? { assemblyMode: "constrained_model", releaseVersion: null }
+    : { assemblyMode: "deterministic", releaseVersion: command.release_version };
 }
 
 async function liveReadingId(
@@ -192,6 +223,61 @@ export async function loadInitialGenerationState(
 }
 
 /**
+ * The newest live generation state for an owner-day, including its command
+ * family. Unlike the frozen M3 reader above, this sees an r2+ fact-repair
+ * successor so the M5 product path cannot mistake it for an absent day.
+ */
+export async function loadCurrentGenerationState(
+  env: Env,
+  userId: string,
+  localDate: string,
+): Promise<CurrentGenerationState | null> {
+  const row = await env.DB.prepare(
+    `SELECT r.id AS reading_id, r.status AS reading_status, r.assembly_mode,
+            r.command_generation, j.id AS job_id, j.status AS job_status,
+            j.result_class, j.available_at, j.dispatched_at, j.lease_expires_at
+     FROM daily_readings r
+     LEFT JOIN jobs j
+       ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+     WHERE r.user_id = ? AND r.local_date = ?
+       AND r.status IN ('pending', 'failed')
+     ORDER BY r.revision DESC
+     LIMIT 1`,
+  )
+    .bind(userId, localDate)
+    .first<{
+      reading_id: string;
+      reading_status: "pending" | "failed";
+      assembly_mode: "deterministic" | "constrained_model";
+      command_generation: number;
+      job_id: string | null;
+      job_status: GenerationJobStatus | null;
+      result_class: string | null;
+      available_at: string | null;
+      dispatched_at: string | null;
+      lease_expires_at: string | null;
+    }>();
+  if (!row) return null;
+  return {
+    readingId: row.reading_id,
+    readingStatus: row.reading_status,
+    assemblyMode: row.assembly_mode,
+    commandGeneration: row.command_generation,
+    activeJob:
+      row.job_id === null || row.job_status === null
+        ? null
+        : {
+            id: row.job_id,
+            status: row.job_status,
+            resultClass: row.result_class,
+            availableAt: row.available_at,
+            dispatchedAt: row.dispatched_at,
+            leaseExpiresAt: row.lease_expires_at,
+          },
+  };
+}
+
+/**
  * Reserve the initial reading for a user-day.
  *
  * One batch: the encrypted job, the pending artifact reservation pointing at it,
@@ -201,10 +287,11 @@ export async function loadInitialGenerationState(
 export async function reserveInitial(
   env: Env,
   identity: UserIdentity,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
 ): Promise<ReserveOutcome> {
   const now = new Date().toISOString();
   const jobId = newId("job");
+  const columns = reservationColumns(command);
 
   try {
     await env.DB.batch([
@@ -234,15 +321,16 @@ export async function reserveInitial(
             contract_id, assembly_mode, status, revision, revision_reason,
             supersedes_reading_id, command_generation, active_generation_job_id,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'deterministic', 'pending', ?, ?, NULL, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL, ?, ?, ?, ?)`,
       ).bind(
         command.reading_id,
         identity.userId,
         command.target_local_date,
-        command.release_version,
+        columns.releaseVersion,
         command.reading_key,
         command.chart.fingerprint,
         command.chart.contract_id,
+        columns.assemblyMode,
         command.revision,
         command.revision_reason,
         command.command_generation,
@@ -284,11 +372,12 @@ export async function reserveInitial(
 export async function reserveReissue(
   env: Env,
   identity: UserIdentity,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
   expectedLiveReadingId: string,
 ): Promise<ReserveOutcome> {
   const now = new Date().toISOString();
   const jobId = newId("job");
+  const columns = reservationColumns(command);
 
   const predecessor = await env.DB.prepare(
     `SELECT id, revision, status FROM daily_readings WHERE id = ? AND user_id = ?`,
@@ -341,15 +430,16 @@ export async function reserveReissue(
             contract_id, assembly_mode, status, revision, revision_reason,
             supersedes_reading_id, command_generation, active_generation_job_id,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'deterministic', 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         command.reading_id,
         identity.userId,
         command.target_local_date,
-        command.release_version,
+        columns.releaseVersion,
         command.reading_key,
         command.chart.fingerprint,
         command.chart.contract_id,
+        columns.assemblyMode,
         command.revision,
         command.revision_reason,
         expectedLiveReadingId,
@@ -399,6 +489,132 @@ export async function reserveReissue(
   return { ok: true, readingId: command.reading_id, jobId };
 }
 
+/**
+ * Reserve the first successor to a named factually invalidated reading.
+ *
+ * This is intentionally not a mode on `reserveReissue`: an ordinary reissue
+ * requires a published predecessor, while a fact repair must refuse until the
+ * predecessor has already stopped being live. Keeping separate assertions is
+ * what prevents a caller from accidentally weakening both paths at once.
+ */
+export async function reserveInvalidatedSuccessor(
+  env: Env,
+  identity: UserIdentity,
+  command: GenerateDailyReadingCommand,
+  invalidatedReadingId: string,
+): Promise<ReserveOutcome> {
+  const now = new Date().toISOString();
+  const jobId = newId("job");
+  const columns = reservationColumns(command);
+  const predecessor = await env.DB.prepare(
+    `SELECT id, revision, status, local_date
+     FROM daily_readings WHERE id = ? AND user_id = ?`,
+  )
+    .bind(invalidatedReadingId, identity.userId)
+    .first<{ id: string; revision: number; status: string; local_date: string }>();
+  if (
+    !predecessor ||
+    predecessor.status !== "invalidated" ||
+    predecessor.local_date !== command.target_local_date ||
+    predecessor.revision + 1 !== command.revision ||
+    command.supersedes_reading_id !== invalidatedReadingId ||
+    !isCommandV2(command) ||
+    command.reservation_reason !== "fact_repair"
+  ) {
+    return { ok: false, reason: "stale_predecessor" };
+  }
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'expected predecessor is not invalidated at the expected revision'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM daily_readings
+           WHERE id = ? AND user_id = ? AND local_date = ?
+             AND status = 'invalidated' AND revision = ?
+         )`,
+      ).bind(
+        invalidatedReadingId,
+        identity.userId,
+        command.target_local_date,
+        command.revision - 1,
+      ),
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'invalidated predecessor already has a successor'
+         WHERE EXISTS (
+           SELECT 1 FROM daily_readings WHERE supersedes_reading_id = ?
+         )`,
+      ).bind(invalidatedReadingId),
+      await encryptedJobInsert(
+        env,
+        identity,
+        jobId,
+        command,
+        idempotencyKeyFor(command),
+        now,
+      ),
+      env.DB.prepare(
+        `INSERT INTO daily_readings
+           (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+            contract_id, assembly_mode, status, revision, revision_reason,
+            supersedes_reading_id, command_generation, active_generation_job_id,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        command.reading_id,
+        identity.userId,
+        command.target_local_date,
+        columns.releaseVersion,
+        command.reading_key,
+        command.chart.fingerprint,
+        command.chart.contract_id,
+        columns.assemblyMode,
+        command.revision,
+        command.revision_reason,
+        invalidatedReadingId,
+        command.command_generation,
+        jobId,
+        now,
+        now,
+      ),
+      auditStatement(
+        env,
+        identity.userId,
+        "daily_reading.fact_repair_reserved",
+        command.reading_id,
+        "fact_repair",
+        now,
+      ),
+    ]);
+  } catch (err) {
+    const successor = await env.DB.prepare(
+      `SELECT id FROM daily_readings
+       WHERE supersedes_reading_id = ? AND user_id = ?`,
+    )
+      .bind(invalidatedReadingId, identity.userId)
+      .first<{ id: string }>();
+    if (successor) {
+      return { ok: false, reason: "duplicate", readingId: successor.id };
+    }
+    const stillInvalidated = await env.DB.prepare(
+      `SELECT 1 AS present FROM daily_readings
+       WHERE id = ? AND user_id = ? AND status = 'invalidated'`,
+    )
+      .bind(invalidatedReadingId, identity.userId)
+      .first<{ present: number }>();
+    if (!stillInvalidated) return { ok: false, reason: "stale_predecessor" };
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: err instanceof Error ? err.message : "fact repair reservation failed",
+    };
+  }
+
+  return { ok: true, readingId: command.reading_id, jobId };
+}
+
 export type ReplaceOutcome =
   | { ok: true; jobId: string }
   | {
@@ -421,9 +637,9 @@ export type ReplaceOutcome =
 export async function replaceCommand(
   env: Env,
   identity: UserIdentity,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
   expectedFailedJobId: string,
-  reason: CommandReplacementReason,
+  reason: GenerationReplacementReason,
 ): Promise<ReplaceOutcome> {
   if (command.command_generation > MAX_COMMAND_GENERATION) {
     return {
@@ -435,6 +651,11 @@ export async function replaceCommand(
 
   const now = new Date().toISOString();
   const jobId = newId("job");
+  const columns = reservationColumns(command);
+  const predecessorStatus =
+    isCommandV2(command) && command.reservation_reason === "fact_repair"
+      ? "invalidated"
+      : "published";
 
   try {
     await env.DB.batch([
@@ -457,19 +678,20 @@ export async function replaceCommand(
         command.command_generation - 1,
         expectedFailedJobId,
       ),
-      // A reissue's predecessor must still be the live row, or the replacement
-      // would revive a successor to a reading that is no longer published.
+      // An ordinary reissue's predecessor must still be live. A fact repair's
+      // predecessor must stay invalidated through every command replacement.
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
-         SELECT 1, 'reissue predecessor is no longer published'
+         SELECT 1, 'reissue predecessor is no longer in its required state'
          WHERE ? IS NOT NULL AND NOT EXISTS (
            SELECT 1 FROM daily_readings
-           WHERE id = ? AND user_id = ? AND status = 'published'
+           WHERE id = ? AND user_id = ? AND status = ?
          )`,
       ).bind(
         command.supersedes_reading_id,
         command.supersedes_reading_id,
         identity.userId,
+        predecessorStatus,
       ),
       await encryptedJobInsert(
         env,
@@ -483,16 +705,17 @@ export async function replaceCommand(
         `UPDATE daily_readings
          SET status = 'pending', command_generation = ?, active_generation_job_id = ?,
              release_version = ?, reading_key = ?, chart_fingerprint = ?,
-             contract_id = ?, updated_at = ?
+             contract_id = ?, assembly_mode = ?, updated_at = ?
          WHERE id = ? AND user_id = ? AND status = 'failed'
            AND active_generation_job_id = ?`,
       ).bind(
         command.command_generation,
         jobId,
-        command.release_version,
+        columns.releaseVersion,
         command.reading_key,
         command.chart.fingerprint,
         command.chart.contract_id,
+        columns.assemblyMode,
         now,
         command.reading_id,
         identity.userId,
@@ -530,7 +753,7 @@ export async function replaceCommand(
            ? IS NULL OR EXISTS (
              SELECT 1 FROM daily_readings predecessor
              WHERE predecessor.id = ? AND predecessor.user_id = ?
-               AND predecessor.status = 'published'
+               AND predecessor.status = ?
            )
          )`,
     )
@@ -542,6 +765,7 @@ export async function replaceCommand(
         command.supersedes_reading_id,
         command.supersedes_reading_id,
         identity.userId,
+        predecessorStatus,
       )
       .first<{ present: number }>();
     return {
@@ -559,7 +783,16 @@ export interface Claim {
   claimToken: string;
   userId: string;
   attempts: number;
-  command: GenerateDailyReadingCommandV1;
+  /** Read back as the union it was sealed as; the dispatcher branches on it. */
+  command: GenerateDailyReadingCommand;
+  /**
+   * When another consumer may reclaim this lease.
+   *
+   * Carried on the claim because V5 execution has to decide, before it spends
+   * money, whether enough of the lease remains for a 90-second provider call
+   * plus a publication margin.
+   */
+  leaseExpiresAt: string;
 }
 
 /**
@@ -649,7 +882,7 @@ export async function claimJob(
       cryptoSubject: asCryptoSubject(row.crypto_subject),
     };
     const { dek } = await loadUserKey(env, identity);
-    const command = await decryptJson<GenerateDailyReadingCommandV1>(
+    const command = await decryptJson<GenerateDailyReadingCommand>(
       {
         key_version: row.payload_key_version,
         nonce: row.payload_nonce,
@@ -659,7 +892,14 @@ export async function claimJob(
       { subject: identity.cryptoSubject, field: "jobs.payload_enc", recordId: jobId },
     );
 
-    return { jobId, claimToken, userId: row.user_id, attempts: row.attempts, command };
+    return {
+      jobId,
+      claimToken,
+      userId: row.user_id,
+      attempts: row.attempts,
+      command,
+      leaseExpiresAt,
+    };
   } catch (err) {
     throw new ClaimLoadError(jobId, claimToken, attempts, err);
   }
@@ -683,6 +923,143 @@ export async function releaseClaimForRetry(
   return result.meta.changes === 1;
 }
 
+export type RolloutPauseOutcome = "paused" | "already_paused" | "not_v2";
+
+/**
+ * Durably pause one opaque Queue nudge while the V5 kill switch is off.
+ *
+ * The decision uses only clear trusted-plane columns. No user key or encrypted
+ * command is loaded, and the guarded update leaves attempts untouched.
+ *
+ * The state set MUST match what `claimJob` is willing to reclaim, which is
+ * `queued` OR `running` with an expired lease. Pausing only `queued` left the
+ * second case answering `not_v2`, so `queue.ts` did not acknowledge, the
+ * delivery fell through to the claim, and the executor — which never reads the
+ * rollout itself — decrypted the command, spent a provider budget unit, and
+ * called OpenAI after the switch was pulled. That state is produced
+ * deliberately: the 305-second retry runs against a 300-second lease so a
+ * crashed execution can be recovered, and the internal sweep re-offers exactly
+ * these rows. A stale claim is cleared on the way back to `queued` so the next
+ * delivery cannot reclaim it and the owner resume can still find it.
+ */
+export async function pauseQueuedV2ForRolloutOff(
+  env: Env,
+  jobId: string,
+  now = new Date(),
+): Promise<RolloutPauseOutcome> {
+  const nowIso = now.toISOString();
+  const availableAt = new Date(now.getTime() + LEASE_RETRY_DELAY_SECONDS * 1000).toISOString();
+  const paused = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, dispatched_at = NULL, result_class = 'rollout_paused',
+         status = 'queued', claim_token = NULL, lease_expires_at = NULL
+     WHERE id = ? AND job_type = ?
+       AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))
+       AND result_class IS NOT 'rollout_paused'
+       AND EXISTS (
+         SELECT 1 FROM daily_readings r
+         WHERE r.active_generation_job_id = jobs.id
+           AND r.user_id = jobs.user_id AND r.status = 'pending'
+           AND r.assembly_mode = 'constrained_model'
+       )
+     RETURNING id`,
+  )
+    .bind(availableAt, jobId, JOB_TYPE, nowIso)
+    .first<{ id: string }>();
+  if (paused) return "paused";
+
+  const existing = await env.DB.prepare(
+    `SELECT 1 AS present
+     FROM jobs j JOIN daily_readings r
+       ON r.active_generation_job_id = j.id AND r.user_id = j.user_id
+     WHERE j.id = ? AND j.job_type = ?
+       AND j.status = 'queued' AND j.result_class = 'rollout_paused'
+       AND r.status = 'pending' AND r.assembly_mode = 'constrained_model'`,
+  )
+    .bind(jobId, JOB_TYPE)
+    .first<{ present: number }>();
+  return existing ? "already_paused" : "not_v2";
+}
+
+/**
+ * Bounded scheduler resume for rows the kill switch parked.
+ *
+ * The owner-scoped resume above only runs when that reader opens the app, and
+ * the outbox sweep deliberately skips paused rows, so without this a reservation
+ * made before the switch was pulled would sit paused forever for anyone who does
+ * not come back — holding the one pending row that blocks a new reservation for
+ * that user and day. This is the plan's third named recovery route.
+ *
+ * Safe to call unconditionally from the scheduler because the scheduler itself
+ * only runs under `hybrid`: reaching it means the switch has already left `off`.
+ * Clearing `result_class` returns the row to the ordinary undispatched lane
+ * rather than dispatching it here, so one bounded query does the whole job.
+ */
+export async function resumePausedV2AfterRollout(
+  env: Env,
+  limit: number,
+  now = new Date(),
+): Promise<number> {
+  if (limit <= 0) return 0;
+  const { results } = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, result_class = NULL
+     WHERE id IN (
+       SELECT j.id FROM jobs j
+       JOIN users u ON u.id = j.user_id AND u.status = 'active'
+       JOIN daily_readings r ON r.active_generation_job_id = j.id
+         AND r.user_id = j.user_id AND r.status = 'pending'
+         AND r.assembly_mode = 'constrained_model'
+       WHERE j.job_type = ? AND j.status = 'queued'
+         AND j.result_class = 'rollout_paused'
+       ORDER BY j.created_at, j.id
+       LIMIT ?
+     )
+     RETURNING id`,
+  )
+    .bind(now.toISOString(), JOB_TYPE, limit)
+    .all<{ id: string }>();
+  return results.length;
+}
+
+/**
+ * Owner-scoped first-open resume for an already-reserved V5 day.
+ *
+ * Only a row explicitly marked by the rollout pause is advanced; an ordinary
+ * provider retry or dispatch failure retains its own schedule.
+ */
+export async function resumePausedV2ForFirstOpen(
+  env: Env,
+  userId: string,
+  localDate: string,
+  now = new Date(),
+): Promise<{ jobId: string; readingId: string } | null> {
+  const row = await env.DB.prepare(
+    `SELECT j.id AS job_id, r.id AS reading_id
+     FROM daily_readings r JOIN jobs j
+       ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+     WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'pending'
+       AND r.assembly_mode = 'constrained_model'
+       AND j.status = 'queued' AND j.result_class = 'rollout_paused'
+     LIMIT 1`,
+  )
+    .bind(userId, localDate)
+    .first<{ job_id: string; reading_id: string }>();
+  if (!row) return null;
+
+  const advanced = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, dispatched_at = NULL, result_class = NULL
+     WHERE id = ? AND user_id = ? AND status = 'queued'
+       AND result_class = 'rollout_paused'`,
+  )
+    .bind(now.toISOString(), row.job_id, userId)
+    .run();
+  return advanced.meta.changes === 1
+    ? { jobId: row.job_id, readingId: row.reading_id }
+    : null;
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -698,13 +1075,30 @@ export interface EvidenceRow {
   nonce: string;
 }
 
+/**
+ * What publication must do to the predecessor it replaces.
+ *
+ * The two non-empty cases are genuinely different rules, not two spellings of
+ * one. An ORDINARY reissue — a safety correction, a defect repair — leaves the
+ * predecessor `published` until the successor commits, so a failed successor
+ * leaves the reader with the reading they already had. A FACT repair follows an
+ * invalidation that already happened: the predecessor stopped being live the
+ * moment its inputs were found to be wrong, and completion must leave it
+ * `invalidated` rather than quietly marking it superseded as though it had been
+ * a valid edition.
+ */
+export type PredecessorTransition =
+  | { kind: "none" }
+  | { kind: "supersede_published"; readingId: string }
+  | { kind: "retain_invalidated"; readingId: string };
+
 export interface PublicationInput {
   identity: UserIdentity;
   readingId: string;
   jobId: string;
   claimToken: string;
   commandGeneration: number;
-  supersedesReadingId: string | null;
+  predecessor: PredecessorTransition;
   reading: { ciphertext: Uint8Array; keyVersion: number; nonce: string };
   evidence: EvidenceRow[];
 }
@@ -744,7 +1138,8 @@ export async function completeReading(
     ).bind(readingId, identity.userId, input.commandGeneration, jobId, claimToken),
   ];
 
-  if (input.supersedesReadingId) {
+  const predecessor = input.predecessor;
+  if (predecessor.kind === "supersede_published") {
     statements.push(
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -753,11 +1148,25 @@ export async function completeReading(
            SELECT 1 FROM daily_readings
            WHERE id = ? AND user_id = ? AND status = 'published'
          )`,
-      ).bind(input.supersedesReadingId, identity.userId),
+      ).bind(predecessor.readingId, identity.userId),
       env.DB.prepare(
         `UPDATE daily_readings SET status = 'superseded', updated_at = ?
          WHERE id = ? AND user_id = ? AND status = 'published'`,
-      ).bind(now, input.supersedesReadingId, identity.userId),
+      ).bind(now, predecessor.readingId, identity.userId),
+    );
+  } else if (predecessor.kind === "retain_invalidated") {
+    // Assert and change nothing. The predecessor was invalidated before this
+    // successor was reserved, and a successor that quietly re-published or
+    // superseded it would be claiming the invalid edition had been fine.
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'expected predecessor is not invalidated'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM daily_readings
+           WHERE id = ? AND user_id = ? AND status = 'invalidated'
+         )`,
+      ).bind(predecessor.readingId, identity.userId),
     );
   }
 
@@ -819,7 +1228,7 @@ export async function completeReading(
     ).bind(readingId, jobId, readingId, input.evidence.length),
   );
 
-  if (input.supersedesReadingId) {
+  if (predecessor.kind === "supersede_published") {
     statements.push(
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -827,7 +1236,17 @@ export async function completeReading(
          WHERE NOT EXISTS (
            SELECT 1 FROM daily_readings WHERE id = ? AND status = 'superseded'
          )`,
-      ).bind(input.supersedesReadingId),
+      ).bind(predecessor.readingId),
+    );
+  } else if (predecessor.kind === "retain_invalidated") {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'predecessor did not stay invalidated'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM daily_readings WHERE id = ? AND status = 'invalidated'
+         )`,
+      ).bind(predecessor.readingId),
     );
   }
 
@@ -953,7 +1372,9 @@ export async function failClaimedJob(
 /** Mark a job dispatched. Advisory: the outbox sweeper reads the absence of this. */
 export async function markDispatched(env: Env, jobId: string): Promise<void> {
   await env.DB.prepare(
-    `UPDATE jobs SET dispatched_at = ? WHERE id = ? AND dispatched_at IS NULL`,
+    `UPDATE jobs SET dispatched_at = ?
+     WHERE id = ? AND status = 'queued' AND dispatched_at IS NULL
+       AND result_class IS NOT 'rollout_paused'`,
   )
     .bind(new Date().toISOString(), jobId)
     .run();
@@ -970,6 +1391,14 @@ export interface SweepCandidate {
  * The first recovers a crash between the reservation batch and the queue send;
  * the second recovers a consumer that died holding a claim. Both converge
  * through the claim CAS, so a duplicate send is harmless.
+ *
+ * A row parked by the rollout kill switch is excluded. It satisfies every other
+ * predicate here permanently — the pause clears `dispatched_at` once and its own
+ * `IS NOT 'rollout_paused'` guard stops `available_at` ever advancing again — so
+ * including it would let paused rows occupy this whole `LIMIT` window and starve
+ * the genuinely undispatched jobs the sweep exists for. The scheduler's twin
+ * already excludes them; resuming one is the owner sweep's job, or
+ * `resumePausedV2AfterRollout`'s once the switch leaves `off`.
  */
 export async function findUndispatched(
   env: Env,
@@ -981,8 +1410,9 @@ export async function findUndispatched(
      FROM jobs j
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
+       AND j.result_class IS NOT 'rollout_paused'
        AND (j.available_at IS NULL OR j.available_at <= ?)
-     ORDER BY j.created_at
+     ORDER BY j.created_at, j.id
      LIMIT ?`,
   )
     .bind(JOB_TYPE, now.toISOString(), limit)
@@ -1000,7 +1430,7 @@ export async function findExpiredLeases(
      FROM jobs j
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'running' AND j.lease_expires_at < ?
-     ORDER BY j.lease_expires_at
+     ORDER BY j.lease_expires_at, j.id
      LIMIT ?`,
   )
     .bind(JOB_TYPE, now.toISOString(), limit)

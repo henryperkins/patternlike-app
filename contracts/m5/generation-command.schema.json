@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/generation-command.schema.json",
+  "title": "GenerateDailyReading Command (v2)",
+  "description": "The immutable command frozen at enqueue and stored as DEK-encrypted jobs.payload_enc. Supersedes generateDailyReadingCommandV1 for new reservations; V1 commands remain readable and executable. Cloudflare Queues is at-least-once, so neither a retry nor a recovered lease may resolve 'today', 'active', or 'currently configured' inputs again: this object pins the exact chart, calculations, consent, context, and publisher configuration the worker is allowed to use. It carries no editorial release pointer, because a v5 reading has none. Raw context values appear here in plaintext, which is safe only because the whole command is inside the user's DEK envelope — nothing here may be copied out of it unencrypted.",
+  "$defs": {
+    "chartPinV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "fingerprint",
+        "profile_version",
+        "contract_id",
+        "contract_version",
+        "container_digest",
+        "effective_accuracy",
+        "uncertainty"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "profile_version": { "type": "integer", "minimum": 1 },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "uncertainty": {
+          "$ref": "https://patternlike.app/contracts/m3/assembly-identity.schema.json#/$defs/assemblyUncertaintyInput"
+        }
+      }
+    },
+    "cyclePinV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cycle_id", "pass_ids", "cycle_hash"],
+      "properties": {
+        "cycle_id": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId"
+        },
+        "pass_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cyclePassId"
+          }
+        },
+        "cycle_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex"
+        }
+      }
+    },
+    "cycleScanPinV2": {
+      "description": "The frozen cycle exchange plus the ordered cycles selected from it. persistCycles is INSERT OR IGNORE, so a refined rescan does not overwrite a stored envelope; the pinned cycle_hash fails the claimed job closed instead, which is a state an operator can see.",
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/calculationPin" },
+        {
+          "type": "object",
+          "required": ["selected"],
+          "properties": {
+            "selected": {
+              "type": "array",
+              "minItems": 0,
+              "items": { "$ref": "#/$defs/cyclePinV2" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "dailySkyFactPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "content_digest"],
+      "properties": {
+        "fact_id": { "$ref": "common.schema.json#/$defs/dailySkyFactId" },
+        "content_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        }
+      }
+    },
+    "dailySkyPinV2": {
+      "description": "The frozen daily-sky exchange plus the ordered facts selected from it, in the response's own (kind rank, effective_at, fact_id) order.",
+      "allOf": [
+        { "$ref": "common.schema.json#/$defs/calculationPin" },
+        {
+          "type": "object",
+          "required": ["selected"],
+          "properties": {
+            "selected": {
+              "type": "array",
+              "minItems": 2,
+              "items": { "$ref": "#/$defs/dailySkyFactPin" },
+              "description": "Never fewer than the mandatory anchor positions and lunar phase: a v5 command with no factual day could only produce invented prose."
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "contextSnapshot": {
+      "description": "The exact value the compiler selected. Free text is NFC-normalized and capped at 2,048 UTF-8 bytes on a code-point boundary before it is frozen, so an execution-time re-read cannot silently truncate differently.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text"],
+          "properties": {
+            "kind": { "const": "text" },
+            "text": { "type": "string", "minLength": 1, "maxLength": 2048 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "structured" },
+            "value": { "type": "object" }
+          }
+        }
+      ]
+    },
+    "contextPinV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_ref",
+        "signal_id",
+        "source_id",
+        "category",
+        "normalized_hash",
+        "allowed_use",
+        "evidence_lane",
+        "consent_id",
+        "consent_version",
+        "permission_state",
+        "freshness_status",
+        "observed_at",
+        "snapshot"
+      ],
+      "description": "One signal/use pair and the exact consent, permission, and freshness state under which that ONE lane was eligible. A signal eligible for two lanes is pinned twice; execution must prove each pinned allowed_use is still present in both the signal's and the consent's arrays before the shared eligibility partition runs. No execution-time read may add a source, and a source that became ineligible is not silently dropped from an already-frozen packet — the command fails.",
+      "properties": {
+        "context_ref": { "$ref": "common.schema.json#/$defs/contextRef" },
+        "signal_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "source_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ingestibleSourceId"
+        },
+        "category": { "$ref": "common.schema.json#/$defs/aiConsentDataCategory" },
+        "normalized_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex"
+        },
+        "allowed_use": { "$ref": "common.schema.json#/$defs/m5AllowedUse" },
+        "evidence_lane": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/evidenceLane"
+        },
+        "consent_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "consent_version": { "type": "integer", "minimum": 1 },
+        "permission_state": { "type": "string", "const": "active" },
+        "freshness_status": { "type": "string", "enum": ["fresh", "stale"] },
+        "observed_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "snapshot": { "$ref": "#/$defs/contextSnapshot" }
+      }
+    },
+    "priorReadingPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local_date", "headline", "lead", "reflection_prompt"],
+      "description": "One published predecessor, used only to reduce repetition. Never evidence for an astrological claim.",
+      "properties": {
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "headline": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "lead": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "reflection_prompt": { "type": "string", "minLength": 1, "maxLength": 2048 }
+      }
+    },
+    "generateDailyReadingCommandV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_version",
+        "schema_version",
+        "generation_id",
+        "generation_input_id",
+        "input_manifest_hash",
+        "reading_id",
+        "reading_key",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "reservation_reason",
+        "command_generation",
+        "target_local_date",
+        "target_timezone",
+        "timezone_source",
+        "timezone_revision",
+        "day_start_at",
+        "day_end_at",
+        "anchor_at",
+        "anchor_resolution",
+        "tzdb_version",
+        "local_day_resolution_policy_version",
+        "generation_anchor",
+        "locale",
+        "locale_source",
+        "locale_updated_at",
+        "domain_preference",
+        "output_schema",
+        "assembly_mode",
+        "ai_consent",
+        "chart",
+        "cycle_scan",
+        "daily_sky",
+        "context",
+        "prior_readings",
+        "publisher"
+      ],
+      "properties": {
+        "command_version": { "type": "string", "const": "v2" },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "generation_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId",
+          "description": "Opaque handle for this generation attempt lineage. Never sent to the provider."
+        },
+        "generation_input_id": {
+          "$ref": "common.schema.json#/$defs/generationInputId",
+          "description": "Recomputed after the claim by running the same pure entry point over the reconstructed inputs. A mismatch is generation_input_id_mismatch, a terminal integrity defect — not a newer answer."
+        },
+        "input_manifest_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "reading_key": { "$ref": "common.schema.json#/$defs/readingKeyV5" },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/readingRevision"
+        },
+        "revision_reason": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/revisionReason"
+        },
+        "supersedes_reading_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ]
+        },
+        "reservation_reason": { "$ref": "common.schema.json#/$defs/reservationReason" },
+        "command_generation": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/commandGeneration"
+        },
+        "replaces_job_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            }
+          ]
+        },
+        "command_replacement_reason": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "common.schema.json#/$defs/commandReplacementReasonV2" }
+          ]
+        },
+        "target_local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate",
+          "description": "Explicit rather than derived: the scheduler reserves TOMORROW's edition before the local day begins, and re-deriving 'today' at execution would give a pre-generated command a different day than the one it was built for."
+        },
+        "target_timezone": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone",
+          "description": "users.timezone, the present-day scheduling zone. Never crosses the provider boundary."
+        },
+        "timezone_source": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/timezoneSource"
+        },
+        "timezone_revision": { "type": "integer", "minimum": 0 },
+        "day_start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "day_end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Half-open: the local day is [day_start_at, day_end_at), spanning 23, 24, or 25 hours."
+        },
+        "anchor_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "Local noon. The stable factual anchor of the day, and the instant every anchor-sampled sky fact was computed at."
+        },
+        "anchor_resolution": { "$ref": "common.schema.json#/$defs/anchorResolution" },
+        "tzdb_version": { "type": "string", "minLength": 1 },
+        "local_day_resolution_policy_version": {
+          "$ref": "common.schema.json#/$defs/localDayResolutionPolicyVersion"
+        },
+        "generation_anchor": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "The freeze instant, written before the command's first attempt and never recomputed from a clock. Published as the reading's generated_at, so a retry reports the same instant. Distinct from anchor_at: a pre-generated edition is frozen BEFORE its local day starts."
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "locale_source": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/localeSource"
+        },
+        "locale_updated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ],
+          "description": "Preserved when a stored preference exists. The current product has no writer, so null is the honest value rather than an invented default."
+        },
+        "output_schema": { "$ref": "common.schema.json#/$defs/outputSchemaName" },
+        "assembly_mode": { "$ref": "common.schema.json#/$defs/assemblyMode" },
+        "ai_consent": { "$ref": "common.schema.json#/$defs/aiConsentPin" },
+        "chart": { "$ref": "#/$defs/chartPinV5" },
+        "cycle_scan": { "$ref": "#/$defs/cycleScanPinV2" },
+        "daily_sky": { "$ref": "#/$defs/dailySkyPinV2" },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/contextPinV2" }
+        },
+        "prior_readings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 7,
+          "items": { "$ref": "#/$defs/priorReadingPin" }
+        },
+        "publisher": { "$ref": "common.schema.json#/$defs/publisherConfigPin" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "command_generation": { "const": 1 } },
+            "required": ["command_generation"]
+          },
+          "then": {
+            "properties": {
+              "replaces_job_id": { "type": "null" },
+              "command_replacement_reason": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "replaces_job_id": { "type": "string" },
+              "command_replacement_reason": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "revision_reason": { "const": "initial" } },
+            "required": ["revision_reason"]
+          },
+          "then": {
+            "properties": {
+              "revision": { "const": 1 },
+              "supersedes_reading_id": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "revision": { "minimum": 2 },
+              "supersedes_reading_id": { "type": "string" }
+            }
+          }
+        },
+        {
+          "description": "Generation is withheld while either preference is an unowned server default, so a frozen command can never carry one.",
+          "properties": {
+            "timezone_source": { "not": { "const": "default_unconfirmed" } },
+            "locale_source": { "not": { "const": "default_unconfirmed" } }
+          }
+        }
+      ],
+      "$comment": "Cross-field rules enforced in code and pinned by fixtures: reading_key's date and revision segments must match target_local_date and revision; chart.effective_accuracy must equal chart.uncertainty.accuracy; day_start_at < day_end_at with day_start_at <= anchor_at < day_end_at; ai_consent.categories must be in the frozen display order; and every context allowed_use must lie in the M5 subset."
+    }
+  },
+  "oneOf": [
+    { "title": "GenerateDailyReadingCommandV2", "$ref": "#/$defs/generateDailyReadingCommandV2" }
+  ]
+}

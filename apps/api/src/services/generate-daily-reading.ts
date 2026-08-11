@@ -4,9 +4,7 @@ import {
   assembleReading,
   finalizeReading,
   renderAssemblyId,
-  type DailyReading,
   type ParagraphEvidence,
-  type ReadingEvidenceDraft,
 } from "@patternlike/reading-engine";
 import {
   canonicalJson,
@@ -30,6 +28,13 @@ import {
   buildAssemblyInput,
   type GenerateDailyReadingCommandV1,
 } from "./generation-command.js";
+import {
+  isCommandV2,
+  type GenerateDailyReadingCommandV2,
+} from "./generation-command-v2.js";
+import { generateDailyReadingV5 } from "./generate-daily-reading-v5.js";
+import type { V1FailureCode, V5FailureCode } from "./generation-failures.js";
+import type { StoredReadingV3 } from "./stored-reading.js";
 
 /**
  * Execute exactly the frozen reservation.
@@ -42,7 +47,7 @@ import {
  */
 
 /**
- * What is stored inside `daily_readings.reading_enc`.
+ * What is stored inside `daily_readings.reading_enc` for a v3 reading.
  *
  * The prose plus every output-derived value capable of identifying the
  * deterministic result. M0 kept `content_hash`, the selected cycle ids, and the
@@ -50,36 +55,21 @@ import {
  * the day's facts: a digest of the day plus the two cycles that produced it is a
  * reconstruction path that survives DEK destruction. 0002 dropped those columns
  * and they live here instead.
+ *
+ * The declaration moved to `stored-reading.ts` when M5 made the stored envelope
+ * a union; this alias keeps the v3 execution path reading the way it always did.
  */
-export interface StoredReading {
-  reading: DailyReading;
-  assembly_id: string;
-  content_hash: string;
-  primary_cycle_id: string | null;
-  supporting_cycle_id: string | null;
-  validation: ReadingEvidenceDraft["validation"];
-  evidence_header: Omit<ReadingEvidenceDraft, "paragraphs">;
-}
+export type { StoredReadingV3 as StoredReading };
 
 export type ExecutionOutcome =
   | { ok: true; readingId: string; fallbackUsed: boolean }
   /** Another claim already committed this reading. Ack and move on. */
   | { ok: false; reason: "duplicate"; detail: string }
-  /** Retryable: the dependency was down, not wrong. */
-  | { ok: false; reason: "calc_unavailable" | "release_unreadable"; detail: string }
-  /** Terminal: the frozen inputs no longer describe a reading we may publish. */
-  | { ok: false; reason: ExecutionFailure; detail: string };
+  | { ok: false; reason: V1FailureCode | V5FailureCode; detail: string }
+  /** Internal Queue disposition; never stored as a generation failure class. */
+  | { ok: false; reason: "insufficient_lease"; detail: "execution_window_exhausted" };
 
-export type ExecutionFailure =
-  | "policy_unsupported"
-  | "chart_missing"
-  | "release_hash_mismatch"
-  | "cycle_missing"
-  | "cycle_hash_mismatch"
-  | "consent_revoked"
-  | "assembly_id_mismatch"
-  | "assembly_failed"
-  | "publication_failed";
+export type ExecutionFailure = Exclude<V1FailureCode, "calc_unavailable" | "release_unreadable">;
 
 interface ChartRow {
   id: string;
@@ -217,9 +207,28 @@ async function pinnedContextStillEligible(
   return true;
 }
 
-export async function generateDailyReading(
+/**
+ * Route a claimed job to the executor its frozen command names.
+ *
+ * The discriminant is the command, never the current configuration: a claim
+ * frozen as V1 executes as V1 forever, whatever the rollout says today. A
+ * command version this deployment does not implement fails `policy_unsupported`
+ * rather than running the executor it happens to have, which would publish prose
+ * under an identity promising different prose.
+ */
+export async function dispatchGeneration(
   env: Env,
   claim: Claim,
+): Promise<ExecutionOutcome> {
+  if (isCommandV2(claim.command)) {
+    return generateDailyReadingV5(env, claim as Claim & { command: GenerateDailyReadingCommandV2 });
+  }
+  return generateDailyReading(env, claim as Claim & { command: GenerateDailyReadingCommandV1 });
+}
+
+export async function generateDailyReading(
+  env: Env,
+  claim: Claim & { command: GenerateDailyReadingCommandV1 },
 ): Promise<ExecutionOutcome> {
   const { command, jobId, claimToken, userId } = claim;
 
@@ -237,7 +246,7 @@ export async function generateDailyReading(
   };
 
   const fail = async (
-    reason: ExecutionFailure | "calc_unavailable" | "release_unreadable",
+    reason: V1FailureCode,
     detail: string,
   ): Promise<ExecutionOutcome> => {
     const failed = await failReading(
@@ -362,7 +371,7 @@ export async function generateDailyReading(
   });
 
   const { paragraphs, ...evidenceHeader } = evidence;
-  const stored: StoredReading = {
+  const stored: StoredReadingV3 = {
     reading: outcome.reading,
     assembly_id: assemblyId,
     content_hash: await contentHash(canonicalJson(outcome.reading)),
@@ -402,7 +411,12 @@ export async function generateDailyReading(
     jobId,
     claimToken,
     commandGeneration: command.command_generation,
-    supersedesReadingId: command.supersedes_reading_id,
+    // V1 has one predecessor rule: an ordinary reissue leaves the live reading
+    // published until its successor commits. The invalidation path is a v5
+    // concept and cannot reach this executor.
+    predecessor: command.supersedes_reading_id
+      ? { kind: "supersede_published", readingId: command.supersedes_reading_id }
+      : { kind: "none" },
     reading: {
       ciphertext: bytes(sealedReading.ciphertext),
       keyVersion: sealedReading.keyVersion,

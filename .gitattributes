@@ -1,0 +1,15 @@
+# Line-ending normalization is on (core.autocrlf=true), and git decides text vs
+# binary by sniffing. A reportlab PDF has long uncompressed stretches and gets
+# sniffed as TEXT, which means checkout would rewrite its LF bytes to CRLF and
+# corrupt the file. These types are declared rather than guessed.
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.ico   binary

@@ -2,13 +2,20 @@
 """Validate every frozen contract package in this repository.
 
 Runs the M0 validator unchanged as a subprocess, then validates contracts/m3
-here. contracts/m0 is byte-frozen by the M3 freeze note, and that includes its
-validator, so this file adds a package rather than editing one.
+and contracts/m5 here. contracts/m0 is byte-frozen by the M3 freeze note, and
+contracts/m3 is byte-frozen by the M5 freeze note; both include their own
+validators, so this file adds packages rather than editing one.
 
 Schemas are registered by absolute $id only. The M0 validator also registers a
-bare-filename key, which is harmless there but would be ambiguous across two
-packages that both ship a common.schema.json; relative $refs resolve against the
+bare-filename key, which is harmless there but would be ambiguous across three
+packages that all ship a common.schema.json; relative $refs resolve against the
 containing document's $id, so the $id registration alone is sufficient.
+
+Fixture-to-schema mapping is scoped BY PACKAGE. m3 and m5 both ship
+generation-command.*, daily-reading.*, and reading-evidence.* fixtures, and a
+single flat prefix map would silently validate an M5 fixture against the M3
+schema it supersedes — a superseding package proving itself against its
+predecessor is exactly the drift this file exists to catch.
 
 Usage:
   python contracts/validate_schemas.py
@@ -32,48 +39,82 @@ from referencing.jsonschema import DRAFT202012
 ROOT = Path(__file__).resolve().parent
 M0 = ROOT / "m0"
 M3 = ROOT / "m3"
+M5 = ROOT / "m5"
 
-# fixture filename prefix -> schema URI (longest prefix wins)
+M3_BASE = "https://patternlike.app/contracts/m3/"
+M5_BASE = "https://patternlike.app/contracts/m5/"
+
+# package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
+# a package). Never flatten these two maps: see the module docstring.
 FIXTURE_SCHEMA = {
-    "assembly-identity": "https://patternlike.app/contracts/m3/assembly-identity.schema.json#/$defs/assemblyIdentityInputV1",
-    "reading-assembly": "https://patternlike.app/contracts/m3/reading-assembly.schema.json#/$defs/assemblyRequest",
-    "reading-evidence": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph",
-    "generation-command": "https://patternlike.app/contracts/m3/generation-command.schema.json#/$defs/generateDailyReadingCommandV1",
-    "cycle-identity": "https://patternlike.app/contracts/m3/cycle-identity.schema.json#/$defs/cycleIdentityV1",
-    "cycle-pass-identity": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json#/$defs/cyclePassIdentityV1",
-    "cycle-hash": "https://patternlike.app/contracts/m3/cycle-derivation.schema.json#/$defs/cycleHashPreimageV1",
-    "cycle-request": "https://patternlike.app/contracts/m3/cycle-request.schema.json#/$defs/cycleRequest",
-    "cycle-response": "https://patternlike.app/contracts/m3/cycle-response.schema.json#/$defs/cycleResponse",
-    "timing-response": "https://patternlike.app/contracts/m3/timing-response.schema.json#/$defs/timingResponse",
-    "content-release": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/contentReleaseBundle",
-    "daily-reading-preparation": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReadingPreparation",
-    "daily-reading": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading",
+    "m3": {
+        "assembly-identity": M3_BASE
+        + "assembly-identity.schema.json#/$defs/assemblyIdentityInputV1",
+        "reading-assembly": M3_BASE + "reading-assembly.schema.json#/$defs/assemblyRequest",
+        "reading-evidence": M3_BASE + "reading-evidence.schema.json#/$defs/readingEvidenceGraph",
+        "generation-command": M3_BASE
+        + "generation-command.schema.json#/$defs/generateDailyReadingCommandV1",
+        "cycle-identity": M3_BASE + "cycle-identity.schema.json#/$defs/cycleIdentityV1",
+        "cycle-pass-identity": M3_BASE
+        + "cycle-derivation.schema.json#/$defs/cyclePassIdentityV1",
+        "cycle-hash": M3_BASE + "cycle-derivation.schema.json#/$defs/cycleHashPreimageV1",
+        "cycle-request": M3_BASE + "cycle-request.schema.json#/$defs/cycleRequest",
+        "cycle-response": M3_BASE + "cycle-response.schema.json#/$defs/cycleResponse",
+        "timing-response": M3_BASE + "timing-response.schema.json#/$defs/timingResponse",
+        "content-release": M3_BASE + "content-release.schema.json#/$defs/contentReleaseBundle",
+        "daily-reading-preparation": M3_BASE
+        + "daily-reading.schema.json#/$defs/dailyReadingPreparation",
+        "daily-reading": M3_BASE + "daily-reading.schema.json#/$defs/dailyReading",
+    },
+    "m5": {
+        "daily-sky-request": M5_BASE + "daily-sky-request.schema.json#/$defs/dailySkyRequest",
+        "daily-sky-response": M5_BASE + "daily-sky-response.schema.json#/$defs/dailySkyResponse",
+        "daily-sky-fact-identity": M5_BASE
+        + "daily-sky-response.schema.json#/$defs/dailySkyFactIdentityV1",
+        "generation-command": M5_BASE
+        + "generation-command.schema.json#/$defs/generateDailyReadingCommandV2",
+        "reading-generation-request": M5_BASE
+        + "reading-generation-request.schema.json#/$defs/readingGenerationRequest",
+        # The document ROOT is the strict candidate object: OpenAI strict mode
+        # requires a self-contained root-object schema, so this one cannot hide
+        # behind a $defs pointer the way its siblings do.
+        "reading-generation-output": M5_BASE + "reading-generation-output.schema.json",
+        "daily-reading": M5_BASE + "daily-reading.schema.json#/$defs/dailyReadingV5",
+        "reading-evidence": M5_BASE + "reading-evidence.schema.json#/$defs/readingEvidenceGraphV5",
+    },
 }
 
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
 # may legitimately accept them; the policy check below must not.
 POLICY_ONLY = {
-    "assembly-identity.accuracy-mismatch",
-    "cycle-response.unordered-passes",
-    "cycle-response.noncontiguous-index",
-    "cycle-response.count-mismatch",
-    "cycle-response.first-exact-mismatch",
-    "cycle-response.pass-outside-envelope",
-    "cycle-response.unordered-cycles",
-    "cycle-response.duplicate-cycle-ids",
-    "cycle-response.inverted-envelope",
-    "content-release.locale-default-not-supported",
-    "content-release.fallback-missing-for-locale",
-    "content-release.fallback-duplicate-for-locale",
-    "content-release.fallback-locale-mismatch",
-    "content-release.timing-template-missing-for-locale",
-    "content-release.timing-undeclared-placeholder",
-    "content-release.timing-malformed-placeholder",
-    "content-release.timing-nested-placeholder",
-    "content-release.timing-residual-closing-brace",
-    "content-release.timing-unmatched-opening-brace",
-    "content-release.same-author",
-    "timing-response.noncontiguous-passes",
+    "m3": {
+        "assembly-identity.accuracy-mismatch",
+        "cycle-response.unordered-passes",
+        "cycle-response.noncontiguous-index",
+        "cycle-response.count-mismatch",
+        "cycle-response.first-exact-mismatch",
+        "cycle-response.pass-outside-envelope",
+        "cycle-response.unordered-cycles",
+        "cycle-response.duplicate-cycle-ids",
+        "cycle-response.inverted-envelope",
+        "content-release.locale-default-not-supported",
+        "content-release.fallback-missing-for-locale",
+        "content-release.fallback-duplicate-for-locale",
+        "content-release.fallback-locale-mismatch",
+        "content-release.timing-template-missing-for-locale",
+        "content-release.timing-undeclared-placeholder",
+        "content-release.timing-malformed-placeholder",
+        "content-release.timing-nested-placeholder",
+        "content-release.timing-residual-closing-brace",
+        "content-release.timing-unmatched-opening-brace",
+        "content-release.same-author",
+        "timing-response.noncontiguous-passes",
+    },
+    "m5": {
+        "daily-sky-response.unordered-facts",
+        "daily-sky-response.end-boundary-event",
+        "reading-generation-output.bad-role-order",
+    },
 }
 
 braced_placeholder_re = re.compile(r"\{([^{}]*)\}")
@@ -93,10 +134,116 @@ FORBIDDEN_IN_ASSEMBLY_REQUEST = (
     "cs_",
 )
 
+# ---------------------------------------------------------------------------
+# M5 constants
+# ---------------------------------------------------------------------------
+
+M5_SCHEMA_VERSION = "0.5.0"
+
+# The closed M0 subset M5 may act on. Not a new enum: contracts/m5 references
+# the frozen M0 allowedUse and narrows it. Anything outside this set reaching an
+# M5 document means a source acquired a lane the milestone never approved.
+M5_SUPPORTED_USES = frozenset(
+    {
+        "annual_context",
+        "environment_context",
+        "life_domain_selection",
+        "narrative_continuity",
+        "optional_recommendations",
+        "pattern_profile",
+        "reflection_prompt",
+        "relationship_interpretation",
+        "repetition_control",
+        "routine_context",
+        "theme_eligibility",
+        "theme_filtering",
+        "theme_ranking",
+        "tone",
+        "travel_context",
+        "user_memory",
+        "workload_context",
+    }
+)
+
+AI_CONSENT_CATEGORIES = (
+    "birth_accuracy_and_uncertainty",
+    "calculated_natal_facts",
+    "active_calculated_cycles",
+    "calculated_daily_sky",
+    "enabled_personal_context",
+    "prior_reading_excerpts",
+    "reading_feedback",
+)
+
+# Frozen kind rank. Fact order is (rank, effective_at, fact_id); JCS preserves
+# array order, so an unsorted array is a different input manifest for the same
+# sky.
+DAILY_SKY_KIND_RANK = {
+    "anchor_position": 0,
+    "lunar_phase": 1,
+    "transit_natal_contact": 2,
+    "sign_ingress": 3,
+    "collective_exact_aspect": 4,
+    "house_placement": 5,
+}
+
+# Facts sampled AT the anchor rather than solved inside the interval. An anchor
+# fact carries anchor_at; every other kind carries a root inside the half-open
+# local day.
+DAILY_SKY_ANCHOR_KINDS = frozenset({"anchor_position", "lunar_phase", "house_placement"})
+
+DAILY_SKY_PERSONALIZED_KINDS = frozenset({"transit_natal_contact", "house_placement"})
+
+# Tokens that must never appear in a serialized daily-sky request. The closed
+# object already rejects an undeclared property; this is the second half, and it
+# also catches a declared property that acquired an identifying VALUE.
+FORBIDDEN_IN_DAILY_SKY_REQUEST = (
+    "user_id",
+    "usr_",
+    "cs_",
+    "chart_id",
+    "chart_fingerprint",
+    "reading_id",
+    "reading_key",
+    "birth_date",
+    "birth_time",
+    "birth_instant",
+    "birthplace",
+    "latitude",
+    "timezone",
+)
+
+# Exact JSON keys that must never appear in the provider-bound request. Written
+# as quoted keys so `longitude_deg` on a calculated fact is not confused with a
+# birth `longitude`, which is the one that matters.
+FORBIDDEN_KEYS_IN_GENERATION_REQUEST = (
+    "user_id",
+    "chart_fingerprint",
+    "chart_id",
+    "reading_key",
+    "reading_id",
+    "consent_id",
+    "job_id",
+    "crypto_subject",
+    "birth_date",
+    "birth_time",
+    "birth_instant",
+    "birthplace",
+    "latitude",
+    "longitude",
+    "timezone",
+    "release_version",
+)
+
+# Value prefixes that name a stored row rather than a fact.
+FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_", "job_", "sig_")
+
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3):
+    for package in (M0, M3, M5):
+        if not package.is_dir():
+            continue
         for path in sorted(package.glob("*.schema.json")):
             doc = json.loads(path.read_text(encoding="utf-8"))
             schema_id = doc.get("$id")
@@ -114,9 +261,9 @@ def resolve_validator(ref: str, registry: Registry) -> Draft202012Validator:
     )
 
 
-def match_schema_ref(filename: str) -> str | None:
+def match_schema_ref(package: str, filename: str) -> str | None:
     best: tuple[int, str] | None = None
-    for prefix, ref in FIXTURE_SCHEMA.items():
+    for prefix, ref in FIXTURE_SCHEMA[package].items():
         if filename.startswith(prefix) and (best is None or len(prefix) > best[0]):
             best = (len(prefix), ref)
     return best[1] if best else None
@@ -356,6 +503,387 @@ def assembly_request_policy(doc: dict) -> list[str]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# M5 policy checks
+# ---------------------------------------------------------------------------
+
+
+def _walk_allowed_uses(node, out: list[str]) -> None:
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "allowed_use" and isinstance(value, str):
+                out.append(value)
+            elif key == "allowed_uses" and isinstance(value, list):
+                out += [v for v in value if isinstance(v, str)]
+            else:
+                _walk_allowed_uses(value, out)
+    elif isinstance(node, list):
+        for value in node:
+            _walk_allowed_uses(value, out)
+
+
+def m5_allowed_use_policy(doc: dict) -> list[str]:
+    """No M5 document may name a lane outside the approved M0 subset.
+
+    `ai_synthesis` is the outer purpose consent, not an allowed_use, and it can
+    never make an otherwise ineligible signal eligible. A value that reaches a
+    frozen command outside this set means the intersection was computed against
+    something other than the frozen enum.
+    """
+    seen: list[str] = []
+    _walk_allowed_uses(doc, seen)
+    return [
+        f"allowed_use {value!r} is outside M5_SUPPORTED_USES"
+        for value in sorted(set(seen))
+        if value not in M5_SUPPORTED_USES
+    ]
+
+
+def _suppressed_classes(uncertainty: dict) -> set[str]:
+    return {
+        entry.get("feature_class")
+        for entry in (uncertainty or {}).get("suppressed_features") or []
+        if isinstance(entry, dict)
+    }
+
+
+def daily_sky_request_policy(doc: dict) -> list[str]:
+    errs: list[str] = []
+    encoded = json.dumps(doc)
+    errs += [
+        f"daily-sky boundary: serialized request contains {token!r}"
+        for token in FORBIDDEN_IN_DAILY_SKY_REQUEST
+        if token in encoded
+    ]
+
+    declared = doc.get("effective_accuracy")
+    projected = (doc.get("uncertainty") or {}).get("accuracy")
+    if declared is not None and projected is not None and declared != projected:
+        errs.append(
+            f"effective_accuracy {declared!r} disagrees with uncertainty.accuracy {projected!r}"
+        )
+
+    top = set(doc.get("suppressed_features") or [])
+    inner = _suppressed_classes(doc.get("uncertainty") or {})
+    if top != inner:
+        errs.append(
+            f"suppressed_features {sorted(top)} disagrees with the uncertainty report "
+            f"{sorted(inner)}: two copies of one decision is how a suppressed feature "
+            "reappears as a fact"
+        )
+
+    start, end, anchor = doc.get("day_start_at"), doc.get("day_end_at"), doc.get("anchor_at")
+    if start and end and not start < end:
+        errs.append("day_start_at is not before day_end_at")
+    if start and end and anchor and not (start <= anchor < end):
+        errs.append("anchor_at lies outside the half-open local day")
+
+    if "houses" in top and doc.get("natal_house_cusps") is not None:
+        errs.append("natal_house_cusps supplied while houses are suppressed")
+    if "angles" in top:
+        angles = [
+            p.get("body")
+            for p in doc.get("natal_positions") or []
+            if p.get("body") in ("ascendant", "midheaven")
+        ]
+        if angles:
+            errs.append(f"angle targets {angles} supplied while angles are suppressed")
+    if "moon_time_sensitive" in top:
+        if any(p.get("body") == "moon" for p in doc.get("natal_positions") or []):
+            errs.append("natal moon supplied while moon_time_sensitive is suppressed")
+    return errs
+
+
+def daily_sky_response_policy(doc: dict) -> list[str]:
+    errs: list[str] = []
+    if not doc.get("ok"):
+        return errs
+
+    facts = doc.get("facts") or []
+    ids = [f.get("fact_id") for f in facts]
+    if len(set(ids)) != len(ids):
+        errs.append("duplicate fact_id in one response")
+
+    def order_key(fact: dict):
+        return (
+            DAILY_SKY_KIND_RANK.get(fact.get("kind"), 99),
+            fact.get("effective_at") or "",
+            fact.get("fact_id") or "",
+        )
+
+    if facts != sorted(facts, key=order_key):
+        errs.append(
+            "facts are not in (kind rank, effective_at, fact_id) order; JCS preserves "
+            "array order, so an unsorted array is a different input manifest for the "
+            "same sky"
+        )
+
+    kinds = [f.get("kind") for f in facts]
+    if "anchor_position" not in kinds:
+        errs.append("a successful response carries no anchor_position fact")
+    if kinds.count("lunar_phase") != 1:
+        errs.append(
+            f"a successful response carries {kinds.count('lunar_phase')} lunar_phase facts; "
+            "exactly one is required so an empty event list never means an empty factual day"
+        )
+
+    start, end, anchor = doc.get("day_start_at"), doc.get("day_end_at"), doc.get("anchor_at")
+    for fact in facts:
+        fid, kind, at = fact.get("fact_id"), fact.get("kind"), fact.get("effective_at")
+        if kind in DAILY_SKY_ANCHOR_KINDS:
+            if anchor and at != anchor:
+                errs.append(f"{fid}: {kind} is sampled at {at}, not the anchor {anchor}")
+        elif start and end and at is not None and not (start <= at < end):
+            errs.append(
+                f"{fid}: {kind} at {at} lies outside the half-open local day "
+                f"[{start}, {end}); an end-boundary event belongs to the NEXT day"
+            )
+
+        digest = fact.get("content_digest") or ""
+        hexpart = digest.split(":", 1)[-1]
+        if fid and hexpart and fid != "dsf_" + hexpart[:32]:
+            errs.append(
+                f"{fid}: fact_id is not 'dsf_' + content_digest[0:32] ({hexpart[:32]})"
+            )
+
+        expected_scope = (
+            "personalized" if kind in DAILY_SKY_PERSONALIZED_KINDS else "collective"
+        )
+        if fact.get("scope") != expected_scope:
+            errs.append(
+                f"{fid}: {kind} declares scope {fact.get('scope')!r}; a collective "
+                "configuration described as personal is the exact claim the reader "
+                "cannot check"
+            )
+
+    suppressed = set(doc.get("suppressed_features") or [])
+    for fact in facts:
+        detail = fact.get("detail") or {}
+        target = detail.get("natal_target")
+        if "houses" in suppressed and fact.get("kind") == "house_placement":
+            errs.append(f"{fact.get('fact_id')}: house fact returned while houses are suppressed")
+        if "angles" in suppressed and target in ("ascendant", "midheaven"):
+            errs.append(f"{fact.get('fact_id')}: angle target returned while angles are suppressed")
+        if "moon_time_sensitive" in suppressed and target == "moon":
+            errs.append(
+                f"{fact.get('fact_id')}: natal moon target returned while "
+                "moon_time_sensitive is suppressed"
+            )
+    return errs
+
+
+def generation_command_v2_policy(doc: dict) -> list[str]:
+    errs = m5_allowed_use_policy(doc)
+
+    if doc.get("revision_reason") == "initial":
+        if doc.get("revision") != 1 or doc.get("supersedes_reading_id") is not None:
+            errs.append("initial revision must be revision 1 with no predecessor")
+    elif doc.get("supersedes_reading_id") is None:
+        errs.append(f"revision_reason {doc.get('revision_reason')!r} requires a predecessor")
+
+    generation = doc.get("command_generation")
+    if isinstance(generation, int):
+        if generation > 1 and not doc.get("replaces_job_id"):
+            errs.append("a replacement command must name the job it replaces")
+        if generation == 1 and doc.get("replaces_job_id"):
+            errs.append("generation 1 cannot replace a job")
+
+    key = doc.get("reading_key") or ""
+    parts = key.split(":")
+    if not key.startswith("reading-v5:") or len(parts) != 4:
+        errs.append(
+            f"reading_key {key!r} is not the closed v5 grammar "
+            "reading-v5:<user_id>:<YYYY-MM-DD>:r<revision>"
+        )
+    else:
+        if parts[2] != doc.get("target_local_date"):
+            errs.append("reading_key local date disagrees with target_local_date")
+        if parts[3] != f"r{doc.get('revision')}":
+            errs.append("reading_key revision disagrees with revision")
+
+    chart = doc.get("chart") or {}
+    if chart.get("effective_accuracy") != (chart.get("uncertainty") or {}).get("accuracy"):
+        errs.append("chart.effective_accuracy disagrees with chart.uncertainty.accuracy")
+
+    start, end, anchor = doc.get("day_start_at"), doc.get("day_end_at"), doc.get("anchor_at")
+    if start and end and not start < end:
+        errs.append("day_start_at is not before day_end_at")
+    if start and end and anchor and not (start <= anchor < end):
+        errs.append("anchor_at lies outside the half-open local day")
+
+    selected = [f.get("fact_id") for f in (doc.get("daily_sky") or {}).get("selected") or []]
+    if len(set(selected)) != len(selected):
+        errs.append("the daily-sky pin selects the same fact twice")
+    for pin in (doc.get("daily_sky") or {}).get("selected") or []:
+        hexpart = (pin.get("content_digest") or "").split(":", 1)[-1]
+        if hexpart and pin.get("fact_id") != "dsf_" + hexpart[:32]:
+            errs.append(f"{pin.get('fact_id')}: pinned fact_id disagrees with its content digest")
+
+    refs = [c.get("context_ref") for c in doc.get("context") or []]
+    if len(set(refs)) != len(refs):
+        errs.append("duplicate context_ref in one command")
+
+    for source, unconfirmed in (("timezone_source", "timezone"), ("locale_source", "locale")):
+        if doc.get(source) == "default_unconfirmed":
+            errs.append(f"{unconfirmed} is still an unconfirmed server default")
+
+    consent = doc.get("ai_consent") or {}
+    if consent.get("kind") != "ai_synthesis" or consent.get("status") != "granted":
+        errs.append("a V2 command requires a granted ai_synthesis consent pin")
+    declared = list(consent.get("categories") or [])
+    if declared != [c for c in AI_CONSENT_CATEGORIES if c in declared]:
+        errs.append("ai_consent.categories are not in the frozen policy order")
+
+    if "release_version" in doc or "release_bundle_hash" in doc:
+        errs.append("a V2 command cannot carry an editorial release pointer")
+
+    gin = doc.get("generation_input_id") or ""
+    if not gin.startswith("gin_sha256_"):
+        errs.append(f"generation_input_id {gin!r} is not domain-separated")
+    return errs
+
+
+def reading_generation_request_policy(doc: dict) -> list[str]:
+    errs = m5_allowed_use_policy(doc)
+    encoded = json.dumps(doc)
+    errs += [
+        f"provider boundary: request declares the key \"{key}\""
+        for key in FORBIDDEN_KEYS_IN_GENERATION_REQUEST
+        if f'"{key}"' in encoded
+    ]
+    errs += [
+        f"provider boundary: request carries a stored-row handle {prefix!r}"
+        for prefix in FORBIDDEN_VALUES_IN_GENERATION_REQUEST
+        if prefix in encoded
+    ]
+
+    facts = {f.get("fact_id") for f in doc.get("facts") or []}
+    if len(facts) != len(doc.get("facts") or []):
+        errs.append("duplicate fact_id in the provider packet")
+    refs = [c.get("context_ref") for c in doc.get("context") or []]
+    if len(set(refs)) != len(refs):
+        errs.append("duplicate context_ref in the provider packet")
+
+    for entry in doc.get("context") or []:
+        if entry.get("category") not in AI_CONSENT_CATEGORIES:
+            errs.append(
+                f"{entry.get('context_ref')}: category {entry.get('category')!r} is not one "
+                "of the seven disclosed AI-consent categories"
+            )
+    return errs
+
+
+OUTPUT_ROLE_ORDER = ("supporting_theme", "phase_context", "timing", "collective_context")
+
+
+def reading_generation_output_policy(doc: dict) -> list[str]:
+    errs: list[str] = []
+    roles = [p.get("role") for p in doc.get("paragraphs") or []]
+    if len(set(roles)) != len(roles):
+        errs.append(f"paragraph roles {roles} repeat; each role appears at most once")
+    ranks = [OUTPUT_ROLE_ORDER.index(r) for r in roles if r in OUTPUT_ROLE_ORDER]
+    if ranks != sorted(ranks):
+        errs.append(
+            f"paragraph roles {roles} are not in the frozen order {list(OUTPUT_ROLE_ORDER)}"
+        )
+
+    known_facts = set()
+    known_context = set()
+    for unit in _grounded_units(doc):
+        known_facts |= set(unit.get("fact_ids") or [])
+        known_context |= set(unit.get("context_refs") or [])
+    for fid in sorted(known_facts):
+        if not fid.startswith(("dsf_", "cyc_", "nat_")):
+            errs.append(f"fact reference {fid!r} is not an opaque calculated fact handle")
+    for ref in sorted(known_context):
+        if not ref.startswith("ctx_"):
+            errs.append(f"context reference {ref!r} is not an opaque packet handle")
+
+    for unit, label in _grounded_units_labelled(doc):
+        if label in ("lead", "supporting_theme", "phase_context", "timing", "collective_context"):
+            if not unit.get("fact_ids"):
+                errs.append(f"{label} cites no calculated fact")
+    return errs
+
+
+def _grounded_units(doc: dict) -> list[dict]:
+    return [unit for unit, _ in _grounded_units_labelled(doc)]
+
+
+def _grounded_units_labelled(doc: dict) -> list[tuple[dict, str]]:
+    units: list[tuple[dict, str]] = []
+    if isinstance(doc.get("lead"), dict):
+        units.append((doc["lead"], "lead"))
+    for paragraph in doc.get("paragraphs") or []:
+        units.append((paragraph, paragraph.get("role") or "paragraph"))
+    if isinstance(doc.get("reflection_prompt"), dict):
+        units.append((doc["reflection_prompt"], "reflection_prompt"))
+    if isinstance(doc.get("uncertainty_note"), dict):
+        units.append((doc["uncertainty_note"], "uncertainty_note"))
+    return units
+
+
+def daily_reading_v5_policy(doc: dict) -> list[str]:
+    errs: list[str] = []
+    paragraphs = doc.get("paragraphs") or []
+    orders = [p.get("order") for p in paragraphs]
+    if orders != list(range(1, len(paragraphs) + 1)):
+        errs.append(f"paragraph orders {orders} are not contiguous from 1")
+    roles = [p.get("role") for p in paragraphs]
+    if roles and roles[0] != "primary_theme":
+        errs.append("a v5 reading must open with the primary_theme lead")
+    if "safety_fallback" in roles or "fallback_used" in doc or "release_version" in doc:
+        errs.append("v5 has no reviewed fallback and no release pointer")
+    return errs
+
+
+def reading_evidence_v5_policy(doc: dict) -> list[str]:
+    errs = m5_allowed_use_policy(doc)
+    paragraphs = doc.get("paragraphs") or []
+    orders = [p.get("order") for p in paragraphs]
+    if orders != list(range(1, len(paragraphs) + 1)):
+        errs.append(f"evidence paragraph orders {orders} are not contiguous from 1")
+
+    for paragraph in paragraphs:
+        pid = paragraph.get("paragraph_id")
+        fact_ids = [f.get("fact_id") for f in paragraph.get("fact_refs") or []]
+        if len(set(fact_ids)) != len(fact_ids):
+            errs.append(f"{pid}: duplicate fact reference")
+        for ref in paragraph.get("fact_refs") or []:
+            if ref.get("scope") not in ("personalized", "collective"):
+                errs.append(f"{pid}: fact reference declares no scope")
+        for ref in paragraph.get("context_refs") or []:
+            if ref.get("category") not in AI_CONSENT_CATEGORIES:
+                errs.append(f"{pid}: context category {ref.get('category')!r} is undisclosed")
+        if paragraph.get("role") in (
+            "primary_theme",
+            "supporting_theme",
+            "phase_context",
+            "timing",
+            "collective_context",
+        ) and not fact_ids:
+            errs.append(f"{pid}: an astrology paragraph cites no calculated fact")
+
+    validation = doc.get("validation") or {}
+    if validation.get("status") != "passed":
+        errs.append("only a passed validation may be published")
+    if not validation.get("checks"):
+        errs.append("validation records no checks")
+    for check in validation.get("checks") or []:
+        if check.get("passed") is not True:
+            errs.append(f"validation check {check.get('code')!r} is not passed")
+
+    if doc.get("revision_reason") == "initial":
+        if doc.get("revision") != 1:
+            errs.append("an initial evidence graph must be revision 1")
+    gin = doc.get("generation_input_id") or ""
+    if not gin.startswith("gin_sha256_"):
+        errs.append(f"generation_input_id {gin!r} is not domain-separated")
+    if (doc.get("model") or {}).get("provider") != "openai":
+        errs.append("v5 evidence must record the model that published the prose")
+    return errs
+
+
 def check_golden_vectors(path: Path) -> list[str]:
     """Verify the vector file is internally consistent.
 
@@ -405,8 +933,45 @@ def check_golden_vectors(path: Path) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def validate_package(registry: Registry, package: Path, catalogue: set[str]) -> list[str]:
+def _m3_policy_errors(name: str, instance: dict, catalogue: set[str]) -> list[str]:
+    if name.startswith("content-release"):
+        return content_release_policy(instance, catalogue)
+    if name.startswith("assembly-identity"):
+        return assembly_identity_policy(instance)
+    if name.startswith("cycle-response"):
+        return cycle_response_policy(instance)
+    if name.startswith("timing-response"):
+        return timing_response_policy(instance)
+    if name.startswith("reading-assembly"):
+        return assembly_request_policy(instance)
+    return []
+
+
+def _m5_policy_errors(name: str, instance: dict) -> list[str]:
+    if name.startswith("daily-sky-request"):
+        return daily_sky_request_policy(instance)
+    if name.startswith("daily-sky-response"):
+        return daily_sky_response_policy(instance)
+    if name.startswith("generation-command"):
+        return generation_command_v2_policy(instance)
+    if name.startswith("reading-generation-request"):
+        return reading_generation_request_policy(instance)
+    if name.startswith("reading-generation-output"):
+        return reading_generation_output_policy(instance)
+    if name.startswith("daily-reading"):
+        return daily_reading_v5_policy(instance)
+    if name.startswith("reading-evidence"):
+        return reading_evidence_v5_policy(instance)
+    return m5_allowed_use_policy(instance)
+
+
+def validate_package(
+    registry: Registry, name: str, package: Path, catalogue: set[str]
+) -> list[str]:
     errors: list[str] = []
+
+    if not package.is_dir():
+        return [f"contract package contracts/{name} is missing"]
 
     for path in sorted(package.glob("*.schema.json")):
         doc = json.loads(path.read_text(encoding="utf-8"))
@@ -417,21 +982,13 @@ def validate_package(registry: Registry, package: Path, catalogue: set[str]) -> 
             errors.append(f"SCHEMA {path.name}: {exc}")
             print(f"FAIL schema meta   {path.name}: {exc}")
 
-    def policy_errors(name: str, instance: dict) -> list[str]:
-        if name.startswith("content-release"):
-            return content_release_policy(instance, catalogue)
-        if name.startswith("assembly-identity"):
-            return assembly_identity_policy(instance)
-        if name.startswith("cycle-response"):
-            return cycle_response_policy(instance)
-        if name.startswith("timing-response"):
-            return timing_response_policy(instance)
-        if name.startswith("reading-assembly"):
-            return assembly_request_policy(instance)
-        return []
+    def policy_errors(fixture: str, instance: dict) -> list[str]:
+        if name == "m5":
+            return _m5_policy_errors(fixture, instance)
+        return _m3_policy_errors(fixture, instance, catalogue)
 
     for path in sorted((package / "fixtures" / "valid").glob("*.json")):
-        ref = match_schema_ref(path.name)
+        ref = match_schema_ref(name, path.name)
         if not ref:
             errors.append(f"No schema mapping for valid fixture {path.name}")
             print(f"FAIL mapping      {path.name}")
@@ -454,7 +1011,7 @@ def validate_package(registry: Registry, package: Path, catalogue: set[str]) -> 
             print(f"OK  valid         {path.name} -> {ref.split('/')[-1]}")
 
     for path in sorted((package / "fixtures" / "invalid").glob("*.json")):
-        ref = match_schema_ref(path.name)
+        ref = match_schema_ref(name, path.name)
         if not ref:
             errors.append(f"No schema mapping for invalid fixture {path.name}")
             print(f"FAIL mapping      {path.name}")
@@ -468,7 +1025,7 @@ def validate_package(registry: Registry, package: Path, catalogue: set[str]) -> 
         except ValidationError:
             schema_rejected = True
 
-        if stem in POLICY_ONLY:
+        if stem in POLICY_ONLY[name]:
             pe = policy_errors(path.name, instance)
             if not pe:
                 errors.append(f"INVALID policy fixture unexpectedly passed {path.name}")
@@ -486,7 +1043,8 @@ def validate_package(registry: Registry, package: Path, catalogue: set[str]) -> 
 
 PACKAGE_BASE = {
     "m0": "https://patternlike.app/contracts/m0/",
-    "m3": "https://patternlike.app/contracts/m3/",
+    "m3": M3_BASE,
+    "m5": M5_BASE,
 }
 
 
@@ -558,35 +1116,60 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     return errors
 
 
-def check_m0_frozen() -> list[str]:
-    """Prove contracts/m0 is unchanged from what M3 declared it a successor to.
+def _normalised_manifest_digest(package: Path) -> str:
+    """SHA-256 over newline-NORMALISED manifest bytes, not raw ones.
+
+    There is no .gitattributes, so git hands Windows checkouts CRLF and Linux
+    checkouts LF, and a raw-byte digest therefore records whichever platform
+    generated it and fails on the other. The value originally recorded for M0
+    came from a CRLF checkout, so its check passed on Windows and failed in
+    Linux CI on a file nobody had touched. Normalising costs nothing: a real
+    edit still moves the digest.
+    """
+    raw = (package / "SCHEMA_MANIFEST.json").read_bytes()
+    return sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _recorded_predecessors(manifest_path: Path) -> dict[str, str]:
+    """Read predecessor digests from either manifest shape.
+
+    M3 records a single `predecessor` object; M5 supersedes two packages and
+    records a `predecessors` array. Both are read here so a successor can be
+    added without rewriting a frozen note.
+    """
+    doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+    recorded: dict[str, str] = {}
+    single = doc.get("predecessor")
+    if isinstance(single, dict) and single.get("package"):
+        recorded[single["package"]] = single.get("manifest_sha256")
+    for entry in doc.get("predecessors") or []:
+        if isinstance(entry, dict) and entry.get("package"):
+            recorded[entry["package"]] = entry.get("manifest_sha256")
+    return recorded
+
+
+def check_frozen(package: Path, label: str, expected: str | None, recorded_by: str) -> list[str]:
+    """Prove a predecessor package is unchanged from what its successor froze.
 
     Two independent proofs, because they fail in different situations. The
     recorded manifest hash catches an edit even in a checkout with no git
-    history; `git diff` catches an edit to any of the other 29 files.
-
-    The hash is over newline-NORMALISED bytes, not raw ones. There is no
-    .gitattributes, so git hands Windows checkouts CRLF and Linux checkouts LF,
-    and a raw-byte digest therefore records whichever platform generated it and
-    fails on the other. The originally recorded value came from a CRLF checkout,
-    so this check passed on Windows and failed in Linux CI on a file nobody had
-    touched. Normalising costs nothing: a real edit still moves the digest.
+    history; `git status` catches an edit to any of the other files.
     """
     errors: list[str] = []
-    manifest = json.loads((M3 / "SCHEMA_MANIFEST.json").read_text(encoding="utf-8"))
-    expected = manifest["predecessor"]["manifest_sha256"]
-    normalised = (M0 / "SCHEMA_MANIFEST.json").read_bytes().replace(b"\r\n", b"\n")
-    actual = sha256(normalised).hexdigest()
-    if actual != expected:
-        errors.append(
-            f"contracts/m0/SCHEMA_MANIFEST.json has changed since the M3 freeze "
-            f"(expected {expected}, found {actual})"
-        )
+    if expected is None:
+        errors.append(f"{recorded_by} records no predecessor digest for {label}")
     else:
-        print("OK  frozen        contracts/m0 manifest matches the recorded M3 predecessor hash")
+        actual = _normalised_manifest_digest(package)
+        if actual != expected:
+            errors.append(
+                f"{label}/SCHEMA_MANIFEST.json has changed since the freeze recorded in "
+                f"{recorded_by} (expected {expected}, found {actual})"
+            )
+        else:
+            print(f"OK  frozen        {label} manifest matches the digest recorded in {recorded_by}")
 
     proc = subprocess.run(
-        ["git", "status", "--porcelain", "--", str(M0)],
+        ["git", "status", "--porcelain", "--", str(package)],
         capture_output=True,
         text=True,
         cwd=ROOT.parent,
@@ -595,17 +1178,183 @@ def check_m0_frozen() -> list[str]:
         print("    (git unavailable; relying on the manifest hash alone)")
     elif proc.stdout.strip():
         errors.append(
-            "contracts/m0 has uncommitted modifications; the M3 freeze requires it "
+            f"{label} has uncommitted modifications; the freeze requires it "
             f"byte-frozen:\n{proc.stdout.strip()}"
         )
     else:
-        print("OK  frozen        contracts/m0 has no working-tree changes")
+        print(f"OK  frozen        {label} has no working-tree changes")
+    return errors
+
+
+def check_predecessors_frozen() -> list[str]:
+    """Prove BOTH frozen predecessor directories, automatically.
+
+    M3's freeze proof covered contracts/m0 only. M5 supersedes the
+    daily-reading family, so contracts/m3 acquires exactly the same standing —
+    and a manual check is not a check.
+    """
+    errors: list[str] = []
+    m3_manifest = M3 / "SCHEMA_MANIFEST.json"
+    m5_manifest = M5 / "SCHEMA_MANIFEST.json"
+
+    errors += check_frozen(
+        M0,
+        "contracts/m0",
+        _recorded_predecessors(m3_manifest).get("contracts/m0"),
+        "contracts/m3/SCHEMA_MANIFEST.json",
+    )
+
+    if not m5_manifest.exists():
+        errors.append(
+            "contracts/m5/SCHEMA_MANIFEST.json is missing, so contracts/m3 has no "
+            "recorded freeze and the daily-reading supersession is undocumented"
+        )
+        return errors
+
+    m5_recorded = _recorded_predecessors(m5_manifest)
+    errors += check_frozen(
+        M3, "contracts/m3", m5_recorded.get("contracts/m3"), "contracts/m5/SCHEMA_MANIFEST.json"
+    )
+
+    # M5 also records M0. Disagreeing with M3's copy would mean two successors
+    # believe different things about the same frozen bytes.
+    m0_from_m3 = _recorded_predecessors(m3_manifest).get("contracts/m0")
+    m0_from_m5 = m5_recorded.get("contracts/m0")
+    if m0_from_m5 is None:
+        errors.append("contracts/m5/SCHEMA_MANIFEST.json records no contracts/m0 predecessor")
+    elif m0_from_m5 != m0_from_m3:
+        errors.append(
+            "contracts/m5 and contracts/m3 record different digests for the same frozen "
+            f"contracts/m0 manifest ({m0_from_m5} vs {m0_from_m3})"
+        )
+    else:
+        print("OK  frozen        contracts/m5 and contracts/m3 agree on the contracts/m0 digest")
+    return errors
+
+
+REQUIRED_M5_BREAKING_CHANGES = {
+    "constrained_model_only",
+    "model_evidence_required",
+    "release_pointer_removed",
+    "reviewed_fallback_removed",
+}
+
+
+def check_m5_manifest() -> list[str]:
+    """The manifest is the inventory, so it has to be checkable.
+
+    A per-file $defs map that drifts from the shipped schemas turns the freeze
+    note into a description of a package that no longer exists.
+    """
+    errors: list[str] = []
+    path = M5 / "SCHEMA_MANIFEST.json"
+    if not path.exists():
+        return ["contracts/m5/SCHEMA_MANIFEST.json is missing"]
+    doc = json.loads(path.read_text(encoding="utf-8"))
+
+    if doc.get("package") != "contracts/m5":
+        errors.append("manifest package is not contracts/m5")
+    if doc.get("schema_version") != M5_SCHEMA_VERSION:
+        errors.append(f"manifest schema_version is not {M5_SCHEMA_VERSION}")
+
+    declared = {entry.get("file"): entry for entry in doc.get("schemas") or []}
+    shipped = {p.name: p for p in sorted(M5.glob("*.schema.json"))}
+    for missing in sorted(set(shipped) - set(declared)):
+        errors.append(f"manifest does not declare shipped schema {missing}")
+    for extra in sorted(set(declared) - set(shipped)):
+        errors.append(f"manifest declares {extra}, which the package does not ship")
+
+    for filename, entry in declared.items():
+        if filename not in shipped:
+            continue
+        schema = json.loads(shipped[filename].read_text(encoding="utf-8"))
+        if entry.get("id") != schema.get("$id"):
+            errors.append(f"{filename}: manifest id disagrees with the document $id")
+        listed = sorted(entry.get("defines") or [])
+        actual = sorted(schema.get("$defs") or {})
+        if listed != actual:
+            errors.append(
+                f"{filename}: manifest defines {listed} but the document defines {actual}"
+            )
+
+    supersedes = doc.get("supersedes") or []
+    if not any(
+        isinstance(s, dict) and s.get("family") == "daily-reading" for s in supersedes
+    ):
+        errors.append("manifest records no explicit daily-reading-family supersession")
+
+    breaking = {b.get("id") for b in doc.get("breaking_changes") or []}
+    for required in sorted(REQUIRED_M5_BREAKING_CHANGES - breaking):
+        errors.append(f"manifest does not inventory the intentional break {required!r}")
+
+    if not errors:
+        print(
+            f"OK  manifest      contracts/m5 declares {len(declared)} schema(s), both "
+            "predecessors, and its breaking-change inventory"
+        )
+    return errors
+
+
+def check_m5_openapi_projection() -> list[str]:
+    """The product OpenAPI is the consent/status contract, so check it names one.
+
+    Validating the document as OpenAPI proves it parses. It does not prove the
+    consent routes exist or that a caller can tell a retryable infrastructure
+    503 from an exhausted 424 — which is the difference between a retry control
+    that can work and one that cannot.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return []
+    path = M5 / "openapi" / "openapi.yaml"
+    if not path.exists():
+        return ["contracts/m5/openapi/openapi.yaml is missing"]
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    paths = spec.get("paths") or {}
+    errors: list[str] = []
+
+    consent = paths.get("/v1/consents/ai-synthesis")
+    if not isinstance(consent, dict):
+        errors.append("openapi.yaml does not describe /v1/consents/ai-synthesis")
+    else:
+        for method in ("get", "put", "delete"):
+            if method not in consent:
+                errors.append(f"/v1/consents/ai-synthesis is missing {method.upper()}")
+
+    today = paths.get("/v1/readings/today")
+    if not isinstance(today, dict):
+        errors.append("openapi.yaml does not describe /v1/readings/today")
+    else:
+        for method in ("get", "put"):
+            if method not in today:
+                errors.append(f"/v1/readings/today is missing {method.upper()}")
+        for status in ("200", "202", "404", "409", "424", "503"):
+            if status not in (today.get("put", {}).get("responses") or {}):
+                errors.append(f"PUT /v1/readings/today does not document {status}")
+
+    if not any(key.endswith("/evidence") for key in paths):
+        errors.append("openapi.yaml does not describe the evidence operation")
+
+    schemas = (spec.get("components") or {}).get("schemas") or {}
+    envelope = schemas.get("ErrorResponse") or {}
+    error_props = (
+        ((envelope.get("properties") or {}).get("error") or {}).get("properties") or {}
+    )
+    if "retryable" not in error_props:
+        errors.append(
+            "ErrorResponse carries no retryable flag; the client would have to infer that "
+            "every 503 can make progress, and a budget-exhausted one cannot"
+        )
+
+    if not errors:
+        print("OK  projection    openapi.yaml declares consent, Today, evidence, and retryable")
     return errors
 
 
 def main() -> int:
     print("== freeze ==")
-    freeze_errors = check_m0_frozen()
+    freeze_errors = check_predecessors_frozen()
     for e in freeze_errors:
         print(f"FAIL frozen       {e}")
 
@@ -628,7 +1377,7 @@ def main() -> int:
 
     registry = load_registry()
     errors = list(freeze_errors)
-    errors += validate_package(registry, M3, catalogue)
+    errors += validate_package(registry, "m3", M3, catalogue)
     errors += check_openapi(M3, registry)
 
     # Every vector file in the directory is checked, not one named file: the
@@ -653,6 +1402,20 @@ def main() -> int:
             print(f"FAIL invalid vector {vectors.name} (expected a vector failure)")
         else:
             print(f"OK  invalid vector {vectors.name}: {ve[0]}")
+
+    print("\n== contracts/m5 ==")
+    errors += validate_package(registry, "m5", M5, set())
+    errors += check_openapi(M5, registry)
+    errors += check_m5_manifest()
+    errors += check_m5_openapi_projection()
+
+    for vectors in sorted((M5 / "fixtures" / "canonicalization").glob("*.json")):
+        ve = check_golden_vectors(vectors)
+        errors += [f"VECTORS {vectors.name}: {e}" for e in ve]
+        for e in ve:
+            print(f"FAIL vectors      {vectors.name}: {e}")
+        if not ve:
+            print(f"OK  vectors       {vectors.name}")
 
     if errors:
         print(f"\n{len(errors)} error(s)")

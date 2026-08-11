@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/daily-sky-response.schema.json",
+  "title": "Daily Sky Response (POST /v1/daily-sky)",
+  "description": "Discriminated union on ok. The frozen M3 cycle contract correctly permits an empty result and states that most days contain no cycle inside orb; removing the reviewed editorial fallback without adding another factual source would therefore make a daily reading impossible on an ordinary zero-cycle day, or tempt the publisher to manufacture a day-specific premise. This document is that other source. A successful response ALWAYS carries anchor positions and exactly one lunar phase, so an empty event subset never means an empty factual day. Failure returns a payload-free error class and no partial fact set.",
+  "$defs": {
+    "factPrecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["longitude_decimals", "instant_resolution_seconds"],
+      "description": "The precision the caller may rely on, stated rather than implied. Both members are nullable because an ingress has no meaningful longitude precision and an anchor sample has no root-solving tolerance.",
+      "properties": {
+        "longitude_decimals": { "type": ["integer", "null"], "minimum": 0, "maximum": 9 },
+        "instant_resolution_seconds": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "anchorPositionDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "longitude_deg", "sign", "sign_degree_deg", "speed_deg_per_day", "retrograde"],
+      "properties": {
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "longitude_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "sign": { "$ref": "common.schema.json#/$defs/zodiacSign" },
+        "sign_degree_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 30 },
+        "speed_deg_per_day": { "type": "number" },
+        "retrograde": { "type": "boolean" }
+      }
+    },
+    "lunarPhaseDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "elongation_deg", "illuminated_fraction"],
+      "properties": {
+        "phase": { "$ref": "common.schema.json#/$defs/lunarPhaseName" },
+        "elongation_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360,
+          "description": "Moon longitude minus Sun longitude, normalized. The bin boundaries are 22.5 degrees either side of each named centre."
+        },
+        "illuminated_fraction": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "transitNatalContactDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transiting_body", "natal_target", "aspect", "direction", "speed_deg_per_day"],
+      "description": "An EXACT contact whose solved root lies inside the half-open local day. Not an in-orb contact: an approaching aspect is the M3 cycle layer's business, and describing one as exact today is precisely the day-specific premise the publisher must not invent.",
+      "properties": {
+        "transiting_body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "natal_target": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "aspect": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+        },
+        "direction": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/passDirection"
+        },
+        "speed_deg_per_day": { "type": "number" }
+      }
+    },
+    "signIngressDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "from_sign", "to_sign", "direction"],
+      "properties": {
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "from_sign": { "$ref": "common.schema.json#/$defs/zodiacSign" },
+        "to_sign": { "$ref": "common.schema.json#/$defs/zodiacSign" },
+        "direction": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/passDirection"
+        }
+      }
+    },
+    "collectiveExactAspectDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "other_body", "aspect", "direction"],
+      "description": "A transiting-to-transiting exact aspect. Collective by construction: it is the same for every reader on Earth, which is why the response labels its scope rather than leaving the distinction to prose.",
+      "properties": {
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "other_body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "aspect": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+        },
+        "direction": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/passDirection"
+        }
+      }
+    },
+    "housePlacementDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "house", "house_system", "longitude_deg"],
+      "description": "Returned only when the request supplied natal house cusps, which it may only do when the effective birth-time accuracy permits houses.",
+      "properties": {
+        "body": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+        },
+        "house": { "$ref": "common.schema.json#/$defs/houseNumber" },
+        "house_system": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/houseSystem"
+        },
+        "longitude_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 }
+      }
+    },
+    "dailySkyFactCore": {
+      "type": "object",
+      "required": [
+        "kind",
+        "scope",
+        "effective_at",
+        "label",
+        "precision",
+        "detail",
+        "daily_sky_policy_id",
+        "daily_sky_policy_version",
+        "calculation_policy_id",
+        "calculation_policy_version",
+        "ephemeris_data_version",
+        "container_digest"
+      ],
+      "description": "Everything that defines a fact. Both the wire fact and its hash preimage compose this, so the digest cannot cover a different set of members than the wire does.",
+      "properties": {
+        "kind": { "$ref": "common.schema.json#/$defs/dailySkyFactKind" },
+        "scope": { "$ref": "common.schema.json#/$defs/factScope" },
+        "effective_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime",
+          "description": "For anchor_position, lunar_phase, and house_placement this is the anchor instant. For every other kind it is the solved exact instant, which must lie inside the half-open local day."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Pre-rendered factual label. Renders a calculated value; states no interpretation. Inside the preimage because the calculation policy version already has to change for any rendering change, so excluding it would leave a version bump with nothing to prove."
+        },
+        "precision": { "$ref": "#/$defs/factPrecision" },
+        "detail": { "type": "object" },
+        "daily_sky_policy_id": { "$ref": "common.schema.json#/$defs/dailySkyPolicyId" },
+        "daily_sky_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "calculation_policy_id": { "type": "string", "minLength": 1 },
+        "calculation_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "anchor_position" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "detail": { "$ref": "#/$defs/anchorPositionDetail" },
+              "scope": { "const": "collective" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "lunar_phase" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "detail": { "$ref": "#/$defs/lunarPhaseDetail" },
+              "scope": { "const": "collective" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "transit_natal_contact" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "detail": { "$ref": "#/$defs/transitNatalContactDetail" },
+              "scope": { "const": "personalized" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "sign_ingress" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "detail": { "$ref": "#/$defs/signIngressDetail" },
+              "scope": { "const": "collective" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "collective_exact_aspect" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "detail": { "$ref": "#/$defs/collectiveExactAspectDetail" },
+              "scope": { "const": "collective" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "house_placement" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "detail": { "$ref": "#/$defs/housePlacementDetail" },
+              "scope": { "const": "personalized" }
+            }
+          }
+        }
+      ]
+    },
+    "dailySkyFactIdentityV1": {
+      "description": "The exact, closed object whose RFC 8785 canonical bytes are hashed to produce content_digest, of which fact_id is the first 32 hex characters. Carries no request_id: the digest names the fact, not the request that happened to ask for it, so the same sky produces the same handle in every reading that contains it.",
+      "allOf": [
+        { "$ref": "#/$defs/dailySkyFactCore" },
+        {
+          "type": "object",
+          "required": ["identity_profile", "schema_version"],
+          "properties": {
+            "identity_profile": { "const": "patternlike.daily-sky-fact-id.v1" },
+            "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "dailySkyFact": {
+      "description": "One calculated fact on the wire. fact_id and content_digest are derived from dailySkyFactIdentityV1 and are therefore the only members the preimage does not contain.",
+      "allOf": [
+        { "$ref": "#/$defs/dailySkyFactCore" },
+        {
+          "type": "object",
+          "required": ["fact_id", "content_digest"],
+          "properties": {
+            "fact_id": { "$ref": "common.schema.json#/$defs/dailySkyFactId" },
+            "content_digest": {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "dailySkyResponseSuccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "schema_version",
+        "request_id",
+        "day_start_at",
+        "day_end_at",
+        "anchor_at",
+        "anchor_resolution",
+        "effective_accuracy",
+        "suppressed_features",
+        "daily_sky_policy_id",
+        "daily_sky_policy_version",
+        "calculation_policy_id",
+        "calculation_policy_version",
+        "contract_id",
+        "contract_version",
+        "container_digest",
+        "ephemeris_data_version",
+        "tzdb_version",
+        "facts"
+      ],
+      "properties": {
+        "ok": { "const": true },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "day_start_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "day_end_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "anchor_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "anchor_resolution": { "$ref": "common.schema.json#/$defs/anchorResolution" },
+        "effective_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "suppressed_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/suppressedFeatureClass"
+          },
+          "description": "Echoed so the response is self-verifying: a caller can prove no suppressed feature reappeared as a fact without holding the request."
+        },
+        "daily_sky_policy_id": { "$ref": "common.schema.json#/$defs/dailySkyPolicyId" },
+        "daily_sky_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "calculation_policy_id": { "type": "string", "minLength": 1 },
+        "calculation_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 },
+        "tzdb_version": { "type": "string", "minLength": 1 },
+        "facts": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/dailySkyFact" },
+          "description": "Ordered by (kind rank, effective_at, fact_id) with unique ids, where kind rank is the declaration order of dailySkyFactKind.",
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": { "kind": { "const": "anchor_position" } },
+                "required": ["kind"]
+              },
+              "minContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": { "kind": { "const": "lunar_phase" } },
+                "required": ["kind"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        }
+      }
+    },
+    "dailySkyResponseFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "schema_version", "request_id", "error_class", "error_message"],
+      "properties": {
+        "ok": { "const": false },
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "error_class": { "$ref": "common.schema.json#/$defs/dailySkyErrorClass" },
+        "error_message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "Payload-free. Upstream Swiss Ephemeris messages have leaked absolute filesystem paths, so nothing from the engine is echoed verbatim."
+        }
+      }
+    },
+    "dailySkyResponse": {
+      "oneOf": [
+        { "$ref": "#/$defs/dailySkyResponseSuccess" },
+        { "$ref": "#/$defs/dailySkyResponseFailure" }
+      ],
+      "$comment": "Semantic validation beyond JSON Schema, enforced in code and pinned by the invalid fixtures: ordering by (kind rank, effective_at, fact_id); unique fact ids; anchor-kind facts sampled exactly at anchor_at; every other kind's effective_at inside [day_start_at, day_end_at) so an end-boundary event belongs to the NEXT day; fact_id equal to 'dsf_' + content_digest[0:32]; and no fact whose target or class is suppressed."
+    }
+  },
+  "oneOf": [{ "title": "DailySkyResponse", "$ref": "#/$defs/dailySkyResponse" }]
+}

@@ -21,20 +21,25 @@ import {
 } from "../../test/helpers.js";
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
+import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
 import {
   MAX_COMMAND_GENERATION,
   claimJob,
+  completeReading,
   findUndispatched,
   loadInitialGenerationState,
 } from "../db/generation.js";
 import {
   dispatch,
+  enqueueConstrainedReading,
   enqueueDailyReading,
   enqueueReissue,
   replaceFailedCommand,
+  resolveV5TargetDate,
   type GenerationMessage,
 } from "./enqueue.js";
-import { generateDailyReading } from "./generate-daily-reading.js";
+import { OPENAI_READING_MODEL } from "./reading-publisher.js";
+import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
 import type { StoredReading } from "./generate-daily-reading.js";
@@ -175,6 +180,40 @@ async function seedEverything() {
   await confirmPreferences(USER_A, "America/Chicago");
   await seedChart(IDENTITY_A);
   return seedActiveRelease();
+}
+
+function enabledV5Env() {
+  return {
+    ...env,
+    READING_V5_ROLLOUT: "internal",
+    READING_PUBLISHER: "openai",
+    OPENAI_READING_MODEL,
+    OPENAI_READING_REASONING: "high",
+    OPENAI_READING_PROMPT_VERSION: "1.0.1",
+    OPENAI_READING_TIMEOUT_MS: "90000",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
+    READING_CONTEXT_MAX_BYTES: "98304",
+    READING_PREGEN_ACTIVE_DAYS: "30",
+    READING_PREGEN_LEAD_MINUTES: "30",
+    READING_PREGEN_SPREAD_MINUTES: "45",
+    READING_SCHEDULER_BATCH_LIMIT: "100",
+    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
+    OPENAI_API_KEY: "sk-test-key",
+  };
+}
+
+async function grantAiSynthesis() {
+  await rows(
+    `INSERT INTO consents (id, user_id, kind, status, policy_version, allowed_uses_json,
+       scopes_json, version, granted_at, created_at, updated_at)
+     VALUES (?, ?, 'ai_synthesis', 'granted', ?, '[]', '[]', 1, ?, ?, ?)`,
+    "cns_ai_synthesis_0001",
+    USER_A,
+    AI_SYNTHESIS_POLICY_VERSION,
+    "2026-08-09T00:00:00.000Z",
+    "2026-08-09T00:00:00.000Z",
+    "2026-08-09T00:00:00.000Z",
+  );
 }
 
 async function seedContextSignal(
@@ -1223,6 +1262,31 @@ describe("frozen inputs", () => {
 describe("claims", () => {
   beforeEach(seedEverything);
 
+  it("dispatches a V2 claim through its executor without changing the V1 seam", async () => {
+    await grantAiSynthesis();
+    const targetLocalDate = resolveV5TargetDate("America/Chicago", new Date());
+    if (!targetLocalDate) throw new Error("target day did not resolve");
+    const enqueued = await enqueueConstrainedReading(enabledV5Env() as typeof env, USER_A, {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate,
+    });
+    if (!enqueued.ok) throw new Error(`V2 enqueue failed: ${enqueued.reason}`);
+
+    const claim = await claimJob(env, enqueued.jobId);
+    expect(claim?.command.command_version).toBe("v2");
+    expect(await dispatchGeneration(enabledV5Env() as typeof env, claim!)).toMatchObject({
+      ok: true,
+      readingId: enqueued.readingId,
+    });
+
+    const [reading] = await rows<{ status: string; assembly_mode: string }>(
+      "SELECT status, assembly_mode FROM daily_readings WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(reading).toEqual({ status: "published", assembly_mode: "constrained_model" });
+  });
+
   it("a stale claim cannot publish", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
     if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
@@ -1240,15 +1304,55 @@ describe("claims", () => {
     expect(second).not.toBeNull();
     expect(second!.claimToken).not.toBe(first!.claimToken);
 
-    const stale = await generateDailyReading(env, first!);
+    const stale = await dispatchGeneration(env, first!);
     expect(stale).toMatchObject({ ok: false, reason: "duplicate" });
 
     const [reading] = await readings();
     expect(reading!.status).toBe("pending");
 
-    const winner = await generateDailyReading(env, second!);
+    const winner = await dispatchGeneration(env, second!);
     expect(winner.ok).toBe(true);
     expect((await readings())[0]!.status).toBe("published");
+  });
+
+  it("a losing claim cannot overwrite the winner's published artifact", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    const loser = await claimJob(env, enqueued.jobId);
+    await rows(
+      `UPDATE jobs SET lease_expires_at = '2000-01-01T00:00:00Z' WHERE id = ?`,
+      enqueued.jobId,
+    );
+    const winner = await claimJob(env, enqueued.jobId);
+    expect(await dispatchGeneration(env, winner!)).toMatchObject({ ok: true });
+
+    const published = await decryptReading(enqueued.readingId);
+
+    // OpenAI is nondeterministic, so two deliveries against one frozen command
+    // can legitimately produce different prose. The claim CAS is the only
+    // publication authority: the loser's candidate is discarded without any
+    // textual comparison, and nothing about the winner changes.
+    const outcome = await completeReading(env, {
+      identity: IDENTITY_A,
+      readingId: enqueued.readingId,
+      jobId: enqueued.jobId,
+      claimToken: loser!.claimToken,
+      commandGeneration: 1,
+      predecessor: { kind: "none" },
+      reading: { ciphertext: new Uint8Array([1, 2, 3]), keyVersion: 1, nonce: "loser" },
+      evidence: [],
+    });
+
+    expect(outcome).toMatchObject({ ok: false, reason: "stale_claim" });
+    expect(await decryptReading(enqueued.readingId)).toEqual(published);
+
+    const [row] = await rows<{ status: string; reading_nonce: string }>(
+      "SELECT status, reading_nonce FROM daily_readings WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(row!.status).toBe("published");
+    expect(row!.reading_nonce).not.toBe("loser");
   });
 });
 
@@ -1433,6 +1537,94 @@ describe("command replacement", () => {
     const [reading] = await readings();
     expect(reading!.status).toBe("failed");
     expect(reading!.command_generation).toBe(3);
+  });
+
+  it("logs retryable generation failures without the job identifier", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    const key = "content-releases/release-12.json";
+    const stored = await env.ARTIFACTS!.get(key);
+    expect(stored).not.toBeNull();
+    await env.ARTIFACTS!.delete(key);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+      expect(error).toHaveBeenCalledWith(
+        "generation_retryable_failure",
+        expect.objectContaining({
+          trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+          failure_class: "release_unreadable",
+        }),
+      );
+    } finally {
+      error.mockRestore();
+      await env.ARTIFACTS!.put(key, await stored!.arrayBuffer(), {
+        httpMetadata: stored!.httpMetadata,
+        customMetadata: stored!.customMetadata,
+      });
+    }
+  });
+
+  it("uses the V2 replacement policy for seeded constrained-model terminal rows", async () => {
+    await grantAiSynthesis();
+    const v5Env = enabledV5Env();
+    const seeded = await enqueueConstrainedReading(v5Env, USER_A, {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate: "2026-08-09",
+      now: new Date("2026-08-09T18:00:00.000Z"),
+    });
+    if (!seeded.ok) throw new Error(`v2 enqueue failed: ${seeded.reason}`);
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, seeded.jobId);
+
+    expect(
+      await replaceFailedCommand(
+        v5Env,
+        USER_A,
+        seeded.readingId,
+        "publisher_unavailable",
+        "scheduler",
+        new Date("2026-08-09T18:00:00.000Z"),
+      ),
+    ).toMatchObject({ ok: true });
+    expect((await readings())[0]).toMatchObject({
+      command_generation: 2,
+      status: "pending",
+    });
+
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
+    const [active] = await rows<{ active_generation_job_id: string }>(
+      `SELECT active_generation_job_id FROM daily_readings WHERE id = ?`,
+      seeded.readingId,
+    );
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, active!.active_generation_job_id);
+
+    await expect(
+      replaceFailedCommand(v5Env, USER_A, seeded.readingId, "release_unreadable", "scheduler"),
+    ).resolves.toMatchObject({ ok: false, reason: "not_replaceable" });
+    await expect(
+      replaceFailedCommand(v5Env, USER_A, seeded.readingId, "consent_regranted", "scheduler"),
+    ).resolves.toMatchObject({ ok: false, reason: "not_replaceable" });
+
+    const replaced = await replaceFailedCommand(
+      v5Env,
+      USER_A,
+      seeded.readingId,
+      "publisher_unavailable",
+      "scheduler",
+      new Date("2026-08-09T18:00:00.000Z"),
+    );
+    expect(replaced).toMatchObject({ ok: true });
+    expect((await readings())[0]).toMatchObject({ command_generation: 3, status: "pending" });
+    if (!replaced.ok) throw new Error(`V2 g3 replacement failed: ${replaced.reason}`);
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, replaced.jobId);
+
+    await expect(
+      replaceFailedCommand(v5Env, USER_A, seeded.readingId, "publisher_unavailable", "scheduler"),
+    ).resolves.toMatchObject({ ok: false, reason: "budget_exhausted" });
   });
 
   it("refuses to silently regenerate a day the reader has moved past", async () => {

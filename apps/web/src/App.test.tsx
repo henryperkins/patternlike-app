@@ -13,7 +13,12 @@ import {
   notImplemented,
   type MockResponse,
 } from "./test/api-mock.js";
-import { READING_ID, evidenceGraph, todayResponse } from "./test/reading-fixture.js";
+import {
+  READING_ID,
+  consentGranted,
+  evidenceGraph,
+  todayResponse,
+} from "./test/reading-fixture.js";
 
 const chart = {
   schema_version: "0.2.0",
@@ -360,12 +365,17 @@ describe("web application shell", () => {
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
       "/v1/account": notImplemented("Account deletion (M1 privacy skeleton follows)", "req_delete"),
+      // Stubbed so the AI-synthesis panel is checked in its loaded state, with
+      // its category list and its live control, rather than in the one-line
+      // failure state an unstubbed route would leave it in.
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
     });
 
     const { container } = render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
     await screen.findByRole("heading", { name: /Portable in. Portable out./i });
+    await screen.findByRole("button", { name: /Withdraw permission/i });
     await user.click(screen.getByRole("button", { name: /Delete account/i }));
 
     const results = await axe.run(container, {

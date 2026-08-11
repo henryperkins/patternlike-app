@@ -20,6 +20,7 @@ interface Envelope {
   undispatched?: number;
   expired_leases?: number;
   redispatched?: number;
+  predecessor_id?: string;
   error?: { code: string; message: string; request_id: string | null };
 }
 
@@ -120,6 +121,42 @@ describe("POST /internal/readings/*", () => {
         })
       ).status,
     ).toBe(400);
+    expect((await post("/readings/invalidate", {})).status).toBe(400);
+    expect(
+      (
+        await post("/readings/invalidate", {
+          user_id: USER_A,
+          reading_id: "rdg_x",
+          reason: "chart_correction",
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it("offers an authenticated calculation-defect path for one named reading", async () => {
+    const { status, body } = await post("/readings/invalidate", {
+      user_id: USER_A,
+      reading_id: "rdg_named_but_absent_0001",
+      reason: "calculation_defect",
+    });
+    expect(status).toBe(409);
+    expect(body.error?.code).toBe("not_found");
+  });
+
+  it("accepts V2 replacement vocabulary before storage rejects it for a V1 row", async () => {
+    const reserved = await post("/readings/generate", { user_id: USER_A });
+    expect(reserved.status).toBe(202);
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, reserved.body.reading_id!);
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, reserved.body.job_id!);
+
+    const { status, body } = await post("/readings/replace", {
+      user_id: USER_A,
+      reading_id: reserved.body.reading_id,
+      reason: "consent_regranted",
+      actor: "scheduler",
+    });
+    expect(status).toBe(409);
+    expect(body.error?.code).toBe("not_replaceable");
   });
 
   it("does not expose raw D1 errors in an internal response", async () => {

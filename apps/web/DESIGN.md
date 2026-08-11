@@ -319,6 +319,16 @@ Each birth-time accuracy choice is a full-width, square row with a `74px` minimu
 
 The evidence drawer is a signature component: a square Evidence Paper disclosure with an `82px` summary row, serif title, monospaced state label, and one-pixel internal grid. Closed state says “Open”; open state says “Close.” Evidence cells use monospaced values and collapse from three columns to one below `700px`.
 
+A model-written reading opens the drawer into three headed layers, progressively more technical: **Calculated facts** per paragraph, each marked as the reader's own chart or the sky everyone shares; **Personal context** as one row per consented category carrying every lane it was permitted, never a value; and the **Generation record** — provider, exact model, prompt, selection, validation and calculation versions, generation time, revision, and integrity identifiers. Layer headings are monospaced eyebrow rules rather than serif titles, because they organize evidence rather than introduce reading. A paragraph with no calculated fact says so in a sentence instead of showing an empty list.
+
+### Reading Disclosure
+
+A model-written reading closes its editorial column with one sans-serif line at `12px` in Soft Ink Green, above the evidence drawer: the product speaking about the reading rather than part of it. It is always present and never faint enough to be hard to read — Faint Ink Green fails the contrast target at this size, and a disclosure nobody can comfortably read is a soft way of not making it.
+
+### Consent Terms
+
+Both surfaces that ask for or review AI-synthesis consent render one shared block: a three-cell processor/purpose/policy grid stacking below `700px`, a rule-marked list of the categories the server declared, and the qualifying paragraphs. The category list uses a short Graphite Rule per row rather than a bullet glyph — the instrument grid marks a row, it does not decorate it. The consent panel in Context & privacy takes the permission ledger's own `24px` spacing and `30px` padding so the two read as one column of controls.
+
 ### Named Rules
 
 **The State Must Read Before It Moves Rule.** Color, label, border, and status copy establish a state first; motion only confirms the transition.

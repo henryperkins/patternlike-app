@@ -2,6 +2,10 @@ import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { asCryptoSubject, type CryptoSubject } from "../crypto.js";
 import { buildUserKeyInsert, type UserIdentity } from "./users.js";
+import {
+  DEFAULT_READING_SCHEDULE_POLICY,
+  selectReadingScheduleTarget,
+} from "../services/reading-schedule.js";
 
 /** `usr_<32 hex>`. Opaque, server-minted, never derived from an IdP subject. */
 export function newUserId(): string {
@@ -49,7 +53,8 @@ export async function linkIdentity(
   provider: string,
   providerSubject: string,
 ): Promise<UserIdentity> {
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
 
   const existing = await readIdentity(env, provider, providerSubject);
 
@@ -66,14 +71,20 @@ export async function linkIdentity(
     userId: newUserId(),
     cryptoSubject: newCryptoSubject(),
   };
+  const initialCursor = await selectReadingScheduleTarget(
+    identity.userId,
+    "UTC",
+    nowDate,
+    DEFAULT_READING_SCHEDULE_POLICY,
+  );
 
   try {
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO users (id, crypto_subject, status, locale, timezone,
-                            entitlement_tier, created_at, updated_at)
-         VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
-      ).bind(identity.userId, identity.cryptoSubject, now, now),
+                            entitlement_tier, next_due_at, created_at, updated_at)
+         VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?, ?)`,
+      ).bind(identity.userId, identity.cryptoSubject, initialCursor.dueAt, now, now),
       env.DB.prepare(
         `INSERT INTO identities (id, user_id, provider, provider_subject, created_at, last_login_at)
          VALUES (?, ?, ?, ?, ?, ?)`,

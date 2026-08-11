@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/reading-generation-request.schema.json",
+  "title": "Reading Generation Request (provider-neutral)",
+  "description": "The closed projection of a frozen V2 command that crosses the provider boundary. Smaller than the command by design: it carries no reading key, user id, chart fingerprint, storage key, queue id, consent record id, birth instant, coordinates, or timezone name. Fact references are content-addressed handles and context references are positional handles valid only inside this one packet. User-authored text appears only as a VALUE inside the closed context array; it can add no instruction, change no output contract, enable no tool, and override no system policy. The object being closed is the enforcement: an undeclared property is rejected rather than forwarded.",
+  "$defs": {
+    "factAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bodies", "signs", "houses", "degrees", "timestamps", "dates"],
+      "description": "The COMPLETE astrology vocabulary this fact licenses. Candidate validation freezes its accepted vocabulary from the union of these arrays, so a body, sign, house, degree, phase, or timestamp the model states without a fact behind it is mechanically detectable rather than a matter of editorial judgement.",
+      "properties": {
+        "bodies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody"
+          }
+        },
+        "aspect": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType"
+            }
+          ]
+        },
+        "signs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/zodiacSign" }
+        },
+        "houses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/houseNumber" }
+        },
+        "phase": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase"
+            }
+          ]
+        },
+        "lunar_phase": {
+          "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/lunarPhaseName" }]
+        },
+        "degrees": { "type": "array", "items": { "type": "number" } },
+        "timestamps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+          }
+        },
+        "dates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+          }
+        }
+      }
+    },
+    "requestFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "fact_class", "scope", "lane_rank", "label", "attributes"],
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "pattern": "^(dsf_[a-f0-9]{32}|cyc_[a-f0-9]{32}|nat_[a-f0-9]{32})$",
+          "description": "Content-addressed handle for a daily-sky fact, a personalized cycle, or a stable natal fact. Never a storage row id."
+        },
+        "fact_class": {
+          "type": "string",
+          "enum": [
+            "cycle_instance",
+            "anchor_position",
+            "lunar_phase",
+            "transit_natal_contact",
+            "sign_ingress",
+            "collective_exact_aspect",
+            "house_placement",
+            "natal_position",
+            "natal_aspect"
+          ]
+        },
+        "scope": { "$ref": "common.schema.json#/$defs/factScope" },
+        "lane_rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "description": "Deterministic reading priority: 1 active personalized cycles, 2 exact daily transit-to-natal contacts, 3 collective daily-sky facts and events, 4 stable natal context. Personal context may choose emphasis among eligible facts; it can never promote a non-fact into an astrological claim."
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "attributes": { "$ref": "#/$defs/factAttributes" }
+      }
+    },
+    "requestContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_ref", "category", "allowed_use", "observed_on", "content"],
+      "description": "One consented context item in ONE permitted lane. observed_on is a calendar date rather than an instant: the exact minute a journal entry was written is more identifying than it is useful for a reading.",
+      "properties": {
+        "context_ref": { "$ref": "common.schema.json#/$defs/contextRef" },
+        "category": { "$ref": "common.schema.json#/$defs/aiConsentDataCategory" },
+        "allowed_use": { "$ref": "common.schema.json#/$defs/m5AllowedUse" },
+        "observed_on": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+        },
+        "content": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "text"],
+              "properties": {
+                "kind": { "const": "untrusted_text" },
+                "text": { "type": "string", "minLength": 1, "maxLength": 2048 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "value"],
+              "properties": {
+                "kind": { "const": "structured" },
+                "value": { "type": "object" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "priorReadingExcerpt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["days_ago", "headline", "lead", "reflection_prompt"],
+      "description": "Relative day offset rather than a date: repetition control needs recency, not a calendar the model could restate as a fact.",
+      "properties": {
+        "days_ago": { "type": "integer", "minimum": 1, "maximum": 7 },
+        "headline": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "lead": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "reflection_prompt": { "type": "string", "minLength": 1, "maxLength": 2048 }
+      }
+    },
+    "readingComposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_paragraph_roles",
+        "min_paragraphs",
+        "max_paragraphs",
+        "headline_max_chars",
+        "lead_max_chars",
+        "paragraph_max_chars",
+        "reflection_max_chars",
+        "uncertainty_note_required"
+      ],
+      "properties": {
+        "allowed_paragraph_roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "reading-generation-output.schema.json#/$defs/generatedParagraphRole"
+          }
+        },
+        "min_paragraphs": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "max_paragraphs": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "headline_max_chars": { "type": "integer", "minimum": 1, "maximum": 200 },
+        "lead_max_chars": { "type": "integer", "minimum": 1, "maximum": 4000 },
+        "paragraph_max_chars": { "type": "integer", "minimum": 1, "maximum": 4000 },
+        "reflection_max_chars": { "type": "integer", "minimum": 1, "maximum": 4000 },
+        "uncertainty_note_required": {
+          "type": "boolean",
+          "description": "True when a surviving qualified feature or a suppressed class must be named. The candidate is rejected when it is true and no note is present."
+        }
+      }
+    },
+    "readingGenerationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "prompt_version",
+        "selection_policy_version",
+        "output_schema",
+        "local_date",
+        "locale",
+        "birth_time_accuracy",
+        "suppressed_features",
+        "facts",
+        "context",
+        "prior_readings",
+        "composition"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "prompt_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "selection_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "output_schema": { "$ref": "common.schema.json#/$defs/outputSchemaName" },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate",
+          "description": "The reader's own local day. The only calendar value in the packet, and the candidate must echo it exactly."
+        },
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "birth_time_accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy",
+          "description": "The accuracy LABEL and its consequences cross the boundary; the birth instant, place, and coordinates never do."
+        },
+        "suppressed_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/suppressedFeatureClass"
+          }
+        },
+        "domain_preference": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/lifeDomain"
+            }
+          ]
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/requestFact" },
+          "description": "Ordered by (lane_rank, fact_id). Never empty: the calculated daily-sky layer guarantees at least an anchor and a phase, so a zero-cycle day is still a factual day."
+        },
+        "context": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/requestContext" }
+        },
+        "prior_readings": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 7,
+          "items": { "$ref": "#/$defs/priorReadingExcerpt" }
+        },
+        "composition": { "$ref": "#/$defs/readingComposition" }
+      }
+    }
+  },
+  "oneOf": [{ "title": "ReadingGenerationRequest", "$ref": "#/$defs/readingGenerationRequest" }]
+}

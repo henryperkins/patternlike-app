@@ -3,6 +3,8 @@
 export * from "./types.js";
 export * from "./chart-types.js";
 export * from "./cycle-types.js";
+export * from "./daily-sky-types.js";
+export * from "./m5-reading-types.js";
 export * from "./jcs.js";
 export * from "./timezone.js";
 
@@ -19,6 +21,8 @@ import {
   buildCyclePassIdentity,
   renderCyclePassId,
 } from "./cycle-types.js";
+import type { DailySkyFact, DailySkyFactCore } from "./daily-sky-types.js";
+import { buildDailySkyFactIdentity, renderDailySkyFactId } from "./daily-sky-types.js";
 import { jcsCanonicalize } from "./jcs.js";
 
 export const LAUNCH_BODIES: readonly CelestialBody[] = [
@@ -208,6 +212,19 @@ export async function cyclePassId(
  */
 export async function cycleHash(cycle: NormalizedCycle): Promise<string> {
   return sha256Hex(jcsCanonicalize(buildCycleHashPreimage(cycle)));
+}
+
+/**
+ * Seal a calculated daily-sky fact with its content-addressed identity.
+ *
+ * `fact_id` and `content_digest` are two views of one SHA-256 over the fact's
+ * canonical preimage, so their agreement is checkable without recomputing the
+ * preimage — which is what lets a contract fixture, a Worker replay, and the
+ * calculation service each verify the pairing independently.
+ */
+export async function sealDailySkyFact(core: DailySkyFactCore): Promise<DailySkyFact> {
+  const digest = await sha256Hex(jcsCanonicalize(buildDailySkyFactIdentity(core)));
+  return { ...core, fact_id: renderDailySkyFactId(digest), content_digest: `sha256:${digest}` };
 }
 
 /** Canonical JSON for stable fingerprints (sorted object keys). */

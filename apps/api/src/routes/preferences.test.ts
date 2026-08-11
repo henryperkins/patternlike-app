@@ -260,6 +260,20 @@ describe("PUT /v1/preferences/timezone", () => {
     }
   });
 
+  it("rejects a zone ICU accepts but the pinned tz database does not carry", async () => {
+    // isValidIanaZone asks the runtime's ICU; every scheduler consumer resolves
+    // the stored value through the pinned moment-timezone table, which throws
+    // for a name it does not carry. Storing one poisons that user's cursor and,
+    // because the scheduler lanes do not catch, aborts every cron invocation for
+    // every user from then on. The write gate has to ask the database that will
+    // actually be used.
+    for (const zone of ["US/Pacific-New", "Canada/East-Saskatchewan"]) {
+      const res = await setZone(zone);
+      expect(res.status, zone).toBe(400);
+      expect(res.body.error?.code, zone).toBe("invalid_timezone");
+    }
+  });
+
   it("rejects a fixed offset, an unknown zone, and a missing source", async () => {
     for (const zone of ["+05:30", "UTC+2", "Not/AZone", "", "   "]) {
       const res = await setZone(zone);

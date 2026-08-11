@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m5/reading-evidence.schema.json",
+  "title": "Reading Evidence Graph (v5)",
+  "description": "The owner-scoped provenance graph behind one constrained-model reading, returned by GET /v1/readings/{id}/evidence. Supersedes readingEvidenceGraph for v5 readings. Three differences from its predecessor carry the whole argument for this milestone: the model record is REQUIRED rather than optional, because a reader is owed the exact model that wrote their prose; content references to reviewed editorial fragments are gone, because there are none; and context references carry a category and a permitted lane instead of a raw excerpt, because a provenance surface that quotes a journal back at its author is a leak, not an explanation.",
+  "$defs": {
+    "factRefV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "fact_class", "label", "scope"],
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "pattern": "^(dsf_[a-f0-9]{32}|cyc_[a-f0-9]{32}|nat_[a-f0-9]{32})$"
+        },
+        "fact_class": { "type": "string", "minLength": 1 },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The readable label the drawer shows. Opaque fact ids stay technical detail rather than primary reader copy."
+        },
+        "scope": { "$ref": "common.schema.json#/$defs/factScope" }
+      }
+    },
+    "contextRefV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["private_ref", "category", "allowed_use"],
+      "description": "What was used and in which lane — never the value. The reader already has their journal; what they cannot otherwise see is which lane it was permitted to influence.",
+      "properties": {
+        "private_ref": { "$ref": "common.schema.json#/$defs/contextRef" },
+        "category": { "$ref": "common.schema.json#/$defs/aiConsentDataCategory" },
+        "allowed_use": { "$ref": "common.schema.json#/$defs/m5AllowedUse" }
+      }
+    },
+    "paragraphEvidenceV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paragraph_id", "role", "order", "fact_refs", "context_refs"],
+      "properties": {
+        "paragraph_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "role": { "$ref": "daily-reading.schema.json#/$defs/paragraphRoleV5" },
+        "order": { "type": "integer", "minimum": 1 },
+        "fact_refs": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/factRefV5" }
+        },
+        "context_refs": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/contextRefV5" }
+        }
+      }
+    },
+    "calculationRecordV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chart_contract_id",
+        "cycle_policy_version",
+        "daily_sky_policy_version",
+        "ephemeris_data_version",
+        "container_digest",
+        "tzdb_version",
+        "local_day_resolution_policy_version"
+      ],
+      "properties": {
+        "chart_contract_id": { "type": "string", "minLength": 1 },
+        "cycle_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "daily_sky_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "ephemeris_data_version": { "type": "string", "minLength": 1 },
+        "container_digest": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "tzdb_version": { "type": "string", "minLength": 1 },
+        "local_day_resolution_policy_version": {
+          "$ref": "common.schema.json#/$defs/localDayResolutionPolicyVersion"
+        }
+      }
+    },
+    "modelRecordV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "prompt_version",
+        "selection_policy_version",
+        "validation_policy_version",
+        "provider_request_id",
+        "input_tokens",
+        "output_tokens"
+      ],
+      "description": "Required, not optional. Token counts and the provider request id are safe operational values; the prompt packet, the raw response bytes, and the reasoning are not stored anywhere and are not recoverable from this record.",
+      "properties": {
+        "provider": { "$ref": "common.schema.json#/$defs/publisherProvider" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "prompt_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "selection_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "validation_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "provider_request_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "validationResultV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "policy_version", "checks"],
+      "description": "Only a passed validation is publishable. There is no partial publication and no deterministic repair of a rejected candidate, so this record has exactly one legal status.",
+      "properties": {
+        "status": { "type": "string", "const": "passed" },
+        "policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/policyVersion"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "passed"],
+            "properties": {
+              "code": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "passed": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    "readingEvidenceGraphV5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "reading_id",
+        "revision",
+        "revision_reason",
+        "generated_at",
+        "generation_input_id",
+        "input_manifest_hash",
+        "content_hash",
+        "provider_response_hash",
+        "calculation",
+        "model",
+        "paragraphs",
+        "validation"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/readingRevision"
+        },
+        "revision_reason": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/revisionReason"
+        },
+        "generated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "generation_input_id": { "$ref": "common.schema.json#/$defs/generationInputId" },
+        "input_manifest_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "content_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash",
+          "description": "Identifies the candidate that WON publication. generation_input_id identifies the frozen input; the provider is nondeterministic, so those are different questions and need different answers."
+        },
+        "provider_response_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash",
+          "description": "Digest of the exact provider response bytes, taken inside the adapter before they are discarded."
+        },
+        "calculation": { "$ref": "#/$defs/calculationRecordV5" },
+        "model": { "$ref": "#/$defs/modelRecordV5" },
+        "paragraphs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/paragraphEvidenceV5" }
+        },
+        "validation": { "$ref": "#/$defs/validationResultV5" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "revision_reason": { "const": "initial" } },
+            "required": ["revision_reason"]
+          },
+          "then": { "properties": { "revision": { "const": 1 } } },
+          "else": { "properties": { "revision": { "minimum": 2 } } }
+        }
+      ],
+      "$comment": "Rules enforced in code and pinned by fixtures: paragraph orders contiguous from 1; every astrology paragraph citing at least one calculated fact; unique fact references per paragraph; every context category drawn from the seven disclosed AI-consent categories; and every allowed_use inside the M5 subset."
+    }
+  },
+  "oneOf": [{ "title": "ReadingEvidenceGraphV5", "$ref": "#/$defs/readingEvidenceGraphV5" }]
+}

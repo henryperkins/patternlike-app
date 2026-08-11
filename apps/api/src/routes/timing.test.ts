@@ -463,10 +463,15 @@ describe("GET /v1/timing", () => {
     expect(status).toBe(200);
     expect(body.unreadable_cycle_count).toBe(1);
     expect(body.cycles.map((cycle) => cycle.cycle_id)).toEqual([valid.id]);
-    expect(log).toHaveBeenCalledWith("timing_cycles_unreadable", {
-      request_id: "req-timing-unreadable-1",
-      cycle_ids: [malformed.id],
-    });
+    expect(log).toHaveBeenCalledWith(
+      "timing_cycles_unreadable",
+      expect.objectContaining({
+        trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+        unreadable_count: 1,
+      }),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain("req-timing-unreadable-1");
+    expect(JSON.stringify(log.mock.calls)).not.toContain(malformed.id);
   });
 
   it("applies phase, duration, and combined filters", async () => {

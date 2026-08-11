@@ -4,10 +4,17 @@ import type {
   ReadingEvidenceDraft,
   ReadingParagraph,
 } from "@patternlike/reading-engine";
+import type { ParagraphEvidenceV5, ReadingEvidenceV5 } from "@patternlike/shared";
+import { M5_SCHEMA_VERSION, PARAGRAPH_ROLES_V5 } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { b64, decryptJson, type EncryptionContext } from "../crypto.js";
 import { loadUserKey, type UserIdentity } from "./users.js";
-import type { StoredReading } from "../services/generate-daily-reading.js";
+import {
+  claimsSchemaVersionV5,
+  isStoredReadingV5,
+  type StoredReading,
+  type StoredReadingV3,
+} from "../services/stored-reading.js";
 
 /**
  * The read side of the daily-reading pipeline.
@@ -32,13 +39,18 @@ export interface ReadingRecord {
   id: string;
   userId: string;
   localDate: string;
-  releaseVersion: string;
-  /** `user:<user_id>:<local_date>:<release_version>:r<revision>`. Never goes on the product wire. */
+  /** Null for a v5 reading: there is no editorial release behind one. */
+  releaseVersion: string | null;
+  /**
+   * `user:<id>:<date>:<release>:r<n>` for v3, `reading-v5:<id>:<date>:r<n>` for
+   * v5. Disjoint by namespace under the global UNIQUE, and neither ever goes on
+   * the product wire.
+   */
   readingKey: string;
   chartFingerprint: string;
   contractId: string;
   assemblyMode: "deterministic" | "constrained_model";
-  status: "pending" | "published" | "failed" | "superseded";
+  status: "pending" | "published" | "failed" | "superseded" | "invalidated";
   revision: number;
   revisionReason:
     | "initial"
@@ -47,6 +59,8 @@ export interface ReadingRecord {
     | "safety_correction"
     | "defect_repair";
   supersedesReadingId: string | null;
+  /** Set exactly when the status is `invalidated`. */
+  invalidatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,11 +70,28 @@ export interface PublishedReading {
   stored: StoredReading;
 }
 
-export interface ReadingEvidence {
+/**
+ * The provenance graph, in whichever format the row was sealed with.
+ *
+ * Discriminated rather than merged: a v3 graph names an editorial release and a
+ * deterministic assembly id, a v5 graph names a model and two hashes, and the
+ * projection each needs shares almost nothing with the other.
+ */
+export type ReadingEvidence = ReadingEvidenceV3Result | ReadingEvidenceV5Result;
+
+export interface ReadingEvidenceV3Result {
+  schemaVersion: "0.3.0";
   record: ReadingRecord;
   header: Omit<ReadingEvidenceDraft, "paragraphs">;
   /** Ordered by `paragraph_order`, cross-checked against the row each came from. */
   paragraphs: ParagraphEvidence[];
+}
+
+export interface ReadingEvidenceV5Result {
+  schemaVersion: typeof M5_SCHEMA_VERSION;
+  record: ReadingRecord;
+  header: Omit<ReadingEvidenceV5, "paragraphs">;
+  paragraphs: ParagraphEvidenceV5[];
 }
 
 /**
@@ -132,7 +163,7 @@ interface ReadingRow {
   id: string;
   user_id: string;
   local_date: string;
-  release_version: string;
+  release_version: string | null;
   reading_key: string;
   chart_fingerprint: string;
   contract_id: string;
@@ -141,6 +172,7 @@ interface ReadingRow {
   revision: number;
   revision_reason: ReadingRecord["revisionReason"];
   supersedes_reading_id: string | null;
+  invalidated_at: string | null;
   created_at: string;
   updated_at: string;
   reading_enc: ArrayBuffer | null;
@@ -150,8 +182,27 @@ interface ReadingRow {
 
 const READING_COLUMNS = `id, user_id, local_date, release_version, reading_key,
        chart_fingerprint, contract_id, assembly_mode, status, revision,
-       revision_reason, supersedes_reading_id, created_at, updated_at,
+       revision_reason, supersedes_reading_id, invalidated_at, created_at, updated_at,
        reading_enc, reading_key_version, reading_nonce`;
+
+const M3_READING_COLUMNS = `id, user_id, local_date, release_version, reading_key,
+       chart_fingerprint, contract_id, assembly_mode, status, revision,
+       revision_reason, supersedes_reading_id, NULL AS invalidated_at, created_at, updated_at,
+       reading_enc, reading_key_version, reading_nonce`;
+
+/**
+ * The M5 Worker can be deployed before migration 0003 is applied. SQLite table
+ * metadata is the compatibility boundary: the legacy projection never names an
+ * M5-only column or table, while the migrated path retains the real invalidation
+ * timestamp for internal callers.
+ */
+async function readingColumnsForSchema(env: Env): Promise<string> {
+  const { results } = await env.DB.prepare("PRAGMA table_info(daily_readings)")
+    .all<{ name: string }>();
+  return results.some((column) => column.name === "invalidated_at")
+    ? READING_COLUMNS
+    : M3_READING_COLUMNS;
+}
 
 function recordFrom(row: ReadingRow): ReadingRecord {
   return {
@@ -167,6 +218,7 @@ function recordFrom(row: ReadingRow): ReadingRecord {
     revision: row.revision,
     revisionReason: row.revision_reason,
     supersedesReadingId: row.supersedes_reading_id,
+    invalidatedAt: row.invalidated_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -245,8 +297,37 @@ function isDailyReading(value: unknown): value is DailyReading {
   return value.paragraphs.every(isReadingParagraph);
 }
 
-function isStoredReading(value: unknown): value is StoredReading {
+function isStoredReadingV3(value: unknown): value is StoredReadingV3 {
   return isObject(value) && isDailyReading(value.reading);
+}
+
+/**
+ * One decrypted envelope, read as whichever format sealed it.
+ *
+ * The v5 branch is chosen by the `schema_version` the envelope CLAIMS, not by
+ * trying each guard in turn: an envelope that says it is v5 and then fails the
+ * v5 shape is a defect, and falling through to the v3 guard would answer 200
+ * with something the reader never saw.
+ */
+function decodeStoredReading(value: unknown, readingId: string): StoredReading {
+  if (claimsSchemaVersionV5(value)) {
+    if (!isStoredReadingV5(value)) {
+      throw new StoredReadingInvalidError(
+        "daily_readings.reading_enc",
+        readingId,
+        "decrypted reading does not match daily-reading-v5",
+      );
+    }
+    return value;
+  }
+  if (!isStoredReadingV3(value)) {
+    throw new StoredReadingInvalidError(
+      "daily_readings.reading_enc",
+      readingId,
+      "decrypted reading does not match daily-reading-v3",
+    );
+  }
+  return value;
 }
 
 function isThemeRef(value: unknown): boolean {
@@ -379,6 +460,55 @@ function isParagraphEvidence(value: unknown): value is ParagraphEvidence {
   );
 }
 
+const PARAGRAPH_ROLES_V5_SET: ReadonlySet<string> = new Set(PARAGRAPH_ROLES_V5);
+const FACT_SCOPES = new Set(["personalized", "collective"]);
+const FACT_ID_PATTERN = /^(dsf|cyc|nat)_[a-f0-9]{32}$/;
+const CONTEXT_REF_PATTERN = /^ctx_[0-9]{1,3}$/;
+
+/**
+ * The v5 paragraph graph, checked to the depth its projection exposes.
+ *
+ * Same reasoning as the v3 guard above: `projectEvidence` copies each field into
+ * a response the frozen schema validates with `additionalProperties: false`, so
+ * asserting only that `fact_refs` is an array leaves the projection able to emit
+ * `[{}]` as a 200 the route calls valid.
+ */
+function isFactRefV5(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  return (
+    typeof value.fact_id === "string" &&
+    FACT_ID_PATTERN.test(value.fact_id) &&
+    isNonEmptyString(value.fact_class) &&
+    isNonEmptyString(value.label) &&
+    typeof value.scope === "string" &&
+    FACT_SCOPES.has(value.scope)
+  );
+}
+
+function isContextRefV5(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  return (
+    typeof value.private_ref === "string" &&
+    CONTEXT_REF_PATTERN.test(value.private_ref) &&
+    isNonEmptyString(value.category) &&
+    isNonEmptyString(value.allowed_use)
+  );
+}
+
+function isParagraphEvidenceV5(value: unknown): value is ParagraphEvidenceV5 {
+  if (!isObject(value)) return false;
+  return (
+    isNonEmptyString(value.paragraph_id) &&
+    typeof value.role === "string" &&
+    PARAGRAPH_ROLES_V5_SET.has(value.role) &&
+    isRevision(value.order) &&
+    Array.isArray(value.fact_refs) &&
+    value.fact_refs.every(isFactRefV5) &&
+    Array.isArray(value.context_refs) &&
+    value.context_refs.every(isContextRefV5)
+  );
+}
+
 async function decryptColumn<T>(
   dek: Uint8Array,
   ciphertext: ArrayBuffer,
@@ -393,21 +523,33 @@ async function decryptColumn<T>(
  * The live artifact for one plaintext `(user_id, local_date)`.
  *
  * `status = 'published'` is in the predicate rather than a filter applied after
- * the fact, because that is the exact predicate of `uq_daily_readings_live`. At
- * most one row can match, enforced by the schema, so there is no `ORDER BY ...
- * LIMIT 1` here that a later reader has to trust. A `pending` row would have
- * nothing to decrypt anyway — the table CHECK only requires `reading_enc` once
- * the status is `published`.
+ * the fact, because that is the exact predicate of `uq_daily_readings_live`.
+ * The active-chart EXISTS is a second fail-closed predicate for constrained-
+ * model readings: chart activation commits before encrypted invalidation, so a
+ * process death between them must still return no V5 prose. Frozen V3 readings
+ * remain readable and immutable under the compatibility policy. At most one
+ * row can match, enforced by the schema, so there is no `ORDER BY ... LIMIT 1`
+ * here that a later reader has to trust.
  */
 export async function loadPublishedReadingForDate(
   env: Env,
   identity: UserIdentity,
   localDate: string,
 ): Promise<PublishedReading | null> {
+  const columns = await readingColumnsForSchema(env);
   const row = await env.DB.prepare(
-    `SELECT ${READING_COLUMNS}
-     FROM daily_readings
-     WHERE user_id = ? AND local_date = ? AND status = 'published'`,
+    `SELECT ${columns}
+     FROM daily_readings r
+     WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'published'
+       AND (
+         r.assembly_mode != 'constrained_model'
+         OR EXISTS (
+           SELECT 1 FROM chart_snapshots c
+           WHERE c.user_id = r.user_id AND c.status = 'active'
+             AND c.fingerprint = r.chart_fingerprint
+             AND c.contract_id = r.contract_id
+         )
+       )`,
   )
     .bind(identity.userId, localDate)
     .first<ReadingRow>();
@@ -434,23 +576,16 @@ export async function loadPublishedReadingForDate(
     },
   );
 
-  if (!isStoredReading(stored)) {
-    throw new StoredReadingInvalidError(
-      "daily_readings.reading_enc",
-      row.id,
-      "decrypted reading does not match daily-reading-v3",
-    );
-  }
-
-  return { record: recordFrom(row), stored };
+  return { record: recordFrom(row), stored: decodeStoredReading(stored, row.id) };
 }
 
 /**
  * The discriminator between the route's two 404s, and nothing more.
  *
- * Deliberately only consulted when no reading was found. Gating the hit on this
- * would be both slower and wrong: a reading generated from a chart that has
- * since been superseded is still a valid immutable artifact.
+ * Deliberately only consulted when no authoritative reading was found. The
+ * published loader itself checks the active chart pin, so the crash window
+ * between chart activation and invalidation is indistinguishable from an
+ * invalidated miss on the product wire.
  */
 export async function hasActiveChart(env: Env, userId: string): Promise<boolean> {
   const row = await env.DB.prepare(
@@ -487,8 +622,9 @@ export async function loadReadingEvidence(
   identity: UserIdentity,
   readingId: string,
 ): Promise<ReadingEvidence | null> {
+  const columns = await readingColumnsForSchema(env);
   const row = await env.DB.prepare(
-    `SELECT ${READING_COLUMNS}
+    `SELECT ${columns}
      FROM daily_readings
      WHERE id = ? AND user_id = ?`,
   )
@@ -513,14 +649,16 @@ export async function loadReadingEvidence(
     },
   );
 
-  if (!isStoredReading(stored) || !isEvidenceHeader(stored.evidence_header)) {
+  const decoded = decodeStoredReading(stored, row.id);
+  const isV5 = isStoredReadingV5(decoded);
+  if (!isV5 && !isEvidenceHeader(decoded.evidence_header)) {
     throw new StoredReadingInvalidError(
       "daily_readings.reading_enc",
       row.id,
       "decrypted evidence header does not match the evidence graph",
     );
   }
-  const header = stored.evidence_header;
+  const header = decoded.evidence_header;
 
   // The ciphertext is AAD-bound to the reading id, so it cannot be lifted from
   // another row. The plaintext columns are not — a disagreement between the two
@@ -556,7 +694,7 @@ export async function loadReadingEvidence(
     );
   }
 
-  const paragraphs: ParagraphEvidence[] = [];
+  const decrypted: unknown[] = [];
   for (const source of sourceRows) {
     const paragraph = await decryptColumn<unknown>(
       dek,
@@ -571,7 +709,8 @@ export async function loadReadingEvidence(
       },
     );
 
-    if (!isParagraphEvidence(paragraph)) {
+    const valid = isV5 ? isParagraphEvidenceV5(paragraph) : isParagraphEvidence(paragraph);
+    if (!valid) {
       throw new StoredReadingInvalidError(
         "reading_sources.evidence_enc",
         row.id,
@@ -582,9 +721,10 @@ export async function loadReadingEvidence(
     // `evidence_enc`'s AAD binds only its own row id, so re-pointing a row's
     // `reading_id` would splice one of this user's other readings into this
     // graph and it would decrypt cleanly. This is what catches that.
+    const sealed = paragraph as { paragraph_id: string; order: number };
     if (
-      paragraph.paragraph_id !== source.paragraph_id ||
-      paragraph.order !== source.paragraph_order
+      sealed.paragraph_id !== source.paragraph_id ||
+      sealed.order !== source.paragraph_order
     ) {
       throw new StoredReadingInvalidError(
         "reading_sources.evidence_enc",
@@ -593,25 +733,26 @@ export async function loadReadingEvidence(
       );
     }
 
-    paragraphs.push(paragraph);
+    decrypted.push(paragraph);
   }
 
   // The graph must cover the reading it claims to explain.
   //
-  // `assembleReading` writes both lists from one call site, so a published
-  // reading has exactly one `reading_sources` row per paragraph, in the same
-  // order — and `completeReading` refuses to commit a batch where the count
-  // disagrees. Nothing keeps that true *afterwards*: a row deleted by a
-  // retention sweep or by hand leaves a graph that still decrypts, still passes
-  // every per-row check above, and answers 200 while silently omitting the
-  // paragraph a reader opened the drawer to ask about. Comparing against the
+  // Both publishers write the reading and its evidence rows from one call site,
+  // so a published reading has exactly one `reading_sources` row per paragraph,
+  // in the same order — and `completeReading` refuses to commit a batch where
+  // the count disagrees. Nothing keeps that true *afterwards*: a row deleted by
+  // a retention sweep or by hand leaves a graph that still decrypts, still
+  // passes every per-row check above, and answers 200 while silently omitting
+  // the paragraph a reader opened the drawer to ask about. Comparing against the
   // sealed reading is what turns that into the 500 an operator can see.
-  const expected = [...stored.reading.paragraphs]
+  const expected = [...decoded.reading.paragraphs]
     .sort((a, b) => a.order - b.order)
     .map((paragraph) => paragraph.paragraph_id);
+  const actual = decrypted.map((paragraph) => (paragraph as { paragraph_id: string }).paragraph_id);
   if (
-    expected.length !== paragraphs.length ||
-    expected.some((paragraphId, index) => paragraphId !== paragraphs[index]?.paragraph_id)
+    expected.length !== actual.length ||
+    expected.some((paragraphId, index) => paragraphId !== actual[index])
   ) {
     throw new StoredReadingInvalidError(
       "reading_sources.evidence_enc",
@@ -620,5 +761,19 @@ export async function loadReadingEvidence(
     );
   }
 
-  return { record: recordFrom(row), header, paragraphs };
+  const record = recordFrom(row);
+  if (isV5) {
+    return {
+      schemaVersion: M5_SCHEMA_VERSION,
+      record,
+      header: decoded.evidence_header,
+      paragraphs: decrypted as ParagraphEvidenceV5[],
+    };
+  }
+  return {
+    schemaVersion: "0.3.0",
+    record,
+    header: (decoded as StoredReadingV3).evidence_header,
+    paragraphs: decrypted as ParagraphEvidence[],
+  };
 }

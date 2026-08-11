@@ -124,7 +124,12 @@ function ensureInit(): void {
   if (!epheInitialized) initSwissEphemeris();
 }
 
-function signOf(longitude: number): (typeof ZODIAC)[number] {
+/**
+ * Exported for the daily-sky scanner, which renders the same sign names into
+ * factual labels. A second copy of the boundary arithmetic would be a second
+ * place for an off-by-one at 0 degrees Aries to hide.
+ */
+export function signOf(longitude: number): (typeof ZODIAC)[number] {
   const idx = Math.floor((((longitude % 360) + 360) % 360) / 30) % 12;
   return ZODIAC[idx]!;
 }
@@ -483,8 +488,16 @@ function computeHouses(
   };
 }
 
-/** Whole-sign-like house number from longitude vs Asc when cusps available: Placidus house via cusp walk. */
-function houseNumber(lon: number, cusps: number[]): number {
+/**
+ * Whole-sign-like house number from longitude vs Asc when cusps available:
+ * Placidus house via cusp walk.
+ *
+ * Exported for the daily-sky scanner, which places a TRANSITING body in the
+ * reader's natal houses. Same walk, same wrap handling — a transit house and a
+ * natal house that disagreed about which cusp owns a longitude would be a
+ * defect no reader could see.
+ */
+export function houseNumber(lon: number, cusps: number[]): number {
   const L = norm360(lon);
   for (let i = 0; i < 12; i++) {
     const a = cusps[i]!;

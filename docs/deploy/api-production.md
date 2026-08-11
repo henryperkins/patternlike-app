@@ -391,3 +391,31 @@ choosing Auth0 above settles that roadmap's open decision F0.1.
 The same roadmap records F1: local development is broken independently of any of
 this, because `x-user-id` now names a user that must already exist and a
 SQL-only seed cannot produce a valid wrapped DEK.
+
+## 6. The daily reading publisher
+
+Daily readings are no longer assembled from a signed editorial release. A
+configured OpenAI model writes them, under an explicit per-account consent, from
+calculated facts the model is never allowed to produce itself. The controls over
+calculation, consent, minimization, validation, publication, and provenance are
+unchanged or stronger; the reviewed-copy control over prose was removed
+deliberately. See
+[`../../spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md`](../../spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md).
+
+That means two things for this runbook:
+
+- **`release_not_active` is no longer the reason production cannot generate.**
+  It is a legacy v3 code and cannot occur on the new path. Production cannot
+  generate because `READING_V5_ROLLOUT` is `off`, the `0003` migration has not
+  been applied, and `OPENAI_API_KEY` and the publisher variables are unset. The
+  empty `content_releases` table is now expected and permanent rather than a gap
+  waiting to be filled.
+- **Enabling it is its own runbook**, with its own stop conditions, its own
+  measured preflight, and its own approved spend ceiling:
+  [`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md). None of
+  its gates have been performed.
+
+The content-release tables, R2 objects, signing configuration, ingestion routes,
+and historical audit records are retained and inert. They cannot influence a new
+command or a new reading. Removing them is a later migration with its own
+retention and rollback review.

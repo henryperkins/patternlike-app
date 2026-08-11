@@ -65,6 +65,21 @@ function json(body: unknown, status = 200): Response {
 }
 
 /**
+ * The hosts `CALC_SERVICE_URL` can name across wrangler's dev and production
+ * blocks.
+ *
+ * Listed rather than inferred from the path, because inferring would defeat the
+ * point: the dispatcher fails closed on an unknown host, and a rule that read
+ * "anything asking for /v1/cycles is the calculation service" would let any host
+ * in through a familiar-looking URL.
+ */
+const CALCULATION_HOSTS = new Set(["127.0.0.1", "localhost", "patternlike-calc.fly.dev"]);
+
+function isCalculationHost(url: URL): boolean {
+  return CALCULATION_HOSTS.has(url.hostname);
+}
+
+/**
  * Sentinel chart fingerprints that drive `/v1/cycles` failure paths.
  *
  * Fingerprints rather than a place label, because the cycle request carries no
@@ -225,9 +240,448 @@ async function mockCycleScan(request: Request): Promise<Response> {
   });
 }
 
+/**
+ * Sentinel request ids that drive `/v1/daily-sky` failure paths.
+ *
+ * Request ids rather than a place label or a fingerprint, because the daily-sky
+ * request carries neither: it holds natal longitudes, a resolved day, and policy
+ * versions, and nothing in it names a chart or a user. That is the property that
+ * keeps a decryption path out of the calculation service, so the test seam has
+ * to respect it too.
+ */
+export const DAILY_SKY_REQ_REFUSED = "req_mock_daily_sky_refused";
+export const DAILY_SKY_REQ_UNAVAILABLE = "req_mock_daily_sky_unavail";
+export const DAILY_SKY_REQ_ZERO_EVENTS = "req_mock_daily_sky_zeroevt";
+
+interface DailySkyRequestBody {
+  schema_version: string;
+  request_id: string;
+  day_start_at: string;
+  day_end_at: string;
+  anchor_at: string;
+  anchor_resolution: string;
+  natal_positions: Array<{ body: string; longitude_deg: number }>;
+  natal_house_cusps: { house_system: string; cusps_deg: number[] } | null;
+  effective_accuracy: "exact" | "approximate" | "unknown";
+  suppressed_features: string[];
+  ephemeris_data_version: string;
+  tzdb_version: string;
+  daily_sky_policy_id: string;
+  daily_sky_policy_version: string;
+  calculation_policy_id: string;
+  calculation_policy_version: string;
+  contract_id: string;
+  contract_version: string;
+}
+
+/**
+ * `dsf_` + 32 hex over the fact's own content, mirroring the real derivation
+ * closely enough that a caller can still check `fact_id === content_digest[0:32]`.
+ */
+function mockFact(
+  req: DailySkyRequestBody,
+  kind: string,
+  effectiveAt: string,
+  label: string,
+  detail: Record<string, unknown>,
+): Record<string, unknown> {
+  const anchored = kind === "anchor_position" || kind === "lunar_phase" || kind === "house_placement";
+  const core = {
+    kind,
+    scope: kind === "transit_natal_contact" || kind === "house_placement" ? "personalized" : "collective",
+    effective_at: effectiveAt,
+    label,
+    precision: anchored
+      ? { longitude_decimals: 6, instant_resolution_seconds: null }
+      : { longitude_decimals: null, instant_resolution_seconds: 1 },
+    detail,
+    daily_sky_policy_id: req.daily_sky_policy_id,
+    daily_sky_policy_version: req.daily_sky_policy_version,
+    calculation_policy_id: req.calculation_policy_id,
+    calculation_policy_version: req.calculation_policy_version,
+    ephemeris_data_version: req.ephemeris_data_version,
+    container_digest: `sha256:${"7e".repeat(32)}`,
+  };
+  const digest = stableHash(JSON.stringify(core));
+  return { ...core, fact_id: `dsf_${digest.slice(0, 32)}`, content_digest: `sha256:${digest}` };
+}
+
+async function mockDailySky(request: Request): Promise<Response> {
+  const req = (await request.json()) as DailySkyRequestBody;
+
+  if (req.request_id === DAILY_SKY_REQ_UNAVAILABLE) {
+    // Transport envelope with a non-200: the request never reached the engine.
+    return json(
+      { error: { code: "unauthorized", message: "Valid service credentials are required" } },
+      401,
+    );
+  }
+  if (req.request_id === DAILY_SKY_REQ_REFUSED) {
+    return json({
+      ok: false,
+      schema_version: req.schema_version,
+      request_id: req.request_id,
+      error_class: "calculation_failed",
+      error_message: "the daily-sky scan did not complete",
+    });
+  }
+
+  const suppressed = new Set(req.suppressed_features ?? []);
+  const facts: Array<Record<string, unknown>> = [
+    mockFact(req, "anchor_position", req.anchor_at, "Sun at 7.42 degrees Leo", {
+      body: "sun",
+      longitude_deg: 127.423118,
+      sign: "leo",
+      sign_degree_deg: 7.423118,
+      speed_deg_per_day: 0.955214,
+      retrograde: false,
+    }),
+    mockFact(req, "anchor_position", req.anchor_at, "Moon at 19.88 degrees Scorpio", {
+      body: "moon",
+      longitude_deg: 229.882407,
+      sign: "scorpio",
+      sign_degree_deg: 19.882407,
+      speed_deg_per_day: 12.114903,
+      retrograde: false,
+    }),
+    // Always present, on every success: an empty EVENT list must never look
+    // like an empty FACTUAL day, or the publisher has nothing to be grounded in.
+    mockFact(req, "lunar_phase", req.anchor_at, "Waxing gibbous Moon", {
+      phase: "waxing_gibbous",
+      elongation_deg: 102.459289,
+      illuminated_fraction: 0.606,
+    }),
+  ];
+
+  if (req.request_id !== DAILY_SKY_REQ_ZERO_EVENTS) {
+    const natalTarget = req.natal_positions.find((p) => p.body === "sun");
+    if (natalTarget) {
+      facts.push(
+        mockFact(
+          req,
+          "transit_natal_contact",
+          "2026-07-30T14:11:07Z",
+          "Transiting Saturn exactly square natal Sun",
+          {
+            transiting_body: "saturn",
+            natal_target: "sun",
+            aspect: "square",
+            direction: "retrograde",
+            speed_deg_per_day: -0.028812,
+          },
+        ),
+      );
+    }
+    facts.push(
+      mockFact(req, "sign_ingress", "2026-07-30T22:05:31Z", "Mercury enters Virgo", {
+        body: "mercury",
+        from_sign: "leo",
+        to_sign: "virgo",
+        direction: "direct",
+      }),
+    );
+  }
+
+  if (req.natal_house_cusps && !suppressed.has("houses")) {
+    facts.push(
+      mockFact(req, "house_placement", req.anchor_at, "Transiting Saturn in the tenth house", {
+        body: "saturn",
+        house: 10,
+        house_system: req.natal_house_cusps.house_system,
+        longitude_deg: 1.774002,
+      }),
+    );
+  }
+
+  const rank = [
+    "anchor_position",
+    "lunar_phase",
+    "transit_natal_contact",
+    "sign_ingress",
+    "collective_exact_aspect",
+    "house_placement",
+  ];
+  facts.sort((a, b) => {
+    const kindDelta = rank.indexOf(String(a.kind)) - rank.indexOf(String(b.kind));
+    if (kindDelta !== 0) return kindDelta;
+    if (a.effective_at !== b.effective_at) return String(a.effective_at) < String(b.effective_at) ? -1 : 1;
+    return String(a.fact_id) < String(b.fact_id) ? -1 : 1;
+  });
+
+  return json({
+    ok: true,
+    schema_version: req.schema_version,
+    request_id: req.request_id,
+    day_start_at: req.day_start_at,
+    day_end_at: req.day_end_at,
+    anchor_at: req.anchor_at,
+    anchor_resolution: req.anchor_resolution,
+    effective_accuracy: req.effective_accuracy,
+    suppressed_features: [...(req.suppressed_features ?? [])].sort(),
+    daily_sky_policy_id: req.daily_sky_policy_id,
+    daily_sky_policy_version: req.daily_sky_policy_version,
+    calculation_policy_id: req.calculation_policy_id,
+    calculation_policy_version: req.calculation_policy_version,
+    contract_id: req.contract_id,
+    contract_version: req.contract_version,
+    container_digest: `sha256:${"7e".repeat(32)}`,
+    ephemeris_data_version: req.ephemeris_data_version,
+    tzdb_version: req.tzdb_version,
+    facts,
+  });
+}
+
+/** The provider host. Reached only by the OpenAI publisher adapter. */
+export const OPENAI_HOST = "api.openai.com";
+
+/**
+ * Sentinel model ids that drive `POST /v1/responses` failure paths.
+ *
+ * The MODEL rather than a header, because the model is the one field the
+ * adapter is required to send verbatim from the frozen pin. Keying the fake on
+ * anything the adapter does not already send would mean testing a request shape
+ * the real one never produces — and the adapter deliberately sends the Worker
+ * no correlation header at all.
+ */
+export const OPENAI_MOCK_TIMEOUT = "mock-openai-timeout";
+export const OPENAI_MOCK_NETWORK_ERROR = "mock-openai-network-error";
+export const OPENAI_MOCK_RATE_LIMITED = "mock-openai-429";
+export const OPENAI_MOCK_SERVER_ERROR = "mock-openai-5xx";
+export const OPENAI_MOCK_AUTH_FAILED = "mock-openai-401";
+export const OPENAI_MOCK_FORBIDDEN = "mock-openai-403";
+export const OPENAI_MOCK_MODEL_MISSING = "mock-openai-model-missing";
+export const OPENAI_MOCK_REFUSAL = "mock-openai-refusal";
+export const OPENAI_MOCK_NO_TEXT = "mock-openai-no-text";
+export const OPENAI_MOCK_TWO_TEXTS = "mock-openai-two-texts";
+export const OPENAI_MOCK_INVALID_JSON = "mock-openai-invalid-json";
+export const OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT = "mock-openai-incomplete-max-output";
+export const OPENAI_MOCK_WRONG_SHAPE = "mock-openai-wrong-shape";
+export const OPENAI_MOCK_ECHO_WRONG_DATE = "mock-openai-wrong-date";
+export const OPENAI_MOCK_UNGROUNDED = "mock-openai-ungrounded";
+
+interface ResponsesBody {
+  model: string;
+  store: boolean;
+  instructions: string;
+  input: Array<{ role: string; content: Array<{ type: string; text: string }> }>;
+  reasoning: { effort: string };
+  text: { verbosity: string; format: { type: string; name: string; strict: boolean } };
+  max_output_tokens: number;
+}
+
+interface PacketFact {
+  fact_id: string;
+  scope: string;
+  label: string;
+}
+
+interface Packet {
+  local_date: string;
+  locale: string;
+  facts: PacketFact[];
+  composition: { allowed_paragraph_roles: string[]; uncertainty_note_required: boolean };
+}
+
+/** One Responses envelope, shaped as the real API shapes it. */
+function responsesEnvelope(model: string, content: unknown[]): unknown {
+  return {
+    id: "resp_mock_0000000000000001",
+    object: "response",
+    model,
+    status: "completed",
+    output: [
+      { id: "rs_mock_reasoning", type: "reasoning", summary: [] },
+      { id: "msg_mock_0001", type: "message", role: "assistant", status: "completed", content },
+    ],
+    usage: { input_tokens: 4210, output_tokens: 512, total_tokens: 4722 },
+  };
+}
+
+function outputText(value: unknown): unknown[] {
+  return [
+    {
+      type: "output_text",
+      text: typeof value === "string" ? value : JSON.stringify(value),
+      annotations: [],
+    },
+  ];
+}
+
+/**
+ * A grounded candidate for the packet that was actually sent.
+ *
+ * It reads the packet rather than returning a fixture so the fake cannot drift
+ * away from the request: the echoed date and locale, the cited fact ids, and the
+ * allowed roles all come from what the Worker asked for.
+ */
+function groundedCandidate(packet: Packet, options: { wrongDate?: boolean; ungrounded?: boolean }) {
+  const personalized = packet.facts.find((fact) => fact.scope === "personalized");
+  const collective = packet.facts.find((fact) => fact.scope === "collective");
+  const lead = personalized ?? collective ?? packet.facts[0]!;
+  const paragraphs: unknown[] = [];
+  if (collective && packet.composition.allowed_paragraph_roles.includes("collective_context")) {
+    paragraphs.push({
+      role: "collective_context",
+      text: "The sky is doing the same thing for everyone tonight, and it is worth noticing.",
+      fact_ids: [collective.fact_id],
+      context_refs: [],
+    });
+  }
+  return {
+    schema_version: "0.5.0",
+    output_schema: "daily-reading-v5",
+    local_date: options.wrongDate ? "2999-01-01" : packet.local_date,
+    locale: packet.locale,
+    headline: "A narrower commitment",
+    lead: {
+      text: "The pressure is not asking for more effort, only for a smaller promise you can keep.",
+      fact_ids: options.ungrounded ? [] : [lead.fact_id],
+      context_refs: [],
+    },
+    paragraphs,
+    reflection_prompt: {
+      text: "Which promise would you keep if nobody was watching?",
+      fact_ids: [],
+      context_refs: [],
+    },
+    uncertainty_note: packet.composition.uncertainty_note_required
+      ? {
+          text: "Without a confirmed birth time this reading leaves houses out entirely.",
+          fact_ids: [],
+          context_refs: [],
+        }
+      : null,
+  };
+}
+
+async function mockOpenAiResponses(request: Request): Promise<Response> {
+  const body = (await request.json()) as ResponsesBody;
+  const model = body.model;
+
+  if (model === OPENAI_MOCK_NETWORK_ERROR) {
+    // A rejected fetch, not a response. The adapter must not read this as a
+    // refusal: nothing reached the provider.
+    throw new Error("connection reset by peer");
+  }
+  if (model === OPENAI_MOCK_TIMEOUT) {
+    // Long enough that any realistic test deadline fires first, short enough
+    // that a suite which forgets the deadline still finishes.
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    return json(responsesEnvelope(model, outputText("{}")));
+  }
+  if (model === OPENAI_MOCK_RATE_LIMITED) {
+    return new Response(
+      JSON.stringify({ error: { message: "Rate limit reached", type: "rate_limit_error" } }),
+      { status: 429, headers: { "content-type": "application/json", "retry-after": "17" } },
+    );
+  }
+  if (model === OPENAI_MOCK_SERVER_ERROR) {
+    return json({ error: { message: "The server had an error", type: "server_error" } }, 503);
+  }
+  if (model === OPENAI_MOCK_AUTH_FAILED) {
+    return json({ error: { message: "Incorrect API key provided: sk-live-REDACTED" } }, 401);
+  }
+  if (model === OPENAI_MOCK_FORBIDDEN) {
+    return json({ error: { message: "Project does not have access" } }, 403);
+  }
+  if (model === OPENAI_MOCK_MODEL_MISSING) {
+    return json(
+      { error: { message: `The model \`${model}\` does not exist`, code: "model_not_found" } },
+      404,
+    );
+  }
+  if (model === OPENAI_MOCK_REFUSAL) {
+    return json(
+      responsesEnvelope(model, [{ type: "refusal", refusal: "I cannot help with that." }]),
+    );
+  }
+  if (model === OPENAI_MOCK_NO_TEXT) {
+    return json(responsesEnvelope(model, []));
+  }
+  if (model === OPENAI_MOCK_TWO_TEXTS) {
+    return json(
+      responsesEnvelope(model, [
+        { type: "output_text", text: "{}", annotations: [] },
+        { type: "output_text", text: "{}", annotations: [] },
+      ]),
+    );
+  }
+  if (model === OPENAI_MOCK_INVALID_JSON) {
+    return json(responsesEnvelope(model, outputText("{ this is not json")));
+  }
+  if (model === OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT) {
+    return json({
+      id: "resp_mock_incomplete_000000001",
+      object: "response",
+      model,
+      status: "incomplete",
+      incomplete_details: { reason: "max_output_tokens" },
+      output: [
+        { id: "rs_mock_reasoning", type: "reasoning", summary: [] },
+        {
+          id: "msg_mock_incomplete_0001",
+          type: "message",
+          role: "assistant",
+          status: "incomplete",
+          content: [{ type: "output_text", text: '{"schema_version":"0.5.0"' }],
+        },
+      ],
+      usage: {
+        input_tokens: 1954,
+        output_tokens: 4000,
+        output_tokens_details: { reasoning_tokens: 3021 },
+        total_tokens: 5954,
+      },
+    });
+  }
+  if (model === OPENAI_MOCK_WRONG_SHAPE) {
+    return json(responsesEnvelope(model, outputText({ headline: "no schema_version here" })));
+  }
+
+  const packet = JSON.parse(body.input[0]!.content[0]!.text) as Packet;
+  return json(
+    responsesEnvelope(
+      model,
+      outputText(
+        groundedCandidate(packet, {
+          wrongDate: model === OPENAI_MOCK_ECHO_WRONG_DATE,
+          ungrounded: model === OPENAI_MOCK_UNGROUNDED,
+        }),
+      ),
+    ),
+  );
+}
+
+
+/**
+ * The single outbound interceptor, dispatching BY HOST first.
+ *
+ * One seam rather than two: a parallel fetch interceptor installed alongside
+ * this one would mean the calculation path and the provider path could each
+ * think they had covered the network while the other quietly reached it. Host
+ * first, then path, and an unknown host is a hard failure — a test that
+ * accidentally addresses a real service should break loudly here rather than
+ * make a request.
+ */
 export async function mockCalcService(request: Request): Promise<Response> {
   const url = new URL(request.url);
+
+  if (url.hostname === OPENAI_HOST) {
+    if (url.pathname === "/v1/responses" && request.method === "POST") {
+      return mockOpenAiResponses(request);
+    }
+    return json(
+      { error: { message: `no OpenAI seam for ${request.method} ${url.pathname}` } },
+      404,
+    );
+  }
+
+  if (!isCalculationHost(url)) {
+    return json({ error: { code: "unmocked_host", message: `no test seam for ${url.hostname}` } }, 502);
+  }
+
   if (url.pathname.endsWith("/v1/cycles")) return mockCycleScan(request);
+  if (url.pathname.endsWith("/v1/daily-sky")) return mockDailySky(request);
   if (!url.pathname.endsWith("/v1/calculate")) {
     return json({ ok: false, chart: null, error_class: "not_found" }, 404);
   }

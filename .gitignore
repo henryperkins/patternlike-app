@@ -15,6 +15,7 @@ dist/
 .DS_Store
 coverage/
 .turbo/
+.worktrees/
 apps/api/.wrangler/
 # Ephemeris binaries: download via npm run ephe:download (not committed by default)
 apps/calc-stub/data/ephe/*.se1

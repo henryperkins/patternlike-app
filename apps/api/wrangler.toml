@@ -50,11 +50,22 @@ queue = "patternlike-daily-readings-dev"
 # a guarded batch. Batching would only widen the blast radius of a retry.
 max_batch_size = 1
 max_batch_timeout = 5
+# Bound local/default queue fan-out to the publisher's intended concurrency. The
+# production consumer below is declared but deliberately left at its incumbent
+# concurrency: raising it is part of the rollout's cost gate, not of shipping the
+# code.
+max_concurrency = 4
 # Three attempts, then the dead-letter queue. Beyond that a retry is no longer
 # waiting out an outage, and the replacement path — which re-freezes a NEW
 # command against working dependencies — is the correct repair.
 max_retries = 3
 dead_letter_queue = "patternlike-daily-readings-dev-dlq"
+
+# Exercise the exported scheduled handler in local/default deployments. Triggers
+# are inheritable, so production explicitly overrides this with an empty list
+# until the separately approved production activation step replaces it.
+[triggers]
+crons = ["*/15 * * * *"]
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the
@@ -74,10 +85,30 @@ SE_LICENSE_MODE = "agpl"
 OIDC_ISSUER = "https://issuer.invalid"
 OIDC_AUDIENCE = "patternlike-dev"
 OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
+# Constrained-model reading generation. Explicitly OFF rather than absent, for
+# the same reason AUTH_STUB is written out as "0" below: an omitted var trains
+# the reader to ignore wrangler's "vars exist at the top level" warning, which
+# is the one channel that would report a genuinely forgotten one.
+#
+# `off` is the kill switch AND the schema-compatible state: every publisher
+# variable and OPENAI_API_KEY may be absent while it holds, and the dual v3/v5
+# readers still serve. checkSecureConfig validates any value that IS present
+# regardless of the mode, so a typo cannot lie dormant until enablement day.
+#
+# The local canary sets this to `internal` in .dev.vars alongside a real key.
+READING_V5_ROLLOUT = "off"
 
 # Named environments do not inherit top-level bindings, so D1 is redeclared.
 [env.production]
 name = "patternlike-api-production"
+
+# An explicit empty override, not an omission. Top-level [triggers] declares the
+# 15-minute development cron, and a named environment INHERITS it when it does
+# not say otherwise — so deleting these two lines silently activates the
+# scheduler in production. Activating it is a separate configuration change with
+# its own gate; see docs/deploy/openai-daily-reading-rollout.md.
+[env.production.triggers]
+crons = []
 
 [env.production.vars]
 ENVIRONMENT = "production"
@@ -118,6 +149,23 @@ OIDC_JWKS_URL = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/.well-known/jwks.json
 # Only "1" re-enables auth that trusts an unauthenticated X-User-Id header, and
 # configGuard turns that value into a hard 503 on every request here regardless.
 AUTH_STUB = "0"
+# Constrained-model reading generation. Advanced one step at a time, each step a
+# separate configuration change with its own gate:
+#   off        dual readers only. No V2 reservation from any entry point.
+#   internal   authenticated internal reservations, for one consented account.
+#   first_open PUT /v1/readings/today may reserve.
+#   hybrid     the 15-minute scheduler may reserve. Requires the production
+#              cron, which below is an explicit `crons = []` OVERRIDE rather
+#              than an omission: wrangler inherits top-level triggers into a
+#              named environment, so leaving the block out would have inherited
+#              the development schedule straight into production.
+#
+# Leaving `off` also requires READING_PUBLISHER, the five pinned OPENAI_READING_*
+# and READING_* values, an operator-approved READING_DAILY_PROVIDER_CALL_LIMIT,
+# and the OPENAI_API_KEY secret. checkSecureConfig refuses every request until
+# all of them are set, which is the intended failure: half-configured generation
+# would reach a provider with values no frozen command described.
+READING_V5_ROLLOUT = "off"
 
 # The PWA ships inside this Worker, so the app and the API share one origin.
 #
@@ -223,6 +271,11 @@ persist = true
 # CALC_SERVICE_AUTH_TOKEN — shared bearer token for Worker → calc requests.
 #            The calc service returns 503 on /v1/calculate in production until
 #            the same value is set there: fly secrets set CALC_SERVICE_AUTH_TOKEN=…
+# OPENAI_API_KEY — the reading publisher credential. A SECRET, never a var:
+#            nothing in this file may ever carry it, and the candidate gate greps
+#            for exactly that. Set it only when READING_V5_ROLLOUT leaves `off`,
+#            and verify the pinned model against the same key first with
+#            `npm run publisher:model:verify -w @patternlike/api`.
 #
 # NOTE ON ENVIRONMENT NAMING: isDevEnvironment() treats BOTH "development" and
 # "test" as development, which disables configGuard and re-enables the

@@ -1,0 +1,164 @@
+{
+  "profile": "patternlike.daily-sky-fact-id.v1",
+  "canonicalization": "RFC 8785 JSON Canonicalization Scheme",
+  "note": "canonical is the exact UTF-8 byte string; full_digest is SHA-256 of those bytes and is also the fact's content_digest hex; rendered_id is 'dsf_' plus the first 32 lowercase hex characters and is the fact_id. An implementation that produces different bytes for any input here is not interoperable, even if its digest happens to round-trip.",
+  "vectors": [
+    {
+      "name": "anchor-position-sun",
+      "description": "An anchor-sampled position. Nested detail object, integral and fractional numbers, and a boolean.",
+      "input": {
+        "identity_profile": "patternlike.daily-sky-fact-id.v1",
+        "schema_version": "0.5.0",
+        "kind": "anchor_position",
+        "scope": "collective",
+        "effective_at": "2026-07-30T19:00:00Z",
+        "label": "Sun at 7.42 degrees Leo",
+        "precision": {
+          "longitude_decimals": 6,
+          "instant_resolution_seconds": null
+        },
+        "detail": {
+          "body": "sun",
+          "longitude_deg": 127.423118,
+          "sign": "leo",
+          "sign_degree_deg": 7.423118,
+          "speed_deg_per_day": 0.955214,
+          "retrograde": false
+        },
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "canonical": "{\"calculation_policy_id\":\"swiss-ephemeris-launch\",\"calculation_policy_version\":\"1.0.0\",\"container_digest\":\"sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e\",\"daily_sky_policy_id\":\"daily-sky-launch\",\"daily_sky_policy_version\":\"1.0.0\",\"detail\":{\"body\":\"sun\",\"longitude_deg\":127.423118,\"retrograde\":false,\"sign\":\"leo\",\"sign_degree_deg\":7.423118,\"speed_deg_per_day\":0.955214},\"effective_at\":\"2026-07-30T19:00:00Z\",\"ephemeris_data_version\":\"se-2.10.03-1800-2399\",\"identity_profile\":\"patternlike.daily-sky-fact-id.v1\",\"kind\":\"anchor_position\",\"label\":\"Sun at 7.42 degrees Leo\",\"precision\":{\"instant_resolution_seconds\":null,\"longitude_decimals\":6},\"schema_version\":\"0.5.0\",\"scope\":\"collective\"}",
+      "full_digest": "9fcfa4928876e1a9ce9dc48bc5f71877b0a458b434ee8134fb5f6f48c8942542",
+      "rendered_id": "dsf_9fcfa4928876e1a9ce9dc48bc5f71877"
+    },
+    {
+      "name": "lunar-phase-waxing-gibbous",
+      "description": "The mandatory phase fact. Present on every successful response, which is what stops a zero-event day from being a zero-fact day.",
+      "input": {
+        "identity_profile": "patternlike.daily-sky-fact-id.v1",
+        "schema_version": "0.5.0",
+        "kind": "lunar_phase",
+        "scope": "collective",
+        "effective_at": "2026-07-30T19:00:00Z",
+        "label": "Waxing gibbous Moon",
+        "precision": {
+          "longitude_decimals": 6,
+          "instant_resolution_seconds": null
+        },
+        "detail": {
+          "phase": "waxing_gibbous",
+          "elongation_deg": 102.459289,
+          "illuminated_fraction": 0.606
+        },
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "canonical": "{\"calculation_policy_id\":\"swiss-ephemeris-launch\",\"calculation_policy_version\":\"1.0.0\",\"container_digest\":\"sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e\",\"daily_sky_policy_id\":\"daily-sky-launch\",\"daily_sky_policy_version\":\"1.0.0\",\"detail\":{\"elongation_deg\":102.459289,\"illuminated_fraction\":0.606,\"phase\":\"waxing_gibbous\"},\"effective_at\":\"2026-07-30T19:00:00Z\",\"ephemeris_data_version\":\"se-2.10.03-1800-2399\",\"identity_profile\":\"patternlike.daily-sky-fact-id.v1\",\"kind\":\"lunar_phase\",\"label\":\"Waxing gibbous Moon\",\"precision\":{\"instant_resolution_seconds\":null,\"longitude_decimals\":6},\"schema_version\":\"0.5.0\",\"scope\":\"collective\"}",
+      "full_digest": "b8e8e65324e38c0f4d2419b7a941ebd9a87217774f5c612f0ab7545524efd921",
+      "rendered_id": "dsf_b8e8e65324e38c0f4d2419b7a941ebd9"
+    },
+    {
+      "name": "transit-natal-contact-saturn-square-sun",
+      "description": "A solved exact root inside the local day, with a null longitude precision.",
+      "input": {
+        "identity_profile": "patternlike.daily-sky-fact-id.v1",
+        "schema_version": "0.5.0",
+        "kind": "transit_natal_contact",
+        "scope": "personalized",
+        "effective_at": "2026-07-30T14:11:07Z",
+        "label": "Transiting Saturn exactly square natal Sun",
+        "precision": {
+          "longitude_decimals": null,
+          "instant_resolution_seconds": 1
+        },
+        "detail": {
+          "transiting_body": "saturn",
+          "natal_target": "sun",
+          "aspect": "square",
+          "direction": "retrograde",
+          "speed_deg_per_day": -0.028812
+        },
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "canonical": "{\"calculation_policy_id\":\"swiss-ephemeris-launch\",\"calculation_policy_version\":\"1.0.0\",\"container_digest\":\"sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e\",\"daily_sky_policy_id\":\"daily-sky-launch\",\"daily_sky_policy_version\":\"1.0.0\",\"detail\":{\"aspect\":\"square\",\"direction\":\"retrograde\",\"natal_target\":\"sun\",\"speed_deg_per_day\":-0.028812,\"transiting_body\":\"saturn\"},\"effective_at\":\"2026-07-30T14:11:07Z\",\"ephemeris_data_version\":\"se-2.10.03-1800-2399\",\"identity_profile\":\"patternlike.daily-sky-fact-id.v1\",\"kind\":\"transit_natal_contact\",\"label\":\"Transiting Saturn exactly square natal Sun\",\"precision\":{\"instant_resolution_seconds\":1,\"longitude_decimals\":null},\"schema_version\":\"0.5.0\",\"scope\":\"personalized\"}",
+      "full_digest": "30fb5019e8d3f789e29ea7a9babf94ae6c4d63652f1ef5713c84e011b6520f25",
+      "rendered_id": "dsf_30fb5019e8d3f789e29ea7a9babf94ae"
+    },
+    {
+      "name": "sign-ingress-mercury-virgo",
+      "description": "Same fact as the end-boundary invalid fixture except for its instant, so a moved timestamp demonstrably moves the identity.",
+      "input": {
+        "identity_profile": "patternlike.daily-sky-fact-id.v1",
+        "schema_version": "0.5.0",
+        "kind": "sign_ingress",
+        "scope": "collective",
+        "effective_at": "2026-07-30T22:05:31Z",
+        "label": "Mercury enters Virgo",
+        "precision": {
+          "longitude_decimals": null,
+          "instant_resolution_seconds": 1
+        },
+        "detail": {
+          "body": "mercury",
+          "from_sign": "leo",
+          "to_sign": "virgo",
+          "direction": "direct"
+        },
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "canonical": "{\"calculation_policy_id\":\"swiss-ephemeris-launch\",\"calculation_policy_version\":\"1.0.0\",\"container_digest\":\"sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e\",\"daily_sky_policy_id\":\"daily-sky-launch\",\"daily_sky_policy_version\":\"1.0.0\",\"detail\":{\"body\":\"mercury\",\"direction\":\"direct\",\"from_sign\":\"leo\",\"to_sign\":\"virgo\"},\"effective_at\":\"2026-07-30T22:05:31Z\",\"ephemeris_data_version\":\"se-2.10.03-1800-2399\",\"identity_profile\":\"patternlike.daily-sky-fact-id.v1\",\"kind\":\"sign_ingress\",\"label\":\"Mercury enters Virgo\",\"precision\":{\"instant_resolution_seconds\":1,\"longitude_decimals\":null},\"schema_version\":\"0.5.0\",\"scope\":\"collective\"}",
+      "full_digest": "dc924a24d6db1344a2656081c38afa29e55ef32cd85863f226d8b8e6d50c67d6",
+      "rendered_id": "dsf_dc924a24d6db1344a2656081c38afa29"
+    },
+    {
+      "name": "sign-ingress-mercury-virgo-at-day-end",
+      "description": "The same ingress one interval later. Must differ from sign-ingress-mercury-virgo: an event that moved to the next local day is a different fact, not the same fact relabelled.",
+      "input": {
+        "identity_profile": "patternlike.daily-sky-fact-id.v1",
+        "schema_version": "0.5.0",
+        "kind": "sign_ingress",
+        "scope": "collective",
+        "effective_at": "2026-07-31T07:00:00Z",
+        "label": "Mercury enters Virgo",
+        "precision": {
+          "longitude_decimals": null,
+          "instant_resolution_seconds": 1
+        },
+        "detail": {
+          "body": "mercury",
+          "from_sign": "leo",
+          "to_sign": "virgo",
+          "direction": "direct"
+        },
+        "daily_sky_policy_id": "daily-sky-launch",
+        "daily_sky_policy_version": "1.0.0",
+        "calculation_policy_id": "swiss-ephemeris-launch",
+        "calculation_policy_version": "1.0.0",
+        "ephemeris_data_version": "se-2.10.03-1800-2399",
+        "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "canonical": "{\"calculation_policy_id\":\"swiss-ephemeris-launch\",\"calculation_policy_version\":\"1.0.0\",\"container_digest\":\"sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e\",\"daily_sky_policy_id\":\"daily-sky-launch\",\"daily_sky_policy_version\":\"1.0.0\",\"detail\":{\"body\":\"mercury\",\"direction\":\"direct\",\"from_sign\":\"leo\",\"to_sign\":\"virgo\"},\"effective_at\":\"2026-07-31T07:00:00Z\",\"ephemeris_data_version\":\"se-2.10.03-1800-2399\",\"identity_profile\":\"patternlike.daily-sky-fact-id.v1\",\"kind\":\"sign_ingress\",\"label\":\"Mercury enters Virgo\",\"precision\":{\"instant_resolution_seconds\":1,\"longitude_decimals\":null},\"schema_version\":\"0.5.0\",\"scope\":\"collective\"}",
+      "full_digest": "518b6cc3c8bc7da393cedd64dc83fb6e0443721a163a7173c11a2fba3d800954",
+      "rendered_id": "dsf_518b6cc3c8bc7da393cedd64dc83fb6e"
+    }
+  ]
+}

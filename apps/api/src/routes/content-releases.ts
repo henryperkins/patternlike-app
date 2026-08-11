@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { canonicalJson, requireIdempotencyKey, SCHEMA_VERSION } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import { safeLog } from "../services/safe-log.js";
 import type { AppVariables } from "../middleware/auth.js";
 import {
   activateRelease,
@@ -217,10 +218,7 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
 
   const parsedKeys = parseReleaseKeyConfiguration(c.env.CONTENT_RELEASE_KEYS);
   if (parsedKeys.malformed || parsedKeys.invalidKeyIds.length > 0) {
-    console.error("content_release_keys_misconfigured", {
-      malformed: parsedKeys.malformed,
-      invalid_key_ids: parsedKeys.invalidKeyIds,
-    });
+    safeLog({ event: "content_release_keys_misconfigured" });
     return refuse(
       {
         class: "release_keys_misconfigured",
@@ -427,10 +425,10 @@ contentReleaseRoutes.post("/content-releases", async (c) => {
         // The response envelope has no field for this and `detail_class` is an
         // opaque class, so without a log the only trace of *which* tests were
         // skipped is the bundle itself. Ids, never content.
-        console.warn("content_release_held_for_fixtures", {
-          request_id: requestId,
+        safeLog({
+          event: "content_release_held_for_fixtures",
           release_version: version,
-          fixture_ids: unevaluated,
+          fixture_count: unevaluated.length,
         });
       }
       await storeRelease(c.env, record, {

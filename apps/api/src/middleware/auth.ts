@@ -2,7 +2,7 @@ import type { Context, Next } from "hono";
 import { getCookie } from "hono/cookie";
 import type { Env } from "../env.js";
 import type { CryptoSubject } from "../crypto.js";
-import { resolveSession } from "../db/sessions.js";
+import { resolveSession, touchSessionActivity } from "../db/sessions.js";
 import { loadUserIdentity } from "../db/users.js";
 
 export type AppVariables = {
@@ -82,7 +82,8 @@ export async function authenticate(
   const token = readSessionToken(c);
   if (!token) return unauthorized(c, requestId);
 
-  const principal = await resolveSession(c.env, token);
+  const now = new Date();
+  const principal = await resolveSession(c.env, token, now);
   // Unknown, revoked, and expired are one answer: which it was is free
   // information for an attacker.
   if (!principal) return unauthorized(c, requestId);
@@ -90,6 +91,7 @@ export async function authenticate(
   c.set("userId", principal.userId);
   c.set("cryptoSubject", principal.cryptoSubject);
   c.set("sessionId", principal.sessionId);
+  await touchSessionActivity(c.env, principal.sessionId, principal.userId, now);
   await next();
 }
 

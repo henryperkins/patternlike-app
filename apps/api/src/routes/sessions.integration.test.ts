@@ -39,12 +39,15 @@ async function signToken(claims: Record<string, unknown>): Promise<string> {
   );
 }
 
-async function startSession(idToken: string) {
+async function startSession(idToken: string, requestId?: string) {
   return app.request(
     "/v1/sessions",
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(requestId ? { "x-request-id": requestId } : {}),
+      },
       body: JSON.stringify({ id_token: idToken }),
     },
     prodEnv(),
@@ -149,6 +152,32 @@ describe("identity end to end", () => {
     // The envelope must not leak what the library said.
     expect(parsed.error.message).not.toMatch(/jwt|jwks|signature|claim/i);
     expect(await rows("SELECT id FROM users")).toHaveLength(0);
+  });
+
+  it("never copies a caller request id or private token detail into API logs", async () => {
+    const sentinel = "PRIVATE_SENTINEL_CLIENT_REQUEST_ID";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const now = Math.floor(Date.now() / 1000);
+    const priv = (await crypto.subtle.exportKey("jwk", keyPair.privateKey)) as JsonWebKey;
+    const rejected = await Jwt.sign(
+      {
+        iss: `https://${sentinel}.invalid`,
+        aud: AUDIENCE,
+        sub: `subject-${sentinel}`,
+        exp: now + 300,
+        iat: now,
+      },
+      { ...priv, kid: "test-key-1" } as never,
+      "RS256",
+    );
+
+    const res = await startSession(rejected, sentinel);
+
+    expect(res.status).toBe(401);
+    const serialized = JSON.stringify(error.mock.calls);
+    expect(serialized).not.toContain(sentinel);
+    expect(serialized).not.toContain(rejected);
+    expect(serialized).not.toContain("x-request-id");
   });
 
   it("rejects a token signed by a key the issuer does not publish", async () => {
