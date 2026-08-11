@@ -43,7 +43,7 @@ Task 17 Step 2 runs `git diff --check "$env:PATTERNLIKE_M5_IMPLEMENTATION_BASE..
 | 14 | Today, provenance, Context & Privacy | done — `a5057dd` |
 | 15 | Evaluation lanes | done — `568be46` |
 | 16 | Product truth and production runbook | done — `e59d02d`, `369cec2` |
-| 17 | Final candidate gate and review | pending |
+| 17 | Final candidate gate and review | done — `24b2b6f` |
 
 ## Deviations from the plan, and why
 
@@ -252,6 +252,21 @@ every clone a corrupt file. `git diff --check` also failed on its internals,
 which would have failed Task 17's whitespace gate. The DOCX escaped only because
 a zip container carries NUL bytes early. Binary document and image types are now
 declared rather than guessed.
+
+**Task 17 — the gate found two faults in itself.** Step 1's release-access
+search names `generation-command-v2.ts`, which contained a literal NUL byte in
+its domain-separator constant; ripgrep skips binary files silently, so that
+search's "no match" evidence meant "not searched". Step 1's console search
+excluded `services/safe-log.ts` with a glob that does not match ripgrep's
+Windows path separators, so it reported nine hits inside the file it was meant
+to exclude. Both are fixed, and both are worth remembering: a gate whose passing
+evidence is the absence of output can pass by not looking.
+
+**Task 17 — the whole-branch review was performed in-thread.** The plan names
+`superpowers:requesting-code-review`. The user's standing instruction for this
+continuation prohibits spawning agents, and a later user instruction outranks a
+plan step, so the review was done directly against the named invariant list.
+Tasks 9-13 each carried their own independent review earlier in the execution.
 
 ## Deferred production gates
 
