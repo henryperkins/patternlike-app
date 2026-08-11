@@ -466,7 +466,14 @@ describe("V5 Today rollout and status projection", () => {
       expect(blocked).toMatchObject({
         status: 503,
         body: {
-          error: { code: "publisher_not_configured", retryable: false },
+          // Not `publisher_not_configured`: this deployment is healthy and the
+          // rollout simply does not admit `first_open`. The two codes are split
+          // precisely so an operator can tell "turned off" from "broken".
+          error: {
+            code: "reading_generation_disabled",
+            message: "Daily reading generation is turned off",
+            retryable: false,
+          },
         },
       });
       expect(messages).toEqual([]);

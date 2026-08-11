@@ -206,10 +206,19 @@ paths:
         '503':
           description: |
             A safe infrastructure answer before any terminal command result
-            exists: `publisher_not_configured`, `publisher_unavailable`,
-            `calc_unavailable`, `daily_sky_unavailable`, or
-            `publisher_budget_exhausted`. Read `retryable`: budget exhaustion and
-            a deterministic policy refusal are false, the rest are true.
+            exists: `reading_generation_disabled`, `publisher_not_configured`,
+            `publisher_unavailable`, `calc_unavailable`, `daily_sky_unavailable`,
+            or `publisher_budget_exhausted`. Read `retryable`: budget exhaustion,
+            a deterministic policy refusal, and both configuration answers are
+            false, the rest are true.
+
+            `reading_generation_disabled` and `publisher_not_configured` are
+            separate codes because they are separate operator states.
+            The first means the staged rollout does not admit this entry point —
+            generation is off on purpose and the deployment is healthy. The
+            second means the rollout does admit it and the publisher
+            configuration behind it is incomplete, which is a defect. A caller
+            treats both identically; an operator must not.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }

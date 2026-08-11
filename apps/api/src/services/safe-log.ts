@@ -1,4 +1,5 @@
 import { newId } from "@patternlike/shared";
+import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { PublisherSafeDetailCode } from "./reading-publisher.js";
 
@@ -39,7 +40,15 @@ export type SafeLogEvent =
         | "missing_subject"
         | "unknown";
     }
-  | { event: "ensure_today_failed" }
+  /**
+   * Projects the reason because the response deliberately does not. Several
+   * distinct outcomes still share one error code by design — naming which
+   * dependency is degraded is not something an unauthenticated-shaped answer
+   * should teach a caller — so without this field nothing anywhere recorded
+   * what produced a given 503 on Today. Every member of the union is a closed
+   * literal code: no identifier, message, or upstream prose can reach here.
+   */
+  | { event: "ensure_today_failed"; reason: EnsureTodayFailureReason }
   | { event: "local_day_unresolvable" }
   | { event: "generation_dispatch_failed" }
   | { event: "fact_repair_reconciliation_failed" }
@@ -103,6 +112,7 @@ export function safeLog(input: SafeLogEvent): string {
       });
       break;
     case "id_token_rejected":
+    case "ensure_today_failed":
       console.error(input.event, { trace_id, reason: input.reason });
       break;
     case "timing_cycles_unreadable":
@@ -137,7 +147,6 @@ export function safeLog(input: SafeLogEvent): string {
     case "calc_failed":
     case "content_release_keys_misconfigured":
     case "internal_generation_failed":
-    case "ensure_today_failed":
     case "local_day_unresolvable":
     case "generation_dispatch_failed":
     case "fact_repair_reconciliation_failed":

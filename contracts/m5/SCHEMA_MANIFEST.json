@@ -322,6 +322,16 @@
         "reading-generation-output.schema.json"
       ],
       "implemented_by": "apps/api/src/services/reading-prompt.ts (buildResponsesRequest sends the document verbatim); guarded offline by apps/api/src/services/reading-prompt.test.ts, which now walks the schema and fails on any $ref carrying a sibling keyword - the mock provider in apps/api/test/mock-calc-service.ts means no other offline test can see this class of defect."
+    },
+    {
+      "date": "2026-08-11",
+      "kind": "error_code_split",
+      "summary": "PUT /v1/readings/today splits the 503 `publisher_not_configured` into two codes: `reading_generation_disabled` when the staged rollout does not admit the calling entry point, and `publisher_not_configured` when it does admit it and the publisher configuration behind it is incomplete.",
+      "detail": "Prompted by a production 503 reading \"Daily reading generation is not configured\" on a deployment that was entirely healthy: READING_V5_ROLLOUT is deliberately `off` in [env.production.vars], `off` admits no entry point, and ensureTodayReading returned `rollout_disabled` - which routes/readings.ts answered with the publisher-misconfiguration code because both arms of the switch fell through to one body. The two states are not the same operational event. `rollout_disabled` is the kill switch working and is resolved by a rollout gate; `publisher_not_configured` means a required publisher variable is missing after enablement and is a deploy defect. configGuard refuses a non-`off` rollout with missing publisher values before the request reaches this route, so the second code is now the narrow residue that guard cannot see rather than the everyday answer. Neither the envelope nor the server log could previously distinguish them, because safeLog's `ensure_today_failed` projected no reason at all; it now projects the closed EnsureTodayFailureReason union, every member of which is a literal code. This is an amendment and not a schema_version bump: ErrorResponse.code is `type: string` with no enum, so no instance changes classification and no fixture moves, and no required field, enum, or $id changed. The only contract file touched is the 503 response description prose on ensureDailyReadingV5. Callers are unaffected - both codes remain 503 with retryable false, and the web client reads retryability from the envelope rather than switching on the 503 code.",
+      "files": [
+        "openapi/openapi.yaml"
+      ],
+      "implemented_by": "apps/api/src/routes/readings.ts (the split switch arms); apps/api/src/services/safe-log.ts (`ensure_today_failed` gains the projected reason). Guarded by apps/api/src/routes/readings.integration.test.ts, which asserts the disabled rollout answers `reading_generation_disabled`, and apps/web/src/lib/reading-state.test.ts, which pins the new code as non-retryable."
     }
   ]
 }

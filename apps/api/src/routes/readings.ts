@@ -315,7 +315,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
     );
   }
 
-  safeLog({ event: "ensure_today_failed" });
+  safeLog({ event: "ensure_today_failed", reason: outcome.reason });
 
   const errorBody = (code: string, message: string) => ({
     error: { code, message, request_id: requestId },
@@ -350,7 +350,35 @@ readingRoutes.put("/v1/readings/today", async (c) => {
         ),
         409,
       );
+    // Two arms, deliberately, where there was one code. Both are 503
+    // retryable:false, so collapsing them cost the caller nothing — but it made
+    // the state an operator resolves by flipping one variable indistinguishable
+    // from the state that means a deploy is broken, and `ensure_today_failed`
+    // projected no reason either, so neither the response nor the log could say
+    // which had happened.
+    //
+    // `reading_generation_disabled`: READING_V5_ROLLOUT does not admit this
+    // entry point. Nothing is wrong; the feature is off on purpose, and `off`
+    // admits no entry point at all.
     case "rollout_disabled":
+      return c.json(
+        {
+          error: {
+            ...errorBody(
+              "reading_generation_disabled",
+              "Daily reading generation is turned off",
+            ).error,
+            retryable: false,
+          },
+        },
+        503,
+      );
+    // `publisher_not_configured`: the rollout DID admit the entry point and the
+    // publisher configuration behind it is incomplete. configGuard runs ahead of
+    // this route (index.ts) and refuses a non-`off` rollout whose publisher
+    // values are missing with 503 configuration_error, so this arm is the
+    // narrow residue that guard cannot see — not the everyday "generation is
+    // off" answer it used to also serve.
     case "publisher_not_configured":
       return c.json(
         {

@@ -67,6 +67,17 @@ describe("classifyTodayError", () => {
       retryable: false,
     },
     {
+      // The sibling code the API splits out when the staged rollout does not
+      // admit this entry point. Classification must not diverge from
+      // `publisher_not_configured`: the reader can act on neither, and this
+      // screen reads retryability from the envelope rather than the code.
+      label: "generation turned off by the rollout",
+      status: 503,
+      code: "reading_generation_disabled",
+      envelope: { retryable: false },
+      retryable: false,
+    },
+    {
       label: "an exhausted generation",
       status: 424,
       code: "reading_generation_failed",

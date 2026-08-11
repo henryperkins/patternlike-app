@@ -181,7 +181,7 @@ it("serves the complete M3 read-only surface on 0001+0002 with rollout off", asy
     });
     expect(blocked.status).toBe(503);
     expect(await blocked.json()).toMatchObject({
-      error: { code: "publisher_not_configured", retryable: false },
+      error: { code: "reading_generation_disabled", retryable: false },
     });
     expect(await rows("SELECT id FROM daily_readings")).toEqual([]);
     expect(await rows("SELECT id FROM jobs")).toEqual(before.jobs);
