@@ -12,6 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "//publisher:model:verify": "PRODUCTION GATE, not part of any test lane. Calls the authorized account's model endpoint with OPENAI_API_KEY and proves the pinned model exists. Required before initial enablement and before every later model change.",
     "publisher:model:verify": "tsx scripts/verify-openai-reading-model.ts",
+    "//publisher:eval:live": "PRODUCTION GATE, not part of any test lane. Sends the checked-in SYNTHETIC corpus to the real provider with OPENAI_API_KEY and scores what comes back through validateReadingCandidate. Reads no D1, no account, and no real birth data. Required before initial enablement and before every later model, prompt, selection-policy, or validation-policy change; the single synthetic canary does not substitute for it. The offline half of the same corpus runs in `npm test`.",
+    "publisher:eval:live": "tsx scripts/run-openai-reading-eval.ts",
     "test:wrangler-config": "tsx --test scripts/wrangler-config.test.ts",
     "test": "vitest run && vitest run --config vitest.m3-compat.config.ts",
     "db:local": "wrangler d1 migrations apply patternlike-ops --local",
