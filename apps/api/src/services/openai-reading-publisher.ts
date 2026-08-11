@@ -21,6 +21,10 @@ import { contentHash, type ReadingGenerationOutput } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { buildResponsesRequest, OPENAI_RESPONSES_URL } from "./reading-prompt.js";
 import {
+  readOpenAiIncompleteReason,
+  readOpenAiResponseUsage,
+} from "./openai-responses-envelope.js";
+import {
   READING_PUBLISHER_PROVIDER,
   type PublishOptions,
   type PublisherFailureCode,
@@ -112,12 +116,6 @@ const REQUIRED_CANDIDATE_KEYS = [
   "uncertainty_note",
 ] as const;
 
-function readUsage(body: unknown, key: "input_tokens" | "output_tokens"): number | null {
-  const usage = (body as { usage?: Record<string, unknown> })?.usage;
-  const value = usage?.[key];
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
-}
-
 export function createOpenAiReadingPublisher(
   env: Pick<Env, "OPENAI_API_KEY">,
 ): ReadingPublisher {
@@ -206,6 +204,20 @@ export function createOpenAiReadingPublisher(
         return failure("publisher_output_invalid", "invalid_json");
       }
 
+      const incompleteReason = readOpenAiIncompleteReason(body);
+      if (incompleteReason === "max_output_tokens") {
+        // Output tokens include reasoning tokens. A high-effort reasoning pass
+        // can therefore exhaust the response ceiling before the JSON document
+        // closes; classify the provider stop, not the truncated text beneath it.
+        return failure("publisher_output_invalid", "max_output_tokens_exhausted");
+      }
+      if (incompleteReason === "content_filter") {
+        return failure("publisher_refused", "provider_refusal");
+      }
+      if (incompleteReason === "unknown") {
+        return failure("publisher_output_invalid", "schema_mismatch");
+      }
+
       const extracted = extractOutputText(body);
       if (!extracted.ok) return extracted.result;
 
@@ -224,8 +236,9 @@ export function createOpenAiReadingPublisher(
       }
 
       const responseId = (body as { id?: unknown })?.id;
-      const inputTokens = readUsage(body, "input_tokens");
-      const outputTokens = readUsage(body, "output_tokens");
+      const responseUsage = readOpenAiResponseUsage(body);
+      const inputTokens = responseUsage.input_tokens;
+      const outputTokens = responseUsage.output_tokens;
       if (
         typeof responseId !== "string" ||
         responseId.length === 0 ||

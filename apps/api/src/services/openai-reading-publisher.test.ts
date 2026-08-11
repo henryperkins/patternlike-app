@@ -7,6 +7,7 @@ import {
   OPENAI_MOCK_ECHO_WRONG_DATE,
   OPENAI_MOCK_FORBIDDEN,
   OPENAI_MOCK_INVALID_JSON,
+  OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT,
   OPENAI_MOCK_MODEL_MISSING,
   OPENAI_MOCK_NETWORK_ERROR,
   OPENAI_MOCK_NO_TEXT,
@@ -198,6 +199,11 @@ describe("OpenAI reading publisher", () => {
     [OPENAI_MOCK_NO_TEXT, "publisher_output_invalid", "missing_output_text"],
     [OPENAI_MOCK_TWO_TEXTS, "publisher_output_invalid", "multiple_output_text"],
     [OPENAI_MOCK_INVALID_JSON, "publisher_output_invalid", "invalid_json"],
+    [
+      OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT,
+      "publisher_output_invalid",
+      "max_output_tokens_exhausted",
+    ],
     [OPENAI_MOCK_WRONG_SHAPE, "publisher_output_invalid", "schema_mismatch"],
   ])("maps %s to %s / %s", async (model, code, detail) => {
     const result = await publish(model, model === OPENAI_MOCK_TIMEOUT ? 40 : 5_000);

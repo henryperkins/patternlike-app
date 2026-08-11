@@ -20,7 +20,7 @@
   "model": {
     "provider": "openai",
     "model": "gpt-5.6-sol",
-    "prompt_version": "1.0.0",
+    "prompt_version": "1.0.1",
     "selection_policy_version": "1.0.0",
     "validation_policy_version": "1.0.0",
     "provider_request_id": "resp_01JAMPLEPROVIDERID01",

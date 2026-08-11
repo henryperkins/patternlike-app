@@ -67,7 +67,7 @@ CYCLE_POLICY_V = "1.4.0"
 ORB_POLICY_ID = "orb-launch"
 ORB_POLICY_V = "1.0.0"
 
-PROMPT_V = "1.0.0"
+PROMPT_V = "1.0.1"
 SELECTION_V = "1.0.0"
 VALIDATION_V = "1.0.0"
 CONSENT_POLICY_V = "2026-08-10.1"
@@ -577,7 +577,7 @@ COMMAND = {
         "output_schema": "daily-reading-v5",
         "selection_policy_version": SELECTION_V,
         "validation_policy_version": VALIDATION_V,
-        "max_output_tokens": 1800,
+        "max_output_tokens": 4000,
         "context_max_bytes": 98304,
     },
 }

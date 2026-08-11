@@ -87,6 +87,10 @@ function hostileRequest(): ReadingGenerationRequest {
 }
 
 describe("provider request body", () => {
+  it("identifies the collective-scope prompt revision", () => {
+    expect(READING_PROMPT_VERSION).toBe("1.0.1");
+  });
+
   it("targets the Responses endpoint directly, with no gateway in between", () => {
     expect(OPENAI_RESPONSES_URL).toBe("https://api.openai.com/v1/responses");
   });
@@ -96,7 +100,7 @@ describe("provider request body", () => {
     expect(body.model).toBe(OPENAI_READING_MODEL);
     expect(body.reasoning).toEqual({ effort: "high" });
     expect(body.text.verbosity).toBe("medium");
-    expect(body.max_output_tokens).toBe(1800);
+    expect(body.max_output_tokens).toBe(4000);
   });
 
   it("stores nothing and enables nothing", () => {
@@ -223,6 +227,24 @@ describe("provider request body", () => {
       "Never diagnose",
     ]) {
       expect(READING_SYSTEM_POLICY, rule).toContain(rule);
+    }
+  });
+
+  it("gives collective-only prose non-possessive placement language", () => {
+    // The validator rejects these possessives whenever every cited fact is
+    // collective. The prompt names the same boundary and gives the model usable
+    // alternatives instead of leaving it to infer a rewrite.
+    for (const shared of ['"the Sun"', '"the Moon"', '"today\'s shared sky"']) {
+      expect(READING_SYSTEM_POLICY, shared).toContain(shared);
+    }
+    for (const possessive of [
+      '"your Sun"',
+      '"your Moon"',
+      '"your chart"',
+      '"your sign"',
+      '"your house"',
+    ]) {
+      expect(READING_SYSTEM_POLICY, possessive).toContain(possessive);
     }
   });
 });

@@ -38,7 +38,7 @@ export const READING_PUBLISHER_PROVIDER = "openai" as const;
 export const OPENAI_READING_MODEL = "gpt-5.6-sol";
 export const OPENAI_READING_REASONING = "high" as const;
 export const OPENAI_READING_TIMEOUT_MS = 90_000;
-export const OPENAI_READING_MAX_OUTPUT_TOKENS = 1800;
+export const OPENAI_READING_MAX_OUTPUT_TOKENS = 4000;
 export const READING_CONTEXT_MAX_BYTES = 98_304;
 export const READING_PREGEN_ACTIVE_DAYS = 30;
 export const READING_PREGEN_LEAD_MINUTES = 30;
@@ -55,7 +55,7 @@ export const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
  * can pin the deployed variable against it without a circular import;
  * `reading-prompt.ts` re-exports it, so every caller still reads it from there.
  */
-export const READING_PROMPT_VERSION = "1.0.0";
+export const READING_PROMPT_VERSION = "1.0.1";
 
 // ---------------------------------------------------------------------------
 // Frozen configuration pin
@@ -121,6 +121,7 @@ export type PublisherSafeDetailCode =
   | "authentication_failed"
   | "model_not_available"
   | "provider_refusal"
+  | "max_output_tokens_exhausted"
   | "missing_output_text"
   | "multiple_output_text"
   | "invalid_json"

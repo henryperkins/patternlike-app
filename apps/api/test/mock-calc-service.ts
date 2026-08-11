@@ -454,6 +454,7 @@ export const OPENAI_MOCK_REFUSAL = "mock-openai-refusal";
 export const OPENAI_MOCK_NO_TEXT = "mock-openai-no-text";
 export const OPENAI_MOCK_TWO_TEXTS = "mock-openai-two-texts";
 export const OPENAI_MOCK_INVALID_JSON = "mock-openai-invalid-json";
+export const OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT = "mock-openai-incomplete-max-output";
 export const OPENAI_MOCK_WRONG_SHAPE = "mock-openai-wrong-shape";
 export const OPENAI_MOCK_ECHO_WRONG_DATE = "mock-openai-wrong-date";
 export const OPENAI_MOCK_UNGROUNDED = "mock-openai-ungrounded";
@@ -607,6 +608,31 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   }
   if (model === OPENAI_MOCK_INVALID_JSON) {
     return json(responsesEnvelope(model, outputText("{ this is not json")));
+  }
+  if (model === OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT) {
+    return json({
+      id: "resp_mock_incomplete_000000001",
+      object: "response",
+      model,
+      status: "incomplete",
+      incomplete_details: { reason: "max_output_tokens" },
+      output: [
+        { id: "rs_mock_reasoning", type: "reasoning", summary: [] },
+        {
+          id: "msg_mock_incomplete_0001",
+          type: "message",
+          role: "assistant",
+          status: "incomplete",
+          content: [{ type: "output_text", text: '{"schema_version":"0.5.0"' }],
+        },
+      ],
+      usage: {
+        input_tokens: 1954,
+        output_tokens: 4000,
+        output_tokens_details: { reasoning_tokens: 3021 },
+        total_tokens: 5954,
+      },
+    });
   }
   if (model === OPENAI_MOCK_WRONG_SHAPE) {
     return json(responsesEnvelope(model, outputText({ headline: "no schema_version here" })));

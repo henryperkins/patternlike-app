@@ -8,7 +8,11 @@ import {
   qualitativeFindings,
 } from "./reading-evaluation.js";
 import { READING_PROMPT_VERSION } from "./reading-prompt.js";
-import { OPENAI_READING_MODEL } from "./reading-publisher.js";
+import {
+  OPENAI_READING_MAX_OUTPUT_TOKENS,
+  OPENAI_READING_MODEL,
+  OPENAI_READING_REASONING,
+} from "./reading-publisher.js";
 import {
   SELECTION_POLICY_VERSION,
   VALIDATION_POLICY_VERSION,
@@ -31,16 +35,20 @@ const corpus = loadEvaluationCorpus();
 describe("the evaluation corpus", () => {
   it("pins the exact policy versions it was validated against", () => {
     // A corpus validated against another prompt proves nothing about this one.
-    // Changing any of these four requires re-running the corpus, incrementing
+    // Changing any of these six requires re-running the corpus, incrementing
     // its version, and updating this record — which is what makes the version
     // bump a decision rather than an afterthought.
     expect(corpus.gates).toEqual({
       model: OPENAI_READING_MODEL,
+      reasoning_effort: OPENAI_READING_REASONING,
+      max_output_tokens: OPENAI_READING_MAX_OUTPUT_TOKENS,
       prompt_version: READING_PROMPT_VERSION,
       selection_policy_version: SELECTION_POLICY_VERSION,
       validation_policy_version: VALIDATION_POLICY_VERSION,
       evaluation_policy_version: EVALUATION_POLICY_VERSION,
     });
+    expect(corpus.corpus_version).toBe("1.0.1");
+    expect(corpus.base.prompt_version).toBe("1.0.1");
   });
 
   it("covers every profile shape the design names", () => {

@@ -63,9 +63,9 @@ function enabledEnv(rollout = "internal") {
     READING_PUBLISHER: "openai",
     OPENAI_READING_MODEL,
     OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.0",
+    OPENAI_READING_PROMPT_VERSION: "1.0.1",
     OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "1800",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
     READING_CONTEXT_MAX_BYTES: "98304",
     READING_PREGEN_ACTIVE_DAYS: "30",
     READING_PREGEN_LEAD_MINUTES: "30",
@@ -202,7 +202,7 @@ describe("V2 command", () => {
       model: OPENAI_READING_MODEL,
       reasoning_effort: "high",
       output_schema: "daily-reading-v5",
-      max_output_tokens: 1800,
+      max_output_tokens: 4000,
       context_max_bytes: 98304,
     });
     expect(built.command.publisher.selection_policy_version).toBeTruthy();

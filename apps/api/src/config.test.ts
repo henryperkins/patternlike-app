@@ -182,9 +182,9 @@ describe("publisher configuration", () => {
     READING_PUBLISHER: "openai",
     OPENAI_READING_MODEL: OPENAI_READING_MODEL,
     OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.0",
+    OPENAI_READING_PROMPT_VERSION: "1.0.1",
     OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "1800",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
     READING_CONTEXT_MAX_BYTES: "98304",
     READING_PREGEN_ACTIVE_DAYS: "30",
     READING_PREGEN_LEAD_MINUTES: "30",
@@ -203,6 +203,7 @@ describe("publisher configuration", () => {
     expect(resolved.config?.pin.model).toBe(OPENAI_READING_MODEL);
     expect(resolved.config?.pin.reasoning_effort).toBe("high");
     expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
+    expect(resolved.config?.pin.max_output_tokens).toBe(4000);
     expect(resolved.config?.timeoutMs).toBe(90_000);
     expect(resolved.config?.dailyCallLimit).toBe(250);
     expect(resolved.config?.apiKey).toBe("sk-test-key");
@@ -262,7 +263,7 @@ describe("publisher configuration", () => {
     ["OPENAI_READING_PROMPT_VERSION", "0.9.0"],
     ["OPENAI_READING_TIMEOUT_MS", "60000"],
     ["OPENAI_READING_TIMEOUT_MS", "90000.5"],
-    ["OPENAI_READING_MAX_OUTPUT_TOKENS", "4000"],
+    ["OPENAI_READING_MAX_OUTPUT_TOKENS", "1800"],
     ["READING_CONTEXT_MAX_BYTES", "65536"],
     ["READING_PREGEN_ACTIVE_DAYS", "90"],
     ["READING_PREGEN_LEAD_MINUTES", "15"],

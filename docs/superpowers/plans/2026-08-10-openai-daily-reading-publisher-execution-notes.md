@@ -288,6 +288,44 @@ The alternative was to make the model write English regardless of the echoed
 locale; that was rejected as the dishonest option, and the decision is recorded
 in the v0.5 specification rather than left in the code.
 
+## Gate 6 attempt and 1.0.1 remediation
+
+The 2026-08-11 live synthetic corpus attempt at `2028227` did **not** authorize
+rollout. The strict-schema repair moved the result from 0/6 to 3/6:
+
+```text
+FAIL  exact_saturn_square   in=1946 out=1800  schema_shape.unparseable
+PASS  approximate_window    in=1949 out=980
+FAIL  unknown_time          in=1954 out=1800  schema_shape.unparseable
+PASS  zero_cycle_day        in=1833 out=1469
+FAIL  collective_only_day   in=1650 out=694   collective_scope.possessive_placement
+PASS  injected_user_text    in=1950 out=1520  ~context_supplied_but_unused
+
+published 3/6  qualitative findings 1
+tokens in=11282 out=8263
+FAIL  publishable rate 0.50 below 1
+```
+
+The two `out=1800` failures were Responses envelopes stopped at the configured
+ceiling. `max_output_tokens` includes high-effort reasoning as well as visible
+structured output, so parsing the partial document hid the actual provider stop
+as `schema_shape.unparseable`. The failure was nondeterministic: an earlier
+single call for `exact_saturn_square` completed at 1,252 output tokens and
+passed. The remediation raises the frozen response ceiling to 4,000, pins that
+ceiling and `reasoning_effort=high` in corpus version 1.0.1, reports reasoning
+tokens separately, and names `max_output_tokens` exhaustion before parsing text.
+
+The collective-only failure was genuine content, not truncation. Prompt version
+1.0.1 explicitly requires non-possessive shared-sky framing such as "the Sun",
+"the Moon", and "today's shared sky", while the existing validator continues to
+reject "your Sun", "your Moon", chart, sign, or house placement language when a
+unit cites only collective facts.
+
+These changes are candidate remediation only. Gate 5 still requires an operator
+to approve and record the higher worst-case spend, and Gate 6 must be rerun live
+against all six profiles with a 6/6 publishable result before rollout can move
+from `off`.
+
 ## Deferred production gates
 
 None of these are performed by implementation work; each is separately

@@ -26,7 +26,11 @@
 
 import process from "node:process";
 
-import { validateReadingCandidate } from "@patternlike/reading-engine";
+import {
+  SELECTION_POLICY_VERSION,
+  VALIDATION_POLICY_VERSION,
+  validateReadingCandidate,
+} from "@patternlike/reading-engine";
 import type { ReadingGenerationOutput } from "@patternlike/shared";
 
 import {
@@ -37,6 +41,10 @@ import {
   type EvaluationCorpus,
 } from "../src/services/reading-evaluation.js";
 import { buildResponsesRequest, READING_PROMPT_VERSION } from "../src/services/reading-prompt.js";
+import {
+  readOpenAiIncompleteReason,
+  readOpenAiResponseUsage,
+} from "../src/services/openai-responses-envelope.js";
 import {
   OPENAI_READING_MAX_OUTPUT_TOKENS,
   OPENAI_READING_MODEL,
@@ -68,6 +76,7 @@ interface ProfileOutcome {
   qualitative: string[];
   input_tokens: number;
   output_tokens: number;
+  reasoning_tokens: number | null;
 }
 
 function extractCandidate(body: unknown): ReadingGenerationOutput | null {
@@ -91,11 +100,6 @@ function extractCandidate(body: unknown): ReadingGenerationOutput | null {
     }
   }
   return null;
-}
-
-function usage(body: unknown, key: "input_tokens" | "output_tokens"): number {
-  const value = (body as { usage?: Record<string, unknown> })?.usage?.[key];
-  return typeof value === "number" ? value : 0;
 }
 
 async function runProfile(
@@ -141,6 +145,7 @@ async function runProfile(
         qualitative: [],
         input_tokens: 0,
         output_tokens: 0,
+        reasoning_tokens: null,
       };
     }
     body = await response.json();
@@ -152,9 +157,32 @@ async function runProfile(
       qualitative: [],
       input_tokens: 0,
       output_tokens: 0,
+      reasoning_tokens: null,
     };
   } finally {
     clearTimeout(timer);
+  }
+
+  const responseUsage = readOpenAiResponseUsage(body);
+  const inputTokens = responseUsage.input_tokens ?? 0;
+  const outputTokens = responseUsage.output_tokens ?? 0;
+  const incompleteReason = readOpenAiIncompleteReason(body);
+  if (incompleteReason !== null) {
+    const code =
+      incompleteReason === "max_output_tokens"
+        ? "provider.max_output_tokens_exhausted"
+        : incompleteReason === "content_filter"
+          ? "provider.content_filter"
+          : "provider.incomplete_unknown";
+    return {
+      profile: profileId,
+      published: false,
+      codes: [code],
+      qualitative: [],
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      reasoning_tokens: responseUsage.reasoning_tokens,
+    };
   }
 
   const candidate = extractCandidate(body);
@@ -164,8 +192,9 @@ async function runProfile(
       published: false,
       codes: ["schema_shape.unparseable"],
       qualitative: [],
-      input_tokens: usage(body, "input_tokens"),
-      output_tokens: usage(body, "output_tokens"),
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      reasoning_tokens: responseUsage.reasoning_tokens,
     };
   }
 
@@ -177,8 +206,9 @@ async function runProfile(
       ? []
       : validation.failures.map((failure) => `${failure.code}.${failure.detail_code}`),
     qualitative: qualitativeFindings(prepared, candidate),
-    input_tokens: usage(body, "input_tokens"),
-    output_tokens: usage(body, "output_tokens"),
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    reasoning_tokens: responseUsage.reasoning_tokens,
   };
 }
 
@@ -199,15 +229,22 @@ async function main(): Promise<number> {
   }
   if (
     corpus.gates.prompt_version !== READING_PROMPT_VERSION ||
-    corpus.gates.evaluation_policy_version !== EVALUATION_POLICY_VERSION
+    corpus.gates.evaluation_policy_version !== EVALUATION_POLICY_VERSION ||
+    corpus.gates.reasoning_effort !== OPENAI_READING_REASONING ||
+    corpus.gates.max_output_tokens !== OPENAI_READING_MAX_OUTPUT_TOKENS ||
+    corpus.gates.selection_policy_version !== SELECTION_POLICY_VERSION ||
+    corpus.gates.validation_policy_version !== VALIDATION_POLICY_VERSION
   ) {
-    console.error("FAIL  corpus gates do not match the deployed prompt/evaluation versions");
+    console.error("FAIL  corpus gates do not match the deployed prompt/evaluation configuration");
     return 2;
   }
 
   const profileIds = Object.keys(corpus.profiles);
   console.log(`corpus ${corpus.corpus_version}  model ${corpus.gates.model}`);
-  console.log(`prompt ${corpus.gates.prompt_version}  profiles ${profileIds.length}`);
+  console.log(
+    `prompt ${corpus.gates.prompt_version}  reasoning ${corpus.gates.reasoning_effort}` +
+      `  max_output_tokens ${corpus.gates.max_output_tokens}  profiles ${profileIds.length}`,
+  );
 
   const outcomes: ProfileOutcome[] = [];
   for (const profileId of profileIds) {
@@ -219,6 +256,7 @@ async function main(): Promise<number> {
     console.log(
       `  ${outcome.published ? "PASS" : "FAIL"}  ${outcome.profile}` +
         `  in=${outcome.input_tokens} out=${outcome.output_tokens}` +
+        ` reasoning=${outcome.reasoning_tokens ?? "unavailable"}` +
         (outcome.codes.length ? `  ${outcome.codes.join(",")}` : "") +
         (outcome.qualitative.length ? `  ~${outcome.qualitative.join(",")}` : ""),
     );
@@ -232,10 +270,22 @@ async function main(): Promise<number> {
   );
   const inputTokens = outcomes.reduce((total, outcome) => total + outcome.input_tokens, 0);
   const outputTokens = outcomes.reduce((total, outcome) => total + outcome.output_tokens, 0);
+  const reasoningTokens = outcomes.reduce(
+    (total, outcome) => total + (outcome.reasoning_tokens ?? 0),
+    0,
+  );
+  const unavailableReasoningCounts = outcomes.filter(
+    (outcome) => outcome.reasoning_tokens === null,
+  ).length;
 
   console.log("");
   console.log(`published ${published}/${outcomes.length}  qualitative findings ${qualitativeTotal}`);
-  console.log(`tokens in=${inputTokens} out=${outputTokens}`);
+  console.log(
+    `tokens in=${inputTokens} out=${outputTokens} reasoning=${reasoningTokens}` +
+      (unavailableReasoningCounts > 0
+        ? ` (${unavailableReasoningCounts} unavailable)`
+        : ""),
+  );
 
   if (rate < MIN_PUBLISHABLE_RATE) {
     console.error(`FAIL  publishable rate ${rate.toFixed(2)} below ${MIN_PUBLISHABLE_RATE}`);

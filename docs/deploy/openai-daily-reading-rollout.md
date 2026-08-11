@@ -154,6 +154,14 @@ per input and output token for the exact model, and the arithmetic giving the
 worst-case daily spend at that ceiling with the configured request and output
 maxima. A ceiling nobody has costed is not an approved ceiling.
 
+The current candidate configuration sets `OPENAI_READING_MAX_OUTPUT_TOKENS=4000`.
+For the Responses API this ceiling includes reasoning tokens and visible output
+tokens together; it is therefore both a reliability control and the output-side
+term in the spend calculation. Record the arithmetic as the approved daily call
+limit multiplied by the worst-case input charge plus 4,000 times the current
+output-token price. This repository change does not constitute that operator
+approval.
+
 These variables are set now but are **not yet load-bearing**: while
 `READING_V5_ROLLOUT` is `off`, `resolvePublisherConfiguration` returns before it
 reaches the required-value block, so a probe here would answer 200 whether or not
@@ -178,15 +186,18 @@ npm run publisher:eval:live -w @patternlike/api
 ```
 
 **Expected:** exit 0, every synthetic profile publishable, qualitative findings
-within threshold. The command prints ids, verdicts, counts, and failure codes
-only; the whole report is safe to paste into the rollout record, and it should
-be.
+within threshold. The command prints ids, verdicts, input/output/reasoning token
+counts, and failure codes only; the whole report is safe to paste into the
+rollout record, and it should be. A provider response stopped at the configured
+ceiling is reported as `provider.max_output_tokens_exhausted`, not as malformed
+candidate JSON.
 
 The corpus refuses to run when its recorded gates do not match the deployed
-model, prompt, and evaluation-policy versions. **This gate repeats in full before
-every later model, prompt, selection-policy, or validation-policy change**, along
-with the Gate 5 model preflight. The single end-to-end canary below does not
-substitute for it.
+model, reasoning effort, response-token ceiling, prompt, selection, validation,
+and evaluation-policy versions. **This gate repeats in full before every later
+model, prompt, selection-policy, or validation-policy change**, along with the
+Gate 5 model preflight. The single end-to-end canary below does not substitute
+for it.
 
 Then run the synthetic end-to-end canary: one internal account with invented
 birth data, through calculation and generation to publication, proving the whole

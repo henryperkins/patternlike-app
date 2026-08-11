@@ -3,20 +3,22 @@
     "Synthetic only. No real account, no real birth data, nothing read from D1 - which is what makes",
     "the live lane safe to point at a real key. Every candidate below is a frozen string a model could",
     "have produced; the corpus pins which ones this deployment accepts and which it refuses.",
-    "Changing the model, prompt, selection policy, or validation policy requires re-running this",
+    "Changing the model, reasoning effort, response ceiling, prompt, selection policy, or validation policy requires re-running this",
     "corpus, incrementing corpus_version, and updating gates."
   ],
-  "corpus_version": "1.0.0",
+  "corpus_version": "1.0.1",
   "gates": {
     "model": "gpt-5.6-sol",
-    "prompt_version": "1.0.0",
+    "reasoning_effort": "high",
+    "max_output_tokens": 4000,
+    "prompt_version": "1.0.1",
     "selection_policy_version": "1.0.0",
     "validation_policy_version": "1.0.0",
     "evaluation_policy_version": "1.0.0"
   },
   "base": {
     "schema_version": "0.5.0",
-    "prompt_version": "1.0.0",
+    "prompt_version": "1.0.1",
     "output_schema": "daily-reading-v5",
     "selection_policy_version": "1.0.0",
     "validation_policy_version": "1.0.0",

@@ -647,6 +647,7 @@ Commit: api: add M5 storage and provider budget guards
       | "authentication_failed"
       | "model_not_available"
       | "provider_refusal"
+      | "max_output_tokens_exhausted"
       | "missing_output_text"
       | "multiple_output_text"
       | "invalid_json"
@@ -659,9 +660,9 @@ Commit: api: add M5 storage and provider budget guards
 
 - [ ] **Step 1: Write failing configuration and adapter tests.**
 
-Always require READING_V5_ROLLOUT to be one of off/internal/first_open/hybrid. When it is off, permit every V5 publisher, scheduler, cost value, and OPENAI_API_KEY to be absent so the dual-reader compatibility deploy is a real kill-switch state; if any optional value is present, still reject a malformed value. When rollout is not off, require READING_PUBLISHER=openai; exact model gpt-5.6-sol; high reasoning; prompt version; 90,000 ms timeout; 1,800 output tokens; 98,304 context bytes; active days 30; lead minutes 30; spread minutes 45; scheduler batch limit 100; a positive operator-approved daily call limit; and OPENAI_API_KEY. Reject unknown enums, non-integers, wrong fixed values, zero/negative call limits, and missing required production values.
+Always require READING_V5_ROLLOUT to be one of off/internal/first_open/hybrid. When it is off, permit every V5 publisher, scheduler, cost value, and OPENAI_API_KEY to be absent so the dual-reader compatibility deploy is a real kill-switch state; if any optional value is present, still reject a malformed value. When rollout is not off, require READING_PUBLISHER=openai; exact model gpt-5.6-sol; high reasoning; prompt version; 90,000 ms timeout; 4,000 output tokens shared by reasoning and visible structured output; 98,304 context bytes; active days 30; lead minutes 30; spread minutes 45; scheduler batch limit 100; a positive operator-approved daily call limit; and OPENAI_API_KEY. Reject unknown enums, non-integers, wrong fixed values, zero/negative call limits, and missing required production values.
 
-For the request, assert POST https://api.openai.com/v1/responses, store: false, no background, no tools, no browsing/file search/code/MCP fields, exact model, reasoning effort high, text verbosity medium, max_output_tokens 1800, and text.format with type json_schema, name patternlike_daily_reading_v5, strict true, and the M5 output schema. Assert one fetch maximum.
+For the request, assert POST https://api.openai.com/v1/responses, store: false, no background, no tools, no browsing/file search/code/MCP fields, exact model, reasoning effort high, text verbosity medium, max_output_tokens 4000, and text.format with type json_schema, name patternlike_daily_reading_v5, strict true, and the M5 output schema. Assert one fetch maximum.
 
 Assert the closed rollout matrix: off permits no V2 reservation; internal permits only authenticated internal reservations; first_open permits internal plus PUT Today; and hybrid permits internal, PUT Today, and scheduled reservations.
 

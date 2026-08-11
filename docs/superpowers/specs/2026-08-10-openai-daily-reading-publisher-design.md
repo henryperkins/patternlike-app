@@ -130,9 +130,11 @@ The Worker environment gains these bindings:
   production value fails configuration validation;
 - `OPENAI_READING_MODEL=gpt-5.6-sol` — the exact configured production model;
 - `OPENAI_READING_REASONING=high` — the initial quality-first reasoning level;
-- `OPENAI_READING_PROMPT_VERSION=<version>` — the deployed prompt contract;
+- `OPENAI_READING_PROMPT_VERSION=1.0.1` — the deployed prompt contract;
 - `OPENAI_READING_TIMEOUT_MS=90000` — one provider-call deadline;
-- `OPENAI_READING_MAX_OUTPUT_TOKENS=1800` — a hard candidate ceiling;
+- `OPENAI_READING_MAX_OUTPUT_TOKENS=4000` — a hard response ceiling shared by
+  reasoning and visible structured output; `output_tokens` includes both, so
+  this is not a 4,000-token prose allowance;
 - `READING_CONTEXT_MAX_BYTES=98304` — a hard serialized context-packet ceiling;
 - `READING_PREGEN_ACTIVE_DAYS=30` — the initial recently-active window;
 - `READING_PREGEN_LEAD_MINUTES=30` — generate the next edition thirty minutes

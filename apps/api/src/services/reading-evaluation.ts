@@ -8,8 +8,8 @@ import type { ReadingGenerationOutput } from "@patternlike/shared";
 import corpusJson from "../../test/fixtures/reading-evaluation-corpus.json";
 
 /**
- * The quality gate for a model, prompt, selection-policy, or validation-policy
- * change.
+ * The quality gate for a model, reasoning/output configuration, prompt,
+ * selection-policy, or validation-policy change.
  *
  * Two lanes read this module. The ordinary suite scores frozen candidates
  * offline, so a policy change that quietly widens or narrows what publishes is a
@@ -34,6 +34,8 @@ export const EVALUATION_POLICY_VERSION = "1.0.0";
 
 export interface EvaluationGates {
   model: string;
+  reasoning_effort: string;
+  max_output_tokens: number;
   prompt_version: string;
   selection_policy_version: string;
   validation_policy_version: string;

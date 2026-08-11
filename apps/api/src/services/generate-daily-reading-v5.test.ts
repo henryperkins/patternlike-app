@@ -48,9 +48,9 @@ function enabledEnv(overrides: Partial<typeof env> = {}): typeof env {
     READING_PUBLISHER: "openai",
     OPENAI_READING_MODEL,
     OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.0",
+    OPENAI_READING_PROMPT_VERSION: "1.0.1",
     OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "1800",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
     READING_CONTEXT_MAX_BYTES: "98304",
     READING_PREGEN_ACTIVE_DAYS: "30",
     READING_PREGEN_LEAD_MINUTES: "30",
@@ -329,7 +329,7 @@ describe("V5 execution", () => {
       model: {
         provider: "openai",
         model: OPENAI_READING_MODEL,
-        prompt_version: "1.0.0",
+        prompt_version: "1.0.1",
         provider_request_id: expect.any(String),
         input_tokens: 4210,
         output_tokens: 512,
@@ -366,7 +366,7 @@ describe("V5 execution", () => {
       globalThis.fetch = originalFetch;
     }
     expect(sentModel).toBe(command.publisher.model);
-    expect(command.publisher.prompt_version).toBe("1.0.0");
+    expect(command.publisher.prompt_version).toBe("1.0.1");
   });
 
   it("rechecks AI consent immediately before budget use and makes no provider call after revocation", async () => {

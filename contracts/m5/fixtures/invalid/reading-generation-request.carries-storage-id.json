@@ -1,6 +1,6 @@
 {
   "schema_version": "0.5.0",
-  "prompt_version": "1.0.0",
+  "prompt_version": "1.0.1",
   "selection_policy_version": "1.0.0",
   "output_schema": "daily-reading-v5",
   "local_date": "2026-07-30",
