@@ -7,6 +7,7 @@ import {
   markDispatched,
   replaceCommand,
   reserveInitial,
+  reserveInvalidatedSuccessor,
   reserveReissue,
   type ReserveOutcome,
 } from "../db/generation.js";
@@ -249,7 +250,10 @@ export async function replaceFailedCommand(
   }
   const reservation = await env.DB.prepare(
     `SELECT id, local_date, status, revision, revision_reason, supersedes_reading_id,
-            command_generation, active_generation_job_id, assembly_mode
+            command_generation, active_generation_job_id, assembly_mode,
+            (SELECT status FROM daily_readings predecessor
+             WHERE predecessor.id = daily_readings.supersedes_reading_id
+               AND predecessor.user_id = daily_readings.user_id) AS predecessor_status
      FROM daily_readings WHERE id = ? AND user_id = ?`,
   )
     .bind(readingId, userId)
@@ -263,6 +267,7 @@ export async function replaceFailedCommand(
       command_generation: number;
       active_generation_job_id: string | null;
       assembly_mode: "deterministic" | "constrained_model";
+      predecessor_status: string | null;
     }>();
   if (!reservation || reservation.status !== "failed" || !reservation.active_generation_job_id) {
     return {
@@ -326,7 +331,13 @@ export async function replaceFailedCommand(
           revision: reservation.revision,
           revisionReason: reservation.revision_reason as RevisionReasonV2,
           supersedesReadingId: reservation.supersedes_reading_id,
-          reservationReason: actor === "scheduler" ? "automatic_replacement" : "manual_reissue",
+          reservationReason:
+            reservation.supersedes_reading_id &&
+            reservation.predecessor_status === "invalidated"
+              ? "fact_repair"
+              : actor === "scheduler"
+                ? "automatic_replacement"
+                : "manual_reissue",
           commandGeneration: nextGeneration,
           replacesJobId: reservation.active_generation_job_id,
           commandReplacementReason: reason as V5ReplacementReason,
@@ -455,12 +466,19 @@ export async function enqueueConstrainedReading(
   await persistCycles(env, userId, build.chartId, build.cycles);
 
   const reserved = build.command.supersedes_reading_id
-    ? await reserveReissue(
-        env,
-        identity,
-        build.command,
-        build.command.supersedes_reading_id,
-      )
+    ? build.command.reservation_reason === "fact_repair"
+      ? await reserveInvalidatedSuccessor(
+          env,
+          identity,
+          build.command,
+          build.command.supersedes_reading_id,
+        )
+      : await reserveReissue(
+          env,
+          identity,
+          build.command,
+          build.command.supersedes_reading_id,
+        )
     : await reserveInitial(env, identity, build.command);
   if (!reserved.ok) return reserveFailure(reserved);
 

@@ -16,6 +16,11 @@ import {
   type GenerationReplacementReason,
 } from "../services/generation-failures.js";
 import { safeLog } from "../services/safe-log.js";
+import { asCryptoSubject } from "../crypto.js";
+import {
+  invalidatePublishedReading,
+  reserveFactRepair,
+} from "../services/reading-invalidation.js";
 
 /**
  * Operator and scheduler entry points for daily-reading generation.
@@ -176,6 +181,90 @@ internalGenerationRoutes.post("/readings/reissue", async (c) => {
       reading_id: result.readingId,
       job_id: result.jobId,
       dispatched: result.dispatched,
+    },
+    202,
+  );
+});
+
+internalGenerationRoutes.post("/readings/invalidate", async (c) => {
+  const requestId = c.get("requestId");
+  const body = await readJson(c);
+  const userId = typeof body?.user_id === "string" ? body.user_id : null;
+  const readingId = typeof body?.reading_id === "string" ? body.reading_id : null;
+  const reason = body?.reason;
+  if (!userId || !readingId || reason !== "calculation_defect") {
+    return c.json(
+      {
+        error: {
+          code: "invalid_body",
+          message: "user_id, reading_id, and reason calculation_defect are required",
+          request_id: requestId,
+        },
+      },
+      400,
+    );
+  }
+
+  const user = await c.env.DB.prepare(
+    `SELECT id, crypto_subject FROM users WHERE id = ? AND status = 'active'`,
+  )
+    .bind(userId)
+    .first<{ id: string; crypto_subject: string }>();
+  if (!user) {
+    return c.json(
+      {
+        error: {
+          code: "not_found",
+          message: "The named reading is not available for invalidation",
+          request_id: requestId,
+        },
+      },
+      409,
+    );
+  }
+
+  const invalidated = await invalidatePublishedReading(c.env, {
+    identity: { userId: user.id, cryptoSubject: asCryptoSubject(user.crypto_subject) },
+    readingId,
+    reason,
+    now: new Date(),
+  });
+  if (!invalidated.ok) {
+    return c.json(
+      {
+        error: {
+          code: invalidated.reason,
+          message:
+            invalidated.reason === "conflict"
+              ? "The reading could not be invalidated"
+              : "The named reading is not available for invalidation",
+          request_id: requestId,
+        },
+      },
+      invalidated.reason === "conflict" ? 424 : 409,
+    );
+  }
+
+  const reserved = await reserveFactRepair(c.env, readingId, new Date());
+  if (!reserved.ok) {
+    return c.json(
+      {
+        error: {
+          code: reserved.reason,
+          message: publicFailureDetail(reserved.reason, reserved.detail),
+          request_id: requestId,
+        },
+      },
+      statusFor(reserved.reason),
+    );
+  }
+  return c.json(
+    {
+      status: "repair_reserved",
+      predecessor_id: readingId,
+      reading_id: reserved.readingId,
+      job_id: reserved.jobId,
+      dispatched: reserved.dispatched,
     },
     202,
   );

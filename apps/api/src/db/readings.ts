@@ -504,11 +504,11 @@ async function decryptColumn<T>(
  * The live artifact for one plaintext `(user_id, local_date)`.
  *
  * `status = 'published'` is in the predicate rather than a filter applied after
- * the fact, because that is the exact predicate of `uq_daily_readings_live`. At
- * most one row can match, enforced by the schema, so there is no `ORDER BY ...
- * LIMIT 1` here that a later reader has to trust. A `pending` row would have
- * nothing to decrypt anyway — the table CHECK only requires `reading_enc` once
- * the status is `published`.
+ * the fact, because that is the exact predicate of `uq_daily_readings_live`.
+ * The active-chart EXISTS is a second fail-closed predicate: chart activation
+ * commits before encrypted invalidation, so a process death between them must
+ * still return no prose. At most one row can match, enforced by the schema, so
+ * there is no `ORDER BY ... LIMIT 1` here that a later reader has to trust.
  */
 export async function loadPublishedReadingForDate(
   env: Env,
@@ -517,8 +517,14 @@ export async function loadPublishedReadingForDate(
 ): Promise<PublishedReading | null> {
   const row = await env.DB.prepare(
     `SELECT ${READING_COLUMNS}
-     FROM daily_readings
-     WHERE user_id = ? AND local_date = ? AND status = 'published'`,
+     FROM daily_readings r
+     WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'published'
+       AND EXISTS (
+         SELECT 1 FROM chart_snapshots c
+         WHERE c.user_id = r.user_id AND c.status = 'active'
+           AND c.fingerprint = r.chart_fingerprint
+           AND c.contract_id = r.contract_id
+       )`,
   )
     .bind(identity.userId, localDate)
     .first<ReadingRow>();
@@ -551,9 +557,10 @@ export async function loadPublishedReadingForDate(
 /**
  * The discriminator between the route's two 404s, and nothing more.
  *
- * Deliberately only consulted when no reading was found. Gating the hit on this
- * would be both slower and wrong: a reading generated from a chart that has
- * since been superseded is still a valid immutable artifact.
+ * Deliberately only consulted when no authoritative reading was found. The
+ * published loader itself checks the active chart pin, so the crash window
+ * between chart activation and invalidation is indistinguishable from an
+ * invalidated miss on the product wire.
  */
 export async function hasActiveChart(env: Env, userId: string): Promise<boolean> {
   const row = await env.DB.prepare(

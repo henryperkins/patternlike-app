@@ -430,6 +430,132 @@ export async function reserveReissue(
   return { ok: true, readingId: command.reading_id, jobId };
 }
 
+/**
+ * Reserve the first successor to a named factually invalidated reading.
+ *
+ * This is intentionally not a mode on `reserveReissue`: an ordinary reissue
+ * requires a published predecessor, while a fact repair must refuse until the
+ * predecessor has already stopped being live. Keeping separate assertions is
+ * what prevents a caller from accidentally weakening both paths at once.
+ */
+export async function reserveInvalidatedSuccessor(
+  env: Env,
+  identity: UserIdentity,
+  command: GenerateDailyReadingCommand,
+  invalidatedReadingId: string,
+): Promise<ReserveOutcome> {
+  const now = new Date().toISOString();
+  const jobId = newId("job");
+  const columns = reservationColumns(command);
+  const predecessor = await env.DB.prepare(
+    `SELECT id, revision, status, local_date
+     FROM daily_readings WHERE id = ? AND user_id = ?`,
+  )
+    .bind(invalidatedReadingId, identity.userId)
+    .first<{ id: string; revision: number; status: string; local_date: string }>();
+  if (
+    !predecessor ||
+    predecessor.status !== "invalidated" ||
+    predecessor.local_date !== command.target_local_date ||
+    predecessor.revision + 1 !== command.revision ||
+    command.supersedes_reading_id !== invalidatedReadingId ||
+    !isCommandV2(command) ||
+    command.reservation_reason !== "fact_repair"
+  ) {
+    return { ok: false, reason: "stale_predecessor" };
+  }
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'expected predecessor is not invalidated at the expected revision'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM daily_readings
+           WHERE id = ? AND user_id = ? AND local_date = ?
+             AND status = 'invalidated' AND revision = ?
+         )`,
+      ).bind(
+        invalidatedReadingId,
+        identity.userId,
+        command.target_local_date,
+        command.revision - 1,
+      ),
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'invalidated predecessor already has a successor'
+         WHERE EXISTS (
+           SELECT 1 FROM daily_readings WHERE supersedes_reading_id = ?
+         )`,
+      ).bind(invalidatedReadingId),
+      await encryptedJobInsert(
+        env,
+        identity,
+        jobId,
+        command,
+        idempotencyKeyFor(command),
+        now,
+      ),
+      env.DB.prepare(
+        `INSERT INTO daily_readings
+           (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+            contract_id, assembly_mode, status, revision, revision_reason,
+            supersedes_reading_id, command_generation, active_generation_job_id,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        command.reading_id,
+        identity.userId,
+        command.target_local_date,
+        columns.releaseVersion,
+        command.reading_key,
+        command.chart.fingerprint,
+        command.chart.contract_id,
+        columns.assemblyMode,
+        command.revision,
+        command.revision_reason,
+        invalidatedReadingId,
+        command.command_generation,
+        jobId,
+        now,
+        now,
+      ),
+      auditStatement(
+        env,
+        identity.userId,
+        "daily_reading.fact_repair_reserved",
+        command.reading_id,
+        "fact_repair",
+        now,
+      ),
+    ]);
+  } catch (err) {
+    const successor = await env.DB.prepare(
+      `SELECT id FROM daily_readings
+       WHERE supersedes_reading_id = ? AND user_id = ?`,
+    )
+      .bind(invalidatedReadingId, identity.userId)
+      .first<{ id: string }>();
+    if (successor) {
+      return { ok: false, reason: "duplicate", readingId: successor.id };
+    }
+    const stillInvalidated = await env.DB.prepare(
+      `SELECT 1 AS present FROM daily_readings
+       WHERE id = ? AND user_id = ? AND status = 'invalidated'`,
+    )
+      .bind(invalidatedReadingId, identity.userId)
+      .first<{ present: number }>();
+    if (!stillInvalidated) return { ok: false, reason: "stale_predecessor" };
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: err instanceof Error ? err.message : "fact repair reservation failed",
+    };
+  }
+
+  return { ok: true, readingId: command.reading_id, jobId };
+}
+
 export type ReplaceOutcome =
   | { ok: true; jobId: string }
   | {
@@ -467,6 +593,10 @@ export async function replaceCommand(
   const now = new Date().toISOString();
   const jobId = newId("job");
   const columns = reservationColumns(command);
+  const predecessorStatus =
+    isCommandV2(command) && command.reservation_reason === "fact_repair"
+      ? "invalidated"
+      : "published";
 
   try {
     await env.DB.batch([
@@ -489,19 +619,20 @@ export async function replaceCommand(
         command.command_generation - 1,
         expectedFailedJobId,
       ),
-      // A reissue's predecessor must still be the live row, or the replacement
-      // would revive a successor to a reading that is no longer published.
+      // An ordinary reissue's predecessor must still be live. A fact repair's
+      // predecessor must stay invalidated through every command replacement.
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
-         SELECT 1, 'reissue predecessor is no longer published'
+         SELECT 1, 'reissue predecessor is no longer in its required state'
          WHERE ? IS NOT NULL AND NOT EXISTS (
            SELECT 1 FROM daily_readings
-           WHERE id = ? AND user_id = ? AND status = 'published'
+           WHERE id = ? AND user_id = ? AND status = ?
          )`,
       ).bind(
         command.supersedes_reading_id,
         command.supersedes_reading_id,
         identity.userId,
+        predecessorStatus,
       ),
       await encryptedJobInsert(
         env,
@@ -563,7 +694,7 @@ export async function replaceCommand(
            ? IS NULL OR EXISTS (
              SELECT 1 FROM daily_readings predecessor
              WHERE predecessor.id = ? AND predecessor.user_id = ?
-               AND predecessor.status = 'published'
+               AND predecessor.status = ?
            )
          )`,
     )
@@ -575,6 +706,7 @@ export async function replaceCommand(
         command.supersedes_reading_id,
         command.supersedes_reading_id,
         identity.userId,
+        predecessorStatus,
       )
       .first<{ present: number }>();
     return {

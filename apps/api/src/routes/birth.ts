@@ -14,6 +14,7 @@ import type { AppVariables } from "../middleware/auth.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { invokeCalc } from "../services/calc-client.js";
 import { resolveTimezone } from "../services/timezone.js";
+import { reconcileCurrentFactRepair } from "../services/reading-invalidation.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -454,6 +455,19 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       `UPDATE jobs SET status = 'succeeded', result_class = ?, finished_at = ? WHERE id = ?`,
     ).bind(chart.id, now, jobId),
   ]);
+
+  // Chart activation commits first. If the process dies here, Today's read
+  // guard already hides prose pinned to the superseded chart; the same
+  // owner-scoped reconciliation is safe to repeat on the next pass.
+  const repair = await reconcileCurrentFactRepair(
+    c.env,
+    identity,
+    "chart_correction",
+    new Date(now),
+  );
+  if (!repair.ok) {
+    safeLog({ event: "fact_repair_reconciliation_failed" });
+  }
 
   return c.json(
     {

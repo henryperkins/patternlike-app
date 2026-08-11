@@ -800,6 +800,11 @@ describe("v5 stored readings", () => {
     const readingId = "rdg_v5_fixture_0001";
     const paragraphId = "par_v5_fixture_0001";
     const sourceId = "rsr_v5_fixture_0001";
+    const [activeChart] = await rows<{ fingerprint: string }>(
+      "SELECT fingerprint FROM chart_snapshots WHERE user_id = ? AND status = 'active'",
+      USER_A,
+    );
+    if (!activeChart) throw new Error("active chart fixture missing");
 
     const reading = {
       schema_version: "0.5.0" as const,
@@ -908,12 +913,13 @@ describe("v5 stored readings", () => {
           contract_id, assembly_mode, status, revision, revision_reason,
           command_generation, invalidated_at, reading_enc, reading_key_version,
           reading_nonce, created_at, updated_at)
-       VALUES (?, ?, ?, NULL, ?, 'sha256:f', 'calc-contract-launch',
+       VALUES (?, ?, ?, NULL, ?, ?, 'calc-contract-launch',
                'constrained_model', ?, 1, 'initial', 1, ?, ?, ?, ?, ?, ?)`,
       readingId,
       USER_A,
       localDate,
       `reading-v5:${USER_A}:${localDate}:r1`,
+      activeChart.fingerprint,
       status,
       status === "invalidated" ? "2026-08-10T09:00:00Z" : null,
       fromB64(sealedReading.ciphertext),
@@ -996,6 +1002,21 @@ describe("v5 stored readings", () => {
     expect(row!.status).toBe("invalidated");
     expect(row!.invalidated_at).toBe("2026-08-10T09:00:00Z");
     expect(row!.sealed).toBe(1);
+  });
+
+  it("hides published prose when its chart pin no longer matches the active chart", async () => {
+    const { readingId } = await seedV5Reading();
+    await rows(
+      `UPDATE daily_readings
+       SET chart_fingerprint = (SELECT fingerprint FROM chart_snapshots WHERE user_id = ?) || '-stale'
+       WHERE id = ?`,
+      USER_A,
+      readingId,
+    );
+
+    const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
+    expect(status).toBe(404);
+    expect(body.error.code).toBe("reading_not_generated");
   });
 
   it("still answers the evidence drawer for an invalidated reading", async () => {

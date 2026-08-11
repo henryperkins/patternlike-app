@@ -35,6 +35,7 @@ import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV2 } from "./generation-command-v2.js";
 import { OPENAI_READING_MODEL } from "./reading-publisher.js";
+import { invalidatePublishedReading } from "./reading-invalidation.js";
 import type { StoredReadingV5 } from "./stored-reading.js";
 
 const QUEUE = "patternlike-daily-readings-dev";
@@ -758,6 +759,14 @@ describe("V5 execution", () => {
     const { enqueued: predecessor, claim: predecessorClaim } = await claimReserved();
     expect(await dispatchGeneration(enabledEnv(), predecessorClaim)).toMatchObject({ ok: true });
     const predecessorCommand = predecessorClaim.command as GenerateDailyReadingCommandV2;
+    expect(
+      await invalidatePublishedReading(enabledEnv(), {
+        identity: IDENTITY_A,
+        readingId: predecessor.readingId,
+        reason: "calculation_defect",
+        now: new Date(),
+      }),
+    ).toMatchObject({ ok: true, status: "invalidated" });
     const successor = await enqueueConstrainedReading(enabledEnv(), USER_A, {
       entry: "internal",
       reservationReason: "fact_repair",
@@ -767,11 +776,6 @@ describe("V5 execution", () => {
       supersedesReadingId: predecessor.readingId,
     });
     if (!successor.ok) throw new Error(`successor enqueue failed: ${successor.reason}`);
-    await rows(
-      "UPDATE daily_readings SET status = 'invalidated', invalidated_at = ? WHERE id = ?",
-      new Date().toISOString(),
-      predecessor.readingId,
-    );
     const successorClaim = await claimJob(enabledEnv(), successor.jobId);
     if (!successorClaim) throw new Error("successor claim missing");
 
