@@ -165,7 +165,7 @@ AUTH_STUB = "0"
 # and the OPENAI_API_KEY secret. checkSecureConfig refuses every request until
 # all of them are set, which is the intended failure: half-configured generation
 # would reach a provider with values no frozen command described.
-READING_V5_ROLLOUT = "off"
+READING_V5_ROLLOUT = "first_open"
 
 # The pinned publisher tuple. Every value is compared for EQUALITY against the
 # compiled constant in services/reading-publisher.ts, not merely for presence:
@@ -186,15 +186,22 @@ READING_PREGEN_LEAD_MINUTES = "30"
 READING_PREGEN_SPREAD_MINUTES = "45"
 READING_SCHEDULER_BATCH_LIMIT = "100"
 
-# READING_DAILY_PROVIDER_CALL_LIMIT is deliberately ABSENT while the rollout is
-# `off`. It has no default because production configuration is invalid until an
-# operator approves and costs a ceiling: the runbook requires the approved
-# number recorded beside the current per-token price and the worst-case daily
-# spend arithmetic. Measured basis from the first real generation: 9,953 input
-# and 2,413 output tokens for one reading, against a 4,000-token response
-# ceiling that counts reasoning and visible output together. Setting the
-# rollout to anything but `off` without this value turns EVERY request into
-# 503 configuration_error, which is the guard working as designed.
+# The operator-approved daily provider call ceiling, per UTC date, counted in
+# reading_provider_daily_usage and NOT keyed by user. Approved at 10,000 by
+# Henry Perkins on 2026-08-11.
+#
+# Measured basis, from the first real end-to-end generation rather than an
+# estimate: 9,953 input and 2,413 output tokens for one reading. The response
+# ceiling of 4,000 bounds the output term and counts reasoning together with
+# visible output, so worst-case daily spend is
+#   10,000 x (input_price x 9,953 + output_price x 4,000)
+# at the current published gpt-5.6-sol rates. Re-cost this line on any model or
+# price change; the number is an approval, not a default.
+#
+# Exhaustion is fail-closed and terminal for the UTC day: the product answers
+# 503 publisher_budget_exhausted with retryable false rather than degrading to
+# something ungrounded.
+READING_DAILY_PROVIDER_CALL_LIMIT = "10000"
 
 # The PWA ships inside this Worker, so the app and the API share one origin.
 #
