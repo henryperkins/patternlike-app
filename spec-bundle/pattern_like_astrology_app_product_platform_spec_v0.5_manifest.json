@@ -1,23 +1,29 @@
 {
   "//": [
-    "Hashes are over LF-normalized bytes, so a checkout on any platform verifies.",
-    "The derived DOCX and PDF are not yet generated; see derived_pending. The manifest",
-    "records what exists rather than reserving a hash for a file nobody has rendered."
+    "Text hashes are over LF-normalized bytes so a checkout on any platform verifies;",
+    "the DOCX and PDF are hashed as written. Both derived files are produced from the",
+    "Markdown by spec-bundle/render_v0_5.py - regenerate rather than edit them."
   ],
   "version": "0.5",
   "date": "2026-08-11",
   "supersedes": "0.2",
   "supersedes_scope": "sections 3, 7 daily reading generation, 10, 11, 12, 14, 15, 16",
+  "source": "pattern_like_astrology_app_product_platform_spec_v0.5.md",
+  "renderer": "spec-bundle/render_v0_5.py",
   "files": {
     "pattern_like_astrology_app_product_platform_spec_v0.5.md": {
-      "sha256": "0611589becc7d724b15923f53bdf7a25d106bbce171c75350b5830938e7a1abe",
-      "bytes": 17996
+      "sha256": "3fbf55c2853161efda6331e0d6244e51be9cde2a5342764c1ebdc4df5139c13e",
+      "bytes": 18010
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.5.docx": {
+      "sha256": "2f63cc84d48a606bbc950ae7643b384da229e45e408be3c502f98696d1f20ca4",
+      "bytes": 42951
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.5.pdf": {
+      "sha256": "bcea60a59f443f445adc89204a83d88390cf12569a33015c4a707a6aec6f1f69",
+      "bytes": 19257
     }
   },
-  "derived_pending": [
-    "pattern_like_astrology_app_product_platform_spec_v0.5.docx",
-    "pattern_like_astrology_app_product_platform_spec_v0.5.pdf"
-  ],
   "carried_forward_unchanged": {
     "pattern_like_astrology_app_product_platform_spec_v0.2.md": "sections this version does not restate remain in force as published",
     "pattern_like_astrology_app_data_source_registry_v0.2.yaml": "unchanged; the source registry is not amended by this version",

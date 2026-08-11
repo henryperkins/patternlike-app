@@ -1,13 +1,13 @@
 # Pattern-Like Astrology App
 ## Product, UX, Data, and Platform Design Specification
 
-**Version:** 0.5
-**Date:** August 11, 2026
-**Status:** Current product and engineering specification
-**Supersedes:** v0.2, for the sections amended below
-**Calculation authority:** Swiss Ephemeris
-**Prose authority:** a configured OpenAI model, under explicit consent, within supplied facts
-**Architecture profile:** Cloudflare-first, Fly.io calculation service, WordPress.com editorial control plane retained as legacy infrastructure
+- **Version:** 0.5
+- **Date:** August 11, 2026
+- **Status:** Current product and engineering specification
+- **Supersedes:** v0.2, for the sections amended below
+- **Calculation authority:** Swiss Ephemeris
+- **Prose authority:** a configured OpenAI model, under explicit consent, within supplied facts
+- **Architecture profile:** Cloudflare-first, Fly.io calculation service, WordPress.com editorial control plane retained as legacy infrastructure
 
 > The app presents private psychological timing as a sequence of inspectable natal patterns, active cycles, and a calculated daily sky. Celestial calculations establish eligibility and supply every fact. A configured model writes the language of a daily reading and may not calculate, invent, or interpolate a fact. User context may rank, frame, or schedule a valid interpretation, but it may not alter chart facts or be presented as something astrology independently discovered.
 
