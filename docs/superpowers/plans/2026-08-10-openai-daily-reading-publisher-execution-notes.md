@@ -268,6 +268,26 @@ continuation prohibits spawning agents, and a later user instruction outranks a
 plan step, so the review was done directly against the named invariant list.
 Tasks 9-13 each carried their own independent review earlier in the execution.
 
+**Post-review remediation — the two findings that were not just bugs.**
+
+*The kill switch did not cover the state its own retry produces.* Pausing matched
+`status = 'queued'`; `claimJob` reclaims `queued` OR `running` with an expired
+lease, and the executor never read the rollout at all. The 305-second retry
+against a 300-second lease produces that state deliberately, so an operator
+pulling the switch during a cost or safety incident still had jobs decrypting
+commands, spending budget, and calling OpenAI. A kill switch has to cover every
+state the thing it kills can be in.
+
+*The validator was English and the locale was anything.* Nothing on the path
+constrained the pinned locale to what the deterministic rules can judge, so a
+non-English reading would slip the grounding demand entirely — an ungrounded
+guaranteed-outcome claim publishing with no human and no second-model review —
+while never being able to satisfy a required uncertainty note. The set is now
+declared beside the rules that define it and refused before a command is frozen.
+The alternative was to make the model write English regardless of the echoed
+locale; that was rejected as the dishonest option, and the decision is recorded
+in the v0.5 specification rather than left in the code.
+
 ## Deferred production gates
 
 None of these are performed by implementation work; each is separately
