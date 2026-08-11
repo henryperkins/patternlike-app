@@ -692,12 +692,23 @@ check-ins, ordinary preference changes, and feedback affect the next day's
 context rather than silently rewriting prose already seen.
 
 A birth-profile correction, chart correction, calculation defect, or other
-change that invalidates factual inputs uses a new, explicit path. As soon as the
-invalidation is accepted, `invalidatePublishedReading` compare-and-swaps the
-live row from `published` to `invalidated`, sets `invalidated_at`, and writes the
-reason to the encrypted/audit record. It does not wait for a successor to
-succeed. Product reads select only `published`, so the invalid artifact remains
-in encrypted revision history but immediately stops being live.
+change that invalidates factual inputs in a V5 `constrained_model` reading uses
+a new, explicit path. As soon as the invalidation is accepted,
+`invalidatePublishedReading` compare-and-swaps the live row from `published` to
+`invalidated`, sets `invalidated_at`, and writes the reason and actor class to
+the DEK-encrypted reading envelope. The clear audit row retains the standard
+actor and resource identifiers needed for accountability, but carries no chart
+or prose detail. Invalidation does not wait for a successor to succeed. Product
+reads hide an active-chart-mismatched row only when its `assembly_mode` is
+`constrained_model`, so the invalid artifact remains in encrypted revision
+history but immediately stops being live.
+
+Historical V3 deterministic envelopes are immutable compatibility artifacts:
+they remain readable under their original envelope and are never rewritten,
+factually invalidated, or automatically repaired by this V5 path. An active
+chart change therefore does not hide a published V3 reading. Dual-reader
+compatibility is a preservation boundary, not permission to retrofit V5 repair
+metadata into V3 ciphertext.
 
 `reserveFactRepair` then creates revision `r+1` against that named invalidated
 predecessor. Its assertions, `replaceCommand`, and `completeReading` accept the
@@ -708,6 +719,11 @@ different: for a safety or non-factual defect correction, its predecessor
 stays published until `completeReading` atomically marks it `superseded`. Thus
 M5 changes the incumbent “failed successor leaves the live reading alone” rule
 only for the explicitly fact-invalidating path.
+
+Automatic orphan repair is limited to the reader's current local day. Once the
+confirmed-zone day rolls over, an invalidated prior-day artifact remains hidden
+history and no successor prose is reserved for it; factual repair never becomes
+historical backfill.
 
 Consent revocation does not retroactively rewrite a valid published reading. It
 prevents all later provider calls and is reflected in future source selection.

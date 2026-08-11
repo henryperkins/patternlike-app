@@ -505,10 +505,12 @@ async function decryptColumn<T>(
  *
  * `status = 'published'` is in the predicate rather than a filter applied after
  * the fact, because that is the exact predicate of `uq_daily_readings_live`.
- * The active-chart EXISTS is a second fail-closed predicate: chart activation
- * commits before encrypted invalidation, so a process death between them must
- * still return no prose. At most one row can match, enforced by the schema, so
- * there is no `ORDER BY ... LIMIT 1` here that a later reader has to trust.
+ * The active-chart EXISTS is a second fail-closed predicate for constrained-
+ * model readings: chart activation commits before encrypted invalidation, so a
+ * process death between them must still return no V5 prose. Frozen V3 readings
+ * remain readable and immutable under the compatibility policy. At most one
+ * row can match, enforced by the schema, so there is no `ORDER BY ... LIMIT 1`
+ * here that a later reader has to trust.
  */
 export async function loadPublishedReadingForDate(
   env: Env,
@@ -519,11 +521,14 @@ export async function loadPublishedReadingForDate(
     `SELECT ${READING_COLUMNS}
      FROM daily_readings r
      WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'published'
-       AND EXISTS (
-         SELECT 1 FROM chart_snapshots c
-         WHERE c.user_id = r.user_id AND c.status = 'active'
-           AND c.fingerprint = r.chart_fingerprint
-           AND c.contract_id = r.contract_id
+       AND (
+         r.assembly_mode != 'constrained_model'
+         OR EXISTS (
+           SELECT 1 FROM chart_snapshots c
+           WHERE c.user_id = r.user_id AND c.status = 'active'
+             AND c.fingerprint = r.chart_fingerprint
+             AND c.contract_id = r.contract_id
+         )
        )`,
   )
     .bind(identity.userId, localDate)

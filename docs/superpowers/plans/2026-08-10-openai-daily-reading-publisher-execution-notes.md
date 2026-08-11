@@ -177,6 +177,18 @@ signal rather than record one.
 Not a placeholder: it is the design's own rule for a frozen command version a
 deployment does not implement. Task 10 extends the same seam.
 
+**Task 11 — factual invalidation is a V5-only compatibility boundary.** Human
+approval resolved the review ambiguity: V3 deterministic envelopes remain
+immutable and readable, including after an active-chart change. Stale-chart
+hiding, encrypted invalidation metadata, and automatic fact repair apply only
+to V5 `constrained_model` rows. The clear audit retains the repository's
+standard `actor_id` and `resource_id` fields for accountability; minimization
+means no chart or prose detail in that row, not removal of its identifiers.
+Orphan repair remains restricted to the reader's current confirmed-zone local
+day. After midnight, an invalidated prior-day row remains hidden history and is
+not regenerated, because the approved design forbids historical prose
+backfill. These are governing decisions, not deferred implementation gaps.
+
 ## Deferred production gates
 
 None of these are performed by implementation work; each is separately

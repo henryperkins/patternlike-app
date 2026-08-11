@@ -33,6 +33,10 @@ import {
   type GenerationMessage,
 } from "../services/enqueue.js";
 import type { StoredReading } from "../services/generate-daily-reading.js";
+import {
+  invalidatePublishedReading,
+  reconcileCurrentFactRepair,
+} from "../services/reading-invalidation.js";
 
 const QUEUE = "patternlike-daily-readings-dev";
 const ZONE = "America/Chicago";
@@ -366,6 +370,66 @@ describe("GET /v1/readings/today", () => {
       expect(paragraph.order).toBe(index + 1);
       expect(paragraph.text.length).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps an immutable V3 reading readable after the active chart changes", async () => {
+    const readingId = await publish(USER_A);
+    const [before] = await rows<{
+      reading_enc: ArrayBuffer;
+      reading_key_version: number;
+      reading_nonce: string;
+    }>(
+      `SELECT reading_enc, reading_key_version, reading_nonce
+       FROM daily_readings WHERE id = ? AND user_id = ?`,
+      readingId,
+      USER_A,
+    );
+
+    await rows(
+      `UPDATE chart_snapshots SET fingerprint = ?
+       WHERE user_id = ? AND status = 'active'`,
+      `sha256:${"9c".repeat(32)}`,
+      USER_A,
+    );
+    expect(
+      await invalidatePublishedReading(env, {
+        identity: IDENTITY_A,
+        readingId,
+        reason: "chart_correction",
+        now: new Date("2026-08-10T15:00:00.000Z"),
+      }),
+    ).toMatchObject({ ok: false, reason: "not_supported" });
+    expect(
+      await reconcileCurrentFactRepair(env, IDENTITY_A, "chart_correction", new Date()),
+    ).toEqual({ ok: true, status: "current" });
+    expect(
+      await rows(
+        "SELECT id FROM daily_readings WHERE supersedes_reading_id = ?",
+        readingId,
+      ),
+    ).toEqual([]);
+
+    const { status, body } = await get<TodayBody>("/v1/readings/today");
+    expect(status).toBe(200);
+    expect(body.reading).toMatchObject({
+      output_schema: "daily-reading-v3",
+      assembly_mode: "deterministic",
+      reading_id: readingId,
+    });
+
+    const [after] = await rows<{
+      reading_enc: ArrayBuffer;
+      reading_key_version: number;
+      reading_nonce: string;
+    }>(
+      `SELECT reading_enc, reading_key_version, reading_nonce
+       FROM daily_readings WHERE id = ? AND user_id = ?`,
+      readingId,
+      USER_A,
+    );
+    expect(new Uint8Array(after!.reading_enc)).toEqual(new Uint8Array(before!.reading_enc));
+    expect(after!.reading_key_version).toBe(before!.reading_key_version);
+    expect(after!.reading_nonce).toBe(before!.reading_nonce);
   });
 
   it("conforms to the frozen daily-reading response schema", async () => {

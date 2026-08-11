@@ -6,6 +6,7 @@ import {
   IDENTITY_A,
   IDENTITY_B,
   USER_A,
+  USER_B,
   confirmPreferences,
   resetDb,
   rows,
@@ -23,6 +24,7 @@ import {
   resolveV5TargetDate,
 } from "./enqueue.js";
 import { OPENAI_READING_MODEL } from "./reading-publisher.js";
+import type { GenerateDailyReadingCommandV2 } from "./generation-command-v2.js";
 import { app } from "../index.js";
 import {
   invalidatePublishedReading,
@@ -33,6 +35,7 @@ import type { StoredReadingV5 } from "./stored-reading.js";
 
 const ZONE = "America/Chicago";
 const NOW = new Date("2026-08-10T15:00:00.000Z");
+const NEXT_DAY = new Date("2026-08-11T15:00:00.000Z");
 const OLD_FINGERPRINT = `sha256:${"1a".repeat(32)}`;
 const CORRECTED_FINGERPRINT = `sha256:${"2b".repeat(32)}`;
 const HEX64 = "b".repeat(64);
@@ -57,19 +60,54 @@ function enabledEnv(): typeof env {
   };
 }
 
-async function grantAiSynthesis(): Promise<void> {
+async function grantAiSynthesis(
+  userId: string = USER_A,
+  consentId: string = "cns_fact_repair_0001",
+): Promise<void> {
   const at = "2026-08-09T00:00:00.000Z";
   await rows(
     `INSERT INTO consents
        (id, user_id, kind, status, policy_version, allowed_uses_json,
         scopes_json, version, granted_at, created_at, updated_at)
      VALUES (?, ?, 'ai_synthesis', 'granted', ?, '[]', '[]', 1, ?, ?, ?)`,
-    "cns_fact_repair_0001",
-    USER_A,
+    consentId,
+    userId,
     AI_SYNTHESIS_POLICY_VERSION,
     at,
     at,
     at,
+  );
+}
+
+async function decryptJobCommand(
+  jobId: string,
+  identity = IDENTITY_A,
+): Promise<GenerateDailyReadingCommandV2> {
+  const [row] = await rows<{
+    payload_enc: ArrayBuffer;
+    payload_key_version: number;
+    payload_nonce: string;
+  }>(
+    `SELECT payload_enc, payload_key_version, payload_nonce
+     FROM jobs WHERE id = ? AND user_id = ?`,
+    jobId,
+    identity.userId,
+  );
+  let binary = "";
+  for (const byte of new Uint8Array(row!.payload_enc)) binary += String.fromCharCode(byte);
+  return decryptPayload<GenerateDailyReadingCommandV2>(
+    env,
+    identity,
+    {
+      key_version: row!.payload_key_version,
+      nonce: row!.payload_nonce,
+      ciphertext: btoa(binary),
+    },
+    {
+      subject: identity.cryptoSubject,
+      field: "jobs.payload_enc",
+      recordId: jobId,
+    },
   );
 }
 
@@ -351,6 +389,97 @@ describe("fact invalidation lifecycle", () => {
         chart_fingerprint: CORRECTED_FINGERPRINT,
       },
     ]);
+    expect(await decryptJobCommand(first.jobId)).toMatchObject({
+      command_version: "v2",
+      reading_id: first.readingId,
+      revision: 2,
+      revision_reason: "chart_recalculated",
+      supersedes_reading_id: readingId,
+      reservation_reason: "fact_repair",
+    });
+  });
+
+  it("rejects an ordinary reissue that names the invalidated predecessor", async () => {
+    const { readingId, localDate } = await seedPublishedReading();
+    const ordinary = await enqueueConstrainedReading(enabledEnv(), USER_A, {
+      entry: "internal",
+      reservationReason: "manual_reissue",
+      targetLocalDate: localDate,
+      revision: 2,
+      revisionReason: "defect_repair",
+      supersedesReadingId: readingId,
+      now: NOW,
+    });
+    if (!ordinary.ok) throw new Error(`ordinary reissue failed: ${ordinary.reason}`);
+    expect((await decryptJobCommand(ordinary.jobId)).reservation_reason).toBe("manual_reissue");
+    await invalidatePublishedReading(env, {
+      identity: IDENTITY_A,
+      readingId,
+      reason: "calculation_defect",
+      now: NOW,
+    });
+
+    expect(await reserveFactRepair(enabledEnv(), readingId, NOW)).toMatchObject({
+      ok: false,
+      reason: "conflict",
+    });
+  });
+
+  it("refuses to recover a fact-repair successor unless its revision is exactly r+1", async () => {
+    const { readingId } = await seedPublishedReading();
+    await invalidatePublishedReading(env, {
+      identity: IDENTITY_A,
+      readingId,
+      reason: "calculation_defect",
+      now: NOW,
+    });
+    const repair = await reserveFactRepair(enabledEnv(), readingId, NOW);
+    if (!repair.ok) throw new Error(`fact repair failed: ${repair.reason}`);
+    await rows(
+      `UPDATE daily_readings SET revision = 3, reading_key = ? WHERE id = ?`,
+      `reading-v5:${USER_A}:${resolveV5TargetDate(ZONE, NOW)}:r3`,
+      repair.readingId,
+    );
+
+    expect(await reserveFactRepair(enabledEnv(), readingId, NOW)).toMatchObject({
+      ok: false,
+      reason: "conflict",
+    });
+  });
+
+  it("never recovers another owner's successor as this owner's fact repair", async () => {
+    const { readingId, localDate } = await seedPublishedReading();
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B, ZONE);
+    await seedChart(IDENTITY_B, { fingerprint: OLD_FINGERPRINT });
+    await grantAiSynthesis(USER_B, "cns_fact_repair_owner_b_0001");
+    const otherOwner = await enqueueConstrainedReading(enabledEnv(), USER_B, {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate: localDate,
+      now: NOW,
+    });
+    if (!otherOwner.ok) throw new Error(`other-owner reservation failed: ${otherOwner.reason}`);
+    await rows(
+      `UPDATE daily_readings
+       SET revision = 2, revision_reason = 'defect_repair',
+           supersedes_reading_id = ?, reading_key = ?
+       WHERE id = ? AND user_id = ?`,
+      readingId,
+      `reading-v5:${USER_B}:${localDate}:r2`,
+      otherOwner.readingId,
+      USER_B,
+    );
+    await invalidatePublishedReading(env, {
+      identity: IDENTITY_A,
+      readingId,
+      reason: "calculation_defect",
+      now: NOW,
+    });
+
+    const outcome = await reserveFactRepair(enabledEnv(), readingId, NOW);
+    expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
+    if (outcome.ok) expect(outcome.readingId).not.toBe(otherOwner.readingId);
   });
 
   it("rejects a fact-repair predecessor until it is invalidated", async () => {
@@ -360,6 +489,43 @@ describe("fact invalidation lifecycle", () => {
       reason: "stale_predecessor",
     });
     expect(await rows("SELECT id FROM jobs WHERE job_type = 'generate_daily_reading'")).toEqual([]);
+  });
+
+  it("never reserves prior-day repair prose after the owner's local day rolls over", async () => {
+    const { readingId } = await seedPublishedReading();
+    await invalidatePublishedReading(env, {
+      identity: IDENTITY_A,
+      readingId,
+      reason: "calculation_defect",
+      now: NOW,
+    });
+
+    expect(await reserveFactRepair(enabledEnv(), readingId, NEXT_DAY)).toMatchObject({
+      ok: false,
+      reason: "stale_predecessor",
+    });
+    expect(await rows("SELECT id FROM jobs WHERE job_type = 'generate_daily_reading'")).toEqual([]);
+  });
+
+  it("does not redispatch an existing prior-day repair after local midnight", async () => {
+    const { readingId } = await seedPublishedReading();
+    await invalidatePublishedReading(env, {
+      identity: IDENTITY_A,
+      readingId,
+      reason: "calculation_defect",
+      now: NOW,
+    });
+    const repair = await reserveFactRepair(enabledEnv(), readingId, NOW);
+    if (!repair.ok) throw new Error(`fact repair failed: ${repair.reason}`);
+    await rows("UPDATE jobs SET dispatched_at = NULL WHERE id = ?", repair.jobId);
+
+    expect(await reserveFactRepair(enabledEnv(), readingId, NEXT_DAY)).toMatchObject({
+      ok: false,
+      reason: "stale_predecessor",
+    });
+    expect(
+      await rows("SELECT dispatched_at FROM jobs WHERE id = ?", repair.jobId),
+    ).toEqual([{ dispatched_at: null }]);
   });
 
   it("leaves the predecessor invalidated when its fact-repair successor fails", async () => {

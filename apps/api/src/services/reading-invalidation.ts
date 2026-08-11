@@ -11,7 +11,12 @@ import {
   type UserIdentity,
 } from "../db/users.js";
 import { dispatch, resolveV5TargetDate, type EnqueueOutcome } from "./enqueue.js";
-import { buildGenerationCommandV2 } from "./generation-command-v2.js";
+import {
+  buildGenerationCommandV2,
+  isCommandV2,
+  type GenerateDailyReadingCommand,
+  type RevisionReasonV2,
+} from "./generation-command-v2.js";
 import { isStoredReadingV5, type StoredReadingV5 } from "./stored-reading.js";
 
 export type FactInvalidationReason = "chart_correction" | "calculation_defect";
@@ -31,6 +36,7 @@ export type InvalidationOutcome =
 interface InvalidationRow {
   id: string;
   status: string;
+  assembly_mode: string;
   reading_enc: ArrayBuffer;
   reading_key_version: number;
   reading_nonce: string;
@@ -59,7 +65,7 @@ export async function invalidatePublishedReading(
 ): Promise<InvalidationOutcome> {
   const { identity, readingId, reason, now } = input;
   const row = await env.DB.prepare(
-    `SELECT id, status, reading_enc, reading_key_version, reading_nonce
+    `SELECT id, status, assembly_mode, reading_enc, reading_key_version, reading_nonce
      FROM daily_readings
      WHERE id = ? AND user_id = ?`,
   )
@@ -76,6 +82,13 @@ export async function invalidatePublishedReading(
       ok: false,
       reason: "not_published",
       detail: "reading is not currently published",
+    };
+  }
+  if (row.assembly_mode !== "constrained_model") {
+    return {
+      ok: false,
+      reason: "not_supported",
+      detail: "only constrained-model readings support factual invalidation",
     };
   }
 
@@ -196,31 +209,135 @@ interface RepairPredecessor {
   local_date: string;
   revision: number;
   status: string;
+  assembly_mode: string;
   reading_enc: ArrayBuffer;
   reading_key_version: number;
   reading_nonce: string;
 }
 
+interface RepairSuccessor {
+  id: string;
+  user_id: string;
+  local_date: string;
+  reading_key: string;
+  chart_fingerprint: string;
+  contract_id: string;
+  assembly_mode: string;
+  revision: number;
+  revision_reason: string;
+  supersedes_reading_id: string | null;
+  command_generation: number;
+  job_id: string;
+  job_user_id: string;
+  dispatched_at: string | null;
+  payload_enc: ArrayBuffer | null;
+  payload_key_version: number | null;
+  payload_nonce: string | null;
+}
+
+function invalidationRevisionReason(stored: StoredReadingV5): RevisionReasonV2 {
+  return stored.invalidation?.reason === "chart_correction"
+    ? "chart_recalculated"
+    : "defect_repair";
+}
+
 async function existingRepair(
   env: Env,
-  predecessorId: string,
+  identity: UserIdentity,
+  predecessor: RepairPredecessor,
+  revisionReason: RevisionReasonV2,
 ): Promise<EnqueueOutcome | null> {
   const row = await env.DB.prepare(
-    `SELECT r.id, r.active_generation_job_id AS job_id, j.dispatched_at
+    `SELECT r.id, r.user_id, r.local_date, r.reading_key, r.chart_fingerprint,
+            r.contract_id, r.assembly_mode, r.revision, r.revision_reason,
+            r.supersedes_reading_id, r.command_generation,
+            r.active_generation_job_id AS job_id, j.user_id AS job_user_id,
+            j.dispatched_at, j.payload_enc, j.payload_key_version, j.payload_nonce
      FROM daily_readings r
-     LEFT JOIN jobs j ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
-     WHERE r.supersedes_reading_id = ?`,
+     JOIN jobs j ON j.id = r.active_generation_job_id
+       AND j.user_id = r.user_id
+       AND j.job_type = 'generate_daily_reading'
+     WHERE r.supersedes_reading_id = ? AND r.user_id = ?`,
   )
-    .bind(predecessorId)
-    .first<{ id: string; job_id: string | null; dispatched_at: string | null }>();
+    .bind(predecessor.id, identity.userId)
+    .first<RepairSuccessor>();
   if (!row) return null;
-  if (!row.job_id) {
+
+  if (
+    row.user_id !== predecessor.user_id ||
+    row.job_user_id !== predecessor.user_id ||
+    row.local_date !== predecessor.local_date ||
+    row.revision !== predecessor.revision + 1 ||
+    row.revision_reason !== revisionReason ||
+    row.supersedes_reading_id !== predecessor.id ||
+    row.assembly_mode !== "constrained_model" ||
+    row.payload_enc === null ||
+    row.payload_key_version === null ||
+    row.payload_nonce === null
+  ) {
     return {
       ok: false,
       reason: "conflict",
-      detail: "fact repair successor has no active generation job",
+      detail: "existing successor is not an exact fact repair",
     };
   }
+
+  let command: unknown;
+  try {
+    let binary = "";
+    for (const byte of new Uint8Array(row.payload_enc)) binary += String.fromCharCode(byte);
+    command = await decryptPayload<unknown>(
+      env,
+      identity,
+      {
+        key_version: row.payload_key_version,
+        nonce: row.payload_nonce,
+        ciphertext: btoa(binary),
+      },
+      {
+        subject: identity.cryptoSubject,
+        field: "jobs.payload_enc",
+        recordId: row.job_id,
+      },
+    );
+  } catch {
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: "existing fact repair command could not be opened",
+    };
+  }
+
+  if (typeof command !== "object" || command === null) {
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: "existing successor is not an exact fact repair",
+    };
+  }
+  const candidate = command as GenerateDailyReadingCommand;
+  if (
+    !isCommandV2(candidate) ||
+    candidate.output_schema !== "daily-reading-v5" ||
+    candidate.assembly_mode !== "constrained_model" ||
+    candidate.reservation_reason !== "fact_repair" ||
+    candidate.reading_id !== row.id ||
+    candidate.reading_key !== row.reading_key ||
+    candidate.revision !== row.revision ||
+    candidate.revision_reason !== revisionReason ||
+    candidate.supersedes_reading_id !== predecessor.id ||
+    candidate.target_local_date !== predecessor.local_date ||
+    candidate.command_generation !== row.command_generation ||
+    candidate.chart?.fingerprint !== row.chart_fingerprint ||
+    candidate.chart?.contract_id !== row.contract_id
+  ) {
+    return {
+      ok: false,
+      reason: "conflict",
+      detail: "existing successor is not an exact fact repair",
+    };
+  }
+
   const dispatched =
     row.dispatched_at !== null ||
     (await dispatch(env, { job_id: row.job_id, reading_id: row.id }));
@@ -233,19 +350,20 @@ export async function reserveFactRepair(
   predecessorId: string,
   now: Date,
 ): Promise<EnqueueOutcome> {
-  const existing = await existingRepair(env, predecessorId);
-  if (existing) return existing;
-
   const predecessor = await env.DB.prepare(
     `SELECT r.id, r.user_id, u.crypto_subject, r.local_date, r.revision, r.status,
-            r.reading_enc, r.reading_key_version, r.reading_nonce
+            r.assembly_mode, r.reading_enc, r.reading_key_version, r.reading_nonce
      FROM daily_readings r
      JOIN users u ON u.id = r.user_id AND u.status = 'active'
      WHERE r.id = ?`,
   )
     .bind(predecessorId)
     .first<RepairPredecessor>();
-  if (!predecessor || predecessor.status !== "invalidated") {
+  if (
+    !predecessor ||
+    predecessor.status !== "invalidated" ||
+    predecessor.assembly_mode !== "constrained_model"
+  ) {
     return {
       ok: false,
       reason: "stale_predecessor",
@@ -256,6 +374,24 @@ export async function reserveFactRepair(
     userId: predecessor.user_id,
     cryptoSubject: asCryptoSubject(predecessor.crypto_subject),
   };
+  const preferences = await loadPreferences(env, identity.userId);
+  const currentLocalDate = preferences
+    ? resolveV5TargetDate(preferences.timezone, now)
+    : null;
+  if (!currentLocalDate) {
+    return {
+      ok: false,
+      reason: "timezone_confirmation_required",
+      detail: "no confirmed local date is available for fact repair",
+    };
+  }
+  if (predecessor.local_date !== currentLocalDate) {
+    return {
+      ok: false,
+      reason: "stale_predecessor",
+      detail: "fact repair is limited to the current local day",
+    };
+  }
 
   let stored: unknown;
   try {
@@ -292,10 +428,10 @@ export async function reserveFactRepair(
     };
   }
 
-  const revisionReason =
-    stored.invalidation.reason === "chart_correction"
-      ? "chart_recalculated"
-      : "defect_repair";
+  const revisionReason = invalidationRevisionReason(stored);
+  const existing = await existingRepair(env, identity, predecessor, revisionReason);
+  if (existing) return existing;
+
   const build = await buildGenerationCommandV2(env, identity, {
     readingId: newId("rdg"),
     revision: predecessor.revision + 1,
@@ -319,7 +455,7 @@ export async function reserveFactRepair(
   );
   if (!reserved.ok) {
     if (reserved.reason === "duplicate") {
-      const raced = await existingRepair(env, predecessor.id);
+      const raced = await existingRepair(env, identity, predecessor, revisionReason);
       if (raced) return raced;
       return {
         ok: false,
@@ -380,7 +516,8 @@ export async function reconcileCurrentFactRepair(
                 AND c.contract_id = r.contract_id
             ) AS authoritative
      FROM daily_readings r
-     WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'published'`,
+     WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'published'
+       AND r.assembly_mode = 'constrained_model'`,
   )
     .bind(identity.userId, localDate)
     .first<{ id: string; authoritative: number }>();
@@ -399,6 +536,7 @@ export async function reconcileCurrentFactRepair(
     const orphan = await env.DB.prepare(
       `SELECT id FROM daily_readings
        WHERE status = 'invalidated' AND user_id = ? AND local_date = ?
+         AND assembly_mode = 'constrained_model'
          AND NOT EXISTS (
            SELECT 1 FROM daily_readings successor
            WHERE successor.supersedes_reading_id = daily_readings.id
