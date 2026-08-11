@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PrivacyView } from "./PrivacyView.js";
 import { aiConsentCategoryLabel } from "../lib/reading-format.js";
 import { capturedFor, mockApiResponses, type MockResponse } from "../test/api-mock.js";
@@ -16,7 +16,7 @@ const ok = (body: unknown): MockResponse => ({ status: 200, body });
 
 function renderPrivacy(responses: Record<string, MockResponse>) {
   mockApiResponses(responses);
-  return render(<PrivacyView hasChart />);
+  return render(<PrivacyView hasChart onSignOut={() => undefined} />);
 }
 
 function consentPanel(): HTMLElement {
@@ -181,5 +181,16 @@ describe("Context & privacy", () => {
 
     expect(screen.getByRole("button", { name: /Request export/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /Delete account/i })).toBeEnabled();
+  });
+
+  it("offers sign out with the other account controls", async () => {
+    const user = userEvent.setup();
+    const onSignOut = vi.fn();
+    mockApiResponses({ [`GET ${CONSENT}`]: ok(consentGranted) });
+    render(<PrivacyView hasChart onSignOut={onSignOut} />);
+
+    await user.click(screen.getByRole("button", { name: /Sign out/i }));
+
+    expect(onSignOut).toHaveBeenCalledOnce();
   });
 });

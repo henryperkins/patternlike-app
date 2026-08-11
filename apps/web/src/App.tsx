@@ -195,7 +195,12 @@ export default function App() {
       </section>
     );
   } else if (view === "privacy") {
-    content = <PrivacyView hasChart={chart !== null} />;
+    content = (
+      <PrivacyView
+        hasChart={chart !== null}
+        onSignOut={() => void endSessionAndSignOut()}
+      />
+    );
   } else if (view === "today") {
     content = <TodayView onUnauthorized={handleSignedOut} />;
   } else if (view === "timing") {
@@ -212,7 +217,6 @@ export default function App() {
     <AppShell
       activeView={view}
       chartStatus={shellStatus}
-      onSignOut={() => void endSessionAndSignOut()}
     >
       {content}
     </AppShell>
