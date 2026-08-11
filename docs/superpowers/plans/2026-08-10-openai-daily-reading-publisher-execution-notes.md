@@ -38,7 +38,7 @@ Task 17 Step 2 runs `git diff --check "$env:PATTERNLIKE_M5_IMPLEMENTATION_BASE..
 | 9 | Centralized generation failure policy | done — `43c65dc`, follow-up `5411714` |
 | 10 | V5 execution and atomic publication | done — `10b37ee`, follow-up `c902d8d` |
 | 11 | Fact invalidation and repair | done — `2e40321`, follow-up `225a46a` |
-| 12 | Bounded hybrid scheduler | pending |
+| 12 | Bounded hybrid scheduler | done — `167b642`, follow-up `c526b41` |
 | 13 | AI consent routes and dual-version projections | pending |
 | 14 | Today, provenance, Context & Privacy | pending |
 | 15 | Evaluation lanes | pending |
