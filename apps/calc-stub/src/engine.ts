@@ -155,6 +155,54 @@ export function angularSeparation(a: number, b: number): number {
 export const EPHEMERIS_MIN_YEAR = 1800;
 export const EPHEMERIS_MAX_YEAR = 2399;
 
+/**
+ * The Julian days at which every launch body resolves from the pinned files
+ * *regardless of what this process calculated before*.
+ *
+ * Two measured facts make this narrower than the 1800–2399 label:
+ *
+ * 1. The data does not begin at the calendar boundary. At 1800-01-01T00:00Z
+ *    only the Moon and the true node answer from `semo_18.se1`; the Sun and the
+ *    inner planets appear within the first hour, Saturn by 02:00Z, Uranus by
+ *    03:00Z, Neptune by 05:00Z, and Pluto — the last — at 05:45Z. Before each
+ *    of those, that body is Moshier.
+ * 2. Coverage at the two edges is *order-dependent*. Swiss Ephemeris remembers
+ *    that a neighbouring file (`sepl_12.se1`, `sepl_24.se1`) was missing, so an
+ *    instant in an edge segment that resolves in a fresh process falls back to
+ *    Moshier once the same process has served any out-of-range request.
+ *    2399-12-31T23:59Z answers from `sepl_18.se1` on a cold container and from
+ *    Moshier on a warm one. The interior is unaffected — the golden fixture is
+ *    bit-identical either way — but "which ephemeris answered" is not a
+ *    property of the instant alone near the edges, and this service stamps
+ *    every artifact with `ephemeris_data_version`.
+ *
+ * The measured order-independent window is 1800-01-01T06:00Z … 2399-12-31T23:00Z.
+ * The constants below sit at least six hours inside it, and `validation.test.ts`
+ * re-measures that margin — including after deliberately poisoning the process —
+ * so a change to `ephemeris.lock.json` cannot quietly invalidate it.
+ *
+ * `EPHEMERIS_MIN_YEAR`/`MAX_YEAR` stay the label the product declares and the
+ * range a caller is told about. These bound the instant that actually reaches
+ * `swe_calc_ut`, which the year of a *local* date does not determine: a
+ * 1800-01-01 birth in Asia/Tokyo is 1799-12-31 in UT.
+ */
+export const EPHEMERIS_COVERAGE_MIN_JD = 2378497.0; // 1800-01-01T12:00Z
+export const EPHEMERIS_COVERAGE_MAX_JD = 2597641.0; // 2399-12-31T12:00Z
+
+/**
+ * True when `jdUt` lies inside that window.
+ *
+ * A predicate rather than a throw, because the daily-sky validator raises its
+ * own contract error class for the same fact.
+ */
+export function isWithinEphemerisCoverage(jdUt: number): boolean {
+  return (
+    Number.isFinite(jdUt) &&
+    jdUt >= EPHEMERIS_COVERAGE_MIN_JD &&
+    jdUt <= EPHEMERIS_COVERAGE_MAX_JD
+  );
+}
+
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const LOCAL_TIME_RE = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
@@ -434,10 +482,18 @@ export function calcBody(jdUt: number, seId: number): {
   retrograde: boolean;
 } {
   const r = sweph.calc_ut(jdUt, seId, FLAGS);
-  if (r.flag < 0 || r.error) {
-    throw new Error(
-      `swe_calc_ut failed for body ${seId}: ${r.error || "flag " + r.flag}`,
-    );
+  // The returned flag — not the return code — is what says which ephemeris
+  // answered. Swiss Ephemeris reports a missing data file by *succeeding*
+  // against Moshier with SEFLG_SWIEPH cleared (flag 260, never negative), so
+  // `flag < 0` alone never fires for the case that matters here. Requiring the
+  // exact requested flags back also catches a dropped SEFLG_SPEED, which does
+  // not fail — it returns every speed as 0, which would silently turn every
+  // applying/separating and retrograde claim into a coin flip.
+  if (r.flag !== FLAGS || r.error) {
+    // `r.error` is deliberately not echoed: it embeds the absolute ephemeris
+    // directory, and this message reaches the response body as `calc_error`.
+    // The flag is the diagnosable part — 260 is "Moshier substituted".
+    throw new Error(`swe_calc_ut refused body ${seId}: flag ${r.flag}`);
   }
   const [lon, lat, dist, speedLon] = r.data;
   return {
@@ -626,6 +682,20 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
     if (!Number.isFinite(jdUt)) {
       throw new InvalidBirthProfileError(
         `birth date did not resolve to a Julian day: ${req.birth_date}`,
+      );
+    }
+
+    // The year check in resolveUtcInstant reads the LOCAL date; this reads the
+    // instant that actually reaches swe_calc_ut. Without it a 1800-01-01 birth
+    // east of Greenwich resolves to 1799-12-31 UT, Swiss Ephemeris substitutes
+    // Moshier, and calcBody's refusal surfaces as an opaque calc_error — which
+    // the Worker turns into a generic calc_failed — rather than as the range
+    // message this validation exists to produce.
+    if (!isWithinEphemerisCoverage(jdUt)) {
+      throw new InvalidBirthProfileError(
+        `birth instant outside the pinned ephemeris coverage: ${req.birth_date} ` +
+          `${utc.iso} (supported ${EPHEMERIS_MIN_YEAR}-01-01 through ` +
+          `${EPHEMERIS_MAX_YEAR}-12-31, less the first and last hours in UT)`,
       );
     }
 
