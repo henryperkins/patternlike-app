@@ -40,7 +40,7 @@ Task 17 Step 2 runs `git diff --check "$env:PATTERNLIKE_M5_IMPLEMENTATION_BASE..
 | 11 | Fact invalidation and repair | done — `2e40321`, follow-up `225a46a` |
 | 12 | Bounded hybrid scheduler | done — `167b642`, follow-up `c526b41` |
 | 13 | AI consent routes and dual-version projections | done — `a245c93`, follow-up `bdf4974` |
-| 14 | Today, provenance, Context & Privacy | pending |
+| 14 | Today, provenance, Context & Privacy | done — `a5057dd` |
 | 15 | Evaluation lanes | pending |
 | 16 | Product truth and production runbook | pending |
 | 17 | Final candidate gate and review | pending |
@@ -188,6 +188,29 @@ Orphan repair remains restricted to the reader's current confirmed-zone local
 day. After midnight, an invalidated prior-day row remains hidden history and is
 not regenerated, because the approved design forbids historical prose
 backfill. These are governing decisions, not deferred implementation gaps.
+
+**Task 14 — two component files beyond the plan's list, and a stub-API browser
+pass.** `AiConsent.tsx` holds the consent copy both surfaces show, because a
+reader who grants on Today and reviews in Context & privacy must be reading the
+same sentences; `AiConsentGate.tsx` is a blocking gate with its own fetch and
+idempotency key, which is what `PreferenceConfirm.tsx` already is. `api-mock.ts`
+gained `"METHOD /path"` keys because the consent surface is three verbs on one
+path. Implementation preceded the tests for the new-file subjects, for the reason
+Task 8 records — the unions had to settle against the API's projections and three
+frozen schemas at once — while the one change to existing UI followed the plan's
+order, driven by an incumbent test that failed by asserting a retry control the
+design forbids. The responsive captures ran against a Node stub serving the web
+fixtures behind the ordinary Vite proxy, since no live provider lane is
+authorized; the real app, CSS, breakpoints, and HTTP path were exercised.
+
+**Task 14 — two contrast corrections against the incumbent palette.** The v5
+disclosure and the fact-scope marker were built with `--ink-faint` to match
+their neighbours, and the browser pass measured them at 3.26:1 and 2.93:1
+against a 4.5:1 target. Both carry meaning the reader must be able to read — the
+disclosure is the sentence that says a model wrote the prose — so both moved to
+`--ink-soft`. The remaining `--ink-faint` metadata across the incumbent
+interface was left alone: it is a pre-existing design-system question, not
+something a refinement should silently rewrite.
 
 ## Deferred production gates
 
