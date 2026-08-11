@@ -22,16 +22,21 @@ import type { ReadingGenerationRequest } from "@patternlike/shared";
 import outputSchema from "../../../../contracts/m5/reading-generation-output.schema.json";
 import {
   OPENAI_RESPONSES_URL,
+  READING_PROMPT_VERSION,
   type PublisherConfigPin,
 } from "./reading-publisher.js";
-
-/** The deployed prompt contract. Bump for ANY wording change. */
-export const READING_PROMPT_VERSION = "1.0.0";
 
 /** The structured-output name the provider echoes back. */
 export const READING_OUTPUT_SCHEMA_NAME = "patternlike_daily_reading_v5";
 
-export { OPENAI_RESPONSES_URL };
+/*
+ * Re-exported, not defined here, for the same reason OPENAI_RESPONSES_URL is:
+ * `resolvePublisherConfiguration` has to pin the deployed variable against it,
+ * and this module already imports from that one. Owning it here and importing
+ * it there would be a cycle, and a `const` in a cycle is a temporal-dead-zone
+ * hazard rather than a lint complaint. Every caller still imports it from here.
+ */
+export { OPENAI_RESPONSES_URL, READING_PROMPT_VERSION };
 
 /**
  * The immutable system policy.

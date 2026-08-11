@@ -930,17 +930,31 @@ export type RolloutPauseOutcome = "paused" | "already_paused" | "not_v2";
  *
  * The decision uses only clear trusted-plane columns. No user key or encrypted
  * command is loaded, and the guarded update leaves attempts untouched.
+ *
+ * The state set MUST match what `claimJob` is willing to reclaim, which is
+ * `queued` OR `running` with an expired lease. Pausing only `queued` left the
+ * second case answering `not_v2`, so `queue.ts` did not acknowledge, the
+ * delivery fell through to the claim, and the executor — which never reads the
+ * rollout itself — decrypted the command, spent a provider budget unit, and
+ * called OpenAI after the switch was pulled. That state is produced
+ * deliberately: the 305-second retry runs against a 300-second lease so a
+ * crashed execution can be recovered, and the internal sweep re-offers exactly
+ * these rows. A stale claim is cleared on the way back to `queued` so the next
+ * delivery cannot reclaim it and the owner resume can still find it.
  */
 export async function pauseQueuedV2ForRolloutOff(
   env: Env,
   jobId: string,
   now = new Date(),
 ): Promise<RolloutPauseOutcome> {
+  const nowIso = now.toISOString();
   const availableAt = new Date(now.getTime() + LEASE_RETRY_DELAY_SECONDS * 1000).toISOString();
   const paused = await env.DB.prepare(
     `UPDATE jobs
-     SET available_at = ?, dispatched_at = NULL, result_class = 'rollout_paused'
-     WHERE id = ? AND job_type = ? AND status = 'queued'
+     SET available_at = ?, dispatched_at = NULL, result_class = 'rollout_paused',
+         status = 'queued', claim_token = NULL, lease_expires_at = NULL
+     WHERE id = ? AND job_type = ?
+       AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))
        AND result_class IS NOT 'rollout_paused'
        AND EXISTS (
          SELECT 1 FROM daily_readings r
@@ -950,7 +964,7 @@ export async function pauseQueuedV2ForRolloutOff(
        )
      RETURNING id`,
   )
-    .bind(availableAt, jobId, JOB_TYPE)
+    .bind(availableAt, jobId, JOB_TYPE, nowIso)
     .first<{ id: string }>();
   if (paused) return "paused";
 
@@ -965,6 +979,47 @@ export async function pauseQueuedV2ForRolloutOff(
     .bind(jobId, JOB_TYPE)
     .first<{ present: number }>();
   return existing ? "already_paused" : "not_v2";
+}
+
+/**
+ * Bounded scheduler resume for rows the kill switch parked.
+ *
+ * The owner-scoped resume above only runs when that reader opens the app, and
+ * the outbox sweep deliberately skips paused rows, so without this a reservation
+ * made before the switch was pulled would sit paused forever for anyone who does
+ * not come back — holding the one pending row that blocks a new reservation for
+ * that user and day. This is the plan's third named recovery route.
+ *
+ * Safe to call unconditionally from the scheduler because the scheduler itself
+ * only runs under `hybrid`: reaching it means the switch has already left `off`.
+ * Clearing `result_class` returns the row to the ordinary undispatched lane
+ * rather than dispatching it here, so one bounded query does the whole job.
+ */
+export async function resumePausedV2AfterRollout(
+  env: Env,
+  limit: number,
+  now = new Date(),
+): Promise<number> {
+  if (limit <= 0) return 0;
+  const { results } = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, result_class = NULL
+     WHERE id IN (
+       SELECT j.id FROM jobs j
+       JOIN users u ON u.id = j.user_id AND u.status = 'active'
+       JOIN daily_readings r ON r.active_generation_job_id = j.id
+         AND r.user_id = j.user_id AND r.status = 'pending'
+         AND r.assembly_mode = 'constrained_model'
+       WHERE j.job_type = ? AND j.status = 'queued'
+         AND j.result_class = 'rollout_paused'
+       ORDER BY j.created_at, j.id
+       LIMIT ?
+     )
+     RETURNING id`,
+  )
+    .bind(now.toISOString(), JOB_TYPE, limit)
+    .all<{ id: string }>();
+  return results.length;
 }
 
 /**
@@ -1336,6 +1391,14 @@ export interface SweepCandidate {
  * The first recovers a crash between the reservation batch and the queue send;
  * the second recovers a consumer that died holding a claim. Both converge
  * through the claim CAS, so a duplicate send is harmless.
+ *
+ * A row parked by the rollout kill switch is excluded. It satisfies every other
+ * predicate here permanently — the pause clears `dispatched_at` once and its own
+ * `IS NOT 'rollout_paused'` guard stops `available_at` ever advancing again — so
+ * including it would let paused rows occupy this whole `LIMIT` window and starve
+ * the genuinely undispatched jobs the sweep exists for. The scheduler's twin
+ * already excludes them; resuming one is the owner sweep's job, or
+ * `resumePausedV2AfterRollout`'s once the switch leaves `off`.
  */
 export async function findUndispatched(
   env: Env,
@@ -1347,6 +1410,7 @@ export async function findUndispatched(
      FROM jobs j
      LEFT JOIN daily_readings r ON r.active_generation_job_id = j.id
      WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
+       AND j.result_class IS NOT 'rollout_paused'
        AND (j.available_at IS NULL OR j.available_at <= ?)
      ORDER BY j.created_at, j.id
      LIMIT ?`,

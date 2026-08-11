@@ -897,6 +897,43 @@ describe("V5 queue controls", () => {
     ).toEqual([{ status: "queued", attempts: 0, result_class: "rollout_paused" }]);
   });
 
+  it("pauses a running job whose lease expired, which claimJob would otherwise reclaim", async () => {
+    // The state is not exotic: queue.ts retries after 305 seconds against a
+    // 300-second lease precisely so a crashed execution can be recovered, and
+    // POST /internal/readings/sweep re-offers exactly these rows. If the pause
+    // does not cover it, pulling the kill switch still lets the job decrypt the
+    // command, spend a provider budget unit, and call OpenAI.
+    const enqueued = await reserve();
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    await rows(
+      `UPDATE jobs SET status = 'running', claim_token = 'clm_stale',
+         lease_expires_at = ?, started_at = ? WHERE id = ?`,
+      expired,
+      expired,
+      enqueued.jobId,
+    );
+
+    expect(await pauseQueuedV2ForRolloutOff(enabledEnv(), enqueued.jobId)).toBe("paused");
+
+    // Back to queued with the stale claim cleared, so the next delivery cannot
+    // reclaim it and the owner sweep can resume it later.
+    expect(
+      await rows(
+        `SELECT status, result_class, claim_token, lease_expires_at, dispatched_at
+         FROM jobs WHERE id = ?`,
+        enqueued.jobId,
+      ),
+    ).toEqual([
+      {
+        status: "queued",
+        result_class: "rollout_paused",
+        claim_token: null,
+        lease_expires_at: null,
+        dispatched_at: null,
+      },
+    ]);
+  });
+
   it("does not let a producer's late dispatch marker overwrite a committed pause", async () => {
     const enqueued = await reserve();
     await rows("UPDATE jobs SET dispatched_at = NULL WHERE id = ?", enqueued.jobId);

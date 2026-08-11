@@ -48,6 +48,15 @@ export const READING_SCHEDULER_BATCH_LIMIT = 100;
 /** The provider endpoint. Direct, with no gateway between. */
 export const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
+/**
+ * The deployed prompt contract. Bump for ANY wording change.
+ *
+ * Lives here rather than beside the prompt so `resolvePublisherConfiguration`
+ * can pin the deployed variable against it without a circular import;
+ * `reading-prompt.ts` re-exports it, so every caller still reads it from there.
+ */
+export const READING_PROMPT_VERSION = "1.0.0";
+
 // ---------------------------------------------------------------------------
 // Frozen configuration pin
 // ---------------------------------------------------------------------------
@@ -258,6 +267,18 @@ export function resolvePublisherConfiguration(
   if (rollout === "off") return { ok: true, rollout, config: null };
 
   const promptVersion = env.OPENAI_READING_PROMPT_VERSION?.trim();
+  // Pinned like every other member of the tuple. Presence alone was not enough:
+  // the execute path demands equality with the compiled constant, and it only
+  // gets there after the pending reading row is reserved and the job committed —
+  // where the mismatch is `policy_unsupported`, which is terminal and NOT
+  // automatically replaceable. A prompt bump that misses the deployed variable
+  // would 424 every reading for every user until an operator noticed. Refusing
+  // here turns that into 503 configuration_error on the first request instead.
+  if (promptVersion !== undefined && promptVersion !== "" && promptVersion !== READING_PROMPT_VERSION) {
+    return misconfigured(
+      "OPENAI_READING_PROMPT_VERSION must be the exact compiled prompt version",
+    );
+  }
   const apiKey = env.OPENAI_API_KEY?.trim();
   const required: Array<[unknown, string]> = [
     [publisher, "READING_PUBLISHER"],

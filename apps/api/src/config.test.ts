@@ -256,6 +256,10 @@ describe("publisher configuration", () => {
     ["OPENAI_READING_REASONING", "medium"],
     ["OPENAI_READING_REASONING", undefined],
     ["OPENAI_READING_PROMPT_VERSION", undefined],
+    // Present but stale. Every other pinned value has this row; without it a
+    // prompt bump that misses [env.production.vars] passes configuration and
+    // fails every reading terminally, after the reservation is already burned.
+    ["OPENAI_READING_PROMPT_VERSION", "0.9.0"],
     ["OPENAI_READING_TIMEOUT_MS", "60000"],
     ["OPENAI_READING_TIMEOUT_MS", "90000.5"],
     ["OPENAI_READING_MAX_OUTPUT_TOKENS", "4000"],

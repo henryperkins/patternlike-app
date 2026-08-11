@@ -14,6 +14,7 @@ import {
   recomputeUserNextDueAt,
   seedUserNextDueAt,
 } from "../db/reading-scheduler.js";
+import { resumePausedV2AfterRollout } from "../db/generation.js";
 import {
   isAutomaticReplacementFailure,
   isGenerationFailureCode,
@@ -45,6 +46,7 @@ export interface SchedulerSummary {
     ineligibleOrphansBackedOff: number;
     expiredLeaseRedispatched: number;
     undispatchedOutboxRedispatched: number;
+    rolloutPausesResumed: number;
   };
   due: {
     evaluated: number;
@@ -68,6 +70,7 @@ function emptySummary(status: SchedulerSummary["status"], batchLimit = 100): Sch
       ineligibleOrphansBackedOff: 0,
       expiredLeaseRedispatched: 0,
       undispatchedOutboxRedispatched: 0,
+      rolloutPausesResumed: 0,
     },
     due: { evaluated: 0, reserved: 0 },
     nullSeed: { evaluated: 0, seeded: 0 },
@@ -100,6 +103,18 @@ export async function runReadingScheduler(
     seen.add(userId);
     return true;
   };
+
+  // Repair 0: rows the kill switch parked. Reaching this line means the rollout
+  // already left `off`, and nothing else will free them: the owner-scoped resume
+  // needs that reader to open the app, and the outbox lane below deliberately
+  // skips paused rows. Clearing the marker hands them to that lane, this
+  // invocation or the next. It does not consume the distinct-user quota, because
+  // it neither reads a user key nor reserves anything.
+  summary.repair.rolloutPausesResumed = await resumePausedV2AfterRollout(
+    env,
+    limit,
+    scheduledAt,
+  );
 
   // Repair 1: terminal command replacement. The exact centralized predicate,
   // not a scheduler-local string set, decides whether a failure is eligible.
