@@ -1077,7 +1077,10 @@ describe("V5 queue controls", () => {
     });
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
-      error: { code: "publisher_budget_exhausted" },
+      error: {
+        code: "publisher_budget_exhausted",
+        retryable: false,
+      },
     });
   });
 });

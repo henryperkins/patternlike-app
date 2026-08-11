@@ -353,10 +353,15 @@ readingRoutes.put("/v1/readings/today", async (c) => {
       );
     case "publisher_budget_exhausted":
       return c.json(
-        errorBody(
-          "publisher_budget_exhausted",
-          "Daily reading capacity is temporarily exhausted",
-        ),
+        {
+          error: {
+            ...errorBody(
+              "publisher_budget_exhausted",
+              "Daily reading capacity is temporarily exhausted",
+            ).error,
+            retryable: false,
+          },
+        },
         503,
       );
     case "internal_error":
