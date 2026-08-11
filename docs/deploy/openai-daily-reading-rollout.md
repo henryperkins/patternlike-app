@@ -154,13 +154,19 @@ per input and output token for the exact model, and the arithmetic giving the
 worst-case daily spend at that ceiling with the configured request and output
 maxima. A ceiling nobody has costed is not an approved ceiling.
 
-Prove the guard: with the limit unset, `checkSecureConfig` must refuse.
+These variables are set now but are **not yet load-bearing**: while
+`READING_V5_ROLLOUT` is `off`, `resolvePublisherConfiguration` returns before it
+reaches the required-value block, so a probe here would answer 200 whether or not
+the ceiling is set. That is the guard behaving correctly, not a fault — do not
+read it as one. The refusal is proven two ways instead: Gate 0's `npm test`
+covers it directly (`config.test.ts` asserts an enabled rollout with the limit
+unset is refused), and Gate 7 exercises it live at the moment the rollout leaves
+`off`.
 
 Separately configure and deploy the production Queue consumer at
 `max_concurrency = 4`.
 
-**Stop condition:** a preflight failure, an unapproved ceiling, or a
-configuration guard that does not refuse.
+**Stop condition:** a preflight failure, or an unapproved ceiling.
 
 ---
 
@@ -192,7 +198,12 @@ path before a real reader is on it.
 
 ## Gate 7 — internal enablement
 
-Set `READING_V5_ROLLOUT = internal` and deploy. This admits authenticated
+First prove the fail-closed budget guard, now that it is load-bearing: with
+`READING_DAILY_PROVIDER_CALL_LIMIT` unset and the rollout leaving `off`,
+`checkSecureConfig` must refuse every request with `503 configuration_error`.
+Restore the approved ceiling before continuing.
+
+Then set `READING_V5_ROLLOUT = internal` and deploy. This admits authenticated
 internal reservations and nothing public.
 
 Run the existing bounded authenticated recovery sweep so anything paused by the
@@ -201,7 +212,8 @@ consent granted, command frozen, job claimed, provider called once, candidate
 validated, reading published, evidence readable, and the three provenance layers
 correct in the interface.
 
-**Stop condition:** anything short of one complete flow.
+**Stop condition:** a configuration guard that does not refuse, or anything
+short of one complete flow.
 
 ---
 

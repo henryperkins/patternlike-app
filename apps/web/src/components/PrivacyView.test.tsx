@@ -120,7 +120,11 @@ describe("Context & privacy", () => {
     expect(screen.getByRole("button", { name: /Grant permission/i })).toBeInTheDocument();
   });
 
-  it("offers no control at all when the permission cannot be read", async () => {
+  it("says Unknown rather than Not granted when the permission cannot be read", async () => {
+    // The privacy surface is exactly where a definite claim about an unknown
+    // state does not belong: a reader whose consent IS granted, opening this
+    // page offline, was told in the product's own words that nothing is being
+    // sent to OpenAI.
     renderPrivacy({
       [`GET ${CONSENT}`]: { status: 0, body: null, unreachable: true },
     });
@@ -129,9 +133,31 @@ describe("Context & privacy", () => {
     expect(await within(panel).findByRole("status")).toHaveTextContent(
       /could not be reached/i,
     );
+    expect(within(panel).getByText("Unknown")).toBeInTheDocument();
+    expect(within(panel).queryByText("Not granted")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Granted")).not.toBeInTheDocument();
+    // Nothing to agree to, but the read is worth retrying.
     expect(
       within(panel).queryByRole("button", { name: /permission/i }),
     ).not.toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /Try again/i })).toBeInTheDocument();
+  });
+
+  it("recovers the panel when the retry succeeds", async () => {
+    const user = userEvent.setup();
+    const responses: Record<string, MockResponse> = {
+      [`GET ${CONSENT}`]: { status: 0, body: null, unreachable: true },
+    };
+    renderPrivacy(responses);
+    const retry = await within(consentPanel()).findByRole("button", { name: /Try again/i });
+
+    responses[`GET ${CONSENT}`] = ok(consentGranted);
+    await user.click(retry);
+
+    expect(
+      await screen.findByRole("button", { name: /Withdraw permission/i }),
+    ).toBeInTheDocument();
+    expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
   });
 
   it("invents no source controls while M4 sources are unimplemented", async () => {

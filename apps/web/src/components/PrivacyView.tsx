@@ -130,6 +130,7 @@ function AiSynthesisConsentPanel() {
   const [state, setState] = useState<ConsentPanelState>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,7 +151,7 @@ function AiSynthesisConsentPanel() {
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [reloads]);
 
   // One key per intent, minted at the press and held until it succeeds, so a
   // retry after a transient failure resumes the same mutation rather than
@@ -194,6 +195,14 @@ function AiSynthesisConsentPanel() {
   };
 
   const granted = state.status === "ready" && state.consent.status === "granted";
+  // Three states, not two. `granted` is false while loading and false when the
+  // read failed, and rendering "Not granted" for either would have the privacy
+  // surface state definitively that nothing is being sent - in the same words
+  // and styling it uses for a real revocation - to a reader whose consent may
+  // in fact be granted. Understating permission is the conservative direction,
+  // but a definite claim about an unknown state does not belong here.
+  const chip =
+    state.status === "ready" ? (granted ? "Granted" : "Not granted") : "Unknown";
 
   return (
     <section className="ai-consent panel" aria-labelledby="ai-consent-heading">
@@ -203,7 +212,7 @@ function AiSynthesisConsentPanel() {
           <h2 id="ai-consent-heading">Who writes your reading</h2>
         </div>
         <span className={`source-state${granted ? " source-state--active" : ""}`}>
-          <i /> {granted ? "Granted" : "Not granted"}
+          <i /> {chip}
         </span>
       </div>
 
@@ -238,6 +247,18 @@ function AiSynthesisConsentPanel() {
             ? state.message
             : (problem ?? "")}
       </p>
+
+      {state.status === "unreadable" ? (
+        // The read failed, so there is nothing to agree to and no state to
+        // report. A retry is the only honest control to offer.
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => setReloads((value) => value + 1)}
+        >
+          Try again <Icon name="refresh" />
+        </button>
+      ) : null}
     </section>
   );
 }

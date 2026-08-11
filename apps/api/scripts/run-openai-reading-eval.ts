@@ -48,9 +48,13 @@ import {
 } from "../src/services/reading-publisher.js";
 
 /**
- * The share of profiles whose live candidate must publish. Not 100%: the model
- * is nondeterministic and one refusal on one profile is a signal to look, not
- * proof of a broken deployment. A regression below this is what fails the gate.
+ * Every synthetic profile must publish. One refusal fails the gate.
+ *
+ * Deliberately 100%, and the runbook's stop condition says the same. The corpus
+ * is six profiles, each chosen to be publishable: a refusal is not the model
+ * being nondeterministic at the margin, it is one of the six shapes this
+ * deployment cannot serve — found immediately before enabling paid autonomous
+ * generation, which is the one moment it is cheap to find.
  */
 const MIN_PUBLISHABLE_RATE = 1;
 
