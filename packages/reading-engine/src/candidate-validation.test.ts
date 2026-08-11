@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 
 import type { DailySkyFact, ReadingGenerationOutput } from "@patternlike/shared";
 
+import { isSupportedReadingLocale } from "./candidate-policy.js";
 import {
   VALIDATION_POLICY_VERSION,
   type ConstrainedReadingInput,
@@ -655,6 +656,81 @@ test("prompt, schema, and identifier leakage is rejected", () => {
 // ---------------------------------------------------------------------------
 // Safety
 // ---------------------------------------------------------------------------
+
+test("the supported-locale set names exactly what the rules can judge", () => {
+  // Every mechanical rule in candidate-policy is English. A reading written in
+  // another language would slip the grounding demand entirely (the body terms
+  // do not match) and could never satisfy a required uncertainty note (the
+  // uncertainty terms do not match), so the set is declared rather than implied
+  // and a locale outside it is refused before a command is frozen.
+  for (const supported of ["en-US", "en-GB", "en", "en-AU"]) {
+    assert.ok(isSupportedReadingLocale(supported), supported);
+  }
+  for (const unsupported of ["es-ES", "fr-FR", "de", "pt-BR", "ja-JP", "eng"]) {
+    assert.ok(!isSupportedReadingLocale(unsupported), unsupported);
+  }
+});
+
+test("the sign Cancer is licensed vocabulary, not a disease term", () => {
+  // "cancer" sits in the medical-causation denylist AND in SIGN_TERMS, and the
+  // packet hands the model the word: a natal fact in that sign renders as
+  // "... degrees Cancer". Any ordinary verb from the rule's first alternation
+  // within eighty characters then tripped it, so a reader with a Cancer
+  // placement - one in twelve per body - could burn the retry and both
+  // replacements and end the day with no reading, logged as a safety violation
+  // that never happened.
+  const cancerInput = input({
+    natal_facts: [
+      {
+        fact_id: `nat_${hex32("natal-moon-cancer")}`,
+        fact_class: "natal_position",
+        body: "moon",
+        target: null,
+        aspect: null,
+        sign: "cancer",
+        degree_deg: 14.2,
+        house: null,
+      },
+    ],
+  });
+  const cancerPrepared = prepareConstrainedReadingInput(cancerInput);
+  const moonFact = cancerPrepared.request.facts.find((f) => f.fact_class === "natal_position");
+  assert.ok(moonFact, "the Cancer natal fact should be eligible");
+
+  const base = candidate();
+  const ordinary = [
+    "A healing tone runs through the day as the Moon moves through Cancer.",
+    "Let the day treat the Cancer part of your chart gently.",
+  ];
+  for (const text of ordinary) {
+    const result = validateReadingCandidate(
+      candidate({
+        lead: { ...base.lead, text, fact_ids: [moonFact!.fact_id] },
+      }),
+      cancerPrepared,
+    );
+    assert.ok(
+      result.ok || !result.failures.some((f) => f.code === "safety"),
+      `astrological Cancer flagged as a safety violation: ${text}`,
+    );
+  }
+
+  // The disease sense is still refused.
+  const medical = validateReadingCandidate(
+    candidate({
+      lead: {
+        ...base.lead,
+        text: "The Moon in Cancer is what is causing your cancer diagnosis.",
+        fact_ids: [moonFact!.fact_id],
+      },
+    }),
+    cancerPrepared,
+  );
+  assert.equal(medical.ok, false);
+  if (!medical.ok) {
+    assert.ok(medical.failures.some((f) => f.code === "safety"));
+  }
+});
 
 test("diagnosis, medical causation, guarantees, fatalism, and advice replacement are rejected", () => {
   const base = candidate();

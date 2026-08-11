@@ -52,6 +52,34 @@ export const CONTEXT_USE_UNITS: Readonly<Record<M5AllowedUse, ReadonlySet<UnitKi
 // Vocabulary
 // ---------------------------------------------------------------------------
 
+/**
+ * The locales this validator can actually judge.
+ *
+ * Every mechanical rule below is English: the body, sign, aspect, phase, and
+ * house vocabularies, the month names, the safety rules, the personalization
+ * rules, the context-attribution rules, and the uncertainty terms. Against a
+ * reading written in another language the validator is simultaneously too lax
+ * and impossible to satisfy — `/\bsaturn\b/` does not match "Saturno", so
+ * `hasAstrologyClaim` is false and the grounding demand never fires, while
+ * `uncertaintyTerms` matches nothing so a required note can never pass. The
+ * first failure mode publishes an ungrounded claim with no human review behind
+ * it; the second spends the whole retry and replacement budget and leaves the
+ * reader with nothing.
+ *
+ * So the supported set is declared rather than implied, and a locale outside it
+ * is refused before a command is frozen. Adding one means translating the rule
+ * tables, not widening this list.
+ */
+export const SUPPORTED_READING_LOCALES: readonly string[] = ["en-US", "en-GB", "en"];
+
+/** Whether the deterministic rules can judge a reading written for `locale`. */
+export function isSupportedReadingLocale(locale: string): boolean {
+  const tag = locale.trim();
+  if (SUPPORTED_READING_LOCALES.includes(tag)) return true;
+  // A regional English the list does not name still reads as English.
+  return /^en([-_]|$)/i.test(tag);
+}
+
 export const BODY_TERMS: ReadonlyArray<[RegExp, CelestialBody]> = [
   [/\bsun\b/gi, "sun"],
   [/\bmoon\b/gi, "moon"],
@@ -316,9 +344,22 @@ export const SAFETY_RULES: readonly PatternRule[] = [
       /\b(?:diagnos(?:is|e|ed|es|ing|tic)|depression|bipolar|schizophreni\w*|psychosis|ptsd|adhd|ocd|autis\w*|anxiety disorder|eating disorder|personality disorder)\b/i,
   },
   {
+    // `cancer` is the one term in this list that is also licensed
+    // astrological vocabulary: it is a sign, and the packet renders natal
+    // facts as "... degrees Cancer", so the model is handed the word. Bare,
+    // it matched any ordinary verb from the first alternation within eighty
+    // characters — rejecting compliant readings for roughly one reader in
+    // twelve per body, and recording a safety violation that never happened.
+    // Disambiguated the way the cycle-phase collision already was: the
+    // disease sense needs a medical construction around it, which the
+    // astrological sense never produces. Every other term here is
+    // unambiguous and stays bare. The lookaround rejects the astrological
+    // constructions the packet actually produces (in / through / enters /
+    // degrees Cancer, and Cancer part / placement / season) and keeps every
+    // disease sense, including the bare "cure your cancer".
     detail_code: "medical_causation",
     pattern:
-      /\b(?:caus(?:e|es|ed|ing)|cur(?:e|es|ed|ing)|heal(?:s|ed|ing)?|treat(?:s|ed|ing|ment)?|prevent(?:s|ed|ing)?|trigger(?:s|ed|ing)?)\b[^.!?]{0,80}\b(?:illness|disease|cancer|insomnia|migraine|symptoms?|infection|fever|allerg\w+|injur\w+|pregnancy|fertility|medication)\b/i,
+      /\b(?:caus(?:e|es|ed|ing)|cur(?:e|es|ed|ing)|heal(?:s|ed|ing)?|treat(?:s|ed|ing|ment)?|prevent(?:s|ed|ing)?|trigger(?:s|ed|ing)?)\b[^.!?]{0,80}\b(?:illness|disease|(?<!\b(?:in|into|through|entering|enters|degrees?|sign)\s)cancers?\b(?!\s+(?:part|placement|placements|season|sign|rising|moon|sun|energy|chart|stellium))|insomnia|migraine|symptoms?|infection|fever|allerg\w+|injur\w+|pregnancy|fertility|medication)\b/i,
   },
   {
     detail_code: "guarantee",

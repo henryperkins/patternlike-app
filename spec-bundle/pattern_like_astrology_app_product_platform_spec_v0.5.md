@@ -167,8 +167,15 @@ A deployment is acceptable when all of the following hold:
 1. **Removal of the editorial control plane.** The content-release infrastructure is retained but inert for new readings. Whether to retire it, and on what retention terms, is undecided.
 2. **M4 context sources.** The publisher consumes every eligible source present when it runs. Journals, check-ins, and connectors remain unimplemented, and the privacy surface exposes only categories that genuinely exist. No provider-specific ingestion path will be added for them.
 3. **Provider routing.** Direct provider calls keep the initial data path small. A gateway may be evaluated later without changing the provider-neutral adapter boundary.
-4. **Consent policy versioning.** One policy version is implemented. When a second is added, the consent read must also report which version the live grant is under, so a reader holding the older grant is not shown the newer category list as though they had agreed to it.
-5. **Shared-library licensing.** Unchanged from v0.2: `packages/shared` is imported by the AGPL calculation service, and that boundary remains the open legal question.
+4. **Reading language.** The deterministic validator's rules — the body, sign,
+   aspect, phase, and house vocabularies, the month names, the safety and
+   personalization rules, the uncertainty terms — are English. A confirmed
+   locale it cannot judge is therefore refused before a command is frozen,
+   rather than publishing prose nothing verified. Supporting another language
+   means translating the rule tables, not widening the list. Until then the
+   product answers a non-English reader honestly instead of quietly.
+5. **Consent policy versioning.** One policy version is implemented. When a second is added, the consent read must also report which version the live grant is under, so a reader holding the older grant is not shown the newer category list as though they had agreed to it.
+6. **Shared-library licensing.** Unchanged from v0.2: `packages/shared` is imported by the AGPL calculation service, and that boundary remains the open legal question.
 
 ## Implementation note
 

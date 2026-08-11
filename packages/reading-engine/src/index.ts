@@ -49,6 +49,10 @@ export {
 } from "./constrained-input.js";
 export { validateReadingCandidate } from "./candidate-validation.js";
 export {
+  SUPPORTED_READING_LOCALES,
+  isSupportedReadingLocale,
+} from "./candidate-policy.js";
+export {
   CANDIDATE_CHECKS,
   GENERATION_INPUT_IDENTITY_PROFILE,
   GENERATION_INPUT_MANIFEST_PROFILE,

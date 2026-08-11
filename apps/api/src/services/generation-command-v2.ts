@@ -33,6 +33,7 @@ import {
   type ConstrainedNatalFactInput,
   type ConstrainedPriorReading,
   type PreparedConstrainedReadingInput,
+  isSupportedReadingLocale,
 } from "@patternlike/reading-engine";
 import type { Env } from "../env.js";
 import type { UserIdentity } from "../db/users.js";
@@ -534,6 +535,19 @@ export async function buildGenerationCommandV2(
       ok: false,
       reason: "locale_confirmation_required",
       detail: "content locale is still the unconfirmed server default",
+    };
+  }
+  // The deterministic validator's rules are English. A confirmed locale outside
+  // what it can judge is refused HERE, before anything is frozen or sent —
+  // publishing prose the validator cannot read would mean an ungrounded
+  // astrological claim reaching a reader with no human review behind it, which
+  // is the one thing this pipeline exists to prevent. `policy_unsupported` is
+  // the deterministic-refusal code, and the product answers 503 retryable:false.
+  if (!isSupportedReadingLocale(preferences.locale)) {
+    return {
+      ok: false,
+      reason: "policy_unsupported",
+      detail: "no deterministic validation policy for the confirmed content locale",
     };
   }
 
