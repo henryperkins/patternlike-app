@@ -39,7 +39,7 @@ Task 17 Step 2 runs `git diff --check "$env:PATTERNLIKE_M5_IMPLEMENTATION_BASE..
 | 10 | V5 execution and atomic publication | done — `10b37ee`, follow-up `c902d8d` |
 | 11 | Fact invalidation and repair | done — `2e40321`, follow-up `225a46a` |
 | 12 | Bounded hybrid scheduler | done — `167b642`, follow-up `c526b41` |
-| 13 | AI consent routes and dual-version projections | pending |
+| 13 | AI consent routes and dual-version projections | done — `a245c93`, follow-up `bdf4974` |
 | 14 | Today, provenance, Context & Privacy | pending |
 | 15 | Evaluation lanes | pending |
 | 16 | Product truth and production runbook | pending |
