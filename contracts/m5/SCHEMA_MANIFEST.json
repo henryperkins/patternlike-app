@@ -312,5 +312,16 @@
     "§11 snapshot_json precision: unresolved. The daily-sky layer states its own precision per fact rather than inventing a fourth policy.",
     "OpenAI's default abuse-monitoring retention may hold customer content for up to 30 days. `store: false` avoids persisted Responses application state but is NOT Zero Data Retention and is not treated as a substitute for product-side minimization or consent. Raw birth instant and coordinates therefore stay inside the encrypted product boundary; any proposal to cross it is a new privacy design requiring explicit review and ZDR eligibility first."
   ],
-  "amendments": []
+  "amendments": [
+    {
+      "date": "2026-08-11",
+      "kind": "annotation_removal",
+      "summary": "reading-generation-output.schema.json drops the `description` sitting beside the `$ref` on properties.lead and properties.reflection_prompt, which made the schema unusable as an OpenAI strict structured output.",
+      "detail": "Found by the Gate 6 live corpus, which failed 0/6 publishable: every profile answered 400 invalid_request_error / invalid_json_schema on text.format.schema with \"context=('properties', 'lead'), $ref cannot have keywords {'description'}\". Strict structured outputs reject any sibling keyword beside a $ref, so this schema could never have produced a reading - the defect was total, not marginal, and no amount of prompt or model work would have moved it. The two removed strings were, verbatim: on lead, \"The focal paragraph. Must cite at least one supplied fact.\"; on reflection_prompt, \"One question to sit with. May be shaped by personal context; may not assert an astrological claim of its own.\" Both are recorded here because neither is lost: the lead's citation rule is enforced mechanically by validateReadingCandidate (an ungrounded lead fails with fact_ids empty regardless of whether the unit is otherwise substantive), and READING_SYSTEM_POLICY already tells the model that a unit making any astrological claim cites at least one fact and that context is never evidence for one. `description` is an annotation keyword with no validation semantics, so no instance changes classification: every existing fixture remains exactly as valid or invalid as it was, which is why this is an amendment and not a schema_version bump. No required field, enum, or $id changed. uncertainty_note keeps its description, which sits beside `anyOf` rather than beside a `$ref` and is legal.",
+      "files": [
+        "reading-generation-output.schema.json"
+      ],
+      "implemented_by": "apps/api/src/services/reading-prompt.ts (buildResponsesRequest sends the document verbatim); guarded offline by apps/api/src/services/reading-prompt.test.ts, which now walks the schema and fails on any $ref carrying a sibling keyword - the mock provider in apps/api/test/mock-calc-service.ts means no other offline test can see this class of defect."
+    }
+  ]
 }

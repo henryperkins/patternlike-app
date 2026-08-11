@@ -31,19 +31,13 @@
       "type": "string",
       "description": "A short, quiet label for the day's primary theme. Rendered as a kicker above the lead, never as the focal sentence."
     },
-    "lead": {
-      "$ref": "#/$defs/groundedUnit",
-      "description": "The focal paragraph. Must cite at least one supplied fact."
-    },
+    "lead": { "$ref": "#/$defs/groundedUnit" },
     "paragraphs": {
       "type": "array",
       "description": "Zero to four supporting paragraphs, each role used at most once and in the declared order: supporting_theme, phase_context, timing, collective_context.",
       "items": { "$ref": "#/$defs/generatedParagraph" }
     },
-    "reflection_prompt": {
-      "$ref": "#/$defs/groundedUnit",
-      "description": "One question to sit with. May be shaped by personal context; may not assert an astrological claim of its own."
-    },
+    "reflection_prompt": { "$ref": "#/$defs/groundedUnit" },
     "uncertainty_note": {
       "description": "Required when the request declares uncertainty_note_required; otherwise exactly null. Names what the reading cannot say, never apologises for it.",
       "anyOf": [{ "$ref": "#/$defs/groundedUnit" }, { "type": "null" }]

@@ -148,6 +148,34 @@ describe("provider request body", () => {
     expect(refs.every((ref) => ref.startsWith("#/"))).toBe(true);
   });
 
+  it("carries no keyword beside a $ref, which strict mode rejects outright", () => {
+    // Only the provider ever validates this schema, and every test that
+    // exercises the publisher is answered by test/mock-calc-service.ts - so
+    // this rule has no other place it can be checked offline. It shipped
+    // broken once: properties.lead and properties.reflection_prompt each
+    // carried a `description` beside its `$ref`, and the Responses API
+    // answered 400 invalid_json_schema to all six corpus profiles. A sibling
+    // keyword is legal JSON Schema and fatal here, which is exactly the
+    // combination a reviewer reading the contract will not notice.
+    const offenders: string[] = [];
+    const walk = (node: unknown, path: string): void => {
+      if (node === null || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        node.forEach((item, index) => walk(item, `${path}[${index}]`));
+        return;
+      }
+      const record = node as Record<string, unknown>;
+      if ("$ref" in record) {
+        const siblings = Object.keys(record).filter((key) => key !== "$ref");
+        if (siblings.length > 0) offenders.push(`${path}: ${siblings.join(", ")}`);
+      }
+      for (const [key, value] of Object.entries(record)) walk(value, `${path}/${key}`);
+    };
+    walk(outputSchema, "");
+
+    expect(offenders).toEqual([]);
+  });
+
   it("carries the packet as one JSON document in one user message", () => {
     const request = hostileRequest();
     const body = buildResponsesRequest(request, PIN);
