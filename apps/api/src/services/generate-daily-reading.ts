@@ -28,6 +28,7 @@ import {
   buildAssemblyInput,
   type GenerateDailyReadingCommandV1,
 } from "./generation-command.js";
+import { isCommandV2 } from "./generation-command-v2.js";
 import type { StoredReadingV3 } from "./stored-reading.js";
 
 /**
@@ -211,9 +212,32 @@ async function pinnedContextStillEligible(
   return true;
 }
 
-export async function generateDailyReading(
+/**
+ * Route a claimed job to the executor its frozen command names.
+ *
+ * The discriminant is the command, never the current configuration: a claim
+ * frozen as V1 executes as V1 forever, whatever the rollout says today. A
+ * command version this deployment does not implement fails `policy_unsupported`
+ * rather than running the executor it happens to have, which would publish prose
+ * under an identity promising different prose.
+ */
+export async function dispatchGeneration(
   env: Env,
   claim: Claim,
+): Promise<ExecutionOutcome> {
+  if (isCommandV2(claim.command)) {
+    return {
+      ok: false,
+      reason: "policy_unsupported",
+      detail: "no registered implementation for command_version v2",
+    };
+  }
+  return generateDailyReading(env, claim as Claim & { command: GenerateDailyReadingCommandV1 });
+}
+
+export async function generateDailyReading(
+  env: Env,
+  claim: Claim & { command: GenerateDailyReadingCommandV1 },
 ): Promise<ExecutionOutcome> {
   const { command, jobId, claimToken, userId } = claim;
 

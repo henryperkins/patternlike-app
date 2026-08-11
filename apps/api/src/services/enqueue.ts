@@ -19,13 +19,31 @@ import {
   type RevisionReason,
 } from "./generation-command.js";
 import { isCurrentOrPreviousLocalDay } from "./local-day.js";
+import { pinnedLocalDate } from "./tzdb.js";
 import { loadPreferences } from "../db/preferences.js";
+import { readReadingV5Rollout, rolloutAllows, type RolloutEntry } from "./reading-rollout.js";
+import {
+  buildGenerationCommandV2,
+  type CommandBuildFailureV2,
+  type ReservationReason,
+  type RevisionReasonV2,
+} from "./generation-command-v2.js";
 
 export type { GenerationMessage } from "../env.js";
 
 export type EnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }
-  | { ok: false; reason: CommandBuildFailure | "duplicate" | "stale_predecessor" | "conflict"; detail: string };
+  | {
+      ok: false;
+      reason:
+        | CommandBuildFailure
+        | CommandBuildFailureV2
+        | "duplicate"
+        | "stale_predecessor"
+        | "conflict"
+        | "rollout_disabled";
+      detail: string;
+    };
 
 async function loadIdentity(env: Env, userId: string): Promise<UserIdentity | null> {
   const row = await env.DB.prepare(
@@ -323,4 +341,111 @@ export async function replaceFailedCommand(
 
   const dispatched = await dispatch(env, { job_id: replaced.jobId, reading_id: readingId });
   return { ok: true, readingId, jobId: replaced.jobId, dispatched };
+}
+
+
+// ---------------------------------------------------------------------------
+// Constrained-model reservations
+// ---------------------------------------------------------------------------
+
+export interface EnqueueV5Options {
+  /** Which surface is asking. Checked against the rollout before anything else. */
+  entry: RolloutEntry;
+  reservationReason: ReservationReason;
+  /**
+   * The local day to reserve, resolved by the SERVER.
+   *
+   * Explicit because the scheduler reserves tomorrow's edition before its local
+   * day begins. The public first-open path passes what `resolveV5TargetDate`
+   * returns, which is today in the reader's confirmed zone — never a client
+   * value.
+   */
+  targetLocalDate: string;
+  revision?: number;
+  revisionReason?: RevisionReasonV2;
+  supersedesReadingId?: string | null;
+  now?: Date;
+}
+
+/**
+ * Today, in the reader's confirmed scheduling zone, under the pinned tz
+ * database.
+ *
+ * `Intl` carries whatever database the platform shipped; a Worker deployment
+ * that silently updated it would move a reader's day boundary without changing
+ * any value the command records. Returns null when the account has no usable
+ * zone, which the caller reports as the ordinary confirmation gate.
+ */
+export function resolveV5TargetDate(zone: string, now: Date): string | null {
+  try {
+    return pinnedLocalDate(zone, now.getTime());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reserve a constrained-model reading for one user and local day.
+ *
+ * The rollout gate runs FIRST, before the command is built and therefore before
+ * any calculation call, any context decryption, and any consent read. `off` must
+ * cost nothing at all — not a scan, not a DEK load — or the kill switch is only
+ * a switch for the provider rather than for the feature.
+ */
+export async function enqueueConstrainedReading(
+  env: Env,
+  userId: string,
+  options: EnqueueV5Options,
+): Promise<EnqueueOutcome> {
+  const rollout = readReadingV5Rollout(env);
+  if (rollout === null || !rolloutAllows(rollout, options.entry)) {
+    return {
+      ok: false,
+      reason: "rollout_disabled",
+      detail: `constrained-model generation is not enabled for the ${options.entry} entry point`,
+    };
+  }
+
+  const identity = await loadIdentity(env, userId);
+  if (!identity) {
+    return { ok: false, reason: "chart_not_found", detail: "no active user" };
+  }
+
+  const now = options.now ?? new Date();
+  const revision = options.revision ?? 1;
+  const build = await buildGenerationCommandV2(env, identity, {
+    readingId: newId("rdg"),
+    revision,
+    revisionReason: options.revisionReason ?? "initial",
+    supersedesReadingId: options.supersedesReadingId ?? null,
+    reservationReason: options.reservationReason,
+    commandGeneration: 1,
+    replacesJobId: null,
+    commandReplacementReason: null,
+    targetLocalDate: options.targetLocalDate,
+    now,
+  });
+  if (!build.ok) return { ok: false, reason: build.reason, detail: build.detail };
+
+  // Cycles are persisted BEFORE the reservation, for the same reason the V1 path
+  // does it: a crash between the two leaves content-addressed rows the next
+  // attempt reuses, while the reverse order would leave a reservation whose
+  // pinned cycles were never stored.
+  await persistCycles(env, userId, build.chartId, build.cycles);
+
+  const reserved = build.command.supersedes_reading_id
+    ? await reserveReissue(
+        env,
+        identity,
+        build.command,
+        build.command.supersedes_reading_id,
+      )
+    : await reserveInitial(env, identity, build.command);
+  if (!reserved.ok) return reserveFailure(reserved);
+
+  const dispatched = await dispatch(env, {
+    job_id: reserved.jobId,
+    reading_id: reserved.readingId,
+  });
+  return { ok: true, readingId: reserved.readingId, jobId: reserved.jobId, dispatched };
 }

@@ -35,7 +35,7 @@ import {
   replaceFailedCommand,
   type GenerationMessage,
 } from "./enqueue.js";
-import { generateDailyReading } from "./generate-daily-reading.js";
+import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
 import type { StoredReading } from "./generate-daily-reading.js";
@@ -1241,13 +1241,13 @@ describe("claims", () => {
     expect(second).not.toBeNull();
     expect(second!.claimToken).not.toBe(first!.claimToken);
 
-    const stale = await generateDailyReading(env, first!);
+    const stale = await dispatchGeneration(env, first!);
     expect(stale).toMatchObject({ ok: false, reason: "duplicate" });
 
     const [reading] = await readings();
     expect(reading!.status).toBe("pending");
 
-    const winner = await generateDailyReading(env, second!);
+    const winner = await dispatchGeneration(env, second!);
     expect(winner.ok).toBe(true);
     expect((await readings())[0]!.status).toBe("published");
   });
@@ -1262,7 +1262,7 @@ describe("claims", () => {
       enqueued.jobId,
     );
     const winner = await claimJob(env, enqueued.jobId);
-    expect(await generateDailyReading(env, winner!)).toMatchObject({ ok: true });
+    expect(await dispatchGeneration(env, winner!)).toMatchObject({ ok: true });
 
     const published = await decryptReading(enqueued.readingId);
 

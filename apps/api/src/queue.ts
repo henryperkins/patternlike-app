@@ -8,7 +8,7 @@ import {
   failClaimedJob,
   releaseClaimForRetry,
 } from "./db/generation.js";
-import { generateDailyReading } from "./services/generate-daily-reading.js";
+import { dispatchGeneration } from "./services/generate-daily-reading.js";
 
 /**
  * The daily-reading consumer.
@@ -108,7 +108,7 @@ export async function queue(
       }
       claimed = claim;
 
-      const outcome = await generateDailyReading(env, claim);
+      const outcome = await dispatchGeneration(env, claim);
       if (outcome.ok) {
         message.ack();
         continue;

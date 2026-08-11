@@ -25,7 +25,7 @@ import {
 } from "../../test/helpers.js";
 import { claimJob } from "./generation.js";
 import { enqueueDailyReading } from "../services/enqueue.js";
-import { generateDailyReading } from "../services/generate-daily-reading.js";
+import { dispatchGeneration } from "../services/generate-daily-reading.js";
 
 const NEW_ROOT_KEK = "a-rotated-root-kek-with-enough-entropy-01";
 
@@ -240,7 +240,7 @@ describe("DEK rotation over the M3 pipeline columns", () => {
     expect(enqueued.ok).toBe(true);
     if (!enqueued.ok) return;
     const claim = await claimJob(env, enqueued.jobId);
-    expect(await generateDailyReading(env, claim!)).toMatchObject({ ok: true });
+    expect(await dispatchGeneration(env, claim!)).toMatchObject({ ok: true });
 
     const before = await rows<{ n: number }>(
       `SELECT

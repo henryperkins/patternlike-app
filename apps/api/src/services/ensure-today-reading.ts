@@ -14,11 +14,14 @@ import {
 } from "./enqueue.js";
 import { localDateIn } from "./local-day.js";
 import type { CommandBuildFailure } from "./generation-command.js";
+import type { CommandBuildFailureV2 } from "./generation-command-v2.js";
 
 export type EnsureTodayFailureReason =
   | CommandBuildFailure
+  | CommandBuildFailureV2
   | "unauthorized"
   | "reading_generation_failed"
+  | "rollout_disabled"
   | "internal_error";
 
 export type EnsureTodayOutcome =

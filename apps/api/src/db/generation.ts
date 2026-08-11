@@ -2,10 +2,11 @@ import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
-import type {
-  CommandReplacementReason,
-  GenerateDailyReadingCommandV1,
-} from "../services/generation-command.js";
+import type { CommandReplacementReason } from "../services/generation-command.js";
+import {
+  isCommandV2,
+  type GenerateDailyReadingCommand,
+} from "../services/generation-command-v2.js";
 
 /**
  * Reservation, claim, and publication — every one a single guarded `DB.batch()`.
@@ -88,7 +89,7 @@ async function encryptedJobInsert(
   env: Env,
   identity: UserIdentity,
   jobId: string,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
   idempotencyKey: string,
   now: string,
 ): Promise<D1PreparedStatement> {
@@ -114,8 +115,34 @@ async function encryptedJobInsert(
   );
 }
 
-export function idempotencyKeyFor(command: GenerateDailyReadingCommandV1): string {
-  return `daily-reading:${command.target_local_date}:r${command.revision}:g${command.command_generation}`;
+/**
+ * The per-user idempotency key for one command.
+ *
+ * The two families are namespaced apart. A user-day can only ever hold one
+ * reservation, so a collision is not reachable through the product — but the key
+ * is what a replay is matched on, and two different command shapes answering to
+ * one key would make "the same request" mean two different readings.
+ */
+export function idempotencyKeyFor(command: GenerateDailyReadingCommand): string {
+  const family = isCommandV2(command) ? "daily-reading-v5" : "daily-reading";
+  return `${family}:${command.target_local_date}:r${command.revision}:g${command.command_generation}`;
+}
+
+/**
+ * The clear reservation columns a command implies.
+ *
+ * One place, because these were hardcoded at three call sites. `deterministic`
+ * with a non-null release and `constrained_model` with a null one are the two
+ * shapes 0003's CHECK admits, and deriving them from the command is what stops a
+ * V2 reservation from claiming an editorial release it does not have.
+ */
+function reservationColumns(command: GenerateDailyReadingCommand): {
+  assemblyMode: "deterministic" | "constrained_model";
+  releaseVersion: string | null;
+} {
+  return isCommandV2(command)
+    ? { assemblyMode: "constrained_model", releaseVersion: null }
+    : { assemblyMode: "deterministic", releaseVersion: command.release_version };
 }
 
 async function liveReadingId(
@@ -201,10 +228,11 @@ export async function loadInitialGenerationState(
 export async function reserveInitial(
   env: Env,
   identity: UserIdentity,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
 ): Promise<ReserveOutcome> {
   const now = new Date().toISOString();
   const jobId = newId("job");
+  const columns = reservationColumns(command);
 
   try {
     await env.DB.batch([
@@ -234,15 +262,16 @@ export async function reserveInitial(
             contract_id, assembly_mode, status, revision, revision_reason,
             supersedes_reading_id, command_generation, active_generation_job_id,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'deterministic', 'pending', ?, ?, NULL, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL, ?, ?, ?, ?)`,
       ).bind(
         command.reading_id,
         identity.userId,
         command.target_local_date,
-        command.release_version,
+        columns.releaseVersion,
         command.reading_key,
         command.chart.fingerprint,
         command.chart.contract_id,
+        columns.assemblyMode,
         command.revision,
         command.revision_reason,
         command.command_generation,
@@ -284,11 +313,12 @@ export async function reserveInitial(
 export async function reserveReissue(
   env: Env,
   identity: UserIdentity,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
   expectedLiveReadingId: string,
 ): Promise<ReserveOutcome> {
   const now = new Date().toISOString();
   const jobId = newId("job");
+  const columns = reservationColumns(command);
 
   const predecessor = await env.DB.prepare(
     `SELECT id, revision, status FROM daily_readings WHERE id = ? AND user_id = ?`,
@@ -341,15 +371,16 @@ export async function reserveReissue(
             contract_id, assembly_mode, status, revision, revision_reason,
             supersedes_reading_id, command_generation, active_generation_job_id,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'deterministic', 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         command.reading_id,
         identity.userId,
         command.target_local_date,
-        command.release_version,
+        columns.releaseVersion,
         command.reading_key,
         command.chart.fingerprint,
         command.chart.contract_id,
+        columns.assemblyMode,
         command.revision,
         command.revision_reason,
         expectedLiveReadingId,
@@ -421,9 +452,9 @@ export type ReplaceOutcome =
 export async function replaceCommand(
   env: Env,
   identity: UserIdentity,
-  command: GenerateDailyReadingCommandV1,
+  command: GenerateDailyReadingCommand,
   expectedFailedJobId: string,
-  reason: CommandReplacementReason,
+  reason: CommandReplacementReason | string,
 ): Promise<ReplaceOutcome> {
   if (command.command_generation > MAX_COMMAND_GENERATION) {
     return {
@@ -435,6 +466,7 @@ export async function replaceCommand(
 
   const now = new Date().toISOString();
   const jobId = newId("job");
+  const columns = reservationColumns(command);
 
   try {
     await env.DB.batch([
@@ -483,16 +515,17 @@ export async function replaceCommand(
         `UPDATE daily_readings
          SET status = 'pending', command_generation = ?, active_generation_job_id = ?,
              release_version = ?, reading_key = ?, chart_fingerprint = ?,
-             contract_id = ?, updated_at = ?
+             contract_id = ?, assembly_mode = ?, updated_at = ?
          WHERE id = ? AND user_id = ? AND status = 'failed'
            AND active_generation_job_id = ?`,
       ).bind(
         command.command_generation,
         jobId,
-        command.release_version,
+        columns.releaseVersion,
         command.reading_key,
         command.chart.fingerprint,
         command.chart.contract_id,
+        columns.assemblyMode,
         now,
         command.reading_id,
         identity.userId,
@@ -559,7 +592,16 @@ export interface Claim {
   claimToken: string;
   userId: string;
   attempts: number;
-  command: GenerateDailyReadingCommandV1;
+  /** Read back as the union it was sealed as; the dispatcher branches on it. */
+  command: GenerateDailyReadingCommand;
+  /**
+   * When another consumer may reclaim this lease.
+   *
+   * Carried on the claim because V5 execution has to decide, before it spends
+   * money, whether enough of the lease remains for a 90-second provider call
+   * plus a publication margin.
+   */
+  leaseExpiresAt: string;
 }
 
 /**
@@ -649,7 +691,7 @@ export async function claimJob(
       cryptoSubject: asCryptoSubject(row.crypto_subject),
     };
     const { dek } = await loadUserKey(env, identity);
-    const command = await decryptJson<GenerateDailyReadingCommandV1>(
+    const command = await decryptJson<GenerateDailyReadingCommand>(
       {
         key_version: row.payload_key_version,
         nonce: row.payload_nonce,
@@ -659,7 +701,14 @@ export async function claimJob(
       { subject: identity.cryptoSubject, field: "jobs.payload_enc", recordId: jobId },
     );
 
-    return { jobId, claimToken, userId: row.user_id, attempts: row.attempts, command };
+    return {
+      jobId,
+      claimToken,
+      userId: row.user_id,
+      attempts: row.attempts,
+      command,
+      leaseExpiresAt,
+    };
   } catch (err) {
     throw new ClaimLoadError(jobId, claimToken, attempts, err);
   }
