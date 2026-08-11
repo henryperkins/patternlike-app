@@ -4,6 +4,7 @@ import {
   isValidIanaZone,
   requireIdempotencyKey,
 } from "@patternlike/shared";
+import { hasZone } from "../services/tzdb.js";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import {
@@ -99,7 +100,15 @@ preferenceRoutes.put("/v1/preferences/timezone", async (c) => {
   // A fixed UTC offset is never accepted as authority: it cannot answer what
   // the local date will be after the next DST transition, which is the only
   // question this value exists to answer.
-  if (!timezone || !isValidIanaZone(timezone)) {
+  // Both gates, not one. isValidIanaZone asks the RUNTIME's ICU; every
+  // scheduling consumer resolves the stored value through the package-pinned
+  // tz database, and the two name sets are not equal — US/Pacific-New and
+  // Canada/East-Saskatchewan pass ICU and are absent from the pinned table.
+  // Storing one leaves a zone that throws on every later read: the write
+  // commits, the cursor recompute throws, and from then on every scheduler
+  // invocation aborts for every user. Refusing here is what keeps an
+  // unresolvable zone from ever becoming durable.
+  if (!timezone || !isValidIanaZone(timezone) || !hasZone(timezone)) {
     return c.json(
       errorBody(
         "invalid_timezone",

@@ -8,6 +8,8 @@ import {
 } from "./consents.js";
 import { linkIdentity } from "./identities.js";
 import {
+  D1_MAX_BOUND_PARAMETERS,
+  excludedBudget,
   findExpiredSchedulerCandidates,
   findStalePublishedCandidates,
   invalidatedOrphanDiscoverySql,
@@ -662,6 +664,29 @@ describe("bounded ordered repair", () => {
     expect(await rows("SELECT id FROM daily_readings WHERE supersedes_reading_id = ?", readingId)).toEqual([]);
   });
 
+  it("repairs an orphan invalidated moments ago, which the six-hour backoff used to hide", async () => {
+    // The crash window this lane exists to converge: invalidation committed and
+    // the r+1 reservation did not. Filtering on updated_at alone hid it for six
+    // hours, by which time the owner's local day had rolled and the current-day
+    // scoping excluded it permanently. A fresh orphan has never been backed off,
+    // so its updated_at has not moved past its own invalidated_at.
+    const account = identity(71);
+    await seedSchedulerAccount(account);
+    const readingId = await seedFactualArtifact(
+      account,
+      "invalidated",
+      `sha256:${"7c".repeat(32)}`,
+      { updatedAt: "2026-08-11T07:00:00.000Z" },
+    );
+
+    const summary = await runReadingScheduler(hybridEnv(), SCHEDULED_AT);
+
+    expect(summary.repair.factRepairs).toBe(1);
+    expect(
+      await rows("SELECT id FROM daily_readings WHERE supersedes_reading_id = ?", readingId),
+    ).not.toEqual([]);
+  });
+
   it("invalidates and backs off an ineligible stale artifact without constructing repair prose", async () => {
     const account = identity(43);
     await seedSchedulerAccount(account, { consent: false });
@@ -941,5 +966,20 @@ describe("rollout and reservation convergence", () => {
         account.userId,
       ),
     ).toEqual([{ count: 1 }]);
+  });
+});
+
+describe("D1's bound-parameter ceiling", () => {
+  it("keeps every lane's exclusion list inside it", () => {
+    // The platform limit is asserted nowhere else in this repository, and the
+    // miniflare D1 the test pool uses does not enforce it - so a lane that
+    // crossed it would pass every integration test and fail only in production,
+    // out of the uncaught scheduled(), taking the due and null-seed lanes with
+    // it. The widest lane binds 12 fixed parameters.
+    for (const fixed of [1, 2, 4, 5, 12]) {
+      expect(excludedBudget(fixed) + fixed).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMETERS);
+    }
+    // And the cap never goes negative for a lane wider than the ceiling.
+    expect(excludedBudget(D1_MAX_BOUND_PARAMETERS + 5)).toBe(0);
   });
 });

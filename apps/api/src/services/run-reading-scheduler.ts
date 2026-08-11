@@ -40,6 +40,8 @@ export interface SchedulerSummary {
   usersExamined: number;
   batchLimit: number;
   repairQuotaExhausted: boolean;
+  /** Candidates whose row could not be processed. One bad row, not an outage. */
+  skippedUnprocessable: number;
   repair: {
     failedReplacements: number;
     factRepairs: number;
@@ -64,6 +66,7 @@ function emptySummary(status: SchedulerSummary["status"], batchLimit = 100): Sch
     usersExamined: 0,
     batchLimit,
     repairQuotaExhausted: false,
+    skippedUnprocessable: 0,
     repair: {
       failedReplacements: 0,
       factRepairs: 0,
@@ -85,6 +88,31 @@ function emptySummary(status: SchedulerSummary["status"], batchLimit = 100): Sch
  * That preserves the approved priority without adding a second budget or a
  * fairness algorithm that could let new work jump recovery.
  */
+/**
+ * Run one lane body, and survive a row it cannot process.
+ *
+ * The scheduler is shared infrastructure: one row it cannot resolve - a zone
+ * absent from the pinned tz database, an account deactivated between the
+ * candidate query and the read - must not abort the invocation for everyone
+ * else. Before this, an unresolvable zone threw out of the lane, out of
+ * runReadingScheduler, and out of scheduled(), skipping the due lane mid-batch
+ * and the null-seed lane entirely, on every invocation, permanently - because
+ * nothing ever advanced the cursor that selected it.
+ *
+ * Deliberately silent about which row: the candidate carries a user id and this
+ * runs outside a request, so there is no safe place to put it.
+ */
+async function perCandidate(
+  summary: SchedulerSummary,
+  body: () => Promise<void>,
+): Promise<void> {
+  try {
+    await body();
+  } catch {
+    summary.skippedUnprocessable += 1;
+  }
+}
+
 export async function runReadingScheduler(
   env: Env,
   scheduledAt: Date,
@@ -94,7 +122,8 @@ export async function runReadingScheduler(
     return emptySummary("disabled");
   }
 
-  const limit = publisher.config.schedulerBatchLimit;
+  const config = publisher.config;
+  const limit = config.schedulerBatchLimit;
   const summary = emptySummary("completed", limit);
   const seen = new Set<string>();
   const remaining = () => Math.max(0, limit - seen.size);
@@ -125,35 +154,37 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of failed) {
-    const commandVersion = candidate.assemblyMode === "constrained_model" ? "v2" : "v1";
-    if (
-      !isGenerationFailureCode(candidate.resultClass) ||
-      !isAutomaticReplacementFailure(commandVersion, candidate.resultClass)
-    ) {
-      continue;
-    }
-    if (!claimUser(candidate.userId)) continue;
-    const eligibility = await loadSchedulerEligibility(
-      env,
-      candidate.userId,
-      scheduledAt,
-      publisher.config.pregenActiveDays,
-      commandVersion === "v2",
-    );
-    if (
-      !eligibility?.eligible
-    ) {
-      continue;
-    }
-    const replaced = await replaceFailedCommand(
-      env,
-      candidate.userId,
-      candidate.readingId,
-      candidate.resultClass as GenerationReplacementReason,
-      "scheduler",
-      scheduledAt,
-    );
-    if (replaced.ok) summary.repair.failedReplacements += 1;
+    await perCandidate(summary, async () => {
+      const commandVersion = candidate.assemblyMode === "constrained_model" ? "v2" : "v1";
+      if (
+        !isGenerationFailureCode(candidate.resultClass) ||
+        !isAutomaticReplacementFailure(commandVersion, candidate.resultClass)
+      ) {
+        return;
+      }
+      if (!claimUser(candidate.userId)) return;
+      const eligibility = await loadSchedulerEligibility(
+        env,
+        candidate.userId,
+        scheduledAt,
+        config.pregenActiveDays,
+        commandVersion === "v2",
+      );
+      if (
+        !eligibility?.eligible
+      ) {
+        return;
+      }
+      const replaced = await replaceFailedCommand(
+        env,
+        candidate.userId,
+        candidate.readingId,
+        candidate.resultClass as GenerationReplacementReason,
+        "scheduler",
+        scheduledAt,
+      );
+      if (replaced.ok) summary.repair.failedReplacements += 1;
+    });
   }
 
   // Repair 2a: a chart activation committed before its stale published V5 row
@@ -165,55 +196,57 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of stale) {
-    const eligibility = await loadSchedulerEligibility(
-      env,
-      candidate.userId,
-      scheduledAt,
-      publisher.config.pregenActiveDays,
-    );
-    if (
-      !eligibility ||
-      candidate.localDate !== resolveV5TargetDate(eligibility.timezone, scheduledAt)
-    ) {
-      continue;
-    }
-    if (!claimUser(candidate.userId)) continue;
-    const identity = {
-      userId: candidate.userId,
-      cryptoSubject: await cryptoSubjectFor(env, candidate.userId),
-    };
-    if (!eligibility.eligible) {
-      const invalidated = await invalidatePublishedReading(env, {
-        identity,
-        readingId: candidate.readingId,
-        reason: "chart_correction",
-        now: scheduledAt,
-      });
+    await perCandidate(summary, async () => {
+      const eligibility = await loadSchedulerEligibility(
+        env,
+        candidate.userId,
+        scheduledAt,
+        config.pregenActiveDays,
+      );
       if (
-        invalidated.ok &&
-        await backoffIneligibleInvalidatedOrphan(
-          env,
-          candidate.readingId,
-          candidate.userId,
-          scheduledAt,
-        )
+        !eligibility ||
+        candidate.localDate !== resolveV5TargetDate(eligibility.timezone, scheduledAt)
       ) {
-        summary.repair.ineligibleOrphansBackedOff += 1;
+        return;
       }
-      if (invalidated.ok) {
-        await recomputeUserNextDueAt(env, candidate.userId, scheduledAt);
+      if (!claimUser(candidate.userId)) return;
+      const identity = {
+        userId: candidate.userId,
+        cryptoSubject: await cryptoSubjectFor(env, candidate.userId),
+      };
+      if (!eligibility.eligible) {
+        const invalidated = await invalidatePublishedReading(env, {
+          identity,
+          readingId: candidate.readingId,
+          reason: "chart_correction",
+          now: scheduledAt,
+        });
+        if (
+          invalidated.ok &&
+          await backoffIneligibleInvalidatedOrphan(
+            env,
+            candidate.readingId,
+            candidate.userId,
+            scheduledAt,
+          )
+        ) {
+          summary.repair.ineligibleOrphansBackedOff += 1;
+        }
+        if (invalidated.ok) {
+          await recomputeUserNextDueAt(env, candidate.userId, scheduledAt);
+        }
+        return;
       }
-      continue;
-    }
-    const repaired = await reconcileCurrentFactRepair(
-      env,
-      identity,
-      "chart_correction",
-      scheduledAt,
-    );
-    if (repaired.ok && repaired.status === "repair_reserved") {
-      summary.repair.factRepairs += 1;
-    }
+      const repaired = await reconcileCurrentFactRepair(
+        env,
+        identity,
+        "chart_correction",
+        scheduledAt,
+      );
+      if (repaired.ok && repaired.status === "repair_reserved") {
+        summary.repair.factRepairs += 1;
+      }
+    });
   }
 
   // Repair 2b: invalidation committed before its r+1 reservation. Rows that
@@ -226,35 +259,37 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of orphans) {
-    const eligibility = await loadSchedulerEligibility(
-      env,
-      candidate.userId,
-      scheduledAt,
-      publisher.config.pregenActiveDays,
-    );
-    if (
-      !eligibility ||
-      candidate.localDate !== resolveV5TargetDate(eligibility.timezone, scheduledAt)
-    ) {
-      continue;
-    }
-    if (!claimUser(candidate.userId)) continue;
-    if (!eligibility?.eligible) {
+    await perCandidate(summary, async () => {
+      const eligibility = await loadSchedulerEligibility(
+        env,
+        candidate.userId,
+        scheduledAt,
+        config.pregenActiveDays,
+      );
       if (
-        await backoffIneligibleInvalidatedOrphan(
-          env,
-          candidate.readingId,
-          candidate.userId,
-          scheduledAt,
-        )
+        !eligibility ||
+        candidate.localDate !== resolveV5TargetDate(eligibility.timezone, scheduledAt)
       ) {
-        summary.repair.ineligibleOrphansBackedOff += 1;
+        return;
       }
-      await recomputeUserNextDueAt(env, candidate.userId, scheduledAt);
-      continue;
-    }
-    const repaired = await reserveFactRepair(env, candidate.readingId, scheduledAt);
-    if (repaired.ok) summary.repair.factRepairs += 1;
+      if (!claimUser(candidate.userId)) return;
+      if (!eligibility?.eligible) {
+        if (
+          await backoffIneligibleInvalidatedOrphan(
+            env,
+            candidate.readingId,
+            candidate.userId,
+            scheduledAt,
+          )
+        ) {
+          summary.repair.ineligibleOrphansBackedOff += 1;
+        }
+        await recomputeUserNextDueAt(env, candidate.userId, scheduledAt);
+        return;
+      }
+      const repaired = await reserveFactRepair(env, candidate.readingId, scheduledAt);
+      if (repaired.ok) summary.repair.factRepairs += 1;
+    });
   }
 
   // Repair 3: a consumer died while holding a claim. Re-offering the opaque
@@ -266,15 +301,17 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of expired) {
-    if (!claimUser(candidate.userId)) continue;
-    if (
-      await dispatch(env, {
-        job_id: candidate.jobId,
-        reading_id: candidate.readingId,
-      })
-    ) {
-      summary.repair.expiredLeaseRedispatched += 1;
-    }
+    await perCandidate(summary, async () => {
+      if (!claimUser(candidate.userId)) return;
+      if (
+        await dispatch(env, {
+          job_id: candidate.jobId,
+          reading_id: candidate.readingId,
+        })
+      ) {
+        summary.repair.expiredLeaseRedispatched += 1;
+      }
+    });
   }
 
   // Repair 4: D1 committed before Queue send. This remains after expired
@@ -286,15 +323,17 @@ export async function runReadingScheduler(
     seen,
   );
   for (const candidate of undispatched) {
-    if (!claimUser(candidate.userId)) continue;
-    if (
-      await dispatch(env, {
-        job_id: candidate.jobId,
-        reading_id: candidate.readingId,
-      })
-    ) {
-      summary.repair.undispatchedOutboxRedispatched += 1;
-    }
+    await perCandidate(summary, async () => {
+      if (!claimUser(candidate.userId)) return;
+      if (
+        await dispatch(env, {
+          job_id: candidate.jobId,
+          reading_id: candidate.readingId,
+        })
+      ) {
+        summary.repair.undispatchedOutboxRedispatched += 1;
+      }
+    });
   }
 
   summary.repairQuotaExhausted = remaining() === 0;
@@ -302,35 +341,37 @@ export async function runReadingScheduler(
   // New due reservations may use only what repair left behind.
   const due = await findDueSchedulerCandidates(env, scheduledAt, remaining(), seen);
   for (const candidate of due) {
-    if (!claimUser(candidate.userId)) continue;
-    summary.due.evaluated += 1;
-    const target = await selectReadingScheduleTarget(
-      candidate.userId,
-      candidate.timezone,
-      scheduledAt,
-      DEFAULT_READING_SCHEDULE_POLICY,
-    );
-    const eligibility = await loadSchedulerEligibility(
-      env,
-      candidate.userId,
-      scheduledAt,
-      publisher.config.pregenActiveDays,
-    );
-    if (eligibility?.eligible) {
-      const reserved = await enqueueConstrainedReading(env, candidate.userId, {
-        entry: "scheduled",
-        reservationReason: "scheduled",
-        targetLocalDate: target.targetLocalDate,
-        now: scheduledAt,
+    await perCandidate(summary, async () => {
+      if (!claimUser(candidate.userId)) return;
+      summary.due.evaluated += 1;
+      const target = await selectReadingScheduleTarget(
+        candidate.userId,
+        candidate.timezone,
+        scheduledAt,
+        DEFAULT_READING_SCHEDULE_POLICY,
+      );
+      const eligibility = await loadSchedulerEligibility(
+        env,
+        candidate.userId,
+        scheduledAt,
+        config.pregenActiveDays,
+      );
+      if (eligibility?.eligible) {
+        const reserved = await enqueueConstrainedReading(env, candidate.userId, {
+          entry: "scheduled",
+          reservationReason: "scheduled",
+          targetLocalDate: target.targetLocalDate,
+          now: scheduledAt,
+        });
+        if (reserved.ok) summary.due.reserved += 1;
+      }
+      await advanceUserNextDueAt(env, {
+        userId: candidate.userId,
+        timezone: candidate.timezone,
+        evaluatedLocalDate: target.targetLocalDate,
+        expectedDueAt: candidate.nextDueAt,
+        scheduledAt,
       });
-      if (reserved.ok) summary.due.reserved += 1;
-    }
-    await advanceUserNextDueAt(env, {
-      userId: candidate.userId,
-      timezone: candidate.timezone,
-      evaluatedLocalDate: target.targetLocalDate,
-      expectedDueAt: candidate.nextDueAt,
-      scheduledAt,
     });
   }
 
@@ -338,18 +379,20 @@ export async function runReadingScheduler(
   // does not reserve prose during the same invocation.
   const unseeded = await findNullCursorCandidates(env, remaining(), seen);
   for (const candidate of unseeded) {
-    if (!claimUser(candidate.userId)) continue;
-    summary.nullSeed.evaluated += 1;
-    if (
-      await seedUserNextDueAt(
-        env,
-        candidate.userId,
-        candidate.timezone,
-        scheduledAt,
-      )
-    ) {
-      summary.nullSeed.seeded += 1;
-    }
+    await perCandidate(summary, async () => {
+      if (!claimUser(candidate.userId)) return;
+      summary.nullSeed.evaluated += 1;
+      if (
+        await seedUserNextDueAt(
+          env,
+          candidate.userId,
+          candidate.timezone,
+          scheduledAt,
+        )
+      ) {
+        summary.nullSeed.seeded += 1;
+      }
+    });
   }
 
   summary.usersExamined = seen.size;

@@ -61,14 +61,39 @@ interface FactualSchedulerRow {
   local_date: string;
 }
 
+/**
+ * D1 binds at most 100 parameters per statement.
+ *
+ * The scheduler's own batch limit is 100 and each lane runs while the quota is
+ * unspent, so the already-seen set reaches 99 while a lane is still executing.
+ * Add a lane's own fixed parameters and the LIMIT and the statement crosses the
+ * ceiling, which D1 rejects — out of the uncaught scheduled(), taking the due
+ * and null-seed lanes with it. The local miniflare D1 the test pool uses does
+ * not enforce the limit, so no integration test can ever see this; the cap and
+ * its unit test are the only places the platform bound exists in this repo.
+ */
+export const D1_MAX_BOUND_PARAMETERS = 100;
+
+/**
+ * The exclusion ids a lane may bind, given how many parameters it binds itself.
+ *
+ * Truncating the list is safe: it is a de-duplication hint, not a correctness
+ * boundary. Every lane still calls `claimUser` per candidate, which refuses a
+ * user another lane already took, so a user who slips past the truncated NOT IN
+ * is skipped one step later instead.
+ */
+export function excludedBudget(fixedParameters: number): number {
+  return Math.max(0, D1_MAX_BOUND_PARAMETERS - fixedParameters);
+}
+
 function excludedSql(excludedCount: number, column = "u.id"): string {
   return excludedCount > 0
     ? ` AND ${column} NOT IN (${Array.from({ length: excludedCount }, () => "?").join(", ")})`
     : "";
 }
 
-function excludedValues(excluded: ReadonlySet<string>): string[] {
-  return [...excluded].sort();
+function excludedValues(excluded: ReadonlySet<string>, budget: number): string[] {
+  return [...excluded].sort().slice(0, budget);
 }
 
 function utcLocalDate(scheduledAt: Date): string {
@@ -152,7 +177,16 @@ export function invalidatedOrphanDiscoverySql(excludedCount: number): string {
                    ) AS user_rank
             FROM daily_readings r INDEXED BY idx_daily_readings_invalidated_repair
             JOIN users u ON u.id = r.user_id AND u.status = 'active'
-            WHERE r.status = 'invalidated' AND r.updated_at <= ?
+            WHERE r.status = 'invalidated'
+              -- The six-hour backoff applies only to an orphan this scheduler
+              -- has ALREADY touched. invalidatePublishedReading stamps
+              -- updated_at too, so filtering on it alone also hid a freshly
+              -- invalidated row - exactly the crash window this lane exists to
+              -- converge - until after the owner's local day had rolled and the
+              -- current-day scoping excluded it for good. A row whose
+              -- updated_at has not moved past its own invalidated_at has never
+              -- been backed off, and is admitted at once.
+              AND (r.updated_at <= ? OR r.updated_at <= r.invalidated_at)
               AND r.assembly_mode = 'constrained_model'
               AND r.local_date BETWEEN ? AND ?
               AND NOT EXISTS (
@@ -176,7 +210,7 @@ export async function findFailedSchedulerCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<FailedSchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(12));
   const [earliestLocalDate, latestLocalDate] = failureDateBounds(scheduledAt);
   const ownerLocalDates = pinnedLocalDateIndexJson(scheduledAt.getTime());
   const sql = `WITH ranked AS (
@@ -221,7 +255,7 @@ export async function findStalePublishedCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<FactualSchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(4));
   const [earliestLocalDate, latestLocalDate] = factualDateBounds(scheduledAt);
   const ownerLocalDates = pinnedLocalDateIndexJson(scheduledAt.getTime());
   const sql = `WITH ranked AS (
@@ -259,7 +293,7 @@ export async function findInvalidatedOrphanCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<FactualSchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(5));
   const cutoff = new Date(
     scheduledAt.getTime() - INVALIDATED_ORPHAN_BACKOFF_MS,
   ).toISOString();
@@ -278,7 +312,7 @@ export async function findExpiredSchedulerCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<RecoverySchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(2));
   const result = await env.DB.prepare(
     `WITH ranked AS (
        SELECT j.id AS job_id, r.id AS reading_id, j.user_id, j.lease_expires_at,
@@ -314,7 +348,7 @@ export async function findUndispatchedSchedulerCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<RecoverySchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(2));
   const result = await env.DB.prepare(
     `WITH ranked AS (
        SELECT j.id AS job_id, r.id AS reading_id, j.user_id, j.created_at,
@@ -353,7 +387,7 @@ export async function findDueSchedulerCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<DueSchedulerCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(2));
   const result = await env.DB.prepare(
     `SELECT u.id, u.timezone, u.next_due_at
      FROM users u INDEXED BY idx_users_next_due_at
@@ -377,7 +411,7 @@ export async function findNullCursorCandidates(
   excluded: ReadonlySet<string>,
 ): Promise<NullCursorCandidate[]> {
   if (limit <= 0) return [];
-  const excludedIds = excludedValues(excluded);
+  const excludedIds = excludedValues(excluded, excludedBudget(1));
   const result = await env.DB.prepare(
     `SELECT u.id, u.timezone
      FROM users u INDEXED BY idx_users_unseeded_due
@@ -410,11 +444,21 @@ export async function loadSchedulerEligibility(
             (u.timezone_source IN ('device_derived', 'user_confirmed')
              AND u.locale_source IN ('device_derived', 'user_confirmed'))
               AS preferences_confirmed,
-            EXISTS (
-              SELECT 1 FROM consents c
+            -- The LATEST ai_synthesis row, not any granted row. Consent
+            -- history is append-only: a revocation appends a revoked row and
+            -- leaves the granted one in place, so an EXISTS matched forever and
+            -- every revoked account still read as consented. That disagreed
+            -- with loadAiSynthesisGrant, which reads the newest row only and is
+            -- the authoritative rule - two implementations of one consent
+            -- decision, differing in the permissive direction, one gate away
+            -- from a paid provider call. The ordering matches loadLatestAiConsent.
+            (
+              SELECT c.status = 'granted' AND c.policy_version = ?
+                     AND (c.expires_at IS NULL OR c.expires_at > ?)
+              FROM consents c
               WHERE c.user_id = u.id AND c.kind = 'ai_synthesis'
-                AND c.status = 'granted' AND c.policy_version = ?
-                AND (c.expires_at IS NULL OR c.expires_at > ?)
+              ORDER BY c.version DESC, c.created_at DESC, c.id DESC
+              LIMIT 1
             ) AS has_ai_consent,
             EXISTS (
               SELECT 1 FROM sessions s
@@ -570,14 +614,31 @@ export async function backoffIneligibleInvalidatedOrphan(
   scheduledAt: Date,
 ): Promise<boolean> {
   const result = await env.DB.prepare(
-    `UPDATE daily_readings SET updated_at = ?
+    // Stamped STRICTLY LATER than invalidated_at, which is what makes
+    // `updated_at <= invalidated_at` mean "this scheduler has never backed this
+    // orphan off". The two writers share one column and both stamp the same
+    // instant when invalidation and backoff happen in one invocation, so
+    // equality alone could not tell them apart - and filtering on the six-hour
+    // threshold alone hid a freshly invalidated orphan for six hours, which is
+    // the crash window this lane exists to converge. One second is inside the
+    // six-hour window and affects nothing but this discriminator.
+    `UPDATE daily_readings
+     SET updated_at = CASE
+       WHEN ? > invalidated_at THEN ?
+       ELSE strftime('%Y-%m-%dT%H:%M:%fZ', invalidated_at, '+1 second')
+     END
      WHERE id = ? AND user_id = ? AND status = 'invalidated'
        AND NOT EXISTS (
          SELECT 1 FROM daily_readings successor
          WHERE successor.supersedes_reading_id = daily_readings.id
        )`,
   )
-    .bind(scheduledAt.toISOString(), readingId, userId)
+    .bind(
+      scheduledAt.toISOString(),
+      scheduledAt.toISOString(),
+      readingId,
+      userId,
+    )
     .run();
   return result.meta.changes === 1;
 }
