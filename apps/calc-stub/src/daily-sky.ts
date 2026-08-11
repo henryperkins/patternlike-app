@@ -156,11 +156,94 @@ function requireLongitude(value: unknown, label: string): number {
  * a natal Moon longitude that reached the scanner would come back as a contact
  * the uncertainty report says is unavailable.
  */
+/** Truncated for the error message; an undeclared key is caller-supplied text. */
+function quoteKey(value: string): string {
+  const points = Array.from(value);
+  const shown = points.length <= 40 ? value : points.slice(0, 40).join("") + "\u2026";
+  return JSON.stringify(shown);
+}
+
+/**
+ * Refuse a property the contract does not declare.
+ *
+ * The closure IS the enforcement, and repeating it at the service is the point:
+ * it refuses the same things whether or not anything validated the body
+ * upstream. This request is the one document that must never carry a user id, a
+ * birth instant, a coordinate, or a zone name into a service with no decryption
+ * path, and the M5 schema and the calc OpenAPI both say the closed object is
+ * what keeps them out. `/v1/cycles` has done this since M3; this endpoint was
+ * shipped without it, so the guarantee was a comment rather than a check.
+ */
+function closeObject(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  where: string,
+): void {
+  const permitted = new Set(allowed);
+  for (const key of Object.keys(value)) {
+    if (!permitted.has(key)) {
+      fail("invalid_request", `undeclared property ${quoteKey(key)} in ${where}`);
+    }
+  }
+}
+
+const REQUEST_KEYS = [
+  "schema_version",
+  "request_id",
+  "day_start_at",
+  "day_end_at",
+  "anchor_at",
+  "anchor_resolution",
+  "natal_positions",
+  "natal_house_cusps",
+  "effective_accuracy",
+  "uncertainty",
+  "suppressed_features",
+  "zodiac",
+  "node",
+  "ephemeris_data_version",
+  "tzdb_version",
+  "local_day_resolution_policy_version",
+  "daily_sky_policy_id",
+  "daily_sky_policy_version",
+  "calculation_policy_id",
+  "calculation_policy_version",
+  "contract_id",
+  "contract_version",
+] as const;
+
+const NATAL_POSITION_KEYS = ["body", "longitude_deg"] as const;
+const HOUSE_CUSPS_KEYS = ["house_system", "cusps_deg"] as const;
+const UNCERTAINTY_KEYS = [
+  "accuracy",
+  "window_plus_minus_minutes",
+  "suppressed_features",
+  "qualified_features",
+] as const;
+
 export function validateDailySkyRequest(body: unknown): ValidatedDailySkyRequest {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     fail("invalid_request", "request body must be an object");
   }
   const raw = body as Record<string, unknown>;
+  closeObject(raw, REQUEST_KEYS, "the request");
+
+  const declaredPositions = raw.natal_positions;
+  if (Array.isArray(declaredPositions)) {
+    for (const entry of declaredPositions) {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        closeObject(entry as Record<string, unknown>, NATAL_POSITION_KEYS, "natal_positions");
+      }
+    }
+  }
+  const declaredCusps = raw.natal_house_cusps;
+  if (declaredCusps && typeof declaredCusps === "object" && !Array.isArray(declaredCusps)) {
+    closeObject(declaredCusps as Record<string, unknown>, HOUSE_CUSPS_KEYS, "natal_house_cusps");
+  }
+  const declaredUncertainty = raw.uncertainty;
+  if (declaredUncertainty && typeof declaredUncertainty === "object" && !Array.isArray(declaredUncertainty)) {
+    closeObject(declaredUncertainty as Record<string, unknown>, UNCERTAINTY_KEYS, "uncertainty");
+  }
 
   if (raw.schema_version !== M5_SCHEMA_VERSION) {
     fail("invalid_request", `schema_version must be ${M5_SCHEMA_VERSION}`);
@@ -437,10 +520,24 @@ function bisect(f: AngleFn, lo: number, hi: number, signAtLo: number): number {
  * separates the two: at a 15-minute grid step the fastest body moves 0.14
  * degrees, so a genuine bracket can never look like an antipodal jump.
  */
+/** One second, in the days that Julian-day arithmetic uses. */
+const ONE_SECOND_DAYS = 1 / 86_400;
+
 function rootsIn(f: AngleFn, from: number, to: number): number[] {
   const roots: number[] = [];
-  const push = (jd: number) => {
-    if (jd < from || jd >= to) return;
+  const toIso = jdToIso(to);
+  const push = (raw: number) => {
+    if (raw < from || raw >= to) return;
+    // Bound the RENDERED instant, not only the raw root. jdToIso rounds to the
+    // nearest second, so a true root in the final half-second of the interval
+    // rendered as exactly day_end_at — which the response contract, the calc
+    // OpenAPI, and the end-boundary invalid fixture all declare belongs to the
+    // NEXT local day. Clamping back to the last second still inside the
+    // interval keeps the fact on the day it actually happened; dropping it
+    // would lose it entirely, because the next day's scan starts at this same
+    // instant and requires jd >= from. The shift is at most one second, which
+    // is the resolution this fact class already declares.
+    const jd = jdToIso(raw) >= toIso ? to - ONE_SECOND_DAYS : raw;
     if (roots.some((existing) => Math.abs(existing - jd) <= ROOT_DEDUPE_TOLERANCE_DAYS)) return;
     roots.push(jd);
   };

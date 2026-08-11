@@ -286,6 +286,50 @@ test("a house placement appears only when the request supplies cusps", () => {
   assert.equal(scan(request(), { ...QUIET }).filter((f) => f.kind === "house_placement").length, 0);
 });
 
+test("the request object is closed, so private fields cannot ride along", () => {
+  // The closure IS the enforcement: the M5 schema and the calc OpenAPI both say
+  // so, and this service has no decryption path, so a user id or a birth
+  // instant reaching it would be a field nobody can justify. /v1/cycles has
+  // refused undeclared properties since M3; this endpoint shipped without it,
+  // which made the guarantee a comment rather than a check.
+  for (const injected of [
+    { user_id: "usr_0000000000000001" },
+    { birth_instant: "1991-01-14T17:42:00Z" },
+    { latitude: 41.8781, longitude: -87.6298 },
+    { timezone: "America/Chicago" },
+    { chart_id: "cht_0000000000000001" },
+  ]) {
+    assert.throws(
+      () => validateDailySkyRequest({ ...request(), ...injected }),
+      /undeclared property/,
+      `accepted ${Object.keys(injected).join(", ")}`,
+    );
+  }
+
+  // Nested objects are closed too.
+  assert.throws(
+    () =>
+      validateDailySkyRequest(
+        request({
+          natal_positions: [
+            { body: "sun", longitude_deg: 0, chart_fingerprint: "a".repeat(64) } as never,
+          ],
+        }),
+      ),
+    /undeclared property .* in natal_positions/,
+  );
+  assert.throws(
+    () =>
+      validateDailySkyRequest(
+        request({ natal_house_cusps: { ...CUSPS, birth_place: "Chicago" } as never }),
+      ),
+    /undeclared property .* in natal_house_cusps/,
+  );
+
+  // And a request carrying only declared properties still validates.
+  assert.doesNotThrow(() => validateDailySkyRequest(request()));
+});
+
 test("suppressed features are refused as INPUTS rather than filtered from output", () => {
   // A longitude that reached the scanner would come back as a contact the
   // uncertainty report says is unavailable, so the refusal is at the door.
