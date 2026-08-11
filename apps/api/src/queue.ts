@@ -1,14 +1,20 @@
 import type { Env, GenerationMessage } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import {
-  CLAIM_LEASE_MS,
-  MAX_JOB_ATTEMPTS,
   ClaimLoadError,
   claimJob,
   failClaimedJob,
   releaseClaimForRetry,
 } from "./db/generation.js";
 import { dispatchGeneration } from "./services/generate-daily-reading.js";
+import {
+  LEASE_RETRY_DELAY_SECONDS,
+  MAX_JOB_ATTEMPTS,
+  RETRY_DELAY_SECONDS,
+  queueDisposition,
+  type GenerationFailureCode,
+} from "./services/generation-failures.js";
+import { isCommandV2 } from "./services/generation-command-v2.js";
 
 /**
  * The daily-reading consumer.
@@ -21,10 +27,6 @@ import { dispatchGeneration } from "./services/generate-daily-reading.js";
  * still run.
  */
 
-/** Backoff for a dependency that was down rather than wrong. */
-const RETRY_DELAY_SECONDS = 60;
-const LEASE_RETRY_DELAY_SECONDS = Math.ceil(CLAIM_LEASE_MS / 1000) + 5;
-
 interface ClaimReference {
   jobId: string;
   claimToken: string;
@@ -36,9 +38,10 @@ async function retryOrFail(
   env: Env,
   claim: ClaimReference,
   resultClass: string,
+  disposition?: "retry_60s" | "terminal",
 ): Promise<void> {
   const attempts = Math.max(message.attempts, claim.attempts ?? 0);
-  if (attempts >= MAX_JOB_ATTEMPTS) {
+  if (disposition === "terminal" || attempts >= MAX_JOB_ATTEMPTS) {
     const failed = await failClaimedJob(env, claim.jobId, claim.claimToken, resultClass);
     if (failed.ok) {
       message.ack();
@@ -119,7 +122,13 @@ export async function queue(
         continue;
       }
 
-      if (outcome.reason === "calc_unavailable" || outcome.reason === "release_unreadable") {
+      const commandVersion = isCommandV2(claim.command) ? "v2" : "v1";
+      const disposition = queueDisposition(
+        commandVersion,
+        outcome.reason as GenerationFailureCode,
+        Math.max(message.attempts, claim.attempts ?? 0),
+      );
+      if (disposition === "retry_60s") {
         // Infrastructural. Release the claim before asking Queue for a delayed
         // redelivery; after the bounded delivery budget, fail the reservation
         // so the scheduler's guarded replacement path can re-freeze the day.
@@ -127,7 +136,16 @@ export async function queue(
           job_id: jobId,
           reason: outcome.reason,
         });
-        await retryOrFail(message, env, claim, outcome.reason);
+        await retryOrFail(message, env, claim, outcome.reason, disposition);
+        continue;
+      }
+
+      if (
+        (commandVersion === "v1" &&
+          (outcome.reason === "calc_unavailable" || outcome.reason === "release_unreadable")) ||
+        commandVersion === "v2"
+      ) {
+        await retryOrFail(message, env, claim, outcome.reason, disposition);
         continue;
       }
 

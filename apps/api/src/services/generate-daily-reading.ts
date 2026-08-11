@@ -29,6 +29,7 @@ import {
   type GenerateDailyReadingCommandV1,
 } from "./generation-command.js";
 import { isCommandV2 } from "./generation-command-v2.js";
+import type { V1FailureCode } from "./generation-failures.js";
 import type { StoredReadingV3 } from "./stored-reading.js";
 
 /**
@@ -60,21 +61,9 @@ export type ExecutionOutcome =
   | { ok: true; readingId: string; fallbackUsed: boolean }
   /** Another claim already committed this reading. Ack and move on. */
   | { ok: false; reason: "duplicate"; detail: string }
-  /** Retryable: the dependency was down, not wrong. */
-  | { ok: false; reason: "calc_unavailable" | "release_unreadable"; detail: string }
-  /** Terminal: the frozen inputs no longer describe a reading we may publish. */
-  | { ok: false; reason: ExecutionFailure; detail: string };
+  | { ok: false; reason: V1FailureCode; detail: string };
 
-export type ExecutionFailure =
-  | "policy_unsupported"
-  | "chart_missing"
-  | "release_hash_mismatch"
-  | "cycle_missing"
-  | "cycle_hash_mismatch"
-  | "consent_revoked"
-  | "assembly_id_mismatch"
-  | "assembly_failed"
-  | "publication_failed";
+export type ExecutionFailure = Exclude<V1FailureCode, "calc_unavailable" | "release_unreadable">;
 
 interface ChartRow {
   id: string;
@@ -255,7 +244,7 @@ export async function generateDailyReading(
   };
 
   const fail = async (
-    reason: ExecutionFailure | "calc_unavailable" | "release_unreadable",
+    reason: V1FailureCode,
     detail: string,
   ): Promise<ExecutionOutcome> => {
     const failed = await failReading(

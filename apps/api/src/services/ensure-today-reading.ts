@@ -15,6 +15,11 @@ import {
 import { localDateIn } from "./local-day.js";
 import type { CommandBuildFailure } from "./generation-command.js";
 import type { CommandBuildFailureV2 } from "./generation-command-v2.js";
+import {
+  isAutomaticReplacementFailure,
+  isGenerationFailureCode,
+  type GenerationReplacementReason,
+} from "./generation-failures.js";
 
 export type EnsureTodayFailureReason =
   | CommandBuildFailure
@@ -165,15 +170,22 @@ export async function ensureTodayReading(
         detail: "the failed reservation does not point at a terminal generation job",
       };
     }
+    const reading = await env.DB.prepare(
+      `SELECT assembly_mode FROM daily_readings WHERE id = ? AND user_id = ?`,
+    )
+      .bind(state.readingId, identity.userId)
+      .first<{ assembly_mode: "deterministic" | "constrained_model" }>();
+    const commandVersion = reading?.assembly_mode === "constrained_model" ? "v2" : "v1";
     if (
-      failedJob.resultClass === "calc_unavailable" ||
-      failedJob.resultClass === "release_unreadable"
+      failedJob.resultClass &&
+      isGenerationFailureCode(failedJob.resultClass) &&
+      isAutomaticReplacementFailure(commandVersion, failedJob.resultClass)
     ) {
       const replaced = await replaceFailedCommand(
         env,
         identity.userId,
         state.readingId,
-        failedJob.resultClass,
+        failedJob.resultClass as GenerationReplacementReason,
         "scheduler",
         now,
       );

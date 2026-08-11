@@ -21,6 +21,7 @@ import {
 } from "../../test/helpers.js";
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
+import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
 import {
   MAX_COMMAND_GENERATION,
   claimJob,
@@ -30,11 +31,13 @@ import {
 } from "../db/generation.js";
 import {
   dispatch,
+  enqueueConstrainedReading,
   enqueueDailyReading,
   enqueueReissue,
   replaceFailedCommand,
   type GenerationMessage,
 } from "./enqueue.js";
+import { OPENAI_READING_MODEL } from "./reading-publisher.js";
 import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
@@ -176,6 +179,40 @@ async function seedEverything() {
   await confirmPreferences(USER_A, "America/Chicago");
   await seedChart(IDENTITY_A);
   return seedActiveRelease();
+}
+
+function enabledV5Env() {
+  return {
+    ...env,
+    READING_V5_ROLLOUT: "internal",
+    READING_PUBLISHER: "openai",
+    OPENAI_READING_MODEL,
+    OPENAI_READING_REASONING: "high",
+    OPENAI_READING_PROMPT_VERSION: "1.0.0",
+    OPENAI_READING_TIMEOUT_MS: "90000",
+    OPENAI_READING_MAX_OUTPUT_TOKENS: "1800",
+    READING_CONTEXT_MAX_BYTES: "98304",
+    READING_PREGEN_ACTIVE_DAYS: "30",
+    READING_PREGEN_LEAD_MINUTES: "30",
+    READING_PREGEN_SPREAD_MINUTES: "45",
+    READING_SCHEDULER_BATCH_LIMIT: "100",
+    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
+    OPENAI_API_KEY: "sk-test-key",
+  };
+}
+
+async function grantAiSynthesis() {
+  await rows(
+    `INSERT INTO consents (id, user_id, kind, status, policy_version, allowed_uses_json,
+       scopes_json, version, granted_at, created_at, updated_at)
+     VALUES (?, ?, 'ai_synthesis', 'granted', ?, '[]', '[]', 1, ?, ?, ?)`,
+    "cns_ai_synthesis_0001",
+    USER_A,
+    AI_SYNTHESIS_POLICY_VERSION,
+    "2026-08-09T00:00:00.000Z",
+    "2026-08-09T00:00:00.000Z",
+    "2026-08-09T00:00:00.000Z",
+  );
 }
 
 async function seedContextSignal(
@@ -1474,6 +1511,49 @@ describe("command replacement", () => {
     const [reading] = await readings();
     expect(reading!.status).toBe("failed");
     expect(reading!.command_generation).toBe(3);
+  });
+
+  it("uses the V2 replacement policy for seeded constrained-model terminal rows", async () => {
+    await grantAiSynthesis();
+    const v5Env = enabledV5Env();
+    const seeded = await enqueueConstrainedReading(v5Env, USER_A, {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate: "2026-08-09",
+      now: new Date("2026-08-09T18:00:00.000Z"),
+    });
+    if (!seeded.ok) throw new Error(`v2 enqueue failed: ${seeded.reason}`);
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, seeded.jobId);
+
+    expect(
+      await replaceFailedCommand(
+        v5Env,
+        USER_A,
+        seeded.readingId,
+        "publisher_unavailable",
+        "scheduler",
+        new Date("2026-08-09T18:00:00.000Z"),
+      ),
+    ).toMatchObject({ ok: true });
+    expect((await readings())[0]).toMatchObject({
+      command_generation: 2,
+      status: "pending",
+    });
+
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
+    const [active] = await rows<{ active_generation_job_id: string }>(
+      `SELECT active_generation_job_id FROM daily_readings WHERE id = ?`,
+      seeded.readingId,
+    );
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, active!.active_generation_job_id);
+
+    await expect(
+      replaceFailedCommand(v5Env, USER_A, seeded.readingId, "release_unreadable", "scheduler"),
+    ).resolves.toMatchObject({ ok: false, reason: "not_replaceable" });
+    await expect(
+      replaceFailedCommand(v5Env, USER_A, seeded.readingId, "consent_regranted", "scheduler"),
+    ).resolves.toMatchObject({ ok: false, reason: "not_replaceable" });
   });
 
   it("refuses to silently regenerate a day the reader has moved past", async () => {

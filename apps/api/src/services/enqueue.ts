@@ -4,7 +4,6 @@ import { asCryptoSubject } from "../crypto.js";
 import type { UserIdentity } from "../db/users.js";
 import { persistCycles } from "../db/cycles.js";
 import {
-  MAX_COMMAND_GENERATION,
   markDispatched,
   replaceCommand,
   reserveInitial,
@@ -15,7 +14,6 @@ import {
   buildGenerationCommand,
   type CommandBuildFailure,
   type CommandReplacementReason,
-  type GenerateDailyReadingCommandV1,
   type RevisionReason,
 } from "./generation-command.js";
 import { isCurrentOrPreviousLocalDay } from "./local-day.js";
@@ -28,6 +26,15 @@ import {
   type ReservationReason,
   type RevisionReasonV2,
 } from "./generation-command-v2.js";
+import {
+  MAX_COMMAND_GENERATION,
+  isAutomaticReplacementFailure,
+  isGenerationFailureCode,
+  isV1ReplacementReason,
+  isV5ReplacementReason,
+  type GenerationReplacementReason,
+  type V5ReplacementReason,
+} from "./generation-failures.js";
 
 export type { GenerationMessage } from "../env.js";
 
@@ -200,18 +207,13 @@ export async function enqueueReissue(
   return { ok: true, readingId: reserved.readingId, jobId: reserved.jobId, dispatched };
 }
 
-/** Reasons the scheduler may act on unattended. Everything else needs a person. */
-const SCHEDULER_REPLACEABLE: ReadonlySet<CommandReplacementReason> = new Set([
-  "calc_unavailable",
-  "release_unreadable",
-]);
-
 export type ReplaceEnqueueOutcome =
   | { ok: true; readingId: string; jobId: string; dispatched: boolean }
   | {
       ok: false;
       reason:
         | CommandBuildFailure
+        | CommandBuildFailureV2
         | "not_replaceable"
         | "budget_exhausted"
         | "stale_job"
@@ -239,7 +241,7 @@ export async function replaceFailedCommand(
   env: Env,
   userId: string,
   readingId: string,
-  reason: CommandReplacementReason,
+  reason: GenerationReplacementReason,
   actor: "scheduler" | "operator",
   now = new Date(),
 ): Promise<ReplaceEnqueueOutcome> {
@@ -247,17 +249,9 @@ export async function replaceFailedCommand(
   if (!identity) {
     return { ok: false, reason: "chart_not_found", detail: "no active user" };
   }
-  if (actor === "scheduler" && !SCHEDULER_REPLACEABLE.has(reason)) {
-    return {
-      ok: false,
-      reason: "not_replaceable",
-      detail: `${reason} is an operator decision, not an automatic repair`,
-    };
-  }
-
   const reservation = await env.DB.prepare(
     `SELECT id, local_date, status, revision, revision_reason, supersedes_reading_id,
-            command_generation, active_generation_job_id
+            command_generation, active_generation_job_id, assembly_mode
      FROM daily_readings WHERE id = ? AND user_id = ?`,
   )
     .bind(readingId, userId)
@@ -270,12 +264,27 @@ export async function replaceFailedCommand(
       supersedes_reading_id: string | null;
       command_generation: number;
       active_generation_job_id: string | null;
+      assembly_mode: "deterministic" | "constrained_model";
     }>();
   if (!reservation || reservation.status !== "failed" || !reservation.active_generation_job_id) {
     return {
       ok: false,
       reason: "stale_job",
       detail: "reservation is not a failed reading with an active terminal job",
+    };
+  }
+
+  const commandVersion = reservation.assembly_mode === "constrained_model" ? "v2" : "v1";
+  if (
+    (commandVersion === "v1" && !isV1ReplacementReason(reason)) ||
+    (commandVersion === "v2" && !isV5ReplacementReason(reason)) ||
+    (actor === "scheduler" &&
+      (!isGenerationFailureCode(reason) || !isAutomaticReplacementFailure(commandVersion, reason)))
+  ) {
+    return {
+      ok: false,
+      reason: "not_replaceable",
+      detail: `${reason} is an operator decision, not an automatic repair`,
     };
   }
 
@@ -302,22 +311,36 @@ export async function replaceFailedCommand(
     }
   }
 
-  const build = await buildGenerationCommand(env, userId, {
-    readingId,
-    revision: reservation.revision,
-    revisionReason: reservation.revision_reason,
-    supersedesReadingId: reservation.supersedes_reading_id,
-    commandGeneration: nextGeneration,
-    replacesJobId: reservation.active_generation_job_id,
-    commandReplacementReason: reason,
-    now,
-  });
+  const build =
+    commandVersion === "v1"
+      ? await buildGenerationCommand(env, userId, {
+          readingId,
+          revision: reservation.revision,
+          revisionReason: reservation.revision_reason,
+          supersedesReadingId: reservation.supersedes_reading_id,
+          commandGeneration: nextGeneration,
+          replacesJobId: reservation.active_generation_job_id,
+          commandReplacementReason: reason as CommandReplacementReason,
+          now,
+        })
+      : await buildGenerationCommandV2(env, identity, {
+          readingId,
+          revision: reservation.revision,
+          revisionReason: reservation.revision_reason as RevisionReasonV2,
+          supersedesReadingId: reservation.supersedes_reading_id,
+          reservationReason: actor === "scheduler" ? "automatic_replacement" : "manual_reissue",
+          commandGeneration: nextGeneration,
+          replacesJobId: reservation.active_generation_job_id,
+          commandReplacementReason: reason as V5ReplacementReason,
+          targetLocalDate: reservation.local_date,
+          now,
+        });
   if (!build.ok) return { ok: false, reason: build.reason, detail: build.detail };
 
   // The replacement must land on the same local day the reservation reserved.
   // A midnight rollover between the failure and the repair would otherwise
   // rewrite which day this reading is for.
-  const command: GenerateDailyReadingCommandV1 = build.command;
+  const command = build.command;
   if (command.target_local_date !== reservation.local_date) {
     return {
       ok: false,

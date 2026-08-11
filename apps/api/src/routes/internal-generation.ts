@@ -9,9 +9,12 @@ import {
 } from "../services/enqueue.js";
 import { findExpiredLeases, findUndispatched } from "../db/generation.js";
 import type {
-  CommandReplacementReason,
   RevisionReason,
 } from "../services/generation-command.js";
+import {
+  isGenerationReplacementReason,
+  type GenerationReplacementReason,
+} from "../services/generation-failures.js";
 
 /**
  * Operator and scheduler entry points for daily-reading generation.
@@ -31,14 +34,6 @@ const REISSUE_REASONS: readonly RevisionReason[] = [
   "chart_recalculated",
   "consent_revoked",
   "safety_correction",
-  "defect_repair",
-];
-
-const REPLACEMENT_REASONS: readonly CommandReplacementReason[] = [
-  "calc_unavailable",
-  "release_unreadable",
-  "context_minimized",
-  "policy_upgraded",
   "defect_repair",
 ];
 
@@ -195,21 +190,21 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
   const body = await readJson(c);
   const userId = typeof body?.user_id === "string" ? body.user_id : null;
   const readingId = typeof body?.reading_id === "string" ? body.reading_id : null;
-  const reason = body?.reason as CommandReplacementReason | undefined;
+  const reason = typeof body?.reason === "string" ? body.reason : null;
   const actor = body?.actor;
 
   if (
     !userId ||
     !readingId ||
     !reason ||
-    !REPLACEMENT_REASONS.includes(reason) ||
+    !isGenerationReplacementReason(reason) ||
     (actor !== "scheduler" && actor !== "operator")
   ) {
     return c.json(
       {
         error: {
           code: "invalid_body",
-          message: `user_id, reading_id, actor (scheduler or operator), and a reason of ${REPLACEMENT_REASONS.join(", ")} are required`,
+          message: "user_id, reading_id, actor (scheduler or operator), and a supported replacement reason are required",
           request_id: requestId,
         },
       },
@@ -217,7 +212,13 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
     );
   }
 
-  const result = await replaceFailedCommand(c.env, userId, readingId, reason, actor);
+  const result = await replaceFailedCommand(
+    c.env,
+    userId,
+    readingId,
+    reason as GenerationReplacementReason,
+    actor,
+  );
   if (!result.ok) {
     return c.json(
       {

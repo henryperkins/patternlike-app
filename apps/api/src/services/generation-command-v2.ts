@@ -54,6 +54,7 @@ import {
 } from "./reading-publisher.js";
 import { toAssemblyUncertainty } from "./generation-command.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
+import type { V5ReplacementReason } from "./generation-failures.js";
 
 /**
  * Freeze every input a constrained-model reading will ever be generated from.
@@ -174,7 +175,7 @@ export interface GenerateDailyReadingCommandV2 {
   reservation_reason: ReservationReason;
   command_generation: number;
   replaces_job_id: string | null;
-  command_replacement_reason: string | null;
+  command_replacement_reason: V5ReplacementReason | null;
   target_local_date: string;
   target_timezone: string;
   timezone_source: "device_derived" | "user_confirmed";
@@ -405,7 +406,7 @@ export interface CommandBuildContextV2 {
   reservationReason: ReservationReason;
   commandGeneration: number;
   replacesJobId: string | null;
-  commandReplacementReason: string | null;
+  commandReplacementReason: V5ReplacementReason | null;
   /**
    * Explicit rather than derived. The scheduler reserves TOMORROW's edition
    * before its local day begins, and re-deriving "today" would give a

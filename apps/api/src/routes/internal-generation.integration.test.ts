@@ -122,6 +122,22 @@ describe("POST /internal/readings/*", () => {
     ).toBe(400);
   });
 
+  it("accepts V2 replacement vocabulary before storage rejects it for a V1 row", async () => {
+    const reserved = await post("/readings/generate", { user_id: USER_A });
+    expect(reserved.status).toBe(202);
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, reserved.body.reading_id!);
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, reserved.body.job_id!);
+
+    const { status, body } = await post("/readings/replace", {
+      user_id: USER_A,
+      reading_id: reserved.body.reading_id,
+      reason: "consent_regranted",
+      actor: "scheduler",
+    });
+    expect(status).toBe(409);
+    expect(body.error?.code).toBe("not_replaceable");
+  });
+
   it("does not expose raw D1 errors in an internal response", async () => {
     await rows("ALTER TABLE audit_events RENAME TO audit_events_unavailable");
     try {
