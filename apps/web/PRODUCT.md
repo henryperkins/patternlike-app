@@ -20,7 +20,9 @@ Success means a user can understand a relevant theme in plain language, inspect 
 
 ## Positioning
 
-Pattern/Like is calculated, not invented. Swiss Ephemeris establishes chart facts and interpretation eligibility; reviewed editorial material supplies the language; user context may rank or frame a valid interpretation but may never alter chart facts. Every substantive interpretation remains traceable to eligible facts and approved content versions.
+Pattern/Like is calculated, not invented. Swiss Ephemeris establishes chart facts, the daily sky, and interpretation eligibility; a configured model writes the language of a daily reading under an explicit consent, within a closed set of supplied facts; user context may rank or frame a valid interpretation but may never alter chart facts. Every astrological statement in a published reading resolves to calculated evidence, and every reading records which model, prompt, and policy versions produced it.
+
+The language of a daily reading is no longer reviewed editorial copy. That is a deliberate change, not a drift: the calculation, eligibility, consent, minimization, structured-output, deterministic-validation, and provenance controls are unchanged, and the reviewed-copy control over prose was removed in exchange for a reading that is genuinely about the reader's own day. Historical readings written by the earlier editorial pipeline remain readable exactly as they were published.
 
 ## Operating Context
 
@@ -32,12 +34,16 @@ The core product loop spans Today, Your Pattern, Timing, Time Travel, and Contex
 
 - Swiss Ephemeris is the calculation authority, normalized through versioned application contracts.
 - Exact, approximate, and unknown birth times are first-class inputs. Unsupported houses, angles, and time-sensitive claims must be suppressed or explicitly qualified.
-- Every interpretive paragraph must resolve to eligible calculated facts and approved editorial content, or be explicitly identified as user context.
-- Deterministic reviewed copy is the fallback when generated assembly is unavailable or invalid.
+- The calculated daily sky — positions and lunar phase at the reader's local-day anchor, exact transit contacts inside that day, and collective sky events — is what makes a reading daily. It is calculated, never inferred by the model.
+- Every astrological claim in a published reading cites the calculated fact behind it. A paragraph may be carried by permitted personal context instead, and then it claims nothing about the sky.
+- A reading is written by a configured model and published only after deterministic validation. There is no reviewed-copy fallback, no previous-day reuse, no alternate model, and no second model reviewing the first: a reading that cannot be produced and validated says so honestly instead.
+- Sending anything to the model requires an explicit AI-synthesis consent, separate from research and model-training consent and revocable at any time. Revoking stops all future generation; it does not rewrite a reading already published.
+- The model receives an accuracy label, the derived uncertainty, calculated facts, confirmed locale and local date, and the personal context the reader enabled. It never receives the birth instant, birthplace, coordinates, scheduling zone, account identifiers, or security material.
 - User context can rank themes, select domains, adapt framing, or schedule delivery; it cannot change the chart or be presented as an astrological discovery.
 - The product must not make predictive guarantees, diagnoses, causal claims, or claims that exceed the available birth data.
 - Birth values and other private user content are encrypted at rest. Sensitive payloads do not belong in analytics, logs, or the editorial system.
 - Users must be able to understand active data sources and request export or deletion without hidden state or misleading success messages.
+- A published reading is stable for its local day. New context, feedback, ordinary preference changes, and consent revocation affect future readings. Only a factual invalidation — a corrected birth profile, a corrected chart, a calculation defect — may remove a published reading from Today before a successor exists, and only for readings the model wrote.
 
 ## Brand Commitments
 
@@ -47,7 +53,7 @@ The voice is calm, precise, direct, and non-mystifying. It leads with ordinary l
 
 ## Evidence on Hand
 
-- `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.2.md` is the product and engineering baseline.
+- `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` is the current product and engineering specification. The v0.2 bundle beside it is the superseded baseline and is kept, unedited, as a truthful record of the editorial-assembly architecture.
 - `apps/web/src/App.tsx` and the components under `apps/web/src/components/` implement the signed-out, onboarding, chart, Today, Timing, Time Travel, and privacy surfaces.
 - `apps/web/public/mark.svg` and `apps/web/public/manifest.webmanifest` contain the current product mark, name, and PWA metadata.
 - Contract fixtures, calculation fingerprints, uncertainty metadata, and technical evidence exposed by the application support inspectability claims.
@@ -55,7 +61,7 @@ The voice is calm, precise, direct, and non-mystifying. It leads with ordinary l
 
 ## Product Principles
 
-1. Facts before meaning: calculation and eligibility boundaries precede interpretation.
+1. Facts before meaning: calculation and eligibility boundaries precede interpretation, and the model is given facts rather than trusted to produce them.
 2. Honest uncertainty: reduce or qualify claims instead of manufacturing precision.
 3. Private by design: minimize access, encrypt sensitive data, and keep control visible to the user.
 4. Inspectable by default: explain why content appeared without forcing technical detail into the primary reading experience.
