@@ -50,8 +50,10 @@ queue = "patternlike-daily-readings-dev"
 # a guarded batch. Batching would only widen the blast radius of a retry.
 max_batch_size = 1
 max_batch_timeout = 5
-# Bound local/default queue fan-out to the publisher's intended concurrency.
-# Production remains absent until the separate activation gate approves it.
+# Bound local/default queue fan-out to the publisher's intended concurrency. The
+# production consumer below is declared but deliberately left at its incumbent
+# concurrency: raising it is part of the rollout's cost gate, not of shipping the
+# code.
 max_concurrency = 4
 # Three attempts, then the dead-letter queue. Beyond that a retry is no longer
 # waiting out an outage, and the replacement path — which re-freezes a NEW
@@ -100,6 +102,11 @@ READING_V5_ROLLOUT = "off"
 [env.production]
 name = "patternlike-api-production"
 
+# An explicit empty override, not an omission. Top-level [triggers] declares the
+# 15-minute development cron, and a named environment INHERITS it when it does
+# not say otherwise — so deleting these two lines silently activates the
+# scheduler in production. Activating it is a separate configuration change with
+# its own gate; see docs/deploy/openai-daily-reading-rollout.md.
 [env.production.triggers]
 crons = []
 
@@ -147,8 +154,11 @@ AUTH_STUB = "0"
 #   off        dual readers only. No V2 reservation from any entry point.
 #   internal   authenticated internal reservations, for one consented account.
 #   first_open PUT /v1/readings/today may reserve.
-#   hybrid     the 15-minute scheduler may reserve. Requires env.production
-#              .triggers, which is deliberately still absent below.
+#   hybrid     the 15-minute scheduler may reserve. Requires the production
+#              cron, which below is an explicit `crons = []` OVERRIDE rather
+#              than an omission: wrangler inherits top-level triggers into a
+#              named environment, so leaving the block out would have inherited
+#              the development schedule straight into production.
 #
 # Leaving `off` also requires READING_PUBLISHER, the five pinned OPENAI_READING_*
 # and READING_* values, an operator-approved READING_DAILY_PROVIDER_CALL_LIMIT,

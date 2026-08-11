@@ -65,11 +65,11 @@ describe("safe logging", () => {
     expect(serialized).toContain("network_error");
   });
 
-  it("logs successful provider metrics without request context or prose", () => {
+  it("logs completed-call metrics without request context or prose", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
 
     safeLog({
-      event: "publisher_attempt_succeeded",
+      event: "publisher_call_completed",
       provider: "openai",
       model: "gpt-5.6-sol",
       prompt_version: "1.0.0",

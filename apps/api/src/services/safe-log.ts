@@ -47,8 +47,15 @@ export type SafeLogEvent =
   | { event: "timing_local_day_unresolvable" }
   | { event: "timing_cycles_unreadable"; unreadable_count: number }
   | { event: "jwks_refresh_failed_using_stale" }
+  /**
+   * The provider CALL finished and returned a parseable candidate. Not an
+   * acceptance: schema and candidate validation run after this, and a rejected
+   * candidate still costs tokens. Emitted here on purpose — moving it past
+   * validation would leave a rejected reading with no cost record at all, and
+   * cost and validation rate are exactly what the rollout watches.
+   */
   | {
-      event: "publisher_attempt_succeeded";
+      event: "publisher_call_completed";
       provider: "openai";
       model: string;
       prompt_version: string;
@@ -101,7 +108,7 @@ export function safeLog(input: SafeLogEvent): string {
     case "timing_cycles_unreadable":
       console.error(input.event, { trace_id, unreadable_count: input.unreadable_count });
       break;
-    case "publisher_attempt_succeeded":
+    case "publisher_call_completed":
       console.info(input.event, {
         trace_id,
         provider: input.provider,

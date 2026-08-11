@@ -369,7 +369,13 @@ export async function projectNatalFacts(
 // Identity
 // ---------------------------------------------------------------------------
 
-const GENERATION_INPUT_DOMAIN = "patternlike.generation-input-id.v1 ";
+const GENERATION_INPUT_DOMAIN = "patternlike.generation-input-id.v1\u0000";
+// The separator is written as an escape, not as a raw byte. A literal NUL in the
+// source makes the whole file BINARY to git and to ripgrep — ripgrep skips binary
+// files silently, so the candidate gate's "no match" evidence for this exact file
+// meant "not searched" rather than "clean", and git showed the file as binary
+// instead of as a diff. The runtime value is byte-identical: no stored
+// generation_input_id changes.
 
 /**
  * `gin_sha256_` plus the FULL 64-hex digest of the domain-separated identity.

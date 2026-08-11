@@ -585,7 +585,7 @@ export async function generateDailyReadingV5(
     return fail(publisher.code, publisher.safe_detail_code);
   }
   safeLog({
-    event: "publisher_attempt_succeeded",
+    event: "publisher_call_completed",
     provider: publisher.metadata.provider,
     model: publisher.metadata.model,
     prompt_version: command.publisher.prompt_version,
