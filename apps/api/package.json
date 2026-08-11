@@ -15,13 +15,13 @@
     "deploy": "wrangler deploy --env production",
     "//db:local": "Applies the ordered db/d1 directory, not just 0001. Deleting .wrangler state is an explicit developer reset, not the migration mechanism."
   },
+  "//moment-timezone": "DATA ONLY. src/services/tzdb.ts imports data/packed/latest.json and decodes it; the library's own runtime is a UMD file inside a CommonJS package that @cloudflare/vitest-pool-workers refuses to load, and pulling in `moment` to answer two questions would put a date-formatting library in a Worker that needs neither. The dependency exists so package-lock.json pins the tz database version M5 day boundaries are resolved against — Intl exposes none.",
   "dependencies": {
     "@patternlike/reading-engine": "0.3.0",
     "@patternlike/shared": "0.2.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "hono": "^4.12.32",
-    "//moment-timezone": "DATA ONLY. src/services/tzdb.ts imports data/packed/latest.json and decodes it; the library's own runtime is a UMD file inside a CommonJS package that @cloudflare/vitest-pool-workers refuses to load, and pulling in `moment` to answer two questions would put a date-formatting library in a Worker that needs neither. The dependency exists so package-lock.json pins the tz database version M5 day boundaries are resolved against — Intl exposes none.",
     "moment-timezone": "^0.6.3",
     "tz-lookup": "^6.1.25"
   },

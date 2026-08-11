@@ -42,6 +42,31 @@ export {
   type EligibilityContext,
 } from "./eligibility.js";
 export {
+  ConstrainedInputError,
+  normalizeExcerpt,
+  prepareConstrainedReadingInput,
+  utf8ByteLength,
+} from "./constrained-input.js";
+export { validateReadingCandidate } from "./candidate-validation.js";
+export {
+  CANDIDATE_CHECKS,
+  GENERATION_INPUT_IDENTITY_PROFILE,
+  GENERATION_INPUT_MANIFEST_PROFILE,
+  HEADLINE_MAX_CHARS,
+  LEAD_MAX_CHARS,
+  MAX_CONTEXT_ITEMS,
+  MAX_CONTEXT_TEXT_BYTES,
+  MAX_FEEDBACK_RECORDS,
+  MAX_PRIOR_READINGS,
+  PARAGRAPH_MAX_CHARS,
+  REFLECTION_MAX_CHARS,
+  SELECTION_POLICY_ID,
+  SELECTION_POLICY_VERSION,
+  VALIDATION_POLICY_ID,
+  VALIDATION_POLICY_VERSION,
+} from "./constrained-types.js";
+export type * from "./constrained-types.js";
+export {
   evaluateDeclaredFixtures,
   evaluateFixture,
   UnknownFixtureError,

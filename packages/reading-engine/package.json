@@ -17,6 +17,10 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "generate:allowlist": "python scripts/generate_source_allowlist.py"
   },
+  "//dependencies": "TYPE-ONLY. @patternlike/shared owns the M5 wire types this package compiles against; importing them keeps one declaration of ReadingGenerationRequest rather than a structurally identical copy that drifts. The direction is safe for LICENSING.md: apps/calc-stub imports shared, shared does not import this package, and ranking, eligibility, selection, prompt, and validation policy all stay here.",
+  "dependencies": {
+    "@patternlike/shared": "0.2.0"
+  },
   "devDependencies": {
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",

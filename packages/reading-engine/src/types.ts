@@ -6,6 +6,18 @@
  * serialized and validated without a translation layer in between.
  */
 
+/**
+ * Frozen M0 vocabulary, re-exported from its single owner.
+ *
+ * These were structurally identical local copies until this package took its
+ * type-only dependency on `@patternlike/shared`. Two assignable copies of one
+ * enum drift silently — the compiler cannot tell you that one of them gained a
+ * member — so the copies are retired rather than kept in step by hand.
+ */
+import type { EvidenceLane, LifeDomain } from "@patternlike/shared";
+
+export type { EvidenceLane, LifeDomain };
+
 export type BirthTimeAccuracy = "exact" | "approximate" | "unknown";
 export type AspectType =
   | "conjunction"
@@ -19,21 +31,7 @@ export type CyclePhase =
   | "peak"
   | "reconsidering"
   | "integrating";
-export type EvidenceLane = "celestial_facts" | "user_and_context" | "operational";
 export type PassDirection = "direct" | "retrograde";
-export type LifeDomain =
-  | "self"
-  | "relationships"
-  | "work"
-  | "creativity"
-  | "home"
-  | "body_energy"
-  | "money_resources"
-  | "learning"
-  | "community"
-  | "caregiving"
-  | "spirituality_meaning"
-  | "unspecified";
 
 export type SuppressedFeatureClass =
   | "houses"
@@ -403,7 +401,7 @@ export interface ValidationResult {
 
 /** A candidate that did not make it, and why. The evidence drawer is the reason. */
 export interface Rejection {
-  subject_kind: "cycle" | "content" | "context";
+  subject_kind: "cycle" | "content" | "context" | "fact" | "source";
   subject_id: string;
   reason_code: string;
   detail: string;
