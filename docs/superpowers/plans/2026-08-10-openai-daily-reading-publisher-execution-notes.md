@@ -41,7 +41,7 @@ Task 17 Step 2 runs `git diff --check "$env:PATTERNLIKE_M5_IMPLEMENTATION_BASE..
 | 12 | Bounded hybrid scheduler | done — `167b642`, follow-up `c526b41` |
 | 13 | AI consent routes and dual-version projections | done — `a245c93`, follow-up `bdf4974` |
 | 14 | Today, provenance, Context & Privacy | done — `a5057dd` |
-| 15 | Evaluation lanes | pending |
+| 15 | Evaluation lanes | done — `568be46` |
 | 16 | Product truth and production runbook | pending |
 | 17 | Final candidate gate and review | pending |
 
@@ -211,6 +211,22 @@ disclosure is the sentence that says a model wrote the prose — so both moved t
 `--ink-soft`. The remaining `--ink-faint` metadata across the incumbent
 interface was left alone: it is a pre-existing design-system question, not
 something a refinement should silently rewrite.
+
+**Task 15 — one module beyond the plan's file list.** The plan names the corpus,
+the offline suite, and the live script. `src/services/reading-evaluation.ts`
+holds what the two lanes share: loading the corpus, compiling a profile through
+the real entry point, and the qualitative scoring. Putting it in the test file
+would have left the live script with its own copy of the scoring rules, which is
+the drift the corpus exists to prevent. The hard gates are not re-stated
+anywhere — they are `validateReadingCandidate`, called directly.
+
+**Task 15 — the corpus source is USR-04, not USR-01.** The registry decides
+which allowed-use tokens a source may carry, and USR-01 declares only
+`life_domain_selection` and `theme_ranking`. A `tone` lane is what lets one
+enabled note reach the lead, a paragraph, and the reflection, so the corpus uses
+the source that actually declares it. Discovered by the compiler rejecting the
+signal rather than by reading the registry, which is the outcome the allowlist is
+for.
 
 ## Deferred production gates
 
