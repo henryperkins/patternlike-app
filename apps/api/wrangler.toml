@@ -167,6 +167,35 @@ AUTH_STUB = "0"
 # would reach a provider with values no frozen command described.
 READING_V5_ROLLOUT = "off"
 
+# The pinned publisher tuple. Every value is compared for EQUALITY against the
+# compiled constant in services/reading-publisher.ts, not merely for presence:
+# a frozen command records the values it was built under, and a deployed
+# variable that drifts from the code would reach the provider describing
+# something no command actually pinned. checkSecureConfig validates each one
+# whether or not the rollout is `off`, so a typo here fails the next request
+# rather than lying dormant until enablement day.
+READING_PUBLISHER = "openai"
+OPENAI_READING_MODEL = "gpt-5.6-sol"
+OPENAI_READING_REASONING = "high"
+OPENAI_READING_PROMPT_VERSION = "1.0.1"
+OPENAI_READING_TIMEOUT_MS = "90000"
+OPENAI_READING_MAX_OUTPUT_TOKENS = "4000"
+READING_CONTEXT_MAX_BYTES = "98304"
+READING_PREGEN_ACTIVE_DAYS = "30"
+READING_PREGEN_LEAD_MINUTES = "30"
+READING_PREGEN_SPREAD_MINUTES = "45"
+READING_SCHEDULER_BATCH_LIMIT = "100"
+
+# READING_DAILY_PROVIDER_CALL_LIMIT is deliberately ABSENT while the rollout is
+# `off`. It has no default because production configuration is invalid until an
+# operator approves and costs a ceiling: the runbook requires the approved
+# number recorded beside the current per-token price and the worst-case daily
+# spend arithmetic. Measured basis from the first real generation: 9,953 input
+# and 2,413 output tokens for one reading, against a 4,000-token response
+# ceiling that counts reasoning and visible output together. Setting the
+# rollout to anything but `off` without this value turns EVERY request into
+# 503 configuration_error, which is the guard working as designed.
+
 # The PWA ships inside this Worker, so the app and the API share one origin.
 #
 # Why this and not a proxy: sessions ride an httpOnly cookie with
