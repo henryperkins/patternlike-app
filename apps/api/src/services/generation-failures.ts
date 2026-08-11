@@ -54,14 +54,14 @@ export type V5ReplacementReason =
   | "publisher_refused"
   | "consent_regranted";
 
-export type V1ReplacementReason =
+export type CommandReplacementReason =
   | "calc_unavailable"
   | "release_unreadable"
   | "context_minimized"
   | "policy_upgraded"
   | "defect_repair";
 
-export type GenerationReplacementReason = V1ReplacementReason | V5ReplacementReason;
+export type GenerationReplacementReason = CommandReplacementReason | V5ReplacementReason;
 
 const V1_FAILURE_CODES: ReadonlySet<V1FailureCode> = new Set([
   "calc_unavailable",
@@ -93,7 +93,7 @@ const V5_FAILURE_CODES: ReadonlySet<V5FailureCode> = new Set([
   "policy_unsupported",
 ]);
 
-const V1_REPLACEMENT_REASONS: ReadonlySet<V1ReplacementReason> = new Set([
+const V1_REPLACEMENT_REASONS: ReadonlySet<CommandReplacementReason> = new Set([
   "calc_unavailable",
   "release_unreadable",
   "context_minimized",
@@ -127,8 +127,8 @@ export function isGenerationFailureCode(code: string): code is GenerationFailure
   return V1_FAILURE_CODES.has(code as V1FailureCode) || V5_FAILURE_CODES.has(code as V5FailureCode);
 }
 
-export function isV1ReplacementReason(code: string): code is V1ReplacementReason {
-  return V1_REPLACEMENT_REASONS.has(code as V1ReplacementReason);
+export function isV1ReplacementReason(code: string): code is CommandReplacementReason {
+  return V1_REPLACEMENT_REASONS.has(code as CommandReplacementReason);
 }
 
 export function isV5ReplacementReason(code: string): code is V5ReplacementReason {

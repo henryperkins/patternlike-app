@@ -123,9 +123,10 @@ export async function queue(
       }
 
       const commandVersion = isCommandV2(claim.command) ? "v2" : "v1";
+      const failureCode = outcome.reason as GenerationFailureCode;
       const disposition = queueDisposition(
         commandVersion,
-        outcome.reason as GenerationFailureCode,
+        failureCode,
         Math.max(message.attempts, claim.attempts ?? 0),
       );
       if (disposition === "retry_60s") {
@@ -133,7 +134,6 @@ export async function queue(
         // redelivery; after the bounded delivery budget, fail the reservation
         // so the scheduler's guarded replacement path can re-freeze the day.
         console.warn("generation_retryable_failure", {
-          job_id: jobId,
           reason: outcome.reason,
         });
         await retryOrFail(message, env, claim, outcome.reason, disposition);
@@ -141,9 +141,8 @@ export async function queue(
       }
 
       if (
-        (commandVersion === "v1" &&
-          (outcome.reason === "calc_unavailable" || outcome.reason === "release_unreadable")) ||
-        commandVersion === "v2"
+        commandVersion === "v2" ||
+        queueDisposition(commandVersion, failureCode, 1) === "retry_60s"
       ) {
         await retryOrFail(message, env, claim, outcome.reason, disposition);
         continue;

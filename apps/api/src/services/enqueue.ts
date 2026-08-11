@@ -13,7 +13,6 @@ import {
 import {
   buildGenerationCommand,
   type CommandBuildFailure,
-  type CommandReplacementReason,
   type RevisionReason,
 } from "./generation-command.js";
 import { isCurrentOrPreviousLocalDay } from "./local-day.js";
@@ -28,6 +27,7 @@ import {
 } from "./generation-command-v2.js";
 import {
   MAX_COMMAND_GENERATION,
+  type CommandReplacementReason,
   isAutomaticReplacementFailure,
   isGenerationFailureCode,
   isV1ReplacementReason,

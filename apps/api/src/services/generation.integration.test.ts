@@ -1513,6 +1513,29 @@ describe("command replacement", () => {
     expect(reading!.command_generation).toBe(3);
   });
 
+  it("logs retryable generation failures without the job identifier", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    const key = "content-releases/release-12.json";
+    const stored = await env.ARTIFACTS!.get(key);
+    expect(stored).not.toBeNull();
+    await env.ARTIFACTS!.delete(key);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+      expect(warn).toHaveBeenCalledWith("generation_retryable_failure", {
+        reason: "release_unreadable",
+      });
+    } finally {
+      warn.mockRestore();
+      await env.ARTIFACTS!.put(key, await stored!.arrayBuffer(), {
+        httpMetadata: stored!.httpMetadata,
+        customMetadata: stored!.customMetadata,
+      });
+    }
+  });
+
   it("uses the V2 replacement policy for seeded constrained-model terminal rows", async () => {
     await grantAiSynthesis();
     const v5Env = enabledV5Env();
@@ -1554,6 +1577,24 @@ describe("command replacement", () => {
     await expect(
       replaceFailedCommand(v5Env, USER_A, seeded.readingId, "consent_regranted", "scheduler"),
     ).resolves.toMatchObject({ ok: false, reason: "not_replaceable" });
+
+    const replaced = await replaceFailedCommand(
+      v5Env,
+      USER_A,
+      seeded.readingId,
+      "publisher_unavailable",
+      "scheduler",
+      new Date("2026-08-09T18:00:00.000Z"),
+    );
+    expect(replaced).toMatchObject({ ok: true });
+    expect((await readings())[0]).toMatchObject({ command_generation: 3, status: "pending" });
+    if (!replaced.ok) throw new Error(`V2 g3 replacement failed: ${replaced.reason}`);
+    await rows(`UPDATE daily_readings SET status = 'failed' WHERE id = ?`, seeded.readingId);
+    await rows(`UPDATE jobs SET status = 'failed' WHERE id = ?`, replaced.jobId);
+
+    await expect(
+      replaceFailedCommand(v5Env, USER_A, seeded.readingId, "publisher_unavailable", "scheduler"),
+    ).resolves.toMatchObject({ ok: false, reason: "budget_exhausted" });
   });
 
   it("refuses to silently regenerate a day the reader has moved past", async () => {

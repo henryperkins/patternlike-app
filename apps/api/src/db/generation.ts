@@ -2,7 +2,10 @@ import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
-import type { CommandReplacementReason } from "../services/generation-command.js";
+import {
+  MAX_COMMAND_GENERATION,
+  type GenerationReplacementReason,
+} from "../services/generation-failures.js";
 import {
   isCommandV2,
   type GenerateDailyReadingCommand,
@@ -25,14 +28,10 @@ import {
 
 export const JOB_TYPE = "generate_daily_reading";
 
-/** Two automatic attempts after the initial command, then the day stays failed. */
-export const MAX_COMMAND_GENERATION = 3;
+export { MAX_COMMAND_GENERATION, MAX_JOB_ATTEMPTS } from "../services/generation-failures.js";
 
 /** How long a consumer may hold a claim before another may reclaim it. */
 export const CLAIM_LEASE_MS = 5 * 60 * 1000;
-
-/** One initial Queue delivery plus the three retries configured in wrangler.toml. */
-export const MAX_JOB_ATTEMPTS = 4;
 
 export type ReserveOutcome =
   | { ok: true; readingId: string; jobId: string }
@@ -454,7 +453,7 @@ export async function replaceCommand(
   identity: UserIdentity,
   command: GenerateDailyReadingCommand,
   expectedFailedJobId: string,
-  reason: CommandReplacementReason | string,
+  reason: GenerationReplacementReason,
 ): Promise<ReplaceOutcome> {
   if (command.command_generation > MAX_COMMAND_GENERATION) {
     return {

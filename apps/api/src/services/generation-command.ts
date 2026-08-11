@@ -30,6 +30,7 @@ import { getActiveRelease } from "../db/content-releases.js";
 import { invokeCycles, buildCycleRequest } from "./cycle-client.js";
 import { loadReleaseBundle } from "./release-bundle.js";
 import { resolveLocalDay, type LocalDayWindow } from "./local-day.js";
+import type { CommandReplacementReason } from "./generation-failures.js";
 
 /**
  * Freeze every input a daily reading will ever be assembled from.
@@ -117,13 +118,6 @@ export type RevisionReason =
   | "chart_recalculated"
   | "consent_revoked"
   | "safety_correction"
-  | "defect_repair";
-
-export type CommandReplacementReason =
-  | "calc_unavailable"
-  | "release_unreadable"
-  | "context_minimized"
-  | "policy_upgraded"
   | "defect_repair";
 
 /**

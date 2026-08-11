@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   LEASE_RETRY_DELAY_SECONDS,
+  MAX_COMMAND_GENERATION,
+  MAX_JOB_ATTEMPTS,
   RETRY_DELAY_SECONDS,
   isAutomaticReplacementFailure,
   leaseDisposition,
@@ -68,6 +70,8 @@ describe("generation failure policy", () => {
   it("keeps lease-window metrics distinct from the calc-unavailable terminal alias", () => {
     expect(RETRY_DELAY_SECONDS).toBe(60);
     expect(LEASE_RETRY_DELAY_SECONDS).toBe(305);
+    expect(MAX_JOB_ATTEMPTS).toBe(4);
+    expect(MAX_COMMAND_GENERATION).toBe(3);
     expect(leaseDisposition(4, 0, 90_000)).toBe("terminal_calc_unavailable");
   });
 });
