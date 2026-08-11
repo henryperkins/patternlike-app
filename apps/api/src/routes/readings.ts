@@ -287,7 +287,10 @@ readingRoutes.put("/v1/readings/today", async (c) => {
       }
     }
   }
-  const outcome = await ensureTodayReading(c.env, identity);
+  const outcome = await ensureTodayReading(c.env, identity, {
+    generationMode: "v5",
+    rolloutEntry: "first_open",
+  });
 
   if (outcome.ok) {
     if (outcome.status === "ready") {
@@ -295,7 +298,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
     }
     return c.json(
       {
-        schema_version: M3_SCHEMA_VERSION,
+        schema_version: outcome.schemaVersion ?? M5_SCHEMA_VERSION,
         status: "preparing" as const,
         local_date: outcome.localDate,
       },
@@ -330,25 +333,65 @@ readingRoutes.put("/v1/readings/today", async (c) => {
         ),
         409,
       );
-    case "release_not_active":
+    case "ai_synthesis_consent_required":
       return c.json(
         errorBody(
-          "release_not_active",
-          "No active reading release is available",
+          "ai_synthesis_consent_required",
+          "Grant AI synthesis consent before a daily reading can be generated",
         ),
+        409,
+      );
+    case "rollout_disabled":
+    case "publisher_not_configured":
+      return c.json(
+        {
+          error: {
+            ...errorBody(
+              "publisher_not_configured",
+              "Daily reading generation is not configured",
+            ).error,
+            retryable: false,
+          },
+        },
         503,
       );
     case "calc_unavailable":
       return c.json(
-        errorBody("calc_unavailable", "The calculation service is unavailable"),
+        {
+          error: {
+            ...errorBody(
+              "calc_unavailable",
+              "The calculation service is unavailable",
+            ).error,
+            retryable: true,
+          },
+        },
         503,
       );
-    case "release_unreadable":
+    case "daily_sky_unavailable":
       return c.json(
-        errorBody(
-          "release_unreadable",
-          "The active content release is unavailable",
-        ),
+        {
+          error: {
+            ...errorBody(
+              "daily_sky_unavailable",
+              "The daily sky calculation is unavailable",
+            ).error,
+            retryable: true,
+          },
+        },
+        503,
+      );
+    case "policy_unsupported":
+      return c.json(
+        {
+          error: {
+            ...errorBody(
+              "policy_unsupported",
+              "The configured calculation policy is unsupported",
+            ).error,
+            retryable: false,
+          },
+        },
         503,
       );
     case "publisher_budget_exhausted":
@@ -368,10 +411,15 @@ readingRoutes.put("/v1/readings/today", async (c) => {
       return c.json(errorBody("internal_error", "Unexpected server error"), 500);
     default:
       return c.json(
-        errorBody(
-          "reading_generation_failed",
-          "Today's reading could not be prepared",
-        ),
+        {
+          error: {
+            ...errorBody(
+              "reading_generation_failed",
+              "Today's reading could not be prepared",
+            ).error,
+            retryable: false,
+          },
+        },
         424,
       );
   }

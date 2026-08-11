@@ -1,9 +1,11 @@
 import {
   AI_CONSENT_DATA_CATEGORIES,
+  newId,
   type AiConsentDataCategory,
 } from "@patternlike/shared";
 import type { ConstrainedContextSourceInput } from "@patternlike/reading-engine";
 import type { Env } from "../env.js";
+import { decryptPayload, encryptPayload, type UserIdentity } from "./users.js";
 
 /**
  * The consent reads the publisher depends on.
@@ -53,6 +55,55 @@ export interface AiSynthesisGrant {
   grantedAt: string;
 }
 
+export interface AiSynthesisConsentState {
+  status: "granted" | "not_granted";
+  grantedAt: string | null;
+}
+
+interface AiConsentRow {
+  id: string;
+  status: string;
+  policy_version: string;
+  granted_at: string | null;
+  expires_at: string | null;
+  version: number;
+  created_at: string;
+}
+
+async function loadLatestAiConsent(env: Env, userId: string): Promise<AiConsentRow | null> {
+  return env.DB.prepare(
+    `SELECT id, status, policy_version, granted_at, expires_at, version, created_at
+     FROM consents
+     WHERE user_id = ? AND kind = 'ai_synthesis'
+     ORDER BY version DESC, created_at DESC, id DESC
+     LIMIT 1`,
+  )
+    .bind(userId)
+    .first<AiConsentRow>();
+}
+
+function activeGrant(
+  row: AiConsentRow | null,
+  now = new Date(),
+): AiSynthesisGrant | null {
+  if (
+    !row ||
+    row.status !== "granted" ||
+    !row.granted_at ||
+    (row.expires_at !== null && row.expires_at <= now.toISOString())
+  ) {
+    return null;
+  }
+  const categories = AI_SYNTHESIS_CATEGORIES_BY_POLICY[row.policy_version];
+  if (!categories) return null;
+  return {
+    consentId: row.id,
+    policyVersion: row.policy_version,
+    categories: [...categories],
+    grantedAt: row.granted_at,
+  };
+}
+
 /**
  * The current `ai_synthesis` grant, or null.
  *
@@ -65,26 +116,284 @@ export async function loadAiSynthesisGrant(
   env: Env,
   userId: string,
 ): Promise<AiSynthesisGrant | null> {
+  return activeGrant(await loadLatestAiConsent(env, userId));
+}
+
+const GRANT_JOB_TYPE = "ai_synthesis_consent_grant";
+const REVOKE_JOB_TYPE = "ai_synthesis_consent_revoke";
+
+interface StoredConsentMutation {
+  operation: "grant" | "revoke";
+  policyVersion: string;
+  state: AiSynthesisConsentState;
+}
+
+interface ConsentMutationJobRow {
+  id: string;
+  payload_enc: ArrayBuffer | null;
+  payload_key_version: number | null;
+  payload_nonce: string | null;
+}
+
+export type AiConsentMutationOutcome =
+  | { ok: true; state: AiSynthesisConsentState; changed: boolean }
+  | { ok: false; reason: "idempotency_conflict" | "conflict" };
+
+function bytesToBase64(bytes: ArrayBuffer): string {
+  let binary = "";
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function isStoredConsentMutation(value: unknown): value is StoredConsentMutation {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Partial<StoredConsentMutation>;
+  return (
+    (record.operation === "grant" || record.operation === "revoke") &&
+    typeof record.policyVersion === "string" &&
+    !!record.state &&
+    (record.state.status === "granted" || record.state.status === "not_granted") &&
+    (record.state.grantedAt === null || typeof record.state.grantedAt === "string")
+  );
+}
+
+async function loadStoredConsentMutation(
+  env: Env,
+  identity: UserIdentity,
+  jobType: string,
+  idempotencyKey: string,
+): Promise<StoredConsentMutation | null> {
   const row = await env.DB.prepare(
-    `SELECT id, policy_version, granted_at
-     FROM consents
-     WHERE user_id = ? AND kind = 'ai_synthesis' AND status = 'granted'
-     ORDER BY version DESC, created_at DESC
-     LIMIT 1`,
+    `SELECT id, payload_enc, payload_key_version, payload_nonce
+     FROM jobs
+     WHERE job_type = ? AND user_id = ? AND idempotency_key = ?
+       AND status = 'succeeded'`,
   )
-    .bind(userId)
-    .first<{ id: string; policy_version: string; granted_at: string | null }>();
+    .bind(jobType, identity.userId, idempotencyKey)
+    .first<ConsentMutationJobRow>();
   if (!row) return null;
+  if (!row.payload_enc || row.payload_key_version === null || !row.payload_nonce) {
+    throw new Error("AI consent idempotency record is incomplete");
+  }
+  const stored = await decryptPayload<unknown>(
+    env,
+    identity,
+    {
+      ciphertext: bytesToBase64(row.payload_enc),
+      key_version: row.payload_key_version,
+      nonce: row.payload_nonce,
+    },
+    {
+      subject: identity.cryptoSubject,
+      field: "jobs.payload_enc",
+      recordId: row.id,
+    },
+  );
+  if (!isStoredConsentMutation(stored)) {
+    throw new Error("AI consent idempotency record is invalid");
+  }
+  return stored;
+}
 
-  const categories = AI_SYNTHESIS_CATEGORIES_BY_POLICY[row.policy_version];
-  if (!categories) return null;
+async function mutationInsert(
+  env: Env,
+  identity: UserIdentity,
+  jobType: string,
+  idempotencyKey: string,
+  stored: StoredConsentMutation,
+  now: string,
+): Promise<D1PreparedStatement> {
+  const jobId = newId("job");
+  const sealed = await encryptPayload(env, identity, stored, {
+    subject: identity.cryptoSubject,
+    field: "jobs.payload_enc",
+    recordId: jobId,
+  });
+  return env.DB.prepare(
+    `INSERT INTO jobs
+       (id, job_type, user_id, idempotency_key, status, payload_enc,
+        payload_key_version, payload_nonce, result_class, attempts,
+        finished_at, created_at)
+     VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, 'consent_saved', 1, ?, ?)`,
+  ).bind(
+    jobId,
+    jobType,
+    identity.userId,
+    idempotencyKey,
+    Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
+    sealed.keyVersion,
+    sealed.nonce,
+    now,
+    now,
+  );
+}
 
-  return {
-    consentId: row.id,
-    policyVersion: row.policy_version,
-    categories: [...categories],
-    grantedAt: row.granted_at ?? "",
+function latestConsentAssertion(
+  env: Env,
+  userId: string,
+  latest: AiConsentRow | null,
+): D1PreparedStatement {
+  return latest
+    ? env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'AI consent state changed concurrently'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM consents
+           WHERE id = ? AND user_id = ? AND kind = 'ai_synthesis'
+             AND version = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM consents newer
+               WHERE newer.user_id = consents.user_id
+                 AND newer.kind = consents.kind
+                 AND (
+                   newer.version > consents.version OR
+                   (newer.version = consents.version AND newer.created_at > consents.created_at) OR
+                   (newer.version = consents.version AND newer.created_at = consents.created_at AND newer.id > consents.id)
+                 )
+             )
+         )`,
+      ).bind(latest.id, userId, latest.version)
+    : env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'AI consent state appeared concurrently'
+         WHERE EXISTS (
+           SELECT 1 FROM consents WHERE user_id = ? AND kind = 'ai_synthesis'
+         )`,
+      ).bind(userId);
+}
+
+async function writeAiConsentMutation(
+  env: Env,
+  identity: UserIdentity,
+  input: {
+    operation: "grant" | "revoke";
+    policyVersion: string;
+    idempotencyKey: string;
+    now: Date;
+  },
+): Promise<AiConsentMutationOutcome> {
+  const jobType = input.operation === "grant" ? GRANT_JOB_TYPE : REVOKE_JOB_TYPE;
+  const replay = await loadStoredConsentMutation(env, identity, jobType, input.idempotencyKey);
+  if (replay) {
+    return replay.operation === input.operation && replay.policyVersion === input.policyVersion
+      ? { ok: true, state: replay.state, changed: false }
+      : { ok: false, reason: "idempotency_conflict" };
+  }
+
+  const latest = await loadLatestAiConsent(env, identity.userId);
+  const current = activeGrant(latest, input.now);
+  const now = input.now.toISOString();
+  const changed = input.operation === "grant" ? current === null : current !== null;
+  const nextConsentId = changed ? newId("cns") : null;
+  const state: AiSynthesisConsentState =
+    input.operation === "grant"
+      ? current
+        ? { status: "granted", grantedAt: current.grantedAt }
+        : { status: "granted", grantedAt: now }
+      : { status: "not_granted", grantedAt: null };
+  const stored: StoredConsentMutation = {
+    operation: input.operation,
+    policyVersion: input.policyVersion,
+    state,
   };
+  const statements: D1PreparedStatement[] = [
+    latestConsentAssertion(env, identity.userId, latest),
+  ];
+  if (changed && nextConsentId) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO consents
+           (id, user_id, kind, status, provider, policy_version, ui_surface,
+            granted_at, revoked_at, version, supersedes_consent_id,
+            created_at, updated_at)
+         VALUES (?, ?, 'ai_synthesis', ?, 'OpenAI', ?, 'context_privacy',
+                 ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        nextConsentId,
+        identity.userId,
+        input.operation === "grant" ? "granted" : "revoked",
+        input.policyVersion,
+        input.operation === "grant" ? now : null,
+        input.operation === "revoke" ? now : null,
+        (latest?.version ?? 0) + 1,
+        latest?.id ?? null,
+        now,
+        now,
+      ),
+    );
+  }
+  statements.push(
+    await mutationInsert(
+      env,
+      identity,
+      jobType,
+      input.idempotencyKey,
+      stored,
+      now,
+    ),
+  );
+  if (changed && nextConsentId) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO audit_events
+           (id, actor_type, actor_id, action, resource_type, resource_id,
+            result, detail_class, created_at)
+         VALUES (?, 'user', ?, ?, 'consent', ?, 'success', 'ai_synthesis', ?)`,
+      ).bind(
+        newId("aud"),
+        identity.userId,
+        input.operation === "grant" ? "consent.granted" : "consent.revoked",
+        nextConsentId,
+        now,
+      ),
+    );
+  }
+
+  try {
+    await env.DB.batch(statements);
+  } catch {
+    const raced = await loadStoredConsentMutation(env, identity, jobType, input.idempotencyKey);
+    if (raced) {
+      return raced.operation === input.operation && raced.policyVersion === input.policyVersion
+        ? { ok: true, state: raced.state, changed: false }
+        : { ok: false, reason: "idempotency_conflict" };
+    }
+    return { ok: false, reason: "conflict" };
+  }
+
+  if (changed) {
+    await refreshReadingCursorAfterAiConsentChange(env, identity.userId, input.now);
+  }
+  return { ok: true, state, changed };
+}
+
+export async function grantAiSynthesisConsent(
+  env: Env,
+  identity: UserIdentity,
+  policyVersion: string,
+  idempotencyKey: string,
+  now = new Date(),
+): Promise<AiConsentMutationOutcome> {
+  return writeAiConsentMutation(env, identity, {
+    operation: "grant",
+    policyVersion,
+    idempotencyKey,
+    now,
+  });
+}
+
+export async function revokeAiSynthesisConsent(
+  env: Env,
+  identity: UserIdentity,
+  idempotencyKey: string,
+  now = new Date(),
+): Promise<AiConsentMutationOutcome> {
+  return writeAiConsentMutation(env, identity, {
+    operation: "revoke",
+    policyVersion: AI_SYNTHESIS_POLICY_VERSION,
+    idempotencyKey,
+    now,
+  });
 }
 
 interface SourceGrantRow {

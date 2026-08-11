@@ -7,6 +7,7 @@ import { birthRoutes } from "./routes/birth.js";
 import { chartRoutes } from "./routes/chart.js";
 import { timezoneRoutes } from "./routes/timezone.js";
 import { preferenceRoutes } from "./routes/preferences.js";
+import { consentRoutes } from "./routes/consents.js";
 import { readingRoutes } from "./routes/readings.js";
 import { timingRoutes } from "./routes/timing.js";
 import { stubRoutes } from "./routes/stubs.js";
@@ -41,6 +42,7 @@ api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", timezoneRoutes);
 api.route("/", preferenceRoutes);
+api.route("/", consentRoutes);
 api.route("/", readingRoutes);
 api.route("/", timingRoutes);
 // Last, deliberately. Hono answers with the first matching registration, so a

@@ -11,5 +11,10 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src/**/*", "test/**/*", "vitest.config.ts"]
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "vitest.config.ts",
+    "vitest.m3-compat.config.ts"
+  ]
 }

@@ -241,7 +241,7 @@ export async function replaceFailedCommand(
   userId: string,
   readingId: string,
   reason: GenerationReplacementReason,
-  actor: "scheduler" | "operator",
+  actor: "scheduler" | "operator" | "first_open",
   now = new Date(),
 ): Promise<ReplaceEnqueueOutcome> {
   const identity = await loadIdentity(env, userId);
@@ -282,7 +282,9 @@ export async function replaceFailedCommand(
     (commandVersion === "v1" && !isV1ReplacementReason(reason)) ||
     (commandVersion === "v2" && !isV5ReplacementReason(reason)) ||
     (actor === "scheduler" &&
-      (!isGenerationFailureCode(reason) || !isAutomaticReplacementFailure(commandVersion, reason)))
+      (!isGenerationFailureCode(reason) || !isAutomaticReplacementFailure(commandVersion, reason))) ||
+    (actor === "first_open" &&
+      (commandVersion !== "v2" || reason !== "consent_regranted"))
   ) {
     return {
       ok: false,
@@ -300,7 +302,7 @@ export async function replaceFailedCommand(
     };
   }
 
-  if (actor === "scheduler") {
+  if (actor === "scheduler" || actor === "first_open") {
     const preferences = await loadPreferences(env, userId);
     const currentLocalDate = preferences
       ? resolveV5TargetDate(preferences.timezone, now)
@@ -345,7 +347,9 @@ export async function replaceFailedCommand(
               ? "fact_repair"
               : actor === "scheduler"
                 ? "automatic_replacement"
-                : "manual_reissue",
+                : actor === "first_open"
+                  ? "first_open"
+                  : "manual_reissue",
           commandGeneration: nextGeneration,
           replacesJobId: reservation.active_generation_job_id,
           commandReplacementReason: reason as V5ReplacementReason,

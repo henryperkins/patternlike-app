@@ -185,6 +185,25 @@ const READING_COLUMNS = `id, user_id, local_date, release_version, reading_key,
        revision_reason, supersedes_reading_id, invalidated_at, created_at, updated_at,
        reading_enc, reading_key_version, reading_nonce`;
 
+const M3_READING_COLUMNS = `id, user_id, local_date, release_version, reading_key,
+       chart_fingerprint, contract_id, assembly_mode, status, revision,
+       revision_reason, supersedes_reading_id, NULL AS invalidated_at, created_at, updated_at,
+       reading_enc, reading_key_version, reading_nonce`;
+
+/**
+ * The M5 Worker can be deployed before migration 0003 is applied. SQLite table
+ * metadata is the compatibility boundary: the legacy projection never names an
+ * M5-only column or table, while the migrated path retains the real invalidation
+ * timestamp for internal callers.
+ */
+async function readingColumnsForSchema(env: Env): Promise<string> {
+  const { results } = await env.DB.prepare("PRAGMA table_info(daily_readings)")
+    .all<{ name: string }>();
+  return results.some((column) => column.name === "invalidated_at")
+    ? READING_COLUMNS
+    : M3_READING_COLUMNS;
+}
+
 function recordFrom(row: ReadingRow): ReadingRecord {
   return {
     id: row.id,
@@ -517,8 +536,9 @@ export async function loadPublishedReadingForDate(
   identity: UserIdentity,
   localDate: string,
 ): Promise<PublishedReading | null> {
+  const columns = await readingColumnsForSchema(env);
   const row = await env.DB.prepare(
-    `SELECT ${READING_COLUMNS}
+    `SELECT ${columns}
      FROM daily_readings r
      WHERE r.user_id = ? AND r.local_date = ? AND r.status = 'published'
        AND (
@@ -602,8 +622,9 @@ export async function loadReadingEvidence(
   identity: UserIdentity,
   readingId: string,
 ): Promise<ReadingEvidence | null> {
+  const columns = await readingColumnsForSchema(env);
   const row = await env.DB.prepare(
-    `SELECT ${READING_COLUMNS}
+    `SELECT ${columns}
      FROM daily_readings
      WHERE id = ? AND user_id = ?`,
   )

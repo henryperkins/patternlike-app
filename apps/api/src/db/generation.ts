@@ -63,6 +63,10 @@ export interface InitialGenerationState {
   } | null;
 }
 
+export interface CurrentGenerationState extends InitialGenerationState {
+  assemblyMode: "deterministic" | "constrained_model";
+}
+
 function auditStatement(
   env: Env,
   userId: string,
@@ -203,6 +207,61 @@ export async function loadInitialGenerationState(
   return {
     readingId: row.reading_id,
     readingStatus: row.reading_status,
+    commandGeneration: row.command_generation,
+    activeJob:
+      row.job_id === null || row.job_status === null
+        ? null
+        : {
+            id: row.job_id,
+            status: row.job_status,
+            resultClass: row.result_class,
+            availableAt: row.available_at,
+            dispatchedAt: row.dispatched_at,
+            leaseExpiresAt: row.lease_expires_at,
+          },
+  };
+}
+
+/**
+ * The newest live generation state for an owner-day, including its command
+ * family. Unlike the frozen M3 reader above, this sees an r2+ fact-repair
+ * successor so the M5 product path cannot mistake it for an absent day.
+ */
+export async function loadCurrentGenerationState(
+  env: Env,
+  userId: string,
+  localDate: string,
+): Promise<CurrentGenerationState | null> {
+  const row = await env.DB.prepare(
+    `SELECT r.id AS reading_id, r.status AS reading_status, r.assembly_mode,
+            r.command_generation, j.id AS job_id, j.status AS job_status,
+            j.result_class, j.available_at, j.dispatched_at, j.lease_expires_at
+     FROM daily_readings r
+     LEFT JOIN jobs j
+       ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+     WHERE r.user_id = ? AND r.local_date = ?
+       AND r.status IN ('pending', 'failed')
+     ORDER BY r.revision DESC
+     LIMIT 1`,
+  )
+    .bind(userId, localDate)
+    .first<{
+      reading_id: string;
+      reading_status: "pending" | "failed";
+      assembly_mode: "deterministic" | "constrained_model";
+      command_generation: number;
+      job_id: string | null;
+      job_status: GenerationJobStatus | null;
+      result_class: string | null;
+      available_at: string | null;
+      dispatched_at: string | null;
+      lease_expires_at: string | null;
+    }>();
+  if (!row) return null;
+  return {
+    readingId: row.reading_id,
+    readingStatus: row.reading_status,
+    assemblyMode: row.assembly_mode,
     commandGeneration: row.command_generation,
     activeJob:
       row.job_id === null || row.job_status === null
