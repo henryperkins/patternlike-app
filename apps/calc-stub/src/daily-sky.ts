@@ -49,6 +49,7 @@ import {
   SE_ID_BY_BODY,
   STUB_CONTAINER_DIGEST,
   houseNumber,
+  isWithinEphemerisCoverage,
   norm360,
   signOf,
 } from "./engine.js";
@@ -386,10 +387,21 @@ export function validateDailySkyRequest(body: unknown): ValidatedDailySkyRequest
     fail("ephemeris_range", "the local day lies outside the pinned ephemeris range");
   }
 
+  const dayStartJd = jdFromUnixMs(dayStartMs);
+  const dayEndJd = jdFromUnixMs(dayEndMs);
+  // The year test above cannot see the sliver at each end of the range that the
+  // pinned files do not answer for every body — a local day starting
+  // 1800-01-01T05:00Z is inside year 1800 and still ahead of Pluto's first
+  // segment. Refusing it here names the reason; letting it through would reach
+  // calcBody's Moshier refusal and come back as `calculation_failed`.
+  if (!isWithinEphemerisCoverage(dayStartJd) || !isWithinEphemerisCoverage(dayEndJd)) {
+    fail("ephemeris_range", "the local day lies outside the pinned ephemeris range");
+  }
+
   return {
     request: raw as unknown as DailySkyRequest,
-    dayStartJd: jdFromUnixMs(dayStartMs),
-    dayEndJd: jdFromUnixMs(dayEndMs),
+    dayStartJd,
+    dayEndJd,
     anchorJd: jdFromUnixMs(anchorMs),
   };
 }

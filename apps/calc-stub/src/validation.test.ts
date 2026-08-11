@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { calculateChart, resolveUtcInstant } from "./engine.js";
+import {
+  EPHEMERIS_COVERAGE_MAX_JD,
+  EPHEMERIS_COVERAGE_MIN_JD,
+  SE_ID_BY_BODY,
+  calcBody,
+  calculateChart,
+  resolveUtcInstant,
+} from "./engine.js";
 import type { CalcRequest } from "@patternlike/shared";
 
 function req(overrides: Partial<CalcRequest> = {}): CalcRequest {
@@ -114,6 +121,90 @@ describe("calculation input validation", () => {
     assert.throws(
       () => resolveUtcInstant(req({ timezone: "Mars/Olympus" })),
       /timezone/i,
+    );
+  });
+
+  it("rejects an in-range local date whose UT instant the files cannot answer", async () => {
+    // Each of these carries a local year inside 1800-2399, so the year test in
+    // resolveUtcInstant passes them. The instant that reaches swe_calc_ut does
+    // not: 1800-01-01 in Asia/Tokyo is 1799-12-31 in UT, and 1800-01-01T02:00Z
+    // is still ahead of Neptune's and Pluto's first segment in sepl_18.se1.
+    // Without the instant-level guard these come back as a generic calc_error,
+    // which the Worker reduces to `calc_failed` — the caller is told nothing.
+    for (const overrides of [
+      { birth_date: "1800-01-01", birth_time_local: "06:00:00", timezone: "Asia/Tokyo" },
+      { birth_date: "1800-01-01", birth_time_local: "02:00:00", timezone: "UTC" },
+      { birth_date: "2399-12-31", birth_time_local: "23:30:00", timezone: "UTC" },
+    ]) {
+      const res = await calculateChart(req(overrides));
+      assert.equal(res.ok, false, `${JSON.stringify(overrides)} should be rejected`);
+      assert.equal(res.error_class, "invalid_birth_profile");
+      const message = res.error_message ?? "";
+      assert.ok(!/[A-Za-z]:\\|\/(home|Users|app|srv)\//.test(message), `path leaked: ${message}`);
+      assert.ok(!/sepl_|semo_/.test(message), `ephemeris filename leaked: ${message}`);
+    }
+  });
+
+  it("still accepts the first and last fully covered days", async () => {
+    for (const overrides of [
+      { birth_date: "1800-01-02", birth_time_local: "12:00:00", timezone: "UTC" },
+      { birth_date: "2399-12-30", birth_time_local: "12:00:00", timezone: "UTC" },
+    ]) {
+      const res = await calculateChart(req(overrides));
+      assert.equal(res.ok, true, `${JSON.stringify(overrides)}: ${res.error_message}`);
+      assert.equal(res.chart?.positions.length, 13);
+    }
+  });
+});
+
+describe("pinned ephemeris coverage", () => {
+  const SE_IDS = Object.values(SE_ID_BY_BODY).filter(
+    (id): id is number => typeof id === "number",
+  );
+
+  it("declares bounds that every launch body actually answers", () => {
+    for (const seId of SE_IDS) {
+      assert.doesNotThrow(
+        () => calcBody(EPHEMERIS_COVERAGE_MIN_JD, seId),
+        `body ${seId} is not covered at EPHEMERIS_COVERAGE_MIN_JD`,
+      );
+      assert.doesNotThrow(
+        () => calcBody(EPHEMERIS_COVERAGE_MAX_JD, seId),
+        `body ${seId} is not covered at EPHEMERIS_COVERAGE_MAX_JD`,
+      );
+    }
+  });
+
+  it("keeps those bounds covered after an out-of-range call has been served", () => {
+    // Swiss Ephemeris remembers that a neighbouring file was missing, and then
+    // falls back to Moshier for edge-segment instants it answered correctly on
+    // a cold process. That is why the declared bounds carry hours of margin
+    // rather than sitting on the measured edge: without it, whether a chart
+    // could be calculated would depend on what the container served before it.
+    assert.throws(() => calcBody(EPHEMERIS_COVERAGE_MIN_JD - 400, SE_ID_BY_BODY.sun!));
+    assert.throws(() => calcBody(EPHEMERIS_COVERAGE_MAX_JD + 400, SE_ID_BY_BODY.sun!));
+    for (const seId of SE_IDS) {
+      assert.doesNotThrow(
+        () => calcBody(EPHEMERIS_COVERAGE_MIN_JD, seId),
+        `body ${seId} stopped resolving at the lower bound after a fallback`,
+      );
+      assert.doesNotThrow(
+        () => calcBody(EPHEMERIS_COVERAGE_MAX_JD, seId),
+        `body ${seId} stopped resolving at the upper bound after a fallback`,
+      );
+    }
+  });
+
+  it("refuses a Moshier substitution instead of returning it as Swiss Ephemeris", () => {
+    // swe_calc_ut does not fail here — it succeeds with SEFLG_SWIEPH cleared
+    // and returns plausible longitudes. Accepting them would stamp a different
+    // theory with this build's ephemeris_data_version.
+    assert.throws(
+      () => calcBody(EPHEMERIS_COVERAGE_MIN_JD - 400, SE_ID_BY_BODY.pluto!),
+      (err: unknown) =>
+        err instanceof Error &&
+        /flag \d+/.test(err.message) &&
+        !/sepl_|semo_|\/(home|Users|app|srv)\//.test(err.message),
     );
   });
 });
