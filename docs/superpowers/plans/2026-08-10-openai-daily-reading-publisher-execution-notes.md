@@ -42,7 +42,7 @@ Task 17 Step 2 runs `git diff --check "$env:PATTERNLIKE_M5_IMPLEMENTATION_BASE..
 | 13 | AI consent routes and dual-version projections | done — `a245c93`, follow-up `bdf4974` |
 | 14 | Today, provenance, Context & Privacy | done — `a5057dd` |
 | 15 | Evaluation lanes | done — `568be46` |
-| 16 | Product truth and production runbook | pending |
+| 16 | Product truth and production runbook | done — `e59d02d`, `369cec2` |
 | 17 | Final candidate gate and review | pending |
 
 ## Deviations from the plan, and why
@@ -227,6 +227,31 @@ enabled note reach the lead, a paragraph, and the reflection, so the corpus uses
 the source that actually declares it. Discovered by the compiler rejecting the
 signal rather than by reading the registry, which is the outcome the allowlist is
 for.
+
+**Task 16 — v0.5 amends v0.2 rather than replacing it.** The plan says to create
+a v0.5 specification and leave the historical M3 documents truthful. v0.5
+restates in full only the sections this change touches — the interpretation
+contract, daily reading generation, the AI boundary, security and privacy,
+reliability, Milestone 5, acceptance, and open decisions — and states that every
+other v0.2 section remains in force as published. Restating three hundred lines
+of unchanged text would have created two documents that could disagree about
+wording neither change touched.
+
+**Task 16 — the documents and PDF skills are not in this environment.** Neither
+is python-docx, reportlab, pandoc, or LibreOffice. The user was asked and
+authorized installing `python-docx` and `reportlab`; `pypdf` and `pymupdf` were
+added to verify the result. `spec-bundle/render_v0_5.py` is checked in beside the
+artifacts so a later version is regenerated rather than reverse-engineered. All
+seven PDF pages were rasterized and read.
+
+**Task 16 — `.gitattributes` was required, and its absence was a live hazard.**
+`core.autocrlf` is true and git decides text versus binary by sniffing. A
+reportlab PDF has long uncompressed stretches and is sniffed as TEXT, so
+committing one would have had checkout rewrite its LF bytes to CRLF and hand
+every clone a corrupt file. `git diff --check` also failed on its internals,
+which would have failed Task 17's whitespace gate. The DOCX escaped only because
+a zip container carries NUL bytes early. Binary document and image types are now
+declared rather than guessed.
 
 ## Deferred production gates
 
