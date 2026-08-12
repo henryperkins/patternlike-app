@@ -21,6 +21,11 @@
   --sans: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --sidebar: 252px;
+  /* Compact labels use tokens rather than one-off pixel values so the mobile
+   * readability floor applies to the whole layer, including future labels. */
+  --label-xs: 8px;
+  --label-sm: 9px;
+  --label-md: 10px;
 }
 
 * {
@@ -219,7 +224,7 @@ summary:focus-visible {
 .nav-item__stage {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.12em;
 }
 
@@ -242,7 +247,7 @@ summary:focus-visible {
   align-items: center;
   gap: 8px;
   color: var(--ink-soft);
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -293,7 +298,7 @@ summary:focus-visible {
 .kicker {
   margin: 0;
   color: var(--coral);
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 800;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -363,7 +368,7 @@ summary:focus-visible {
 .panel-code {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.09em;
 }
 
@@ -510,7 +515,7 @@ summary:focus-visible {
 .step-heading__count {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--label-md);
   letter-spacing: 0.08em;
 }
 
@@ -645,7 +650,7 @@ summary:focus-visible {
 
 .field > span {
   color: var(--ink-soft);
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 750;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -733,7 +738,7 @@ summary:focus-visible {
   margin-left: auto;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-style: normal;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -781,7 +786,7 @@ summary:focus-visible {
 .unknown-time-note strong {
   color: var(--coral);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -797,7 +802,7 @@ summary:focus-visible {
   border-bottom: 1px solid var(--line-dark);
   cursor: pointer;
   background: transparent;
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -819,7 +824,7 @@ summary:focus-visible {
 .consent-ledger span {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -922,7 +927,7 @@ summary:focus-visible {
 .calculation-stamp small {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -958,7 +963,7 @@ summary:focus-visible {
   align-self: start;
   color: var(--coral);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
 }
 
 .anchor p,
@@ -971,7 +976,7 @@ summary:focus-visible {
 .anchor p {
   margin-bottom: 4px;
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 750;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -986,7 +991,7 @@ summary:focus-visible {
 .anchor small {
   margin-top: 5px;
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: var(--label-md);
 }
 
 /*
@@ -1137,7 +1142,7 @@ summary:focus-visible {
   justify-content: center;
   gap: 20px;
   color: var(--ink-faint);
-  font-size: 9px;
+  font-size: var(--label-sm);
 }
 
 .wheel-legend span {
@@ -1181,7 +1186,7 @@ summary:focus-visible {
   justify-content: space-between;
   color: #bdd0c5;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1219,13 +1224,13 @@ summary:focus-visible {
 
 .uncertainty-card dt {
   color: #9db3a7;
-  font-size: 10px;
+  font-size: var(--label-md);
 }
 
 .uncertainty-card dd {
   margin: 0;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   text-transform: uppercase;
 }
 
@@ -1247,7 +1252,7 @@ summary:focus-visible {
   gap: 10px;
   margin-top: 14px;
   color: var(--forest);
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 800;
   letter-spacing: 0.06em;
   text-decoration: none;
@@ -1284,7 +1289,7 @@ summary:focus-visible {
   gap: 10px;
   min-height: 48px;
   border-bottom: 1px solid var(--line);
-  font-size: 10px;
+  font-size: var(--label-md);
 }
 
 .position-row__body {
@@ -1307,7 +1312,7 @@ summary:focus-visible {
   justify-self: end;
   color: var(--forest);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1348,7 +1353,7 @@ summary:focus-visible {
   margin-bottom: 5px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1356,7 +1361,7 @@ summary:focus-visible {
 
 .evidence-drawer__toggle {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1366,7 +1371,7 @@ summary:focus-visible {
 }
 
 .evidence-drawer[open] .evidence-drawer__toggle::after {
-  font-size: 9px;
+  font-size: var(--label-sm);
   content: "Close";
 }
 
@@ -1388,7 +1393,7 @@ summary:focus-visible {
   margin-bottom: 8px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -1397,7 +1402,7 @@ summary:focus-visible {
   overflow: hidden;
   margin: 0;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--label-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1425,7 +1430,7 @@ summary:focus-visible {
   border: 1px solid var(--line);
   color: var(--ink-soft);
   font-family: var(--sans);
-  font-size: 10px;
+  font-size: var(--label-md);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1439,7 +1444,7 @@ summary:focus-visible {
 
 .today-chip--code {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.06em;
   text-transform: none;
 }
@@ -1601,7 +1606,7 @@ summary:focus-visible {
 .today-gate__request {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.06em;
 }
 
@@ -1627,7 +1632,7 @@ summary:focus-visible {
 .today-gate__form label {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -1687,7 +1692,7 @@ summary:focus-visible {
 .evidence-lane {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1719,7 +1724,7 @@ summary:focus-visible {
   margin-left: 8px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.04em;
 }
 
@@ -1766,7 +1771,7 @@ summary:focus-visible {
   padding: 20px 28px 0;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1814,7 +1819,7 @@ summary:focus-visible {
   margin: 0;
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.07em;
   text-align: right;
   text-transform: uppercase;
@@ -1829,7 +1834,7 @@ summary:focus-visible {
   /* Carries a factual distinction, so it is legible rather than merely quiet. */
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1890,7 +1895,7 @@ summary:focus-visible {
 .privacy-score span {
   color: #9fb4a8;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -1977,7 +1982,7 @@ summary:focus-visible {
   margin-bottom: 7px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -1992,7 +1997,7 @@ summary:focus-visible {
 
 .ai-consent-facts__code {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--label-md);
   letter-spacing: 0.04em;
 }
 
@@ -2068,7 +2073,7 @@ summary:focus-visible {
   gap: 8px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -2102,7 +2107,7 @@ summary:focus-visible {
 .source-row p {
   margin-top: 4px;
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: var(--label-md);
 }
 
 .source-row button {
@@ -2112,7 +2117,7 @@ summary:focus-visible {
   border: 1px solid var(--line);
   cursor: not-allowed;
   background: transparent;
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -2176,7 +2181,7 @@ summary:focus-visible {
 
 .privacy-actions__buttons .button span {
   font-family: var(--mono);
-  font-size: 7px;
+  font-size: var(--label-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2191,7 +2196,7 @@ summary:focus-visible {
   margin-top: 8px;
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   line-height: 1.5;
   letter-spacing: 0.02em;
 }
@@ -2232,7 +2237,7 @@ summary:focus-visible {
 .privacy-action__confirm label {
   color: var(--coral);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   line-height: 1.5;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2314,7 +2319,7 @@ summary:focus-visible {
   margin: 12px 0 0;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.06em;
 }
 
@@ -2342,7 +2347,7 @@ summary:focus-visible {
 .timing-scan strong,
 .timing-scan p {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   line-height: 1.5;
   letter-spacing: 0.06em;
 }
@@ -2385,7 +2390,7 @@ summary:focus-visible {
 .timing-filters label > span {
   color: var(--ink-faint);
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-weight: 800;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -2490,7 +2495,7 @@ summary:focus-visible {
   border: 1px solid var(--coral);
   color: var(--coral);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2520,7 +2525,7 @@ summary:focus-visible {
 .timing-cycle__envelope span {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -2566,7 +2571,7 @@ summary:focus-visible {
   margin: 0 0 10px;
   color: var(--ink-faint);
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: var(--label-sm);
   font-weight: 800;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -2592,7 +2597,7 @@ summary:focus-visible {
 .timing-cycle__direction {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -2628,7 +2633,7 @@ summary:focus-visible {
   margin: 0 0 7px;
   color: var(--ink-faint);
   font-family: var(--sans);
-  font-size: 8px;
+  font-size: var(--label-xs);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2639,7 +2644,7 @@ summary:focus-visible {
   margin: 0;
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   line-height: 1.55;
   letter-spacing: 0.04em;
 }
@@ -2708,7 +2713,7 @@ summary:focus-visible {
 .timing-failure__request {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--label-sm);
   letter-spacing: 0.06em;
 }
 
@@ -2751,7 +2756,7 @@ summary:focus-visible {
   color: var(--coral);
   border: 1px solid rgba(199, 96, 67, 0.5);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2772,7 +2777,7 @@ summary:focus-visible {
   color: var(--ink-faint);
   border: 1px solid var(--line);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2819,7 +2824,7 @@ summary:focus-visible {
 .return-link span {
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: var(--label-xs);
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2893,7 +2898,7 @@ summary:focus-visible {
 .error-page code {
   margin: 4px 0 28px;
   color: var(--ink-faint);
-  font-size: 9px;
+  font-size: var(--label-sm);
 }
 
 .error-page small {
@@ -3028,6 +3033,9 @@ summary:focus-visible {
   :root {
     --mobile-header: 68px;
     --mobile-nav: 70px;
+    --label-xs: 11px;
+    --label-sm: 11px;
+    --label-md: 11px;
   }
 
   .sidebar {
@@ -3099,7 +3107,9 @@ summary:focus-visible {
   }
 
   .main-content {
-    min-height: calc(100dvh - var(--mobile-header) - var(--mobile-nav));
+    /* This box owns the chrome-clearing padding, so its border-box remains a
+     * full viewport. Nested fill surfaces subtract the chrome below. */
+    min-height: 100dvh;
     margin-left: 0;
     padding-top: var(--mobile-header);
     /* The bar itself is this tall plus the inset, so the content has to clear
@@ -3126,27 +3136,6 @@ summary:focus-visible {
   .loading-page,
   .error-page {
     min-height: calc(100dvh - var(--mobile-header) - var(--mobile-nav));
-  }
-
-  :is(
-    .eyebrow,
-    .kicker,
-    .panel-code,
-    .field > span,
-    .step-heading__count,
-    .zone-resolution__grade,
-    .calculation-stamp span,
-    .calculation-stamp small,
-    .today-gate__form label,
-    .timing-filters label > span,
-    .source-state,
-    .source-row p,
-    .source-row button,
-    .privacy-action__confirm label,
-    .privacy-action__status,
-    .return-link span
-  ) {
-    font-size: 11px;
   }
 
   .source-row button {
