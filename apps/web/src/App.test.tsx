@@ -430,10 +430,12 @@ describe("web application shell", () => {
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
       "/v1/sessions/current": { status: 204, body: null },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
     });
 
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
 
     await user.click(screen.getByRole("button", { name: /Sign out/i }));
 

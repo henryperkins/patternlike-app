@@ -263,7 +263,13 @@ function AiSynthesisConsentPanel() {
   );
 }
 
-export function PrivacyView({ hasChart }: { hasChart: boolean }) {
+export function PrivacyView({
+  hasChart,
+  onSignOut,
+}: {
+  hasChart: boolean;
+  onSignOut: () => void;
+}) {
   const [exportState, setExportState] = useState<PrivacyActionState>({ status: "idle" });
   const [deleteState, setDeleteState] = useState<PrivacyActionState>({ status: "idle" });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -455,6 +461,17 @@ export function PrivacyView({ hasChart }: { hasChart: boolean }) {
             <PrivacyActionStatus id="delete-status" state={deleteState} />
           </div>
         </div>
+      </section>
+
+      <section className="privacy-session panel" aria-labelledby="session-heading">
+        <div>
+          <p className="kicker">Session</p>
+          <h2 id="session-heading">Finished on this device?</h2>
+          <p>Sign out to end this browser session and protect your account on a shared device.</p>
+        </div>
+        <button className="button button--secondary" type="button" onClick={onSignOut}>
+          Sign out <Icon name="arrow" />
+        </button>
       </section>
     </div>
   );
