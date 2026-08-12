@@ -17,6 +17,31 @@ grid work and can be fixed without touching it.
 
 ---
 
+## Status
+
+[#18](https://github.com/henryperkins/patternlike-app/pull/18) addresses these.
+Re-measured against its head (`b6f6650`) with the same harness:
+
+| Finding | Before | After |
+|---|---|---|
+| 1 · Sign-out on mobile | 0 of 5 views | Privacy, 123×50, clears the nav ✅ |
+| 2 · Inputs under 16px | 4 | 0 ✅ |
+| 3 · Text under 10px | 46% of runs | 27% — **partially fixed**, see below |
+| 4 · Landscape chrome | 138px (35%) | 70px (18%) ✅ |
+| 5 · Tap targets under 44px | 5 | 0 ✅ |
+| 6 · `viewport-fit=cover` | absent | present ✅ |
+| 7 · `theme-color` mismatch | yes | aligned ✅ |
+| 8 · `100vh` | — | `100dvh` ✅, but see the correction in that finding |
+
+Finding 3 is lifted by a hand-enumerated `:is(…)` allowlist of ~16 selectors, so
+it raises exactly those and nothing else. Text under 12px is unchanged at ~63% of
+runs, and 67 runs remain under 10px — concentrated in the evidence tables
+(`dt` at 8px, `dd` at 9px), the timing-cycle metadata, and the 7px `M1` milestone
+stamps. The remainder is the design decision named in the finding, not an
+oversight in the PR.
+
+---
+
 ## Findings
 
 Ordered by what a reader on a phone actually hits.
@@ -175,19 +200,33 @@ again — `.onboarding` (`:433`), `.unavailable-page` (`:2686`), `.loading-page`
 `.error-page` (`:492`). The child measures 100vh against the *full* viewport, not
 against what is left after 138px of chrome, so the two stack.
 
-Measured on Time travel, a near-empty page: `scrollHeight 1033` against
-`clientHeight 852` — **181px of scroll on a page with one heading and a link**,
-and its `align-content: center` centres the content in the wrong box.
+Two consequences. `align-content: center` on `.unavailable-page` centres its
+content in an 852px box when only 714px is visible, so a short page is centred
+against the wrong rectangle. And `100vh` on iOS resolves to the
+toolbar-*retracted* viewport, so on a real device each of these is another
+~60–90px taller than it measures in an emulator.
 
-Two further notes. `100vh` on iOS resolves to the toolbar-*retracted* viewport,
-so on a real device each of these is another ~60–90px taller than measured here.
-And `.onboarding` keeps its `min-height: 100vh` at every width — the 1180px block
-resets `.onboarding__intro` and `.onboarding-card` to `auto` but not the grid
-itself.
+`.onboarding` also keeps its `min-height: 100vh` at every width — the 1180px
+block resets `.onboarding__intro` and `.onboarding-card` to `auto` but not the
+grid itself.
 
 **Fix:** `100dvh` in place of `100vh` on these five rules, and subtract the chrome
 where the intent is "fill the visible area" —
-`min-height: calc(100dvh - var(--mobile-header) - var(--mobile-nav))`.
+`min-height: calc(100dvh - var(--mobile-header) - var(--mobile-nav))`. Note that
+`.main-content` is *not* one of those: it starts at `y=0` and carries the 138px
+of chrome as its own padding under `box-sizing: border-box`, so a plain `100dvh`
+is already the correct value there and subtracting again lands 138px short.
+
+> **Correction, 2026-08-12.** An earlier revision of this finding claimed
+> "181px of scroll on a page with one heading and a link" on Time travel, and
+> attributed that scroll to the nested `min-height`. That was wrong. Measuring
+> [#18](https://github.com/henryperkins/patternlike-app/pull/18), which applies
+> the `100dvh` fix, shows the `min-height` was never the binding constraint —
+> `.unavailable-page` renders 899px of real content, so it exceeds an 852px
+> viewport on its own, and the page still scrolls 185px afterwards (marginally
+> more, because the larger label sizes from finding #3 add height). The rule
+> change is still correct for the two reasons above; it simply does not reduce
+> scrolling, and the original text over-claimed that it would.
 
 ---
 
