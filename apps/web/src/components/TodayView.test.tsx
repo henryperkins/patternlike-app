@@ -168,6 +168,22 @@ describe("TodayView", () => {
     expect(screen.queryByText(/once per local day, on a schedule/i)).not.toBeInTheDocument();
   });
 
+  /*
+   * The wait polls silently, so the only thing distinguishing it from a page
+   * that has given up is the mark. It is decorative on purpose: the sentence
+   * beside it already lives in the `aria-live` region, and announcing the mark
+   * as well would say the same thing twice to the readers least able to skip it.
+   */
+  it("marks the wait as still working, without announcing it twice", async () => {
+    const { container } = renderToday({ [TODAY]: preparing() });
+
+    await screen.findByRole("heading", { name: "Preparing your reading." });
+    const mark = container.querySelector(".today-working");
+    expect(mark).not.toBeNull();
+    expect(mark).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("status")).not.toContainElement(mark as HTMLElement);
+  });
+
   it("renders a reading automatically after the first 500 ms poll", async () => {
     vi.useFakeTimers();
     try {

@@ -10,11 +10,27 @@
   --paper-deep: #e5dfd1;
   --ink: #17312a;
   --ink-soft: #4e625b;
-  --ink-faint: #7a8781;
+  /*
+   * The compact-label tone. Was #7a8781, which is 3.26:1 on paper and 2.93:1 on
+   * the drawer — below AA at every size this token is used at, and it is only
+   * ever used for 8–11px labels. The Today reading is the case that settled it:
+   * `.kicker` carries the v5 headline, and a headline nobody can comfortably
+   * read is a soft way of not writing one. This value clears 4.5:1 on paper,
+   * paper-light, the drawer, and forest-light; it stays a step lighter than
+   * --ink-soft, so the label/body hierarchy survives the correction.
+   */
+  --ink-faint: #596962;
   --forest: #173f35;
   --forest-light: #dce7df;
   --cobalt: #234c9f;
   --coral: #c76043;
+  /*
+   * Coral for text, as against coral for accent marks. #c76043 is 3.52:1 on
+   * paper — fine for the rules, dots, and markers it was chosen for, and below
+   * AA for every label that borrowed it. Rules that paint glyphs use this one;
+   * rules that paint a shape keep --coral.
+   */
+  --coral-ink: #a84528;
   --line: #cec7b8;
   --line-dark: #9fa89f;
   --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
@@ -272,7 +288,7 @@ summary:focus-visible {
 }
 
 .shell-status--offline {
-  color: var(--coral);
+  color: var(--coral-ink);
 }
 
 .mobile-header,
@@ -297,7 +313,7 @@ summary:focus-visible {
 .eyebrow,
 .kicker {
   margin: 0;
-  color: var(--coral);
+  color: var(--coral-ink);
   font-size: var(--label-md);
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -418,7 +434,7 @@ summary:focus-visible {
 }
 
 .button--danger {
-  color: var(--coral);
+  color: var(--coral-ink);
   border-color: rgba(199, 96, 67, 0.5);
   background: transparent;
 }
@@ -750,7 +766,7 @@ summary:focus-visible {
 
 .zone-resolution__grade--medium,
 .zone-resolution__grade--low {
-  color: var(--coral);
+  color: var(--coral-ink);
 }
 
 .zone-resolution__notes {
@@ -784,7 +800,7 @@ summary:focus-visible {
 }
 
 .unknown-time-note strong {
-  color: var(--coral);
+  color: var(--coral-ink);
   font-family: var(--mono);
   font-size: var(--label-sm);
   letter-spacing: 0.08em;
@@ -961,7 +977,7 @@ summary:focus-visible {
 
 .anchor__number {
   align-self: start;
-  color: var(--coral);
+  color: var(--coral-ink);
   font-family: var(--mono);
   font-size: var(--label-sm);
 }
@@ -1318,7 +1334,7 @@ summary:focus-visible {
 }
 
 .retrograde {
-  color: var(--coral);
+  color: var(--coral-ink);
 }
 
 .evidence-drawer {
@@ -1425,7 +1441,17 @@ summary:focus-visible {
   gap: 8px;
 }
 
+/*
+ * Wrapping, not `nowrap`. The domain chip is the only one whose text the server
+ * chooses, and `Ranked toward spirituality meaning` measures 286px inside the
+ * 284px column a 320px phone leaves — it was already crossing into the gutter,
+ * and a longer domain or a reader with a larger system font size would push it
+ * past the viewport and give the page a horizontal scroll. The two short chips
+ * below opt back in: `Revised · r3` and a locale tag are single tokens that
+ * should never break, and they have room at every width.
+ */
 .today-chip {
+  max-width: 100%;
   padding: 6px 11px;
   border: 1px solid var(--line);
   color: var(--ink-soft);
@@ -1434,12 +1460,12 @@ summary:focus-visible {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .today-chip--revised {
   border-color: var(--coral);
-  color: var(--coral);
+  color: var(--coral-ink);
+  white-space: nowrap;
 }
 
 .today-chip--code {
@@ -1447,6 +1473,7 @@ summary:focus-visible {
   font-size: var(--label-sm);
   letter-spacing: 0.06em;
   text-transform: none;
+  white-space: nowrap;
 }
 
 .today-fallback-note {
@@ -1574,6 +1601,7 @@ summary:focus-visible {
   color: var(--ink-soft);
 }
 
+/* An accent mark rather than a glyph, so it keeps the lighter coral. */
 .reading-notice--context_label svg {
   color: var(--coral);
 }
@@ -1600,6 +1628,53 @@ summary:focus-visible {
 .today-empty__aside {
   font-style: italic;
   color: var(--ink-faint) !important;
+}
+
+/*
+ * The waiting mark. The panel is `align-items: start`, so this is a row of
+ * three dots rather than a bar: a bar would want a width, and there is nothing
+ * here that knows how long the wait is.
+ */
+.today-working {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.today-working i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+  opacity: 0.3;
+  animation: today-working 1400ms ease-in-out infinite;
+}
+
+.today-working i:nth-child(2) {
+  animation-delay: 200ms;
+}
+
+.today-working i:nth-child(3) {
+  animation-delay: 400ms;
+}
+
+/*
+ * The final keyframe is the reduced-motion resting state: the global reduce
+ * rule collapses the duration and pins the iteration count to one, so whatever
+ * 100% holds is what a reader who asked for no motion sees. Holding the dim
+ * value leaves a quiet ellipsis rather than one dot stranded at full strength.
+ */
+@keyframes today-working {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+  }
+
+  35% {
+    opacity: 1;
+  }
 }
 
 .today-empty__request,
@@ -2235,7 +2310,7 @@ summary:focus-visible {
 }
 
 .privacy-action__confirm label {
-  color: var(--coral);
+  color: var(--coral-ink);
   font-family: var(--mono);
   font-size: var(--label-sm);
   line-height: 1.5;
@@ -2369,7 +2444,7 @@ summary:focus-visible {
 }
 
 .timing-scan__warning {
-  color: var(--coral) !important;
+  color: var(--coral-ink) !important;
   font-weight: 700;
 }
 
@@ -2493,7 +2568,7 @@ summary:focus-visible {
   flex: none;
   padding: 7px 10px;
   border: 1px solid var(--coral);
-  color: var(--coral);
+  color: var(--coral-ink);
   font-family: var(--mono);
   font-size: var(--label-sm);
   font-weight: 700;
@@ -2753,7 +2828,7 @@ summary:focus-visible {
   top: 0;
   right: 0;
   padding: 8px 11px;
-  color: var(--coral);
+  color: var(--coral-ink);
   border: 1px solid rgba(199, 96, 67, 0.5);
   font-family: var(--mono);
   font-size: var(--label-xs);
@@ -2927,7 +3002,7 @@ summary:focus-visible {
 
 .signin-page__error {
   margin-top: 20px;
-  color: var(--coral);
+  color: var(--coral-ink);
   font-size: 14px;
 }
 
@@ -3248,10 +3323,22 @@ summary:focus-visible {
     padding: 24px 20px;
   }
 
-  /* .page-header goes display:block here, so the chips fall under the date. */
+  /*
+   * .page-header goes display:block here, so the chips fall under the date —
+   * which turns the header into a stack whose gaps are all set for the
+   * side-by-side desktop arrangement. Measured on a 390×844 phone, 114px sat
+   * between the last chip and the first word of the reading, against 24px of
+   * padding between the reading's own paragraphs: five times the rhythm of the
+   * thing it introduces. These three values close it to 88px, which is still a
+   * clear break and returns a line and a half of prose to the first screen.
+   */
+  .today-page__header {
+    padding-bottom: 24px;
+  }
+
   .today-meta {
     justify-content: start;
-    margin-top: 22px;
+    margin-top: 14px;
   }
 
   .evidence-paragraph,
@@ -3287,7 +3374,7 @@ summary:focus-visible {
   }
 
   .today-reading {
-    margin-top: 34px;
+    margin-top: 24px;
   }
 
   .reading-block,

@@ -317,6 +317,26 @@ interface NoticeAction {
 }
 
 /**
+ * The one thing on a waiting screen that says the app is still working.
+ *
+ * Both waiting states poll — 500ms, then 1s, 2s, 5s — and neither drew anything
+ * that moved, so a phone left on the preparing screen was indistinguishable
+ * from a phone that had stopped. Purely decorative: the sentence beside it is
+ * already in an `aria-live` region, and repeating "working" to a screen reader
+ * every frame would be worse than silent. Under `prefers-reduced-motion` the
+ * animation is suppressed and the three marks resolve to a static ellipsis.
+ */
+function WorkingMarks() {
+  return (
+    <span className="today-working" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+/**
  * Every non-reading state, rendered through one component.
  *
  * The action button is a slot rather than part of `children` so it holds the
@@ -541,6 +561,7 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
     case "loading":
       return (
         <TodayNotice title="Reading today.">
+          <WorkingMarks />
           <p role="status" aria-live="polite">
             Starting your reading for today.
           </p>
@@ -565,6 +586,7 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
     case "preparing":
       return (
         <TodayNotice title="Preparing your reading.">
+          <WorkingMarks />
           <p role="status" aria-live="polite">
             {state.takingLonger
               ? `Your reading for ${formatLocalDate(state.localDate)} is still being prepared. This is taking longer than usual; you can leave this page and come back.`
