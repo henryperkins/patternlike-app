@@ -248,12 +248,21 @@ describe("AI-synthesis consent routes", () => {
     )).toBe(true);
     expect(current.body).not.toHaveProperty("context_sources");
 
-    const m4Stub = await app.request(
+    const contextSources = await app.request(
       "/v1/context-sources",
       { headers: { "x-user-id": USER_A } },
       { ...env, READING_V5_ROLLOUT: "off" },
     );
-    expect(m4Stub.status).toBe(501);
+    expect(contextSources.status).toBe(200);
+    expect(await contextSources.json()).toMatchObject({
+      schema_version: "0.2.0",
+      user_id: USER_A,
+      sources: [{
+        source_id: "USR-06",
+        permission_state: "never_granted",
+        enabled: false,
+      }],
+    });
   });
 
   it("requires the exact displayed policy and applies the existing idempotency convention", async () => {

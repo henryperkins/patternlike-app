@@ -223,6 +223,8 @@ async function seedContextSignal(
     sourceId?: string;
     signalAllowedUses?: string[];
     consentAllowedUses?: string[];
+    permissionState?: "active" | "paused" | "revoked" | "expired";
+    expiresAt?: string | null;
   } = {},
 ): Promise<void> {
   const now = "2026-08-09T12:00:00.000Z";
@@ -233,6 +235,11 @@ async function seedContextSignal(
     "theme_ranking",
   ];
   const consentAllowedUses = options.consentAllowedUses ?? signalAllowedUses;
+  const permissionState =
+    options.permissionState ??
+    (options.consentStatus === undefined || options.consentStatus === "granted"
+      ? "active"
+      : "revoked");
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO consents
@@ -252,13 +259,27 @@ async function seedContextSignal(
       now,
     ),
     env.DB.prepare(
+      `INSERT INTO context_source_permissions
+         (user_id, source_id, enabled, permission_state, allowed_uses_json,
+          permission_tier, consent_id, scopes_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, 2, ?, '[]', ?)`,
+    ).bind(
+      USER_A,
+      sourceId,
+      permissionState === "active" ? 1 : 0,
+      permissionState,
+      JSON.stringify(consentAllowedUses),
+      consentId,
+      now,
+    ),
+    env.DB.prepare(
       `INSERT INTO context_signals
          (id, user_id, source_id, evidence_lane, allowed_uses_json, confidence,
           sensitivity, permission_state, conflict_status, consent_id,
-          freshness_status, observed_at, ingested_at, value_encoding, value_json,
+          freshness_status, observed_at, ingested_at, expires_at, value_encoding, value_json,
           normalized_hash, created_at, updated_at)
        VALUES (?, ?, ?, 'user_and_context', ?, 'user_confirmed',
-               'personal', 'active', 'none', ?, 'fresh', ?, ?, 'structured', '{}',
+               'personal', 'active', 'none', ?, 'fresh', ?, ?, ?, 'structured', '{}',
                ?, ?, ?)`,
     ).bind(
       "sig_context_0000000001",
@@ -268,6 +289,7 @@ async function seedContextSignal(
       consentId,
       now,
       now,
+      options.expiresAt ?? null,
       "5".repeat(64),
       now,
       now,
@@ -348,6 +370,24 @@ describe("enqueue", () => {
 
   it("does not freeze context whose consent is not currently granted", async () => {
     await seedContextSignal({ consentStatus: "revoked", consentVersion: 8 });
+
+    const result = await enqueueDailyReading(env, USER_A);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
+    expect((await decryptCommand(result.jobId)).context).toEqual([]);
+  });
+
+  it("does not freeze context after the current source permission moves away", async () => {
+    await seedContextSignal({ permissionState: "paused" });
+
+    const result = await enqueueDailyReading(env, USER_A);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(`enqueue failed: ${result.reason}`);
+    expect((await decryptCommand(result.jobId)).context).toEqual([]);
+  });
+
+  it("does not freeze a current signal expired at the generation anchor", async () => {
+    await seedContextSignal({ expiresAt: "2000-01-01T00:00:00.000Z" });
 
     const result = await enqueueDailyReading(env, USER_A);
     expect(result.ok).toBe(true);
@@ -1213,6 +1253,40 @@ describe("frozen inputs", () => {
     expect((await jobs())[0]!.result_class).toBe("consent_revoked");
   });
 
+  it("fails closed when the current source permission is paused after enqueue", async () => {
+    await seedContextSignal({ consentVersion: 7 });
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows(
+      `UPDATE context_source_permissions
+       SET enabled = 0, permission_state = 'paused'
+       WHERE user_id = ? AND source_id = 'USR-03'`,
+      USER_A,
+    );
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("consent_revoked");
+  });
+
+  it("fails closed when a pinned signal expires before execution", async () => {
+    await seedContextSignal({
+      consentVersion: 7,
+      expiresAt: "2999-01-01T00:00:00.000Z",
+    });
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows(
+      "UPDATE context_signals SET expires_at = '2000-01-01T00:00:00.000Z' WHERE id = 'sig_context_0000000001'",
+    );
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+
+    expect((await readings())[0]!.status).toBe("failed");
+    expect((await jobs())[0]!.result_class).toBe("consent_revoked");
+  });
+
   it("fails closed when the signal no longer permits its pinned use", async () => {
     await seedContextSignal({ consentVersion: 7 });
     const enqueued = await enqueueDailyReading(env, USER_A);
@@ -1261,6 +1335,40 @@ describe("frozen inputs", () => {
 
 describe("claims", () => {
   beforeEach(seedEverything);
+
+  it("does not claim a reading job after the account leaves active state", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows("UPDATE users SET status = 'pending_deletion' WHERE id = ?", USER_A);
+
+    expect(await claimJob(env, enqueued.jobId)).toBeNull();
+    expect((await jobs())[0]).toMatchObject({ status: "queued", attempts: 0 });
+  });
+
+  it("refuses publication when deletion wins after a claim", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    const claim = await claimJob(env, enqueued.jobId);
+    if (!claim) throw new Error("claim missing");
+
+    await rows("UPDATE users SET status = 'pending_deletion' WHERE id = ?", USER_A);
+
+    const outcome = await completeReading(env, {
+      identity: IDENTITY_A,
+      readingId: enqueued.readingId,
+      jobId: enqueued.jobId,
+      claimToken: claim.claimToken,
+      commandGeneration: 1,
+      predecessor: { kind: "none" },
+      reading: { ciphertext: new Uint8Array([1, 2, 3]), keyVersion: 1, nonce: "stale" },
+      evidence: [],
+    });
+
+    expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
+    expect((await readings())[0]).toMatchObject({ status: "pending", reading_enc: null });
+    expect((await jobs())[0]).toMatchObject({ status: "running" });
+  });
 
   it("dispatches a V2 claim through its executor without changing the V1 seam", async () => {
     await grantAiSynthesis();

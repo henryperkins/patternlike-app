@@ -493,6 +493,13 @@ interface SourceGrantRow {
   consent_allowed_uses_json: string | null;
 }
 
+export class ContextSourceInvariantError extends Error {
+  constructor() {
+    super("Context-source permission state is inconsistent");
+    this.name = "ContextSourceInvariantError";
+  }
+}
+
 function parseUses(raw: string | null): string[] | null {
   if (raw === null) return null;
   try {
@@ -516,8 +523,8 @@ function parseUses(raw: string | null): string[] | null {
  *
  * A permission row with no consent at all is still returned, with the consent
  * half emptied, so the compiler rejects it for a reason rather than never seeing
- * it. `enabled = 0` is folded into the permission state for the same reason the
- * state exists: a disabled source is not active, whatever the column says.
+ * it. The stored permission state is preserved. An active/disabled mismatch is
+ * an invariant failure, not silently re-labelled as a pause.
  */
 export async function loadContextSourceGrants(
   env: Env,
@@ -545,16 +552,31 @@ export async function loadContextSourceGrants(
   return results.map((row) => {
     const permissionUses = parseUses(row.permission_allowed_uses_json) ?? [];
     const consentUses = parseUses(row.consent_allowed_uses_json) ?? [];
-    const state = row.enabled === 1 ? row.permission_state : "paused";
+    if (
+      !["active", "paused", "revoked", "expired", "never_granted"].includes(
+        row.permission_state,
+      ) ||
+      (row.enabled === 1) !== (row.permission_state === "active") ||
+      row.consent_status === "denied" ||
+      row.consent_status === "pending"
+    ) {
+      throw new ContextSourceInvariantError();
+    }
+    const consentStatus =
+      row.consent_status === "granted"
+        ? "granted"
+        : row.consent_status === "expired"
+          ? "expired"
+          : "revoked";
     return {
       source_id: row.source_id,
-      permission_state: state as ConstrainedContextSourceInput["permission_state"],
+      permission_state:
+        row.permission_state as ConstrainedContextSourceInput["permission_state"],
       permission_allowed_uses: permissionUses,
       permission_consent_id: row.permission_consent_id ?? "",
       consent_id: row.consent_id ?? "",
       consent_source_id: row.consent_source_id ?? "",
-      consent_status: (row.consent_status ??
-        "revoked") as ConstrainedContextSourceInput["consent_status"],
+      consent_status: consentStatus,
       consent_version: row.consent_version ?? 0,
       consent_allowed_uses: consentUses,
     };

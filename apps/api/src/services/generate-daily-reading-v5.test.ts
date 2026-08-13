@@ -413,7 +413,9 @@ describe("V5 execution", () => {
       if (!changed && url.pathname.endsWith("/v1/daily-sky")) {
         changed = true;
         await rows(
-          "UPDATE context_source_permissions SET permission_state = 'paused' WHERE user_id = ?",
+          `UPDATE context_source_permissions
+           SET enabled = 0, permission_state = 'paused'
+           WHERE user_id = ?`,
           USER_A,
         );
       }
@@ -431,6 +433,45 @@ describe("V5 execution", () => {
     expect(providerCalls).toBe(0);
     expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
   });
+
+  it.each([
+    [
+      "expires",
+      "UPDATE context_signals SET expires_at = '2000-01-01T00:00:00.000Z' WHERE user_id = ?",
+    ],
+    [
+      "is superseded",
+      "UPDATE context_signals SET is_current = 0, conflict_status = 'superseded' WHERE user_id = ?",
+    ],
+  ])(
+    "rechecks that pinned context %s before provider disclosure",
+    async (_label, mutation) => {
+      const { claim } = await claimReserved({ context: true });
+      const originalFetch = globalThis.fetch;
+      let providerCalls = 0;
+      let changed = false;
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        const url = new URL(request.url);
+        if (!changed && url.pathname.endsWith("/v1/daily-sky")) {
+          changed = true;
+          await rows(mutation, USER_A);
+        }
+        if (url.hostname === "api.openai.com") providerCalls += 1;
+        return originalFetch(input, init);
+      }) as typeof fetch;
+      try {
+        expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
+          ok: false,
+          reason: "context_ineligible",
+        });
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      expect(providerCalls).toBe(0);
+      expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
+    },
+  );
 
   it.each([
     ["wrong local date", (c: ReadingGenerationOutput) => ({ ...c, local_date: "2999-01-01" })],

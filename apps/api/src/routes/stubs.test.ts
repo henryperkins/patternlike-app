@@ -32,8 +32,6 @@ describe("not-implemented stubs", () => {
     ["/v1/readings/rdg_seed_00000001/feedback", { method: "POST" }],
     ["/v1/time-travel?date=2026-08-08", {}],
     ["/v1/pattern", {}],
-    ["/v1/exports", { method: "POST" }],
-    ["/v1/account", { method: "DELETE" }],
   ];
 
   it.each(routes)("answers %s with a 501 carrying a request id", async (path, init) => {

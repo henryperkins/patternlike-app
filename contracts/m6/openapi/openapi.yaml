@@ -1,0 +1,309 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API (M6 amendment)
+  version: 0.6.0
+  description: |
+    Forward-only amendment for the privacy lifecycle and USR-06 daily check-in.
+    The frozen M0 request and success components remain authoritative and are
+    named by x-frozen-m0-component; new status and portable-artifact bodies
+    name their M6 JSON Schema through x-normative-schema.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+  - url: http://localhost:8787
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/exports:
+    post:
+      operationId: startAccountExport
+      tags: [privacy]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              x-frozen-m0-component: ExportRequest
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '202':
+          description: Export reservation accepted
+          content:
+            application/json:
+              schema:
+                x-frozen-m0-component: WorkflowAccepted
+                $ref: '#/components/schemas/WorkflowAccepted'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/exports/{export_id}:
+    get:
+      operationId: getAccountExportStatus
+      tags: [privacy]
+      x-normative-schema: 'm6:export-status.schema.json#/$defs/exportStatus'
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Owner-scoped export status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/exports/{export_id}/download:
+    get:
+      operationId: downloadAccountExport
+      tags: [privacy]
+      x-normative-schema: 'm6:account-export.schema.json#/$defs/accountExport'
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Decrypted portable JSON attachment
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountExport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /v1/account:
+    delete:
+      operationId: startAccountDeletion
+      tags: [privacy]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              x-frozen-m0-component: DeleteAccountRequest
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '202':
+          description: Deletion reservation accepted
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                x-frozen-m0-component: WorkflowAccepted
+                $ref: '#/components/schemas/WorkflowAccepted'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/account/deletion-status:
+    get:
+      operationId: getAccountDeletionStatus
+      tags: [privacy]
+      security:
+        - deletionReceipt: []
+      x-normative-schema: 'm6:deletion-status.schema.json#/$defs/deletionStatus'
+      responses:
+        '200':
+          description: Receipt-scoped deletion status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeletionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/context-sources:
+    get:
+      operationId: getContextSourcesM6
+      tags: [context]
+      x-normative-schema: 'm0:consent.schema.json#/$defs/contextSourcesDocument'
+      responses:
+        '200':
+          description: Current USR-06 permission projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContextSourcesDocument' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: putContextSourcesM6
+      tags: [context]
+      x-normative-schema: 'm0:consent.schema.json#/$defs/contextSourcesDocument'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              x-frozen-m0-component: ContextSourcesDocument
+              $ref: '#/components/schemas/ContextSourcesDocument'
+      responses:
+        '200':
+          description: Updated source projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContextSourcesDocument' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /v1/check-ins:
+    post:
+      operationId: postDailyCheckInM6
+      tags: [context]
+      x-normative-schema: 'm0:context-signal.schema.json'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              x-frozen-m0-component: CheckInRequest
+              $ref: '#/components/schemas/CheckInRequest'
+      responses:
+        '201':
+          description: Context signal stored or exactly replayed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContextSignal' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+    deletionReceipt:
+      type: apiKey
+      in: cookie
+      name: pl_deletion_receipt
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    ExportId:
+      name: export_id
+      in: path
+      required: true
+      schema: { type: string, minLength: 8 }
+  responses:
+    Error:
+      description: Existing request-id error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+    ExportRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        include_readings: { type: boolean, default: true }
+        include_journal: { type: boolean, default: true }
+    DeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm]
+      properties:
+        confirm: { type: string, const: DELETE }
+        reason: { type: [string, 'null'] }
+    WorkflowAccepted:
+      type: object
+      additionalProperties: false
+      required: [schema_version, workflow, status, idempotency_key]
+      properties:
+        schema_version: { type: string, const: '0.2.0' }
+        workflow: { type: string, enum: [ExportAccount, DeleteAccount] }
+        status: { type: string, enum: [queued, duplicate] }
+        idempotency_key: { type: string }
+        job_id: { type: [string, 'null'] }
+        resource_id: { type: [string, 'null'] }
+    ExportStatus:
+      type: object
+      additionalProperties: true
+      required: [schema_version, export_request_id, status]
+      properties:
+        schema_version: { type: string, const: '0.6.0' }
+        export_request_id: { type: string }
+        status: { type: string }
+    DeletionStatus:
+      type: object
+      additionalProperties: true
+      required: [schema_version, deletion_request_id, status]
+      properties:
+        schema_version: { type: string, const: '0.6.0' }
+        deletion_request_id: { type: string }
+        status: { type: string }
+    AccountExport:
+      type: object
+      additionalProperties: true
+      required: [schema_version, export_id, generated_at]
+      properties:
+        schema_version: { type: string, const: '0.6.0' }
+        export_id: { type: string }
+        generated_at: { type: string, format: date-time }
+    CheckInRequest:
+      type: object
+      additionalProperties: false
+      required: [energy]
+      properties:
+        energy: { type: string, enum: [low, medium, high] }
+        pressure: { type: string, enum: [low, medium, high] }
+        clarity: { type: string, enum: [low, medium, high] }
+        connection: { type: string, enum: [low, medium, high] }
+        focus_domain: { type: string }
+        note: { type: [string, 'null'], maxLength: 1000 }
+        expires_in_seconds:
+          type: integer
+          minimum: 300
+          maximum: 604800
+          default: 86400
+    ContextSignal:
+      type: object
+      additionalProperties: true
+      required: [schema_version, id, source_id, allowed_uses, evidence_lane]
+      properties:
+        schema_version: { type: string, const: '0.2.0' }
+        id: { type: string }
+        source_id: { type: string, const: USR-06 }
+        allowed_uses: { type: array, items: { type: string } }
+        evidence_lane: { type: string, const: user_and_context }
+    ContextSourcesDocument:
+      type: object
+      additionalProperties: true
+      required: [schema_version, user_id, sources]
+      properties:
+        schema_version: { type: string, const: '0.2.0' }
+        user_id: { type: string }
+        sources: { type: array, items: { type: object } }

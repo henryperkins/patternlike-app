@@ -245,11 +245,28 @@ export interface AccountExportOptions {
   includeJournal?: boolean;
 }
 
+export interface PrivacyWorkflowAccepted extends Omit<WorkflowAccepted, "job_id" | "resource_id"> {
+  job_id: string;
+  resource_id: string;
+}
+
+export interface AccountExportStatus {
+  schema_version: "0.6.0";
+  export_request_id: string;
+  status: "queued" | "running" | "ready" | "failed" | "expired";
+  requested_at: string;
+  status_updated_at: string;
+  completed_at: string | null;
+  expires_at: string | null;
+  download_available: boolean;
+  error_class: string | null;
+}
+
 export function requestAccountExport(
   idempotencyKey: string,
   options: AccountExportOptions = {},
-): Promise<WorkflowAccepted> {
-  return request<WorkflowAccepted>("/v1/exports", {
+): Promise<PrivacyWorkflowAccepted> {
+  return request<PrivacyWorkflowAccepted>("/v1/exports", {
     method: "POST",
     headers: requestHeaders({ json: true, idempotencyKey }),
     body: JSON.stringify({
@@ -257,6 +274,16 @@ export function requestAccountExport(
       include_journal: options.includeJournal ?? true,
     }),
   });
+}
+
+export function getAccountExportStatus(
+  exportId: string,
+  signal?: AbortSignal,
+): Promise<AccountExportStatus> {
+  return request<AccountExportStatus>(
+    `/v1/exports/${encodeURIComponent(exportId)}`,
+    { method: "GET", headers: requestHeaders(), signal },
+  );
 }
 
 /**
@@ -267,11 +294,142 @@ export function requestAccountExport(
 export function deleteAccount(
   idempotencyKey: string,
   reason?: string | null,
-): Promise<WorkflowAccepted> {
-  return request<WorkflowAccepted>("/v1/account", {
+): Promise<PrivacyWorkflowAccepted> {
+  return request<PrivacyWorkflowAccepted>("/v1/account", {
     method: "DELETE",
     headers: requestHeaders({ json: true, idempotencyKey }),
     body: JSON.stringify({ confirm: "DELETE", reason: reason ?? null }),
+  });
+}
+
+export interface AccountDeletionStatus {
+  schema_version: "0.6.0";
+  deletion_request_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  requested_at: string;
+  status_updated_at: string;
+  completed_at: string | null;
+  error_class: string | null;
+}
+
+export function getAccountDeletionStatus(
+  signal?: AbortSignal,
+): Promise<AccountDeletionStatus> {
+  return request<AccountDeletionStatus>("/v1/account/deletion-status", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export type ContextSourceState =
+  | "active"
+  | "paused"
+  | "revoked"
+  | "expired"
+  | "never_granted";
+
+export interface ContextSourceProjection {
+  schema_version: "0.2.0";
+  user_id: string;
+  source_id: "USR-06";
+  enabled: boolean;
+  permission_state: ContextSourceState;
+  allowed_uses: string[];
+  permission_tier: 1;
+  consent_id: string | null;
+  freshness: null;
+  last_signal_id: string | null;
+  scopes: string[];
+  connector_status: "not_applicable";
+  updated_at: string;
+}
+
+export interface ContextSourcesDocument {
+  schema_version: "0.2.0";
+  user_id: string;
+  sources: [ContextSourceProjection];
+  updated_at: string;
+}
+
+export function getContextSources(
+  signal?: AbortSignal,
+): Promise<ContextSourcesDocument> {
+  return request<ContextSourcesDocument>("/v1/context-sources", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function updateContextSources(
+  document: ContextSourcesDocument,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<ContextSourcesDocument> {
+  return request<ContextSourcesDocument>("/v1/context-sources", {
+    method: "PUT",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify(document),
+    signal,
+  });
+}
+
+export type CheckInLevel = "low" | "medium" | "high";
+
+export interface CheckInRequest {
+  energy: CheckInLevel;
+  pressure?: CheckInLevel;
+  clarity?: CheckInLevel;
+  connection?: CheckInLevel;
+  focus_domain?: string;
+  note?: string | null;
+  expires_in_seconds: 86400;
+}
+
+export interface CheckInSignal {
+  schema_version: "0.2.0";
+  id: string;
+  user_id: string;
+  source_id: "USR-06";
+  source_window: string;
+  evidence_lane: "user_and_context";
+  allowed_uses: string[];
+  permission_state: "active";
+  conflict_status: "none";
+  freshness: {
+    status: "fresh";
+    observed_at: string;
+    ingested_at: string;
+    expires_at: string;
+    max_age_seconds: number;
+    age_seconds: 0;
+  };
+  value: {
+    encoding: "structured";
+    structured: {
+      energy: CheckInLevel;
+      pressure: CheckInLevel | null;
+      clarity: CheckInLevel | null;
+      connection: CheckInLevel | null;
+      focus_domain: string | null;
+      note: string | null;
+    };
+  };
+  supersedes_signal_id: string | null;
+  normalized_hash: string;
+}
+
+export function saveDailyCheckIn(
+  checkIn: CheckInRequest,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<CheckInSignal> {
+  return request<CheckInSignal>("/v1/check-ins", {
+    method: "POST",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify(checkIn),
+    signal,
   });
 }
 

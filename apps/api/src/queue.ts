@@ -1,4 +1,4 @@
-import type { Env, GenerationMessage } from "./env.js";
+import type { Env, GenerationMessage, WorkerMessage } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import {
   ClaimLoadError,
@@ -18,6 +18,14 @@ import {
 import { isCommandV2 } from "./services/generation-command-v2.js";
 import { readReadingV5Rollout } from "./services/reading-rollout.js";
 import { safeLog } from "./services/safe-log.js";
+import {
+  PRIVACY_RETRY_DELAY_SECONDS,
+  isPrivacyMessage,
+  processExportMessage,
+} from "./services/privacy-jobs.js";
+import {
+  processDeletionMessage,
+} from "./services/account-deletion.js";
 
 /**
  * The daily-reading consumer.
@@ -75,13 +83,44 @@ async function retryOrFail(
 }
 
 export async function queue(
-  batch: MessageBatch<GenerationMessage>,
+  batch: MessageBatch<WorkerMessage>,
   env: Env,
 ): Promise<void> {
+  const failure = checkSecureConfig(env);
+  if (failure) {
+    safeLog({ event: "insecure_configuration", config_code: failure.code });
+    // Retry rather than ack: the messages are valid and the deployment is not.
+    batch.retryAll({ delaySeconds: RETRY_DELAY_SECONDS });
+    return;
+  }
+
+  const generationMessages: Message<GenerationMessage>[] = [];
+  for (const message of batch.messages) {
+    if (isPrivacyMessage(message.body)) {
+      if (message.body.job_type === "delete_account") {
+        const outcome = await processDeletionMessage(env, message.body);
+        if (outcome === "ack") {
+          message.ack();
+        } else {
+          message.retry({ delaySeconds: outcome.retryAfterSeconds });
+        }
+      } else {
+        const outcome = await processExportMessage(env, message.body);
+        if (outcome === "retry") {
+          message.retry({ delaySeconds: PRIVACY_RETRY_DELAY_SECONDS });
+        } else {
+          message.ack();
+        }
+      }
+    } else {
+      generationMessages.push(message as Message<GenerationMessage>);
+    }
+  }
+
   const rollout = readReadingV5Rollout(env);
   const rolloutPaused = new Set<string>();
   if (rollout === "off") {
-    for (const message of batch.messages) {
+    for (const message of generationMessages) {
       const { job_id: jobId } = message.body ?? {};
       if (!jobId) continue;
       const paused = await pauseQueuedV2ForRolloutOff(env, jobId);
@@ -94,15 +133,7 @@ export async function queue(
     }
   }
 
-  const failure = checkSecureConfig(env);
-  if (failure) {
-    safeLog({ event: "insecure_configuration", config_code: failure.code });
-    // Retry rather than ack: the messages are valid and the deployment is not.
-    batch.retryAll({ delaySeconds: RETRY_DELAY_SECONDS });
-    return;
-  }
-
-  for (const message of batch.messages) {
+  for (const message of generationMessages) {
     if (rolloutPaused.has(message.id)) continue;
     const { job_id: jobId, reading_id: readingId } = message.body ?? {};
     if (!jobId || !readingId) {

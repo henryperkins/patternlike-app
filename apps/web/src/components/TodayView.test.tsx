@@ -70,6 +70,57 @@ describe("TodayView", () => {
     expect(screen.queryByText(/horoscope/i)).not.toBeInTheDocument();
   });
 
+  it("places a check-in before the reading without rewriting the published artifact", async () => {
+    const user = userEvent.setup();
+    const expiresAt = "2026-08-14T12:30:00.000Z";
+    const { container } = renderToday({
+      [TODAY]: ok(todayResponse),
+      "GET /v1/context-sources": ok({
+        schema_version: "0.2.0",
+        user_id: "usr_test_0001",
+        sources: [{
+          schema_version: "0.2.0",
+          user_id: "usr_test_0001",
+          source_id: "USR-06",
+          enabled: true,
+          permission_state: "active",
+          allowed_uses: ["theme_ranking", "tone", "reflection_prompt"],
+          permission_tier: 1,
+          consent_id: "cns_usr06_0001",
+          freshness: null,
+          last_signal_id: null,
+          scopes: [],
+          connector_status: "not_applicable",
+          updated_at: "2026-08-13T12:00:00.000Z",
+        }],
+        updated_at: "2026-08-13T12:00:00.000Z",
+      }),
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      "POST /v1/check-ins": {
+        status: 201,
+        body: {
+          id: "ctx_today_0001",
+          freshness: { expires_at: expiresAt },
+        },
+      },
+    });
+
+    const firstParagraph = todayResponse.reading.paragraphs[0]!.text;
+    await screen.findByText(firstParagraph);
+    const checkIn = container.querySelector<HTMLElement>(".daily-check-in");
+    const reading = container.querySelector<HTMLElement>(".today-reading");
+    expect(checkIn).not.toBeNull();
+    expect(reading).not.toBeNull();
+    expect(checkIn!.compareDocumentPosition(reading!) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+
+    await user.click(await screen.findByRole("radio", { name: "Low" }));
+    await user.click(screen.getByRole("button", { name: /^Save$/i }));
+    expect(await screen.findByText(/Active until/i)).toBeInTheDocument();
+    expect(screen.getByText(firstParagraph)).toBeInTheDocument();
+    expect(capturedFor(TODAY)).toHaveLength(1);
+  });
+
   it("orders paragraphs by `order`, not by array position", async () => {
     const shuffled = {
       ...todayResponse,
@@ -800,7 +851,7 @@ describe("formatLocalDate", () => {
 });
 
 describe("the Today surface", () => {
-  it("keeps one heading level and labels its article", async () => {
+  it("keeps one page title and labels its article and check-in region", async () => {
     const { container } = renderToday({
       [TODAY]: ok(todayResponse),
       [EVIDENCE]: ok(evidenceGraph),
@@ -809,7 +860,12 @@ describe("the Today surface", () => {
 
     const article = container.querySelector("article.today-page");
     expect(article).not.toBeNull();
-    expect(within(article as HTMLElement).getAllByRole("heading")).toHaveLength(1);
+    expect(within(article as HTMLElement).getAllByRole("heading", { level: 1 }))
+      .toHaveLength(1);
+    expect(within(article as HTMLElement).getByRole("heading", {
+      level: 2,
+      name: "How are you arriving?",
+    })).toBeInTheDocument();
   });
 
   describe("a v5 reading", () => {
@@ -882,11 +938,13 @@ describe("the Today surface", () => {
 
     it("presents three provenance layers, ending in the exact generation record", async () => {
       const user = userEvent.setup();
-      renderToday(v5());
+      const { container } = renderToday(v5());
       await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
       await user.click(screen.getByText("Why this reading?"));
 
-      const layers = await screen.findAllByRole("heading", { level: 2 });
+      const drawer = container.querySelector<HTMLElement>(".today-evidence");
+      expect(drawer).not.toBeNull();
+      const layers = await within(drawer!).findAllByRole("heading", { level: 2 });
       expect(layers.map((heading) => heading.textContent)).toEqual([
         "Calculated facts",
         "Personal context",

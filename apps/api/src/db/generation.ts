@@ -847,7 +847,11 @@ export async function claimJob(
          dispatched_at = COALESCE(dispatched_at, ?)
      WHERE id = ? AND job_type = ?
        AND (available_at IS NULL OR available_at <= ?)
-       AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))`,
+       AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))
+       AND EXISTS (
+         SELECT 1 FROM users
+         WHERE users.id = jobs.user_id AND users.status = 'active'
+       )`,
   )
     .bind(claimToken, leaseExpiresAt, nowIso, nowIso, jobId, JOB_TYPE, nowIso, nowIso)
     .run();
@@ -1131,9 +1135,11 @@ export async function completeReading(
        WHERE NOT EXISTS (
          SELECT 1 FROM daily_readings r
          JOIN jobs j ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+         JOIN users u ON u.id = r.user_id
          WHERE r.id = ? AND r.user_id = ? AND r.status = 'pending'
            AND r.command_generation = ?
            AND j.id = ? AND j.status = 'running' AND j.claim_token = ?
+           AND u.status = 'active'
        )`,
     ).bind(readingId, identity.userId, input.commandGeneration, jobId, claimToken),
   ];

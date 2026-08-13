@@ -152,6 +152,7 @@ export interface ContextPinV2 {
   permission_state: "active";
   freshness_status: "fresh" | "stale";
   observed_at: string;
+  expires_at: string | null;
   snapshot: { kind: "text"; text: string } | { kind: "structured"; value: Record<string, unknown> };
 }
 
@@ -491,6 +492,7 @@ function toContextPins(refs: ConstrainedContextRef[]): ContextPinV2[] {
     permission_state: ref.permission_state,
     freshness_status: ref.freshness_status,
     observed_at: ref.observed_at,
+    expires_at: ref.expires_at,
     snapshot: ref.snapshot,
   }));
 }

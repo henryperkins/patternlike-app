@@ -25,18 +25,32 @@ export interface UserIdentity {
   cryptoSubject: CryptoSubject;
 }
 
+export type AccountStatus =
+  | "active"
+  | "frozen"
+  | "pending_deletion"
+  | "deleted";
+
+export interface AuthenticatedUserIdentity extends UserIdentity {
+  status: AccountStatus;
+}
+
 /** Read both identifiers for a user, or null if the user does not exist. */
 export async function loadUserIdentity(
   env: Env,
   userId: string,
-): Promise<UserIdentity | null> {
+): Promise<AuthenticatedUserIdentity | null> {
   const row = await env.DB.prepare(
-    "SELECT id, crypto_subject FROM users WHERE id = ?",
+    "SELECT id, crypto_subject, status FROM users WHERE id = ?",
   )
     .bind(userId)
-    .first<{ id: string; crypto_subject: string }>();
+    .first<{ id: string; crypto_subject: string; status: AccountStatus }>();
   if (!row) return null;
-  return { userId: row.id, cryptoSubject: asCryptoSubject(row.crypto_subject) };
+  return {
+    userId: row.id,
+    cryptoSubject: asCryptoSubject(row.crypto_subject),
+    status: row.status,
+  };
 }
 
 /**

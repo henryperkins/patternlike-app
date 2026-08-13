@@ -16,6 +16,7 @@ import {
   type RolePresentation,
 } from "../lib/reading-format.js";
 import { AiConsentGate } from "./AiConsentGate.js";
+import { DailyCheckInCard } from "./DailyCheckInCard.js";
 import { PreferenceConfirm } from "./PreferenceConfirm.js";
 import { WhyThisDrawer } from "./WhyThisDrawer.js";
 import { Icon } from "./icons.js";
@@ -187,6 +188,8 @@ function TodayReadingV3({
         domainPreference={reading.domain_preference}
       />
 
+      <DailyCheckInCard />
+
       {isFallbackShape(reading) ? (
         <p className="today-fallback-note">
           Nothing in your chart was eligible to be written about today, so what
@@ -255,6 +258,8 @@ function TodayReadingV5({
         revision={reading.revision}
         domainPreference={reading.domain_preference}
       />
+
+      <DailyCheckInCard />
 
       <div className="today-reading">
         <div className="today-body">

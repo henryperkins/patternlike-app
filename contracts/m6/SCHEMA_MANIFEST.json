@@ -1,0 +1,75 @@
+{
+  "package": "contracts/m6",
+  "schema_version": "0.6.0",
+  "document_date": "2026-08-12",
+  "status": "frozen",
+  "milestone": "M6 - privacy lifecycle and daily check-in amendment",
+  "predecessors": [
+    {
+      "package": "contracts/m0",
+      "schema_version": "0.2.0",
+      "manifest_sha256": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
+      "relationship": "base_vocabulary",
+      "note": "The four historical request and success documents remain frozen M0 contracts."
+    },
+    {
+      "package": "contracts/m5",
+      "schema_version": "0.5.0",
+      "manifest_sha256": "57aadef51a6eca825866865c4cb0e75503cb29f497f998dc2a56b8971cc6674e",
+      "relationship": "successor",
+      "note": "M6 adds privacy and context surfaces without rewriting the constrained reading publisher contract."
+    }
+  ],
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m6/common.schema.json",
+      "defines": [
+        "deletionErrorClass",
+        "exportErrorClass",
+        "schemaVersion",
+        "sectionDisposition"
+      ]
+    },
+    {
+      "file": "export-status.schema.json",
+      "id": "https://patternlike.app/contracts/m6/export-status.schema.json",
+      "defines": ["exportStatus"]
+    },
+    {
+      "file": "deletion-status.schema.json",
+      "id": "https://patternlike.app/contracts/m6/deletion-status.schema.json",
+      "defines": ["deletionStatus"]
+    },
+    {
+      "file": "account-export.schema.json",
+      "id": "https://patternlike.app/contracts/m6/account-export.schema.json",
+      "defines": [
+        "accountExport",
+        "accountProfile",
+        "birthProfile",
+        "chartSnapshot",
+        "portableSection",
+        "preferenceSnapshot",
+        "timezoneChange"
+      ]
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.6.0",
+      "describes": "Forward-only amendment for account export, account deletion, USR-06 source controls, and daily check-ins."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "wire_format": "snake_case",
+    "m0_reuse": "Embedded M0 documents retain schema_version 0.2.0; only new status and artifact documents use 0.6.0."
+  },
+  "out_of_scope": [
+    "Remote D1 migration and queue creation",
+    "Production deployment and certification",
+    "Journals and external connectors"
+  ]
+}

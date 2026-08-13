@@ -8,7 +8,8 @@ type ConfigurationCode =
   | "reading_publisher_misconfigured"
   | "auth_stub_in_production"
   | "root_kek_not_configured"
-  | "identity_not_configured";
+  | "identity_not_configured"
+  | "check_in_retention_misconfigured";
 
 type OperationalFailureClass =
   | GenerationFailureCode

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { mockCalcService } from "./test/mock-calc-service.js";
+import { HERMETIC_TEST_BINDINGS } from "./test/hermetic-bindings.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,7 +20,10 @@ export default defineConfig({
       main: "src/index.ts",
       wrangler: { configPath: "./wrangler.toml" },
       miniflare: {
-        bindings: { TEST_MIGRATIONS: migrations },
+        bindings: {
+          ...HERMETIC_TEST_BINDINGS,
+          TEST_MIGRATIONS: migrations,
+        },
         // Every outbound fetch from the Worker — including invokeCalc's POST to
         // CALC_SERVICE_URL — lands here instead of the network, so tests are
         // hermetic and the calculation result is deterministic on its input.

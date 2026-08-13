@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import worker from "./index.js";
 import type { Env } from "./env.js";
-import { resetDb, rows } from "../test/helpers.js";
+import { IDENTITY_A, USER_A, resetDb, rows, seedUser } from "../test/helpers.js";
 import { OPENAI_READING_MODEL } from "./services/reading-publisher.js";
 
 function hybridEnv(db: D1Database = env.DB): Env {
@@ -86,5 +86,82 @@ describe("scheduled Worker entry point", () => {
 
     await expect(worker.scheduled(controller, invalid, ctx)).resolves.toBeUndefined();
     expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it("redrives an undispatched privacy outbox job on the scheduled clock", async () => {
+    await seedUser(IDENTITY_A);
+    await rows("UPDATE users SET status = 'frozen' WHERE id = ?", USER_A);
+    await rows(
+      `INSERT INTO jobs
+         (id, job_type, user_id, idempotency_key, status, attempts, created_at)
+       VALUES ('job_scheduled_export', 'export_account', ?, 'idem-scheduled-export',
+               'queued', 0, '2031-01-01T00:00:00.000Z')`,
+      USER_A,
+    );
+    const send = vi.fn(async () => undefined);
+    const privacyQueue = { send } as unknown as Queue;
+    const scheduledTime = Date.parse("2031-01-02T12:00:00.000Z");
+
+    await worker.scheduled(
+      createScheduledController({ scheduledTime, cron: "*/15 * * * *" }),
+      { ...hybridEnv(), PRIVACY_QUEUE: privacyQueue },
+      createExecutionContext(),
+    );
+
+    expect(send).toHaveBeenCalledWith({
+      kind: "privacy",
+      job_id: "job_scheduled_export",
+      job_type: "export_account",
+    });
+    expect(
+      await rows("SELECT dispatched_at FROM jobs WHERE id = 'job_scheduled_export'"),
+    ).toEqual([{ dispatched_at: "2031-01-02T12:00:00.000Z" }]);
+  });
+
+  it("attempts privacy maintenance even when the reading lane fails", async () => {
+    await seedUser(IDENTITY_A);
+    await rows("UPDATE users SET status = 'frozen' WHERE id = ?", USER_A);
+    await rows(
+      `INSERT INTO jobs
+         (id, job_type, user_id, idempotency_key, status, attempts, created_at)
+       VALUES ('job_scheduled_after_failure', 'export_account', ?,
+               'idem-scheduled-after-failure', 'queued', 0,
+               '2031-01-01T00:00:00.000Z')`,
+      USER_A,
+    );
+    let readingLaneFailed = false;
+    const db = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property === "prepare") {
+          return (query: string) => {
+            if (!readingLaneFailed) {
+              readingLaneFailed = true;
+              throw new Error("reading lane unavailable");
+            }
+            return target.prepare(query);
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    }) as D1Database;
+    const send = vi.fn(async () => undefined);
+    const scheduledTime = Date.parse("2031-01-02T12:00:00.000Z");
+
+    await expect(
+      worker.scheduled(
+        createScheduledController({ scheduledTime, cron: "*/15 * * * *" }),
+        {
+          ...hybridEnv(db),
+          PRIVACY_QUEUE: { send } as unknown as Queue,
+        },
+        createExecutionContext(),
+      ),
+    ).rejects.toThrow("reading lane unavailable");
+
+    expect(send).toHaveBeenCalledWith({
+      kind: "privacy",
+      job_id: "job_scheduled_after_failure",
+      job_type: "export_account",
+    });
   });
 });

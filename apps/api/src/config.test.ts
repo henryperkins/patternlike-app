@@ -47,6 +47,32 @@ describe("secure configuration guard", () => {
   it("treats an unset ENVIRONMENT as non-development", () => {
     expect(checkSecureConfig({})?.code).toBe("root_kek_not_configured");
   });
+
+  it.each(["0", "14", "1.5", "not-a-number"])(
+    "refuses an invalid check-in retention value %s in every environment",
+    (value) => {
+      expect(
+        checkSecureConfig({
+          ENVIRONMENT: "development",
+          AUTH_STUB: "1",
+          CHECK_IN_RETENTION_MONTHS: value,
+        })?.code,
+      ).toBe("check_in_retention_misconfigured");
+    },
+  );
+
+  it.each([undefined, "", "1", "13"])(
+    "accepts a bounded or defaulted check-in retention value %s",
+    (value) => {
+      expect(
+        checkSecureConfig({
+          ENVIRONMENT: "development",
+          AUTH_STUB: "1",
+          CHECK_IN_RETENTION_MONTHS: value,
+        }),
+      ).toBeNull();
+    },
+  );
 });
 
 describe("identity configuration", () => {

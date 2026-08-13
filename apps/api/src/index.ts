@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import type { Env } from "./env.js";
-import { authenticate, serviceAuth, type AppVariables } from "./middleware/auth.js";
+import {
+  accountStateGate,
+  authenticate,
+  serviceAuth,
+  type AppVariables,
+} from "./middleware/auth.js";
 import { configGuard } from "./middleware/config-guard.js";
 import { healthRoutes } from "./routes/health.js";
 import { birthRoutes } from "./routes/birth.js";
@@ -10,6 +15,7 @@ import { preferenceRoutes } from "./routes/preferences.js";
 import { consentRoutes } from "./routes/consents.js";
 import { readingRoutes } from "./routes/readings.js";
 import { timingRoutes } from "./routes/timing.js";
+import { deletionStatusRoutes, privacyRoutes } from "./routes/privacy.js";
 import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
@@ -33,11 +39,18 @@ app.use("/v1/sessions", configGuard);
 app.use("/v1/sessions/*", configGuard);
 app.route("/", sessionRoutes);
 
+// The one-purpose deletion receipt survives normal-session revocation and may
+// authorize only this exact path. Attach config directly before mounting it so
+// no wildcard middleware leaks into authenticated product routes.
+app.use("/v1/account/deletion-status", configGuard);
+app.route("/", deletionStatusRoutes);
+
 // Authenticated product API. configGuard runs first so no surface serves on a
 // development-shaped configuration in a non-development environment.
 const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 api.use("*", configGuard);
 api.use("*", authenticate);
+api.use("*", accountStateGate);
 api.route("/", birthRoutes);
 api.route("/", chartRoutes);
 api.route("/", timezoneRoutes);
@@ -45,6 +58,7 @@ api.route("/", preferenceRoutes);
 api.route("/", consentRoutes);
 api.route("/", readingRoutes);
 api.route("/", timingRoutes);
+api.route("/", privacyRoutes);
 // Last, deliberately. Hono answers with the first matching registration, so a
 // real route always shadows a stub rather than the other way round.
 api.route("/", stubRoutes);

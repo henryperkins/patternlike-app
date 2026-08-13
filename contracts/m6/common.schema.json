@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m6/common.schema.json",
+  "title": "Pattern-Like M6 common definitions",
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "0.6.0"
+    },
+    "sectionDisposition": {
+      "type": "string",
+      "enum": ["included", "omitted_by_request", "not_available"]
+    },
+    "exportErrorClass": {
+      "type": "string",
+      "enum": [
+        "object_storage_not_configured",
+        "export_too_large",
+        "artifact_write_failed",
+        "artifact_unreadable",
+        "account_not_exportable",
+        "invariant_failed"
+      ]
+    },
+    "deletionErrorClass": {
+      "type": "string",
+      "enum": [
+        "object_storage_unavailable",
+        "export_barrier_failed",
+        "object_cleanup_failed",
+        "row_cleanup_failed",
+        "key_erasure_failed",
+        "invariant_failed"
+      ]
+    }
+  }
+}

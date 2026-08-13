@@ -195,7 +195,7 @@ def check_fresh_schema() -> None:
     }
     missing = expected - tables
     if missing:
-        raise SystemExit(f"Missing tables after 0003: {sorted(missing)}")
+        raise SystemExit(f"Missing tables after latest migration: {sorted(missing)}")
     print(f"D1 OK  fresh apply of {len(migration_files())} migration(s), {len(tables)} tables")
 
     indexes = {
@@ -215,6 +215,16 @@ def check_fresh_schema() -> None:
         "idx_daily_readings_failed_generation",
         "idx_daily_readings_invalidated_repair",
         "idx_jobs_failed_result_class",
+        # 0004. Privacy outbox/lease recovery, artifact expiry, deletion
+        # receipts, and raw check-in retention must all remain bounded.
+        "idx_jobs_privacy_undispatched",
+        "idx_jobs_privacy_running_lease",
+        "idx_export_requests_expiry",
+        "uq_deletion_requests_receipt_hash",
+        "idx_context_signals_retention",
+        "uq_context_signals_usr06_current",
+        "uq_context_signals_usr06_revision",
+        "idx_context_signals_norm_evidence",
     ):
         if name not in indexes:
             raise SystemExit(f"Missing index {name}")
@@ -237,6 +247,33 @@ def check_fresh_schema() -> None:
         raise SystemExit("daily_readings.release_version is still NOT NULL")
     print("D1 OK  daily_readings carries invalidation and a nullable release")
 
+    key_columns = {r[1]: r for r in con.execute("PRAGMA table_info(user_keys)")}
+    if "erased_at" not in key_columns:
+        raise SystemExit("user_keys.erased_at missing")
+    if key_columns["wrapped_dek"][3] != 0:
+        raise SystemExit("user_keys.wrapped_dek is still unconditionally NOT NULL")
+
+    for table, required in {
+        "export_requests": {
+            "job_id", "wrapped_export_key", "export_key_nonce",
+            "export_kek_version", "artifact_nonce", "object_size_bytes",
+            "status_updated_at", "error_class", "artifact_deleted_at",
+        },
+        "deletion_requests": {
+            "job_id", "receipt_hash", "receipt_expires_at", "checkpoint",
+            "status_updated_at", "error_class", "artifact_manifest_json",
+            "artifact_cleanup_until",
+        },
+        "context_signals": {
+            "source_revision", "is_current", "retention_expires_at",
+        },
+    }.items():
+        columns = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
+        missing_columns = required - columns
+        if missing_columns:
+            raise SystemExit(f"{table} missing columns {sorted(missing_columns)}")
+    print("D1 OK  privacy workflow and check-in columns exist")
+
     # The M0 uniqueness key must be GONE: scoped by release_version, it allowed
     # two published readings for one user-day whenever a release activated
     # mid-day.
@@ -252,6 +289,103 @@ def check_fresh_schema() -> None:
     if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
         raise SystemExit("quick_check failed on a fresh database")
     print("D1 OK  foreign_key_check clean, quick_check ok")
+
+
+def check_0004_over_populated_m5() -> None:
+    """0004 preserves recovery keys and deterministically orders old USR-06 rows."""
+    con = fresh(upto=3)
+    seed_user(con, USER_A, SUBJ_A)
+    con.executemany(
+        "INSERT INTO user_keys "
+        "(user_id, key_version, kek_version, wrapped_dek, created_at, destroyed_at) "
+        "VALUES (?, ?, 3, ?, ?, ?)",
+        (
+            (USER_A, 1, b"retired", NOW, NOW),
+            (USER_A, 2, b"live", NOW, None),
+        ),
+    )
+    con.execute(
+        "INSERT INTO consents "
+        "(id, user_id, kind, status, source_id, permission_tier, allowed_uses_json, "
+        "scopes_json, policy_version, version, created_at, updated_at) "
+        "VALUES ('cns_usr06', ?, 'product_source', 'granted', 'USR-06', 1, "
+        "'[\"theme_ranking\"]', '[]', '1.0.0', 1, ?, ?)",
+        (USER_A, NOW, NOW),
+    )
+    for index, conflict in ((1, "none"), (2, "superseded"), (3, "none")):
+        con.execute(
+            "INSERT INTO context_signals "
+            "(id, user_id, source_id, source_window, evidence_lane, allowed_uses_json, "
+            "confidence, sensitivity, permission_state, conflict_status, consent_id, "
+            "freshness_status, observed_at, ingested_at, value_encoding, value_json, "
+            "labels_json, normalized_hash, created_at, updated_at) "
+            "VALUES (?, ?, 'USR-06', '2026-08-11', 'user_and_context', "
+            "'[\"theme_ranking\"]', 'user_confirmed', 'sensitive', 'active', ?, "
+            "'cns_usr06', 'fresh', ?, ?, 'structured', '{}', '[]', ?, ?, ?)",
+            (
+                f"sig_usr06_{index}",
+                USER_A,
+                conflict,
+                f"2026-08-11T0{index}:00:00Z",
+                f"2026-08-11T0{index}:00:00Z",
+                f"sha256:{index:064x}",
+                NOW,
+                NOW,
+            ),
+        )
+    con.execute(
+        "INSERT INTO context_signals "
+        "(id, user_id, source_id, source_window, evidence_lane, allowed_uses_json, "
+        "confidence, sensitivity, permission_state, freshness_status, observed_at, "
+        "ingested_at, value_encoding, value_json, labels_json, normalized_hash, "
+        "created_at, updated_at) "
+        "VALUES ('sig_other', ?, 'USR-01', 'forever', 'user_and_context', "
+        "'[\"theme_ranking\"]', 'user_confirmed', 'sensitive', 'active', 'fresh', "
+        "?, ?, 'structured', '{}', '[]', ?, ?, ?)",
+        (USER_A, NOW, NOW, f"sha256:{9:064x}", NOW, NOW),
+    )
+    con.commit()
+
+    apply_migrations(con, start=4)
+
+    keys = con.execute(
+        "SELECT key_version, wrapped_dek, destroyed_at, erased_at "
+        "FROM user_keys WHERE user_id = ? ORDER BY key_version",
+        (USER_A,),
+    ).fetchall()
+    if len(keys) != 2 or any(row[1] is None or row[3] is not None for row in keys):
+        raise SystemExit("0004 lost wrapped bytes or marked a pre-existing key erased")
+    print("D1 OK  0004 preserves live and rotation-retired wrapped DEKs")
+
+    revisions = con.execute(
+        "SELECT source_revision, is_current FROM context_signals "
+        "WHERE source_id = 'USR-06' ORDER BY observed_at, id"
+    ).fetchall()
+    if revisions != [(1, 0), (2, 0), (3, 1)]:
+        raise SystemExit(f"USR-06 backfill was not deterministic: {revisions}")
+    other_current = con.execute(
+        "SELECT is_current FROM context_signals WHERE id = 'sig_other'"
+    ).fetchone()[0]
+    if other_current != 1:
+        raise SystemExit("0004 changed current semantics for another source family")
+    print("D1 OK  existing USR-06 rows gain ordered revisions and one current row")
+
+    con.execute(
+        "INSERT INTO user_keys "
+        "(user_id, key_version, kek_version, wrapped_dek, created_at, destroyed_at, erased_at) "
+        "VALUES (?, 3, 3, NULL, ?, ?, ?)",
+        (USER_A, NOW, NOW, NOW),
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO user_keys "
+            "(user_id, key_version, kek_version, wrapped_dek, created_at, destroyed_at) "
+            "VALUES (?, 4, 3, NULL, ?, ?)",
+            (USER_A, NOW, NOW),
+        ),
+        "rotation retirement cannot discard wrapped recovery bytes",
+    )
+    print("D1 OK  only deletion-erased keys may lose wrapped bytes")
 
 
 def check_upgrade_over_populated_0001() -> None:
@@ -683,6 +817,7 @@ def check_provider_budget_table() -> None:
 
 def main() -> int:
     check_fresh_schema()
+    check_0004_over_populated_m5()
     check_upgrade_over_populated_0001()
     check_refuses_to_destroy_rows()
     check_0003_over_empty_m3()

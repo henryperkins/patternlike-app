@@ -190,6 +190,8 @@ export interface ConstrainedContextSignalInput {
   normalized_hash: string;
   freshness_status: "fresh" | "stale" | "expired" | "unknown";
   observed_at: string;
+  /** Absolute raw-signal expiry; null for source families without one. */
+  expires_at: string | null;
   content: ConstrainedContextContent;
 }
 
@@ -263,6 +265,7 @@ export interface ConstrainedContextRef {
   permission_state: "active";
   freshness_status: "fresh";
   observed_at: string;
+  expires_at: string | null;
   /** Normalized and truncated exactly as the packet carries it. */
   snapshot: ConstrainedContextContent;
 }

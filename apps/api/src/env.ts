@@ -4,6 +4,15 @@ export interface GenerationMessage {
   reading_id: string;
 }
 
+/** Opaque privacy nudge; the encrypted command and checkpoints remain in D1. */
+export interface PrivacyMessage {
+  kind: "privacy";
+  job_id: string;
+  job_type: "export_account" | "delete_account";
+}
+
+export type WorkerMessage = GenerationMessage | PrivacyMessage;
+
 export interface Env {
   DB: D1Database;
   ENVIRONMENT: string;
@@ -36,6 +45,9 @@ export interface Env {
    * frozen chart, cycle, and context state.
    */
   READING_QUEUE: Queue<GenerationMessage>;
+  PRIVACY_QUEUE: Queue<PrivacyMessage>;
+  /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
+  CHECK_IN_RETENTION_MONTHS?: string;
 
   // -------------------------------------------------------------------------
   // M5 constrained-model publisher

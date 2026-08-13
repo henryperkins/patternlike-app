@@ -212,6 +212,7 @@ function signal(
     normalized_hash: hex64(signalId),
     freshness_status: "fresh",
     observed_at: observedAt,
+    expires_at: null,
     content: { kind: "text", text: `note ${signalId}` },
     ...overrides,
   };
@@ -668,6 +669,33 @@ test("a stale or expired signal is excluded even under an active source", () => 
     );
     assert.equal(prepared.request.context.length, 0, `${freshness} signal was included`);
   }
+});
+
+test("a signal expired at the generation anchor is excluded even when marked fresh", () => {
+  const expired = prepareConstrainedReadingInput(
+    baseInput({
+      context_sources: [source("USR-02", ["life_domain_selection"])],
+      context_signals: [
+        signal("sig_expired", "USR-02", ["life_domain_selection"], "2026-07-29T10:00:00Z", {
+          expires_at: "2026-07-29T23:30:00Z",
+        }),
+      ],
+    }),
+  );
+  assert.equal(expired.request.context.length, 0);
+  assert.ok(expired.rejections.some((r) => r.reason_code === "context_expired_at_anchor"));
+
+  const current = prepareConstrainedReadingInput(
+    baseInput({
+      context_sources: [source("USR-02", ["life_domain_selection"])],
+      context_signals: [
+        signal("sig_current", "USR-02", ["life_domain_selection"], "2026-07-29T10:00:00Z", {
+          expires_at: "2026-07-29T23:30:01Z",
+        }),
+      ],
+    }),
+  );
+  assert.equal(current.request.context.length, 1);
 });
 
 test("a signal naming a source with no permission row is excluded", () => {

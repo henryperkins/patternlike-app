@@ -181,6 +181,7 @@ interface ContextRow {
   normalized_hash: string;
   allowed_uses_json: string;
   consent_allowed_uses_json: string;
+  permission_allowed_uses_json: string;
   evidence_lane: string;
   consent_id: string;
   consent_version: number;
@@ -330,7 +331,11 @@ export function natalPositionsForScan(
     .map((position) => ({ body: position.body, longitude_deg: position.longitude_deg }));
 }
 
-async function readEligibleContext(env: Env, userId: string): Promise<ContextRow[]> {
+async function readEligibleContext(
+  env: Env,
+  userId: string,
+  generationAnchor: string,
+): Promise<ContextRow[]> {
   // Nothing writes context_signals yet — the ingestion surfaces are M4 — so this
   // is empty in practice today. It is still read rather than hardcoded to []
   // because the command must pin the exact state under which each signal was
@@ -339,19 +344,27 @@ async function readEligibleContext(env: Env, userId: string): Promise<ContextRow
   const { results } = await env.DB.prepare(
     `SELECT s.id, s.source_id, s.normalized_hash, s.allowed_uses_json,
             c.allowed_uses_json AS consent_allowed_uses_json,
+            p.allowed_uses_json AS permission_allowed_uses_json,
             s.evidence_lane, s.consent_id, c.version AS consent_version,
             c.source_id AS consent_source_id,
             s.permission_state, s.freshness_status
      FROM context_signals s
      JOIN consents c ON c.id = s.consent_id AND c.user_id = s.user_id
+     JOIN context_source_permissions p
+       ON p.user_id = s.user_id AND p.source_id = s.source_id
      WHERE s.user_id = ?
+       AND p.enabled = 1
+       AND p.permission_state = 'active'
+       AND p.consent_id = s.consent_id
        AND s.permission_state = 'active'
        AND s.conflict_status = 'none'
+       AND s.is_current = 1
        AND s.freshness_status = 'fresh'
+       AND (s.expires_at IS NULL OR s.expires_at > ?)
        AND c.status = 'granted'
      ORDER BY s.source_id, s.id`,
   )
-    .bind(userId)
+    .bind(userId, generationAnchor)
     .all<ContextRow>();
   return results;
 }
@@ -360,19 +373,26 @@ function toContextPins(rows: ContextRow[]): ContextPin[] {
   return rows.flatMap((row) => {
     let allowedUses: unknown;
     let consentAllowedUses: unknown;
+    let permissionAllowedUses: unknown;
     try {
       allowedUses = JSON.parse(row.allowed_uses_json);
       consentAllowedUses = JSON.parse(row.consent_allowed_uses_json);
+      permissionAllowedUses = JSON.parse(row.permission_allowed_uses_json);
     } catch {
       return [];
     }
-    if (!Array.isArray(allowedUses) || !Array.isArray(consentAllowedUses)) return [];
+    if (
+      !Array.isArray(allowedUses) ||
+      !Array.isArray(consentAllowedUses) ||
+      !Array.isArray(permissionAllowedUses)
+    ) return [];
     if (row.consent_source_id !== row.source_id) return [];
     const consentSet = new Set(
       consentAllowedUses.filter((use): use is string => typeof use === "string"),
     );
     const allowedUse = allowedUses.find((use): use is string => {
       if (typeof use !== "string" || !consentSet.has(use)) return false;
+      if (!permissionAllowedUses.includes(use)) return false;
       const signal: NormalizedContextSignal = {
         signal_id: row.id,
         source_id: row.source_id,
@@ -569,7 +589,7 @@ export async function buildGenerationCommand(
 
   const cycles = scan.response.cycles;
   const derived: PersistedCycle[] = await deriveCycles(cycles);
-  const contextRows = await readEligibleContext(env, userId);
+  const contextRows = await readEligibleContext(env, userId, ctx.now.toISOString());
   const contextPins = toContextPins(contextRows);
 
   const assemblyInput = buildAssemblyInput({

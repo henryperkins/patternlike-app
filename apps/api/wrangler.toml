@@ -61,6 +61,20 @@ max_concurrency = 4
 max_retries = 3
 dead_letter_queue = "patternlike-daily-readings-dev-dlq"
 
+# Privacy lifecycle work has its own queue. Messages contain only the closed
+# {kind, job_id, job_type} nudge; encrypted commands and checkpoints stay in D1.
+[[queues.producers]]
+binding = "PRIVACY_QUEUE"
+queue = "patternlike-privacy-dev"
+
+[[queues.consumers]]
+queue = "patternlike-privacy-dev"
+max_batch_size = 1
+max_batch_timeout = 5
+max_concurrency = 2
+max_retries = 3
+dead_letter_queue = "patternlike-privacy-dev-dlq"
+
 # Exercise the exported scheduled handler in local/default deployments. Triggers
 # are inheritable, so production explicitly overrides this with an empty list
 # until the separately approved production activation step replaces it.
@@ -97,6 +111,7 @@ OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
 #
 # The local canary sets this to `internal` in .dev.vars alongside a real key.
 READING_V5_ROLLOUT = "off"
+CHECK_IN_RETENTION_MONTHS = "13"
 
 # Named environments do not inherit top-level bindings, so D1 is redeclared.
 [env.production]
@@ -166,6 +181,7 @@ AUTH_STUB = "0"
 # all of them are set, which is the intended failure: half-configured generation
 # would reach a provider with values no frozen command described.
 READING_V5_ROLLOUT = "first_open"
+CHECK_IN_RETENTION_MONTHS = "13"
 
 # The pinned publisher tuple. Every value is compared for EQUALITY against the
 # compiled constant in services/reading-publisher.ts, not merely for presence:
@@ -251,6 +267,17 @@ max_batch_size = 1
 max_batch_timeout = 5
 max_retries = 3
 dead_letter_queue = "patternlike-daily-readings-dlq"
+
+[[env.production.queues.producers]]
+binding = "PRIVACY_QUEUE"
+queue = "patternlike-privacy"
+
+[[env.production.queues.consumers]]
+queue = "patternlike-privacy"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "patternlike-privacy-dlq"
 
 # Workers Logs / Traces. Declared here so a deploy cannot silently reset what
 # the dashboard currently has: observability is part of the uploaded metadata,
