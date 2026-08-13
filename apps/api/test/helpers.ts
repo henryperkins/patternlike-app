@@ -37,6 +37,8 @@ const TABLES = [
   "birth_profiles",
   "context_signals",
   "context_source_permissions",
+  "device_tokens",
+  "connector_accounts",
   // Pointer before releases: content_release_pointer.active_version is a
   // foreign key into content_releases.
   "content_release_pointer",
@@ -81,6 +83,19 @@ export async function resetDb(): Promise<void> {
     env.DB.prepare("UPDATE daily_readings SET active_generation_job_id = NULL"),
     ...TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
   ]);
+
+  // Export artifacts share ARTIFACTS with immutable editorial releases. Keep
+  // cleanup prefix-scoped and paginate so a suite can never erase the release
+  // fixtures another suite intentionally installed.
+  if (env.ARTIFACTS) {
+    let cursor: string | undefined;
+    do {
+      const page = await env.ARTIFACTS.list({ prefix: "exports/", cursor });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
 }
 
 export interface ApiResponse<T = Record<string, unknown>> {

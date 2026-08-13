@@ -42,6 +42,8 @@ interface SignalRow {
   normalized_hash: string;
   freshness_status: string;
   observed_at: string;
+  expires_at: string | null;
+  is_current: number;
   value_encoding: string;
   value_json: string | null;
   value_enc: ArrayBuffer | null;
@@ -91,10 +93,11 @@ export async function loadConstrainedContext(
   // said should not be read.
   const { results: signalRows } = await env.DB.prepare(
     `SELECT id, source_id, evidence_lane, allowed_uses_json, normalized_hash,
-            freshness_status, observed_at, value_encoding, value_json,
+            freshness_status, observed_at, expires_at, is_current,
+            value_encoding, value_json,
             value_enc, value_key_version, value_nonce
      FROM context_signals
-     WHERE user_id = ? AND conflict_status = 'none'
+     WHERE user_id = ? AND conflict_status = 'none' AND is_current = 1
      ORDER BY observed_at DESC, id`,
   )
     .bind(identity.userId)
@@ -123,7 +126,14 @@ export async function loadConstrainedContext(
       // A stored value is either prose or structure. Anything else is a row this
       // compiler does not know how to describe, and describing it wrongly is
       // worse than leaving it out.
-      if (isPlainObject(plain) && typeof plain.text === "string") {
+      if (
+        row.source_id === "USR-06" &&
+        isPlainObject(plain) &&
+        typeof plain.hash_salt === "string" &&
+        isPlainObject(plain.value)
+      ) {
+        content = { kind: "structured", value: plain.value };
+      } else if (isPlainObject(plain) && typeof plain.text === "string") {
         content = { kind: "text", text: plain.text };
       } else if (isPlainObject(plain)) {
         content = { kind: "structured", value: plain };
@@ -151,6 +161,7 @@ export async function loadConstrainedContext(
       freshness_status:
         row.freshness_status as ConstrainedContextSignalInput["freshness_status"],
       observed_at: row.observed_at,
+      expires_at: row.expires_at,
       content,
     });
   }
@@ -183,6 +194,7 @@ export async function loadConstrainedContext(
       normalized_hash: row.id,
       freshness_status: "fresh",
       observed_at: row.created_at,
+      expires_at: null,
       content: {
         kind: "structured",
         value: {

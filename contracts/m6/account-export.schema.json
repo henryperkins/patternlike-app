@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m6/account-export.schema.json",
+  "title": "Portable account export",
+  "$defs": {
+    "accountProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user_id",
+        "status",
+        "locale",
+        "timezone",
+        "entitlement_tier",
+        "created_at"
+      ],
+      "properties": {
+        "user_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/userId"
+        },
+        "status": {"type": "string", "enum": ["active", "frozen"]},
+        "locale": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+        },
+        "timezone": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone"
+        },
+        "entitlement_tier": {"type": "string"},
+        "created_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        }
+      }
+    },
+    "birthProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "accuracy", "status", "timezone", "birth"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "accuracy": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy"
+        },
+        "status": {"type": "string"},
+        "timezone": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone"}
+          ]
+        },
+        "birth": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "chartSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "profile_version",
+        "fingerprint",
+        "contract_id",
+        "contract_version",
+        "calculated_at",
+        "snapshot",
+        "birth",
+        "uncertainty"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "profile_version": {"type": "integer", "minimum": 1},
+        "fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "contract_id": {"type": "string"},
+        "contract_version": {"type": "string"},
+        "calculated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "snapshot": {"type": "object", "additionalProperties": true},
+        "birth": {"type": "object", "additionalProperties": true},
+        "uncertainty": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "preferenceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "locale_source",
+        "timezone",
+        "timezone_source",
+        "timezone_revision",
+        "entitlement_tier"
+      ],
+      "properties": {
+        "locale": {"type": "string"},
+        "locale_source": {"type": "string"},
+        "timezone": {"type": "string"},
+        "timezone_source": {"type": "string"},
+        "timezone_revision": {"type": "integer", "minimum": 0},
+        "entitlement_tier": {"type": "string"},
+        "next_due_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "timezoneChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "previous_zone",
+        "next_zone",
+        "source",
+        "revision",
+        "changed_at"
+      ],
+      "properties": {
+        "id": {"type": "string"},
+        "previous_zone": {"type": ["string", "null"]},
+        "next_zone": {"type": "string"},
+        "source": {"type": "string"},
+        "revision": {"type": "integer", "minimum": 1},
+        "changed_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "portableSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "items"],
+      "properties": {
+        "status": {"$ref": "common.schema.json#/$defs/sectionDisposition"},
+        "items": {"type": "array", "items": {}}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {"enum": ["omitted_by_request", "not_available"]}
+            },
+            "required": ["status"]
+          },
+          "then": {"properties": {"items": {"maxItems": 0}}}
+        }
+      ]
+    },
+    "accountExport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "export_id",
+        "generated_at",
+        "account",
+        "birth_profiles",
+        "chart_snapshots",
+        "preferences",
+        "timezone_changes",
+        "consents",
+        "context_sources",
+        "context_signals",
+        "readings",
+        "journal"
+      ],
+      "properties": {
+        "schema_version": {"$ref": "common.schema.json#/$defs/schemaVersion"},
+        "export_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "generated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "account": {"$ref": "#/$defs/accountProfile"},
+        "birth_profiles": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/birthProfile"}
+        },
+        "chart_snapshots": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/chartSnapshot"}
+        },
+        "preferences": {"$ref": "#/$defs/preferenceSnapshot"},
+        "timezone_changes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/timezoneChange"}
+        },
+        "consents": {
+          "type": "array",
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/consent.schema.json#/$defs/consentRecord"
+          }
+        },
+        "context_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/consent.schema.json#/$defs/contextSourcePermission"
+          }
+        },
+        "context_signals": {
+          "type": "array",
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m0/context-signal.schema.json"
+          }
+        },
+        "readings": {"$ref": "#/$defs/portableSection"},
+        "journal": {"$ref": "#/$defs/portableSection"}
+      }
+    }
+  },
+  "$ref": "#/$defs/accountExport"
+}

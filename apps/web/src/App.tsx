@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { BirthProfileRequest } from "@patternlike/shared";
 import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
+import { DeletionStatusView } from "./components/DeletionStatusView.js";
 import { Icon } from "./components/icons.js";
 import { Onboarding } from "./components/Onboarding.js";
 import { PrivacyView } from "./components/PrivacyView.js";
@@ -38,10 +39,12 @@ type AuthState =
   | { status: "signed-out"; error?: string | null };
 
 const viewIds = new Set<ViewId>(["today", "pattern", "timing", "travel", "privacy"]);
+type AppRoute = ViewId | "deletion-status";
 
-function currentView(): ViewId {
-  const hash = window.location.hash.replace(/^#/, "") as ViewId;
-  return viewIds.has(hash) ? hash : "pattern";
+function currentView(): AppRoute {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (hash === "deletion-status") return hash;
+  return viewIds.has(hash as ViewId) ? hash as ViewId : "pattern";
 }
 
 function wait(milliseconds: number): Promise<void> {
@@ -49,7 +52,7 @@ function wait(milliseconds: number): Promise<void> {
 }
 
 export default function App() {
-  const [view, setView] = useState<ViewId>(currentView);
+  const [view, setView] = useState<AppRoute>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
   const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
 
@@ -90,6 +93,11 @@ export default function App() {
     const controller = new AbortController();
 
     const start = async () => {
+      // Deletion status is deliberately independent of the chart bootstrap.
+      // A pending-deletion account is frozen, so probing a normal account route
+      // first would strand a direct reload on the generic error screen.
+      if (currentView() === "deletion-status") return;
+
       // Finish an Auth0 redirect before asking the API anything: the session
       // cookie is set by that exchange, so probing /v1/chart first would 401 on
       // every single sign-in and flash the signed-out page at a user who just
@@ -121,6 +129,17 @@ export default function App() {
    * holds it as an effect dependency.
    */
   const handleSignedOut = useCallback(() => setAuthState({ status: "signed-out" }), []);
+
+  const showDeletionStatus = useCallback(() => {
+    window.location.hash = "deletion-status";
+    setView("deletion-status");
+  }, []);
+
+  const finishDeletionStatus = useCallback(() => {
+    window.location.hash = "";
+    setView("pattern");
+    setAuthState({ status: "signed-out" });
+  }, []);
 
   const endSessionAndSignOut = async () => {
     await signOut(async () => {
@@ -156,6 +175,10 @@ export default function App() {
     }
     throw new Error("The calculation was accepted but is not ready yet. Try again in a moment.");
   };
+
+  if (view === "deletion-status") {
+    return <DeletionStatusView onComplete={finishDeletionStatus} />;
+  }
 
   // Rendered outside AppShell on purpose: every link in that navigation leads
   // to a view that requires a session, so showing the chrome to a signed-out
@@ -199,6 +222,7 @@ export default function App() {
       <PrivacyView
         hasChart={chart !== null}
         onSignOut={() => void endSessionAndSignOut()}
+        onDeletionAccepted={showDeletionStatus}
       />
     );
   } else if (view === "today") {

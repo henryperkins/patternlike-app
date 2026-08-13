@@ -95,6 +95,8 @@ interface SignalEligibilityRow {
   normalized_hash: string;
   consent_id: string | null;
   observed_at: string;
+  expires_at: string | null;
+  is_current: number;
 }
 
 function bytes(base64: string): Uint8Array {
@@ -189,6 +191,7 @@ async function pinnedContextEligible(
   env: Env,
   userId: string,
   pins: readonly ContextPinV2[],
+  now = new Date(),
 ): Promise<boolean> {
   if (pins.length === 0) return true;
   const grants = new Map(
@@ -213,7 +216,7 @@ async function pinnedContextEligible(
     const row = await env.DB.prepare(
       `SELECT source_id, evidence_lane, allowed_uses_json, permission_state,
               conflict_status, freshness_status, normalized_hash, consent_id,
-              observed_at
+              observed_at, expires_at, is_current
        FROM context_signals WHERE id = ? AND user_id = ?`,
     )
       .bind(pin.signal_id, userId)
@@ -226,9 +229,12 @@ async function pinnedContextEligible(
       row.permission_state !== "active" ||
       row.conflict_status !== "none" ||
       row.freshness_status !== pin.freshness_status ||
+      row.is_current !== 1 ||
       row.normalized_hash !== pin.normalized_hash ||
       row.consent_id !== pin.consent_id ||
       row.observed_at !== pin.observed_at ||
+      row.expires_at !== pin.expires_at ||
+      (row.expires_at !== null && Date.parse(row.expires_at) <= now.getTime()) ||
       !uses?.includes(pin.allowed_use)
     ) {
       return false;
@@ -280,6 +286,7 @@ function frozenContext(
       normalized_hash: pin.normalized_hash,
       freshness_status: pin.freshness_status,
       observed_at: pin.observed_at,
+      expires_at: pin.expires_at,
       content: pin.snapshot,
     })),
   };

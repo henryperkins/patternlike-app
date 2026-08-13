@@ -1,7 +1,7 @@
 import { newId, sha256Hex } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
-import type { UserIdentity } from "./users.js";
+import type { AccountStatus, UserIdentity } from "./users.js";
 import { recomputeUserNextDueAt } from "./reading-scheduler.js";
 
 /**
@@ -13,7 +13,7 @@ export const SESSION_TTL_SECONDS = 2_592_000;
 export interface SessionPrincipal extends UserIdentity {
   sessionId: string;
   /** users.status — the account-state gate reads this. */
-  status: string;
+  status: AccountStatus;
 }
 
 /** 32 random bytes, base64url. Returned once; only its hash is stored. */
@@ -78,7 +78,7 @@ export async function resolveSession(
       session_id: string;
       user_id: string;
       crypto_subject: string;
-      status: string;
+      status: AccountStatus;
     }>();
 
   if (!row) return null;

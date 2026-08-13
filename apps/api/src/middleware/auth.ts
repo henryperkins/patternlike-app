@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import type { Env } from "../env.js";
 import type { CryptoSubject } from "../crypto.js";
 import { resolveSession, touchSessionActivity } from "../db/sessions.js";
-import { loadUserIdentity } from "../db/users.js";
+import { loadUserIdentity, type AccountStatus } from "../db/users.js";
 
 export type AppVariables = {
   userId: string;
@@ -12,6 +12,7 @@ export type AppVariables = {
   requestId: string;
   /** Present only when a real session authenticated the request. */
   sessionId?: string;
+  accountStatus: AccountStatus;
 };
 
 /** Same-origin browsers present the session here; native clients use Bearer. */
@@ -75,6 +76,7 @@ export async function authenticate(
     if (!identity) return unauthorized(c, requestId);
     c.set("userId", identity.userId);
     c.set("cryptoSubject", identity.cryptoSubject);
+    c.set("accountStatus", identity.status);
     await next();
     return;
   }
@@ -90,8 +92,43 @@ export async function authenticate(
 
   c.set("userId", principal.userId);
   c.set("cryptoSubject", principal.cryptoSubject);
+  c.set("accountStatus", principal.status);
   c.set("sessionId", principal.sessionId);
   await touchSessionActivity(c.env, principal.sessionId, principal.userId, now);
+  await next();
+}
+
+function frozenRouteAllowed(path: string): boolean {
+  return (
+    path === "/v1/account" ||
+    path === "/v1/exports" ||
+    path.startsWith("/v1/exports/") ||
+    path === "/v1/consents" ||
+    path.startsWith("/v1/consents/")
+  );
+}
+
+/** Enforce account lifecycle policy once, before any product route runs. */
+export async function accountStateGate(
+  c: Context<{ Bindings: Env; Variables: AppVariables }>,
+  next: Next,
+) {
+  const status = c.get("accountStatus");
+  const allowed =
+    status === "active" ||
+    (status === "frozen" && frozenRouteAllowed(c.req.path));
+  if (!allowed) {
+    return c.json(
+      {
+        error: {
+          code: "account_not_active",
+          message: "This operation is unavailable for the current account state",
+          request_id: c.get("requestId"),
+        },
+      },
+      403,
+    );
+  }
   await next();
 }
 

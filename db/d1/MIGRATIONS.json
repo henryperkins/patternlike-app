@@ -1,6 +1,6 @@
 {
   "engine": "cloudflare-d1",
-  "schema_version": "0.5.0",
+  "schema_version": "0.6.0",
   "migrations": [
     {
       "id": "0001_m0_core",
@@ -16,6 +16,11 @@
       "id": "0003_m5_openai_reading_publisher",
       "file": "0003_m5_openai_reading_publisher.sql",
       "description": "M5 constrained-model reading publisher. daily_readings.release_version becomes nullable and is required exactly for deterministic rows, because a v5 reading has no editorial release behind it; status gains `invalidated`, the only state that removes a published artifact from Today before a successor exists, with invalidated_at required exactly then; the two reading_key grammars are held disjoint by namespace under the retained global UNIQUE (reading_key). reading_provider_daily_usage bounds provider spend by UTC date and is deliberately not keyed by user. Five partial indexes make the bounded scheduler and repair sweeps indexed rather than scanning: users next-due and unseeded cursors, failed readings below the command-generation ceiling, invalidated readings awaiting repair, and failed jobs by result class."
+    },
+    {
+      "id": "0004_privacy_context",
+      "file": "0004_privacy_context.sql",
+      "description": "M6 privacy lifecycle and USR-06 check-ins. Rebuilds user_keys so only deletion-erased rows may lose wrapped DEK bytes; extends export/deletion requests with opaque job, receipt, envelope, checkpoint, timestamp, and safe error state; adds privacy-specific bounded outbox and lease indexes; and gives context signals deterministic source revisions, one-current-row semantics, non-unique evidence hashes, and bounded retention."
     }
   ],
   "notes": [

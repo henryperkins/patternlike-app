@@ -16,7 +16,13 @@ const ok = (body: unknown): MockResponse => ({ status: 200, body });
 
 function renderPrivacy(responses: Record<string, MockResponse>) {
   mockApiResponses(responses);
-  return render(<PrivacyView hasChart onSignOut={() => undefined} />);
+  return render(
+    <PrivacyView
+      hasChart
+      onSignOut={() => undefined}
+      onDeletionAccepted={() => undefined}
+    />,
+  );
 }
 
 function consentPanel(): HTMLElement {
@@ -160,19 +166,39 @@ describe("Context & privacy", () => {
     expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
   });
 
-  it("invents no source controls while M4 sources are unimplemented", async () => {
-    renderPrivacy({ [`GET ${CONSENT}`]: ok(consentGranted) });
-    await screen.findByRole("button", { name: /Withdraw permission/i });
+  it("shows the live daily check-in source without inventing external connectors", async () => {
+    renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      "GET /v1/context-sources": ok({
+        schema_version: "0.2.0",
+        user_id: "usr_test_0001",
+        sources: [{
+          schema_version: "0.2.0",
+          user_id: "usr_test_0001",
+          source_id: "USR-06",
+          enabled: true,
+          permission_state: "active",
+          allowed_uses: ["theme_ranking", "tone"],
+          permission_tier: 1,
+          consent_id: "cns_usr06_0001",
+          freshness: null,
+          last_signal_id: null,
+          scopes: [],
+          connector_status: "not_applicable",
+          updated_at: "2026-08-13T12:00:00.000Z",
+        }],
+        updated_at: "2026-08-13T12:00:00.000Z",
+      }),
+    });
 
-    // The ledger still describes what exists and disables what does not; the
-    // consent panel adds one real control and no imaginary ones.
-    for (const label of ["Check-ins and priorities", "Calendar, health, and device data"]) {
-      const row = screen.getByText(label).closest(".source-row");
-      expect(within(row as HTMLElement).getByRole("button")).toBeDisabled();
-    }
-    expect(
-      screen.getAllByRole("button", { name: /permission/i }),
-    ).toHaveLength(1);
+    const checkIn = await screen.findByRole("article", { name: /Daily check-in/i });
+    expect(within(checkIn).getByRole("button", { name: "Pause" })).toBeEnabled();
+    expect(within(checkIn).getByRole("button", { name: "Revoke" })).toBeEnabled();
+
+    const unavailable = screen.getByText("Calendar, health, and device data")
+      .closest(".source-row");
+    expect(within(unavailable as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(unavailable as HTMLElement).getByText("Unavailable")).toBeInTheDocument();
   });
 
   it("keeps the export and deletion controls untouched", async () => {
@@ -187,7 +213,13 @@ describe("Context & privacy", () => {
     const user = userEvent.setup();
     const onSignOut = vi.fn();
     mockApiResponses({ [`GET ${CONSENT}`]: ok(consentGranted) });
-    render(<PrivacyView hasChart onSignOut={onSignOut} />);
+    render(
+      <PrivacyView
+        hasChart
+        onSignOut={onSignOut}
+        onDeletionAccepted={() => undefined}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: /Sign out/i }));
 

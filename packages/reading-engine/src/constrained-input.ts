@@ -489,6 +489,19 @@ function expandContext(
   const byKey = new Map<string, PendingPin>();
 
   for (const signal of [...input.context_signals].sort(compareSignals)) {
+    if (signal.expires_at !== null) {
+      const expiry = Date.parse(signal.expires_at);
+      const anchor = Date.parse(input.generation_anchor);
+      if (!Number.isFinite(expiry) || !Number.isFinite(anchor) || expiry <= anchor) {
+        rejections.push({
+          subject_kind: "context",
+          subject_id: signal.signal_id,
+          reason_code: "context_expired_at_anchor",
+          detail: `source ${signal.source_id}`,
+        });
+        continue;
+      }
+    }
     if (!granted.has(signal.category)) {
       rejections.push({
         subject_kind: "context",
@@ -900,6 +913,7 @@ export function prepareConstrainedReadingInput(
       permission_state: "active",
       freshness_status: "fresh",
       observed_at: pin.signal.observed_at,
+      expires_at: pin.signal.expires_at,
       snapshot: toSnapshot(pin.signal.content),
     };
     request.context.push(toRequestContext(ref));

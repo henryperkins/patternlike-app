@@ -221,6 +221,7 @@ function input(overrides: Partial<ConstrainedReadingInput> = {}): ConstrainedRea
         normalized_hash: hex64("sig_1"),
         freshness_status: "fresh",
         observed_at: "2026-07-29T10:00:00Z",
+        expires_at: null,
         content: { kind: "text", text: "Third week of the migration." },
       },
       {
@@ -232,6 +233,7 @@ function input(overrides: Partial<ConstrainedReadingInput> = {}): ConstrainedRea
         normalized_hash: hex64("sig_2"),
         freshness_status: "fresh",
         observed_at: "2026-07-28T10:00:00Z",
+        expires_at: null,
         content: { kind: "text", text: "I keep promising more than I finish." },
       },
     ],

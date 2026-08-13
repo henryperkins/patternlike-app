@@ -67,6 +67,31 @@ afterEach(() => {
 });
 
 describe("web application shell", () => {
+  it("loads deletion status directly without probing the frozen account chart", async () => {
+    window.location.hash = "deletion-status";
+    mockApiResponses({
+      "/v1/account/deletion-status": {
+        status: 200,
+        body: {
+          schema_version: "0.6.0",
+          deletion_request_id: "del_direct_0001",
+          status: "running",
+          requested_at: "2026-08-13T12:00:00.000Z",
+          status_updated_at: "2026-08-13T12:01:00.000Z",
+          completed_at: null,
+          error_class: null,
+        },
+      },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /Closing your account/i }))
+      .toBeInTheDocument();
+    expect(screen.getByText(/account is locked/i)).toBeInTheDocument();
+    expect(capturedFor("/v1/chart")).toHaveLength(0);
+  });
+
   it("routes a user without a chart into honest onboarding", async () => {
     mockApiResponses({
       "/v1/chart": {
@@ -196,6 +221,7 @@ describe("web application shell", () => {
   it("sends a contract-shaped export request and reports acceptance", async () => {
     const user = userEvent.setup();
     const gate = deferred();
+    const exportId = "exp_cccccccccccccccccccccccccccccccc";
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
       "/v1/exports": {
@@ -206,8 +232,22 @@ describe("web application shell", () => {
           workflow: "ExportAccount",
           status: "queued",
           idempotency_key: "web-export-test",
-          job_id: null,
-          resource_id: null,
+          job_id: "job_export_app_0001",
+          resource_id: exportId,
+        },
+      },
+      [`/v1/exports/${exportId}`]: {
+        status: 200,
+        body: {
+          schema_version: "0.6.0",
+          export_request_id: exportId,
+          status: "ready",
+          requested_at: "2026-08-13T12:00:00.000Z",
+          status_updated_at: "2026-08-13T12:01:00.000Z",
+          completed_at: "2026-08-13T12:01:00.000Z",
+          expires_at: "2026-08-20T12:01:00.000Z",
+          download_available: true,
+          error_class: null,
         },
       },
     });
@@ -217,10 +257,11 @@ describe("web application shell", () => {
     await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
 
     await user.click(screen.getByRole("button", { name: /Request export/i }));
-    expect(screen.getByText("Submitting...")).toBeInTheDocument();
+    expect(screen.getByText("Requesting your export.")).toBeInTheDocument();
 
     gate.release();
-    expect(await screen.findByText("Request accepted")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Download export/i }))
+      .toHaveAttribute("href", `/v1/exports/${exportId}/download`);
 
     const [request] = capturedFor("/v1/exports");
     expect(request.method).toBe("POST");
@@ -229,11 +270,33 @@ describe("web application shell", () => {
     expect(request.body).toEqual({ include_readings: true, include_journal: true });
   });
 
-  it("requires a typed confirmation before it will call account deletion", async () => {
+  it("requires typed confirmation before deletion and enters the receipt route", async () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/account": notImplemented("Account deletion (M1 privacy skeleton follows)", "req_delete"),
+      "/v1/account": {
+        status: 202,
+        body: {
+          schema_version: "0.2.0",
+          workflow: "DeleteAccount",
+          status: "queued",
+          idempotency_key: "idem-web-delete",
+          job_id: "job_delete_app_0001",
+          resource_id: "del_app_0001",
+        },
+      },
+      "/v1/account/deletion-status": {
+        status: 200,
+        body: {
+          schema_version: "0.6.0",
+          deletion_request_id: "del_app_0001",
+          status: "running",
+          requested_at: "2026-08-13T12:00:00.000Z",
+          status_updated_at: "2026-08-13T12:01:00.000Z",
+          completed_at: null,
+          error_class: null,
+        },
+      },
     });
 
     render(<App />);
@@ -256,7 +319,9 @@ describe("web application shell", () => {
     expect(confirmButton).toBeEnabled();
     await user.click(confirmButton);
 
-    expect(await screen.findByText(`${NOT_BUILT} (Request req_delete)`)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Closing your account/i }))
+      .toBeInTheDocument();
+    expect(window.location.hash).toBe("#deletion-status");
 
     const [request] = capturedFor("/v1/account");
     expect(request.method).toBe("DELETE");
@@ -291,6 +356,7 @@ describe("web application shell", () => {
 
   it("reuses one idempotency key when a failed mutation is retried", async () => {
     const user = userEvent.setup();
+    const exportId = "exp_dddddddddddddddddddddddddddddddd";
     const responses: Record<string, MockResponse> = {
       "/v1/chart": { status: 200, body: chart },
       "/v1/exports": { status: 0, body: null, unreachable: true },
@@ -311,12 +377,26 @@ describe("web application shell", () => {
         workflow: "ExportAccount",
         status: "queued",
         idempotency_key: "web-export-test",
-        job_id: null,
-        resource_id: null,
+        job_id: "job_export_app_0002",
+        resource_id: exportId,
+      },
+    };
+    responses[`/v1/exports/${exportId}`] = {
+      status: 200,
+      body: {
+        schema_version: "0.6.0",
+        export_request_id: exportId,
+        status: "ready",
+        requested_at: "2026-08-13T12:00:00.000Z",
+        status_updated_at: "2026-08-13T12:01:00.000Z",
+        completed_at: "2026-08-13T12:01:00.000Z",
+        expires_at: "2026-08-20T12:01:00.000Z",
+        download_available: true,
+        error_class: null,
       },
     };
     await user.click(screen.getByRole("button", { name: /Request export/i }));
-    await screen.findByText("Request accepted");
+    await screen.findByRole("link", { name: /Download export/i });
 
     // A second key would start a second export instead of resuming the first.
     const keys = capturedFor("/v1/exports").map((r) => r.headers.get("idempotency-key"));

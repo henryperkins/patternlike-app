@@ -2,9 +2,9 @@
 """Validate every frozen contract package in this repository.
 
 Runs the M0 validator unchanged as a subprocess, then validates contracts/m3
-and contracts/m5 here. contracts/m0 is byte-frozen by the M3 freeze note, and
-contracts/m3 is byte-frozen by the M5 freeze note; both include their own
-validators, so this file adds packages rather than editing one.
+through contracts/m6 here. Each successor freezes its predecessor; older
+packages include their own validators, so this file adds packages rather than
+editing one.
 
 Schemas are registered by absolute $id only. The M0 validator also registers a
 bare-filename key, which is harmless there but would be ambiguous across three
@@ -40,9 +40,11 @@ ROOT = Path(__file__).resolve().parent
 M0 = ROOT / "m0"
 M3 = ROOT / "m3"
 M5 = ROOT / "m5"
+M6 = ROOT / "m6"
 
 M3_BASE = "https://patternlike.app/contracts/m3/"
 M5_BASE = "https://patternlike.app/contracts/m5/"
+M6_BASE = "https://patternlike.app/contracts/m6/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
@@ -82,6 +84,11 @@ FIXTURE_SCHEMA = {
         "daily-reading": M5_BASE + "daily-reading.schema.json#/$defs/dailyReadingV5",
         "reading-evidence": M5_BASE + "reading-evidence.schema.json#/$defs/readingEvidenceGraphV5",
     },
+    "m6": {
+        "account-export": M6_BASE + "account-export.schema.json#/$defs/accountExport",
+        "deletion-status": M6_BASE + "deletion-status.schema.json#/$defs/deletionStatus",
+        "export-status": M6_BASE + "export-status.schema.json#/$defs/exportStatus",
+    },
 }
 
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
@@ -115,6 +122,7 @@ POLICY_ONLY = {
         "daily-sky-response.end-boundary-event",
         "reading-generation-output.bad-role-order",
     },
+    "m6": set(),
 }
 
 braced_placeholder_re = re.compile(r"\{([^{}]*)\}")
@@ -241,7 +249,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M5):
+    for package in (M0, M3, M5, M6):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -985,6 +993,8 @@ def validate_package(
     def policy_errors(fixture: str, instance: dict) -> list[str]:
         if name == "m5":
             return _m5_policy_errors(fixture, instance)
+        if name == "m6":
+            return []
         return _m3_policy_errors(fixture, instance, catalogue)
 
     for path in sorted((package / "fixtures" / "valid").glob("*.json")):
@@ -1045,6 +1055,7 @@ PACKAGE_BASE = {
     "m0": "https://patternlike.app/contracts/m0/",
     "m3": M3_BASE,
     "m5": M5_BASE,
+    "m6": M6_BASE,
 }
 
 
@@ -1187,15 +1198,17 @@ def check_frozen(package: Path, label: str, expected: str | None, recorded_by: s
 
 
 def check_predecessors_frozen() -> list[str]:
-    """Prove BOTH frozen predecessor directories, automatically.
+    """Prove every frozen predecessor directory, automatically.
 
     M3's freeze proof covered contracts/m0 only. M5 supersedes the
-    daily-reading family, so contracts/m3 acquires exactly the same standing —
-    and a manual check is not a check.
+    daily-reading family, and M6 follows M5 with privacy lifecycle additions.
+    A manual promise that any one of those directories stayed untouched is not
+    a check.
     """
     errors: list[str] = []
     m3_manifest = M3 / "SCHEMA_MANIFEST.json"
     m5_manifest = M5 / "SCHEMA_MANIFEST.json"
+    m6_manifest = M6 / "SCHEMA_MANIFEST.json"
 
     errors += check_frozen(
         M0,
@@ -1229,6 +1242,29 @@ def check_predecessors_frozen() -> list[str]:
         )
     else:
         print("OK  frozen        contracts/m5 and contracts/m3 agree on the contracts/m0 digest")
+
+    if not m6_manifest.exists():
+        errors.append(
+            "contracts/m6/SCHEMA_MANIFEST.json is missing, so contracts/m5 has no "
+            "recorded freeze and the privacy amendment is undocumented"
+        )
+        return errors
+
+    m6_recorded = _recorded_predecessors(m6_manifest)
+    errors += check_frozen(
+        M5, "contracts/m5", m6_recorded.get("contracts/m5"),
+        "contracts/m6/SCHEMA_MANIFEST.json"
+    )
+    m0_from_m6 = m6_recorded.get("contracts/m0")
+    if m0_from_m6 is None:
+        errors.append("contracts/m6/SCHEMA_MANIFEST.json records no contracts/m0 predecessor")
+    elif m0_from_m6 != m0_from_m3:
+        errors.append(
+            "contracts/m6 and contracts/m3 record different digests for the same frozen "
+            f"contracts/m0 manifest ({m0_from_m6} vs {m0_from_m3})"
+        )
+    else:
+        print("OK  frozen        contracts/m6 and contracts/m3 agree on the contracts/m0 digest")
     return errors
 
 
@@ -1352,6 +1388,95 @@ def check_m5_openapi_projection() -> list[str]:
     return errors
 
 
+M6_SCHEMA_VERSION = "0.6.0"
+
+
+def check_m6_manifest() -> list[str]:
+    """Check that the M6 freeze inventory matches the schemas it ships."""
+    errors: list[str] = []
+    path = M6 / "SCHEMA_MANIFEST.json"
+    if not path.exists():
+        return ["contracts/m6/SCHEMA_MANIFEST.json is missing"]
+    doc = json.loads(path.read_text(encoding="utf-8"))
+
+    if doc.get("package") != "contracts/m6":
+        errors.append("M6 manifest package is not contracts/m6")
+    if doc.get("schema_version") != M6_SCHEMA_VERSION:
+        errors.append(f"M6 manifest schema_version is not {M6_SCHEMA_VERSION}")
+
+    declared = {entry.get("file"): entry for entry in doc.get("schemas") or []}
+    shipped = {p.name: p for p in sorted(M6.glob("*.schema.json"))}
+    for missing in sorted(set(shipped) - set(declared)):
+        errors.append(f"M6 manifest does not declare shipped schema {missing}")
+    for extra in sorted(set(declared) - set(shipped)):
+        errors.append(f"M6 manifest declares {extra}, which the package does not ship")
+
+    for filename, entry in declared.items():
+        if filename not in shipped:
+            continue
+        schema = json.loads(shipped[filename].read_text(encoding="utf-8"))
+        if entry.get("id") != schema.get("$id"):
+            errors.append(f"{filename}: M6 manifest id disagrees with the document $id")
+        listed = sorted(entry.get("defines") or [])
+        actual = sorted(schema.get("$defs") or {})
+        if listed != actual:
+            errors.append(
+                f"{filename}: M6 manifest defines {listed} but the document defines {actual}"
+            )
+
+    recorded = _recorded_predecessors(path)
+    for predecessor in ("contracts/m0", "contracts/m5"):
+        if predecessor not in recorded:
+            errors.append(f"M6 manifest records no {predecessor} predecessor")
+
+    if not errors:
+        print(
+            f"OK  manifest      contracts/m6 declares {len(declared)} schema(s) "
+            "and both predecessors"
+        )
+    return errors
+
+
+def check_m6_openapi_projection() -> list[str]:
+    """Pin the implemented privacy/context routes and their complete status sets."""
+    try:
+        import yaml
+    except ImportError:
+        return []
+
+    path = M6 / "openapi" / "openapi.yaml"
+    if not path.exists():
+        return ["contracts/m6/openapi/openapi.yaml is missing"]
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    expected = {
+        ("/v1/exports", "post"): {"202", "400", "401", "403", "409", "503"},
+        ("/v1/exports/{export_id}", "get"): {"200", "401", "404"},
+        ("/v1/exports/{export_id}/download", "get"): {
+            "200", "401", "404", "409", "410", "500"
+        },
+        ("/v1/account", "delete"): {"202", "400", "401", "403", "409", "503"},
+        ("/v1/account/deletion-status", "get"): {"200", "401"},
+        ("/v1/context-sources", "get"): {"200", "401", "403"},
+        ("/v1/context-sources", "put"): {"200", "400", "401", "403", "409"},
+        ("/v1/check-ins", "post"): {"201", "400", "401", "403", "409"},
+    }
+    errors: list[str] = []
+    for (route, method), statuses in expected.items():
+        operation = (spec.get("paths", {}).get(route) or {}).get(method)
+        if operation is None:
+            errors.append(f"M6 OpenAPI does not describe {method.upper()} {route}")
+            continue
+        actual = set((operation.get("responses") or {}).keys())
+        if actual != statuses:
+            errors.append(
+                f"M6 OpenAPI {method.upper()} {route} responses are "
+                f"{sorted(actual)}, expected {sorted(statuses)}"
+            )
+    if not errors:
+        print("OK  projection    M6 OpenAPI declares every privacy/context status")
+    return errors
+
+
 def main() -> int:
     print("== freeze ==")
     freeze_errors = check_predecessors_frozen()
@@ -1416,6 +1541,12 @@ def main() -> int:
             print(f"FAIL vectors      {vectors.name}: {e}")
         if not ve:
             print(f"OK  vectors       {vectors.name}")
+
+    print("\n== contracts/m6 ==")
+    errors += validate_package(registry, "m6", M6, set())
+    errors += check_openapi(M6, registry)
+    errors += check_m6_manifest()
+    errors += check_m6_openapi_projection()
 
     if errors:
         print(f"\n{len(errors)} error(s)")

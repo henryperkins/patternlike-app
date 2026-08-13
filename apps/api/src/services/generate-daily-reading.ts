@@ -147,17 +147,24 @@ async function pinnedContextStillEligible(
   env: Env,
   userId: string,
   command: GenerateDailyReadingCommandV1,
+  now = new Date(),
 ): Promise<boolean> {
   for (const pin of command.context) {
     const row = await env.DB.prepare(
       `SELECT s.source_id, s.evidence_lane, s.allowed_uses_json,
               s.permission_state, s.conflict_status, s.freshness_status,
+              s.is_current, s.expires_at,
               s.normalized_hash, s.consent_id, c.status AS consent_status,
               c.version AS consent_version, c.source_id AS consent_source_id,
-              c.allowed_uses_json AS consent_allowed_uses_json
+              c.allowed_uses_json AS consent_allowed_uses_json,
+              p.allowed_uses_json AS permission_allowed_uses_json
        FROM context_signals s
        JOIN consents c ON c.id = s.consent_id AND c.user_id = s.user_id
-       WHERE s.id = ? AND s.user_id = ?`,
+       JOIN context_source_permissions p
+         ON p.user_id = s.user_id AND p.source_id = s.source_id
+       WHERE s.id = ? AND s.user_id = ?
+         AND p.enabled = 1 AND p.permission_state = 'active'
+         AND p.consent_id = s.consent_id`,
     )
       .bind(pin.signal_id, userId)
       .first<{
@@ -167,19 +174,24 @@ async function pinnedContextStillEligible(
         permission_state: string;
         conflict_status: string;
         freshness_status: string;
+        is_current: number;
+        expires_at: string | null;
         normalized_hash: string;
         consent_id: string;
         consent_status: string;
         consent_version: number;
         consent_source_id: string | null;
         consent_allowed_uses_json: string;
+        permission_allowed_uses_json: string;
       }>();
     let allowedUses: unknown = null;
     let consentAllowedUses: unknown = null;
+    let permissionAllowedUses: unknown = null;
     if (row) {
       try {
         allowedUses = JSON.parse(row.allowed_uses_json);
         consentAllowedUses = JSON.parse(row.consent_allowed_uses_json);
+        permissionAllowedUses = JSON.parse(row.permission_allowed_uses_json);
       } catch {
         return false;
       }
@@ -190,7 +202,9 @@ async function pinnedContextStillEligible(
       row.evidence_lane !== pin.evidence_lane ||
       row.permission_state !== pin.permission_state ||
       row.conflict_status !== "none" ||
+      row.is_current !== 1 ||
       row.freshness_status !== pin.freshness_status ||
+      (row.expires_at !== null && Date.parse(row.expires_at) <= now.getTime()) ||
       row.normalized_hash !== pin.normalized_hash ||
       row.consent_id !== pin.consent_id ||
       row.consent_status !== "granted" ||
@@ -199,7 +213,9 @@ async function pinnedContextStillEligible(
       !Array.isArray(allowedUses) ||
       !allowedUses.includes(pin.allowed_use) ||
       !Array.isArray(consentAllowedUses) ||
-      !consentAllowedUses.includes(pin.allowed_use)
+      !consentAllowedUses.includes(pin.allowed_use) ||
+      !Array.isArray(permissionAllowedUses) ||
+      !permissionAllowedUses.includes(pin.allowed_use)
     ) {
       return false;
     }

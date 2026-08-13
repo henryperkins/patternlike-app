@@ -3,6 +3,7 @@ import type { Env } from "../env.js";
 import type { AppVariables } from "./auth.js";
 import { DEV_ROOT_KEK, isDevEnvironment } from "../crypto.js";
 import { resolvePublisherConfiguration } from "../services/reading-publisher.js";
+import { resolveCheckInRetentionMonths } from "../services/check-in-retention.js";
 import { safeLog } from "../services/safe-log.js";
 
 export interface ConfigFailure {
@@ -11,7 +12,8 @@ export interface ConfigFailure {
     | "reading_publisher_misconfigured"
     | "auth_stub_in_production"
     | "root_kek_not_configured"
-    | "identity_not_configured";
+    | "identity_not_configured"
+    | "check_in_retention_misconfigured";
   message: string;
 }
 
@@ -44,9 +46,20 @@ export function checkSecureConfig(
         | "OIDC_ISSUER"
         | "OIDC_AUDIENCE"
         | "OIDC_JWKS_URL"
+        | "CHECK_IN_RETENTION_MONTHS"
       >
     | Partial<Env>,
 ): ConfigFailure | null {
+  const checkInRetention = resolveCheckInRetentionMonths(
+    env.CHECK_IN_RETENTION_MONTHS,
+  );
+  if (!checkInRetention.ok) {
+    return {
+      code: "check_in_retention_misconfigured",
+      message: "CHECK_IN_RETENTION_MONTHS must be an integer from 1 through 13",
+    };
+  }
+
   // Before the development short-circuit, deliberately. The local canary runs
   // with ENVIRONMENT=development and a real key, so a half-configured local run
   // would otherwise reach a provider with values no frozen command described.

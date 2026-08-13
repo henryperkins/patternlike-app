@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m6/deletion-status.schema.json",
+  "title": "Account deletion status",
+  "$defs": {
+    "deletionStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "deletion_request_id",
+        "status",
+        "requested_at",
+        "status_updated_at",
+        "completed_at",
+        "error_class"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
+        "deletion_request_id": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "running", "completed", "failed"]
+        },
+        "requested_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "status_updated_at": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+        },
+        "completed_at": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"}
+          ]
+        },
+        "error_class": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "common.schema.json#/$defs/deletionErrorClass"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"enum": ["queued", "running"]}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "completed_at": {"type": "null"},
+              "error_class": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
+          "then": {
+            "properties": {
+              "completed_at": {"type": "string", "format": "date-time"},
+              "error_class": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "failed"}}, "required": ["status"]},
+          "then": {
+            "properties": {
+              "completed_at": {"type": "null"},
+              "error_class": {"$ref": "common.schema.json#/$defs/deletionErrorClass"}
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/deletionStatus"
+}

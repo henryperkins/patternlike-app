@@ -66,7 +66,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -82,6 +84,8 @@ a {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--cobalt);
   outline-offset: 3px;
@@ -1476,6 +1480,208 @@ summary:focus-visible {
   white-space: nowrap;
 }
 
+/*
+ * A compact instrument, not a second hero. It sits in the same 700px editorial
+ * measure as the reading and uses the ledger's hard rules and operational type.
+ */
+.daily-check-in {
+  width: min(700px, 100%);
+  margin-top: 24px;
+  padding: 22px 24px;
+}
+
+.daily-check-in__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.daily-check-in__heading h2 {
+  margin: 5px 0 0;
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.daily-check-in > p,
+.daily-check-in__inactive p,
+.daily-check-in__saved p {
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.daily-check-in__privacy-link {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--forest);
+  font-size: 11px;
+  font-weight: 750;
+  text-underline-offset: 3px;
+}
+
+.daily-check-in__inactive .button,
+.daily-check-in__saved .button {
+  margin-top: 18px;
+  text-decoration: none;
+}
+
+.daily-check-in__form {
+  margin-top: 20px;
+}
+
+.daily-check-in__energy {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.daily-check-in__energy legend,
+.daily-check-in__field > span {
+  margin-bottom: 8px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.daily-check-in__levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line-dark);
+}
+
+.daily-check-in__levels label {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.daily-check-in__levels label + label {
+  border-left: 1px solid var(--line-dark);
+}
+
+.daily-check-in__levels input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.daily-check-in__levels span {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  color: var(--ink-soft);
+  background: var(--paper-light);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.daily-check-in__levels input:checked + span {
+  color: #fffdf6;
+  background: var(--forest);
+}
+
+.daily-check-in__levels input:focus-visible + span {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+.daily-check-in__detail-toggle {
+  margin-top: 14px;
+  padding: 0;
+  color: var(--forest);
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.daily-check-in__details {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.daily-check-in__selects {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.daily-check-in__field {
+  display: grid;
+}
+
+.daily-check-in__field input,
+.daily-check-in__field select,
+.daily-check-in__field textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 0;
+  background: var(--paper-light);
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+.daily-check-in__field textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.daily-check-in__footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.daily-check-in__footer .button {
+  min-width: 112px;
+}
+
+.daily-check-in__status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.daily-check-in__until {
+  color: var(--forest) !important;
+  font-family: var(--mono) !important;
+  font-size: 10px !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .today-fallback-note {
   width: min(700px, 100%);
   margin: 32px 0 0;
@@ -2197,6 +2403,96 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
+.source-row__fixed {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.source-row--live {
+  align-items: start;
+  padding-block: 18px;
+}
+
+.source-row--live .source-row__body {
+  min-width: 0;
+}
+
+.source-row__uses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-row__uses li {
+  position: relative;
+  padding-left: 12px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.source-row__uses li::before {
+  position: absolute;
+  top: 0.65em;
+  left: 0;
+  width: 6px;
+  height: 1px;
+  background: var(--line-dark);
+  content: "";
+}
+
+.source-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 7px;
+}
+
+.source-row--live .source-row__actions button {
+  min-width: 74px;
+  color: var(--forest);
+  border-color: var(--line-dark);
+  cursor: pointer;
+  background: transparent;
+}
+
+.source-row--live .source-row__actions button:hover:not(:disabled) {
+  border-color: var(--forest);
+  background: var(--forest-light);
+}
+
+.source-row--live .source-row__actions .source-row__revoke {
+  color: var(--coral);
+  border-color: rgba(199, 96, 67, 0.5);
+}
+
+.source-row--live .source-row__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.source-row p.source-row__consequence {
+  margin-top: 9px;
+  color: var(--coral);
+  line-height: 1.5;
+}
+
+.source-row p.source-row__status {
+  grid-column: 2 / -1;
+  min-height: 14px;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
 .privacy-actions {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2302,6 +2598,24 @@ summary:focus-visible {
   flex: 0 0 auto;
 }
 
+.privacy-action__download,
+.privacy-action__retry {
+  justify-self: start;
+  margin-top: 10px;
+  padding: 0;
+  color: var(--forest);
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
 .privacy-action__confirm {
   display: grid;
   gap: 8px;
@@ -2347,6 +2661,65 @@ summary:focus-visible {
   justify-content: center;
   min-height: 44px;
   padding-inline: 12px;
+}
+
+/* The deletion receipt renders before normal app boot, so it owns its frame. */
+.deletion-status-page {
+  display: flex;
+  width: min(680px, calc(100% - 36px));
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 64px 0;
+}
+
+.deletion-status-page__mark {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 30px;
+  place-items: center;
+  color: var(--forest);
+  border: 1px solid var(--line-dark);
+}
+
+.deletion-status-page__mark svg {
+  width: 25px;
+  height: 25px;
+}
+
+.deletion-status-page h1 {
+  margin: 13px 0 0;
+  font-family: var(--serif);
+  font-size: clamp(42px, 8vw, 72px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.deletion-status-page__body {
+  margin-top: 34px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.deletion-status-page__body p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.deletion-status-page__body p.deletion-status-page__meta {
+  margin-top: 16px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* Timing */
@@ -3377,6 +3750,16 @@ summary:focus-visible {
     margin-top: 24px;
   }
 
+  .daily-check-in {
+    padding: 20px;
+  }
+
+  .daily-check-in__field input,
+  .daily-check-in__field select,
+  .daily-check-in__field textarea {
+    font-size: 16px;
+  }
+
   .reading-block,
   .reading-reflection,
   .reading-notice {
@@ -3488,6 +3871,10 @@ summary:focus-visible {
     grid-column: 1 / -1;
   }
 
+  .source-row p.source-row__status {
+    grid-column: 1 / -1;
+  }
+
   .privacy-actions {
     grid-template-columns: 1fr;
   }
@@ -3505,6 +3892,11 @@ summary:focus-visible {
 
   .privacy-session .button {
     align-self: start;
+  }
+
+  .deletion-status-page {
+    justify-content: start;
+    padding-top: 72px;
   }
 
   .milestone-stamp {
@@ -3570,6 +3962,38 @@ summary:focus-visible {
   .privacy-actions__buttons {
     grid-auto-flow: row;
     grid-template-columns: 1fr;
+  }
+
+  .daily-check-in__heading {
+    display: block;
+  }
+
+  .daily-check-in__heading .panel-code {
+    display: block;
+    margin-top: 8px;
+  }
+
+  .daily-check-in__selects {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-check-in__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .source-row--live {
+    grid-template-columns: 1fr;
+  }
+
+  .source-row--live .source-state,
+  .source-row--live .source-row__actions,
+  .source-row--live p.source-row__status {
+    grid-column: 1;
+  }
+
+  .source-row--live .source-row__actions {
+    justify-content: start;
   }
 
   .timing-notice {

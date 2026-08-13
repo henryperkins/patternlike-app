@@ -77,8 +77,10 @@ async function seedEncryptedSignal(
   signalId: string,
   text: string,
   observedAt = "2026-08-09T10:00:00Z",
+  options: { sourceId?: string; value?: unknown } = {},
 ) {
-  const sealed = await encryptPayload(env, identity, { text }, {
+  const sourceId = options.sourceId ?? "USR-02";
+  const sealed = await encryptPayload(env, identity, options.value ?? { text }, {
     subject: identity.cryptoSubject,
     field: "context_signals.value_enc",
     recordId: signalId,
@@ -89,10 +91,11 @@ async function seedEncryptedSignal(
         permission_state, conflict_status, consent_id, freshness_status, observed_at,
         ingested_at, value_encoding, value_enc, value_key_version, value_nonce,
         normalized_hash, created_at, updated_at)
-     VALUES (?, ?, 'USR-02', 'user_and_context', '["life_domain_selection"]', 'high', 'personal',
+     VALUES (?, ?, ?, 'user_and_context', '["life_domain_selection"]', 'high', 'personal',
              'active', 'none', ?, 'fresh', ?, ?, 'encrypted', ?, ?, ?, ?, ?, ?)`,
     signalId,
     userId,
+    sourceId,
     `${CONSENT_ID}_${userId}`,
     observedAt,
     observedAt,
@@ -143,10 +146,11 @@ describe("context loader", () => {
     expect(grant!.consent_allowed_uses).toEqual(["life_domain_selection", "tone"]);
   });
 
-  it("folds a disabled permission into a non-active state", async () => {
+  it("rejects an enabled/state mismatch as an invariant failure", async () => {
     await seedSourceGrant(USER_A, { enabled: 0, permissionState: "active" });
-    const [grant] = await loadContextSourceGrants(env, USER_A);
-    expect(grant!.permission_state).not.toBe("active");
+    await expect(loadContextSourceGrants(env, USER_A)).rejects.toThrow(
+      "Context-source permission state is inconsistent",
+    );
   });
 
   it("returns a permission with no consent so the compiler can reject it", async () => {
@@ -171,8 +175,33 @@ describe("context loader", () => {
     expect(loaded.signals.every((s) => s.signal_id !== "sig_b_0001")).toBe(true);
   });
 
+  it("unwraps a check-in value without exposing its private hash salt", async () => {
+    await seedSourceGrant(USER_A, { sourceId: "USR-06" });
+    await seedEncryptedSignal(
+      USER_A,
+      IDENTITY_A,
+      "sig_checkin_0001",
+      "unused",
+      "2026-08-09T10:00:00Z",
+      {
+        sourceId: "USR-06",
+        value: {
+          hash_salt: "private-salt",
+          value: { energy: "low", note: null },
+        },
+      },
+    );
+
+    const loaded = await loadConstrainedContext(env, IDENTITY_A, "2026-08-10");
+    const signal = loaded.signals.find((item) => item.signal_id === "sig_checkin_0001");
+    expect(signal?.content).toEqual({
+      kind: "structured",
+      value: { energy: "low", note: null },
+    });
+  });
+
   it("keeps ineligible signals rather than filtering them out of the compiler's view", async () => {
-    await seedSourceGrant(USER_A, { permissionState: "revoked" });
+    await seedSourceGrant(USER_A, { enabled: 0, permissionState: "revoked" });
     await seedEncryptedSignal(USER_A, IDENTITY_A, "sig_a_0002", "Still loaded.");
 
     const loaded = await loadConstrainedContext(env, IDENTITY_A, "2026-08-10");
