@@ -16,11 +16,23 @@ type OperationalFailureClass =
   | "payload_undecryptable"
   | "execution_error";
 
+export type DeletionFailureCheckpoint =
+  | "accepted"
+  | "exports_fenced"
+  | "objects_deleted"
+  | "rows_deleted"
+  | "keys_erased"
+  | "completed";
+
 export type SafeLogEvent =
   | { event: "unhandled_error" }
   | { event: "generation_claim_release_failed" }
   | { event: "insecure_configuration"; config_code: ConfigurationCode }
   | { event: "generation_message_malformed" }
+  | {
+      event: "deletion_processing_failed";
+      checkpoint: DeletionFailureCheckpoint;
+    }
   | { event: "generation_retryable_failure"; failure_class: GenerationFailureCode }
   | { event: "generation_failed"; failure_class: OperationalFailureClass }
   | { event: "generation_threw"; failure_class: "payload_undecryptable" | "execution_error" }
@@ -101,6 +113,9 @@ export function safeLog(input: SafeLogEvent): string {
     case "generation_retryable_failure":
     case "generation_failed":
       console.error(input.event, { trace_id, failure_class: input.failure_class });
+      break;
+    case "deletion_processing_failed":
+      console.error(input.event, { trace_id, checkpoint: input.checkpoint });
       break;
     case "generation_threw":
       console.error(input.event, { trace_id, failure_class: input.failure_class });
