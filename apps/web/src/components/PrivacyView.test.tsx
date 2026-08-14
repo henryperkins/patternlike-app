@@ -221,7 +221,10 @@ describe("Context & privacy", () => {
 
   it("offers chart correction only when a chart exists", async () => {
     const onCorrectBirth = vi.fn();
-    mockApiResponses({ [`GET ${CONSENT}`]: ok(consentGranted) });
+    mockApiResponses({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${TOPICS}`]: emptyTopics,
+    });
     const { rerender } = render(
       <PrivacyView
         hasChart

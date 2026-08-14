@@ -8,7 +8,7 @@ import { __setAuthClientForTests } from "./lib/auth.js";
 import {
   capturedFor,
   deferred,
-  mockApiResponses,
+  mockApiResponses as stubApiResponses,
   notImplemented,
   type MockResponse,
 } from "./test/api-mock.js";
@@ -24,6 +24,19 @@ const emptyTopics: MockResponse = {
   status: 200,
   body: { schema_version: "0.2.0", excluded_topics: [], updated_at: null },
 };
+
+function mockApiResponses(responses: Record<string, MockResponse>) {
+  // Privacy mounts TopicExclusionsPanel on every visit. Defaults land on the
+  // same object later tests mutate (chart getters, poll transitions), matching
+  // TodayView's feedback stubs.
+  if (
+    !("GET /v1/preferences/topic-exclusions" in responses) &&
+    !("/v1/preferences/topic-exclusions" in responses)
+  ) {
+    responses["GET /v1/preferences/topic-exclusions"] = emptyTopics;
+  }
+  stubApiResponses(responses);
+}
 
 const chart = {
   schema_version: "0.2.0",

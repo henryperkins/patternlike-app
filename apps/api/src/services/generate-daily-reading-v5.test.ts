@@ -340,6 +340,63 @@ describe("V5 execution", () => {
       .toHaveLength(stored.reading.paragraphs.length);
   });
 
+  it("executes a command that pinned USR-12 feedback and USR-05 exclusions", async () => {
+    await seedUser(IDENTITY_A);
+    await confirmPreferences(USER_A, ZONE);
+    await seedChart(IDENTITY_A);
+    await grantAiSynthesis();
+
+    await rows(
+      `INSERT INTO daily_readings
+         (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+          contract_id, assembly_mode, status, revision, revision_reason,
+          command_generation, created_at, updated_at)
+       VALUES ('rdg_fb_exec_0001', ?, '2026-08-08', NULL, ?, 'sha256:f', 'c',
+               'constrained_model', 'failed', 1, 'initial', 1, ?, ?)`,
+      USER_A,
+      `reading-v5:${USER_A}:2026-08-08:r1`,
+      "2026-08-08T00:00:00Z",
+      "2026-08-08T00:00:00Z",
+    );
+    await rows(
+      `INSERT INTO reading_feedback (id, reading_id, user_id, resonance,
+         relevance_labels_json, created_at)
+       VALUES ('rfb_exec_0001', 'rdg_fb_exec_0001', ?, 'helpful', '["work"]', ?)`,
+      USER_A,
+      "2026-08-08T12:00:00Z",
+    );
+    const { ensureFirstPartyGrant, USR12_SOURCE_ID } = await import("../db/first-party-sources.js");
+    await ensureFirstPartyGrant(env, IDENTITY_A, USR12_SOURCE_ID);
+    const { storeTopicExclusions } = await import("../db/topic-exclusions.js");
+    const exclusions = await storeTopicExclusions(
+      env,
+      IDENTITY_A,
+      "idem-exec-exclusions-1",
+      ["work"],
+    );
+    expect(exclusions.ok).toBe(true);
+
+    const targetLocalDate = resolveV5TargetDate(ZONE, new Date());
+    if (!targetLocalDate) throw new Error("test date did not resolve");
+    const enqueued = await enqueueConstrainedReading(enabledEnv(), USER_A, {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate,
+    });
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason} / ${enqueued.detail}`);
+    const claim = await claimJob(enabledEnv(), enqueued.jobId);
+    if (!claim) throw new Error("job did not claim");
+
+    const command = claim.command as GenerateDailyReadingCommandV2;
+    expect(command.context.some((pin) => pin.source_id === "USR-12")).toBe(true);
+    expect(command.context.some((pin) => pin.source_id === "USR-05")).toBe(true);
+
+    expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
+      ok: true,
+      readingId: enqueued.readingId,
+    });
+  });
+
   it("passes the frozen publisher pin when current prompt and model variables moved", async () => {
     const { claim } = await claimReserved();
     const command = claim.command as GenerateDailyReadingCommandV2;

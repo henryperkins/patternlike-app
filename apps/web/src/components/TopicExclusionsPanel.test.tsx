@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { EXCLUDABLE_LIFE_DOMAINS } from "@patternlike/shared";
 import { TopicExclusionsPanel } from "./TopicExclusionsPanel.js";
 import { capturedFor, mockApiResponses } from "../test/api-mock.js";
 
@@ -25,6 +26,7 @@ describe("Topic exclusions", () => {
     });
 
     render(<TopicExclusionsPanel />);
+    expect(await screen.findAllByRole("checkbox")).toHaveLength(EXCLUDABLE_LIFE_DOMAINS.length);
     await user.click(await screen.findByRole("checkbox", { name: "Relationships" }));
     await user.click(screen.getByRole("checkbox", { name: "Work" }));
     await user.click(screen.getByRole("button", { name: /Save exclusions/i }));

@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
+  EXCLUDABLE_LIFE_DOMAINS,
+  type ExcludableLifeDomain,
+} from "@patternlike/shared";
+import {
   ApiError,
   getTopicExclusions,
   newIdempotencyKey,
@@ -7,19 +11,19 @@ import {
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
 
-const TOPICS: ReadonlyArray<{ id: string; label: string }> = [
-  { id: "self", label: "Self" },
-  { id: "relationships", label: "Relationships" },
-  { id: "work", label: "Work" },
-  { id: "creativity", label: "Creativity" },
-  { id: "home", label: "Home" },
-  { id: "body_energy", label: "Body and energy" },
-  { id: "money_resources", label: "Money and resources" },
-  { id: "learning", label: "Learning" },
-  { id: "community", label: "Community" },
-  { id: "caregiving", label: "Caregiving" },
-  { id: "spirituality_meaning", label: "Meaning" },
-];
+const TOPIC_LABELS: Record<ExcludableLifeDomain, string> = {
+  self: "Self",
+  relationships: "Relationships",
+  work: "Work",
+  creativity: "Creativity",
+  home: "Home",
+  body_energy: "Body and energy",
+  money_resources: "Money and resources",
+  learning: "Learning",
+  community: "Community",
+  caregiving: "Caregiving",
+  spirituality_meaning: "Meaning",
+};
 
 /**
  * USR-05 sensitive-topic exclusions.
@@ -110,14 +114,14 @@ export function TopicExclusionsPanel() {
         <form onSubmit={(event) => void submit(event)}>
           <fieldset className="topic-exclusions__list">
             <legend>Do not interpret</legend>
-            {TOPICS.map((topic) => (
-              <label key={topic.id}>
+            {EXCLUDABLE_LIFE_DOMAINS.map((id) => (
+              <label key={id}>
                 <input
                   type="checkbox"
-                  checked={selected.includes(topic.id)}
-                  onChange={() => toggle(topic.id)}
+                  checked={selected.includes(id)}
+                  onChange={() => toggle(id)}
                 />
-                <span>{topic.label}</span>
+                <span>{TOPIC_LABELS[id]}</span>
               </label>
             ))}
           </fieldset>
