@@ -1,5 +1,9 @@
 node_modules/
 dist/
+# Release-builder output: unsigned and signed content-release bodies. A signed
+# release committed here would be an ingestable artifact nobody reviewed in a
+# pull request.
+build/
 *.tsbuildinfo
 .wrangler/
 # Auth0 CLI state. XDG_CONFIG_HOME resolves to a relative `.config` in some

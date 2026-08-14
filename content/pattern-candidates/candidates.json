@@ -1,0 +1,1421 @@
+{
+  "schema_note": "Draft review candidates. Not a contract, not ingestable, not approved. See README.md.",
+  "locale_default": "en-US",
+  "candidates": [
+    {
+      "candidate_id": "cand.aspect.mars-saturn-square",
+      "content_id": "pattern.aspect.mars-saturn-square",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 10,
+      "tags": [
+        "aspect",
+        "effort",
+        "constraint"
+      ],
+      "title": "Effort meeting its own brake",
+      "summary": "Your chart puts the part of you that pushes and the part that checks in direct tension.",
+      "body": "Mars and Saturn stand at ninety degrees in your chart. In plain terms: the impulse to act and the instinct to first make sure sit at odds rather than in sequence. People with this contact often describe starting slower than they want to and finishing more thoroughly than they expected. The friction is not a fault in either half; it is what happens when both halves are strong and neither defers.",
+      "resources": [
+        "Work that rewards finishing rather than starting",
+        "A high tolerance for effort that shows no result yet"
+      ],
+      "tensions": [
+        "Beginning can cost more energy than the task itself",
+        "Caution arrives as self-criticism rather than as information"
+      ],
+      "counter_expression": "The same contact reads as durability: someone who does not stop when the first push fails, because they never expected the first push to be the whole job.",
+      "prohibited_claims": [
+        "Do not claim this predicts failure, delay, or a specific outcome.",
+        "Do not describe this as a limitation of the person rather than a description of a calculated contact."
+      ],
+      "evidence_requirements": "A calculated square between natal Mars and natal Saturn. No houses or angles are required, so this remains eligible on an unknown birth time.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "mars",
+        "saturn"
+      ],
+      "required_aspects": [
+        "square"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "mars",
+            "body_b": "saturn",
+            "aspect": "square"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Check that 'brake' does not read as pathology. Confirm the counter-expression is as prominent as the tension list."
+    },
+    {
+      "candidate_id": "cand.aspect.moon-saturn-opposition",
+      "content_id": "pattern.aspect.moon-saturn-opposition",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 20,
+      "tags": [
+        "aspect",
+        "need",
+        "reserve"
+      ],
+      "title": "Needing and withholding at the same distance",
+      "summary": "The part of you that needs and the part that rations sit exactly opposite each other.",
+      "body": "Your Moon and Saturn are in opposition — a hundred and eighty degrees apart, each visible to the other across the chart. Opposition is not conflict so much as mutual awareness: the need is never unconscious, and neither is the reluctance to state it. People with this contact often report knowing precisely what they want from someone and saying a smaller version of it out loud.",
+      "resources": [
+        "An unusually clear read on what you actually need",
+        "Steadiness in situations where other people flood"
+      ],
+      "tensions": [
+        "Asking plainly can feel like an imposition",
+        "Self-sufficiency becomes the default long after it stopped being necessary"
+      ],
+      "counter_expression": "The same opposition reads as reliability under strain: someone whose feeling does not overwhelm their judgement, and whose word holds when it costs something.",
+      "prohibited_claims": [
+        "Do not diagnose attachment style, depression, or any clinical condition.",
+        "Do not claim this describes the person's childhood or family."
+      ],
+      "evidence_requirements": "A calculated opposition between natal Moon and natal Saturn. Time-sensitive Moon material is not used, so an unknown birth time remains eligible.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "moon",
+        "saturn"
+      ],
+      "required_aspects": [
+        "opposition"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "moon",
+            "body_b": "saturn",
+            "aspect": "opposition"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. This one is closest to sounding diagnostic; check every sentence against the prohibited claims."
+    },
+    {
+      "candidate_id": "cand.aspect.mercury-saturn-conjunction",
+      "content_id": "pattern.aspect.mercury-saturn-conjunction",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 30,
+      "tags": [
+        "aspect",
+        "thinking",
+        "precision"
+      ],
+      "title": "Thinking that will not round up",
+      "summary": "Your thinking and your standard for what counts as known are fused rather than separate.",
+      "body": "Mercury and Saturn are conjunct in your chart — the same degree region, acting as one. The practical effect people describe is a mind that will not call something understood until it can be defended. That makes for slow first drafts and unusually few retractions. It also makes casual conversation more effortful than it looks from outside.",
+      "resources": [
+        "Conclusions that survive being questioned",
+        "Comfort with long study and no immediate audience"
+      ],
+      "tensions": [
+        "Speed reads as carelessness, including your own",
+        "Saying 'I don't know yet' is easier than saying an approximate answer"
+      ],
+      "counter_expression": "The same conjunction reads as authority earned rather than claimed: someone whose statements are worth more precisely because they are rarer.",
+      "prohibited_claims": [
+        "Do not claim intelligence, aptitude, or academic outcome.",
+        "Do not describe slowness as a deficit."
+      ],
+      "evidence_requirements": "A calculated conjunction between natal Mercury and natal Saturn.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "mercury",
+        "saturn"
+      ],
+      "required_aspects": [
+        "conjunction"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "mercury",
+            "body_b": "saturn",
+            "aspect": "conjunction"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Verify no sentence implies a capability claim."
+    },
+    {
+      "candidate_id": "cand.aspect.jupiter-neptune-square",
+      "content_id": "pattern.aspect.jupiter-neptune-square",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 40,
+      "tags": [
+        "aspect",
+        "imagination",
+        "scale"
+      ],
+      "title": "Imagination without an edge to it",
+      "summary": "The impulse to expand and the impulse to dissolve boundaries pull against each other.",
+      "body": "Jupiter squares Neptune in your chart. Both are bodies of scale rather than detail, and in square they enlarge each other without either supplying a limit. What people describe is a vivid sense of what could be, arriving faster and larger than the means to test it. The corrective is not less vision; it is one hard number attached to it.",
+      "resources": [
+        "A picture of the whole before the parts exist",
+        "Generosity that does not first calculate the return"
+      ],
+      "tensions": [
+        "The scale of a plan and the evidence for it drift apart",
+        "Disappointment reads as betrayal rather than as a revised estimate"
+      ],
+      "counter_expression": "The same square reads as the ability to keep working toward something nobody else can see yet, which is a prerequisite for anything long.",
+      "prohibited_claims": [
+        "Do not claim this predicts financial loss, deception, or a specific event.",
+        "Do not describe this as naivety."
+      ],
+      "evidence_requirements": "A calculated square between natal Jupiter and natal Neptune.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "jupiter",
+        "neptune"
+      ],
+      "required_aspects": [
+        "square"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "jupiter",
+            "body_b": "neptune",
+            "aspect": "square"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. 'One hard number' is advice; confirm advice is acceptable in body copy or move it to resources."
+    },
+    {
+      "candidate_id": "cand.aspect.venus-pluto-square",
+      "content_id": "pattern.aspect.venus-pluto-square",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 50,
+      "tags": [
+        "aspect",
+        "attachment",
+        "intensity"
+      ],
+      "title": "Nothing about attachment stays casual",
+      "summary": "What you value and what you cannot be indifferent about are the same faculty here.",
+      "body": "Venus and Pluto stand in square in your chart. Venus is preference; Pluto is what does not negotiate. Held at ninety degrees they do not take turns, so liking something tends to arrive already at full weight. People with this contact often describe having no reliable middle setting between not caring and caring completely.",
+      "resources": [
+        "Loyalty that does not require maintenance",
+        "An accurate sense of what is actually worth wanting"
+      ],
+      "tensions": [
+        "Small preferences carry more weight than they can hold",
+        "Withdrawal is the only available brake, so it gets used"
+      ],
+      "counter_expression": "The same square reads as depth rather than excess: someone who cannot perform interest they do not have, which makes the interest they do have worth something.",
+      "prohibited_claims": [
+        "Do not claim this predicts a relationship outcome, betrayal, or loss.",
+        "Do not describe the person as controlling, obsessive, or jealous."
+      ],
+      "evidence_requirements": "A calculated square between natal Venus and natal Pluto.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "venus",
+        "pluto"
+      ],
+      "required_aspects": [
+        "square"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "venus",
+            "body_b": "pluto",
+            "aspect": "square"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Highest risk of character judgement in the catalog. Review the tension list especially closely."
+    },
+    {
+      "candidate_id": "cand.aspect.mars-jupiter-trine",
+      "content_id": "pattern.aspect.mars-jupiter-trine",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 60,
+      "tags": [
+        "aspect",
+        "momentum",
+        "scale"
+      ],
+      "title": "Momentum that finds room",
+      "summary": "Acting and enlarging are in easy contact, which makes starting cheap.",
+      "body": "Mars trines Jupiter in your chart — a hundred and twenty degrees, the angle where two functions cooperate without being asked. The effect people describe is that action tends to open space rather than meet resistance, so the cost of trying something is low. Low cost is a real advantage and a real hazard: nothing here forces a second look before the first move.",
+      "resources": [
+        "Starting is not the expensive part",
+        "Physical and social confidence that does not need rehearsal"
+      ],
+      "tensions": [
+        "Ease removes the pause that would have caught the error",
+        "Scale creeps because nothing objects"
+      ],
+      "counter_expression": "The same trine reads as recoverability: someone whose next attempt is available immediately, which matters more over years than any single attempt.",
+      "prohibited_claims": [
+        "Do not claim luck, success, or protection from consequence.",
+        "Do not promise an outcome from an easy aspect."
+      ],
+      "evidence_requirements": "A calculated trine between natal Mars and natal Jupiter.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "mars",
+        "jupiter"
+      ],
+      "required_aspects": [
+        "trine"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "mars",
+            "body_b": "jupiter",
+            "aspect": "trine"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Check that 'advantage' language never becomes a luck claim."
+    },
+    {
+      "candidate_id": "cand.aspect.mercury-uranus-opposition",
+      "content_id": "pattern.aspect.mercury-uranus-opposition",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 70,
+      "tags": [
+        "aspect",
+        "thinking",
+        "discontinuity"
+      ],
+      "title": "Conclusions that arrive sideways",
+      "summary": "Sequential thinking and sudden reframing face each other across your chart.",
+      "body": "Mercury opposes Uranus here. One function builds an argument a step at a time; the other reorganises the whole frame without warning. In opposition they alternate rather than blend, which is why the answer often shows up before the working does. Reconstructing the path afterwards is a separate task, and it is usually the harder one.",
+      "resources": [
+        "Reframing a stuck problem faster than you can explain it",
+        "Genuine indifference to how a thing is normally done"
+      ],
+      "tensions": [
+        "The reasoning has to be rebuilt for anyone else to follow",
+        "Patience with an established method runs out early"
+      ],
+      "counter_expression": "The same opposition reads as independence of mind: someone whose conclusions are not downstream of the room they are in.",
+      "prohibited_claims": [
+        "Do not diagnose attention, learning, or neurological difference.",
+        "Do not claim originality or genius."
+      ],
+      "evidence_requirements": "A calculated opposition between natal Mercury and natal Uranus.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "mercury",
+        "uranus"
+      ],
+      "required_aspects": [
+        "opposition"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "mercury",
+            "body_b": "uranus",
+            "aspect": "opposition"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. The diagnostic risk here is real; the prohibited-claims line is not optional."
+    },
+    {
+      "candidate_id": "cand.aspect.moon-neptune-trine",
+      "content_id": "pattern.aspect.moon-neptune-trine",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "integrated_aspect_structure",
+      "display_priority": 80,
+      "tags": [
+        "aspect",
+        "perception",
+        "porousness"
+      ],
+      "title": "A wide aperture on other people",
+      "summary": "Feeling and dissolution are in easy contact, so the boundary between your state and the room's is thin.",
+      "body": "Your Moon trines Neptune. The trine is the cooperative angle, and what cooperates here is responsiveness and permeability. People with this contact usually describe reading a room accurately and then needing time to work out which part of what they picked up was theirs. Both halves of that are the same faculty; neither can be kept without the other.",
+      "resources": [
+        "Accurate read on unspoken states",
+        "Imagination that stays available under pressure"
+      ],
+      "tensions": [
+        "Other people's weather becomes your weather without a decision",
+        "Solitude is a requirement rather than a preference, and that gets read as distance"
+      ],
+      "counter_expression": "The same trine reads as steadiness in other people's crises: someone who can sit with a state without needing to fix it or flee it.",
+      "prohibited_claims": [
+        "Do not claim psychic ability, intuition as fact, or perception of hidden information.",
+        "Do not diagnose sensitivity as a disorder."
+      ],
+      "evidence_requirements": "A calculated trine between natal Moon and natal Neptune. Uses no time-sensitive Moon claim.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "moon",
+        "neptune"
+      ],
+      "required_aspects": [
+        "trine"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "moon",
+            "body_b": "neptune",
+            "aspect": "trine"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. 'Reads a room accurately' is the sentence most likely to slide into a psychic claim."
+    },
+    {
+      "candidate_id": "cand.element.luminaries-water",
+      "content_id": "pattern.element.luminaries-water",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "elemental_or_modal_emphasis",
+      "display_priority": 90,
+      "tags": [
+        "element",
+        "water",
+        "luminaries"
+      ],
+      "title": "One instrument, tuned to feeling",
+      "summary": "Your Sun and Moon are conjunct in a water sign, so identity and response are not separate systems.",
+      "body": "The Sun and Moon are conjunct in your chart, and the conjunction falls in a water sign. When the two luminaries share a degree region they stop acting as two references and start acting as one: what you are and how you react are reported by the same instrument. In water, that instrument is calibrated to significance rather than to fact — which of the things happening actually matters.",
+      "resources": [
+        "No gap between what you feel and what you are willing to say you are",
+        "An early and reliable read on what matters in a situation"
+      ],
+      "tensions": [
+        "There is no second opinion available internally",
+        "A mood and an identity crisis are hard to tell apart from inside"
+      ],
+      "counter_expression": "The same placement reads as wholeness rather than fusion: someone who is not performing a self that differs from the one they experience.",
+      "prohibited_claims": [
+        "Do not read this as a Sun-sign description.",
+        "Do not claim emotional instability or diagnose mood."
+      ],
+      "evidence_requirements": "A calculated Sun–Moon conjunction, and a calculated Moon position in Cancer, Scorpio, or Pisces. Both halves must match; the element alone is not this family.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "moon"
+      ],
+      "required_aspects": [
+        "conjunction"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "conjunction"
+          }
+        ],
+        "any_of": [
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 4
+          },
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 8
+          },
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 12
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. The structural anchor is deliberate: an element family with no aspect requirement would be Sun-sign filler."
+    },
+    {
+      "candidate_id": "cand.element.luminaries-earth",
+      "content_id": "pattern.element.luminaries-earth",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "elemental_or_modal_emphasis",
+      "display_priority": 100,
+      "tags": [
+        "element",
+        "earth",
+        "luminaries"
+      ],
+      "title": "One instrument, tuned to consequence",
+      "summary": "Your Sun and Moon are conjunct in an earth sign, so identity and response report the same reading.",
+      "body": "Sun and Moon are conjunct here, in an earth sign. The conjunction removes the internal second opinion; the element decides what the single remaining opinion is about. In earth, that is consequence: what will still be true after the enthusiasm passes, and what it will cost. The result is unusually little distance between what you intend and what you actually do.",
+      "resources": [
+        "Intention and action rarely diverge",
+        "A reliable sense of what a thing will really take"
+      ],
+      "tensions": [
+        "Changing your mind feels like changing who you are",
+        "What cannot be made concrete is easy to dismiss too early"
+      ],
+      "counter_expression": "The same placement reads as integrity in the literal sense: one piece rather than several, which is why your commitments hold.",
+      "prohibited_claims": [
+        "Do not read this as a Sun-sign description.",
+        "Do not claim material outcome, wealth, or career success."
+      ],
+      "evidence_requirements": "A calculated Sun–Moon conjunction, and a calculated Moon position in Taurus, Virgo, or Capricorn.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "moon"
+      ],
+      "required_aspects": [
+        "conjunction"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "conjunction"
+          }
+        ],
+        "any_of": [
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 2
+          },
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 6
+          },
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 10
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Pairs with the water family; keep the two titles parallel so neither reads as better."
+    },
+    {
+      "candidate_id": "cand.element.mars-moon-fire",
+      "content_id": "pattern.element.mars-moon-fire",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "elemental_or_modal_emphasis",
+      "display_priority": 110,
+      "tags": [
+        "element",
+        "fire",
+        "response"
+      ],
+      "title": "Response and action on the same trigger",
+      "summary": "Mars is conjunct your Moon in a fire sign, so reacting and moving are one motion.",
+      "body": "Mars sits conjunct the Moon in your chart, and both fall in a fire sign. The conjunction means the reacting function and the acting function fire together rather than in sequence; the element means the first move is outward. What people describe is knowing how they feel about something at the moment they are already responding to it, which is fast and occasionally faster than intended.",
+      "resources": [
+        "No lag between recognising a problem and addressing it",
+        "Feelings that are legible to other people because they are already in motion"
+      ],
+      "tensions": [
+        "The pause that would have sorted signal from noise is not there",
+        "Heat passes quickly for you and slowly for everyone else"
+      ],
+      "counter_expression": "The same conjunction reads as honesty in real time: someone whose reaction is not edited before it is shown, which is rarer than it sounds.",
+      "prohibited_claims": [
+        "Do not describe the person as angry, aggressive, or volatile.",
+        "Do not claim this predicts conflict."
+      ],
+      "evidence_requirements": "A calculated Mars–Moon conjunction, and a calculated Moon position in Aries, Leo, or Sagittarius.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "mars",
+        "moon"
+      ],
+      "required_aspects": [
+        "conjunction"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "moon",
+            "body_b": "mars",
+            "aspect": "conjunction"
+          }
+        ],
+        "any_of": [
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 1
+          },
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 5
+          },
+          {
+            "type": "position",
+            "body": "moon",
+            "sign": 9
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Character-judgement risk; the prohibited claims must be checked line by line."
+    },
+    {
+      "candidate_id": "cand.element.venus-saturn-earth",
+      "content_id": "pattern.element.venus-saturn-earth",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "elemental_or_modal_emphasis",
+      "display_priority": 120,
+      "tags": [
+        "element",
+        "earth",
+        "value"
+      ],
+      "title": "Liking something and committing to it are the same decision",
+      "summary": "Venus trines Saturn from an earth sign, so preference arrives already durable.",
+      "body": "Venus and Saturn are in trine here, with Venus in an earth sign. The trine lets the two cooperate: what you are drawn to and what you are willing to maintain do not have to be reconciled after the fact. The earth placement means the attraction is usually to something that can be kept — a craft, a place, a person who is actually available.",
+      "resources": [
+        "Taste that does not need to be revised in a year",
+        "Comfort with slow returns on something you care about"
+      ],
+      "tensions": [
+        "Provisional interest barely registers, so options get closed early",
+        "What cannot be maintained is not allowed to be enjoyed"
+      ],
+      "counter_expression": "The same trine reads as fidelity to your own judgement: someone who does not need a thing to be fashionable in order to keep liking it.",
+      "prohibited_claims": [
+        "Do not claim relationship longevity or predict a partnership.",
+        "Do not read this as a Venus-sign description."
+      ],
+      "evidence_requirements": "A calculated Venus–Saturn trine, and a calculated Venus position in Taurus, Virgo, or Capricorn.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "venus",
+        "saturn"
+      ],
+      "required_aspects": [
+        "trine"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "venus",
+            "body_b": "saturn",
+            "aspect": "trine"
+          }
+        ],
+        "any_of": [
+          {
+            "type": "position",
+            "body": "venus",
+            "sign": 2
+          },
+          {
+            "type": "position",
+            "body": "venus",
+            "sign": 6
+          },
+          {
+            "type": "position",
+            "body": "venus",
+            "sign": 10
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted."
+    },
+    {
+      "candidate_id": "cand.element.mercury-sun-air",
+      "content_id": "pattern.element.mercury-sun-air",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "elemental_or_modal_emphasis",
+      "display_priority": 130,
+      "tags": [
+        "element",
+        "air",
+        "thinking"
+      ],
+      "title": "Thinking is not a tool you pick up",
+      "summary": "Mercury is conjunct your Sun in an air sign, so articulating and being are the same act.",
+      "body": "Mercury sits on your Sun, in an air sign. The conjunction fuses the function that describes with the function that is; the element points both at relation — how things stand to each other rather than what they weigh. People with this placement often find that they do not know what they think until they have said it, and that saying it is not a report on the thinking but the thinking itself.",
+      "resources": [
+        "Fluency that holds under pressure",
+        "An instinct for the structure of an argument rather than its volume"
+      ],
+      "tensions": [
+        "Silence feels like absence rather than rest",
+        "A position stated out loud becomes harder to abandon than it should be"
+      ],
+      "counter_expression": "The same conjunction reads as transparency: someone whose reasoning is available to other people instead of arriving finished and unexaminable.",
+      "prohibited_claims": [
+        "Do not claim intelligence or verbal aptitude.",
+        "Do not read this as a Sun-sign description."
+      ],
+      "evidence_requirements": "A calculated Sun–Mercury conjunction, and a calculated Mercury position in Gemini, Libra, or Aquarius.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "mercury"
+      ],
+      "required_aspects": [
+        "conjunction"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "mercury",
+            "aspect": "conjunction"
+          }
+        ],
+        "any_of": [
+          {
+            "type": "position",
+            "body": "mercury",
+            "sign": 3
+          },
+          {
+            "type": "position",
+            "body": "mercury",
+            "sign": 7
+          },
+          {
+            "type": "position",
+            "body": "mercury",
+            "sign": 11
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted."
+    },
+    {
+      "candidate_id": "cand.mode.sun-saturn-cardinal",
+      "content_id": "pattern.mode.sun-saturn-cardinal",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "elemental_or_modal_emphasis",
+      "display_priority": 140,
+      "tags": [
+        "mode",
+        "cardinal",
+        "authority"
+      ],
+      "title": "Starting things you will then be responsible for",
+      "summary": "Sun squares Saturn from a cardinal sign, so initiative and accountability arrive together.",
+      "body": "The Sun squares Saturn in your chart, with Saturn in a cardinal sign. Cardinal signs begin things; the square means beginning is never free of the question of who will carry it. The pattern people describe is being the one who starts and then, without quite deciding to, the one who is answerable for how it ends.",
+      "resources": [
+        "Authority that comes from having done the work, not from position",
+        "A realistic estimate of what a commitment will require"
+      ],
+      "tensions": [
+        "Delegating feels like abandoning",
+        "Self-assessment is stricter than the assessment anyone else would give"
+      ],
+      "counter_expression": "The same square reads as substance: someone whose initiatives are backed, which is why other people rely on them.",
+      "prohibited_claims": [
+        "Do not claim career outcome, seniority, or professional recognition.",
+        "Do not describe this as a burden the person cannot set down."
+      ],
+      "evidence_requirements": "A calculated Sun–Saturn square, and a calculated Saturn position in Aries, Cancer, Libra, or Capricorn.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "saturn"
+      ],
+      "required_aspects": [
+        "square"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "saturn",
+            "aspect": "square"
+          }
+        ],
+        "any_of": [
+          {
+            "type": "position",
+            "body": "saturn",
+            "sign": 1
+          },
+          {
+            "type": "position",
+            "body": "saturn",
+            "sign": 4
+          },
+          {
+            "type": "position",
+            "body": "saturn",
+            "sign": 7
+          },
+          {
+            "type": "position",
+            "body": "saturn",
+            "sign": 10
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted."
+    },
+    {
+      "candidate_id": "cand.multi.grand-trine-personal",
+      "content_id": "pattern.multi.grand-trine-personal",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "calculated_multi_body_pattern",
+      "display_priority": 150,
+      "tags": [
+        "configuration",
+        "grand-trine",
+        "closed-circuit"
+      ],
+      "title": "A closed circuit between three of your own functions",
+      "summary": "Sun, Moon, and Jupiter form three mutual trines — a self-contained loop.",
+      "body": "Three trines close on each other in your chart: Sun to Moon, Moon to Jupiter, Jupiter to Sun. A closed circuit of easy angles behaves differently from any single trine. Energy circulates inside it without ever being obliged to leave, which is why configurations like this are described as both a resource and a room that is comfortable enough to stay in. Nothing in the geometry pushes outward; that has to come from you.",
+      "resources": [
+        "A reliable internal supply that does not depend on circumstance",
+        "Recovery that does not need much external input"
+      ],
+      "tensions": [
+        "Sufficiency reduces the pressure that would otherwise produce a change",
+        "The circuit is easy to mistake for the whole chart"
+      ],
+      "counter_expression": "The same configuration reads as a stable base rather than a comfortable trap: somewhere to return to that does not have to be rebuilt each time.",
+      "prohibited_claims": [
+        "Do not claim talent, giftedness, or good fortune.",
+        "Do not describe the person as complacent."
+      ],
+      "evidence_requirements": "Three calculated trines forming a closed set: Sun–Moon, Jupiter–Moon, and Jupiter–Sun. All three must be present; two of the three is a different configuration.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "moon",
+        "jupiter"
+      ],
+      "required_aspects": [
+        "trine"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "trine"
+          },
+          {
+            "type": "aspect",
+            "body_a": "moon",
+            "body_b": "jupiter",
+            "aspect": "trine"
+          },
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "jupiter",
+            "aspect": "trine"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Written as three aspect predicates because the calculation service does not currently emit multi-body pattern objects."
+    },
+    {
+      "candidate_id": "cand.multi.t-square-luminaries",
+      "content_id": "pattern.multi.t-square-luminaries",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "calculated_multi_body_pattern",
+      "display_priority": 160,
+      "tags": [
+        "configuration",
+        "t-square",
+        "tension"
+      ],
+      "title": "Two poles and something that will not let either settle",
+      "summary": "Sun opposes Moon and Mars squares both — a three-body configuration with no resting position.",
+      "body": "Your Sun and Moon stand opposite each other, and Mars squares both. Geometrically this is a T-square: two ends of a bar with a third body pressing at right angles to the middle. What it describes is a system that cannot settle by picking a side, because the third body objects to whichever side is chosen. People with this configuration usually report high output and a persistent sense of unfinished business.",
+      "resources": [
+        "Sustained drive that does not require external motivation",
+        "An unusual tolerance for holding two incompatible things at once"
+      ],
+      "tensions": [
+        "Rest reads as neglect of one pole or the other",
+        "The pressure is constant, so it stops being noticeable and starts being normal"
+      ],
+      "counter_expression": "The same configuration reads as engine rather than affliction: nothing here is idle, and the tension is what keeps the work moving.",
+      "prohibited_claims": [
+        "Do not claim stress, burnout, or any health outcome.",
+        "Do not describe this as a hard chart or a difficult life."
+      ],
+      "evidence_requirements": "A calculated Sun–Moon opposition together with calculated Mars–Sun and Mars–Moon squares. All three must be present.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "moon",
+        "mars"
+      ],
+      "required_aspects": [
+        "opposition",
+        "square"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "opposition"
+          },
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "mars",
+            "aspect": "square"
+          },
+          {
+            "type": "aspect",
+            "body_a": "moon",
+            "body_b": "mars",
+            "aspect": "square"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. 'Affliction' is deliberately named and rejected; check that no other sentence reintroduces it."
+    },
+    {
+      "candidate_id": "cand.multi.solar-cluster",
+      "content_id": "pattern.multi.solar-cluster",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "calculated_multi_body_pattern",
+      "display_priority": 170,
+      "tags": [
+        "configuration",
+        "cluster",
+        "concentration"
+      ],
+      "title": "Three functions occupying one region",
+      "summary": "Sun, Mercury, and Venus are all conjunct — thinking, valuing, and being share a single position.",
+      "body": "Mercury and Venus are both conjunct your Sun. Three functions in one region of the chart concentrate rather than distribute: describing, preferring, and being are not separable acts for you, and there is no neutral vantage point among them from which to check the other two. Concentration of this kind produces unusual coherence and unusually little internal disagreement.",
+      "resources": [
+        "A voice that is recognisably one voice across every context",
+        "Preferences that do not require justification to hold"
+      ],
+      "tensions": [
+        "There is no internal dissent, so external dissent lands harder",
+        "A single region of the chart carries more of the load than it can distribute"
+      ],
+      "counter_expression": "The same cluster reads as clarity rather than narrowness: someone who is not divided against themselves, which is a real and uncommon advantage.",
+      "prohibited_claims": [
+        "Do not claim charisma, talent, or social outcome.",
+        "Do not describe the person as self-centred."
+      ],
+      "evidence_requirements": "Calculated Sun–Mercury and Sun–Venus conjunctions. Both must be present.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "mercury",
+        "venus"
+      ],
+      "required_aspects": [
+        "conjunction"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "mercury",
+            "aspect": "conjunction"
+          },
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "venus",
+            "aspect": "conjunction"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted."
+    },
+    {
+      "candidate_id": "cand.multi.saturn-support-structure",
+      "content_id": "pattern.multi.saturn-support-structure",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "calculated_multi_body_pattern",
+      "display_priority": 180,
+      "tags": [
+        "configuration",
+        "structure",
+        "support"
+      ],
+      "title": "Structure that supports rather than restricts",
+      "summary": "Saturn is in easy contact with both Venus and Mars — form arriving as scaffolding.",
+      "body": "Saturn trines Venus and sextiles Mars in your chart. Both are cooperative angles, and what cooperates is the function that limits with the functions that want and act. Rather than opposing appetite, structure here supplies it with a shape. The practical description people give is that discipline feels less like restraint and more like the reason the thing is possible at all.",
+      "resources": [
+        "Routine that supports the work instead of substituting for it",
+        "Effort that can be sustained past the point of enthusiasm"
+      ],
+      "tensions": [
+        "Structure is comfortable, so an unstructured situation reads as unsafe",
+        "The scaffolding can outlive the thing it was built for"
+      ],
+      "counter_expression": "The same pair reads as freedom bought with form: someone for whom the constraint is what made the range possible.",
+      "prohibited_claims": [
+        "Do not claim productivity, achievement, or professional outcome.",
+        "Do not present easy aspects as guarantees."
+      ],
+      "evidence_requirements": "A calculated Saturn–Venus trine together with a calculated Mars–Saturn sextile.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "saturn",
+        "venus",
+        "mars"
+      ],
+      "required_aspects": [
+        "trine",
+        "sextile"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "venus",
+            "body_b": "saturn",
+            "aspect": "trine"
+          },
+          {
+            "type": "aspect",
+            "body_a": "mars",
+            "body_b": "saturn",
+            "aspect": "sextile"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted."
+    },
+    {
+      "candidate_id": "cand.multi.pluto-cross-luminaries",
+      "content_id": "pattern.multi.pluto-cross-luminaries",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "calculated_multi_body_pattern",
+      "display_priority": 190,
+      "tags": [
+        "configuration",
+        "intensity",
+        "revision"
+      ],
+      "title": "Nothing central stays provisional",
+      "summary": "Pluto squares both your Sun and your Moon — the two most personal points are under the same pressure.",
+      "body": "Pluto stands at ninety degrees to both luminaries in your chart. What Pluto contacts does not stay approximate: the arrangement gets taken apart and rebuilt rather than adjusted. With both the Sun and the Moon involved, that applies to identity and to response at once, which is why people with this configuration often describe their life in distinct periods rather than as a continuous line.",
+      "resources": [
+        "The capacity to rebuild from the ground rather than patch",
+        "An accurate sense of when something is genuinely finished"
+      ],
+      "tensions": [
+        "Partial change does not hold, so change is expensive when it comes",
+        "Intensity is the baseline, which makes ordinary calm feel like something is missing"
+      ],
+      "counter_expression": "The same configuration reads as regenerative rather than destructive: what is rebuilt here is usually built better, and the person doing the rebuilding is the same one who tore it down.",
+      "prohibited_claims": [
+        "Do not claim crisis, trauma, loss, or any life event.",
+        "Do not describe the person as intense, destructive, or extreme as a character verdict."
+      ],
+      "evidence_requirements": "Calculated Pluto–Sun and Moon–Pluto squares. Both must be present; one alone is a different family.",
+      "minimum_accuracy": "unknown",
+      "requires_houses": false,
+      "required_bodies": [
+        "sun",
+        "moon",
+        "pluto"
+      ],
+      "required_aspects": [
+        "square"
+      ],
+      "match": {
+        "all_of": [
+          {
+            "type": "aspect",
+            "body_a": "sun",
+            "body_b": "pluto",
+            "aspect": "square"
+          },
+          {
+            "type": "aspect",
+            "body_a": "moon",
+            "body_b": "pluto",
+            "aspect": "square"
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Highest risk of implying life events in the catalog. Every sentence needs checking against the first prohibited claim."
+    },
+    {
+      "candidate_id": "cand.angular.saturn-first-house",
+      "content_id": "pattern.angular.saturn-first-house",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "accuracy_gated_angular_or_house",
+      "display_priority": 200,
+      "tags": [
+        "house",
+        "angular",
+        "self-presentation"
+      ],
+      "title": "The version of you that arrives first is the careful one",
+      "summary": "Saturn is in your first house, so restraint is the first thing about you a room meets.",
+      "body": "Saturn sits in the first house of your chart — the region that describes how you arrive rather than what you are once you have. The effect people describe is being read as more reserved, more serious, or older than they experience themselves as being. The gap between the first impression and the actual person tends to close slowly and then hold, which is a different trajectory from most.",
+      "resources": [
+        "Credibility that does not have to be performed",
+        "A first impression that ages well rather than deflating"
+      ],
+      "tensions": [
+        "Warmth has to be shown deliberately because it is not assumed",
+        "Being taken seriously early can be lonelier than it looks"
+      ],
+      "counter_expression": "The same placement reads as a self-presentation that does not overpromise: what people meet first is something you can actually keep supplying.",
+      "prohibited_claims": [
+        "Do not claim appearance, age, or how the person is perceived as a fact.",
+        "Do not diagnose social anxiety or reserve as a condition."
+      ],
+      "evidence_requirements": "A calculated Saturn position in house 1. Houses require a real birth time, so this family is ineligible whenever houses are suppressed.",
+      "minimum_accuracy": "approximate",
+      "requires_houses": true,
+      "required_bodies": [
+        "saturn"
+      ],
+      "required_aspects": [],
+      "match": {
+        "all_of": [
+          {
+            "type": "position",
+            "body": "saturn",
+            "house": 1
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Accuracy gate is load-bearing: with an unknown birth time this must never appear."
+    },
+    {
+      "candidate_id": "cand.angular.sun-tenth-house",
+      "content_id": "pattern.angular.sun-tenth-house",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "accuracy_gated_angular_or_house",
+      "display_priority": 210,
+      "tags": [
+        "house",
+        "angular",
+        "visibility"
+      ],
+      "title": "Whatever you are doing is visible",
+      "summary": "Your Sun is in the tenth house, so identity and public position are calculated in the same region.",
+      "body": "The Sun falls in the tenth house of your chart — the most exposed part of the wheel, the part visible from furthest away. What that describes is not ambition but visibility: what you do tends to be seen, attributed, and remembered as yours, whether or not you arranged for it to be. Private work is available to you; anonymous work is harder to arrange.",
+      "resources": [
+        "Effort that gets attributed rather than absorbed",
+        "A clear relationship between what you do and how you are known"
+      ],
+      "tensions": [
+        "There is little separation between a professional setback and a personal one",
+        "Visibility is not optional, so it has to be managed rather than avoided"
+      ],
+      "counter_expression": "The same placement reads as accountability: someone whose work carries their name, which is a constraint and a form of standing at the same time.",
+      "prohibited_claims": [
+        "Do not claim career, status, fame, or professional outcome.",
+        "Do not present visibility as inevitable success."
+      ],
+      "evidence_requirements": "A calculated Sun position in house 10. Requires a real birth time.",
+      "minimum_accuracy": "approximate",
+      "requires_houses": true,
+      "required_bodies": [
+        "sun"
+      ],
+      "required_aspects": [],
+      "match": {
+        "all_of": [
+          {
+            "type": "position",
+            "body": "sun",
+            "house": 10
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted."
+    },
+    {
+      "candidate_id": "cand.angular.moon-fourth-house",
+      "content_id": "pattern.angular.moon-fourth-house",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "accuracy_gated_angular_or_house",
+      "display_priority": 220,
+      "tags": [
+        "house",
+        "angular",
+        "base"
+      ],
+      "title": "Where you rest is not incidental",
+      "summary": "Your Moon is in the fourth house, so the base you return to is load-bearing rather than optional.",
+      "body": "The Moon falls in the fourth house of your chart, the part of the wheel furthest from public view. What that describes is that recovery is located rather than portable: a specific place, arrangement, or set of people does the work that other people can do anywhere. When that base is intact, a great deal is possible; when it is disrupted, the disruption is not proportional to how small it looks from outside.",
+      "resources": [
+        "A base that genuinely restores rather than merely pauses",
+        "Continuity that other people can rely on because you rely on it"
+      ],
+      "tensions": [
+        "Moving, or a change at home, costs more than the visible disruption suggests",
+        "Building the base can absorb effort that was meant for something else"
+      ],
+      "counter_expression": "The same placement reads as rootedness rather than dependence: knowing exactly what restores you is more useful than being indifferent to your surroundings.",
+      "prohibited_claims": [
+        "Do not claim anything about the person's family, childhood, or home life as fact.",
+        "Do not predict relocation or domestic events."
+      ],
+      "evidence_requirements": "A calculated Moon position in house 4. Requires a real birth time; the Moon's house is time-sensitive and is suppressed otherwise.",
+      "minimum_accuracy": "approximate",
+      "requires_houses": true,
+      "required_bodies": [
+        "moon"
+      ],
+      "required_aspects": [],
+      "match": {
+        "all_of": [
+          {
+            "type": "position",
+            "body": "moon",
+            "house": 4
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. The family-claim prohibition matters here more than anywhere else in the catalog."
+    },
+    {
+      "candidate_id": "cand.angular.saturn-tenth-house",
+      "content_id": "pattern.angular.saturn-tenth-house",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "accuracy_gated_angular_or_house",
+      "display_priority": 230,
+      "tags": [
+        "house",
+        "angular",
+        "responsibility"
+      ],
+      "title": "Standing that has to be built rather than granted",
+      "summary": "Saturn is in your tenth house, so position and the work of earning it are calculated together.",
+      "body": "Saturn falls in the tenth house of your chart, the most public region of the wheel. Saturn in this position describes standing that accrues rather than arrives: recognition tends to come later than the work that justified it, and to be more durable when it does. The pattern people report is a long middle stretch where the effort is real and the acknowledgement has not caught up.",
+      "resources": [
+        "Standing that does not evaporate when attention moves elsewhere",
+        "Comfort with responsibility that other people decline"
+      ],
+      "tensions": [
+        "The gap between contribution and recognition is wide enough to be discouraging",
+        "Authority is accepted more readily than it is enjoyed"
+      ],
+      "counter_expression": "The same placement reads as a slow compound return: what is built here does not need to be rebuilt, which is why the late arrival matters less than it feels like it does.",
+      "prohibited_claims": [
+        "Do not claim career outcome, promotion, or professional recognition.",
+        "Do not promise eventual success."
+      ],
+      "evidence_requirements": "A calculated Saturn position in house 10. Requires a real birth time.",
+      "minimum_accuracy": "approximate",
+      "requires_houses": true,
+      "required_bodies": [
+        "saturn"
+      ],
+      "required_aspects": [],
+      "match": {
+        "all_of": [
+          {
+            "type": "position",
+            "body": "saturn",
+            "house": 10
+          }
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. 'Slow compound return' is close to a promise; consider rewording."
+    },
+    {
+      "candidate_id": "cand.angular.ascendant-fixed",
+      "content_id": "pattern.angular.ascendant-fixed",
+      "content_version": "1.0.0",
+      "locale": "en-US",
+      "state": "review_candidate",
+      "group": "accuracy_gated_angular_or_house",
+      "display_priority": 240,
+      "tags": [
+        "angle",
+        "ascendant",
+        "fixed"
+      ],
+      "title": "An approach that does not adjust to the room",
+      "summary": "Your Ascendant falls in a fixed sign, so how you arrive stays the same across contexts.",
+      "body": "The Ascendant — the exact degree rising at your birth, and therefore the part of the chart that most depends on the birth time — falls in a fixed sign. Fixed signs hold rather than initiate or adapt. What that describes is an approach that is recognisably the same in a meeting, a kitchen, and a crisis. Consistency of this kind is legible to other people and costs something to maintain when the room would prefer otherwise.",
+      "resources": [
+        "People know what they are getting, and that is worth a great deal",
+        "An approach that does not have to be reconstructed for each new setting"
+      ],
+      "tensions": [
+        "Adapting reads as capitulating, so it happens later than it needs to",
+        "Consistency can be mistaken for inflexibility by people who only see the surface"
+      ],
+      "counter_expression": "The same placement reads as reliability rather than rigidity: an approach that does not shift with the audience is the reason people can predict you, and prediction is most of trust.",
+      "prohibited_claims": [
+        "Do not claim appearance, first impressions, or how the person is perceived as fact.",
+        "Do not describe the person as stubborn."
+      ],
+      "evidence_requirements": "A calculated Ascendant in Taurus, Leo, Scorpio, or Aquarius. The Ascendant is the most birth-time-sensitive point in the chart and is suppressed on an unknown birth time, so this family requires at least an approximate time.",
+      "minimum_accuracy": "approximate",
+      "requires_houses": true,
+      "required_bodies": [],
+      "required_aspects": [],
+      "match": {
+        "all_of": [],
+        "any_of": [
+          {
+            "type": "angle",
+            "angle": "ascendant",
+            "sign": 2
+          },
+          {
+            "type": "angle",
+            "angle": "ascendant",
+            "sign": 5
+          },
+          {
+            "type": "angle",
+            "angle": "ascendant",
+            "sign": 8
+          },
+          {
+            "type": "angle",
+            "angle": "ascendant",
+            "sign": 11
+          }
+        ],
+        "none_of": []
+      },
+      "reviewer_notes": "Assistant-drafted. Only candidate whose match is any_of-only; confirms the contract permits it. Uses the angle predicate rather than a house."
+    }
+  ]
+}
