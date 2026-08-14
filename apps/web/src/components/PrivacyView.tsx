@@ -12,6 +12,7 @@ import { formatInstant } from "../lib/reading-format.js";
 import { AccountDataControls } from "./AccountDataControls.js";
 import { AiConsentTerms } from "./AiConsent.js";
 import { ContextSourceControl } from "./ContextSourceControl.js";
+import { TopicExclusionsPanel } from "./TopicExclusionsPanel.js";
 import { Icon } from "./icons.js";
 
 type ConsentPanelState =
@@ -208,6 +209,8 @@ export function PrivacyView({
       </section>
 
       <AiSynthesisConsentPanel />
+
+      <TopicExclusionsPanel />
 
       <section className="source-ledger panel" aria-labelledby="source-heading">
         <div className="panel-heading">

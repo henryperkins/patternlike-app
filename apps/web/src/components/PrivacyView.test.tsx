@@ -11,11 +11,21 @@ import {
 } from "../test/reading-fixture.js";
 
 const CONSENT = "/v1/consents/ai-synthesis";
+const TOPICS = "/v1/preferences/topic-exclusions";
 
 const ok = (body: unknown): MockResponse => ({ status: 200, body });
 
+const emptyTopics = ok({
+  schema_version: "0.2.0",
+  excluded_topics: [],
+  updated_at: null,
+});
+
 function renderPrivacy(responses: Record<string, MockResponse>) {
-  mockApiResponses(responses);
+  mockApiResponses({
+    [`GET ${TOPICS}`]: emptyTopics,
+    ...responses,
+  });
   return render(
     <PrivacyView
       hasChart
@@ -242,7 +252,10 @@ describe("Context & privacy", () => {
   it("offers sign out with the other account controls", async () => {
     const user = userEvent.setup();
     const onSignOut = vi.fn();
-    mockApiResponses({ [`GET ${CONSENT}`]: ok(consentGranted) });
+    mockApiResponses({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${TOPICS}`]: emptyTopics,
+    });
     render(
       <PrivacyView
         hasChart

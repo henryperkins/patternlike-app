@@ -896,6 +896,74 @@ export function setContentLocale(
   });
 }
 
+export type FeedbackResonance = "helpful" | "neutral" | "not_helpful" | "off";
+
+export interface ReadingFeedbackRecord {
+  id: string;
+  reading_id: string;
+  resonance: FeedbackResonance;
+  relevance_labels: string[];
+  created_at: string;
+}
+
+export interface TopicExclusionsResponse {
+  schema_version: string;
+  excluded_topics: string[];
+  updated_at: string | null;
+}
+
+export function getReadingFeedback(
+  readingId: string,
+  signal?: AbortSignal,
+): Promise<ReadingFeedbackRecord> {
+  return request<ReadingFeedbackRecord>(`/v1/readings/${readingId}/feedback`, {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function submitReadingFeedback(
+  readingId: string,
+  body: {
+    resonance: FeedbackResonance;
+    relevance_labels?: string[];
+    note?: string | null;
+  },
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<Pick<ReadingFeedbackRecord, "id" | "reading_id" | "created_at">> {
+  return request(`/v1/readings/${readingId}/feedback`, {
+    method: "POST",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
+export function getTopicExclusions(
+  signal?: AbortSignal,
+): Promise<TopicExclusionsResponse> {
+  return request<TopicExclusionsResponse>("/v1/preferences/topic-exclusions", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function setTopicExclusions(
+  excludedTopics: string[],
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<TopicExclusionsResponse> {
+  return request<TopicExclusionsResponse>("/v1/preferences/topic-exclusions", {
+    method: "PUT",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({ excluded_topics: excludedTopics }),
+    signal,
+  });
+}
+
 export type TimingPhase =
   | "emerging"
   | "building"

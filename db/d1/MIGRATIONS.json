@@ -26,6 +26,11 @@
       "id": "0005_m4_pattern_time_travel",
       "file": "0005_m4_pattern_time_travel.sql",
       "description": "M4 Your Pattern and Time Travel. Adds deterministic natal-feature completion receipts, immutable bounded cycle-scan receipts, the per-user UTC-day outbound-scan ledger, and USR-09 revision/current-row uniqueness. Life-event values remain in encrypted context_signals and the three new tables are non-portable derived or operational state."
+    },
+    {
+      "id": "0006_usr05_topic_exclusions",
+      "file": "0006_usr05_topic_exclusions.sql",
+      "description": "USR-05 sensitive-topic exclusions. One current encrypted context_signals row per owner, with uniqueness on (user_id, source_id) for the current row and on (user_id, source_id, source_revision) for the revision chain. No new encrypted column: values stay in context_signals.value_enc. USR-12 reading feedback uses the existing reading_feedback table and is not part of this migration."
     }
   ],
   "notes": [

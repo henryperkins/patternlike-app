@@ -407,4 +407,67 @@ describe("V2 reservation", () => {
     // The kill switch has to cost nothing at all: no scan means no cycle rows.
     expect(await rows("SELECT id FROM cycle_instances WHERE user_id = ?", USER_A)).toEqual([]);
   });
+
+  it("pins stored reading feedback once the USR-12 grant exists", async () => {
+    const { ensureFirstPartyGrant, USR12_SOURCE_ID } = await import("../db/first-party-sources.js");
+    await rows(
+      `INSERT INTO daily_readings
+         (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+          contract_id, assembly_mode, status, revision, revision_reason,
+          command_generation, created_at, updated_at)
+       VALUES ('rdg_fb_cmd_0001', ?, '2026-08-08', NULL, ?, 'sha256:f', 'c',
+               'constrained_model', 'failed', 1, 'initial', 1, ?, ?)`,
+      USER_A,
+      `reading-v5:${USER_A}:2026-08-08:r1`,
+      "2026-08-08T00:00:00Z",
+      "2026-08-08T00:00:00Z",
+    );
+    await rows(
+      `INSERT INTO reading_feedback (id, reading_id, user_id, resonance,
+         relevance_labels_json, created_at)
+       VALUES ('rfb_cmd_0001', 'rdg_fb_cmd_0001', ?, 'helpful', '["work"]', ?)`,
+      USER_A,
+      "2026-08-08T12:00:00Z",
+    );
+    await ensureFirstPartyGrant(env, IDENTITY_A, USR12_SOURCE_ID);
+
+    const built = await build();
+    if (!built.ok) throw new Error(built.detail);
+    const pins = built.command.context.filter((pin) => pin.source_id === USR12_SOURCE_ID);
+    expect(pins.length).toBeGreaterThan(0);
+    expect(pins.every((pin) => pin.category === "reading_feedback")).toBe(true);
+    expect(new Set(pins.map((pin) => pin.allowed_use))).toEqual(
+      new Set(["repetition_control", "theme_ranking"]),
+    );
+    expect(pins[0]!.snapshot).toEqual({
+      kind: "structured",
+      value: { resonance: "helpful", relevance_labels: ["work"] },
+    });
+  });
+
+  it("pins topic exclusions under theme_filtering", async () => {
+    const { storeTopicExclusions } = await import("../db/topic-exclusions.js");
+    const stored = await storeTopicExclusions(
+      env,
+      IDENTITY_A,
+      "idem-cmd-exclusions-1",
+      ["relationships", "work"],
+    );
+    expect(stored.ok).toBe(true);
+
+    const built = await build();
+    if (!built.ok) throw new Error(built.detail);
+    const pins = built.command.context.filter((pin) => pin.source_id === "USR-05");
+    expect(pins).toEqual([
+      expect.objectContaining({
+        source_id: "USR-05",
+        allowed_use: "theme_filtering",
+        category: "enabled_personal_context",
+        snapshot: {
+          kind: "structured",
+          value: { excluded_topics: ["relationships", "work"] },
+        },
+      }),
+    ]);
+  });
 });

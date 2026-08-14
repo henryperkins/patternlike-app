@@ -125,9 +125,9 @@ export async function loadConstrainedContext(
       );
       // A stored value is either prose or structure. Anything else is a row this
       // compiler does not know how to describe, and describing it wrongly is
-      // worse than leaving it out.
+      // worse than leaving it out. First-party writers that salt the evidence
+      // hash wrap `{ hash_salt, value }`; the salt is not a context value.
       if (
-        row.source_id === "USR-06" &&
         isPlainObject(plain) &&
         typeof plain.hash_salt === "string" &&
         isPlainObject(plain.value)
@@ -168,10 +168,9 @@ export async function loadConstrainedContext(
 
   // Structured reading feedback, offered as ordinary signals under the registry
   // source that describes it. It reaches a packet through exactly the same
-  // permission, consent, and allowed-use gate as any other source — so today,
-  // with no permission surface, it does not, and the day M4 adds one it does
-  // with no change here. Bounded at the selection cap so the query is bounded
-  // too.
+  // permission, consent, and allowed-use gate as any other source. The writer
+  // creates the USR-12 grant on first submit; this loader still does not
+  // synthesize one. Bounded at the selection cap so the query is bounded too.
   const { results: feedbackRows } = await env.DB.prepare(
     `SELECT id, resonance, relevance_labels_json, created_at
      FROM reading_feedback

@@ -1693,6 +1693,103 @@ summary:focus-visible {
   margin-top: 44px;
 }
 
+.reading-feedback {
+  width: min(700px, 100%);
+  margin-top: 28px;
+  padding: 22px 24px;
+}
+
+.reading-feedback__heading h2,
+.topic-exclusions .panel-heading h2 {
+  margin: 5px 0 0;
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.reading-feedback__saved,
+.reading-feedback__form,
+.topic-exclusions > p,
+.topic-exclusions form {
+  margin-top: 18px;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.reading-feedback__choices,
+.topic-exclusions__list {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.reading-feedback__choices legend,
+.topic-exclusions__list legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.reading-feedback__options,
+.topic-exclusions__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reading-feedback__options label,
+.topic-exclusions__list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.reading-feedback__options input,
+.topic-exclusions__list input {
+  accent-color: var(--forest);
+}
+
+.reading-feedback__note {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.reading-feedback__note textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font: inherit;
+}
+
+.reading-feedback__footer,
+.topic-exclusions__footer {
+  margin-top: 16px;
+}
+
+.reading-feedback__status,
+.topic-exclusions__status {
+  margin-top: 12px;
+}
+
+.topic-exclusions {
+  margin-top: 24px;
+  padding: 22px 24px;
+}
+
 /*
  * The v5 disclosure sits between the last paragraph and the drawer, in the
  * operational sans voice rather than the reading serif: it is the product

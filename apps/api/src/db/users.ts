@@ -307,6 +307,16 @@ export const ENCRYPTED_COLUMNS = [
     keyVersionColumn: "value_key_version",
     nonceColumn: "value_nonce",
   },
+  // USR-12. Optional notes on a feedback row. Moved off UNWRITTEN_ENCRYPTED_COLUMNS
+  // before the writer landed: a note sealed while this sat in the unwritten
+  // list would be left under a destroyed key at the next rotation.
+  {
+    table: "reading_feedback",
+    idColumn: "id",
+    encColumn: "notes_enc",
+    keyVersionColumn: "notes_key_version",
+    nonceColumn: "notes_nonce",
+  },
 ] as const;
 
 /**
@@ -319,7 +329,6 @@ export const ENCRYPTED_COLUMNS = [
  */
 export const UNWRITTEN_ENCRYPTED_COLUMNS = [
   { table: "chart_snapshots", encColumn: "snapshot_enc", keyVersionColumn: "snapshot_key_version" },
-  { table: "reading_feedback", encColumn: "notes_enc", keyVersionColumn: "notes_key_version" },
 ] as const;
 
 async function assertNoUnrotatedCiphertext(

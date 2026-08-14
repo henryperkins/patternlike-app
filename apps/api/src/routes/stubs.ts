@@ -29,13 +29,12 @@ function notImplemented(c: StubContext, feature: string) {
   );
 }
 
-// `/v1/readings/today` and `/v1/readings/:id/evidence` are served by
-// routes/readings.ts. Feedback stays here: M3 documents it as 501 on purpose,
-// and `resonance_feedback` was removed from the ranking vocabulary, so there is
-// nowhere for an engagement signal to land even if it were collected.
-stubRoutes.post("/v1/readings/:id/feedback", (c) =>
-  notImplemented(c, "Reading feedback (M3)"),
-);
+// `/v1/readings/today`, `/v1/readings/:id/evidence`, and
+// `/v1/readings/:id/feedback` are served by routes/readings.ts. Feedback is a
+// first-party write that does not feed the deterministic ranker:
+// `resonance_feedback` stays out of the ranking vocabulary. The constrained
+// compiler may pin it for repetition_control and theme_ranking only after the
+// writer has created the USR-12 source grant.
 // `/v1/pattern` and `/v1/time-travel` are served by routes/pattern.ts and
 // routes/time-travel.ts. Their stubs are gone rather than shadowed: this router
 // is mounted last, so a registration a real route already answers can never be

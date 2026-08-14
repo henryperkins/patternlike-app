@@ -74,6 +74,13 @@ describe("encrypted column registration", () => {
     expect(unwritten).not.toContain("context_signals.value_enc");
   });
 
+  it("rotates reading_feedback.notes_enc now that feedback writes notes", async () => {
+    const rotated = ENCRYPTED_COLUMNS.map((c) => `${c.table}.${c.encColumn}`);
+    const unwritten = UNWRITTEN_ENCRYPTED_COLUMNS.map((c) => `${c.table}.${c.encColumn}`);
+    expect(rotated).toContain("reading_feedback.notes_enc");
+    expect(unwritten).not.toContain("reading_feedback.notes_enc");
+  });
+
   it("every registered column names a real key-version and nonce column", async () => {
     const { results } = await env.DB.prepare(
       "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql IS NOT NULL",

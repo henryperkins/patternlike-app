@@ -29,9 +29,19 @@ const TODAY = "/v1/readings/today";
 const EVIDENCE = `/v1/readings/${READING_ID}/evidence`;
 const EVIDENCE_V5 = `/v1/readings/${V5_READING_ID}/evidence`;
 const CONSENT = "/v1/consents/ai-synthesis";
+const noFeedback = (readingId: string): Record<string, MockResponse> => ({
+  [`GET /v1/readings/${readingId}/feedback`]: {
+    status: 404,
+    body: errorBody("feedback_not_found", "No feedback recorded for this reading"),
+  },
+});
 
 function renderToday(responses: Record<string, MockResponse>) {
-  mockApiResponses(responses);
+  mockApiResponses({
+    ...noFeedback(READING_ID),
+    ...noFeedback(V5_READING_ID),
+    ...responses,
+  });
   const onUnauthorized = vi.fn();
   const view = render(<TodayView onUnauthorized={onUnauthorized} />);
   return { ...view, onUnauthorized };
@@ -784,6 +794,7 @@ describe("TodayView", () => {
         [TODAY]: ok(todayResponse),
         [EVIDENCE]: { status: 404, body: errorBody("reading_not_found", "No such reading") },
         [REISSUED_EVIDENCE]: ok({ ...evidenceGraph, reading_id: REISSUED_ID, revision: 2 }),
+        ...noFeedback(REISSUED_ID),
       };
       renderToday(responses);
       await screen.findByText(todayResponse.reading.paragraphs[0]!.text);

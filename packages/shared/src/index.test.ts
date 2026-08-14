@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { newId } from "./index.js";
+import { newId, EXCLUDABLE_LIFE_DOMAINS, LIFE_DOMAINS } from "./index.js";
 
 describe("newId", () => {
   it("produces prefix_<32 lowercase hex>", () => {
@@ -30,5 +30,13 @@ describe("newId", () => {
     } finally {
       Object.defineProperty(globalThis, "crypto", { value: real, configurable: true });
     }
+  });
+});
+
+describe("life domains", () => {
+  it("lets a reader exclude every named domain except the ranking remainder", () => {
+    assert.equal(LIFE_DOMAINS.includes("unspecified"), true);
+    assert.equal(EXCLUDABLE_LIFE_DOMAINS.includes("unspecified" as never), false);
+    assert.equal(EXCLUDABLE_LIFE_DOMAINS.length, LIFE_DOMAINS.length - 1);
   });
 });

@@ -12,6 +12,8 @@ import {
   setSchedulingTimezone,
   type PreferenceWriteSource,
 } from "../db/preferences.js";
+import { loadTopicExclusions, parseExcludedTopics, storeTopicExclusions } from "../db/topic-exclusions.js";
+import type { UserIdentity } from "../db/users.js";
 
 export const preferenceRoutes = new Hono<{
   Bindings: Env;
@@ -246,4 +248,73 @@ preferenceRoutes.put("/v1/preferences/locale", async (c) => {
     },
     200,
   );
+});
+
+preferenceRoutes.get("/v1/preferences/topic-exclusions", async (c) => {
+  const identity: UserIdentity = {
+    userId: c.get("userId"),
+    cryptoSubject: c.get("cryptoSubject"),
+  };
+  return c.json(await loadTopicExclusions(c.env, identity), 200);
+});
+
+preferenceRoutes.put("/v1/preferences/topic-exclusions", async (c) => {
+  const requestId = c.get("requestId");
+  const errorBody = (code: string, message: string) => ({
+    error: { code, message, request_id: requestId },
+  });
+
+  const idem = requireIdempotencyKey(c.req.header("idempotency-key"));
+  if (!idem) {
+    return c.json(
+      errorBody("missing_idempotency_key", "Idempotency-Key header required (8-256 chars)"),
+      400,
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json(errorBody("invalid_json", "Request body must be valid JSON"), 400);
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return c.json(errorBody("invalid_body", "Request body must be a JSON object"), 400);
+  }
+  const record = body as Record<string, unknown>;
+  if (Object.keys(record).some((key) => key !== "excluded_topics")) {
+    return c.json(errorBody("invalid_body", "excluded_topics is the only accepted field"), 400);
+  }
+  const topics = parseExcludedTopics(record.excluded_topics);
+  if (topics === null) {
+    return c.json(
+      errorBody(
+        "invalid_body",
+        "excluded_topics must be a unique array of named life domains",
+      ),
+      400,
+    );
+  }
+
+  const result = await storeTopicExclusions(
+    c.env,
+    { userId: c.get("userId"), cryptoSubject: c.get("cryptoSubject") },
+    idem,
+    topics,
+  );
+  if (!result.ok) {
+    return c.json(
+      result.reason === "idempotency_conflict"
+        ? errorBody(
+            "idempotency_conflict",
+            "Idempotency-Key was already used for a different exclusion set",
+          )
+        : errorBody(
+            "preference_conflict",
+            "The exclusion set changed concurrently; retry the request",
+          ),
+      409,
+    );
+  }
+  return c.json(result.response, 200);
 });

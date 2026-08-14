@@ -16,6 +16,7 @@ import {
 } from "../db/readings.js";
 import type { DailyReading } from "@patternlike/reading-engine";
 import { isStoredReadingV5 } from "../services/stored-reading.js";
+import { loadLatestFeedback, parseFeedbackRequest, storeReadingFeedback } from "../db/feedback.js";
 import { ensureTodayReading } from "../services/ensure-today-reading.js";
 import { resumePausedV2ForFirstOpen } from "../db/generation.js";
 import { dispatch, resolveV5TargetDate } from "../services/enqueue.js";
@@ -577,4 +578,81 @@ readingRoutes.get("/v1/readings/:id/evidence", async (c) => {
   }
 
   return c.json(projectEvidence(evidence));
+});
+
+readingRoutes.get("/v1/readings/:id/feedback", async (c) => {
+  const requestId = c.get("requestId");
+  const identity: UserIdentity = {
+    userId: c.get("userId"),
+    cryptoSubject: c.get("cryptoSubject"),
+  };
+  const record = await loadLatestFeedback(c.env, identity, c.req.param("id"));
+  if (!record) {
+    return c.json(
+      {
+        error: {
+          code: "feedback_not_found",
+          message: "No feedback recorded for this reading",
+          request_id: requestId,
+        },
+      },
+      404,
+    );
+  }
+  return c.json(record, 200);
+});
+
+readingRoutes.post("/v1/readings/:id/feedback", async (c) => {
+  const requestId = c.get("requestId");
+  const errorBody = (code: string, message: string) => ({
+    error: { code, message, request_id: requestId },
+  });
+  const identity: UserIdentity = {
+    userId: c.get("userId"),
+    cryptoSubject: c.get("cryptoSubject"),
+  };
+
+  let value: unknown;
+  try {
+    value = await c.req.json();
+  } catch {
+    value = null;
+  }
+  const request = parseFeedbackRequest(value);
+  if (!request) {
+    return c.json(
+      errorBody(
+        "invalid_body",
+        "resonance must be helpful, neutral, not_helpful, or off",
+      ),
+      400,
+    );
+  }
+
+  const result = await storeReadingFeedback(
+    c.env,
+    identity,
+    c.req.param("id"),
+    c.req.header("idempotency-key") ?? null,
+    request,
+  );
+  if (!result.ok) {
+    if (result.reason === "missing_idempotency_key") {
+      return c.json(
+        errorBody("missing_idempotency_key", "Idempotency-Key header required (8-256 chars)"),
+        400,
+      );
+    }
+    if (result.reason === "reading_not_found") {
+      return c.json(errorBody("reading_not_found", "No such reading"), 404);
+    }
+    return c.json(
+      errorBody(
+        "idempotency_conflict",
+        "Idempotency-Key was already used for different feedback",
+      ),
+      409,
+    );
+  }
+  return c.json(result.response, 201);
 });

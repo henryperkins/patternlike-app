@@ -63,3 +63,29 @@ export type LifeDomain =
   | "caregiving"
   | "spirituality_meaning"
   | "unspecified";
+
+/**
+ * Frozen M0 order. `unspecified` is a ranking remainder, not a topic a reader
+ * can mute — exclusions are an explicit negative preference over named domains.
+ */
+export const LIFE_DOMAINS: readonly LifeDomain[] = [
+  "self",
+  "relationships",
+  "work",
+  "creativity",
+  "home",
+  "body_energy",
+  "money_resources",
+  "learning",
+  "community",
+  "caregiving",
+  "spirituality_meaning",
+  "unspecified",
+] as const;
+
+export type ExcludableLifeDomain = Exclude<LifeDomain, "unspecified">;
+
+export const EXCLUDABLE_LIFE_DOMAINS: readonly ExcludableLifeDomain[] =
+  LIFE_DOMAINS.filter(
+    (domain): domain is ExcludableLifeDomain => domain !== "unspecified",
+  );

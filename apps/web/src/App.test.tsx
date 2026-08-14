@@ -20,6 +20,11 @@ import {
   todayResponse,
 } from "./test/reading-fixture.js";
 
+const emptyTopics: MockResponse = {
+  status: 200,
+  body: { schema_version: "0.2.0", excluded_topics: [], updated_at: null },
+};
+
 const chart = {
   schema_version: "0.2.0",
   id: "cht_web_test_0001",
@@ -246,6 +251,7 @@ describe("web application shell", () => {
     const exportId = "exp_cccccccccccccccccccccccccccccccc";
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
       "/v1/exports": {
         status: 202,
         gate: gate.promise,
@@ -296,6 +302,7 @@ describe("web application shell", () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
       "/v1/account": {
         status: 202,
         body: {
@@ -353,7 +360,10 @@ describe("web application shell", () => {
 
   it("moves focus into the confirmation and back to the trigger on cancel", async () => {
     const user = userEvent.setup();
-    mockApiResponses({ "/v1/chart": { status: 200, body: chart } });
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
+    });
 
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
@@ -381,6 +391,7 @@ describe("web application shell", () => {
     const exportId = "exp_dddddddddddddddddddddddddddddddd";
     const responses: Record<string, MockResponse> = {
       "/v1/chart": { status: 200, body: chart },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
       "/v1/exports": { status: 0, body: null, unreachable: true },
     };
     mockApiResponses(responses);
@@ -430,6 +441,7 @@ describe("web application shell", () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
       "/v1/exports": { status: 0, body: null, unreachable: true },
     });
 
@@ -644,6 +656,7 @@ describe("web application shell", () => {
         status: 404,
         body: { error: { code: "chart_not_found", message: "No active chart for user" } },
       },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
     });
 
     render(<App />);
@@ -665,6 +678,7 @@ describe("web application shell", () => {
       // its category list and its live control, rather than in the one-line
       // failure state an unstubbed route would leave it in.
       "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
     });
 
     const { container } = render(<App />);
@@ -727,6 +741,7 @@ describe("web application shell", () => {
       "/v1/chart": { status: 200, body: chart },
       "/v1/sessions/current": { status: 204, body: null },
       "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
     });
 
     render(<App />);
@@ -851,12 +866,17 @@ describe("web application shell", () => {
       "/v1/chart": { status: 200, body: chart },
       "/v1/readings/today": { status: 200, body: todayResponse },
       [`/v1/readings/${READING_ID}/evidence`]: { status: 200, body: evidenceGraph },
+      [`GET /v1/readings/${READING_ID}/feedback`]: {
+        status: 404,
+        body: { error: { code: "feedback_not_found", message: "No feedback recorded for this reading" } },
+      },
     });
 
     const { container } = render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Today" })[0]);
     await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
+    await screen.findByRole("heading", { name: /Was this useful/i });
 
     // Opened, because the drawer's contents are the part with the most markup
     // and the only place a heading-order violation could hide.

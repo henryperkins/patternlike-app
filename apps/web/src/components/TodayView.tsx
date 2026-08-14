@@ -17,6 +17,7 @@ import {
 } from "../lib/reading-format.js";
 import { AiConsentGate } from "./AiConsentGate.js";
 import { DailyCheckInCard } from "./DailyCheckInCard.js";
+import { ReadingFeedbackCard } from "./ReadingFeedbackCard.js";
 import { PreferenceConfirm } from "./PreferenceConfirm.js";
 import { WhyThisDrawer } from "./WhyThisDrawer.js";
 import { Icon } from "./icons.js";
@@ -220,6 +221,7 @@ function TodayReadingV3({
           />
         ) : null}
       </div>
+      <ReadingFeedbackCard readingId={reading.reading_id} />
     </article>
   );
 }
@@ -284,6 +286,7 @@ function TodayReadingV5({
           onUnauthorized={onUnauthorized}
         />
       </div>
+      <ReadingFeedbackCard readingId={reading.reading_id} />
     </article>
   );
 }

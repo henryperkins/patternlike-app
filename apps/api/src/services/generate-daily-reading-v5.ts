@@ -187,6 +187,44 @@ async function currentConsentMatches(
   );
 }
 
+async function pinnedFeedbackEligible(
+  env: Env,
+  userId: string,
+  pin: ContextPinV2,
+): Promise<boolean> {
+  // reading_feedback is not a context_signals row. The compiler uses the row
+  // id as normalized_hash because the structured value never changes after
+  // insert. Execute must look in the same table or every USR-12 pin would fail
+  // closed and block the reading.
+  const row = await env.DB.prepare(
+    `SELECT id, resonance, relevance_labels_json, created_at
+     FROM reading_feedback WHERE id = ? AND user_id = ?`,
+  )
+    .bind(pin.signal_id, userId)
+    .first<{
+      id: string;
+      resonance: string | null;
+      relevance_labels_json: string;
+      created_at: string;
+    }>();
+  if (
+    !row ||
+    row.id !== pin.normalized_hash ||
+    row.created_at !== pin.observed_at ||
+    pin.expires_at !== null ||
+    pin.freshness_status !== "fresh" ||
+    pin.snapshot.kind !== "structured"
+  ) {
+    return false;
+  }
+  const labels = parseStringArray(row.relevance_labels_json);
+  const snapshot = pin.snapshot.value;
+  return (
+    snapshot.resonance === row.resonance &&
+    JSON.stringify(snapshot.relevance_labels ?? []) === JSON.stringify(labels)
+  );
+}
+
 async function pinnedContextEligible(
   env: Env,
   userId: string,
@@ -211,6 +249,11 @@ async function pinnedContextEligible(
       !grant.consent_allowed_uses.includes(pin.allowed_use)
     ) {
       return false;
+    }
+
+    if (pin.source_id === "USR-12" || pin.category === "reading_feedback") {
+      if (!(await pinnedFeedbackEligible(env, userId, pin))) return false;
+      continue;
     }
 
     const row = await env.DB.prepare(

@@ -239,9 +239,37 @@ describe("context loader", () => {
     expect(feedback!.source_id).toBe(READING_FEEDBACK_SOURCE_ID);
     expect(feedback!.category).toBe("reading_feedback");
     expect(feedback!.content.kind).toBe("structured");
-    // No permission surface exists for it yet, so the compiler will reject it —
-    // through exactly the same gate as every other source, with no special case.
+    // No grant exists yet, so the compiler will reject it through exactly the
+    // same gate as every other source, with no special case.
     expect(loaded.sources.some((s) => s.source_id === READING_FEEDBACK_SOURCE_ID)).toBe(false);
+  });
+
+  it("surfaces the USR-12 grant once the writer has created it", async () => {
+    const { ensureFirstPartyGrant, USR12_SOURCE_ID } = await import("../db/first-party-sources.js");
+    await rows(
+      `INSERT INTO daily_readings
+         (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+          contract_id, assembly_mode, status, revision, revision_reason,
+          command_generation, created_at, updated_at)
+       VALUES ('rdg_fb_0002', ?, '2026-08-08', NULL, ?, 'sha256:f', 'c',
+               'constrained_model', 'failed', 1, 'initial', 1, ?, ?)`,
+      USER_A,
+      `reading-v5:${USER_A}:2026-08-08:r2`,
+      "2026-08-08T00:00:00Z",
+      "2026-08-08T00:00:00Z",
+    );
+    await rows(
+      `INSERT INTO reading_feedback (id, reading_id, user_id, resonance,
+         relevance_labels_json, created_at)
+       VALUES ('fb_0002', 'rdg_fb_0002', ?, 'not_helpful', '[]', ?)`,
+      USER_A,
+      "2026-08-08T12:00:00Z",
+    );
+    await ensureFirstPartyGrant(env, IDENTITY_A, USR12_SOURCE_ID);
+
+    const loaded = await loadConstrainedContext(env, IDENTITY_A, "2026-08-10");
+    expect(loaded.sources.some((s) => s.source_id === USR12_SOURCE_ID)).toBe(true);
+    expect(loaded.signals.some((s) => s.signal_id === "fb_0002")).toBe(true);
   });
 
   it("draws prior readings only from v5 artifacts", async () => {

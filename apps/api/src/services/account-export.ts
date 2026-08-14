@@ -34,15 +34,16 @@ function assertBounded(value: unknown): void {
  *
  * `hash_salt` is the per-revision random value that keeps the clear
  * `normalized_hash` column from being a dictionary fingerprint of low-entropy
- * fields — check-in answers for USR-06, dates/categories/titles for USR-09. It
+ * fields — check-in answers for USR-06, topic exclusions for USR-05,
+ * dates/categories/titles for USR-09. It
  * lives inside the ciphertext precisely so it cannot be read beside the hash it
  * protects, and an export that copied the decrypted value verbatim would hand
  * the reader (and anyone they forward the file to) both halves.
  *
- * The two sources wrap their content differently and both are handled here
- * rather than at one call site: USR-06 nests the portable document under
- * `value`, USR-09 carries `event` plus its normalized window at the top level.
- * Everything the reader authored survives in both cases.
+ * First-party writers wrap content differently and all are handled here
+ * rather than at one call site: USR-05 and USR-06 nest the portable document
+ * under `value`, USR-09 carries `event` plus its normalized window at the top
+ * level. Everything the reader authored survives in each case.
  */
 function portableSignalValue(
   sourceId: string,
@@ -52,7 +53,7 @@ function portableSignalValue(
     ? (({ hash_salt: _salt, ...rest }) => rest)(structured)
     : structured;
   if (
-    sourceId === "USR-06" &&
+    (sourceId === "USR-05" || sourceId === "USR-06") &&
     portable.value &&
     typeof portable.value === "object" &&
     !Array.isArray(portable.value)

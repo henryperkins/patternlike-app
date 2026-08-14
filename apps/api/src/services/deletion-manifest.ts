@@ -102,7 +102,10 @@ export const PORTABLE_USER_TABLES = [
 export const NON_PORTABLE_USER_TABLES = [
   /** Prose evidence links; the reading itself is the portable artifact. */
   "reading_sources",
-  /** Operational signal, recomputable from nothing the reader authored. */
+  /**
+   * Resonance is an operational ranking signal. Optional notes are deleted
+   * with the account; the frozen M6 export has no section that can carry them.
+   */
   "reading_feedback",
   /** Deterministic calculation output, recomputable from the chart. */
   "cycle_passes",
