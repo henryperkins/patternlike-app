@@ -295,6 +295,29 @@ describe("chart lifecycle invariants", () => {
     expect(all.filter((c) => c.status === "superseded")).toHaveLength(1);
   });
 
+  it("serves the replacement chart and writes its natal-feature receipt", async () => {
+    const first = await postBirthProfile(USER_A, "key-alpha-01", ALICE);
+    const second = await postBirthProfile(USER_A, "key-bob-corr", BOB);
+
+    expect(second.status).toBe(202);
+    expect(second.body.status).toBe("succeeded");
+    expect(second.body.resource_id).not.toBe(first.body.resource_id);
+
+    const chart = await getChart(USER_A);
+    expect(chart.status).toBe(200);
+    expect(chart.body.id).toBe(second.body.resource_id);
+
+    const receipts = await rows<{ chart_id: string }>(
+      `SELECT chart_id FROM natal_feature_sets
+       WHERE user_id = ? ORDER BY created_at, chart_id`,
+      USER_A,
+    );
+    expect(receipts.map((row) => row.chart_id)).toEqual([
+      first.body.resource_id,
+      second.body.resource_id,
+    ]);
+  });
+
   it("stores birth PII only as ciphertext", async () => {
     await postBirthProfile(USER_A, "key-alpha-01", ALICE);
 

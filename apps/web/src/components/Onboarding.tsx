@@ -10,6 +10,13 @@ import { Icon } from "./icons.js";
 
 interface OnboardingProps {
   onSubmit: (profile: BirthProfileRequest) => Promise<void>;
+  /**
+   * First-time calculation vs replacing an already-active chart. The API is
+   * the same POST; this only changes the words, hides the local example, and
+   * offers a way back to the chart the reader already has.
+   */
+  mode?: "create" | "correct";
+  onCancel?: () => void;
 }
 
 /** Long enough that typing a decimal does not fire a request per keystroke. */
@@ -44,7 +51,8 @@ const accuracyOptions: Array<{
   },
 ];
 
-export function Onboarding({ onSubmit }: OnboardingProps) {
+export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingProps) {
+  const correcting = mode === "correct";
   const [step, setStep] = useState(1);
   const [accuracy, setAccuracy] = useState<BirthTimeAccuracy>("exact");
   const [birthDate, setBirthDate] = useState("");
@@ -180,7 +188,11 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
       return;
     }
     if (!consent) {
-      setError("Confirm the calculation permission before creating the chart.");
+      setError(
+        correcting
+          ? "Confirm the calculation permission before replacing the chart."
+          : "Confirm the calculation permission before creating the chart.",
+      );
       return;
     }
 
@@ -231,10 +243,17 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
     <section className="onboarding page-enter">
       <div className="onboarding__intro">
         <p className="eyebrow">Chart foundation</p>
-        <h1 aria-label="Begin with what you know.">Begin with<br />what you know.</h1>
+        {correcting ? (
+          <h1 aria-label="Replace what the chart is built from.">
+            Replace what<br />the chart is built from.
+          </h1>
+        ) : (
+          <h1 aria-label="Begin with what you know.">Begin with<br />what you know.</h1>
+        )}
         <p className="onboarding__lede">
-          Precision matters, but certainty is never assumed. Pattern/Like keeps
-          unknowns visible and removes claims your details cannot support.
+          {correcting
+            ? "Birth details are not returned after calculation, so this form starts empty. A replacement supersedes the current chart. Submitting the same details does not replace anything."
+            : "Precision matters, but certainty is never assumed. Pattern/Like keeps unknowns visible and removes claims your details cannot support."}
         </p>
         <div className="privacy-note">
           <Icon name="shield" />
@@ -321,7 +340,7 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
               </label>
             ) : null}
 
-            {import.meta.env.DEV ? (
+            {import.meta.env.DEV && !correcting ? (
               <button className="text-button" type="button" onClick={fillExample}>
                 Fill local example
               </button>
@@ -441,8 +460,9 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
           <fieldset className="form-step form-step--consent">
             <legend>Review the boundary.</legend>
             <p className="field-help">
-              Your chart is a calculation, not a diagnosis or a prediction. You can revisit
-              uncertainty and technical evidence at any time.
+              {correcting
+                ? "The previous chart is superseded, not deleted. Today readings pinned to it may be withheld until a successor exists. Pattern chapters follow the new facts once a reviewed release is active."
+                : "Your chart is a calculation, not a diagnosis or a prediction. You can revisit uncertainty and technical evidence at any time."}
             </p>
 
             <div className="consent-ledger">
@@ -459,7 +479,9 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
               />
               <span className="consent-check__box"><Icon name="check" /></span>
               <span>
-                I allow Pattern/Like to encrypt these details and calculate my natal chart.
+                {correcting
+                  ? "I allow Pattern/Like to encrypt these details and calculate a replacement natal chart."
+                  : "I allow Pattern/Like to encrypt these details and calculate my natal chart."}
               </span>
             </label>
           </fieldset>
@@ -479,9 +501,23 @@ export function Onboarding({ onSubmit }: OnboardingProps) {
             >
               Back
             </button>
+          ) : onCancel ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
           ) : <span />}
           <button className="button button--primary" type="submit" disabled={submitting}>
-            {step < 3 ? "Continue" : submitting ? "Calculating..." : "Create my chart"}
+            {step < 3
+              ? "Continue"
+              : submitting
+                ? "Calculating..."
+                : correcting
+                  ? "Replace my chart"
+                  : "Create my chart"}
             {submitting ? <span className="button-spinner" /> : <Icon name="arrow" />}
           </button>
         </div>

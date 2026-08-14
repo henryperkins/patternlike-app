@@ -209,6 +209,35 @@ describe("Context & privacy", () => {
     expect(screen.getByRole("button", { name: /Delete account/i })).toBeEnabled();
   });
 
+  it("offers chart correction only when a chart exists", async () => {
+    const onCorrectBirth = vi.fn();
+    mockApiResponses({ [`GET ${CONSENT}`]: ok(consentGranted) });
+    const { rerender } = render(
+      <PrivacyView
+        hasChart
+        onSignOut={() => undefined}
+        onDeletionAccepted={() => undefined}
+        onCorrectBirth={onCorrectBirth}
+      />,
+    );
+
+    const birth = await screen.findByRole("article", { name: /Birth details/i });
+    const user = userEvent.setup();
+    await user.click(within(birth).getByRole("button", { name: /Correct/i }));
+    expect(onCorrectBirth).toHaveBeenCalledOnce();
+
+    rerender(
+      <PrivacyView
+        hasChart={false}
+        onSignOut={() => undefined}
+        onDeletionAccepted={() => undefined}
+        onCorrectBirth={onCorrectBirth}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /Correct/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Account data")).toBeInTheDocument();
+  });
+
   it("offers sign out with the other account controls", async () => {
     const user = userEvent.setup();
     const onSignOut = vi.fn();

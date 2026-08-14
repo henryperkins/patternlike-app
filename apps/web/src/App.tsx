@@ -54,7 +54,7 @@ function wait(milliseconds: number): Promise<void> {
 export default function App() {
   const [view, setView] = useState<AppRoute>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
-  const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
+  const [correctingBirth, setCorrectingBirth] = useState(false);
 
   const load = async (signal?: AbortSignal) => {
     try {
@@ -88,6 +88,12 @@ export default function App() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  useEffect(() => {
+    // Leaving Privacy abandons an in-progress correction rather than trapping
+    // the reader in the form while the rest of the app looks reachable.
+    if (view !== "privacy") setCorrectingBirth(false);
+  }, [view]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -153,11 +159,19 @@ export default function App() {
     });
   };
 
-  const createChart = async (profile: BirthProfileRequest) => {
+  const submitBirthProfile = async (
+    profile: BirthProfileRequest,
+    intent: "create" | "correct",
+  ) => {
     try {
       await createBirthProfile(profile);
     } catch (error) {
       if (!(error instanceof ApiError && error.code === "chart_already_exists")) {
+        throw error;
+      }
+      // Identical fingerprint under a new key. First-time onboarding can land
+      // here from a retry; correction must not pretend the active chart moved.
+      if (intent === "correct") {
         throw error;
       }
     }
@@ -165,6 +179,7 @@ export default function App() {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const chart = await getChart();
+        setCorrectingBirth(false);
         setChartState({ status: "ready", chart });
         window.location.hash = "pattern";
         return;
@@ -174,6 +189,14 @@ export default function App() {
       }
     }
     throw new Error("The calculation was accepted but is not ready yet. Try again in a moment.");
+  };
+
+  const createChart = async (profile: BirthProfileRequest) => {
+    await submitBirthProfile(profile, "create");
+  };
+
+  const correctChart = async (profile: BirthProfileRequest) => {
+    await submitBirthProfile(profile, "correct");
   };
 
   if (view === "deletion-status") {
@@ -217,12 +240,21 @@ export default function App() {
         ) : null}
       </section>
     );
+  } else if (correctingBirth && chart && view === "privacy") {
+    content = (
+      <Onboarding
+        mode="correct"
+        onSubmit={correctChart}
+        onCancel={() => setCorrectingBirth(false)}
+      />
+    );
   } else if (view === "privacy") {
     content = (
       <PrivacyView
         hasChart={chart !== null}
         onSignOut={() => void endSessionAndSignOut()}
         onDeletionAccepted={showDeletionStatus}
+        onCorrectBirth={chart ? () => setCorrectingBirth(true) : undefined}
       />
     );
   } else if (view === "today") {

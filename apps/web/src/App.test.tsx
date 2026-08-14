@@ -443,6 +443,135 @@ describe("web application shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens birth correction from privacy and returns on cancel", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+    expect(
+      await screen.findByRole("heading", { name: /Replace what the chart is built from/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Cancel/i }));
+    expect(
+      await screen.findByRole("heading", { name: /Your data has/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("replaces the active chart when different birth data is submitted", async () => {
+    const user = userEvent.setup();
+    const responses: Record<string, MockResponse> = {
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "/v1/birth-profiles": {
+        status: 202,
+        body: {
+          schema_version: "0.2.0",
+          workflow: "NormalizeBirthAndCalculateChart",
+          status: "succeeded",
+          idempotency_key: "web-birth-test",
+          job_id: "job_birth_corr_0001",
+          resource_id: "cht_web_test_0002",
+        },
+      },
+    };
+    Object.defineProperty(responses, "/v1/chart", {
+      enumerable: true,
+      get() {
+        const posted = capturedFor("/v1/birth-profiles").length > 0;
+        return {
+          status: 200,
+          body: posted
+            ? {
+                ...chart,
+                id: "cht_web_test_0002",
+                profile_version: 2,
+                fingerprint: `sha256:${"e".repeat(64)}`,
+                positions: [
+                  { body: "sun", longitude_deg: 120.4, sign: "leo", house: 1, retrograde: false },
+                  { body: "moon", longitude_deg: 201.4, sign: "libra", house: 3, retrograde: false },
+                  { body: "ascendant", longitude_deg: 10, sign: "aries", house: 1, retrograde: false },
+                ],
+              }
+            : chart,
+        };
+      },
+    });
+    mockApiResponses(responses);
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+
+    await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
+    await user.type(screen.getByLabelText("Local time"), "03:15:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(
+      screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+
+    expect(await screen.findByText("Leo 0.4 deg")).toBeInTheDocument();
+    expect(window.location.hash).toBe("#pattern");
+
+    const [request] = capturedFor("/v1/birth-profiles");
+    expect(request.method).toBe("POST");
+    expect(request.headers.get("idempotency-key")?.startsWith("web-birth-")).toBe(true);
+    expect(request.body).toEqual(
+      expect.objectContaining({
+        accuracy: "exact",
+        birth_date: "1985-11-02",
+      }),
+    );
+  });
+
+  it("keeps the current chart when correction resubmits the same birth data", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "/v1/birth-profiles": {
+        status: 409,
+        body: {
+          error: {
+            code: "chart_already_exists",
+            message: "This birth data already has a chart",
+            request_id: "req_dup_chart",
+            details: { chart_id: chart.id, fingerprint: chart.fingerprint },
+          },
+        },
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+
+    await user.type(screen.getByLabelText("Birth date"), "1990-05-15");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(
+      screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/already has a chart/i);
+    expect(
+      screen.getByRole("heading", { name: /Replace what the chart is built from/i }),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/birth-profiles")).toHaveLength(1);
+  });
+
   it("keeps export and deletion reachable for a user who has no chart", async () => {
     const user = userEvent.setup();
     mockApiResponses({

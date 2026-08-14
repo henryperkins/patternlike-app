@@ -171,10 +171,12 @@ export function PrivacyView({
   hasChart,
   onSignOut,
   onDeletionAccepted,
+  onCorrectBirth,
 }: {
   hasChart: boolean;
   onSignOut: () => void;
   onDeletionAccepted: () => void;
+  onCorrectBirth?: () => void;
 }) {
   return (
     <div className="privacy-page page-enter">
@@ -216,13 +218,25 @@ export function PrivacyView({
           <span className="panel-code">USR-06 CONTROL</span>
         </div>
         <div className="source-list">
-          <article className="source-row">
+          <article className={`source-row${hasChart && onCorrectBirth ? " source-row--live" : ""}`} aria-label="Birth details">
             <span className="source-state source-state--active"><i /> Encrypted</span>
-            <div>
+            <div className="source-row__body">
               <h3>Birth details</h3>
-              <p>Used only to calculate your chart.</p>
+              <p>
+                {hasChart
+                  ? "Used only to calculate your chart. The values are not shown again after calculation."
+                  : "Used only to calculate your chart."}
+              </p>
             </div>
-            <span className="source-row__fixed">Account data</span>
+            {hasChart && onCorrectBirth ? (
+              <div className="source-row__actions">
+                <button type="button" onClick={onCorrectBirth}>
+                  Correct
+                </button>
+              </div>
+            ) : (
+              <span className="source-row__fixed">Account data</span>
+            )}
           </article>
           <article className="source-row">
             <span className={`source-state${hasChart ? " source-state--active" : ""}`}>

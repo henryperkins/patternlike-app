@@ -353,6 +353,10 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   // declares 409 for this; the previous code let UNIQUE(user_id, fingerprint)
   // throw a bare 500 after the profile and job rows were already committed,
   // leaving the job stuck 'running' forever.
+  //
+  // Different birth data under a new key is the correction path: it increments
+  // profile_version, activates the new snapshot, and supersedes the previous
+  // chart. 409 is only this fingerprint, not "the user already has a chart".
   const duplicate = await c.env.DB.prepare(
     `SELECT id FROM chart_snapshots WHERE user_id = ? AND fingerprint = ?`,
   )

@@ -263,3 +263,49 @@ describe("historical timezone lookup", () => {
     );
   });
 });
+
+describe("chart correction", () => {
+  it("says the form cannot replay stored birth details", () => {
+    render(<Onboarding mode="correct" onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(
+      screen.getByRole("heading", { name: /Replace what the chart is built from/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/form starts empty/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Fill local example/i })).not.toBeInTheDocument();
+  });
+
+  it("returns to the chart the reader already has", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(<Onboarding mode="correct" onSubmit={vi.fn()} onCancel={onCancel} />);
+
+    await user.click(screen.getByRole("button", { name: /Cancel/i }));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("posts a replacement rather than a first chart", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Onboarding mode="correct" onSubmit={onSubmit} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
+    await user.type(screen.getByLabelText("Local time"), "03:15:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /allow Pattern\/Like to encrypt these details/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accuracy: "exact",
+        birth_date: "1985-11-02",
+        birth_time_local: expect.stringMatching(/^03:15/),
+      }),
+    );
+  });
+});
