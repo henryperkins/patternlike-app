@@ -379,6 +379,24 @@ describe("USR-09 hardening", () => {
     expect(next.status).toBe(201);
   });
 
+  it("restores Time Travel context after pause then resume", async () => {
+    const created = await create("event-resume-key-01");
+    await seedChart(IDENTITY_A);
+
+    expect((await travel("2026-08-10")).saved_context.map((item) => item.event.id))
+      .toEqual([created.body.id]);
+
+    await setUsr09("paused", "set-usr09-resume-pause-01");
+    const hidden = await travel("2026-08-10");
+    expect(hidden.life_event_source_state).toBe("paused");
+    expect(hidden.saved_context).toEqual([]);
+
+    await setUsr09("active", "set-usr09-resume-active-01");
+    const restored = await travel("2026-08-10");
+    expect(restored.life_event_source_state).toBe("active");
+    expect(restored.saved_context.map((item) => item.event.id)).toEqual([created.body.id]);
+  });
+
   it("keeps listing and deletion available while the source is paused or revoked", async () => {
     const created = await create("event-state-key-01");
     await seedChart(IDENTITY_A);

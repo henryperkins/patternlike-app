@@ -309,4 +309,30 @@ describe("immutable Time Travel scan receipts", () => {
     expect(ledger.at(-1)!.utc_date).toBe("2026-07-10");
     expect(ledger[0]!.utc_date).toBe("2026-06-06");
   });
+
+  it("treats scheduling timezone as part of the lookup identity", async () => {
+    const chart = await seedChart(IDENTITY_A);
+    const chicago = key(chart.chartId, chart.fingerprint);
+    await persistScanReceipt(
+      env,
+      chicago,
+      request(chart.fingerprint),
+      response(chart.fingerprint),
+      "{}",
+      NOW,
+    );
+    const newYork = { ...chicago, schedulingTimezone: "America/New_York" };
+    expect(await loadScanReceipt(env, newYork)).toBeNull();
+    await persistScanReceipt(
+      env,
+      newYork,
+      request(chart.fingerprint),
+      response(chart.fingerprint),
+      "{}",
+      new Date(NOW.getTime() + 1000),
+    );
+    expect(await loadScanReceipt(env, chicago)).not.toBeNull();
+    expect(await loadScanReceipt(env, newYork)).not.toBeNull();
+    expect(await rows("SELECT id FROM cycle_scan_receipts")).toHaveLength(2);
+  });
 });

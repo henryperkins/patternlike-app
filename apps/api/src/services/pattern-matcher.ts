@@ -82,7 +82,9 @@ export function matchPatternObject(
     return { eligible: false, evidence: [], omission: "houses_or_angles" };
   }
   for (const required of pattern.required_bodies) {
-    if (!features.some((feature) => feature.feature_class === "position" && feature.body === required)) {
+    if (!features.some((feature) =>
+      (feature.feature_class === "position" && feature.body === required) ||
+      (feature.feature_class === "angle" && feature.angle === required))) {
       return { eligible: false, evidence: [], omission: "predicate_mismatch" };
     }
   }
@@ -108,6 +110,6 @@ export function matchPatternObject(
   }
 
   const evidence = [...new Map(positive.map((feature) => [feature.feature_id, feature])).values()]
-    .sort((a, b) => a.feature_id.localeCompare(b.feature_id));
+    .sort((a, b) => a.feature_id < b.feature_id ? -1 : a.feature_id > b.feature_id ? 1 : 0);
   return { eligible: true, evidence, omission: null };
 }

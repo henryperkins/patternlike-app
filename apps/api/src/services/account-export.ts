@@ -48,8 +48,9 @@ function portableSignalValue(
   sourceId: string,
   structured: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (typeof structured.hash_salt !== "string") return structured;
-  const { hash_salt: _salt, ...portable } = structured;
+  const portable = typeof structured.hash_salt === "string"
+    ? (({ hash_salt: _salt, ...rest }) => rest)(structured)
+    : structured;
   if (
     sourceId === "USR-06" &&
     portable.value &&

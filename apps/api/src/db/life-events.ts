@@ -822,11 +822,33 @@ export async function deleteLifeEvent(
   }
 }
 
-function exactSignalMetadata(row: SignalRow, consentId: string): boolean {
+const CONSENT_LINEAGE_CAP = 32;
+
+async function loadConsentLineage(
+  env: Env,
+  userId: string,
+  headConsentId: string,
+): Promise<string[]> {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  let current: string | null = headConsentId;
+  while (current && !seen.has(current) && ids.length < CONSENT_LINEAGE_CAP) {
+    seen.add(current);
+    ids.push(current);
+    const row = await env.DB.prepare(
+      `SELECT supersedes_consent_id FROM consents WHERE id = ? AND user_id = ?`,
+    ).bind(current, userId).first<{ supersedes_consent_id: string | null }>();
+    current = row?.supersedes_consent_id ?? null;
+  }
+  return ids;
+}
+
+function exactSignalMetadata(row: SignalRow, consentIds: ReadonlySet<string>): boolean {
   return row.is_current === 1 && row.evidence_lane === "user_and_context" &&
     exactUses(row.allowed_uses_json) && row.confidence === "user_confirmed" &&
     row.sensitivity === "highly_sensitive" && row.permission_state === "active" &&
-    row.conflict_status === "none" && row.consent_id === consentId &&
+    row.conflict_status === "none" && row.consent_id !== null &&
+    consentIds.has(row.consent_id) &&
     row.freshness_status === "fresh" && row.expires_at === null &&
     row.retention_expires_at === null;
 }
@@ -844,6 +866,9 @@ export async function loadTimeTravelLifeEvents(
   if (!before.active || !before.consentId) {
     return { savedContext: [], unreadableCount: 0, sourceState: before.state };
   }
+  const lineage = await loadConsentLineage(env, identity.userId, before.consentId);
+  const consentIds = new Set(lineage);
+  const placeholders = lineage.map(() => "?").join(",");
   const result = await env.DB.prepare(
     `SELECT id, source_window, source_revision, is_current, evidence_lane,
             allowed_uses_json, confidence, sensitivity, permission_state,
@@ -851,9 +876,9 @@ export async function loadTimeTravelLifeEvents(
             expires_at, retention_expires_at, value_encoding, value_enc,
             value_key_version, value_nonce, normalized_hash
      FROM context_signals
-     WHERE user_id = ? AND source_id = ? AND is_current = 1 AND consent_id = ?
+     WHERE user_id = ? AND source_id = ? AND is_current = 1 AND consent_id IN (${placeholders})
      LIMIT ?`,
-  ).bind(identity.userId, USR09_SOURCE_ID, before.consentId, ACCOUNT_EVENT_CAP + 1).all<SignalRow>();
+  ).bind(identity.userId, USR09_SOURCE_ID, ...lineage, ACCOUNT_EVENT_CAP + 1).all<SignalRow>();
   if (result.results.length > ACCOUNT_EVENT_CAP) throw new Error("life-event account cap invariant failed");
 
   let unreadableCount = 0;
@@ -863,7 +888,7 @@ export async function loadTimeTravelLifeEvents(
     recording_relation: "recorded_then" | "added_later";
   }> = [];
   for (const row of result.results) {
-    if (!exactSignalMetadata(row, before.consentId)) continue;
+    if (!exactSignalMetadata(row, consentIds)) continue;
     let value: StoredLifeEventValue;
     try {
       value = await openLifeEvent(env, identity, row);

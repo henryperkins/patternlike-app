@@ -28,11 +28,14 @@ async function get(path: string) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("GET /v1/time-travel", () => {
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-13T18:00:00.000Z"));
     await resetDb();
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A, "America/Chicago");

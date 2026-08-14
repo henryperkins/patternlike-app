@@ -250,11 +250,15 @@ describe("USR-06 context source", () => {
     wrongOwner.user_id = "usr_someone_else_0001";
     expect((await putSources("idem-context-owner-1", wrongOwner)).status).toBe(400);
 
+    expect((await putSources("idem-context-two-1", initial.body)).status).toBe(400);
+
     const wrongTier = structuredClone(initial.body);
+    wrongTier.sources = [wrongTier.sources.find((item) => item.source_id === "USR-06")!];
     wrongTier.sources[0].permission_tier = 2 as 1;
     expect((await putSources("idem-context-tier-1", wrongTier)).status).toBe(400);
 
     const extra = structuredClone(initial.body);
+    extra.sources = [extra.sources.find((item) => item.source_id === "USR-06")!];
     (extra.sources[0] as SourceProjection & { client_field?: boolean }).client_field = true;
     expect((await putSources("idem-context-extra-1", extra as SourcesDocument)).status)
       .toBe(400);

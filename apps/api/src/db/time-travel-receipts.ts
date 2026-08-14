@@ -124,7 +124,8 @@ function lookupStatement(env: Env, key: ScanReceiptKey) {
             semantic_request_hash, semantic_result_hash, raw_response_sha256,
             result_json, created_at
      FROM cycle_scan_receipts
-     WHERE user_id = ? AND chart_fingerprint = ? AND window_from = ? AND window_to = ?
+     WHERE user_id = ? AND chart_fingerprint = ? AND local_date = ?
+       AND scheduling_timezone = ? AND window_from = ? AND window_to = ?
        AND contract_id = ? AND contract_version = ?
        AND cycle_policy_id = ? AND cycle_policy_version = ?
        AND orb_policy_id = ? AND orb_policy_version = ?
@@ -133,6 +134,8 @@ function lookupStatement(env: Env, key: ScanReceiptKey) {
   ).bind(
     key.userId,
     key.chartFingerprint,
+    key.localDate,
+    key.schedulingTimezone,
     key.windowFrom,
     key.windowTo,
     key.contractId,

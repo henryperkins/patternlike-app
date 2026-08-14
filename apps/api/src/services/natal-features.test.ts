@@ -71,6 +71,30 @@ describe("deriveNatalFeatureSet", () => {
       .toMatchObject({ body_a: "sun", body_b: "moon", orb: 1.25 });
   });
 
+  it("deduplicates identical derived facts before hashing the set", async () => {
+    const duplicated = snapshot();
+    duplicated.positions.push({ ...duplicated.positions[0]! });
+    const result = await deriveNatalFeatureSet({
+      chartId: "cht_alpha",
+      userId: "usr_alpha",
+      chartFingerprint: fingerprint,
+      effectiveAccuracy: "exact",
+      snapshot: duplicated,
+      uncertainty: { accuracy: "exact", suppressed_features: [] },
+    });
+    expect(result.features.filter((feature) =>
+      feature.feature_class === "position" && feature.body === "sun")).toHaveLength(1);
+    const original = await deriveNatalFeatureSet({
+      chartId: "cht_alpha",
+      userId: "usr_alpha",
+      chartFingerprint: fingerprint,
+      effectiveAccuracy: "exact",
+      snapshot: snapshot(),
+      uncertainty: { accuracy: "exact", suppressed_features: [] },
+    });
+    expect(result.featureSetHash).toBe(original.featureSetHash);
+  });
+
   it("omits houses and angles when the effective chart says they are suppressed", async () => {
     const result = await deriveNatalFeatureSet({
       chartId: "cht_alpha",
@@ -193,6 +217,48 @@ describe("matchPatternObject", () => {
     });
     expect(matchPatternObject({ ...base, status: "deprecated" }, set.features, "exact"))
       .toMatchObject({ eligible: false, omission: "deprecated" });
+  });
+
+  it("treats required angle bodies as satisfied by angle features", async () => {
+    const set = await deriveNatalFeatureSet({
+      chartId: "cht_alpha",
+      userId: "usr_alpha",
+      chartFingerprint: fingerprint,
+      effectiveAccuracy: "exact",
+      snapshot: snapshot(),
+      uncertainty: { accuracy: "exact", suppressed_features: [] },
+    });
+    const result = matchPatternObject(
+      {
+        id: "pattern.ascendant",
+        content_type: "pattern",
+        content_version: "1.0.0",
+        object_hash: `sha256:${"7d".repeat(32)}`,
+        locale: "en-US",
+        status: "approved",
+        display_priority: 1,
+        title: "Rising",
+        summary: "Summary",
+        body: "Body",
+        resources: [],
+        tensions: ["Tension"],
+        counter_expression: "Counter-expression",
+        prohibited_claims: [],
+        tags: [],
+        minimum_accuracy: "unknown",
+        requires_houses: false,
+        required_bodies: ["ascendant"],
+        required_aspects: [],
+        match: {
+          all_of: [{ type: "angle", angle: "ascendant" }],
+          any_of: [],
+          none_of: [],
+        },
+      },
+      set.features,
+      "exact",
+    );
+    expect(result).toMatchObject({ eligible: true, omission: null });
   });
 });
 

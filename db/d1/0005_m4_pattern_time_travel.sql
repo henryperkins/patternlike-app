@@ -97,7 +97,8 @@ CREATE TABLE cycle_scan_receipts (
 
 CREATE UNIQUE INDEX uq_cycle_scan_receipts_lookup
   ON cycle_scan_receipts(
-    user_id, chart_fingerprint, window_from, window_to,
+    user_id, chart_fingerprint, local_date, scheduling_timezone,
+    window_from, window_to,
     contract_id, contract_version, cycle_policy_id, cycle_policy_version,
     orb_policy_id, orb_policy_version, tzdb_version,
     local_day_resolution_policy_version, receipt_epoch

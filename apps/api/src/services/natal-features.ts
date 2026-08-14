@@ -193,9 +193,18 @@ export async function deriveNatalFeatureSet(
     fact: { accuracy: input.effectiveAccuracy, suppressed_features: suppressed },
   });
 
-  const features = await Promise.all(facts.map(({ featureClass, fact }) =>
+  const sealed = await Promise.all(facts.map(({ featureClass, fact }) =>
     sealFeature(input.chartFingerprint, featureClass, fact)));
-  features.sort((a, b) => a.feature_id.localeCompare(b.feature_id));
+  const byId = new Map<string, NatalFeature>();
+  for (const feature of sealed) {
+    const existing = byId.get(feature.feature_id);
+    if (existing && jcsCanonicalize(existing) !== jcsCanonicalize(feature)) {
+      throw new Error("natal feature id collision");
+    }
+    byId.set(feature.feature_id, feature);
+  }
+  const features = [...byId.values()].sort((a, b) =>
+    a.feature_id < b.feature_id ? -1 : a.feature_id > b.feature_id ? 1 : 0);
   const featureSetHash = await sha256Hex(jcsCanonicalize({
     chart_fingerprint: input.chartFingerprint,
     policy_id: NATAL_FEATURE_POLICY_ID,

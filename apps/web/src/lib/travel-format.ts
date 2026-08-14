@@ -30,6 +30,7 @@ export function todayIsoDate(now = new Date()): string {
  * to do nothing once a year.
  */
 export function shiftIsoDate(isoDate: string, days: number): string {
+  if (!isIsoDate(isoDate) || !Number.isInteger(days)) return isoDate;
   const [year, month, day] = isoDate.split("-").map(Number);
   if (year === undefined || month === undefined || day === undefined) return isoDate;
   const shifted = new Date(Date.UTC(year, month - 1, day + days));
