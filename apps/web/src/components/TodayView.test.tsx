@@ -37,11 +37,16 @@ const noFeedback = (readingId: string): Record<string, MockResponse> => ({
 });
 
 function renderToday(responses: Record<string, MockResponse>) {
-  mockApiResponses({
+  // Defaults land on the same object the tests mutate after mount (poll
+  // transitions, preference gates, consent grant). Spreading into a new table
+  // would freeze the first lookup.
+  for (const [key, value] of Object.entries({
     ...noFeedback(READING_ID),
     ...noFeedback(V5_READING_ID),
-    ...responses,
-  });
+  })) {
+    if (!(key in responses)) responses[key] = value;
+  }
+  mockApiResponses(responses);
   const onUnauthorized = vi.fn();
   const view = render(<TodayView onUnauthorized={onUnauthorized} />);
   return { ...view, onUnauthorized };

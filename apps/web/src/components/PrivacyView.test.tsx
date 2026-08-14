@@ -22,10 +22,10 @@ const emptyTopics = ok({
 });
 
 function renderPrivacy(responses: Record<string, MockResponse>) {
-  mockApiResponses({
-    [`GET ${TOPICS}`]: emptyTopics,
-    ...responses,
-  });
+  if (!(`GET ${TOPICS}` in responses) && !(TOPICS in responses)) {
+    responses[`GET ${TOPICS}`] = emptyTopics;
+  }
+  mockApiResponses(responses);
   return render(
     <PrivacyView
       hasChart
