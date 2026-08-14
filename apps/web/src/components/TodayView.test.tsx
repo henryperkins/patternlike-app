@@ -129,9 +129,9 @@ describe("TodayView", () => {
     expect(checkIn!.compareDocumentPosition(reading!) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
 
-    await user.click(await screen.findByRole("radio", { name: "Low" }));
-    await user.click(screen.getByRole("button", { name: /^Save$/i }));
-    expect(await screen.findByText(/Active until/i)).toBeInTheDocument();
+    await user.click(await screen.findByRole("radio", { name: /Quiet/i }));
+    await user.click(screen.getByRole("button", { name: /Keep this/i }));
+    expect(await screen.findByText(/Held until/i)).toBeInTheDocument();
     expect(screen.getByText(firstParagraph)).toBeInTheDocument();
     expect(capturedFor(TODAY)).toHaveLength(1);
   });
