@@ -230,9 +230,9 @@ export default function App() {
   } else if (view === "timing") {
     content = <TimingView onUnauthorized={handleSignedOut} />;
   } else if (view === "travel") {
-    content = <TimeTravelView />;
+    content = <TimeTravelView onUnauthorized={handleSignedOut} />;
   } else if (chart) {
-    content = <ChartView chart={chart} />;
+    content = <ChartView chart={chart} onUnauthorized={handleSignedOut} />;
   } else {
     content = <Onboarding onSubmit={createChart} />;
   }

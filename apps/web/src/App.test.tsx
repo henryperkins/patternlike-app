@@ -6,13 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.js";
 import { __setAuthClientForTests } from "./lib/auth.js";
 import {
-  NOT_BUILT,
   capturedFor,
   deferred,
   mockApiResponses,
   notImplemented,
   type MockResponse,
 } from "./test/api-mock.js";
+import { lifeEvent, travelResponse } from "./test/travel-fixture.js";
 import {
   READING_ID,
   consentGranted,
@@ -142,9 +142,9 @@ describe("web application shell", () => {
     expect(results.violations).toEqual([]);
   });
 
-  // Today and Timing now have modelled payloads and dedicated state owners.
-  // Time Travel remains the one generic future-route surface.
-  it("navigates the remaining future route through its hash link and reports honest route state", async () => {
+  // Time Travel owns its own surface now, so these exercise the dedicated view
+  // rather than the removed generic future-route panel.
+  it("keeps the honest not-active state when the Worker is older than this app", async () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
@@ -155,22 +155,30 @@ describe("web application shell", () => {
     await screen.findByRole("heading", { name: /architecture of your chart/i });
 
     await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
-    expect(await screen.findByText(`${NOT_BUILT} (Request req_travel)`)).toBeInTheDocument();
-    expect(screen.getByText("Not active")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /not active on this Worker/i }),
+    ).toBeInTheDocument();
     expect(window.location.hash).toBe("#travel");
 
-    // `date` is required:true on GET /v1/time-travel; omitting it is a 400 the
-    // moment the stub becomes a real handler.
+    // A 501 is a roadmap answer, not a failure: retrying only asks the same
+    // question again, and the saved-event surface is withheld rather than
+    // offering writes the Worker cannot accept.
+    expect(screen.queryByRole("button", { name: /Try again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Saved life events/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Request req_travel/)).toBeInTheDocument();
+
+    // `date` is required:true on GET /v1/time-travel; omitting it is a 400.
     const now = new Date();
     const today = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}-${`${now.getDate()}`.padStart(2, "0")}`;
     expect(capturedFor("/v1/time-travel")[0].search).toBe(`?date=${today}`);
   });
 
-  it("offers a retry when a future route cannot be reached", async () => {
+  it("keeps the selected date and the retry control when a reconstruction cannot be reached", async () => {
     const user = userEvent.setup();
     const responses: Record<string, MockResponse> = {
       "/v1/chart": { status: 200, body: chart },
       "/v1/time-travel": { status: 0, body: null, unreachable: true },
+      "/v1/life-events": { status: 200, body: { schema_version: "0.4.0", items: [] } },
     };
     mockApiResponses(responses);
 
@@ -178,44 +186,58 @@ describe("web application shell", () => {
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
 
-    expect(
-      await screen.findByText("The Pattern/Like API could not be reached."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Unreachable")).toBeInTheDocument();
+    const now = new Date();
+    const today = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}-${`${now.getDate()}`.padStart(2, "0")}`;
+    const dateField = await screen.findByLabelText(/Selected date/i);
+    expect(dateField).toHaveValue(today);
 
-    const retryButton = screen.getByRole("button", { name: /Try again/i });
+    const retryButton = await screen.findByRole("button", { name: /Try again/i });
     retryButton.focus();
-    responses["/v1/time-travel"] = { status: 0, body: null, unreachable: true };
     await user.click(retryButton);
 
-    // The button must survive the reload it triggers; rendering it on "error"
-    // alone unmounted it mid-click and dumped focus to <body> every attempt.
+    // The button must survive the reload it triggers; rendering it on the
+    // failure alone unmounted it mid-click and dumped focus to <body>.
     expect(document.activeElement).toBe(retryButton);
+    expect(dateField).toHaveValue(today);
 
-    responses["/v1/time-travel"] = notImplemented("Time Travel (M4)", "req_travel");
+    responses["/v1/time-travel"] = { status: 200, body: travelResponse() };
     await user.click(screen.getByRole("button", { name: /Try again/i }));
 
-    expect(await screen.findByText(`${NOT_BUILT} (Request req_travel)`)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /Selected date against now/i }),
+    ).toBeInTheDocument();
     expect(capturedFor("/v1/time-travel")).toHaveLength(3);
   });
 
-  it("reports a live route without leaking the payload and without offering a retry", async () => {
+  it("renders a reconstruction as facts and never as a development payload", async () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/time-travel": {
-        status: 200,
-        body: { items: [], calculation_status: { stale: false } },
-      },
+      "/v1/time-travel": { status: 200, body: travelResponse() },
+      "/v1/life-events": { status: 200, body: { schema_version: "0.4.0", items: [] } },
     });
 
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
 
     await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
-    expect(await screen.findByText(/This route is returning data/i)).toBeInTheDocument();
-    expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Try again/i })).not.toBeInTheDocument();
+
+    // Both references, their provenance, and the comparison group the two
+    // states actually fall into.
+    expect(await screen.findByRole("heading", { name: /Sunday, 14 June|June 14/i })).toBeInTheDocument();
+    expect(screen.getByText("Calculated now")).toBeInTheDocument();
+    expect(screen.getByText("Reused calculation")).toBeInTheDocument();
+    expect(screen.getByText("Still running now")).toBeInTheDocument();
+    expect(screen.getAllByText("Phase changed").length).toBeGreaterThan(0);
+
+    // A successful empty context is distinguished from a failure, and the
+    // source is not implicitly enabled by rendering it.
+    expect(
+      screen.getByText(/Life-event timeline is not enabled/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add an event/i })).not.toBeInTheDocument();
+
+    expect(screen.queryByText(/"schema_version"/)).not.toBeInTheDocument();
   });
 
   it("sends a contract-shaped export request and reports acceptance", async () => {
@@ -524,17 +546,24 @@ describe("web application shell", () => {
     expect(logout).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a future route surface free of detectable structural accessibility violations", async () => {
+  it("keeps the Time Travel surface free of detectable structural accessibility violations", async () => {
     const user = userEvent.setup();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/time-travel": notImplemented("Time Travel (M4)", "req_travel"),
+      "/v1/time-travel": {
+        status: 200,
+        body: travelResponse({ life_event_source_state: "active" }),
+      },
+      "/v1/life-events": {
+        status: 200,
+        body: { schema_version: "0.4.0", items: [lifeEvent()] },
+      },
     });
 
     const { container } = render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Time travel" })[0]);
-    await screen.findByText(`${NOT_BUILT} (Request req_travel)`);
+    await screen.findByRole("heading", { name: /Saved life events/i });
 
     const results = await axe.run(container, {
       rules: { "color-contrast": { enabled: false } },

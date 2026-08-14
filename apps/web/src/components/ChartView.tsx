@@ -2,6 +2,7 @@ import type { CelestialBody, LongitudePosition } from "@patternlike/shared";
 import type { ChartResponse } from "../lib/api-client.js";
 import { ChartWheel } from "./ChartWheel.js";
 import { Icon } from "./icons.js";
+import { PatternChapters } from "./PatternChapters.js";
 
 const BODY_NAMES: Record<CelestialBody, string> = {
   sun: "Sun",
@@ -42,7 +43,13 @@ function fingerprintTail(value: string): string {
   return `${bare.slice(0, 8)}...${bare.slice(-8)}`;
 }
 
-export function ChartView({ chart }: { chart: ChartResponse }) {
+interface ChartViewProps {
+  chart: ChartResponse;
+  /** A 401 discovered by the Pattern request belongs to the app, not this page. */
+  onUnauthorized: () => void;
+}
+
+export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
   const positionByBody = new Map(chart.positions.map((position) => [position.body, position]));
   const anchors: CelestialBody[] = ["sun", "moon", "ascendant"];
   const visiblePositions = chart.positions.filter(
@@ -133,8 +140,9 @@ export function ChartView({ chart }: { chart: ChartResponse }) {
             <p className="kicker">Interpretation boundary</p>
             <h2>Facts first. Meaning second.</h2>
             <p>
-              This M1 view contains chart facts only. Pattern chapters arrive through
-              reviewed editorial releases, never generic sign filler.
+              The facts on this page are calculated. The chapters below them are
+              published, reviewed content matched against those facts — never generic
+              sign filler, and never written on the spot.
             </p>
             <a href="#today" className="inline-link">
               See the daily layer status <Icon name="arrow" />
@@ -164,6 +172,8 @@ export function ChartView({ chart }: { chart: ChartResponse }) {
           ))}
         </div>
       </section>
+
+      <PatternChapters onUnauthorized={onUnauthorized} />
 
       <details className="evidence-drawer">
         <summary>

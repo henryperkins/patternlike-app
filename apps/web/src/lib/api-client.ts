@@ -3,6 +3,10 @@ import type {
   BirthTimeAccuracy,
   ChartSnapshot,
   ErrorBody,
+  LifeEvent,
+  LifeEventRequest,
+  PatternResponse,
+  TimeTravelResponse,
   TimezoneLookupRequest,
   TimezoneLookupResponse,
   WorkflowAccepted,
@@ -329,10 +333,20 @@ export type ContextSourceState =
   | "expired"
   | "never_granted";
 
+/**
+ * The registry sources this client knows how to render.
+ *
+ * USR-06 is the Daily check-in grant; USR-09 is the Life-event timeline that
+ * Time Travel reads. They are separate consents by design — enabling one must
+ * never be a way to enable the other — so the client never treats them as
+ * interchangeable and never infers one from the other's state.
+ */
+export type ContextSourceId = "USR-06" | "USR-09";
+
 export interface ContextSourceProjection {
   schema_version: "0.2.0";
   user_id: string;
-  source_id: "USR-06";
+  source_id: ContextSourceId;
   enabled: boolean;
   permission_state: ContextSourceState;
   allowed_uses: string[];
@@ -345,11 +359,25 @@ export interface ContextSourceProjection {
   updated_at: string;
 }
 
+/**
+ * `sources` is a list, not a one-tuple.
+ *
+ * GET returns every source in canonical order. Indexing position 0 to find one
+ * of them was correct only while a single source existed; it now silently reads
+ * or writes the wrong grant. Callers locate a source by `source_id`.
+ */
 export interface ContextSourcesDocument {
   schema_version: "0.2.0";
   user_id: string;
-  sources: [ContextSourceProjection];
+  sources: ContextSourceProjection[];
   updated_at: string;
+}
+
+export function findContextSource(
+  document: ContextSourcesDocument,
+  sourceId: ContextSourceId,
+): ContextSourceProjection | null {
+  return document.sources.find((source) => source.source_id === sourceId) ?? null;
 }
 
 export function getContextSources(
@@ -362,15 +390,25 @@ export function getContextSources(
   });
 }
 
-export function updateContextSources(
+/**
+ * Compare-and-set one source inside the document shape.
+ *
+ * The request carries exactly one source object; an omitted source is left
+ * untouched rather than disabled. Both the document's `updated_at` and the
+ * included source's `updated_at` are preconditions, so a page that has drifted
+ * is refused instead of overwriting a change made elsewhere. The response is
+ * the full document again — retain it, or the other source's state goes stale.
+ */
+export function updateContextSource(
   document: ContextSourcesDocument,
+  source: ContextSourceProjection,
   idempotencyKey: string,
   signal?: AbortSignal,
 ): Promise<ContextSourcesDocument> {
   return request<ContextSourcesDocument>("/v1/context-sources", {
     method: "PUT",
     headers: requestHeaders({ json: true, idempotencyKey }),
-    body: JSON.stringify(document),
+    body: JSON.stringify({ ...document, sources: [source] }),
     signal,
   });
 }
@@ -946,12 +984,101 @@ export function getTiming(
 export function getTimeTravel(
   date: string,
   signal?: AbortSignal,
-): Promise<unknown> {
+): Promise<TimeTravelResponse> {
   const query = new URLSearchParams({ date });
 
-  return request<unknown>(`/v1/time-travel?${query.toString()}`, {
+  return request<TimeTravelResponse>(`/v1/time-travel?${query.toString()}`, {
     method: "GET",
     headers: requestHeaders(),
+    signal,
+  });
+}
+
+export interface PatternPageQuery {
+  cursor?: string | null;
+  limit?: number;
+}
+
+/**
+ * One page of eligible Pattern chapters.
+ *
+ * The route accepts only `cursor` and `limit`; anything else is a 400, so the
+ * query is built here rather than passed through. Callers follow `next_cursor`
+ * until it is null — the page size is a transport bound, not a personalisation
+ * cap, and stopping early would hide chapters the reader is eligible for.
+ */
+export function getPattern(
+  query: PatternPageQuery = {},
+  signal?: AbortSignal,
+): Promise<PatternResponse> {
+  const params = new URLSearchParams();
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const serialized = params.toString();
+
+  return request<PatternResponse>(`/v1/pattern${serialized ? `?${serialized}` : ""}`, {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export interface LifeEventListResponse {
+  schema_version: "0.4.0";
+  items: LifeEvent[];
+}
+
+/** Accepts no query parameters: the account cap bounds the list instead. */
+export function listLifeEvents(signal?: AbortSignal): Promise<LifeEventListResponse> {
+  return request<LifeEventListResponse>("/v1/life-events", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function createLifeEvent(
+  event: LifeEventRequest,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<LifeEvent> {
+  return request<LifeEvent>("/v1/life-events", {
+    method: "POST",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify(event),
+    signal,
+  });
+}
+
+/**
+ * Writes a new immutable revision; it does not edit the stored one.
+ *
+ * The key is held for one user intent so a retry after a transient failure
+ * resumes that revision rather than stacking a second one.
+ */
+export function updateLifeEvent(
+  eventId: string,
+  event: LifeEventRequest,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<LifeEvent> {
+  return request<LifeEvent>(`/v1/life-events/${encodeURIComponent(eventId)}`, {
+    method: "PUT",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify(event),
+    signal,
+  });
+}
+
+/** 204, so it uses the no-content reader. Removes every retained revision. */
+export function deleteLifeEvent(
+  eventId: string,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return requestNoContent(`/v1/life-events/${encodeURIComponent(eventId)}`, {
+    method: "DELETE",
+    headers: requestHeaders({ idempotencyKey }),
     signal,
   });
 }
