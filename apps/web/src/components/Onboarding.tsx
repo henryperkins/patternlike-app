@@ -222,7 +222,9 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
       setError(
         submissionError instanceof Error
           ? submissionError.message
-          : "The chart could not be created.",
+          : correcting
+            ? "The chart could not be replaced."
+            : "The chart could not be created.",
       );
       setSubmitting(false);
     }

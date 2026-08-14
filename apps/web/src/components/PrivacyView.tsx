@@ -230,7 +230,7 @@ export function PrivacyView({
             </div>
             {hasChart && onCorrectBirth ? (
               <div className="source-row__actions">
-                <button type="button" onClick={onCorrectBirth}>
+                <button type="button" onClick={onCorrectBirth} aria-label="Correct birth details">
                   Correct
                 </button>
               </div>

@@ -573,6 +573,70 @@ describe("web application shell", () => {
     expect(capturedFor("/v1/birth-profiles")).toHaveLength(1);
   });
 
+  it("does not keep the superseded chart when GET still returns it after replace", async () => {
+    const user = userEvent.setup();
+    const replacement = {
+      ...chart,
+      id: "cht_web_test_0002",
+      profile_version: 2,
+      fingerprint: `sha256:${"e".repeat(64)}`,
+      positions: [
+        { body: "sun", longitude_deg: 120.4, sign: "leo", house: 1, retrograde: false },
+        { body: "moon", longitude_deg: 201.4, sign: "libra", house: 3, retrograde: false },
+        { body: "ascendant", longitude_deg: 10, sign: "aries", house: 1, retrograde: false },
+      ],
+    };
+    let readsAfterPost = 0;
+    const responses: Record<string, MockResponse> = {
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "/v1/birth-profiles": {
+        status: 202,
+        body: {
+          schema_version: "0.2.0",
+          workflow: "NormalizeBirthAndCalculateChart",
+          status: "succeeded",
+          idempotency_key: "web-birth-test",
+          job_id: "job_birth_corr_0002",
+          resource_id: replacement.id,
+        },
+      },
+    };
+    Object.defineProperty(responses, "/v1/chart", {
+      enumerable: true,
+      get() {
+        const posted = capturedFor("/v1/birth-profiles").length > 0;
+        if (!posted) return { status: 200, body: chart };
+        readsAfterPost += 1;
+        return {
+          status: 200,
+          body: readsAfterPost === 1 ? chart : replacement,
+        };
+      },
+    });
+    mockApiResponses(responses);
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+
+    await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(
+      screen.getByRole("checkbox", { name: /allow Pattern\/Like to encrypt these details/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+
+    expect(
+      (await screen.findAllByText("Leo 0.4 deg", {}, { timeout: 4000 })).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Taurus 24.1 deg")).not.toBeInTheDocument();
+    expect(window.location.hash).toBe("#pattern");
+    expect(readsAfterPost).toBeGreaterThan(1);
+  });
+
   it("keeps export and deletion reachable for a user who has no chart", async () => {
     const user = userEvent.setup();
     mockApiResponses({

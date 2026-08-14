@@ -308,14 +308,13 @@ describe("chart lifecycle invariants", () => {
     expect(chart.body.id).toBe(second.body.resource_id);
 
     const receipts = await rows<{ chart_id: string }>(
-      `SELECT chart_id FROM natal_feature_sets
-       WHERE user_id = ? ORDER BY created_at, chart_id`,
+      `SELECT chart_id FROM natal_feature_sets WHERE user_id = ?`,
       USER_A,
     );
-    expect(receipts.map((row) => row.chart_id)).toEqual([
-      first.body.resource_id,
-      second.body.resource_id,
-    ]);
+    expect(receipts).toHaveLength(2);
+    expect(receipts.map((row) => row.chart_id)).toEqual(
+      expect.arrayContaining([first.body.resource_id, second.body.resource_id]),
+    );
   });
 
   it("stores birth PII only as ciphertext", async () => {

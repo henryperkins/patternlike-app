@@ -15,6 +15,7 @@ import {
   createBirthProfile,
   endSession,
   getChart,
+  type BirthWorkflowResponse,
   type ChartResponse,
 } from "./lib/api-client.js";
 import { beginSignIn, completeSignIn, isRedirectCallback, signOut } from "./lib/auth.js";
@@ -164,8 +165,9 @@ export default function App() {
     profile: BirthProfileRequest,
     intent: "create" | "correct",
   ) => {
+    let accepted: BirthWorkflowResponse | null = null;
     try {
-      await createBirthProfile(profile);
+      accepted = await createBirthProfile(profile);
     } catch (error) {
       if (!(error instanceof ApiError && error.code === "chart_already_exists")) {
         throw error;
@@ -180,6 +182,18 @@ export default function App() {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const chart = await getChart();
+        // POST commits the replacement before it returns, but GET can still
+        // answer the superseded snapshot (in-flight job, or a cached 200).
+        // Accepting that 200 would leave Pattern on the chart the reader
+        // just asked to replace.
+        if (
+          accepted &&
+          (accepted.status === "running" ||
+            (accepted.resource_id !== null && chart.id !== accepted.resource_id))
+        ) {
+          await wait(700);
+          continue;
+        }
         setCorrectingBirth(false);
         setChartState({ status: "ready", chart });
         window.location.hash = "pattern";

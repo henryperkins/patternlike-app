@@ -107,6 +107,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     response = await fetch(`${apiBaseUrl}${path}`, {
       ...init,
       credentials: "include",
+      // Chart correction polls GET /v1/chart for the replacement id. A cached
+      // 200 of the superseded snapshot would look like success.
+      cache: "no-store",
     });
   } catch {
     throw new Error("The Pattern/Like API could not be reached.");
@@ -149,7 +152,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, { ...init, credentials: "include" });
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      credentials: "include",
+      cache: "no-store",
+    });
   } catch {
     throw new Error("The Pattern/Like API could not be reached.");
   }
