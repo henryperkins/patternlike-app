@@ -13,6 +13,7 @@ import {
   collectDeletionArtifactKeys,
   deleteUserRows,
 } from "./deletion-manifest.js";
+import { safeLog, type DeletionFailureCheckpoint } from "./safe-log.js";
 
 export const DELETION_RETRY_DELAY_SECONDS = 60;
 export const DELETION_MAX_RETRY_DELAY_SECONDS = 60 * 60;
@@ -217,6 +218,9 @@ export async function processDeletionMessage(
     }
     return "ack";
   } catch {
+    const checkpoint: DeletionFailureCheckpoint =
+      claim.request.checkpoint ?? "accepted";
+    safeLog({ event: "deletion_processing_failed", checkpoint });
     // If key erasure has committed, the command no longer exists and releasing
     // the job is still safe: the next claim resumes from the clear checkpoint.
     const retryAfterSeconds = deletionRetryDelaySeconds(claim.attempts);

@@ -5,7 +5,7 @@ import {
   getQueueResult,
   SELF,
 } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../index.js";
 import type { PrivacyMessage } from "../env.js";
 import {
@@ -555,6 +555,65 @@ describe("account deletion", () => {
     expect(
       await rows("SELECT available_at FROM jobs WHERE id = ?", message.job_id),
     ).toEqual([{ available_at: "2026-08-12T18:03:00.000Z" }]);
+  });
+
+  it("logs a safe failure event before retrying deletion work", async () => {
+    const now = new Date("2026-08-12T18:00:00.000Z");
+    const exportRequest = await reserveAccountExport(
+      env,
+      IDENTITY_A,
+      "idem-export-delete-log",
+      { include_readings: true, include_journal: true },
+      now,
+    );
+    if (exportRequest.kind !== "created") throw new Error("export reservation missing");
+    await env.ARTIFACTS!.put(
+      exportObjectKey(exportRequest.response.resource_id),
+      "encrypted export",
+    );
+
+    const deletion = await reserveAccountDeletion(
+      env,
+      IDENTITY_A,
+      "idem-delete-log-failure",
+      { confirm: "DELETE", reason: null },
+      now,
+    );
+    if (deletion.kind !== "created") throw new Error("deletion reservation missing");
+
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failingBucket = new Proxy(env.ARTIFACTS!, {
+      get(target, property) {
+        if (property === "delete") {
+          return async () => {
+            throw new Error("forced deletion failure must stay out of logs");
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    await expect(
+      processDeletionMessage(
+        { ...env, ARTIFACTS: failingBucket },
+        {
+          kind: "privacy",
+          job_id: deletion.response.job_id,
+          job_type: "delete_account",
+        },
+        now,
+      ),
+    ).resolves.toEqual({ retryAfterSeconds: 60 });
+
+    expect(error).toHaveBeenCalledWith(
+      "deletion_processing_failed",
+      expect.objectContaining({
+        checkpoint: "exports_fenced",
+        trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+      }),
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain("forced deletion failure");
   });
 
   it("rolls back both sides when releasing a deletion claim fails", async () => {
