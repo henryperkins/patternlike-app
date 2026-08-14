@@ -157,7 +157,7 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
                 </p>
               ) : null}
               <div className="reading-feedback__footer">
-                <button className="text-button" type="submit" disabled={busy}>
+                <button className="reading-feedback__send" type="submit" disabled={busy}>
                   {busy ? "Sending…" : "Send this"}
                 </button>
               </div>

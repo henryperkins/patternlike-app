@@ -199,11 +199,9 @@ export function DailyCheckInCard() {
   return (
     <section className="daily-check-in panel" aria-labelledby="daily-check-in-heading">
       <div className="daily-check-in__heading">
-        <div>
-          <p className="kicker">Private context · one day</p>
-          <h2 id="daily-check-in-heading">How are you arriving?</h2>
-        </div>
+        <p className="kicker">Private context · one day</p>
         <span className="panel-code">USR-06</span>
+        <h2 id="daily-check-in-heading">How are you arriving?</h2>
       </div>
 
       {availability.status === "loading" ? (
