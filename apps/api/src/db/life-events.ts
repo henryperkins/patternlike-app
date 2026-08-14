@@ -829,16 +829,20 @@ async function loadConsentLineage(
   userId: string,
   headConsentId: string,
 ): Promise<string[]> {
+  const result = await env.DB.prepare(
+    `SELECT id, supersedes_consent_id FROM consents
+     WHERE user_id = ? AND kind = 'product_source' AND source_id = ?`,
+  ).bind(userId, USR09_SOURCE_ID).all<{ id: string; supersedes_consent_id: string | null }>();
+  const predecessor = new Map(
+    (result.results ?? []).map((row) => [row.id, row.supersedes_consent_id]),
+  );
   const ids: string[] = [];
   const seen = new Set<string>();
   let current: string | null = headConsentId;
   while (current && !seen.has(current) && ids.length < CONSENT_LINEAGE_CAP) {
     seen.add(current);
     ids.push(current);
-    const row = await env.DB.prepare(
-      `SELECT supersedes_consent_id FROM consents WHERE id = ? AND user_id = ?`,
-    ).bind(current, userId).first<{ supersedes_consent_id: string | null }>();
-    current = row?.supersedes_consent_id ?? null;
+    current = predecessor.get(current) ?? null;
   }
   return ids;
 }
