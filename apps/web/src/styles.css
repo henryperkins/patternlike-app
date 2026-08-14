@@ -1601,15 +1601,26 @@ summary:focus-visible {
 
 .daily-check-in__levels span {
   display: grid;
-  min-height: 74px;
+  min-height: 88px;
   place-content: center;
   gap: 6px;
-  padding: 12px 8px;
+  padding: 14px 8px 12px;
   color: var(--ink);
   border: 1px solid var(--line);
   background: var(--paper-light);
   text-align: center;
   transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.daily-check-in__levels svg {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 2px;
+  color: var(--ink-soft);
+}
+
+.daily-check-in__levels input:checked + span svg {
+  color: var(--forest);
 }
 
 .daily-check-in__levels strong {
@@ -1645,6 +1656,9 @@ summary:focus-visible {
 }
 
 .daily-check-in__detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 14px;
   padding: 0;
   color: var(--forest);
@@ -1657,6 +1671,11 @@ summary:focus-visible {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.daily-check-in__detail-toggle svg {
+  width: 12px;
+  height: 12px;
 }
 
 .daily-check-in__details {
@@ -1718,12 +1737,21 @@ summary:focus-visible {
 }
 
 .daily-check-in__until {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--forest) !important;
   font-family: var(--mono) !important;
   font-size: 10px !important;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.daily-check-in__until svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 .today-fallback-note {
@@ -1801,6 +1829,7 @@ summary:focus-visible {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
+  gap: 8px;
   padding: 0 12px;
   color: var(--ink-soft);
   border-bottom: 1px solid transparent;
@@ -1809,6 +1838,12 @@ summary:focus-visible {
   font-weight: 600;
   letter-spacing: 0.01em;
   transition: color 160ms ease, border-color 160ms ease;
+}
+
+.reading-feedback__options svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
 }
 
 .reading-feedback__options label:hover span {
@@ -1827,6 +1862,9 @@ summary:focus-visible {
 
 .reading-feedback__note-toggle,
 .reading-feedback__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 12px;
   padding: 0;
   color: var(--forest);
@@ -1838,6 +1876,12 @@ summary:focus-visible {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+.reading-feedback__note-toggle svg,
+.reading-feedback__send svg {
+  width: 14px;
+  height: 14px;
 }
 
 .reading-feedback__send {

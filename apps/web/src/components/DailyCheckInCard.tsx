@@ -12,6 +12,7 @@ import {
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
 import { formatInstant } from "../lib/reading-format.js";
+import { Icon, type IconName } from "./icons.js";
 
 type Availability =
   | { status: "loading" }
@@ -52,10 +53,11 @@ const ENERGY_LEVELS: ReadonlyArray<{
   value: CheckInLevel;
   label: string;
   hint: string;
+  icon: IconName;
 }> = [
-  { value: "low", label: "Quiet", hint: "Held back" },
-  { value: "medium", label: "Steady", hint: "Enough to move" },
-  { value: "high", label: "Full", hint: "A lot in motion" },
+  { value: "low", label: "Quiet", hint: "Held back", icon: "quiet" },
+  { value: "medium", label: "Steady", hint: "Enough to move", icon: "steady" },
+  { value: "high", label: "Full", hint: "A lot in motion", icon: "full" },
 ];
 
 function buildRequest(form: CheckInForm): CheckInRequest {
@@ -226,6 +228,7 @@ export function DailyCheckInCard() {
       ) : saved ? (
         <div className="daily-check-in__saved">
           <p className="daily-check-in__until">
+            <Icon name="check" />
             Held until {formatInstant(saved.freshness.expires_at)}
           </p>
           <p>
@@ -259,6 +262,7 @@ export function DailyCheckInCard() {
                     required
                   />
                   <span>
+                    <Icon name={level.icon} />
                     <strong>{level.label}</strong>
                     <small>{level.hint}</small>
                   </span>
@@ -274,6 +278,7 @@ export function DailyCheckInCard() {
             aria-controls="daily-check-in-details"
             onClick={() => setDetailsOpen((open) => !open)}
           >
+            <Icon name={detailsOpen ? "minus" : "plus"} />
             {detailsOpen ? "Hide the rest" : "Say a little more"}
           </button>
 

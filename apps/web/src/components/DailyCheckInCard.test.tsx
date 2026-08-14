@@ -94,6 +94,8 @@ describe("daily check-in card", () => {
 
     render(<DailyCheckInCard />);
     expect(await screen.findByText(/One mark is enough/i)).toBeInTheDocument();
+    const energyMarks = document.querySelectorAll(".daily-check-in__levels svg");
+    expect(energyMarks).toHaveLength(3);
     await user.click(await screen.findByRole("radio", { name: /Full/i }));
     expect(screen.queryByLabelText("Pressure")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Keep this/i }));

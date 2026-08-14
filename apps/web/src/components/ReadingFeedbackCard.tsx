@@ -8,12 +8,17 @@ import {
   type ReadingFeedbackRecord,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
+import { Icon, type IconName } from "./icons.js";
 
-const OPTIONS: ReadonlyArray<{ value: FeedbackResonance; label: string }> = [
-  { value: "helpful", label: "This helped" },
-  { value: "neutral", label: "Mixed" },
-  { value: "not_helpful", label: "Not quite" },
-  { value: "off", label: "Off the mark" },
+const OPTIONS: ReadonlyArray<{
+  value: FeedbackResonance;
+  label: string;
+  icon: IconName;
+}> = [
+  { value: "helpful", label: "This helped", icon: "check" },
+  { value: "neutral", label: "Mixed", icon: "mixed" },
+  { value: "not_helpful", label: "Not quite", icon: "almost" },
+  { value: "off", label: "Off the mark", icon: "miss" },
 ];
 
 function resonanceLabel(value: FeedbackResonance): string {
@@ -123,7 +128,10 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
                     checked={resonance === option.value}
                     onChange={() => setResonance(option.value)}
                   />
-                  <span>{option.label}</span>
+                  <span>
+                    <Icon name={option.icon} />
+                    {option.label}
+                  </span>
                 </label>
               ))}
             </div>
@@ -137,6 +145,7 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
                 aria-controls="reading-feedback-note"
                 onClick={() => setNoteOpen((open) => !open)}
               >
+                <Icon name={noteOpen ? "minus" : "plus"} />
                 {noteOpen ? "Hide the note" : "A sentence, if you want"}
               </button>
               {noteOpen ? (
@@ -159,6 +168,7 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
               <div className="reading-feedback__footer">
                 <button className="reading-feedback__send" type="submit" disabled={busy}>
                   {busy ? "Sending…" : "Send this"}
+                  <Icon name="arrow" />
                 </button>
               </div>
             </>

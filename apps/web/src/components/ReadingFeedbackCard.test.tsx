@@ -21,6 +21,7 @@ describe("Reading feedback", () => {
 
     render(<ReadingFeedbackCard readingId={READING_ID} />);
     expect(screen.queryByText("USR-12")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".reading-feedback__options svg")).toHaveLength(4);
     expect(screen.queryByRole("button", { name: /Send this/i })).not.toBeInTheDocument();
     await user.click(await screen.findByRole("radio", { name: "This helped" }));
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
