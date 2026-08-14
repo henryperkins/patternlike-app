@@ -5,6 +5,7 @@ export * from "./chart-types.js";
 export * from "./cycle-types.js";
 export * from "./daily-sky-types.js";
 export * from "./m5-reading-types.js";
+export * from "./m4-types.js";
 export * from "./jcs.js";
 export * from "./timezone.js";
 
@@ -40,6 +41,36 @@ export const LAUNCH_BODIES: readonly CelestialBody[] = [
   "ascendant",
   "midheaven",
 ] as const;
+
+/**
+ * Canonical order for the two bodies of an aspect: `LAUNCH_BODIES` rank, not
+ * alphabetical.
+ *
+ * The frozen M4 contract settles this — `contracts/m4/fixtures/invalid/
+ * natal-feature.aspect-noncanonical.json` is `{body_a: "moon", body_b: "sun"}`,
+ * so a Sun–Moon aspect is canonically `sun` then `moon`. Alphabetical sorting
+ * produces exactly that rejected shape, which is why this lives here as one
+ * definition rather than as `[a, b].sort()` at each call site: the derivation
+ * that writes features and the matcher that reads predicates have to agree with
+ * the contract and with each other, and a second hand-rolled ordering is how
+ * they stop agreeing.
+ */
+export function canonicalAspectPair<T extends CelestialBody>(a: T, b: T): [T, T] {
+  const rank = (body: CelestialBody): number => {
+    const index = LAUNCH_BODIES.indexOf(body);
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return rank(a) <= rank(b) ? [a, b] : [b, a];
+}
+
+/** Whether an authored pair is already in canonical order. */
+export function isCanonicalAspectPair(a: string, b: string): boolean {
+  const rank = (body: string): number => {
+    const index = (LAUNCH_BODIES as readonly string[]).indexOf(body);
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return rank(a) < rank(b);
+}
 
 export const LAUNCH_ASPECTS: readonly AspectType[] = [
   "conjunction",

@@ -39,10 +39,12 @@ from referencing.jsonschema import DRAFT202012
 ROOT = Path(__file__).resolve().parent
 M0 = ROOT / "m0"
 M3 = ROOT / "m3"
+M4 = ROOT / "m4"
 M5 = ROOT / "m5"
 M6 = ROOT / "m6"
 
 M3_BASE = "https://patternlike.app/contracts/m3/"
+M4_BASE = "https://patternlike.app/contracts/m4/"
 M5_BASE = "https://patternlike.app/contracts/m5/"
 M6_BASE = "https://patternlike.app/contracts/m6/"
 
@@ -67,6 +69,19 @@ FIXTURE_SCHEMA = {
         "daily-reading-preparation": M3_BASE
         + "daily-reading.schema.json#/$defs/dailyReadingPreparation",
         "daily-reading": M3_BASE + "daily-reading.schema.json#/$defs/dailyReading",
+    },
+    "m4": {
+        "content-release": M4_BASE + "content-release.schema.json#/$defs/contentReleaseBundle",
+        "pattern-match": M4_BASE + "natal-feature.schema.json#/$defs/patternMatch",
+        "natal-feature": M4_BASE + "natal-feature.schema.json#/$defs/natalFeature",
+        "pattern-response": M4_BASE + "pattern-response.schema.json#/$defs/patternResponse",
+        "time-travel-response": M4_BASE
+        + "time-travel-response.schema.json#/$defs/timeTravelResponse",
+        "cycle-scan-receipt": M4_BASE
+        + "cycle-scan-receipt.schema.json#/$defs/cycleScanReceipt",
+        "life-event-request": M4_BASE + "life-event.schema.json#/$defs/lifeEventRequest",
+        "life-event-response": M4_BASE + "life-event.schema.json#/$defs/lifeEvent",
+        "life-event-list": M4_BASE + "life-event.schema.json#/$defs/lifeEventList",
     },
     "m5": {
         "daily-sky-request": M5_BASE + "daily-sky-request.schema.json#/$defs/dailySkyRequest",
@@ -116,6 +131,11 @@ POLICY_ONLY = {
         "content-release.timing-unmatched-opening-brace",
         "content-release.same-author",
         "timing-response.noncontiguous-passes",
+    },
+    "m4": {
+        "natal-feature.aspect-noncanonical",
+        "life-event-request.reversed-range",
+        "time-travel-response.overlapping-groups",
     },
     "m5": {
         "daily-sky-response.unordered-facts",
@@ -249,7 +269,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M5, M6):
+    for package in (M0, M3, M4, M5, M6):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -955,6 +975,68 @@ def _m3_policy_errors(name: str, instance: dict, catalogue: set[str]) -> list[st
     return []
 
 
+M4_BODY_RANK = {
+    body: rank
+    for rank, body in enumerate(
+        (
+            "sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn",
+            "uranus", "neptune", "pluto", "true_node", "ascendant", "midheaven",
+        )
+    )
+}
+
+
+def _m4_match_errors(match: dict, *, pattern: dict | None = None) -> list[str]:
+    errors: list[str] = []
+    positive = list(match.get("all_of") or []) + list(match.get("any_of") or [])
+    if not positive:
+        errors.append("pattern match has no positive predicate")
+    for predicate in positive + list(match.get("none_of") or []):
+        if predicate.get("type") == "aspect":
+            left = M4_BODY_RANK.get(predicate.get("body_a"), 10_000)
+            right = M4_BODY_RANK.get(predicate.get("body_b"), 10_000)
+            if left >= right:
+                errors.append("aspect predicate body order is not canonical")
+        if pattern is not None and predicate.get("type") in {"angle", "house_cusp"}:
+            if pattern.get("minimum_accuracy") == "unknown" or not pattern.get(
+                "requires_houses"
+            ):
+                errors.append("house or angle predicate lacks an accuracy/house gate")
+    return errors
+
+
+def _m4_policy_errors(name: str, instance: dict) -> list[str]:
+    if name.startswith("content-release"):
+        errors = content_release_policy(instance, set())
+        for pattern in (instance.get("objects") or {}).get("patterns") or []:
+            errors += _m4_match_errors(pattern.get("match") or {}, pattern=pattern)
+        return errors
+    if name.startswith("pattern-match"):
+        return _m4_match_errors(instance)
+    if name.startswith("natal-feature") and instance.get("feature_class") == "aspect":
+        left = M4_BODY_RANK.get(instance.get("body_a"), 10_000)
+        right = M4_BODY_RANK.get(instance.get("body_b"), 10_000)
+        return [] if left < right else ["natal aspect body order is not canonical"]
+    if name.startswith("life-event"):
+        start, end = instance.get("start_date"), instance.get("end_date")
+        return [] if not end or not start or start <= end else ["life-event end precedes start"]
+    if name.startswith("cycle-scan-receipt"):
+        start, end = instance.get("window_from"), instance.get("window_to")
+        return [] if not start or not end or start < end else ["scan window is not half-open"]
+    if name.startswith("time-travel-response"):
+        comparison = instance.get("comparison") or {}
+        continuing = set(comparison.get("continuing") or [])
+        selected = set(comparison.get("selected_only") or [])
+        present = set(comparison.get("present_only") or [])
+        errors: list[str] = []
+        if continuing & selected or continuing & present or selected & present:
+            errors.append("comparison cycle belongs to more than one primary group")
+        if not set(comparison.get("phase_changed") or []).issubset(continuing):
+            errors.append("phase_changed contains a cycle that is not continuing")
+        return errors
+    return []
+
+
 def _m5_policy_errors(name: str, instance: dict) -> list[str]:
     if name.startswith("daily-sky-request"):
         return daily_sky_request_policy(instance)
@@ -991,11 +1073,15 @@ def validate_package(
             print(f"FAIL schema meta   {path.name}: {exc}")
 
     def policy_errors(fixture: str, instance: dict) -> list[str]:
+        if name == "m3":
+            return _m3_policy_errors(fixture, instance, catalogue)
+        if name == "m4":
+            return _m4_policy_errors(fixture, instance)
         if name == "m5":
             return _m5_policy_errors(fixture, instance)
         if name == "m6":
             return []
-        return _m3_policy_errors(fixture, instance, catalogue)
+        raise ValueError(f"unregistered contract package policy: {name}")
 
     for path in sorted((package / "fixtures" / "valid").glob("*.json")):
         ref = match_schema_ref(name, path.name)
@@ -1054,6 +1140,7 @@ def validate_package(
 PACKAGE_BASE = {
     "m0": "https://patternlike.app/contracts/m0/",
     "m3": M3_BASE,
+    "m4": M4_BASE,
     "m5": M5_BASE,
     "m6": M6_BASE,
 }
@@ -1388,6 +1475,83 @@ def check_m5_openapi_projection() -> list[str]:
     return errors
 
 
+M4_SCHEMA_VERSION = "0.4.0"
+
+
+def check_m4_manifest() -> list[str]:
+    """Check M4's additive inventory and exact frozen predecessor pins."""
+    errors: list[str] = []
+    path = M4 / "SCHEMA_MANIFEST.json"
+    if not path.exists():
+        return ["contracts/m4/SCHEMA_MANIFEST.json is missing"]
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    if doc.get("package") != "contracts/m4":
+        errors.append("M4 manifest package is not contracts/m4")
+    if doc.get("schema_version") != M4_SCHEMA_VERSION:
+        errors.append(f"M4 manifest schema_version is not {M4_SCHEMA_VERSION}")
+
+    declared = {entry.get("file"): entry for entry in doc.get("schemas") or []}
+    shipped = {p.name: p for p in sorted(M4.glob("*.schema.json"))}
+    for missing in sorted(set(shipped) - set(declared)):
+        errors.append(f"M4 manifest does not declare shipped schema {missing}")
+    for extra in sorted(set(declared) - set(shipped)):
+        errors.append(f"M4 manifest declares {extra}, which the package does not ship")
+    for filename, entry in declared.items():
+        if filename not in shipped:
+            continue
+        schema = json.loads(shipped[filename].read_text(encoding="utf-8"))
+        if entry.get("id") != schema.get("$id"):
+            errors.append(f"{filename}: M4 manifest id disagrees with the document $id")
+        if sorted(entry.get("defines") or []) != sorted(schema.get("$defs") or {}):
+            errors.append(f"{filename}: M4 manifest definition inventory disagrees")
+
+    recorded = _recorded_predecessors(path)
+    expected = {
+        "contracts/m0": _normalised_manifest_digest(M0),
+        "contracts/m3": _normalised_manifest_digest(M3),
+    }
+    for predecessor, digest in expected.items():
+        if recorded.get(predecessor) != digest:
+            errors.append(f"M4 manifest does not pin the exact {predecessor} manifest")
+    if not errors:
+        print(
+            f"OK  manifest      contracts/m4 declares {len(declared)} schema(s) "
+            "and pins the exact M0/M3 predecessors"
+        )
+    return errors
+
+
+def check_m4_openapi_projection() -> list[str]:
+    try:
+        import yaml
+    except ImportError:
+        return []
+    path = M4 / "openapi" / "openapi.yaml"
+    if not path.exists():
+        return ["contracts/m4/openapi/openapi.yaml is missing"]
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    paths = spec.get("paths") or {}
+    required = {
+        "/v1/pattern": {"get"},
+        "/v1/time-travel": {"get"},
+        "/v1/life-events": {"get", "post"},
+        "/v1/life-events/{event_id}": {"put", "delete"},
+        "/v1/context-sources": {"get", "put"},
+    }
+    errors: list[str] = []
+    for route, methods in required.items():
+        item = paths.get(route)
+        if not isinstance(item, dict):
+            errors.append(f"M4 OpenAPI does not describe {route}")
+            continue
+        for method in methods:
+            if method not in item:
+                errors.append(f"M4 OpenAPI {route} has no {method.upper()}")
+    if not errors:
+        print("OK  projection    M4 OpenAPI declares Pattern, Time Travel, life events, and context CAS")
+    return errors
+
+
 M6_SCHEMA_VERSION = "0.6.0"
 
 
@@ -1527,6 +1691,12 @@ def main() -> int:
             print(f"FAIL invalid vector {vectors.name} (expected a vector failure)")
         else:
             print(f"OK  invalid vector {vectors.name}: {ve[0]}")
+
+    print("\n== contracts/m4 ==")
+    errors += validate_package(registry, "m4", M4, set())
+    errors += check_openapi(M4, registry)
+    errors += check_m4_manifest()
+    errors += check_m4_openapi_projection()
 
     print("\n== contracts/m5 ==")
     errors += validate_package(registry, "m5", M5, set())

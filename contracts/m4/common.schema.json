@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m4/common.schema.json",
+  "title": "Pattern/Like M4 common definitions",
+  "$defs": {
+    "schemaVersion": { "type": "string", "const": "0.4.0" },
+    "featureId": { "type": "string", "pattern": "^nft_[0-9a-f]{32}$" },
+    "featureSetId": { "type": "string", "pattern": "^nfs_[0-9a-f]{32}$" },
+    "scanReceiptId": { "type": "string", "pattern": "^csr_[0-9a-f]{32}$" },
+    "lifeEventId": { "type": "string", "pattern": "^evt_[0-9a-f]{32}$" },
+    "featureClass": {
+      "type": "string",
+      "enum": ["position", "aspect", "pattern", "angle", "house_cusp", "uncertainty"]
+    },
+    "datePrecision": {
+      "type": "string",
+      "enum": ["day", "month", "year", "range"]
+    },
+    "lifeEventCategory": {
+      "type": "string",
+      "enum": [
+        "education", "work", "home", "travel", "relationship",
+        "family", "creative", "community", "health_context", "other"
+      ]
+    },
+    "significance": { "type": "string", "enum": ["low", "medium", "high"] },
+    "scanProvenance": { "type": "string", "enum": ["cache", "on_demand"] },
+    "comparisonGroup": {
+      "type": "string",
+      "enum": ["continuing", "selected_only", "present_only"]
+    },
+    "recordingRelation": {
+      "type": "string",
+      "enum": ["recorded_then", "added_later"]
+    }
+  }
+}

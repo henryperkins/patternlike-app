@@ -1,0 +1,72 @@
+{
+  "package": "contracts/m4",
+  "schema_version": "0.4.0",
+  "document_date": "2026-08-13",
+  "status": "frozen",
+  "milestone": "M4 - Your Pattern and Time Travel",
+  "predecessors": [
+    {
+      "package": "contracts/m0",
+      "schema_version": "0.2.0",
+      "manifest_sha256": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
+      "relationship": "base_vocabulary"
+    },
+    {
+      "package": "contracts/m3",
+      "schema_version": "0.3.0",
+      "manifest_sha256": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
+      "relationship": "signed_release_predecessor"
+    }
+  ],
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m4/common.schema.json",
+      "defines": ["comparisonGroup", "datePrecision", "featureClass", "featureId", "featureSetId", "lifeEventCategory", "lifeEventId", "recordingRelation", "scanProvenance", "scanReceiptId", "schemaVersion", "significance"]
+    },
+    {
+      "file": "natal-feature.schema.json",
+      "id": "https://patternlike.app/contracts/m4/natal-feature.schema.json",
+      "defines": ["angleFeature", "anglePredicate", "aspectFeature", "aspectPredicate", "featureCore", "houseCuspFeature", "houseCuspPredicate", "natalFeature", "natalPredicate", "patternFeature", "patternMatch", "patternObject", "patternPredicate", "positionFeature", "positionPredicate", "uncertaintyFeature", "uncertaintyPredicate"]
+    },
+    {
+      "file": "content-release.schema.json",
+      "id": "https://patternlike.app/contracts/m4/content-release.schema.json",
+      "defines": ["contentReleaseBundle", "contentReleaseIngestionRequest"],
+      "supersedes": "m3:content-release.schema.json#/$defs/contentReleaseBundle"
+    },
+    {
+      "file": "pattern-response.schema.json",
+      "id": "https://patternlike.app/contracts/m4/pattern-response.schema.json",
+      "defines": ["patternChapter", "patternEvidence", "patternOmissions", "patternResponse"]
+    },
+    {
+      "file": "life-event.schema.json",
+      "id": "https://patternlike.app/contracts/m4/life-event.schema.json",
+      "defines": ["lifeEvent", "lifeEventList", "lifeEventRequest"]
+    },
+    {
+      "file": "cycle-scan-receipt.schema.json",
+      "id": "https://patternlike.app/contracts/m4/cycle-scan-receipt.schema.json",
+      "defines": ["cycleScanReceipt"]
+    },
+    {
+      "file": "time-travel-response.schema.json",
+      "id": "https://patternlike.app/contracts/m4/time-travel-response.schema.json",
+      "defines": ["comparison", "dateState", "projectedCycle", "savedContextItem", "timeTravelResponse"]
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.4.0",
+      "describes": "Public Worker amendment for Pattern, Time Travel, USR-09 life events, and the two-source context document."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "wire_format": "snake_case",
+    "signed_release": "M3 and M4 ingestion remain supported; the one active pointer may target either."
+  },
+  "frozen_unchanged_packages": ["contracts/m0", "contracts/m3", "contracts/m5", "contracts/m6"]
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m4/pattern-response.schema.json",
+  "title": "M4 Your Pattern response",
+  "$defs": {
+    "patternEvidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["feature_id", "feature_class", "label"],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "$ref": "common.schema.json#/$defs/featureClass" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "patternChapter": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "content_id", "content_version", "title", "summary", "body",
+        "resources", "tensions", "counter_expression", "evidence"
+      ],
+      "properties": {
+        "content_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "content_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "resources": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "tensions": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "counter_expression": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/patternEvidence" } }
+      }
+    },
+    "patternOmissions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["accuracy", "houses_or_angles", "locale", "predicate_mismatch"],
+      "properties": {
+        "accuracy": { "type": "integer", "minimum": 0 },
+        "houses_or_angles": { "type": "integer", "minimum": 0 },
+        "locale": { "type": "integer", "minimum": 0 },
+        "predicate_mismatch": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "patternResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "generated_at", "chart_id", "chart_fingerprint",
+        "effective_accuracy", "feature_policy_version", "feature_set_hash",
+        "release_version", "bundle_hash", "locale", "items", "next_cursor",
+        "omissions"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "generated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "chart_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "chart_fingerprint": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "feature_policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "feature_set_hash": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/sha256Hex" },
+        "release_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "bundle_hash": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/patternChapter" } },
+        "next_cursor": { "type": ["string", "null"], "minLength": 1, "maxLength": 4096 },
+        "omissions": { "$ref": "#/$defs/patternOmissions" }
+      }
+    }
+  }
+}

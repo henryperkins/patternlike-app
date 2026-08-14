@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m4/life-event.schema.json",
+  "title": "M4 USR-09 life events",
+  "$defs": {
+    "lifeEventRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "start_date", "end_date", "precision", "category",
+        "significance", "title", "note", "use_in_time_travel"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "start_date": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate" },
+        "end_date": { "anyOf": [{ "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate" }, { "type": "null" }] },
+        "precision": { "$ref": "common.schema.json#/$defs/datePrecision" },
+        "category": { "$ref": "common.schema.json#/$defs/lifeEventCategory" },
+        "significance": { "$ref": "common.schema.json#/$defs/significance" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "note": { "type": ["string", "null"], "maxLength": 2000 },
+        "use_in_time_travel": { "type": "boolean", "default": false }
+      }
+    },
+    "lifeEvent": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "id", "start_date", "end_date", "precision",
+        "category", "significance", "title", "note", "use_in_time_travel",
+        "revision", "observed_at", "recorded_at", "updated_at"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "id": { "$ref": "common.schema.json#/$defs/lifeEventId" },
+        "start_date": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate" },
+        "end_date": { "anyOf": [{ "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate" }, { "type": "null" }] },
+        "precision": { "$ref": "common.schema.json#/$defs/datePrecision" },
+        "category": { "$ref": "common.schema.json#/$defs/lifeEventCategory" },
+        "significance": { "$ref": "common.schema.json#/$defs/significance" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "note": { "type": ["string", "null"], "maxLength": 2000 },
+        "use_in_time_travel": { "type": "boolean" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "observed_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "recorded_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "updated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" }
+      }
+    },
+    "lifeEventList": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "items"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "items": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/lifeEvent" } }
+      }
+    }
+  }
+}

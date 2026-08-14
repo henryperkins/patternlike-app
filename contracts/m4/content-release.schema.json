@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m4/content-release.schema.json",
+  "title": "M4 signed content release",
+  "$defs": {
+    "contentReleaseBundle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "release", "objects", "signature"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "release": { "$ref": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/releaseMetadata" },
+        "objects": {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "patterns", "cycles", "phases", "modifiers", "prompts",
+            "safety_rules", "timing_templates", "daily_fallbacks"
+          ],
+          "properties": {
+            "patterns": { "type": "array", "items": { "$ref": "natal-feature.schema.json#/$defs/patternObject" } },
+            "cycles": { "type": "array", "items": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/cycleObject" } },
+            "phases": { "type": "array", "minItems": 1, "items": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/phaseObject" } },
+            "modifiers": { "type": "array", "items": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/modifierObject" } },
+            "prompts": { "type": "array", "items": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/promptObject" } },
+            "safety_rules": { "type": "array", "minItems": 1, "items": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/safetyRuleObject" } },
+            "timing_templates": { "type": "array", "minItems": 1, "items": { "$ref": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/timingTemplateObject" } },
+            "daily_fallbacks": { "type": "array", "minItems": 1, "items": { "$ref": "https://patternlike.app/contracts/m3/content-release.schema.json#/$defs/fallbackCopyObject" } }
+          }
+        },
+        "signature": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/bundleSignature" },
+        "fixtures": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["fixture_id", "expect"],
+            "properties": {
+              "fixture_id": { "type": "string", "minLength": 1 },
+              "expect": { "type": "string", "enum": ["eligible", "ineligible", "fallback"] }
+            }
+          }
+        }
+      }
+    },
+    "contentReleaseIngestionRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "bundle", "idempotency_key"],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "bundle": { "$ref": "#/$defs/contentReleaseBundle" },
+        "idempotency_key": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/idempotencyKey" },
+        "activate": { "type": "boolean", "default": true }
+      }
+    }
+  }
+}

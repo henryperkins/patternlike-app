@@ -192,6 +192,8 @@ def check_fresh_schema() -> None:
         "assertion_probe", "timezone_changes", "cycle_passes",
         "daily_readings", "reading_sources", "jobs",
         "reading_provider_daily_usage",
+        "natal_feature_sets", "cycle_scan_receipts",
+        "time_travel_daily_usage",
     }
     missing = expected - tables
     if missing:
@@ -225,6 +227,15 @@ def check_fresh_schema() -> None:
         "uq_context_signals_usr06_current",
         "uq_context_signals_usr06_revision",
         "idx_context_signals_norm_evidence",
+        # 0005. M4 feature-set convergence, receipt lookup/pruning, spend
+        # bounds, and one-current USR-09 revision are database invariants.
+        "uq_natal_feature_sets_policy",
+        "idx_natal_features_feature_set",
+        "uq_cycle_scan_receipts_lookup",
+        "idx_cycle_scan_receipts_user_prune",
+        "uq_time_travel_daily_usage_user_date",
+        "uq_context_signals_usr09_current",
+        "uq_context_signals_usr09_revision",
     ):
         if name not in indexes:
             raise SystemExit(f"Missing index {name}")

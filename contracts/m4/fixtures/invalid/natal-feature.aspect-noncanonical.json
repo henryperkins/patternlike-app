@@ -1,0 +1,10 @@
+{
+  "feature_id": "nft_0123456789abcdef0123456789abcdef",
+  "feature_class": "aspect",
+  "policy_id": "natal-feature-policy",
+  "policy_version": "1.0.0",
+  "body_a": "moon",
+  "body_b": "sun",
+  "aspect": "trine",
+  "orb": 1.2
+}

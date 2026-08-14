@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.4.0",
+  "generated_at": "2026-08-13T12:00:00Z",
+  "timezone": "America/Chicago",
+  "calculation_policy": {
+    "contract_id": "patternlike.calc",
+    "contract_version": "0.3.0",
+    "cycle_policy_id": "transits-v1",
+    "cycle_policy_version": "1.0.0",
+    "orb_policy_id": "major-aspects-v1",
+    "orb_policy_version": "1.0.0",
+    "receipt_epoch": 1
+  },
+  "selected": {
+    "local_date": "2024-05-12",
+    "reference_at": "2024-05-12T17:00:00Z",
+    "provenance": "on_demand",
+    "calculated_at": "2026-08-13T12:00:00Z",
+    "cycles": []
+  },
+  "present": {
+    "local_date": "2026-08-13",
+    "reference_at": "2026-08-13T12:00:00Z",
+    "provenance": "cache",
+    "calculated_at": "2026-08-13T11:00:00Z",
+    "cycles": []
+  },
+  "comparison": {
+    "continuing": [],
+    "selected_only": [],
+    "present_only": [],
+    "phase_changed": []
+  },
+  "saved_context": [],
+  "unreadable_context_count": 0,
+  "life_event_source_state": "never_granted"
+}

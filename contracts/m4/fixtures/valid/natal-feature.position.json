@@ -1,0 +1,10 @@
+{
+  "feature_id": "nft_0123456789abcdef0123456789abcdef",
+  "feature_class": "position",
+  "policy_id": "natal-feature-policy",
+  "policy_version": "1.0.0",
+  "body": "sun",
+  "longitude": 123.456789,
+  "sign": 5,
+  "house": 9
+}

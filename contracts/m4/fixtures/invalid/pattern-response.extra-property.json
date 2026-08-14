@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.4.0",
+  "generated_at": "2026-08-13T12:00:00Z",
+  "chart_id": "cht_test",
+  "chart_fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "effective_accuracy": "unknown",
+  "feature_policy_version": "1.0.0",
+  "feature_set_hash": "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0",
+  "release_version": "test",
+  "bundle_hash": "sha256:23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01",
+  "locale": "en-US",
+  "items": [],
+  "next_cursor": null,
+  "omissions": { "accuracy": 0, "houses_or_angles": 0, "locale": 0, "predicate_mismatch": 0 },
+  "draft_fallback": "not allowed"
+}

@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m4/natal-feature.schema.json",
+  "title": "M4 natal features and Pattern matching",
+  "$defs": {
+    "featureCore": {
+      "type": "object",
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "$ref": "common.schema.json#/$defs/featureClass" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion"
+        }
+      }
+    },
+    "positionFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version",
+        "body", "longitude", "sign", "house"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "const": "position" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "body": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" },
+        "longitude": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "sign": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "house": { "type": ["integer", "null"], "minimum": 1, "maximum": 12 }
+      }
+    },
+    "aspectFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version",
+        "body_a", "body_b", "aspect", "orb"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "const": "aspect" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "body_a": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" },
+        "body_b": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" },
+        "aspect": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType" },
+        "orb": { "type": "number", "minimum": 0, "maximum": 12 }
+      }
+    },
+    "patternFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version",
+        "pattern", "member_bodies"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "const": "pattern" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "pattern": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "member_bodies": {
+          "type": "array", "minItems": 2, "uniqueItems": true,
+          "items": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" }
+        }
+      }
+    },
+    "angleFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version",
+        "angle", "longitude", "sign"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "const": "angle" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "angle": { "type": "string", "enum": ["ascendant", "midheaven"] },
+        "longitude": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "sign": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "houseCuspFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version",
+        "house", "longitude", "sign"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "const": "house_cusp" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "house": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "longitude": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "sign": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "uncertaintyFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id", "feature_class", "policy_id", "policy_version",
+        "accuracy", "suppressed_features"
+      ],
+      "properties": {
+        "feature_id": { "$ref": "common.schema.json#/$defs/featureId" },
+        "feature_class": { "const": "uncertainty" },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+        "accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "suppressed_features": {
+          "type": "array", "uniqueItems": true,
+          "items": { "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/suppressedFeatureClass" }
+        }
+      }
+    },
+    "natalFeature": {
+      "oneOf": [
+        { "$ref": "#/$defs/positionFeature" },
+        { "$ref": "#/$defs/aspectFeature" },
+        { "$ref": "#/$defs/patternFeature" },
+        { "$ref": "#/$defs/angleFeature" },
+        { "$ref": "#/$defs/houseCuspFeature" },
+        { "$ref": "#/$defs/uncertaintyFeature" }
+      ]
+    },
+    "positionPredicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "body"],
+      "properties": {
+        "type": { "const": "position" },
+        "body": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" },
+        "sign": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "house": { "type": "integer", "minimum": 1, "maximum": 12 }
+      },
+      "anyOf": [
+        {
+          "required": ["sign"],
+          "properties": { "sign": { "type": "integer", "minimum": 1, "maximum": 12 } }
+        },
+        {
+          "required": ["house"],
+          "properties": { "house": { "type": "integer", "minimum": 1, "maximum": 12 } }
+        }
+      ]
+    },
+    "aspectPredicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "body_a", "body_b", "aspect"],
+      "properties": {
+        "type": { "const": "aspect" },
+        "body_a": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" },
+        "body_b": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" },
+        "aspect": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType" },
+        "max_orb": { "type": "number", "minimum": 0, "maximum": 12 }
+      }
+    },
+    "patternPredicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "pattern"],
+      "properties": {
+        "type": { "const": "pattern" },
+        "pattern": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "member_bodies": {
+          "type": "array", "minItems": 2, "uniqueItems": true,
+          "items": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" }
+        }
+      }
+    },
+    "anglePredicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "angle"],
+      "properties": {
+        "type": { "const": "angle" },
+        "angle": { "type": "string", "enum": ["ascendant", "midheaven"] },
+        "sign": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "houseCuspPredicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "house"],
+      "properties": {
+        "type": { "const": "house_cusp" },
+        "house": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "sign": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "uncertaintyPredicate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "accuracy"],
+      "properties": {
+        "type": { "const": "uncertainty" },
+        "accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "suppressed_feature": { "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/suppressedFeatureClass" }
+      }
+    },
+    "natalPredicate": {
+      "oneOf": [
+        { "$ref": "#/$defs/positionPredicate" },
+        { "$ref": "#/$defs/aspectPredicate" },
+        { "$ref": "#/$defs/patternPredicate" },
+        { "$ref": "#/$defs/anglePredicate" },
+        { "$ref": "#/$defs/houseCuspPredicate" },
+        { "$ref": "#/$defs/uncertaintyPredicate" }
+      ]
+    },
+    "patternMatch": {
+      "type": "object", "additionalProperties": false,
+      "required": ["all_of", "any_of", "none_of"],
+      "properties": {
+        "all_of": { "type": "array", "items": { "$ref": "#/$defs/natalPredicate" } },
+        "any_of": { "type": "array", "items": { "$ref": "#/$defs/natalPredicate" } },
+        "none_of": { "type": "array", "items": { "$ref": "#/$defs/natalPredicate" } }
+      },
+      "anyOf": [
+        { "properties": { "all_of": { "type": "array", "minItems": 1 } } },
+        { "properties": { "any_of": { "type": "array", "minItems": 1 } } }
+      ]
+    },
+    "patternObject": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "id", "content_type", "content_version", "object_hash", "locale",
+        "status", "display_priority", "title", "summary", "body", "resources",
+        "tensions", "counter_expression", "prohibited_claims", "tags",
+        "minimum_accuracy", "requires_houses", "required_bodies",
+        "required_aspects", "match"
+      ],
+      "properties": {
+        "id": { "$ref": "https://patternlike.app/contracts/m0/content-release.schema.json#/$defs/fragmentId" },
+        "content_type": { "const": "pattern" },
+        "content_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "object_hash": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "status": { "type": "string", "enum": ["approved", "deprecated"] },
+        "display_priority": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "resources": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "tensions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "counter_expression": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "prohibited_claims": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "tags": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+        "minimum_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "requires_houses": { "type": "boolean" },
+        "required_bodies": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/celestialBody" } },
+        "required_aspects": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/aspectType" } },
+        "match": { "$ref": "#/$defs/patternMatch" }
+      }
+    }
+  }
+}

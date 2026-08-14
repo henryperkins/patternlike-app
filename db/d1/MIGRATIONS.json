@@ -21,6 +21,11 @@
       "id": "0004_privacy_context",
       "file": "0004_privacy_context.sql",
       "description": "M6 privacy lifecycle and USR-06 check-ins. Rebuilds user_keys so only deletion-erased rows may lose wrapped DEK bytes; extends export/deletion requests with opaque job, receipt, envelope, checkpoint, timestamp, and safe error state; adds privacy-specific bounded outbox and lease indexes; and gives context signals deterministic source revisions, one-current-row semantics, non-unique evidence hashes, and bounded retention."
+    },
+    {
+      "id": "0005_m4_pattern_time_travel",
+      "file": "0005_m4_pattern_time_travel.sql",
+      "description": "M4 Your Pattern and Time Travel. Adds deterministic natal-feature completion receipts, immutable bounded cycle-scan receipts, the per-user UTC-day outbound-scan ledger, and USR-09 revision/current-row uniqueness. Life-event values remain in encrypted context_signals and the three new tables are non-portable derived or operational state."
     }
   ],
   "notes": [

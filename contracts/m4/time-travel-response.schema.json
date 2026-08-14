@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m4/time-travel-response.schema.json",
+  "title": "M4 Time Travel response",
+  "$defs": {
+    "projectedCycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cycle", "phase", "rank", "dominant"],
+      "properties": {
+        "cycle": { "$ref": "https://patternlike.app/contracts/m3/cycle-response.schema.json#/$defs/normalizedCycle" },
+        "phase": {
+          "anyOf": [
+            { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/cyclePhase" },
+            { "type": "null" }
+          ]
+        },
+        "rank": { "type": "integer", "minimum": 1 },
+        "dominant": { "type": "boolean" }
+      }
+    },
+    "dateState": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "local_date", "reference_at", "provenance", "calculated_at", "cycles"
+      ],
+      "properties": {
+        "local_date": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate" },
+        "reference_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "provenance": { "$ref": "common.schema.json#/$defs/scanProvenance" },
+        "calculated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "cycles": { "type": "array", "items": { "$ref": "#/$defs/projectedCycle" } }
+      }
+    },
+    "comparison": {
+      "type": "object", "additionalProperties": false,
+      "required": ["continuing", "selected_only", "present_only", "phase_changed"],
+      "properties": {
+        "continuing": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId" } },
+        "selected_only": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId" } },
+        "present_only": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId" } },
+        "phase_changed": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId" } }
+      }
+    },
+    "savedContextItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["event", "recording_relation"],
+      "properties": {
+        "event": { "$ref": "life-event.schema.json#/$defs/lifeEvent" },
+        "recording_relation": { "$ref": "common.schema.json#/$defs/recordingRelation" }
+      }
+    },
+    "timeTravelResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "generated_at", "timezone", "calculation_policy",
+        "selected", "present", "comparison", "saved_context",
+        "unreadable_context_count", "life_event_source_state"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+        "generated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "timezone": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/ianaTimeZone" },
+        "calculation_policy": {
+          "type": "object", "additionalProperties": false,
+          "required": ["contract_id", "contract_version", "cycle_policy_id", "cycle_policy_version", "orb_policy_id", "orb_policy_version", "receipt_epoch"],
+          "properties": {
+            "contract_id": { "type": "string", "minLength": 1 },
+            "contract_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+            "cycle_policy_id": { "type": "string", "minLength": 1 },
+            "cycle_policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+            "orb_policy_id": { "type": "string", "minLength": 1 },
+            "orb_policy_version": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/semanticVersion" },
+            "receipt_epoch": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "selected": { "$ref": "#/$defs/dateState" },
+        "present": { "$ref": "#/$defs/dateState" },
+        "comparison": { "$ref": "#/$defs/comparison" },
+        "saved_context": { "type": "array", "items": { "$ref": "#/$defs/savedContextItem" } },
+        "unreadable_context_count": { "type": "integer", "minimum": 0 },
+        "life_event_source_state": { "type": "string", "enum": ["active", "paused", "revoked", "never_granted"] }
+      }
+    }
+  }
+}

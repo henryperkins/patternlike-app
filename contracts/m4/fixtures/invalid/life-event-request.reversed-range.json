@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.4.0",
+  "start_date": "2025-06-01",
+  "end_date": "2025-05-01",
+  "precision": "range",
+  "category": "home",
+  "significance": "medium",
+  "title": "Moved",
+  "note": null,
+  "use_in_time_travel": true
+}

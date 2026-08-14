@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API (M4 amendment)
+  version: 0.4.0
+  description: Your Pattern, Time Travel, USR-09 life events, and context-source CAS.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+  - url: http://localhost:8787
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/pattern:
+    get:
+      operationId: getPattern
+      x-normative-schema: 'm4:pattern-response.schema.json#/$defs/patternResponse'
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string, minLength: 1, maxLength: 4096 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Stable page of reviewed eligible Pattern chapters
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/time-travel:
+    get:
+      operationId: getTimeTravel
+      x-normative-schema: 'm4:time-travel-response.schema.json#/$defs/timeTravelResponse'
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Selected and present reconstructed cycle state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimeTravelResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/life-events:
+    get:
+      operationId: listLifeEvents
+      x-normative-schema: 'm4:life-event.schema.json#/$defs/lifeEventList'
+      responses:
+        '200':
+          description: Complete bounded owner-scoped list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LifeEventList' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createLifeEvent
+      x-normative-request-schema: 'm4:life-event.schema.json#/$defs/lifeEventRequest'
+      x-normative-response-schema: 'm4:life-event.schema.json#/$defs/lifeEvent'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LifeEventRequest' }
+      responses:
+        '201':
+          description: Created immutable first revision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LifeEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+  /v1/life-events/{event_id}:
+    parameters:
+      - { name: event_id, in: path, required: true, schema: { type: string, pattern: '^evt_[0-9a-f]{32}$' } }
+    put:
+      operationId: updateLifeEvent
+      x-normative-request-schema: 'm4:life-event.schema.json#/$defs/lifeEventRequest'
+      x-normative-response-schema: 'm4:life-event.schema.json#/$defs/lifeEvent'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LifeEventRequest' }
+      responses:
+        '200':
+          description: Created immutable replacement revision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LifeEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteLifeEvent
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Full revision chain deleted }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /v1/context-sources:
+    get:
+      operationId: getContextSourcesM4
+      responses:
+        '200': { description: Frozen M0 document containing canonical USR-06 and USR-09 source projections }
+        '401': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: updateOneContextSourceM4
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Full two-source document after one-source CAS }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: pl_session }
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 256 }
+  responses:
+    Error:
+      description: Closed safe error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    PatternResponse:
+      type: object
+      x-normative-schema: 'm4:pattern-response.schema.json#/$defs/patternResponse'
+    TimeTravelResponse:
+      type: object
+      x-normative-schema: 'm4:time-travel-response.schema.json#/$defs/timeTravelResponse'
+    LifeEventRequest:
+      type: object
+      x-normative-schema: 'm4:life-event.schema.json#/$defs/lifeEventRequest'
+    LifeEvent:
+      type: object
+      x-normative-schema: 'm4:life-event.schema.json#/$defs/lifeEvent'
+    LifeEventList:
+      type: object
+      x-normative-schema: 'm4:life-event.schema.json#/$defs/lifeEventList'
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, retryable]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }
+            request_id: { type: [string, 'null'] }
+            details: { type: [object, 'null'] }
