@@ -54,6 +54,7 @@ function wait(milliseconds: number): Promise<void> {
 export default function App() {
   const [view, setView] = useState<AppRoute>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
+  const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
   const [correctingBirth, setCorrectingBirth] = useState(false);
 
   const load = async (signal?: AbortSignal) => {

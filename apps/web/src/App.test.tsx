@@ -511,7 +511,7 @@ describe("web application shell", () => {
     await user.click(screen.getByRole("button", { name: /Correct/i }));
 
     await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
-    await user.type(screen.getByLabelText("Local time"), "03:15:00");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
     await user.click(screen.getByRole("button", { name: /Continue/i }));
     await user.click(screen.getByRole("button", { name: /Continue/i }));
     await user.click(
@@ -519,7 +519,8 @@ describe("web application shell", () => {
     );
     await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
 
-    expect(await screen.findByText("Leo 0.4 deg")).toBeInTheDocument();
+    expect((await screen.findAllByText("Leo 0.4 deg")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Taurus 24.1 deg")).not.toBeInTheDocument();
     expect(window.location.hash).toBe("#pattern");
 
     const [request] = capturedFor("/v1/birth-profiles");

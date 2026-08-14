@@ -235,7 +235,8 @@ describe("Context & privacy", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: /Correct/i })).not.toBeInTheDocument();
-    expect(screen.getByText("Account data")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: /Birth details/i })).getByText("Account data"))
+      .toBeInTheDocument();
   });
 
   it("offers sign out with the other account controls", async () => {

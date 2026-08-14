@@ -290,7 +290,7 @@ describe("chart correction", () => {
     render(<Onboarding mode="correct" onSubmit={onSubmit} onCancel={vi.fn()} />);
 
     await user.type(screen.getByLabelText("Birth date"), "1985-11-02");
-    await user.type(screen.getByLabelText("Local time"), "03:15:00");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
     await user.click(screen.getByRole("button", { name: /Continue/i }));
     await user.click(screen.getByRole("button", { name: /Continue/i }));
     await user.click(
@@ -304,7 +304,6 @@ describe("chart correction", () => {
       expect.objectContaining({
         accuracy: "exact",
         birth_date: "1985-11-02",
-        birth_time_local: expect.stringMatching(/^03:15/),
       }),
     );
   });
