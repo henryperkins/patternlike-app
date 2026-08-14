@@ -8,12 +8,17 @@ import {
   type ReadingFeedbackRecord,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
+import { Icon, type IconName } from "./icons.js";
 
-const OPTIONS: ReadonlyArray<{ value: FeedbackResonance; label: string }> = [
-  { value: "helpful", label: "This helped" },
-  { value: "neutral", label: "Mixed" },
-  { value: "not_helpful", label: "Not helpful" },
-  { value: "off", label: "Off the mark" },
+const OPTIONS: ReadonlyArray<{
+  value: FeedbackResonance;
+  label: string;
+  icon: IconName;
+}> = [
+  { value: "helpful", label: "This helped", icon: "check" },
+  { value: "neutral", label: "Mixed", icon: "mixed" },
+  { value: "not_helpful", label: "Not quite", icon: "almost" },
+  { value: "off", label: "Off the mark", icon: "miss" },
 ];
 
 function resonanceLabel(value: FeedbackResonance): string {
@@ -25,7 +30,7 @@ interface ReadingFeedbackCardProps {
 }
 
 /**
- * Structured usefulness feedback for the reading on screen.
+ * A quiet postscript, not a second panel.
  *
  * Resonance is stored so later readings can avoid repeating a framing the
  * reader already rejected. It does not feed the deterministic ranker —
@@ -35,6 +40,7 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
   const [existing, setExisting] = useState<ReadingFeedbackRecord | null>(null);
   const [resonance, setResonance] = useState<FeedbackResonance | "">("");
   const [note, setNote] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const key = useRef<string | null>(null);
@@ -95,20 +101,22 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
   };
 
   return (
-    <section className="reading-feedback panel" aria-labelledby="feedback-heading">
-      <div className="reading-feedback__heading">
-        <div>
-          <p className="kicker">USR-12</p>
-          <h2 id="feedback-heading">Was this useful?</h2>
-        </div>
-      </div>
+    <section className="reading-feedback" aria-labelledby="feedback-heading">
+      <h2 id="feedback-heading">Did this meet you?</h2>
       {existing ? (
         <p className="reading-feedback__saved">
-          You marked this reading as {resonanceLabel(existing.resonance).toLowerCase()}.
+          Noted — {resonanceLabel(existing.resonance).toLowerCase()}. Later
+          readings can take this into account.
         </p>
       ) : (
         <form className="reading-feedback__form" onSubmit={(event) => void submit(event)}>
-          <fieldset className="reading-feedback__choices">
+          <p className="reading-feedback__invite" id="reading-feedback-invite">
+            Optional. It never changes today's chapter.
+          </p>
+          <fieldset
+            className="reading-feedback__choices"
+            aria-describedby="reading-feedback-invite"
+          >
             <legend>How this reading landed</legend>
             <div className="reading-feedback__options">
               {OPTIONS.map((option) => (
@@ -120,31 +128,51 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
                     checked={resonance === option.value}
                     onChange={() => setResonance(option.value)}
                   />
-                  <span>{option.label}</span>
+                  <span>
+                    <Icon name={option.icon} />
+                    {option.label}
+                  </span>
                 </label>
               ))}
             </div>
           </fieldset>
-          <label className="reading-feedback__note" htmlFor="reading-feedback-note">
-            <span>Optional note</span>
-            <textarea
-              id="reading-feedback-note"
-              rows={2}
-              maxLength={2000}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </label>
-          {problem ? (
-            <p className="reading-feedback__status" role="status">
-              {problem}
-            </p>
+          {resonance ? (
+            <>
+              <button
+                className="reading-feedback__note-toggle"
+                type="button"
+                aria-expanded={noteOpen}
+                aria-controls="reading-feedback-note"
+                onClick={() => setNoteOpen((open) => !open)}
+              >
+                <Icon name={noteOpen ? "minus" : "plus"} />
+                {noteOpen ? "Hide the note" : "A sentence, if you want"}
+              </button>
+              {noteOpen ? (
+                <label className="reading-feedback__note" htmlFor="reading-feedback-note">
+                  <span>A sentence, if you want</span>
+                  <textarea
+                    id="reading-feedback-note"
+                    rows={2}
+                    maxLength={2000}
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                </label>
+              ) : null}
+              {problem ? (
+                <p className="reading-feedback__status" role="status">
+                  {problem}
+                </p>
+              ) : null}
+              <div className="reading-feedback__footer">
+                <button className="reading-feedback__send" type="submit" disabled={busy}>
+                  {busy ? "Sending…" : "Send this"}
+                  <Icon name="arrow" />
+                </button>
+              </div>
+            </>
           ) : null}
-          <div className="reading-feedback__footer">
-            <button className="button" type="submit" disabled={!resonance || busy}>
-              {busy ? "Saving…" : "Save feedback"}
-            </button>
-          </div>
         </form>
       )}
     </section>

@@ -1478,8 +1478,8 @@ summary:focus-visible {
 }
 
 /*
- * A compact instrument, not a second hero. It sits in the same 700px editorial
- * measure as the reading and uses the ledger's hard rules and operational type.
+ * Private context sits in the same 700px measure as the reading. It is an
+ * invitation, not a second hero: the date and the lead still carry the page.
  */
 .daily-check-in {
   width: min(700px, 100%);
@@ -1488,14 +1488,15 @@ summary:focus-visible {
 }
 
 .daily-check-in__heading {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: start;
-  justify-content: space-between;
-  gap: 24px;
+  gap: 8px 24px;
 }
 
 .daily-check-in__heading h2 {
-  margin: 5px 0 0;
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
   font-family: var(--serif);
   font-size: 24px;
   font-weight: 500;
@@ -1511,6 +1512,14 @@ summary:focus-visible {
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.daily-check-in__invite {
+  margin: 14px 0 18px;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 .daily-check-in__privacy-link {
@@ -1529,7 +1538,7 @@ summary:focus-visible {
 }
 
 .daily-check-in__form {
-  margin-top: 20px;
+  margin-top: 4px;
 }
 
 .daily-check-in__energy {
@@ -1540,7 +1549,17 @@ summary:focus-visible {
 }
 
 .daily-check-in__energy legend,
-.daily-check-in__field > span {
+.reading-feedback__choices legend,
+.reading-feedback__note > span,
+.topic-exclusions__list legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.daily-check-in__field > span:first-child {
   margin-bottom: 8px;
   color: var(--ink-faint);
   font-family: var(--mono);
@@ -1550,20 +1569,27 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
+.daily-check-in__field-hint {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+}
+
 .daily-check-in__levels {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border: 1px solid var(--line-dark);
+  gap: 8px;
 }
 
 .daily-check-in__levels label {
   position: relative;
   min-width: 0;
   cursor: pointer;
-}
-
-.daily-check-in__levels label + label {
-  border-left: 1px solid var(--line-dark);
 }
 
 .daily-check-in__levels input {
@@ -1575,19 +1601,51 @@ summary:focus-visible {
 
 .daily-check-in__levels span {
   display: grid;
-  min-height: 42px;
-  place-items: center;
-  color: var(--ink-soft);
+  min-height: 88px;
+  place-content: center;
+  gap: 6px;
+  padding: 14px 8px 12px;
+  color: var(--ink);
+  border: 1px solid var(--line);
   background: var(--paper-light);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-align: center;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.daily-check-in__levels svg {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 2px;
+  color: var(--ink-soft);
+}
+
+.daily-check-in__levels input:checked + span svg {
+  color: var(--forest);
+}
+
+.daily-check-in__levels strong {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.daily-check-in__levels small {
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+.daily-check-in__levels label:hover span {
+  border-color: var(--line-dark);
 }
 
 .daily-check-in__levels input:checked + span {
-  color: #fffdf6;
-  background: var(--forest);
+  border-color: var(--forest);
+  background: var(--forest-light);
 }
 
 .daily-check-in__levels input:focus-visible + span {
@@ -1598,6 +1656,9 @@ summary:focus-visible {
 }
 
 .daily-check-in__detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 14px;
   padding: 0;
   color: var(--forest);
@@ -1610,6 +1671,11 @@ summary:focus-visible {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.daily-check-in__detail-toggle svg {
+  width: 12px;
+  height: 12px;
 }
 
 .daily-check-in__details {
@@ -1671,12 +1737,21 @@ summary:focus-visible {
 }
 
 .daily-check-in__until {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--forest) !important;
   font-family: var(--mono) !important;
   font-size: 10px !important;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.daily-check-in__until svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 .today-fallback-note {
@@ -1693,13 +1768,163 @@ summary:focus-visible {
   margin-top: 44px;
 }
 
+/*
+ * A postscript after the chapter, not a second panel. No fill, no USR code,
+ * no 50px action — the reading has already done the work.
+ */
 .reading-feedback {
   width: min(700px, 100%);
-  margin-top: 28px;
+  margin-top: 36px;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.reading-feedback h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.reading-feedback__invite,
+.reading-feedback__saved {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.reading-feedback__form {
+  margin-top: 4px;
+}
+
+.reading-feedback__choices {
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.reading-feedback__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 4px;
+}
+
+.reading-feedback__options label {
+  position: relative;
+  cursor: pointer;
+}
+
+.reading-feedback__options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.reading-feedback__options span {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  border-bottom: 1px solid transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.reading-feedback__options svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.reading-feedback__options label:hover span {
+  color: var(--ink);
+}
+
+.reading-feedback__options input:checked + span {
+  color: var(--forest);
+  border-bottom-color: var(--forest);
+}
+
+.reading-feedback__options input:focus-visible + span {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 3px;
+}
+
+.reading-feedback__note-toggle,
+.reading-feedback__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0;
+  color: var(--forest);
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.reading-feedback__note-toggle svg,
+.reading-feedback__send svg {
+  width: 14px;
+  height: 14px;
+}
+
+.reading-feedback__send {
+  min-height: 44px;
+}
+
+.reading-feedback__send:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.reading-feedback__note {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.reading-feedback__note textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper-light);
+  font: inherit;
+}
+
+.reading-feedback__footer {
+  margin-top: 14px;
+}
+
+.reading-feedback__status {
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.topic-exclusions {
+  margin-top: 24px;
   padding: 22px 24px;
 }
 
-.reading-feedback__heading h2,
 .topic-exclusions .panel-heading h2 {
   margin: 5px 0 0;
   font-family: var(--serif);
@@ -1709,8 +1934,6 @@ summary:focus-visible {
   letter-spacing: -0.03em;
 }
 
-.reading-feedback__saved,
-.reading-feedback__form,
 .topic-exclusions > p,
 .topic-exclusions form {
   margin-top: 18px;
@@ -1720,30 +1943,15 @@ summary:focus-visible {
   line-height: 1.6;
 }
 
-.reading-feedback__choices,
 .topic-exclusions__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.reading-feedback__choices legend,
-.topic-exclusions__list legend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
-.reading-feedback__options,
-.topic-exclusions__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.reading-feedback__options label,
 .topic-exclusions__list label {
   display: flex;
   align-items: center;
@@ -1756,38 +1964,16 @@ summary:focus-visible {
   cursor: pointer;
 }
 
-.reading-feedback__options input,
 .topic-exclusions__list input {
   accent-color: var(--forest);
 }
 
-.reading-feedback__note {
-  display: grid;
-  gap: 6px;
-  margin-top: 16px;
-}
-
-.reading-feedback__note textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  font: inherit;
-}
-
-.reading-feedback__footer,
 .topic-exclusions__footer {
   margin-top: 16px;
 }
 
-.reading-feedback__status,
 .topic-exclusions__status {
   margin-top: 12px;
-}
-
-.topic-exclusions {
-  margin-top: 24px;
-  padding: 22px 24px;
 }
 
 /*
@@ -5133,15 +5319,6 @@ summary:focus-visible {
   .privacy-actions__buttons {
     grid-auto-flow: row;
     grid-template-columns: 1fr;
-  }
-
-  .daily-check-in__heading {
-    display: block;
-  }
-
-  .daily-check-in__heading .panel-code {
-    display: block;
-    margin-top: 8px;
   }
 
   .daily-check-in__selects {

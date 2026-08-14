@@ -12,6 +12,7 @@ import {
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
 import { formatInstant } from "../lib/reading-format.js";
+import { Icon, type IconName } from "./icons.js";
 
 type Availability =
   | { status: "loading" }
@@ -44,7 +45,20 @@ const SOURCE_LABELS: Record<string, string> = {
   never_granted: "not enabled",
 };
 
-const LEVELS: CheckInLevel[] = ["low", "medium", "high"];
+/**
+ * Wire values stay low/medium/high. The visible words are how a person might
+ * answer "How are you arriving?" rather than a Likert scale.
+ */
+const ENERGY_LEVELS: ReadonlyArray<{
+  value: CheckInLevel;
+  label: string;
+  hint: string;
+  icon: IconName;
+}> = [
+  { value: "low", label: "Quiet", hint: "Held back", icon: "quiet" },
+  { value: "medium", label: "Steady", hint: "Enough to move", icon: "steady" },
+  { value: "high", label: "Full", hint: "A lot in motion", icon: "full" },
+];
 
 function buildRequest(form: CheckInForm): CheckInRequest {
   const request: CheckInRequest = {
@@ -62,11 +76,13 @@ function buildRequest(form: CheckInForm): CheckInRequest {
 function LevelSelect({
   id,
   label,
+  hint,
   value,
   onChange,
 }: {
   id: string;
   label: string;
+  hint: string;
   value: CheckInLevel | "";
   onChange: (value: CheckInLevel | "") => void;
 }) {
@@ -78,11 +94,12 @@ function LevelSelect({
         value={value}
         onChange={(event) => onChange(event.target.value as CheckInLevel | "")}
       >
-        <option value="">Not set</option>
-        {LEVELS.map((level) => (
-          <option value={level} key={level}>{level[0]!.toUpperCase() + level.slice(1)}</option>
+        <option value="">Leave aside</option>
+        {ENERGY_LEVELS.map((level) => (
+          <option value={level.value} key={level.value}>{level.label}</option>
         ))}
       </select>
+      <span className="daily-check-in__field-hint">{hint}</span>
     </label>
   );
 }
@@ -148,7 +165,7 @@ export function DailyCheckInCard() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.energy || availability.status !== "active") {
-      setProblem("Choose an energy level before saving.");
+      setProblem("Choose how you are arriving before keeping this.");
       return;
     }
 
@@ -184,15 +201,13 @@ export function DailyCheckInCard() {
   return (
     <section className="daily-check-in panel" aria-labelledby="daily-check-in-heading">
       <div className="daily-check-in__heading">
-        <div>
-          <p className="kicker">Private context · 24 hours</p>
-          <h2 id="daily-check-in-heading">How are you arriving?</h2>
-        </div>
+        <p className="kicker">Private context · one day</p>
         <span className="panel-code">USR-06</span>
+        <h2 id="daily-check-in-heading">How are you arriving?</h2>
       </div>
 
       {availability.status === "loading" ? (
-        <p>Reading your check-in permission.</p>
+        <p>Seeing whether check-in is available.</p>
       ) : availability.status === "unavailable" ? (
         <>
           <p>{withRequestId(availability.message, availability.requestId)}</p>
@@ -203,24 +218,25 @@ export function DailyCheckInCard() {
       ) : availability.status === "inactive" ? (
         <div className="daily-check-in__inactive">
           <p>
-            Daily check-in is {availability.label}. PatternLike will not save a
-            check-in until you choose to enable that source.
+            Check-in is {availability.label}. Nothing is recorded until you
+            turn this source on.
           </p>
           <a className="button button--secondary" href="#privacy">
-            Manage check-in permission
+            Open check-in permission
           </a>
         </div>
       ) : saved ? (
         <div className="daily-check-in__saved">
           <p className="daily-check-in__until">
-            Saved · Active until {formatInstant(saved.freshness.expires_at)}
+            <Icon name="check" />
+            Held until {formatInstant(saved.freshness.expires_at)}
           </p>
           <p>
             {personalContextEligible === true
-              ? "Available to the next eligible generation. Your current reading has not been rewritten."
+              ? "The next reading can use this. Today's chapter stays as it is."
               : personalContextEligible === false
-                ? "Your check-in is saved but will not be sent to the reading publisher until Reading generation permission includes personal context. Your current reading has not been rewritten."
-                : "Your check-in is saved. Reading generation permission could not be confirmed. Your current reading has not been rewritten."}
+                ? "Saved, and kept from the publisher until reading generation includes personal context. Today's chapter stays as it is."
+                : "Saved. Today's chapter stays as it is."}
           </p>
           <button className="button button--secondary" type="button" onClick={beginEdit}>
             Edit
@@ -228,20 +244,28 @@ export function DailyCheckInCard() {
         </div>
       ) : (
         <form className="daily-check-in__form" onSubmit={submit}>
-          <fieldset className="daily-check-in__energy">
+          <p className="daily-check-in__invite" id="daily-check-in-invite">
+            One mark is enough. It lasts a day, and only a later reading can
+            use it — never this one.
+          </p>
+          <fieldset className="daily-check-in__energy" aria-describedby="daily-check-in-invite">
             <legend>Energy</legend>
             <div className="daily-check-in__levels">
-              {LEVELS.map((level) => (
-                <label key={level}>
+              {ENERGY_LEVELS.map((level) => (
+                <label key={level.value}>
                   <input
                     type="radio"
                     name="check-in-energy"
-                    value={level}
-                    checked={form.energy === level}
-                    onChange={() => editForm("energy", level)}
+                    value={level.value}
+                    checked={form.energy === level.value}
+                    onChange={() => editForm("energy", level.value)}
                     required
                   />
-                  <span>{level[0]!.toUpperCase() + level.slice(1)}</span>
+                  <span>
+                    <Icon name={level.icon} />
+                    <strong>{level.label}</strong>
+                    <small>{level.hint}</small>
+                  </span>
                 </label>
               ))}
             </div>
@@ -254,7 +278,8 @@ export function DailyCheckInCard() {
             aria-controls="daily-check-in-details"
             onClick={() => setDetailsOpen((open) => !open)}
           >
-            {detailsOpen ? "Hide detail" : "Add detail"}
+            <Icon name={detailsOpen ? "minus" : "plus"} />
+            {detailsOpen ? "Hide the rest" : "Say a little more"}
           </button>
 
           {detailsOpen ? (
@@ -263,33 +288,38 @@ export function DailyCheckInCard() {
                 <LevelSelect
                   id="check-in-pressure"
                   label="Pressure"
+                  hint="How much is on you"
                   value={form.pressure}
                   onChange={(value) => editForm("pressure", value)}
                 />
                 <LevelSelect
                   id="check-in-clarity"
                   label="Clarity"
+                  hint="How clearly you can see"
                   value={form.clarity}
                   onChange={(value) => editForm("clarity", value)}
                 />
                 <LevelSelect
                   id="check-in-connection"
                   label="Connection"
+                  hint="How close you feel"
                   value={form.connection}
                   onChange={(value) => editForm("connection", value)}
                 />
               </div>
               <label className="daily-check-in__field" htmlFor="check-in-focus">
-                <span>Focus domain</span>
+                <span>Focus</span>
                 <input
                   id="check-in-focus"
                   type="text"
                   value={form.focusDomain}
+                  placeholder="Work, home, a conversation"
                   onChange={(event) => editForm("focusDomain", event.target.value)}
                 />
+                <span className="daily-check-in__field-hint">What's occupying you</span>
               </label>
               <label className="daily-check-in__field" htmlFor="check-in-note">
-                <span>Optional note</span>
+                <span>Note</span>
                 <textarea
                   id="check-in-note"
                   value={form.note}
@@ -297,6 +327,7 @@ export function DailyCheckInCard() {
                   rows={3}
                   onChange={(event) => editForm("note", event.target.value)}
                 />
+                <span className="daily-check-in__field-hint">A sentence, if you want</span>
               </label>
             </div>
           ) : null}
@@ -308,7 +339,7 @@ export function DailyCheckInCard() {
               disabled={busy || !form.energy}
               aria-busy={busy}
             >
-              {busy ? "Saving" : "Save"}
+              {busy ? "Keeping…" : "Keep this"}
             </button>
             <p
               className="daily-check-in__status"
@@ -316,7 +347,7 @@ export function DailyCheckInCard() {
               aria-label="Check-in status"
               aria-live="polite"
             >
-              {busy ? "Saving your check-in." : problem}
+              {busy ? "Keeping your check-in." : problem}
             </p>
           </div>
         </form>

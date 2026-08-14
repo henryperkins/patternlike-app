@@ -78,9 +78,9 @@ describe("daily check-in card", () => {
 
     render(<DailyCheckInCard />);
 
-    const link = await screen.findByRole("link", { name: /Manage check-in permission/i });
+    const link = await screen.findByRole("link", { name: /Open check-in permission/i });
     expect(link).toHaveAttribute("href", "#privacy");
-    expect(screen.queryByRole("button", { name: /^Save$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Keep this/i })).not.toBeInTheDocument();
     expect(capturedFor(CHECK_INS)).toHaveLength(0);
   });
 
@@ -93,9 +93,12 @@ describe("daily check-in card", () => {
     });
 
     render(<DailyCheckInCard />);
-    await user.click(await screen.findByRole("radio", { name: "High" }));
+    expect(await screen.findByText(/One mark is enough/i)).toBeInTheDocument();
+    const energyMarks = document.querySelectorAll(".daily-check-in__levels svg");
+    expect(energyMarks).toHaveLength(3);
+    await user.click(await screen.findByRole("radio", { name: /Full/i }));
     expect(screen.queryByLabelText("Pressure")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^Save$/i }));
+    await user.click(screen.getByRole("button", { name: /Keep this/i }));
 
     expect(capturedFor(CHECK_INS)[0]!.body).toEqual({
       energy: "high",
@@ -103,10 +106,10 @@ describe("daily check-in card", () => {
     });
     expect(capturedFor(CHECK_INS)[0]!.headers.get("idempotency-key"))
       .toMatch(/^web-check-in-/);
-    expect(await screen.findByText(/Active until/i)).toBeInTheDocument();
-    expect(screen.getByText(/Available to the next eligible generation/i))
+    expect(await screen.findByText(/Held until/i)).toBeInTheDocument();
+    expect(screen.getByText(/The next reading can use this/i))
       .toBeInTheDocument();
-    expect(screen.getByText(/current reading has not been rewritten/i))
+    expect(screen.getByText(/Today's chapter stays as it is/i))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeEnabled();
   });
@@ -130,20 +133,20 @@ describe("daily check-in card", () => {
     mockApiResponses(responses);
 
     render(<DailyCheckInCard />);
-    await user.click(await screen.findByRole("radio", { name: "Medium" }));
-    await user.click(screen.getByRole("button", { name: /Add detail/i }));
-    await user.selectOptions(screen.getByLabelText("Pressure"), "high");
-    await user.type(screen.getByLabelText("Focus domain"), "Work transition");
-    await user.type(screen.getByLabelText("Optional note"), "Waiting on a decision.");
-    await user.click(screen.getByRole("button", { name: /^Save$/i }));
+    await user.click(await screen.findByRole("radio", { name: /Steady/i }));
+    await user.click(screen.getByRole("button", { name: /Say a little more/i }));
+    await user.selectOptions(screen.getByLabelText(/Pressure/i), "high");
+    await user.type(screen.getByRole("textbox", { name: /Focus/i }), "Work transition");
+    await user.type(screen.getByRole("textbox", { name: /Note/i }), "Waiting on a decision.");
+    await user.click(screen.getByRole("button", { name: /Keep this/i }));
 
     expect(await screen.findByRole("status", { name: /Check-in status/i }))
       .toHaveTextContent("req_checkin_conflict");
-    expect(screen.getByLabelText("Focus domain")).toHaveValue("Work transition");
-    expect(screen.getByLabelText("Optional note")).toHaveValue("Waiting on a decision.");
+    expect(screen.getByRole("textbox", { name: /Focus/i })).toHaveValue("Work transition");
+    expect(screen.getByRole("textbox", { name: /Note/i })).toHaveValue("Waiting on a decision.");
 
     responses[`POST ${CHECK_INS}`] = { status: 201, body: signal("medium") };
-    await user.click(screen.getByRole("button", { name: /^Save$/i }));
+    await user.click(screen.getByRole("button", { name: /Keep this/i }));
 
     const writes = capturedFor(CHECK_INS);
     expect(writes).toHaveLength(2);
@@ -156,8 +159,8 @@ describe("daily check-in card", () => {
       note: "Waiting on a decision.",
       expires_in_seconds: 86400,
     });
-    expect(await screen.findByText(/saved but will not be sent/i)).toBeInTheDocument();
-    expect(screen.getByText(/current reading has not been rewritten/i))
+    expect(await screen.findByText(/kept from the publisher/i)).toBeInTheDocument();
+    expect(screen.getByText(/Today's chapter stays as it is/i))
       .toBeInTheDocument();
   });
 });

@@ -889,7 +889,7 @@ describe("web application shell", () => {
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Today" })[0]);
     await screen.findByText(todayResponse.reading.paragraphs[0]!.text);
-    await screen.findByRole("heading", { name: /Was this useful/i });
+    await screen.findByRole("heading", { name: /Did this meet you/i });
 
     // Opened, because the drawer's contents are the part with the most markup
     // and the only place a heading-order violation could hide.
