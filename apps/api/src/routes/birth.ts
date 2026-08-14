@@ -16,6 +16,7 @@ import { invokeCalc } from "../services/calc-client.js";
 import { resolveTimezone } from "../services/timezone.js";
 import { reconcileCurrentFactRepair } from "../services/reading-invalidation.js";
 import { recomputeUserNextDueAt } from "../db/reading-scheduler.js";
+import { ensureNatalFeatureSet } from "../db/natal-features.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -456,6 +457,16 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       `UPDATE jobs SET status = 'succeeded', result_class = ?, finished_at = ? WHERE id = ?`,
     ).bind(chart.id, now, jobId),
   ]);
+
+  // The chart commit above is authoritative. Pattern's deterministic cache is
+  // awaited for the eager path, but its failure must not roll back a valid
+  // chart or make onboarding depend on editorial content. The Pattern GET
+  // repairs the same receipt lazily.
+  try {
+    await ensureNatalFeatureSet(c.env, userId, chart.id, new Date(now));
+  } catch {
+    safeLog({ event: "natal_feature_cache_write_failed" });
+  }
 
   await recomputeUserNextDueAt(c.env, userId, new Date(now));
 

@@ -78,6 +78,19 @@ describe("POST /v1/birth-profiles — the cross-tenant defect", () => {
 });
 
 describe("POST /v1/birth-profiles — idempotency", () => {
+  it("eagerly commits a deterministic natal-feature receipt after chart activation", async () => {
+    const created = await postBirthProfile(USER_A, "key-feature-cache", ALICE);
+    expect(created.status).toBe(202);
+    const receipts = await rows<{ chart_id: string; feature_count: number }>(
+      "SELECT chart_id, feature_count FROM natal_feature_sets WHERE user_id = ?",
+      USER_A,
+    );
+    expect(receipts).toEqual([
+      expect.objectContaining({ chart_id: created.body.resource_id, feature_count: expect.any(Number) }),
+    ]);
+    expect(receipts[0]!.feature_count).toBeGreaterThan(0);
+  });
+
   it("returns 202 duplicate with the same chart id when a key is replayed", async () => {
     const first = await postBirthProfile(USER_A, "key-replay", ALICE);
     const second = await postBirthProfile(USER_A, "key-replay", ALICE);

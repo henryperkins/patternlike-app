@@ -29,7 +29,7 @@ const CYCLE_FETCH_TIMEOUT_MS = 10_000;
  * refusal as a 200 carrying `ok: false`.
  */
 export type CycleInvocation =
-  | { ok: true; response: CycleResponseSuccess }
+  | { ok: true; response: CycleResponseSuccess; rawResponse: string }
   | { ok: false; kind: "refused"; failure: CycleResponseFailure }
   | { ok: false; kind: "unavailable"; detail: string };
 
@@ -126,8 +126,10 @@ export async function invokeCycles(
   }
 
   let json: CycleResponse;
+  let rawResponse: string;
   try {
-    json = (await res.json()) as CycleResponse;
+    rawResponse = await res.text();
+    json = JSON.parse(rawResponse) as CycleResponse;
   } catch {
     return { ok: false, kind: "unavailable", detail: "calc /v1/cycles returned invalid JSON" };
   }
@@ -158,5 +160,5 @@ export async function invokeCycles(
     };
   }
 
-  return { ok: true, response: json };
+  return { ok: true, response: json, rawResponse };
 }

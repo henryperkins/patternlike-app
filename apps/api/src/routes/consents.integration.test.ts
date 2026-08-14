@@ -254,14 +254,24 @@ describe("AI-synthesis consent routes", () => {
       { ...env, READING_V5_ROLLOUT: "off" },
     );
     expect(contextSources.status).toBe(200);
+    // Both registry sources, in canonical order. Neither is granted by the
+    // AI-synthesis consent: that consent governs model synthesis, and a source
+    // it silently switched on would be a permission nobody was shown.
     expect(await contextSources.json()).toMatchObject({
       schema_version: "0.2.0",
       user_id: USER_A,
-      sources: [{
-        source_id: "USR-06",
-        permission_state: "never_granted",
-        enabled: false,
-      }],
+      sources: [
+        {
+          source_id: "USR-06",
+          permission_state: "never_granted",
+          enabled: false,
+        },
+        {
+          source_id: "USR-09",
+          permission_state: "never_granted",
+          enabled: false,
+        },
+      ],
     });
   });
 

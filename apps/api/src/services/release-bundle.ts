@@ -4,6 +4,8 @@ import { findReleaseByVersion } from "../db/content-releases.js";
 import {
   computeBundleHash,
   hashesEqual,
+  validateIngestionRequest,
+  type ContentObject,
   type ContentReleaseBundle,
 } from "./content-release.js";
 
@@ -35,12 +37,21 @@ export function releaseObjectKey(version: string): string {
 /**
  * Project an ingested bundle into the engine's input shape.
  *
- * The cast is safe because ingestion validated every object against
- * `contracts/m3/content-release.schema.json` before the bytes reached R2, and
- * the hash check above proves these are those bytes. Re-validating here would
- * be a second copy of the contract that could disagree with the first.
+ * Stored bytes are validated again through the explicit M3/M4 dispatcher
+ * before projection. This is cheap compared with the R2 read and prevents a
+ * cast from silently treating an unregistered future shape as Today content.
  */
 export function toVerifiedBundle(bundle: ContentReleaseBundle): VerifiedBundle {
+  const validated = validateIngestionRequest({
+    schema_version: bundle.schema_version,
+    bundle,
+    idempotency_key: "stored-release-validation",
+    activate: false,
+  });
+  if ("error" in validated) {
+    throw new Error(`stored release bundle is invalid: ${validated.error.class}`);
+  }
+
   const release: VerifiedBundle["release"] = {
     version: bundle.release.version,
     bundle_hash: bundle.release.bundle_hash,
@@ -53,15 +64,133 @@ export function toVerifiedBundle(bundle: ContentReleaseBundle): VerifiedBundle {
   return {
     release,
     objects: {
-      cycles: bundle.objects.cycles as unknown as VerifiedBundle["objects"]["cycles"],
-      phases: bundle.objects.phases as unknown as VerifiedBundle["objects"]["phases"],
-      prompts: bundle.objects.prompts as unknown as VerifiedBundle["objects"]["prompts"],
-      modifiers: bundle.objects.modifiers as unknown as VerifiedBundle["objects"]["modifiers"],
-      timing_templates:
-        bundle.objects.timing_templates as unknown as VerifiedBundle["objects"]["timing_templates"],
-      daily_fallbacks:
-        bundle.objects.daily_fallbacks as unknown as VerifiedBundle["objects"]["daily_fallbacks"],
+      cycles: bundle.objects.cycles.map(projectCycle),
+      phases: bundle.objects.phases.map(projectPhase),
+      prompts: bundle.objects.prompts.map(projectPrompt),
+      modifiers: bundle.objects.modifiers.map(projectModifier),
+      timing_templates: bundle.objects.timing_templates.map(projectTimingTemplate),
+      daily_fallbacks: bundle.objects.daily_fallbacks.map(projectFallback),
     },
+  };
+}
+
+function requiredString(object: ContentObject, key: string): string {
+  const value = object[key];
+  if (typeof value !== "string") throw new Error(`stored release ${object.id}.${key} invalid`);
+  return value;
+}
+
+function requiredStrings(object: ContentObject, key: string): string[] {
+  const value = object[key];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`stored release ${object.id}.${key} invalid`);
+  }
+  return value;
+}
+
+function commonOptional<T extends { eligibility?: unknown; status?: unknown }>(
+  object: ContentObject,
+): Partial<T> {
+  const optional: Partial<T> = {};
+  if (object.eligibility !== undefined) {
+    optional.eligibility = object.eligibility as T["eligibility"];
+  }
+  if (object.status !== undefined) optional.status = object.status as T["status"];
+  return optional;
+}
+
+type EngineCycle = VerifiedBundle["objects"]["cycles"][number];
+function projectCycle(object: ContentObject): EngineCycle {
+  return {
+    id: object.id,
+    content_type: "astrology_cycle",
+    content_version: object.content_version,
+    locale: object.locale,
+    technique: requiredString(object, "technique"),
+    bodies: requiredStrings(object, "bodies"),
+    targets: requiredStrings(object, "targets"),
+    aspect: object.aspect as EngineCycle["aspect"],
+    phase_ids: requiredStrings(object, "phase_ids"),
+    ...commonOptional<EngineCycle>(object),
+  };
+}
+
+type EnginePhase = VerifiedBundle["objects"]["phases"][number];
+function projectPhase(object: ContentObject): EnginePhase {
+  return {
+    id: object.id,
+    content_type: "astrology_phase",
+    content_version: object.content_version,
+    locale: object.locale,
+    parent_cycle_id: requiredString(object, "parent_cycle_id"),
+    phase: object.phase as EnginePhase["phase"],
+    summary: requiredString(object, "summary"),
+    constructive_expression: requiredString(object, "constructive_expression"),
+    shadow_expression: requiredString(object, "shadow_expression"),
+    ...commonOptional<EnginePhase>(object),
+  };
+}
+
+type EnginePrompt = VerifiedBundle["objects"]["prompts"][number];
+function projectPrompt(object: ContentObject): EnginePrompt {
+  return {
+    id: object.id,
+    content_type: "astrology_prompt",
+    content_version: object.content_version,
+    locale: object.locale,
+    prompt_text: requiredString(object, "prompt_text"),
+    life_domains: requiredStrings(object, "life_domains") as EnginePrompt["life_domains"],
+    ...commonOptional<EnginePrompt>(object),
+  };
+}
+
+type EngineModifier = VerifiedBundle["objects"]["modifiers"][number];
+function projectModifier(object: ContentObject): EngineModifier {
+  const precedence = object.precedence;
+  if (typeof precedence !== "number") {
+    throw new Error(`stored release ${object.id}.precedence invalid`);
+  }
+  return {
+    id: object.id,
+    content_type: "astrology_modifier",
+    content_version: object.content_version,
+    locale: object.locale,
+    modifier_kind: requiredString(object, "modifier_kind"),
+    body: requiredString(object, "body"),
+    precedence,
+    ...commonOptional<EngineModifier>(object),
+  };
+}
+
+type EngineTiming = VerifiedBundle["objects"]["timing_templates"][number];
+function projectTimingTemplate(object: ContentObject): EngineTiming {
+  if (typeof object.is_locale_default !== "boolean") {
+    throw new Error(`stored release ${object.id}.is_locale_default invalid`);
+  }
+  return {
+    id: object.id,
+    content_type: "timing_template",
+    content_version: object.content_version,
+    locale: object.locale,
+    template_text: requiredString(object, "template_text"),
+    placeholders: requiredStrings(object, "placeholders") as EngineTiming["placeholders"],
+    is_locale_default: object.is_locale_default,
+    ...(object.status === undefined ? {} : { status: object.status as EngineTiming["status"] }),
+  };
+}
+
+type EngineFallback = VerifiedBundle["objects"]["daily_fallbacks"][number];
+function projectFallback(object: ContentObject): EngineFallback {
+  return {
+    id: object.id,
+    content_type: "daily_fallback",
+    content_version: object.content_version,
+    locale: object.locale,
+    body: requiredString(object, "body"),
+    eligibility_mode: "universal",
+    ...(object.status === undefined
+      ? {}
+      : { status: object.status as EngineFallback["status"] }),
   };
 }
 

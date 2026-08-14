@@ -1,10 +1,19 @@
-import { canonicalJson, contentHash, M3_SCHEMA_VERSION } from "@patternlike/shared";
+import {
+  canonicalJson,
+  contentHash,
+  isCanonicalAspectPair,
+  M3_SCHEMA_VERSION,
+} from "@patternlike/shared";
 import Ajv2020 from "ajv/dist/2020.js";
+import type { ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import commonSchema from "../../../../contracts/m0/common.schema.json";
 import contentReleaseSchema from "../../../../contracts/m0/content-release.schema.json";
 import m3CommonSchema from "../../../../contracts/m3/common.schema.json";
 import m3ContentReleaseSchema from "../../../../contracts/m3/content-release.schema.json";
+import m4CommonSchema from "../../../../contracts/m4/common.schema.json";
+import m4NatalFeatureSchema from "../../../../contracts/m4/natal-feature.schema.json";
+import m4ContentReleaseSchema from "../../../../contracts/m4/content-release.schema.json";
 
 /**
  * Verification for signed editorial release bundles.
@@ -52,6 +61,12 @@ const COLLECTION_CONTENT_TYPE: Record<ReleaseObjectCollection, string> = {
   timing_templates: "timing_template",
   daily_fallbacks: "daily_fallback",
 };
+
+export const M4_SCHEMA_VERSION = "0.4.0" as const;
+export const SUPPORTED_RELEASE_SCHEMA_VERSIONS = [
+  M3_SCHEMA_VERSION,
+  M4_SCHEMA_VERSION,
+] as const;
 
 /** Collections the contract requires to be non-empty. */
 const REQUIRED_NON_EMPTY: ReleaseObjectCollection[] = [
@@ -379,24 +394,39 @@ function isStringArray(value: unknown): value is string[] {
 const HASH_RE = /^(sha256:)?[a-f0-9]{64}$/;
 const RELEASE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
-// All four documents are registered because the M3 bundle schema refs both
-// packages: `common.schema.json` relative (m3) and two absolute m0 URLs. The M0
-// pair stays registered even though nothing validates against it directly — it
-// is what the m3 refs resolve through.
+// Register every absolute document reached by either supported release schema.
+// Version selection remains explicit below; registration alone never makes a
+// schema version ingestible.
 const schemaValidator = new Ajv2020({ strict: true });
 addFormats(schemaValidator);
 schemaValidator.addSchema(commonSchema);
 schemaValidator.addSchema(contentReleaseSchema);
 schemaValidator.addSchema(m3CommonSchema);
 schemaValidator.addSchema(m3ContentReleaseSchema);
-const loadedContentReleaseRequestValidator =
-  schemaValidator.getSchema<ContentReleaseIngestionRequest>(
-    `${m3ContentReleaseSchema.$id}#/$defs/contentReleaseIngestionRequest`,
-  );
-if (!loadedContentReleaseRequestValidator) {
-  throw new Error("Could not load contentReleaseIngestionRequest schema");
-}
-const validateContentReleaseRequest = loadedContentReleaseRequestValidator;
+schemaValidator.addSchema(m4CommonSchema);
+schemaValidator.addSchema(m4NatalFeatureSchema);
+schemaValidator.addSchema(m4ContentReleaseSchema);
+
+/**
+ * Explicit, bounded version dispatch. A `schema_version` with no entry here
+ * fails closed before hashing, signing, R2, or D1 work; it never falls through
+ * to the M3 validator, which would let an M4-shaped body reserve an immutable
+ * release version under a contract it was never checked against.
+ */
+const RELEASE_REQUEST_SCHEMAS: ReadonlyArray<readonly [string, { $id: string }]> = [
+  [M3_SCHEMA_VERSION, m3ContentReleaseSchema],
+  [M4_SCHEMA_VERSION, m4ContentReleaseSchema],
+];
+
+const releaseRequestValidators = new Map<string, ValidateFunction<ContentReleaseIngestionRequest>>(
+  RELEASE_REQUEST_SCHEMAS.map(([version, schema]) => {
+    const validator = schemaValidator.getSchema<ContentReleaseIngestionRequest>(
+      `${schema.$id}#/$defs/contentReleaseIngestionRequest`,
+    );
+    if (!validator) throw new Error(`Could not load ${version} content release schema`);
+    return [version, validator] as const;
+  }),
+);
 
 /**
  * Structural validation of an ingestion request.
@@ -414,11 +444,14 @@ export function validateIngestionRequest(
   }
   const body = value as Record<string, unknown>;
 
-  if (body.schema_version !== M3_SCHEMA_VERSION) {
+  if (
+    typeof body.schema_version !== "string" ||
+    !(SUPPORTED_RELEASE_SCHEMA_VERSIONS as readonly string[]).includes(body.schema_version)
+  ) {
     return {
       error: reject(
         "schema_version_unsupported",
-        `schema_version must be ${M3_SCHEMA_VERSION}`,
+        `schema_version must be one of ${SUPPORTED_RELEASE_SCHEMA_VERSIONS.join(", ")}`,
       ),
     };
   }
@@ -437,6 +470,10 @@ export function validateIngestionRequest(
   const bundleError = validateBundleShape(body.bundle);
   if (bundleError) return { error: bundleError };
 
+  const validateContentReleaseRequest = releaseRequestValidators.get(body.schema_version);
+  if (!validateContentReleaseRequest) {
+    return { error: reject("schema_version_unsupported", "No validator for schema_version") };
+  }
   if (!validateContentReleaseRequest(value)) {
     const firstError = validateContentReleaseRequest.errors?.[0];
     const schemaLocation = firstError
@@ -459,16 +496,13 @@ function validateBundleShape(value: unknown): RejectionReason | null {
   }
   const bundle = value as Record<string, unknown>;
 
-  // M3 only. A 0.2.0 bundle carries no timing templates, no daily fallbacks, and
-  // no declared locales, so the assembler cannot produce a reading from it —
-  // storing one would reserve an immutable release version for bytes that can
-  // never be served. Nothing has ever been ingested in production
-  // (CONTENT_RELEASE_KEYS is unset there and ingestion fails closed at 503), so
-  // narrowing this orphans no stored release.
-  if (bundle.schema_version !== M3_SCHEMA_VERSION) {
+  if (
+    typeof bundle.schema_version !== "string" ||
+    !(SUPPORTED_RELEASE_SCHEMA_VERSIONS as readonly string[]).includes(bundle.schema_version)
+  ) {
     return reject(
       "schema_version_unsupported",
-      `bundle.schema_version must be ${M3_SCHEMA_VERSION}`,
+      `bundle.schema_version must be one of ${SUPPORTED_RELEASE_SCHEMA_VERSIONS.join(", ")}`,
     );
   }
 
@@ -585,7 +619,7 @@ function validateBundleShape(value: unknown): RejectionReason | null {
       );
     }
     for (const [index, item] of list.entries()) {
-      const objectError = validateObjectShape(name, index, item);
+      const objectError = validateObjectShape(name, index, item, bundle.schema_version);
       if (objectError) return objectError;
     }
   }
@@ -621,6 +655,7 @@ function validateObjectShape(
   collection: ReleaseObjectCollection,
   index: number,
   value: unknown,
+  schemaVersion: string,
 ): RejectionReason | null {
   const where = `bundle.objects.${collection}[${index}]`;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -642,10 +677,14 @@ function validateObjectShape(
   ) {
     return reject("invalid_body", `${where}.object_hash must be a sha256 digest`);
   }
-  if (object.content_type !== COLLECTION_CONTENT_TYPE[collection]) {
+  const expectedContentType =
+    collection === "patterns" && schemaVersion === M4_SCHEMA_VERSION
+      ? "pattern"
+      : COLLECTION_CONTENT_TYPE[collection];
+  if (object.content_type !== expectedContentType) {
     return reject(
       "objects_incomplete",
-      `${where}.content_type must be ${COLLECTION_CONTENT_TYPE[collection]}`,
+      `${where}.content_type must be ${expectedContentType}`,
     );
   }
 
@@ -802,6 +841,46 @@ export function validateContentGraph(bundle: ContentReleaseBundle): RejectionRea
         return reject(
           "incomplete_cycle",
           `cycle ${cycle.id} lists phase ${phaseId}, whose parent_cycle_id is ${String(phase.parent_cycle_id)}`,
+        );
+      }
+    }
+  }
+
+  // M4 pattern matching. The JSON Schema cannot express canonical body order,
+  // and the runtime narrower refuses a release that gets it wrong — which would
+  // turn an editorial mistake into a 503 on a reader's Pattern page rather than
+  // a rejected ingestion. Checking it here fails the release instead.
+  for (const pattern of objects.patterns) {
+    const match = pattern.match;
+    if (match === undefined) continue;
+    if (!match || typeof match !== "object" || Array.isArray(match)) {
+      return reject("invalid_body", `pattern ${pattern.id} match must be an object`);
+    }
+    const clauses = match as Record<string, unknown>;
+    const positive = [
+      ...(Array.isArray(clauses.all_of) ? clauses.all_of : []),
+      ...(Array.isArray(clauses.any_of) ? clauses.any_of : []),
+    ];
+    if (positive.length === 0) {
+      return reject(
+        "invalid_body",
+        `pattern ${pattern.id} match has no positive predicate, so it would be shown to every reader whose chart merely lacks something`,
+      );
+    }
+    for (const predicate of [...positive, ...(Array.isArray(clauses.none_of) ? clauses.none_of : [])]) {
+      if (!predicate || typeof predicate !== "object" || Array.isArray(predicate)) {
+        return reject("invalid_body", `pattern ${pattern.id} carries a malformed predicate`);
+      }
+      const typed = predicate as Record<string, unknown>;
+      if (typed.type !== "aspect") continue;
+      if (
+        typeof typed.body_a !== "string" ||
+        typeof typed.body_b !== "string" ||
+        !isCanonicalAspectPair(typed.body_a, typed.body_b)
+      ) {
+        return reject(
+          "invalid_body",
+          `pattern ${pattern.id} aspect predicate (${String(typed.body_a)}, ${String(typed.body_b)}) is not in canonical body order`,
         );
       }
     }

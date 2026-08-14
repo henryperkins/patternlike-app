@@ -37,8 +37,11 @@ describe("central account-state policy", () => {
   it("allows active accounts to use ordinary product routes", async () => {
     const result = await request("/v1/time-travel?date=2026-08-12");
 
-    expect(result.status).toBe(501);
-    expect(result.body.error?.code).toBe("not_implemented");
+    // The guard's job is to let the request reach its own handler. This seed
+    // has no confirmed scheduling zone, so Time Travel's own refusal is the
+    // proof it got there — a 403 would mean the guard answered instead.
+    expect(result.status).toBe(409);
+    expect(result.body.error?.code).toBe("timezone_confirmation_required");
   });
 
   it("limits frozen accounts to consent recovery, export, and deletion", async () => {

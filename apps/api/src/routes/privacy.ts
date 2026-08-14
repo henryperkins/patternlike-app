@@ -444,7 +444,7 @@ function parseContextSourcesDocument(value: unknown): ContextSourcesDocument | n
     !hasExactKeys(source, SOURCE_KEYS) ||
     source.schema_version !== "0.2.0" ||
     source.user_id !== document.user_id ||
-    source.source_id !== "USR-06" ||
+    (source.source_id !== "USR-06" && source.source_id !== "USR-09") ||
     typeof source.enabled !== "boolean" ||
     !states.includes(source.permission_state as string) ||
     !Array.isArray(source.allowed_uses) ||
@@ -492,7 +492,7 @@ privacyRoutes.put("/v1/context-sources", async (c) => {
       errorBody(
         requestId,
         "invalid_body",
-        "Request must be the current owner-scoped USR-06 document",
+        "Request must contain one current owner-scoped context source",
       ),
       400,
     );

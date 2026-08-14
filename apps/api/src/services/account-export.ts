@@ -29,6 +29,38 @@ function assertBounded(value: unknown): void {
   }
 }
 
+/**
+ * Project a decrypted context-signal value into its portable form.
+ *
+ * `hash_salt` is the per-revision random value that keeps the clear
+ * `normalized_hash` column from being a dictionary fingerprint of low-entropy
+ * fields — check-in answers for USR-06, dates/categories/titles for USR-09. It
+ * lives inside the ciphertext precisely so it cannot be read beside the hash it
+ * protects, and an export that copied the decrypted value verbatim would hand
+ * the reader (and anyone they forward the file to) both halves.
+ *
+ * The two sources wrap their content differently and both are handled here
+ * rather than at one call site: USR-06 nests the portable document under
+ * `value`, USR-09 carries `event` plus its normalized window at the top level.
+ * Everything the reader authored survives in both cases.
+ */
+function portableSignalValue(
+  sourceId: string,
+  structured: Record<string, unknown>,
+): Record<string, unknown> {
+  if (typeof structured.hash_salt !== "string") return structured;
+  const { hash_salt: _salt, ...portable } = structured;
+  if (
+    sourceId === "USR-06" &&
+    portable.value &&
+    typeof portable.value === "object" &&
+    !Array.isArray(portable.value)
+  ) {
+    return portable.value as Record<string, unknown>;
+  }
+  return portable;
+}
+
 interface AccountRow {
   id: string;
   crypto_subject: string;
@@ -335,14 +367,7 @@ export async function assembleAccountExport(
     } else {
       structured = parseJson(row.value_json ?? "{}");
     }
-    const exportedValue =
-      row.source_id === "USR-06" &&
-      typeof structured.hash_salt === "string" &&
-      structured.value &&
-      typeof structured.value === "object" &&
-      !Array.isArray(structured.value)
-        ? (structured.value as Record<string, unknown>)
-        : structured;
+    const exportedValue = portableSignalValue(row.source_id, structured);
     (document.context_signals as unknown[]).push({
       schema_version: M0_SCHEMA_VERSION,
       id: row.id,

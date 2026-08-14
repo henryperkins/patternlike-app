@@ -48,6 +48,10 @@ export interface Env {
   PRIVACY_QUEUE: Queue<PrivacyMessage>;
   /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
   CHECK_IN_RETENTION_MONTHS?: string;
+  /** Positive cache epoch; bump before any result-changing calculation deploy. */
+  TIME_TRAVEL_RECEIPT_EPOCH?: string;
+  /** Launch outbound scan ceiling. Configuration guard requires exactly 32. */
+  TIME_TRAVEL_DAILY_SCAN_LIMIT?: string;
 
   // -------------------------------------------------------------------------
   // M5 constrained-model publisher

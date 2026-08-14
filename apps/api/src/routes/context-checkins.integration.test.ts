@@ -12,7 +12,7 @@ import {
 interface SourceProjection {
   schema_version: "0.2.0";
   user_id: string;
-  source_id: "USR-06";
+  source_id: "USR-06" | "USR-09";
   enabled: boolean;
   permission_state: "active" | "paused" | "revoked" | "expired" | "never_granted";
   allowed_uses: string[];
@@ -28,7 +28,7 @@ interface SourceProjection {
 interface SourcesDocument {
   schema_version: "0.2.0";
   user_id: string;
-  sources: [SourceProjection];
+  sources: SourceProjection[];
   updated_at: string;
 }
 
@@ -61,7 +61,7 @@ function desired(
   document: SourcesDocument,
   state: "active" | "paused" | "revoked",
 ): SourcesDocument {
-  const source = document.sources[0];
+  const source = document.sources.find((item) => item.source_id === "USR-06")!;
   return {
     ...document,
     sources: [
@@ -112,7 +112,7 @@ afterEach(() => {
 });
 
 describe("USR-06 context source", () => {
-  it("projects exactly one server-owned source and appends every legal transition", async () => {
+  it("projects both server-owned sources and appends every legal USR-06 transition", async () => {
     const initial = await getSources();
     expect(initial.status).toBe(200);
     expect(initial.body).toEqual({
@@ -123,6 +123,21 @@ describe("USR-06 context source", () => {
           schema_version: "0.2.0",
           user_id: USER_A,
           source_id: "USR-06",
+          enabled: false,
+          permission_state: "never_granted",
+          allowed_uses: [],
+          permission_tier: 1,
+          consent_id: null,
+          freshness: null,
+          last_signal_id: null,
+          scopes: [],
+          connector_status: "not_applicable",
+          updated_at: expect.any(String),
+        },
+        {
+          schema_version: "0.2.0",
+          user_id: USER_A,
+          source_id: "USR-09",
           enabled: false,
           permission_state: "never_granted",
           allowed_uses: [],

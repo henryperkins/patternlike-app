@@ -15,6 +15,9 @@ import { preferenceRoutes } from "./routes/preferences.js";
 import { consentRoutes } from "./routes/consents.js";
 import { readingRoutes } from "./routes/readings.js";
 import { timingRoutes } from "./routes/timing.js";
+import { patternRoutes } from "./routes/pattern.js";
+import { timeTravelRoutes } from "./routes/time-travel.js";
+import { lifeEventRoutes } from "./routes/life-events.js";
 import { deletionStatusRoutes, privacyRoutes } from "./routes/privacy.js";
 import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
@@ -58,6 +61,9 @@ api.route("/", preferenceRoutes);
 api.route("/", consentRoutes);
 api.route("/", readingRoutes);
 api.route("/", timingRoutes);
+api.route("/", patternRoutes);
+api.route("/", timeTravelRoutes);
+api.route("/", lifeEventRoutes);
 api.route("/", privacyRoutes);
 // Last, deliberately. Hono answers with the first matching registration, so a
 // real route always shadows a stub rather than the other way round.

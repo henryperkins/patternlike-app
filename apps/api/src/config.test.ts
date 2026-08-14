@@ -21,6 +21,8 @@ describe("secure configuration guard", () => {
         OIDC_ISSUER: "https://issuer.example.com",
         OIDC_AUDIENCE: "patternlike-web",
         OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+        TIME_TRAVEL_RECEIPT_EPOCH: "1",
+        TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
       }),
     ).toBeNull();
   });
@@ -82,6 +84,8 @@ describe("identity configuration", () => {
     OIDC_ISSUER: "https://issuer.example.com",
     OIDC_AUDIENCE: "patternlike-web",
     OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+    TIME_TRAVEL_RECEIPT_EPOCH: "1",
+    TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
   };
 
   it("passes when every OIDC value is present", () => {
@@ -218,6 +222,8 @@ describe("publisher configuration", () => {
     READING_SCHEDULER_BATCH_LIMIT: "100",
     READING_DAILY_PROVIDER_CALL_LIMIT: "250",
     OPENAI_API_KEY: "sk-test-key",
+    TIME_TRAVEL_RECEIPT_EPOCH: "1",
+    TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
   };
 
   it("accepts a complete enabled configuration", () => {
@@ -243,6 +249,8 @@ describe("publisher configuration", () => {
       OIDC_AUDIENCE: "patternlike-web",
       OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
       READING_V5_ROLLOUT: "off",
+      TIME_TRAVEL_RECEIPT_EPOCH: "1",
+      TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
     };
     expect(checkSecureConfig(off)).toBeNull();
     const resolved = resolvePublisherConfiguration(off);

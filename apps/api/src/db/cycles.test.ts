@@ -76,6 +76,7 @@ describe("invokeCycles", () => {
     expect(result.response.cycles[0]!.body).toBe("saturn");
     expect(result.response.cycles[0]!.pass_count).toBe(3);
     expect(result.response.ephemeris_data_version).toBe("se-2.10.03-1800-2399");
+    expect(result.rawResponse).toContain(`"request_id":"${result.response.request_id}"`);
   });
 
   it("treats an empty scan as an ordinary result, not a failure", async () => {

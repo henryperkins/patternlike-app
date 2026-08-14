@@ -243,6 +243,19 @@ describe("ingestion request validation", () => {
     expect(validateIngestionRequest(wrap(draftBundle()))).toHaveProperty("request");
   });
 
+  it("dispatches a 0.4.0 release through the closed M4 schema", () => {
+    const bundle = draftBundle((draft) => {
+      draft.schema_version = "0.4.0";
+    });
+    const result = validateIngestionRequest({
+      schema_version: "0.4.0",
+      bundle,
+      idempotency_key: "release-ingest-key-m4-0001",
+    });
+
+    expect(result).toHaveProperty("request");
+  });
+
   it.each([
     ["a non-object body", "nope", "invalid_body"],
     ["a bad schema_version", { schema_version: "0.1.0" }, "schema_version_unsupported"],
@@ -475,6 +488,53 @@ describe("content graph policy", () => {
     ],
   ])("rejects a bundle with %s", (expected, mutate) => {
     expect(validateContentGraph(draftBundle(mutate))?.class).toBe(expected);
+  });
+
+  /**
+   * The JSON Schema cannot express canonical body order, and the runtime
+   * narrower refuses a release that gets it wrong. Rejecting it here turns an
+   * editorial mistake into a failed ingestion rather than a 503 on a reader's
+   * Pattern page.
+   */
+  it.each([
+    [
+      "a noncanonical aspect pair",
+      (bundle: ContentReleaseBundle) => {
+        withPattern(bundle);
+        (bundle.objects.patterns[0] as Record<string, unknown>).match = {
+          // The frozen contract's own rejection fixture: alphabetical, not rank.
+          all_of: [{ type: "aspect", body_a: "moon", body_b: "sun", aspect: "trine" }],
+          any_of: [],
+          none_of: [],
+        };
+      },
+    ],
+    [
+      "a match with no positive predicate",
+      (bundle: ContentReleaseBundle) => {
+        withPattern(bundle);
+        (bundle.objects.patterns[0] as Record<string, unknown>).match = {
+          all_of: [],
+          any_of: [],
+          none_of: [{ type: "position", body: "sun", sign: 1 }],
+        };
+      },
+    ],
+  ])("rejects %s in a pattern match", (_label, mutate) => {
+    const reason = validateContentGraph(draftBundle(mutate));
+    expect(reason?.class).toBe("invalid_body");
+  });
+
+  it("accepts a canonical aspect pair", () => {
+    const bundle = draftBundle((draft) => {
+      withPattern(draft);
+      (draft.objects.patterns[0] as Record<string, unknown>).match = {
+        all_of: [{ type: "aspect", body_a: "sun", body_b: "moon", aspect: "trine" }],
+        any_of: [],
+        none_of: [],
+      };
+    });
+    expect(validateContentGraph(bundle)).toBeNull();
   });
 
   /**

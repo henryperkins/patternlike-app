@@ -36,10 +36,11 @@ function notImplemented(c: StubContext, feature: string) {
 stubRoutes.post("/v1/readings/:id/feedback", (c) =>
   notImplemented(c, "Reading feedback (M3)"),
 );
-stubRoutes.get("/v1/pattern", (c) =>
-  notImplemented(c, "Your Pattern chapters (M3)"),
-);
-stubRoutes.get("/v1/time-travel", (c) => notImplemented(c, "Time Travel (M4)"));
+// `/v1/pattern` and `/v1/time-travel` are served by routes/pattern.ts and
+// routes/time-travel.ts. Their stubs are gone rather than shadowed: this router
+// is mounted last, so a registration a real route already answers can never be
+// reached, and leaving one here would read as a live rollback path that does
+// not exist.
 stubRoutes.post("/v1/check-ins", (c) => notImplemented(c, "Check-ins (M4)"));
 stubRoutes.get("/v1/context-sources", (c) =>
   notImplemented(c, "Context sources (M4)"),

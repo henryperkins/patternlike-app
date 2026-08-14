@@ -30,8 +30,6 @@ beforeEach(async () => {
 describe("not-implemented stubs", () => {
   const routes: Array<[string, RequestInit]> = [
     ["/v1/readings/rdg_seed_00000001/feedback", { method: "POST" }],
-    ["/v1/time-travel?date=2026-08-08", {}],
-    ["/v1/pattern", {}],
   ];
 
   it.each(routes)("answers %s with a 501 carrying a request id", async (path, init) => {
@@ -43,7 +41,8 @@ describe("not-implemented stubs", () => {
   });
 
   it("echoes a caller-supplied x-request-id so a client can correlate it", async () => {
-    const { body } = await callStub("/v1/time-travel?date=2026-08-08", {
+    const { body } = await callStub("/v1/readings/rdg_seed_00000001/feedback", {
+      method: "POST",
       headers: { "x-request-id": "req-stub-correlation-1" },
     });
 

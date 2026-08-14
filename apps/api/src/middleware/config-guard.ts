@@ -4,16 +4,15 @@ import type { AppVariables } from "./auth.js";
 import { DEV_ROOT_KEK, isDevEnvironment } from "../crypto.js";
 import { resolvePublisherConfiguration } from "../services/reading-publisher.js";
 import { resolveCheckInRetentionMonths } from "../services/check-in-retention.js";
-import { safeLog } from "../services/safe-log.js";
+import { safeLog, type ConfigurationCode } from "../services/safe-log.js";
+import { resolveTimeTravelConfiguration } from "../services/time-travel-config.js";
 
 export interface ConfigFailure {
-  code:
-    | "reading_rollout_invalid"
-    | "reading_publisher_misconfigured"
-    | "auth_stub_in_production"
-    | "root_kek_not_configured"
-    | "identity_not_configured"
-    | "check_in_retention_misconfigured";
+  /**
+   * Shared with the log union deliberately: a code the guard can produce but
+   * safeLog cannot name would be a 503 with no record of why.
+   */
+  code: ConfigurationCode;
   message: string;
 }
 
@@ -47,6 +46,8 @@ export function checkSecureConfig(
         | "OIDC_AUDIENCE"
         | "OIDC_JWKS_URL"
         | "CHECK_IN_RETENTION_MONTHS"
+        | "TIME_TRAVEL_RECEIPT_EPOCH"
+        | "TIME_TRAVEL_DAILY_SCAN_LIMIT"
       >
     | Partial<Env>,
 ): ConfigFailure | null {
@@ -70,7 +71,16 @@ export function checkSecureConfig(
     return { code: publisher.code, message: publisher.message };
   }
 
-  if (isDevEnvironment(env.ENVIRONMENT)) return null;
+  if (isDevEnvironment(env.ENVIRONMENT)) {
+    // Unit callers that exercise unrelated config rules may omit the M4 pair,
+    // but a real local Worker declares both. If either is present, the pair is
+    // validated exactly as production is.
+    if (env.TIME_TRAVEL_RECEIPT_EPOCH !== undefined || env.TIME_TRAVEL_DAILY_SCAN_LIMIT !== undefined) {
+      const timeTravel = resolveTimeTravelConfiguration(env);
+      if (!timeTravel.ok) return { code: "time_travel_misconfigured", message: timeTravel.message };
+    }
+    return null;
+  }
 
   if (env.AUTH_STUB === "1") {
     return {
@@ -106,6 +116,10 @@ export function checkSecureConfig(
       message:
         "Identity provider configuration is incomplete; the API cannot authenticate anyone",
     };
+  }
+  const timeTravel = resolveTimeTravelConfiguration(env);
+  if (!timeTravel.ok) {
+    return { code: "time_travel_misconfigured", message: timeTravel.message };
   }
   return null;
 }

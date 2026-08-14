@@ -112,6 +112,8 @@ OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
 # The local canary sets this to `internal` in .dev.vars alongside a real key.
 READING_V5_ROLLOUT = "off"
 CHECK_IN_RETENTION_MONTHS = "13"
+TIME_TRAVEL_RECEIPT_EPOCH = "1"
+TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
 
 # Named environments do not inherit top-level bindings, so D1 is redeclared.
 [env.production]
@@ -182,6 +184,8 @@ AUTH_STUB = "0"
 # would reach a provider with values no frozen command described.
 READING_V5_ROLLOUT = "first_open"
 CHECK_IN_RETENTION_MONTHS = "13"
+TIME_TRAVEL_RECEIPT_EPOCH = "1"
+TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
 
 # The pinned publisher tuple. Every value is compared for EQUALITY against the
 # compiled constant in services/reading-publisher.ts, not merely for presence:

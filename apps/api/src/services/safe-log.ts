@@ -3,13 +3,14 @@ import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { PublisherSafeDetailCode } from "./reading-publisher.js";
 
-type ConfigurationCode =
+export type ConfigurationCode =
   | "reading_rollout_invalid"
   | "reading_publisher_misconfigured"
   | "auth_stub_in_production"
   | "root_kek_not_configured"
   | "identity_not_configured"
-  | "check_in_retention_misconfigured";
+  | "check_in_retention_misconfigured"
+  | "time_travel_misconfigured";
 
 type OperationalFailureClass =
   | GenerationFailureCode
@@ -57,6 +58,44 @@ export type SafeLogEvent =
   | { event: "timing_local_day_unresolvable" }
   | { event: "timing_cycles_unreadable"; unreadable_count: number }
   | { event: "jwks_refresh_failed_using_stale" }
+  // ---------------------------------------------------------------------
+  // M4 Your Pattern and Time Travel.
+  //
+  // Every arm below is a closed literal. Pattern evidence, life-event prose,
+  // selected dates, and receipt bodies are private by construction and none of
+  // them has a field here to travel through.
+  // ---------------------------------------------------------------------
+  /** The eager post-chart feature write failed; the chart itself committed. */
+  | { event: "natal_feature_cache_write_failed" }
+  /** Lazy derivation could not produce a receipted set for a Pattern read. */
+  | { event: "natal_feature_derivation_failed" }
+  /** Two derivations of one (chart, policy) disagreed. Never an overwrite. */
+  | { event: "natal_feature_set_hash_conflict" }
+  /** The active release could not be verified for a Pattern read. */
+  | { event: "release_unreadable" }
+  | { event: "release_hash_mismatch" }
+  /** A stored scan receipt failed its own integrity checks on read. */
+  | { event: "time_travel_receipt_unreadable" }
+  /**
+   * Two calculations under one receipt key produced different semantic
+   * results. Almost always an unbumped TIME_TRAVEL_RECEIPT_EPOCH across a
+   * result-changing calc deployment. Fails closed rather than overwriting.
+   */
+  | { event: "time_travel_receipt_semantic_conflict" }
+  /** The calculation service echoed a policy, contract, or pin we did not send. */
+  | { event: "time_travel_calc_echo_rejected" }
+  /** Transport, configuration, or upstream 5xx on the cycle boundary. */
+  | { event: "calc_unavailable" }
+  /** A normalized result exceeded the application cap before any D1 write. */
+  | { event: "time_travel_result_oversized"; byte_length: number }
+  /** An unexpected throw inside the Time Travel route. */
+  | { event: "time_travel_unhandled_failure" }
+  | { event: "time_travel_integrity_failure" }
+  | { event: "time_travel_configuration_error" }
+  /** One saved event failed to decrypt; the count is all that is projected. */
+  | { event: "life_event_unreadable"; unreadable_count: number }
+  /** The life-event list could not be decrypted or normalized. */
+  | { event: "life_event_list_integrity_failure" }
   /**
    * The provider CALL finished and returned a parseable candidate. Not an
    * acceptance: schema and candidate validation run after this, and a rejected
@@ -154,7 +193,26 @@ export function safeLog(input: SafeLogEvent): string {
     case "scheduler_repair_quota_exhausted":
     case "timing_local_day_unresolvable":
     case "jwks_refresh_failed_using_stale":
+    case "natal_feature_cache_write_failed":
+    case "natal_feature_derivation_failed":
+    case "natal_feature_set_hash_conflict":
+    case "release_unreadable":
+    case "release_hash_mismatch":
+    case "time_travel_receipt_unreadable":
+    case "time_travel_receipt_semantic_conflict":
+    case "time_travel_calc_echo_rejected":
+    case "calc_unavailable":
+    case "time_travel_unhandled_failure":
+    case "time_travel_integrity_failure":
+    case "time_travel_configuration_error":
+    case "life_event_list_integrity_failure":
       console.error(input.event, { trace_id });
+      break;
+    case "time_travel_result_oversized":
+      console.error(input.event, { trace_id, byte_length: input.byte_length });
+      break;
+    case "life_event_unreadable":
+      console.warn(input.event, { trace_id, unreadable_count: input.unreadable_count });
       break;
   }
 

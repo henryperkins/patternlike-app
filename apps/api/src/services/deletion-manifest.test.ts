@@ -6,6 +6,8 @@ import {
   DELETION_ARTIFACT_FAMILIES,
   DELETED_USER_TABLES,
   JOBS_TABLE,
+  NON_PORTABLE_USER_TABLES,
+  PORTABLE_USER_TABLES,
   RETAINED_USER_TABLES,
 } from "./deletion-manifest.js";
 
@@ -70,6 +72,42 @@ describe("account-deletion manifest", () => {
       [...directChildren].filter((table) => !classified.has(table)),
       "A new users foreign-key child must be classified for account deletion.",
     ).toEqual([]);
+  });
+
+  it("classifies every directly user-owned table as portable or non-portable", async () => {
+    const owned = new Set<string>();
+    for (const table of await schemaTables()) {
+      const { results } = await env.DB.prepare(`PRAGMA table_info(${table})`)
+        .all<{ name: string }>();
+      if (results.some((column) => column.name === "user_id" || column.name === "id" && table === "users")) {
+        owned.add(table);
+      }
+    }
+    owned.delete(JOBS_TABLE);
+    owned.delete(AUDIT_TABLE);
+
+    const portable = new Set<string>(PORTABLE_USER_TABLES);
+    const nonPortable = new Set<string>(NON_PORTABLE_USER_TABLES);
+    expect(
+      [...owned].filter((table) => !portable.has(table) && !nonPortable.has(table)),
+      "A new user-owned table must be explicitly portable or explicitly non-portable.",
+    ).toEqual([]);
+    expect(
+      [...portable].filter((table) => nonPortable.has(table)),
+      "A table cannot be both portable and non-portable.",
+    ).toEqual([]);
+    expect(
+      [...portable, ...nonPortable].filter((table) => !owned.has(table)),
+      "The portability manifest names a table that no longer exists.",
+    ).toEqual([]);
+  });
+
+  it("keeps the M4 derived caches non-portable and deleted with the account", () => {
+    for (const table of ["natal_feature_sets", "cycle_scan_receipts", "time_travel_daily_usage"] as const) {
+      expect(NON_PORTABLE_USER_TABLES).toContain(table);
+      expect(PORTABLE_USER_TABLES).not.toContain(table as never);
+      expect(DELETED_USER_TABLES).toContain(table);
+    }
   });
 
   it("keeps payload-free audit proof in its explicit special class", async () => {
