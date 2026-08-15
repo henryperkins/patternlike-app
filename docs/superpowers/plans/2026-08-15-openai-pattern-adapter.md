@@ -532,6 +532,7 @@ Extract the evaluator into its own module — `pattern-semantic.ts` — taking t
 - Modify: `apps/api/src/env.ts`
 - Modify: `apps/api/src/config.test.ts`
 - Modify: `apps/api/wrangler.toml`
+- Modify: `docs/deploy/openai-daily-reading-rollout.md`
 
 **Requires sign-off, and touches the shipped reading adapter.** Today "the Worker holds the provider key" is an unstated assumption compiled into both adapters. On a provider-native request that key has first precedence, so sending it bypasses the operator's stored key. Replace the assumption with a declared credential mode.
 
