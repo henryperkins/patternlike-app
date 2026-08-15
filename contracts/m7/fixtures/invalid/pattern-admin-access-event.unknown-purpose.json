@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.7.0",
+  "id": "paae_ffffffffffffffffffffffffffffffff",
+  "admin_subject": "admin_reviewer_1",
+  "target_user_id": null,
+  "target_scope_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "generation_id": "pgen_cccccccccccccccccccccccccccccccc",
+  "purpose_class": "curiosity",
+  "artifact_classes": [
+    "planner_response"
+  ],
+  "result": "granted",
+  "created_at": "2026-08-14T12:00:00Z"
+}

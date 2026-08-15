@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-generation-request.schema.json",
+  "title": "Pattern generation request",
+  "$defs": {
+    "patternGenerationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "consent_policy_version", "confirm", "reason"],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "consent_policy_version": { "type": "string", "minLength": 1 },
+        "confirm": { "type": "string", "const": "GENERATE MY PATTERN" },
+        "reason": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationReason" }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternGenerationRequest"
+}

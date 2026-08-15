@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-ontology-record.schema.json",
+  "title": "Pattern ontology record",
+  "$defs": {
+    "featurePredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["position", "aspect", "pattern", "angle", "house_cusp", "uncertainty"]
+        },
+        "body": { "type": "string" },
+        "body_a": { "type": "string" },
+        "body_b": { "type": "string" },
+        "aspect": { "type": "string" },
+        "pattern": { "type": "string" },
+        "angle": { "type": "string" },
+        "house": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "accuracy": { "type": "string" }
+      }
+    },
+    "patternOntologyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "meaning_class",
+        "locale",
+        "feature_predicate",
+        "normalized_proposition",
+        "source_fragment_ids",
+        "input_meaning_ids",
+        "transformation_class",
+        "tensions",
+        "counter_expressions",
+        "prohibited_claims",
+        "salience_band",
+        "presentation_priority",
+        "cluster_tags"
+      ],
+      "properties": {
+        "id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/ontologyRuleId" },
+        "meaning_class": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/meaningClass" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "feature_predicate": { "$ref": "#/$defs/featurePredicate" },
+        "normalized_proposition": { "type": "string", "minLength": 1 },
+        "source_fragment_ids": {
+          "type": "array",
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/sourceFragmentId" }
+        },
+        "input_meaning_ids": {
+          "type": "array",
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/ontologyRuleId" }
+        },
+        "transformation_class": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/transformationClass" }
+          ]
+        },
+        "tensions": { "type": "array", "items": { "type": "string" } },
+        "counter_expressions": { "type": "array", "items": { "type": "string" } },
+        "prohibited_claims": { "type": "array", "items": { "type": "string" } },
+        "salience_band": { "type": "string", "enum": ["low", "medium", "high"] },
+        "presentation_priority": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "cluster_tags": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternOntologyRecord"
+}

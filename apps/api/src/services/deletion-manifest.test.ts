@@ -24,7 +24,10 @@ async function schemaTables(): Promise<string[]> {
 describe("account-deletion manifest", () => {
   it("registers each user artifact family behind an internal safe prefix", () => {
     expect(DELETION_ARTIFACT_FAMILIES.map(({ family, prefix }) => ({ family, prefix })))
-      .toEqual([{ family: "account_exports", prefix: "exports/" }]);
+      .toEqual([
+        { family: "account_exports", prefix: "exports/" },
+        { family: "pattern_generations", prefix: "pattern-generations/" },
+      ]);
     for (const { prefix } of DELETION_ARTIFACT_FAMILIES) {
       expect(prefix).toMatch(/^[a-z][a-z0-9-]*\/$/);
       expect(prefix).not.toContain("..");
@@ -100,6 +103,20 @@ describe("account-deletion manifest", () => {
       [...portable, ...nonPortable].filter((table) => !owned.has(table)),
       "The portability manifest names a table that no longer exists.",
     ).toEqual([]);
+  });
+
+  it("keeps M7 generation operational state non-portable and the Pattern document portable", () => {
+    expect(PORTABLE_USER_TABLES).toContain("pattern_documents");
+    for (const table of [
+      "pattern_generation_claims",
+      "pattern_generation_jobs",
+      "pattern_generation_artifact_keys",
+      "pattern_generation_artifacts",
+    ] as const) {
+      expect(NON_PORTABLE_USER_TABLES).toContain(table);
+      expect(PORTABLE_USER_TABLES).not.toContain(table as never);
+      expect(DELETED_USER_TABLES).toContain(table);
+    }
   });
 
   it("keeps the M4 derived caches non-portable and deleted with the account", () => {

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/common.schema.json",
+  "title": "Pattern/Like M7 common definitions",
+  "$defs": {
+    "schemaVersion": { "type": "string", "const": "0.7.0" },
+    "patternId": { "type": "string", "pattern": "^pat_[0-9a-f]{32}$" },
+    "generationId": { "type": "string", "pattern": "^pgen_[0-9a-f]{32}$" },
+    "claimId": { "type": "string", "pattern": "^pgc_[0-9a-f]{32}$" },
+    "featureAlias": { "type": "string", "pattern": "^f[0-9]{3}$" },
+    "ontologyRuleId": { "type": "string", "pattern": "^ont_[0-9a-f]{32}$" },
+    "synthesisId": { "type": "string", "pattern": "^syn_[0-9a-f]{32}$" },
+    "sourceFragmentId": { "type": "string", "pattern": "^srcf_[0-9a-f]{32}$" },
+    "clusterId": { "type": "string", "pattern": "^clu_[0-9a-f]{8}$" },
+    "chapterKey": { "type": "string", "pattern": "^chapter_[0-9]{2}$" },
+    "signatureKey": { "type": "string", "pattern": "^signature_[0-9]{2}$" },
+    "patternState": {
+      "type": "string",
+      "enum": [
+        "chart_required",
+        "locale_confirmation_required",
+        "consent_required",
+        "ontology_unavailable",
+        "available",
+        "organizing_evidence",
+        "writing",
+        "checking_claims",
+        "ready",
+        "failed",
+        "deleted",
+        "withdrawn",
+        "editorial_catalog"
+      ]
+    },
+    "consentStatus": { "type": "string", "enum": ["granted", "not_granted"] },
+    "consentCategory": {
+      "type": "string",
+      "enum": [
+        "calculated_natal_features",
+        "accuracy_and_suppression",
+        "confirmed_content_locale",
+        "activated_interpretation_ontology",
+        "generated_pattern_plan_and_draft_for_validation"
+      ]
+    },
+    "coverageClass": {
+      "type": "string",
+      "enum": [
+        "mandatory_core",
+        "mandatory_any",
+        "eligible",
+        "redundant",
+        "suppressed",
+        "ontology_unsupported",
+        "capacity_omitted"
+      ]
+    },
+    "omissionReason": {
+      "type": "string",
+      "enum": [
+        "redundant_with_chapter",
+        "capacity_omitted",
+        "cluster_incompatible",
+        "sparse_document"
+      ]
+    },
+    "claimClass": {
+      "type": "string",
+      "enum": [
+        "reflective_interpretation",
+        "structural_description",
+        "tension",
+        "resource",
+        "counter_expression",
+        "uncertainty"
+      ]
+    },
+    "generationReason": {
+      "type": "string",
+      "enum": ["first_open", "first_open_retry", "failed_attempt_retry"]
+    },
+    "verdict": { "type": "string", "enum": ["pass", "reject"] },
+    "artifactClass": {
+      "type": "string",
+      "enum": [
+        "fact_packet",
+        "planner_request",
+        "planner_response",
+        "validated_plan",
+        "writer_request",
+        "writer_response",
+        "rejected_candidate",
+        "candidate_validation",
+        "verifier_request",
+        "verifier_response",
+        "semantic_verdict",
+        "accepted_internal_document"
+      ]
+    },
+    "meaningClass": {
+      "type": "string",
+      "enum": ["source_supported", "derived_synthesis", "expression_guidance"]
+    },
+    "transformationClass": {
+      "type": "string",
+      "enum": [
+        "intersection",
+        "contrast",
+        "tension",
+        "counterbalance",
+        "developmental_arc",
+        "expression_range",
+        "shared_motif"
+      ]
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

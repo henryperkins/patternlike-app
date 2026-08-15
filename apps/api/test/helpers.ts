@@ -12,6 +12,9 @@ import { buildUserKeyInsert, encryptPayload, type UserIdentity } from "../src/db
 import { activateRelease } from "../src/db/content-releases.js";
 import type { ContentReleaseBundle } from "../src/services/content-release.js";
 import { generateSigningKey, signedBundle, withoutFixtures } from "./content-release-fixtures.js";
+import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
+import { storeOntologyRelease } from "../src/db/pattern-ontology.js";
+import { computeOntologyBundleHash } from "../src/services/pattern-ontology-verify.js";
 
 /**
  * Tables the API writes, in foreign-key-safe delete order. Storage is not
@@ -36,6 +39,18 @@ const TABLES = [
   "timezone_changes",
   "natal_feature_sets",
   "natal_features",
+  "pattern_generation_artifacts",
+  "pattern_generation_artifact_keys",
+  "pattern_documents",
+  "pattern_generation_jobs",
+  "pattern_generation_claims",
+  "pattern_admin_access_events",
+  "pattern_ontology_evaluation_runs",
+  "pattern_ontology_recall_events",
+  "pattern_ontology_pointer",
+  "pattern_ontology_releases",
+  "pattern_provider_daily_usage",
+  "pattern_ontology_provider_daily_usage",
   "chart_snapshots",
   "birth_profiles",
   "context_signals",
@@ -58,6 +73,7 @@ const TABLES = [
 ];
 
 export async function resetDb(): Promise<void> {
+  await env.DB.prepare("DROP TRIGGER IF EXISTS fail_pattern_correction_reconcile").run();
   // daily_readings.supersedes_reading_id self-references, so a bare DELETE can
   // hit a predecessor while its successor still points at it.
   //
@@ -98,7 +114,26 @@ export async function resetDb(): Promise<void> {
       if (keys.length > 0) await env.ARTIFACTS.delete(keys);
       cursor = page.truncated ? page.cursor : undefined;
     } while (cursor);
+    cursor = undefined;
+    do {
+      const page = await env.ARTIFACTS.list({ prefix: "pattern-generations/", cursor });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+    cursor = undefined;
+    do {
+      const page = await env.ARTIFACTS.list({ prefix: "pattern-ontology/", cursor });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
   }
+
+  await env.DB.prepare(
+    `INSERT INTO pattern_ontology_pointer (id, active_version, updated_at)
+     VALUES (1, NULL, '1970-01-01T00:00:00Z')`,
+  ).run();
 }
 
 export interface ApiResponse<T = Record<string, unknown>> {
@@ -456,4 +491,36 @@ export async function seedTimingReceipt(
       options.createdAt,
     )
     .run();
+}
+
+/** Activate the synthetic ontology used by Pattern generation tests. */
+export async function seedActiveOntology(version = "ont-test-1"): Promise<void> {
+  const release = syntheticOntologyRelease(version);
+  const bundleHash = await computeOntologyBundleHash(release);
+  await storeOntologyRelease(
+    env,
+    { ...release, bundle_hash: bundleHash },
+    `pattern-ontology/${version}.json`,
+  );
+}
+
+/**
+ * Turn on first-open Pattern generation with the development synthetic publisher.
+ * Callers must restore the hermetic defaults afterwards — env mutations persist
+ * across tests in this pool.
+ */
+export function enablePatternAi(): void {
+  env.PATTERN_AI_ROLLOUT = "first_open";
+  env.PATTERN_PUBLISHER = "synthetic";
+  env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100";
+  env.PATTERN_ARTIFACT_RETENTION_DAYS = "30";
+}
+
+export function disablePatternAi(): void {
+  env.PATTERN_AI_ROLLOUT = "off";
+  env.PATTERN_PUBLISHER = "";
+  env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "";
+  env.PATTERN_ARTIFACT_RETENTION_DAYS = "";
+  env.PATTERN_SEMANTIC_FORCE_REJECT = "";
+  env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
 }

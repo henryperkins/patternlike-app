@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.7.0",
+  "locale": "en-US",
+  "effective_accuracy": "exact",
+  "uncertainty": {
+    "suppressed_classes": [],
+    "required_language_rule_ids": []
+  },
+  "features": [
+    {
+      "alias": "f001",
+      "feature_class": "position",
+      "fact": {
+        "body": "sun",
+        "longitude": 15.2,
+        "sign": 0,
+        "house": 10
+      },
+      "coverage": "mandatory_core",
+      "ontology_rule_ids": [
+        "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "cluster_ids": [
+        "clu_abcd1234"
+      ]
+    }
+  ],
+  "clusters": [
+    {
+      "cluster_id": "clu_abcd1234",
+      "feature_aliases": [
+        "f001"
+      ],
+      "compatible_with": []
+    }
+  ],
+  "selection_constraints": {
+    "core_chapters_min": 4,
+    "core_chapters_max": 6,
+    "additional_signatures_max": 8,
+    "sparse_pattern": false
+  }
+}

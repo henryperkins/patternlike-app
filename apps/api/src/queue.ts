@@ -1,4 +1,4 @@
-import type { Env, GenerationMessage, WorkerMessage } from "./env.js";
+import type { Env, GenerationMessage, PatternGenerationMessage, WorkerMessage } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import {
   ClaimLoadError,
@@ -26,6 +26,7 @@ import {
 import {
   processDeletionMessage,
 } from "./services/account-deletion.js";
+import { executePatternJob } from "./services/pattern-execute.js";
 
 /**
  * The daily-reading consumer.
@@ -82,6 +83,14 @@ async function retryOrFail(
   message.retry({ delaySeconds: LEASE_RETRY_DELAY_SECONDS });
 }
 
+function isPatternMessage(body: WorkerMessage): body is PatternGenerationMessage {
+  return "kind" in body && body.kind === "pattern_generation";
+}
+
+function isPatternQueueName(name: string): boolean {
+  return name.includes("pattern-generation");
+}
+
 export async function queue(
   batch: MessageBatch<WorkerMessage>,
   env: Env,
@@ -95,6 +104,7 @@ export async function queue(
   }
 
   const generationMessages: Message<GenerationMessage>[] = [];
+  const patternMessages: Message<PatternGenerationMessage>[] = [];
   for (const message of batch.messages) {
     if (isPrivacyMessage(message.body)) {
       if (message.body.job_type === "delete_account") {
@@ -112,8 +122,38 @@ export async function queue(
           message.ack();
         }
       }
+    } else if (isPatternMessage(message.body)) {
+      if (!isPatternQueueName(batch.queue)) {
+        safeLog({ event: "generation_message_malformed" });
+        message.ack();
+        continue;
+      }
+      patternMessages.push(message as Message<PatternGenerationMessage>);
+    } else if (isPatternQueueName(batch.queue)) {
+      safeLog({ event: "generation_message_malformed" });
+      message.ack();
     } else {
       generationMessages.push(message as Message<GenerationMessage>);
+    }
+  }
+
+  for (const message of patternMessages) {
+    const body = message.body;
+    if (!body.job_id || !body.generation_id) {
+      safeLog({ event: "generation_message_malformed" });
+      message.ack();
+      continue;
+    }
+    try {
+      const outcome = await executePatternJob(env, body);
+      if (outcome.ok || outcome.reason === "duplicate" || outcome.reason === "terminal") {
+        message.ack();
+      } else {
+        message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
+      }
+    } catch {
+      safeLog({ event: "pattern_stage_failed" });
+      message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
     }
   }
 

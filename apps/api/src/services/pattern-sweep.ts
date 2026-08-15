@@ -1,0 +1,355 @@
+import { PATTERN_JOB_TYPE, publicStageFor, type PatternDomainStage } from "./pattern-command.js";
+import { markDispatched } from "../db/generation.js";
+import type { Env } from "../env.js";
+import { safeLog } from "./safe-log.js";
+import { readPatternAiRollout } from "./pattern-rollout.js";
+
+/**
+ * Claims one job may take across every stage before the sweep stops re-arming
+ * it and fails it instead. The frozen command pins two planner, two writer, and
+ * two verifier attempts plus a publish, so a healthy job never approaches this.
+ *
+ * The ceiling exists because provider budget is consumed on stage entry and
+ * never refunded by policy. Without it, a consumer that dies between
+ * `claimStage` committing and `advance`/`failJob` leaves a lease that expires,
+ * the next tick re-sends the same stage, the stage charges the budget again --
+ * and one deterministically wedging chart drains the whole account's daily
+ * ceiling one cron tick at a time, forever.
+ */
+const MAX_STAGE_CLAIMS = 8;
+
+export type PatternReconcileResult =
+  | { ok: false; status: 404; code: "not_found" }
+  | {
+      ok: true;
+      status: 202;
+      body: { generation_id: string; status: "accepted" | "already_complete"; stage: string };
+    };
+
+/**
+ * Operator recovery for a stuck Pattern job: re-nudge the queue when the
+ * generic jobs row is still queued or running. Cancelled and other terminal
+ * rows are not re-queued.
+ */
+export async function reconcilePatternGeneration(
+  env: Env,
+  generationId: string,
+): Promise<PatternReconcileResult> {
+  const row = await env.DB.prepare(
+    `SELECT p.generation_id, p.stage, p.stage_generation, j.id AS job_id, j.status AS job_status
+     FROM pattern_generation_jobs p
+     JOIN jobs j ON j.id = p.job_id
+     WHERE p.generation_id = ?`,
+  )
+    .bind(generationId)
+    .first<{
+      generation_id: string;
+      stage: string;
+      stage_generation: number;
+      job_id: string;
+      job_status: string;
+    }>();
+  if (!row) return { ok: false, status: 404, code: "not_found" };
+
+  const terminal =
+    row.stage === "succeeded" ||
+    row.stage === "failed" ||
+    row.stage === "cancelled" ||
+    row.job_status === "succeeded" ||
+    row.job_status === "failed" ||
+    row.job_status === "cancelled";
+  if (terminal) {
+    return {
+      ok: true,
+      status: 202,
+      body: { generation_id: row.generation_id, status: "already_complete", stage: row.stage },
+    };
+  }
+
+  if (row.job_status === "queued" || row.job_status === "running") {
+    try {
+      await env.PATTERN_QUEUE.send({
+        kind: "pattern_generation",
+        job_id: row.job_id,
+        generation_id: row.generation_id,
+        stage_generation: row.stage_generation,
+      });
+      if (row.job_status === "queued") {
+        await markDispatched(env, row.job_id);
+      }
+    } catch {
+      safeLog({ event: "pattern_dispatch_failed" });
+    }
+  }
+
+  return {
+    ok: true,
+    status: 202,
+    body: { generation_id: row.generation_id, status: "accepted", stage: row.stage },
+  };
+}
+
+/**
+ * Recover Pattern jobs that committed but were never sent, and drop expired
+ * generation artifacts. Cron does not enter Hono, so the caller already ran
+ * checkSecureConfig.
+ */
+/**
+ * Pattern copied daily-reading's pause (`result_class = 'rollout_paused'`) but
+ * not its resume. The outbox lane skips that class forever, so a job parked
+ * while `PATTERN_AI_ROLLOUT=off` would never be nudged again. Clearing the
+ * class returns the row to the ordinary undispatched query.
+ *
+ * A job parked mid-flight is parked while `status = 'running'`, so resuming
+ * only `'queued'` rows left it in the running lane: the expired-lease sweep
+ * re-sent it on every tick for as long as the rollout stayed off. Those rows
+ * come back to `'queued'` here, and only once their lease has lapsed, so a
+ * consumer still working the stage is never robbed of its claim.
+ */
+export async function resumePausedPatternJobsAfterRollout(
+  env: Env,
+  now = new Date(),
+): Promise<number> {
+  const rollout = readPatternAiRollout(env);
+  if (!rollout || rollout === "off") return 0;
+  const nowIso = now.toISOString();
+  const updated = await env.DB.prepare(
+    `UPDATE jobs
+     SET available_at = ?, result_class = NULL, status = 'queued',
+         claim_token = NULL, lease_expires_at = NULL
+     WHERE job_type = ? AND result_class = 'rollout_paused'
+       AND (
+         status = 'queued'
+         OR (status = 'running' AND (lease_expires_at IS NULL OR lease_expires_at < ?))
+       )`,
+  )
+    .bind(nowIso, PATTERN_JOB_TYPE, nowIso)
+    .run();
+  return updated.meta.changes ?? 0;
+}
+
+
+/**
+ * Terminal state for a job whose stage has been claimed MAX_STAGE_CLAIMS times
+ * without completing. Mirrors failJob, but keyed on the expired lease rather
+ * than on a claim token the sweep never held.
+ */
+async function failExhaustedPatternJob(
+  env: Env,
+  row: {
+    job_id: string;
+    generation_id: string;
+    stage: PatternDomainStage;
+    stage_generation: number;
+    user_id: string;
+    claim_id: string;
+  },
+  nowIso: string,
+): Promise<void> {
+  const retentionExpiresAt = new Date(Date.parse(nowIso) + 30 * 86400_000).toISOString();
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE jobs SET status = 'failed', claim_token = NULL, lease_expires_at = NULL,
+                finished_at = ?, result_class = 'stage_attempts_exhausted'
+         WHERE id = ? AND job_type = ? AND status = 'running' AND lease_expires_at < ?`,
+      ).bind(nowIso, row.job_id, PATTERN_JOB_TYPE, nowIso),
+      env.DB.prepare(
+        `UPDATE pattern_generation_jobs
+         SET stage = 'failed', stage_generation = stage_generation + 1, updated_at = ?,
+             finished_at = ?, public_failure_stage = ?, failure_class = 'stage_attempts_exhausted',
+             retention_expires_at = ?
+         WHERE generation_id = ? AND stage_generation = ?
+           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
+      ).bind(
+        nowIso,
+        nowIso,
+        publicStageFor(row.stage) ?? "organizing_evidence",
+        retentionExpiresAt,
+        row.generation_id,
+        row.stage_generation,
+      ),
+      env.DB.prepare(
+        `UPDATE pattern_generation_claims
+         SET status = 'available', active_generation_id = NULL, updated_at = ?
+         WHERE id = ? AND user_id = ? AND status = 'reserved' AND consumed_at IS NULL
+           AND active_generation_id = ?`,
+      ).bind(nowIso, row.claim_id, row.user_id, row.generation_id),
+    ]);
+    safeLog({ event: "pattern_stage_terminal_failure" });
+  } catch {
+    safeLog({ event: "pattern_stage_terminal_failure" });
+  }
+}
+
+/**
+ * Spec 15: prune terminal job metadata once its retention period elapses.
+ *
+ * failJob stamps `retention_expires_at` 30 days out and 0007 indexes it, but
+ * nothing read the column: the frozen command in `jobs.payload_enc` -- chart
+ * id, chart fingerprint hash, feature-set hash, consent id, all under the
+ * user's DEK -- was kept for the life of the account. Clearing the column as
+ * the ciphertext goes takes the row back out of the partial index so a later
+ * tick does no work.
+ */
+async function prunePatternJobRetention(env: Env, nowIso: string): Promise<void> {
+  const { results: expiredJobs } = await env.DB.prepare(
+    `SELECT generation_id, job_id FROM pattern_generation_jobs
+     WHERE retention_expires_at IS NOT NULL AND finished_at IS NOT NULL
+       AND retention_expires_at <= ?
+     ORDER BY retention_expires_at, generation_id
+     LIMIT 100`,
+  )
+    .bind(nowIso)
+    .all<{ generation_id: string; job_id: string }>();
+
+  for (const row of expiredJobs) {
+    try {
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE jobs SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
+           WHERE id = ?`,
+        ).bind(row.job_id),
+        env.DB.prepare(
+          `UPDATE pattern_generation_artifact_keys
+           SET wrapped_key_enc = NULL, wrapped_key_version = NULL, wrapped_key_nonce = NULL,
+               erased_at = COALESCE(erased_at, ?)
+           WHERE generation_id = ? AND erased_at IS NULL`,
+        ).bind(nowIso, row.generation_id),
+        env.DB.prepare(
+          `UPDATE pattern_generation_jobs SET retention_expires_at = NULL, updated_at = ?
+           WHERE generation_id = ?`,
+        ).bind(nowIso, row.generation_id),
+      ]);
+    } catch {
+      safeLog({ event: "pattern_artifact_cleanup_failed" });
+    }
+  }
+}
+
+export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void> {
+  await resumePausedPatternJobsAfterRollout(env, now);
+  const nowIso = now.toISOString();
+  const { results: undispatched } = await env.DB.prepare(
+    `SELECT j.id AS job_id, p.generation_id, p.stage_generation
+     FROM jobs j
+     JOIN pattern_generation_jobs p ON p.job_id = j.id
+     WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
+       AND j.result_class IS NOT 'rollout_paused'
+       AND (j.available_at IS NULL OR j.available_at <= ?)
+     ORDER BY j.created_at, j.id
+     LIMIT 50`,
+  )
+    .bind(PATTERN_JOB_TYPE, nowIso)
+    .all<{ job_id: string; generation_id: string; stage_generation: number }>();
+
+  for (const row of undispatched) {
+    try {
+      await env.PATTERN_QUEUE.send({
+        kind: "pattern_generation",
+        job_id: row.job_id,
+        generation_id: row.generation_id,
+        stage_generation: row.stage_generation,
+      });
+      await markDispatched(env, row.job_id);
+    } catch {
+      safeLog({ event: "pattern_dispatch_failed" });
+    }
+  }
+
+  const { results: expiredLeases } = await env.DB.prepare(
+    `SELECT j.id AS job_id, j.attempts, p.generation_id, p.stage, p.stage_generation,
+            p.user_id, p.claim_id
+     FROM jobs j
+     JOIN pattern_generation_jobs p ON p.job_id = j.id
+     WHERE j.job_type = ? AND j.status = 'running' AND j.lease_expires_at < ?
+       AND j.result_class IS NOT 'rollout_paused'
+     ORDER BY j.lease_expires_at, j.id
+     LIMIT 50`,
+  )
+    .bind(PATTERN_JOB_TYPE, nowIso)
+    .all<{
+      job_id: string;
+      attempts: number;
+      generation_id: string;
+      stage: PatternDomainStage;
+      stage_generation: number;
+      user_id: string;
+      claim_id: string;
+    }>();
+
+  for (const row of expiredLeases) {
+    if (row.attempts >= MAX_STAGE_CLAIMS) {
+      // Re-arming this would charge the provider budget again for a stage that
+      // has already failed to complete MAX_STAGE_CLAIMS times. Fail it instead:
+      // a job left running holds the reader's one Pattern opportunity, while a
+      // failed one returns the claim and gives them a retry affordance.
+      await failExhaustedPatternJob(env, row, nowIso);
+      continue;
+    }
+    try {
+      await env.PATTERN_QUEUE.send({
+        kind: "pattern_generation",
+        job_id: row.job_id,
+        generation_id: row.generation_id,
+        stage_generation: row.stage_generation,
+      });
+    } catch {
+      safeLog({ event: "pattern_dispatch_failed" });
+    }
+  }
+
+  await prunePatternJobRetention(env, nowIso);
+
+  const { results: expired } = await env.DB.prepare(
+    `SELECT object_key, generation_id FROM pattern_generation_artifacts
+     WHERE expires_at <= ? AND deleted_at IS NULL
+     ORDER BY expires_at, object_key
+     LIMIT 100`,
+  )
+    .bind(nowIso)
+    .all<{ object_key: string; generation_id: string }>();
+
+  if (expired.length === 0 || !env.ARTIFACTS) return;
+
+  const deletedKeys: string[] = [];
+  const deletedGenerations = new Set<string>();
+  for (const row of expired) {
+    try {
+      await env.ARTIFACTS.delete(row.object_key);
+    } catch {
+      continue;
+    }
+    const stillThere = await env.ARTIFACTS.head(row.object_key);
+    if (stillThere) continue;
+    deletedKeys.push(row.object_key);
+    deletedGenerations.add(row.generation_id);
+  }
+
+  for (const objectKey of deletedKeys) {
+    await env.DB.prepare(
+      `UPDATE pattern_generation_artifacts SET deleted_at = ?
+       WHERE object_key = ? AND deleted_at IS NULL`,
+    )
+      .bind(nowIso, objectKey)
+      .run();
+  }
+
+  for (const generationId of deletedGenerations) {
+    const leftover = await env.DB.prepare(
+      `SELECT 1 AS present FROM pattern_generation_artifacts
+       WHERE generation_id = ? AND deleted_at IS NULL LIMIT 1`,
+    )
+      .bind(generationId)
+      .first<{ present: number }>();
+    if (leftover) continue;
+    await env.DB.prepare(
+      `UPDATE pattern_generation_artifact_keys
+       SET wrapped_key_enc = NULL, wrapped_key_version = NULL, wrapped_key_nonce = NULL,
+           erased_at = COALESCE(erased_at, ?)
+       WHERE generation_id = ?`,
+    )
+      .bind(nowIso, generationId)
+      .run();
+  }
+}

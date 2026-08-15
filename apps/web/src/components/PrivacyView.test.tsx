@@ -25,6 +25,30 @@ function renderPrivacy(responses: Record<string, MockResponse>) {
   if (!(`GET ${TOPICS}` in responses) && !(TOPICS in responses)) {
     responses[`GET ${TOPICS}`] = emptyTopics;
   }
+  if (
+    !("GET /v1/consents/pattern-generation" in responses) &&
+    !("/v1/consents/pattern-generation" in responses)
+  ) {
+    responses["GET /v1/consents/pattern-generation"] = {
+      status: 200,
+      body: {
+        schema_version: "0.7.0",
+        kind: "pattern_generation",
+        status: "not_granted",
+        provider: "OpenAI",
+        purpose: "one_pattern_per_chart",
+        policy_version: "1.0.0",
+        enabled_categories: [
+          "calculated_natal_features",
+          "accuracy_and_suppression",
+          "confirmed_content_locale",
+          "activated_interpretation_ontology",
+          "generated_pattern_plan_and_draft_for_validation",
+        ],
+        granted_at: null,
+      },
+    };
+  }
   mockApiResponses(responses);
   return render(
     <PrivacyView
@@ -224,6 +248,19 @@ describe("Context & privacy", () => {
     mockApiResponses({
       [`GET ${CONSENT}`]: ok(consentGranted),
       [`GET ${TOPICS}`]: emptyTopics,
+      [`GET /v1/consents/pattern-generation`]: {
+        status: 200,
+        body: {
+          schema_version: "0.7.0",
+          kind: "pattern_generation",
+          status: "not_granted",
+          provider: "OpenAI",
+          purpose: "one_pattern_per_chart",
+          policy_version: "1.0.0",
+          enabled_categories: [],
+          granted_at: null,
+        },
+      },
     });
     const { rerender } = render(
       <PrivacyView
@@ -258,6 +295,19 @@ describe("Context & privacy", () => {
     mockApiResponses({
       [`GET ${CONSENT}`]: ok(consentGranted),
       [`GET ${TOPICS}`]: emptyTopics,
+      [`GET /v1/consents/pattern-generation`]: {
+        status: 200,
+        body: {
+          schema_version: "0.7.0",
+          kind: "pattern_generation",
+          status: "not_granted",
+          provider: "OpenAI",
+          purpose: "one_pattern_per_chart",
+          policy_version: "1.0.0",
+          enabled_categories: [],
+          granted_at: null,
+        },
+      },
     });
     render(
       <PrivacyView

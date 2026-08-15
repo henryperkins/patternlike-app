@@ -5,7 +5,12 @@ import type {
   ErrorBody,
   LifeEvent,
   LifeEventRequest,
+  PatternConsent,
+  PatternGenerationAccepted,
+  PatternGenerationStatus,
   PatternResponse,
+  PatternResponseV7,
+  PatternStateDocument,
   TimeTravelResponse,
   TimezoneLookupRequest,
   TimezoneLookupResponse,
@@ -1094,6 +1099,85 @@ export function getPattern(
   return request<PatternResponse>(`/v1/pattern${serialized ? `?${serialized}` : ""}`, {
     method: "GET",
     headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getPatternState(signal?: AbortSignal): Promise<PatternStateDocument> {
+  return request<PatternStateDocument>("/v1/pattern-state", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getGeneratedPattern(signal?: AbortSignal): Promise<PatternResponseV7> {
+  return request<PatternResponseV7>("/v1/pattern", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getPatternGenerationConsent(signal?: AbortSignal): Promise<PatternConsent> {
+  return request<PatternConsent>("/v1/consents/pattern-generation", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function revokePatternGenerationConsent(
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<{ consent: PatternConsent; existing_pattern_retained: boolean }> {
+  return request<{ consent: PatternConsent; existing_pattern_retained: boolean }>(
+    "/v1/consents/pattern-generation",
+    {
+      method: "DELETE",
+      headers: requestHeaders({ idempotencyKey }),
+      signal,
+    },
+  );
+}
+
+export function startPatternGeneration(
+  consentPolicyVersion: string,
+  reason: "first_open" | "first_open_retry" | "failed_attempt_retry",
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<PatternGenerationAccepted> {
+  return request<PatternGenerationAccepted>("/v1/pattern-generations", {
+    method: "POST",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({
+      schema_version: "0.7.0",
+      consent_policy_version: consentPolicyVersion,
+      confirm: "GENERATE MY PATTERN",
+      reason,
+    }),
+    signal,
+  });
+}
+
+export function getPatternGeneration(
+  generationId: string,
+  signal?: AbortSignal,
+): Promise<PatternGenerationStatus> {
+  return request<PatternGenerationStatus>(
+    `/v1/pattern-generations/${encodeURIComponent(generationId)}`,
+    { method: "GET", headers: requestHeaders(), signal },
+  );
+}
+
+export function deleteGeneratedPattern(
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return requestNoContent("/v1/pattern", {
+    method: "DELETE",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({ confirm: "DELETE PATTERN" }),
     signal,
   });
 }

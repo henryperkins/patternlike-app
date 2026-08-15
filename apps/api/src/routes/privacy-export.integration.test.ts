@@ -405,11 +405,12 @@ describe("account export", () => {
     expect(download.headers.get("cache-control")).toBe("no-store");
     const artifact = JSON.parse(downloadText) as Record<string, unknown>;
     expect(artifact).toMatchObject({
-      schema_version: "0.6.0",
+      schema_version: "0.7.0",
       export_id: accepted.body.resource_id,
       account: { user_id: USER_A, status: "active" },
       readings: { status: "omitted_by_request", items: [] },
       journal: { status: "not_available", items: [] },
+      patterns: { status: "not_available", items: [] },
     });
     expect(artifact.birth_profiles).toHaveLength(1);
     expect(artifact.chart_snapshots).toHaveLength(1);

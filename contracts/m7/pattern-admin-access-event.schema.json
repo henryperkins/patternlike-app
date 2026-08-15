@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-admin-access-event.schema.json",
+  "title": "Administrative Pattern access event",
+  "$defs": {
+    "patternAdminAccessEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "admin_subject",
+        "target_scope_hash",
+        "generation_id",
+        "purpose_class",
+        "artifact_classes",
+        "result",
+        "created_at"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "id": { "type": "string", "pattern": "^paae_[0-9a-f]{32}$" },
+        "admin_subject": { "type": "string", "minLength": 1 },
+        "target_user_id": { "type": ["string", "null"] },
+        "target_scope_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "generation_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" },
+        "purpose_class": {
+          "type": "string",
+          "enum": ["quality_review", "safety_investigation", "incident_response", "retention_audit"]
+        },
+        "artifact_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/artifactClass" }
+        },
+        "result": { "type": "string", "enum": ["granted", "denied", "not_found", "expired"] },
+        "created_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternAdminAccessEvent"
+}

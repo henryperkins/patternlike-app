@@ -5,6 +5,7 @@ import { DEV_ROOT_KEK, isDevEnvironment } from "../crypto.js";
 import { resolvePublisherConfiguration } from "../services/reading-publisher.js";
 import { resolveCheckInRetentionMonths } from "../services/check-in-retention.js";
 import { safeLog, type ConfigurationCode } from "../services/safe-log.js";
+import { resolvePatternPublisherConfiguration } from "../services/pattern-publisher.js";
 import { resolveTimeTravelConfiguration } from "../services/time-travel-config.js";
 
 export interface ConfigFailure {
@@ -69,6 +70,11 @@ export function checkSecureConfig(
   const publisher = resolvePublisherConfiguration(env);
   if (!publisher.ok) {
     return { code: publisher.code, message: publisher.message };
+  }
+
+  const patternPublisher = resolvePatternPublisherConfiguration(env);
+  if (!patternPublisher.ok) {
+    return { code: patternPublisher.code, message: patternPublisher.message };
   }
 
   if (isDevEnvironment(env.ENVIRONMENT)) {

@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.7.0",
+  "policy_id": "pattern-selection-policy",
+  "policy_version": "1.0.0",
+  "feature_set_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "sparse_pattern": false,
+  "accounting": [
+    {
+      "feature_id": "nft_11111111111111111111111111111111",
+      "alias": "f001",
+      "coverage": "mandatory_core",
+      "reason": null
+    }
+  ]
+}

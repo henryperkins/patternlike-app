@@ -1,0 +1,271 @@
+{
+  "package": "contracts/m7",
+  "schema_version": "0.7.0",
+  "document_date": "2026-08-14",
+  "status": "additive",
+  "milestone": "M7 - AI-generated Your Pattern",
+  "predecessors": [
+    {
+      "package": "contracts/m4",
+      "schema_version": "0.4.0",
+      "manifest_sha256": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
+      "relationship": "natal_feature_and_editorial_pattern_predecessor",
+      "note": "M7 reuses M4 natal-feature types and does not mutate the M4 Pattern response. AI-cohort GET /v1/pattern is an M7 successor document."
+    },
+    {
+      "package": "contracts/m5",
+      "schema_version": "0.5.0",
+      "manifest_sha256": "57aadef51a6eca825866865c4cb0e75503cb29f497f998dc2a56b8971cc6674e",
+      "relationship": "constrained_model_operational_predecessor",
+      "note": "M7 copies M5 frozen-command, encrypted-outbox, and strict-provider posture. It does not widen ai_synthesis or the daily-reading command."
+    },
+    {
+      "package": "contracts/m6",
+      "schema_version": "0.6.0",
+      "manifest_sha256": "4ead039fd6a264555c2712f1eb950352eccfb9ca78e10a8d9f03c1e00159c148",
+      "relationship": "export_lifecycle_predecessor",
+      "note": "M6 account-export remains frozen. M7 ships a successor export document with an explicit patterns section."
+    }
+  ],
+  "supersedes": [
+    {
+      "family": "consumer-pattern-success",
+      "documents": [
+        "m4:pattern-response.schema.json#/$defs/patternResponse"
+      ],
+      "note": "Supersession applies only to accounts that have entered the AI Pattern path. Editorial-cohort GET /v1/pattern remains the frozen M4 document."
+    },
+    {
+      "family": "account-export",
+      "documents": [
+        "m6:account-export.schema.json#/$defs/accountExport"
+      ],
+      "note": "Forward-only successor. Stored M6 export artifacts remain valid under their own frozen document."
+    }
+  ],
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m7/common.schema.json",
+      "defines": [
+        "artifactClass",
+        "chapterKey",
+        "claimClass",
+        "claimId",
+        "clusterId",
+        "consentCategory",
+        "consentStatus",
+        "contentHash",
+        "coverageClass",
+        "featureAlias",
+        "generationId",
+        "generationReason",
+        "meaningClass",
+        "omissionReason",
+        "ontologyRuleId",
+        "patternId",
+        "patternState",
+        "schemaVersion",
+        "signatureKey",
+        "sourceFragmentId",
+        "synthesisId",
+        "transformationClass",
+        "verdict"
+      ]
+    },
+    {
+      "file": "pattern-state.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-state.schema.json",
+      "defines": [
+        "patternStateDocument"
+      ]
+    },
+    {
+      "file": "pattern-consent.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-consent.schema.json",
+      "defines": [
+        "patternConsent",
+        "patternConsentRevocation"
+      ]
+    },
+    {
+      "file": "pattern-generation-request.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-generation-request.schema.json",
+      "defines": [
+        "patternGenerationRequest"
+      ]
+    },
+    {
+      "file": "pattern-generation-accepted.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-generation-accepted.schema.json",
+      "defines": [
+        "patternGenerationAccepted"
+      ]
+    },
+    {
+      "file": "pattern-generation-status.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-generation-status.schema.json",
+      "defines": [
+        "patternGenerationStatus"
+      ]
+    },
+    {
+      "file": "pattern-delete-request.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-delete-request.schema.json",
+      "defines": [
+        "patternDeleteRequest"
+      ]
+    },
+    {
+      "file": "pattern-fact-packet.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-fact-packet.schema.json",
+      "defines": [
+        "packetCluster",
+        "packetFeature",
+        "patternFactPacket"
+      ]
+    },
+    {
+      "file": "pattern-selection-manifest.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-selection-manifest.schema.json",
+      "defines": [
+        "featureAccounting",
+        "patternSelectionManifest"
+      ]
+    },
+    {
+      "file": "pattern-planner-output.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-planner-output.schema.json",
+      "defines": [
+        "plannerChapter",
+        "plannerOmission",
+        "plannerSignature"
+      ]
+    },
+    {
+      "file": "pattern-plan.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-plan.schema.json",
+      "defines": [
+        "patternPlan"
+      ]
+    },
+    {
+      "file": "pattern-writer-output.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-writer-output.schema.json",
+      "defines": [
+        "proseUnit",
+        "writerChapter",
+        "writerSection",
+        "writerSignature"
+      ]
+    },
+    {
+      "file": "pattern-semantic-verdict.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-semantic-verdict.schema.json",
+      "defines": [
+        "finding"
+      ]
+    },
+    {
+      "file": "pattern-document-internal.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-document-internal.schema.json",
+      "defines": [
+        "patternDocumentInternal"
+      ]
+    },
+    {
+      "file": "pattern-response.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-response.schema.json",
+      "defines": [
+        "patternResponse",
+        "publicChapter",
+        "publicProseUnit",
+        "publicSignature"
+      ]
+    },
+    {
+      "file": "pattern-admin-artifact.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-admin-artifact.schema.json",
+      "defines": [
+        "patternAdminArtifact"
+      ]
+    },
+    {
+      "file": "pattern-admin-access-event.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-admin-access-event.schema.json",
+      "defines": [
+        "patternAdminAccessEvent"
+      ]
+    },
+    {
+      "file": "pattern-source-fragment.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-source-fragment.schema.json",
+      "defines": [
+        "patternSourceFragment"
+      ]
+    },
+    {
+      "file": "pattern-source-corpus-release.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-source-corpus-release.schema.json",
+      "defines": [
+        "patternSourceCorpusRelease"
+      ]
+    },
+    {
+      "file": "pattern-ontology-record.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-ontology-record.schema.json",
+      "defines": [
+        "featurePredicate",
+        "patternOntologyRecord"
+      ]
+    },
+    {
+      "file": "pattern-ontology-evaluation.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-ontology-evaluation.schema.json",
+      "defines": [
+        "patternOntologyEvaluation"
+      ]
+    },
+    {
+      "file": "pattern-ontology-release.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-ontology-release.schema.json",
+      "defines": [
+        "patternOntologyRelease"
+      ]
+    },
+    {
+      "file": "account-export.schema.json",
+      "id": "https://patternlike.app/contracts/m7/account-export.schema.json",
+      "defines": [
+        "accountExport",
+        "exportedPattern",
+        "portableSection"
+      ]
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.7.0",
+      "describes": "Consumer Pattern generation, Pattern consent, AI-cohort Pattern document, internal ontology ingestion, and administrative artifact inspection."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "wire_format": "snake_case",
+    "frozen_unchanged_packages": [
+      "contracts/m0",
+      "contracts/m3",
+      "contracts/m4",
+      "contracts/m5",
+      "contracts/m6"
+    ]
+  },
+  "amendments": [
+    {
+      "date": "2026-08-15",
+      "change": "Added patternConsentRevocation to pattern-consent.schema.json and pointed DELETE /v1/consents/pattern-generation at it.",
+      "reason": "Design spec 19.3 documents the revoke response as a {schema_version, consent, existing_pattern_retained} envelope and the route emits one, but the OpenAPI response and x-normative-schema both named the bare patternConsent, which the envelope does not validate against. Purely additive: no existing def, enum, required field, or $id changed."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.7.0",
+  "pattern_id": "pat_dddddddddddddddddddddddddddddddd",
+  "generation_id": "pgen_cccccccccccccccccccccccccccccccc",
+  "locale": "en-US",
+  "effective_accuracy": "exact",
+  "plan_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "semantic_verdict_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "artifact": {
+    "title": "Your Pattern"
+  },
+  "compact_provenance": {
+    "assembly_mode": "constrained_model",
+    "provider": "OpenAI",
+    "model_family": "gpt",
+    "raw_birth_details_sent": true,
+    "ontology_version": "1.0.0",
+    "selection_policy_version": "1.0.0"
+  }
+}

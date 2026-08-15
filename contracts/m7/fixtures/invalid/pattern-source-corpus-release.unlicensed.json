@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.7.0",
+  "corpus_release_id": "corpus-synthetic-1",
+  "corpus_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "locale": "en-US",
+  "license_resolved": false,
+  "fragments": [
+    {
+      "id": "srcf_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "corpus_release_id": "corpus-synthetic-1",
+      "locale": "en-US",
+      "normalized_proposition": "A natal square can describe friction that asks for skill rather than fate.",
+      "excerpt": "Friction between initiative and effort can be worked with.",
+      "license_class": "internal_synthetic",
+      "allowed_transformations": [
+        "intersection"
+      ]
+    }
+  ]
+}

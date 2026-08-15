@@ -2,7 +2,7 @@
 """Validate every frozen contract package in this repository.
 
 Runs the M0 validator unchanged as a subprocess, then validates contracts/m3
-through contracts/m6 here. Each successor freezes its predecessor; older
+through contracts/m7 here. Each successor freezes its predecessor; older
 packages include their own validators, so this file adds packages rather than
 editing one.
 
@@ -42,11 +42,13 @@ M3 = ROOT / "m3"
 M4 = ROOT / "m4"
 M5 = ROOT / "m5"
 M6 = ROOT / "m6"
+M7 = ROOT / "m7"
 
 M3_BASE = "https://patternlike.app/contracts/m3/"
 M4_BASE = "https://patternlike.app/contracts/m4/"
 M5_BASE = "https://patternlike.app/contracts/m5/"
 M6_BASE = "https://patternlike.app/contracts/m6/"
+M7_BASE = "https://patternlike.app/contracts/m7/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
@@ -104,6 +106,45 @@ FIXTURE_SCHEMA = {
         "deletion-status": M6_BASE + "deletion-status.schema.json#/$defs/deletionStatus",
         "export-status": M6_BASE + "export-status.schema.json#/$defs/exportStatus",
     },
+    "m7": {
+        "pattern-state": M7_BASE + "pattern-state.schema.json#/$defs/patternStateDocument",
+        "pattern-consent": M7_BASE + "pattern-consent.schema.json#/$defs/patternConsent",
+        "pattern-consent-revocation": M7_BASE
+        + "pattern-consent.schema.json#/$defs/patternConsentRevocation",
+        "pattern-generation-request": M7_BASE
+        + "pattern-generation-request.schema.json#/$defs/patternGenerationRequest",
+        "pattern-generation-accepted": M7_BASE
+        + "pattern-generation-accepted.schema.json#/$defs/patternGenerationAccepted",
+        "pattern-generation-status": M7_BASE
+        + "pattern-generation-status.schema.json#/$defs/patternGenerationStatus",
+        "pattern-delete-request": M7_BASE
+        + "pattern-delete-request.schema.json#/$defs/patternDeleteRequest",
+        "pattern-fact-packet": M7_BASE + "pattern-fact-packet.schema.json#/$defs/patternFactPacket",
+        "pattern-selection-manifest": M7_BASE
+        + "pattern-selection-manifest.schema.json#/$defs/patternSelectionManifest",
+        "pattern-planner-output": M7_BASE + "pattern-planner-output.schema.json",
+        "pattern-plan": M7_BASE + "pattern-plan.schema.json#/$defs/patternPlan",
+        "pattern-writer-output": M7_BASE + "pattern-writer-output.schema.json",
+        "pattern-semantic-verdict": M7_BASE + "pattern-semantic-verdict.schema.json",
+        "pattern-document-internal": M7_BASE
+        + "pattern-document-internal.schema.json#/$defs/patternDocumentInternal",
+        "pattern-response": M7_BASE + "pattern-response.schema.json#/$defs/patternResponse",
+        "pattern-admin-artifact": M7_BASE
+        + "pattern-admin-artifact.schema.json#/$defs/patternAdminArtifact",
+        "pattern-admin-access-event": M7_BASE
+        + "pattern-admin-access-event.schema.json#/$defs/patternAdminAccessEvent",
+        "pattern-source-corpus-release": M7_BASE
+        + "pattern-source-corpus-release.schema.json#/$defs/patternSourceCorpusRelease",
+        "pattern-source-fragment": M7_BASE
+        + "pattern-source-fragment.schema.json#/$defs/patternSourceFragment",
+        "pattern-ontology-record": M7_BASE
+        + "pattern-ontology-record.schema.json#/$defs/patternOntologyRecord",
+        "pattern-ontology-evaluation": M7_BASE
+        + "pattern-ontology-evaluation.schema.json#/$defs/patternOntologyEvaluation",
+        "pattern-ontology-release": M7_BASE
+        + "pattern-ontology-release.schema.json#/$defs/patternOntologyRelease",
+        "account-export": M7_BASE + "account-export.schema.json#/$defs/accountExport",
+    },
 }
 
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
@@ -143,6 +184,13 @@ POLICY_ONLY = {
         "reading-generation-output.bad-role-order",
     },
     "m6": set(),
+    "m7": {
+        "pattern-fact-packet.birthplace-in-fact",
+        "pattern-fact-packet.check-in-in-fact",
+        "pattern-fact-packet.journal-in-fact",
+        "pattern-fact-packet.latitude-in-fact",
+        "pattern-fact-packet.life-event-in-fact",
+    },
 }
 
 braced_placeholder_re = re.compile(r"\{([^{}]*)\}")
@@ -269,7 +317,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6):
+    for package in (M0, M3, M4, M5, M6, M7):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1055,6 +1103,73 @@ def _m5_policy_errors(name: str, instance: dict) -> list[str]:
     return m5_allowed_use_policy(instance)
 
 
+# Identity, birth coordinates, and personal-context keys are forbidden
+# anywhere in a Pattern fact packet. Calculated planetary/angle/house
+# `longitude` is allowed only under features[].fact.
+FORBIDDEN_IN_PATTERN_PACKET_KEYS = (
+    "user_id",
+    "chart_id",
+    "chart_fingerprint",
+    "fingerprint",
+    "birth_date",
+    "birth_time",
+    "birthplace",
+    "consent_id",
+    "check_in",
+    "check_ins",
+    "journal",
+    "life_event",
+    "life_events",
+    "reading",
+    "readings",
+    "daily_reading",
+    "latitude",
+)
+
+
+def _is_allowed_planetary_longitude(path: tuple) -> bool:
+    return (
+        len(path) == 4
+        and path[0] == "features"
+        and isinstance(path[1], int)
+        and path[2] == "fact"
+        and path[3] == "longitude"
+    )
+
+
+def _pattern_packet_key_errors(obj: object, path: tuple = ()) -> list[str]:
+    errors: list[str] = []
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            child = (*path, key)
+            if key == "longitude":
+                if not _is_allowed_planetary_longitude(child):
+                    errors.append("provider packet contains prohibited field longitude")
+            elif key in FORBIDDEN_IN_PATTERN_PACKET_KEYS:
+                errors.append(f"provider packet contains prohibited field {key}")
+            errors.extend(_pattern_packet_key_errors(value, child))
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            errors.extend(_pattern_packet_key_errors(item, (*path, index)))
+    return errors
+
+
+def _m7_policy_errors(name: str, instance: dict) -> list[str]:
+    errors: list[str] = []
+    if name.startswith("pattern-fact-packet"):
+        errors.extend(_pattern_packet_key_errors(instance))
+    if name.startswith("pattern-response"):
+        blob = json.dumps(instance)
+        for token in ("feature_aliases", "ontology_rule_ids", "claim_class", "nft_"):
+            if token in blob:
+                errors.append(f"consumer Pattern response leaks {token}")
+    if name.startswith("pattern-ontology-evaluation") or name.startswith("pattern-ontology-release"):
+        evaluation = instance if name.startswith("pattern-ontology-evaluation") else instance.get("evaluation") or {}
+        if evaluation.get("verdict") == "pass" and evaluation.get("unevaluated_fixture_count", 0) != 0:
+            errors.append("an ontology release cannot activate with unevaluated regression fixtures")
+    return errors
+
+
 def validate_package(
     registry: Registry, name: str, package: Path, catalogue: set[str]
 ) -> list[str]:
@@ -1081,6 +1196,8 @@ def validate_package(
             return _m5_policy_errors(fixture, instance)
         if name == "m6":
             return []
+        if name == "m7":
+            return _m7_policy_errors(fixture, instance)
         raise ValueError(f"unregistered contract package policy: {name}")
 
     for path in sorted((package / "fixtures" / "valid").glob("*.json")):
@@ -1143,6 +1260,7 @@ PACKAGE_BASE = {
     "m4": M4_BASE,
     "m5": M5_BASE,
     "m6": M6_BASE,
+    "m7": M7_BASE,
 }
 
 
@@ -1352,6 +1470,39 @@ def check_predecessors_frozen() -> list[str]:
         )
     else:
         print("OK  frozen        contracts/m6 and contracts/m3 agree on the contracts/m0 digest")
+
+    m7_manifest = M7 / "SCHEMA_MANIFEST.json"
+    if not m7_manifest.exists():
+        errors.append(
+            "contracts/m7/SCHEMA_MANIFEST.json is missing, so M4/M5/M6 have no "
+            "recorded freeze for the AI Pattern successor"
+        )
+        return errors
+
+    m7_recorded = _recorded_predecessors(m7_manifest)
+    errors += check_frozen(
+        M4, "contracts/m4", m7_recorded.get("contracts/m4"),
+        "contracts/m7/SCHEMA_MANIFEST.json",
+    )
+    errors += check_frozen(
+        M5, "contracts/m5", m7_recorded.get("contracts/m5"),
+        "contracts/m7/SCHEMA_MANIFEST.json",
+    )
+    errors += check_frozen(
+        M6, "contracts/m6", m7_recorded.get("contracts/m6"),
+        "contracts/m7/SCHEMA_MANIFEST.json",
+    )
+    m5_from_m6 = m6_recorded.get("contracts/m5")
+    m5_from_m7 = m7_recorded.get("contracts/m5")
+    if m5_from_m7 is None:
+        errors.append("contracts/m7/SCHEMA_MANIFEST.json records no contracts/m5 predecessor")
+    elif m5_from_m6 is not None and m5_from_m7 != m5_from_m6:
+        errors.append(
+            "contracts/m7 and contracts/m6 record different digests for the same frozen "
+            f"contracts/m5 manifest ({m5_from_m7} vs {m5_from_m6})"
+        )
+    else:
+        print("OK  frozen        contracts/m7 and contracts/m6 agree on the contracts/m5 digest")
     return errors
 
 
@@ -1601,6 +1752,92 @@ def check_m6_manifest() -> list[str]:
     return errors
 
 
+M7_SCHEMA_VERSION = "0.7.0"
+
+
+def check_m7_manifest() -> list[str]:
+    errors: list[str] = []
+    path = M7 / "SCHEMA_MANIFEST.json"
+    if not path.exists():
+        return ["contracts/m7/SCHEMA_MANIFEST.json is missing"]
+    doc = json.loads(path.read_text(encoding="utf-8"))
+
+    if doc.get("package") != "contracts/m7":
+        errors.append("M7 manifest package is not contracts/m7")
+    if doc.get("schema_version") != M7_SCHEMA_VERSION:
+        errors.append(f"M7 manifest schema_version is not {M7_SCHEMA_VERSION}")
+
+    declared = {entry.get("file"): entry for entry in doc.get("schemas") or []}
+    shipped = {p.name: p for p in sorted(M7.glob("*.schema.json"))}
+    for missing in sorted(set(shipped) - set(declared)):
+        errors.append(f"M7 manifest does not declare shipped schema {missing}")
+    for extra in sorted(set(declared) - set(shipped)):
+        errors.append(f"M7 manifest declares {extra}, which the package does not ship")
+
+    for filename, entry in declared.items():
+        if filename not in shipped:
+            continue
+        schema = json.loads(shipped[filename].read_text(encoding="utf-8"))
+        if entry.get("id") != schema.get("$id"):
+            errors.append(f"{filename}: M7 manifest id disagrees with the document $id")
+        listed = sorted(entry.get("defines") or [])
+        actual = sorted(schema.get("$defs") or {})
+        if listed != actual:
+            errors.append(
+                f"{filename}: M7 manifest defines {listed} but the document defines {actual}"
+            )
+
+    recorded = _recorded_predecessors(path)
+    for predecessor in ("contracts/m4", "contracts/m5", "contracts/m6"):
+        if predecessor not in recorded:
+            errors.append(f"M7 manifest records no {predecessor} predecessor")
+
+    if not errors:
+        print(
+            f"OK  manifest      contracts/m7 declares {len(declared)} schema(s) "
+            "and M4/M5/M6 predecessors"
+        )
+    return errors
+
+
+def check_m7_openapi_projection() -> list[str]:
+    try:
+        import yaml
+    except ImportError:
+        return []
+
+    path = M7 / "openapi" / "openapi.yaml"
+    if not path.exists():
+        return ["contracts/m7/openapi/openapi.yaml is missing"]
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    expected = {
+        ("/v1/pattern-state", "get"): {"200", "401", "500"},
+        ("/v1/consents/pattern-generation", "get"): {"200", "401"},
+        ("/v1/consents/pattern-generation", "delete"): {"200", "400", "401", "409"},
+        ("/v1/pattern-generations", "post"): {"202", "400", "401", "409", "503"},
+        ("/v1/pattern-generations/{generation_id}", "get"): {"200", "401", "404"},
+        ("/v1/pattern", "get"): {"200", "401", "404", "409", "410", "503"},
+        ("/v1/pattern", "delete"): {"202", "204", "400", "401", "404", "409"},
+        ("/internal/pattern-ontology-releases", "post"): {"201", "400", "401", "409", "503"},
+        ("/admin/pattern-generations/{generation_id}", "get"): {"200", "401", "404", "503"},
+    }
+    errors: list[str] = []
+    for (route, method), statuses in expected.items():
+        operation = (spec.get("paths", {}).get(route) or {}).get(method)
+        if operation is None:
+            errors.append(f"M7 OpenAPI does not describe {method.upper()} {route}")
+            continue
+        actual = set((operation.get("responses") or {}).keys())
+        if actual != statuses:
+            errors.append(
+                f"M7 OpenAPI {method.upper()} {route} responses are "
+                f"{sorted(actual)}, expected {sorted(statuses)}"
+            )
+    if not errors:
+        print("OK  projection    M7 OpenAPI declares Pattern generation and admin statuses")
+    return errors
+
+
 def check_m6_openapi_projection() -> list[str]:
     """Pin the implemented privacy/context routes and their complete status sets."""
     try:
@@ -1717,6 +1954,12 @@ def main() -> int:
     errors += check_openapi(M6, registry)
     errors += check_m6_manifest()
     errors += check_m6_openapi_projection()
+
+    print("\n== contracts/m7 ==")
+    errors += validate_package(registry, "m7", M7, set())
+    errors += check_openapi(M7, registry)
+    errors += check_m7_manifest()
+    errors += check_m7_openapi_projection()
 
     if errors:
         print(f"\n{len(errors)} error(s)")

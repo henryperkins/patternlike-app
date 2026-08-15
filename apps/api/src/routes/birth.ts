@@ -17,6 +17,10 @@ import { resolveTimezone } from "../services/timezone.js";
 import { reconcileCurrentFactRepair } from "../services/reading-invalidation.js";
 import { recomputeUserNextDueAt } from "../db/reading-scheduler.js";
 import { ensureNatalFeatureSet } from "../db/natal-features.js";
+import {
+  reconcilePatternAfterChartCorrection,
+  retryPatternReconcileIfStale,
+} from "../services/pattern-lifecycle.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -181,6 +185,18 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     .first<{ id: string; status: string; result_class: string | null }>();
 
   if (existingJob?.status === "succeeded") {
+    try {
+      await retryPatternReconcileIfStale(c.env, identity, new Date());
+    } catch {
+      safeLog({ event: "pattern_stage_failed" });
+      return c.json(
+        errorBody(
+          "pattern_invalidation_failed",
+          "Pattern invalidation after chart correction did not complete",
+        ),
+        503,
+      );
+    }
     return c.json(
       {
         schema_version: SCHEMA_VERSION,
@@ -485,6 +501,19 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   );
   if (!repair.ok) {
     safeLog({ event: "fact_repair_reconciliation_failed" });
+  }
+
+  try {
+    await reconcilePatternAfterChartCorrection(c.env, identity, new Date(now));
+  } catch {
+    safeLog({ event: "pattern_stage_failed" });
+    return c.json(
+      errorBody(
+        "pattern_invalidation_failed",
+        "Pattern invalidation after chart correction did not complete",
+      ),
+      503,
+    );
   }
 
   return c.json(

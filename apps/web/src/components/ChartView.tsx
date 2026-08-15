@@ -2,7 +2,7 @@ import type { CelestialBody, LongitudePosition } from "@patternlike/shared";
 import type { ChartResponse } from "../lib/api-client.js";
 import { ChartWheel } from "./ChartWheel.js";
 import { Icon } from "./icons.js";
-import { PatternChapters } from "./PatternChapters.js";
+import { PatternExperience } from "./PatternExperience.js";
 
 const BODY_NAMES: Record<CelestialBody, string> = {
   sun: "Sun",
@@ -140,9 +140,9 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
             <p className="kicker">Interpretation boundary</p>
             <h2>Facts first. Meaning second.</h2>
             <p>
-              The facts on this page are calculated. The chapters below them are
-              published, reviewed content matched against those facts — never generic
-              sign filler, and never written on the spot.
+              The facts on this page are calculated. The Pattern below them is
+              written from those facts after you agree — never generic sign
+              filler, and never from check-ins, life events, or a biography.
             </p>
             <a href="#today" className="inline-link">
               See the daily layer status <Icon name="arrow" />
@@ -173,7 +173,7 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
         </div>
       </section>
 
-      <PatternChapters onUnauthorized={onUnauthorized} />
+      <PatternExperience onUnauthorized={onUnauthorized} />
 
       <details className="evidence-drawer">
         <summary>

@@ -1,0 +1,280 @@
+{
+  "schema_version": "0.7.0",
+  "title": "Your Pattern",
+  "chapters": [
+    {
+      "chapter_key": "chapter_01",
+      "title": "A recurring structure 1",
+      "summary": "A calculated pattern described in ordinary language.",
+      "sections": [
+        {
+          "section_key": "chapter_01_section_01",
+          "text": "This structure can show up as a preference for movement when something resists it.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        },
+        {
+          "section_key": "chapter_01_section_02",
+          "text": "The same facts can also describe a slower, more deliberate use of effort.",
+          "claim_class": "structural_description",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "tensions": [
+        {
+          "text": "Urgency can outrun judgment when the pressure is unnamed.",
+          "claim_class": "tension",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "resources": [
+        {
+          "text": "Resistance can clarify which actions deserve sustained effort.",
+          "claim_class": "resource",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "counter_expression": {
+        "text": "The same structure can appear as disciplined courage rather than continual conflict.",
+        "claim_class": "counter_expression",
+        "feature_aliases": [
+          "f001"
+        ],
+        "ontology_rule_ids": [
+          "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    {
+      "chapter_key": "chapter_02",
+      "title": "A recurring structure 2",
+      "summary": "A calculated pattern described in ordinary language.",
+      "sections": [
+        {
+          "section_key": "chapter_02_section_01",
+          "text": "This structure can show up as a preference for movement when something resists it.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        },
+        {
+          "section_key": "chapter_02_section_02",
+          "text": "The same facts can also describe a slower, more deliberate use of effort.",
+          "claim_class": "structural_description",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "tensions": [
+        {
+          "text": "Urgency can outrun judgment when the pressure is unnamed.",
+          "claim_class": "tension",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "resources": [
+        {
+          "text": "Resistance can clarify which actions deserve sustained effort.",
+          "claim_class": "resource",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "counter_expression": {
+        "text": "The same structure can appear as disciplined courage rather than continual conflict.",
+        "claim_class": "counter_expression",
+        "feature_aliases": [
+          "f001"
+        ],
+        "ontology_rule_ids": [
+          "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    {
+      "chapter_key": "chapter_03",
+      "title": "A recurring structure 3",
+      "summary": "A calculated pattern described in ordinary language.",
+      "sections": [
+        {
+          "section_key": "chapter_03_section_01",
+          "text": "This structure can show up as a preference for movement when something resists it.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        },
+        {
+          "section_key": "chapter_03_section_02",
+          "text": "The same facts can also describe a slower, more deliberate use of effort.",
+          "claim_class": "structural_description",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "tensions": [
+        {
+          "text": "Urgency can outrun judgment when the pressure is unnamed.",
+          "claim_class": "tension",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "resources": [
+        {
+          "text": "Resistance can clarify which actions deserve sustained effort.",
+          "claim_class": "resource",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "counter_expression": {
+        "text": "The same structure can appear as disciplined courage rather than continual conflict.",
+        "claim_class": "counter_expression",
+        "feature_aliases": [
+          "f001"
+        ],
+        "ontology_rule_ids": [
+          "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    {
+      "chapter_key": "chapter_04",
+      "title": "A recurring structure 4",
+      "summary": "A calculated pattern described in ordinary language.",
+      "sections": [
+        {
+          "section_key": "chapter_04_section_01",
+          "text": "This structure can show up as a preference for movement when something resists it.",
+          "claim_class": "reflective_interpretation",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        },
+        {
+          "section_key": "chapter_04_section_02",
+          "text": "The same facts can also describe a slower, more deliberate use of effort.",
+          "claim_class": "structural_description",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "tensions": [
+        {
+          "text": "Urgency can outrun judgment when the pressure is unnamed.",
+          "claim_class": "tension",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "resources": [
+        {
+          "text": "Resistance can clarify which actions deserve sustained effort.",
+          "claim_class": "resource",
+          "feature_aliases": [
+            "f001"
+          ],
+          "ontology_rule_ids": [
+            "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "derived_synthesis_ids": []
+        }
+      ],
+      "counter_expression": {
+        "text": "The same structure can appear as disciplined courage rather than continual conflict.",
+        "claim_class": "counter_expression",
+        "feature_aliases": [
+          "f001"
+        ],
+        "ontology_rule_ids": [
+          "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "derived_synthesis_ids": []
+      }
+    }
+  ],
+  "additional_signatures": [],
+  "uncertainty_note": null
+}

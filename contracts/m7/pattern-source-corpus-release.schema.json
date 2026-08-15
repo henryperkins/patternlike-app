@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-source-corpus-release.schema.json",
+  "title": "Pattern source corpus release",
+  "$defs": {
+    "patternSourceCorpusRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "corpus_release_id",
+        "corpus_hash",
+        "locale",
+        "license_resolved",
+        "fragments"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "corpus_release_id": { "type": "string", "minLength": 1 },
+        "corpus_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "license_resolved": { "type": "boolean", "const": true },
+        "fragments": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "https://patternlike.app/contracts/m7/pattern-source-fragment.schema.json#/$defs/patternSourceFragment" }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternSourceCorpusRelease"
+}

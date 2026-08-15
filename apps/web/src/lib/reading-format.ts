@@ -115,8 +115,20 @@ const AI_CONSENT_CATEGORY_LABELS: Record<string, string> = {
   reading_feedback: "Feedback you have given on readings",
 };
 
+const PATTERN_CONSENT_CATEGORY_LABELS: Record<string, string> = {
+  calculated_natal_features: "Calculated facts from your natal chart",
+  accuracy_and_suppression: "Birth-time accuracy and what it rules out",
+  confirmed_content_locale: "The language you confirmed for content",
+  activated_interpretation_ontology: "The activated interpretation meanings",
+  generated_pattern_plan_and_draft_for_validation: "The Pattern plan and draft, so they can be checked",
+};
+
 export function aiConsentCategoryLabel(category: string): string {
   return AI_CONSENT_CATEGORY_LABELS[category] ?? humanize(category);
+}
+
+export function patternConsentCategoryLabel(category: string): string {
+  return PATTERN_CONSENT_CATEGORY_LABELS[category] ?? humanize(category);
 }
 
 /** What a permitted lane means in reader words, with the same open fallback. */

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-delete-request.schema.json",
+  "title": "Pattern delete request",
+  "$defs": {
+    "patternDeleteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirm"],
+      "properties": {
+        "confirm": { "type": "string", "const": "DELETE PATTERN" }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternDeleteRequest"
+}

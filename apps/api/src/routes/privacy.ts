@@ -53,7 +53,7 @@ function errorBody(requestId: string, code: string, message: string) {
 async function parseExportRequest(request: Request): Promise<ExportOptions | null> {
   const text = await request.text();
   if (text.trim() === "") {
-    return { include_readings: true, include_journal: true };
+    return { include_readings: true, include_journal: true, include_patterns: true };
   }
   let value: unknown;
   try {
@@ -65,18 +65,22 @@ async function parseExportRequest(request: Request): Promise<ExportOptions | nul
   const body = value as Record<string, unknown>;
   if (
     Object.keys(body).some(
-      (key) => key !== "include_readings" && key !== "include_journal",
+      (key) =>
+        key !== "include_readings" && key !== "include_journal" && key !== "include_patterns",
     ) ||
     (body.include_readings !== undefined &&
       typeof body.include_readings !== "boolean") ||
     (body.include_journal !== undefined &&
-      typeof body.include_journal !== "boolean")
+      typeof body.include_journal !== "boolean") ||
+    (body.include_patterns !== undefined &&
+      typeof body.include_patterns !== "boolean")
   ) {
     return null;
   }
   return {
     include_readings: body.include_readings ?? true,
     include_journal: body.include_journal ?? true,
+    include_patterns: body.include_patterns ?? true,
   } as ExportOptions;
 }
 

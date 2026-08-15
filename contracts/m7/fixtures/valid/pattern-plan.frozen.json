@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.7.0",
+  "plan_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "sparse_pattern": false,
+  "chapters": [
+    { "chapter_key": "chapter_01" },
+    { "chapter_key": "chapter_02" },
+    { "chapter_key": "chapter_03" },
+    { "chapter_key": "chapter_04" }
+  ],
+  "additional_signatures": [],
+  "omissions": []
+}

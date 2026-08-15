@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-consent.schema.json",
+  "title": "Pattern generation consent",
+  "$defs": {
+    "patternConsent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "status",
+        "provider",
+        "purpose",
+        "policy_version",
+        "enabled_categories",
+        "granted_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "const": "pattern_generation"
+        },
+        "status": {
+          "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/consentStatus"
+        },
+        "provider": {
+          "type": "string",
+          "const": "OpenAI"
+        },
+        "purpose": {
+          "type": "string",
+          "const": "one_pattern_per_chart"
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled_categories": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/consentCategory"
+          }
+        },
+        "granted_at": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ]
+        },
+        "revoked_at": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+            }
+          ]
+        },
+        "existing_pattern_retained": {
+          "type": "boolean"
+        }
+      }
+    },
+    "patternConsentRevocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "consent",
+        "existing_pattern_retained"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion"
+        },
+        "consent": {
+          "$ref": "#/$defs/patternConsent"
+        },
+        "existing_pattern_retained": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternConsent"
+}

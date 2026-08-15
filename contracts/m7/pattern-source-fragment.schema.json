@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-source-fragment.schema.json",
+  "title": "Pattern source fragment",
+  "$defs": {
+    "patternSourceFragment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "corpus_release_id",
+        "locale",
+        "normalized_proposition",
+        "excerpt",
+        "license_class",
+        "allowed_transformations"
+      ],
+      "properties": {
+        "id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/sourceFragmentId" },
+        "corpus_release_id": { "type": "string", "minLength": 1 },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "normalized_proposition": { "type": "string", "minLength": 1 },
+        "excerpt": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "license_class": { "type": "string", "enum": ["licensed_excerpt", "internal_synthetic"] },
+        "allowed_transformations": {
+          "type": "array",
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/transformationClass" }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternSourceFragment"
+}

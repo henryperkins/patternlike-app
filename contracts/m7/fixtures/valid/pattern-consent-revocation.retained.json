@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.7.0",
+  "consent": {
+    "schema_version": "0.7.0",
+    "kind": "pattern_generation",
+    "status": "not_granted",
+    "provider": "OpenAI",
+    "purpose": "one_pattern_per_chart",
+    "policy_version": "1.0.0",
+    "enabled_categories": [
+      "calculated_natal_features",
+      "accuracy_and_suppression",
+      "confirmed_content_locale",
+      "activated_interpretation_ontology",
+      "generated_pattern_plan_and_draft_for_validation"
+    ],
+    "granted_at": null,
+    "revoked_at": "2026-08-15T00:00:00Z"
+  },
+  "existing_pattern_retained": true
+}

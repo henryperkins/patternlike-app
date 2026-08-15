@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-ontology-evaluation.schema.json",
+  "title": "Pattern ontology evaluation",
+  "$defs": {
+    "patternOntologyEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "ontology_version",
+        "verdict",
+        "compiler_passed",
+        "evaluator_passed",
+        "regression_passed",
+        "unevaluated_fixture_count"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "ontology_version": { "type": "string", "minLength": 1 },
+        "verdict": { "type": "string", "enum": ["pass", "reject"] },
+        "compiler_passed": { "type": "boolean" },
+        "evaluator_passed": { "type": "boolean" },
+        "regression_passed": { "type": "boolean" },
+        "unevaluated_fixture_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternOntologyEvaluation"
+}

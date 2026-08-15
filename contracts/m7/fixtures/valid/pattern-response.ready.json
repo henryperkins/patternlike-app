@@ -1,0 +1,117 @@
+{
+  "schema_version": "0.7.0",
+  "pattern_id": "pat_dddddddddddddddddddddddddddddddd",
+  "generated_at": "2026-08-14T12:00:00Z",
+  "locale": "en-US",
+  "effective_accuracy": "exact",
+  "provenance": {
+    "assembly_mode": "constrained_model",
+    "provider": "OpenAI",
+    "model_family": "gpt",
+    "raw_birth_details_sent": false
+  },
+  "core_chapters": [
+    {
+      "title": "Chapter 1",
+      "summary": "A calculated structure in ordinary language.",
+      "sections": [
+        {
+          "text": "A descriptive sentence."
+        },
+        {
+          "text": "Another descriptive sentence."
+        }
+      ],
+      "tensions": [
+        {
+          "text": "A tension."
+        }
+      ],
+      "resources": [
+        {
+          "text": "A resource."
+        }
+      ],
+      "counter_expression": {
+        "text": "The other expression."
+      }
+    },
+    {
+      "title": "Chapter 2",
+      "summary": "A calculated structure in ordinary language.",
+      "sections": [
+        {
+          "text": "A descriptive sentence."
+        },
+        {
+          "text": "Another descriptive sentence."
+        }
+      ],
+      "tensions": [
+        {
+          "text": "A tension."
+        }
+      ],
+      "resources": [
+        {
+          "text": "A resource."
+        }
+      ],
+      "counter_expression": {
+        "text": "The other expression."
+      }
+    },
+    {
+      "title": "Chapter 3",
+      "summary": "A calculated structure in ordinary language.",
+      "sections": [
+        {
+          "text": "A descriptive sentence."
+        },
+        {
+          "text": "Another descriptive sentence."
+        }
+      ],
+      "tensions": [
+        {
+          "text": "A tension."
+        }
+      ],
+      "resources": [
+        {
+          "text": "A resource."
+        }
+      ],
+      "counter_expression": {
+        "text": "The other expression."
+      }
+    },
+    {
+      "title": "Chapter 4",
+      "summary": "A calculated structure in ordinary language.",
+      "sections": [
+        {
+          "text": "A descriptive sentence."
+        },
+        {
+          "text": "Another descriptive sentence."
+        }
+      ],
+      "tensions": [
+        {
+          "text": "A tension."
+        }
+      ],
+      "resources": [
+        {
+          "text": "A resource."
+        }
+      ],
+      "counter_expression": {
+        "text": "The other expression."
+      }
+    }
+  ],
+  "additional_signatures": [],
+  "uncertainty": null
+}

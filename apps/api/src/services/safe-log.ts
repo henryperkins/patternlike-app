@@ -10,7 +10,9 @@ export type ConfigurationCode =
   | "root_kek_not_configured"
   | "identity_not_configured"
   | "check_in_retention_misconfigured"
-  | "time_travel_misconfigured";
+  | "time_travel_misconfigured"
+  | "pattern_rollout_invalid"
+  | "pattern_publisher_misconfigured";
 
 type OperationalFailureClass =
   | GenerationFailureCode
@@ -79,6 +81,12 @@ export type SafeLogEvent =
   // ---------------------------------------------------------------------
   /** The eager post-chart feature write failed; the chart itself committed. */
   | { event: "natal_feature_cache_write_failed" }
+  | { event: "pattern_dispatch_failed" }
+  | { event: "pattern_stage_failed" }
+  /** A stage exhausted its claim ceiling and the sweep failed the job. */
+  | { event: "pattern_stage_terminal_failure" }
+  /** Retention prune or expired-artifact cleanup could not complete. */
+  | { event: "pattern_artifact_cleanup_failed" }
   /** Lazy derivation could not produce a receipted set for a Pattern read. */
   | { event: "natal_feature_derivation_failed" }
   /** Two derivations of one (chart, policy) disagreed. Never an overwrite. */
@@ -209,6 +217,10 @@ export function safeLog(input: SafeLogEvent): string {
     case "timing_local_day_unresolvable":
     case "jwks_refresh_failed_using_stale":
     case "natal_feature_cache_write_failed":
+    case "pattern_dispatch_failed":
+    case "pattern_stage_failed":
+    case "pattern_stage_terminal_failure":
+    case "pattern_artifact_cleanup_failed":
     case "natal_feature_derivation_failed":
     case "natal_feature_set_hash_conflict":
     case "release_unreadable":

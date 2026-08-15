@@ -11,7 +11,15 @@ export interface PrivacyMessage {
   job_type: "export_account" | "delete_account";
 }
 
-export type WorkerMessage = GenerationMessage | PrivacyMessage;
+export type WorkerMessage = GenerationMessage | PrivacyMessage | PatternGenerationMessage;
+
+/** Opaque Pattern-generation nudge. The encrypted command remains in D1. */
+export interface PatternGenerationMessage {
+  kind: "pattern_generation";
+  job_id: string;
+  generation_id: string;
+  stage_generation: number;
+}
 
 export interface Env {
   DB: D1Database;
@@ -46,6 +54,12 @@ export interface Env {
    */
   READING_QUEUE: Queue<GenerationMessage>;
   PRIVACY_QUEUE: Queue<PrivacyMessage>;
+  /**
+   * Dedicated Pattern-generation queue. Long-form jobs must not contend with
+   * daily-reading latency. The message is opaque; the frozen command stays in
+   * jobs.payload_enc.
+   */
+  PATTERN_QUEUE: Queue<PatternGenerationMessage>;
   /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
   CHECK_IN_RETENTION_MONTHS?: string;
   /** Positive cache epoch; bump before any result-changing calculation deploy. */
@@ -88,4 +102,53 @@ export interface Env {
   READING_DAILY_PROVIDER_CALL_LIMIT?: string;
   /** Secret. Never a var, and never written to wrangler.toml. */
   OPENAI_API_KEY?: string;
+
+  // -------------------------------------------------------------------------
+  // M7 AI-generated Pattern
+  // -------------------------------------------------------------------------
+
+  /**
+   * Staged rollout: `off` | `internal` | `first_open`.
+   *
+   * Named PATTERN_AI_ROLLOUT in the M7 spec. Default `off` in every wrangler
+   * block. There is no scheduler hybrid at launch — Pattern is first-open.
+   */
+  PATTERN_AI_ROLLOUT?: string;
+  /**
+   * Designated internal accounts for `PATTERN_AI_ROLLOUT=internal`. JSON array
+   * or comma-separated user ids. Missing or malformed is an empty allowlist.
+   */
+  PATTERN_INTERNAL_ACCOUNT_IDS?: string;
+  /**
+   * Test-only semantic reject hook. Honored only when AUTH_STUB=1 so a
+   * production deploy cannot accidentally refuse every Pattern.
+   */
+  PATTERN_SEMANTIC_FORCE_REJECT?: string;
+  /** `openai` in production; `synthetic` is refused outside development. */
+  PATTERN_PUBLISHER?: string;
+  OPENAI_PATTERN_PLANNER_MODEL?: string;
+  OPENAI_PATTERN_PLANNER_REASONING?: string;
+  OPENAI_PATTERN_PLANNER_PROMPT_VERSION?: string;
+  OPENAI_PATTERN_PLANNER_TIMEOUT_MS?: string;
+  OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS?: string;
+  OPENAI_PATTERN_WRITER_MODEL?: string;
+  OPENAI_PATTERN_WRITER_REASONING?: string;
+  OPENAI_PATTERN_WRITER_PROMPT_VERSION?: string;
+  OPENAI_PATTERN_WRITER_TIMEOUT_MS?: string;
+  OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS?: string;
+  OPENAI_PATTERN_VERIFIER_MODEL?: string;
+  OPENAI_PATTERN_VERIFIER_REASONING?: string;
+  OPENAI_PATTERN_VERIFIER_PROMPT_VERSION?: string;
+  OPENAI_PATTERN_VERIFIER_TIMEOUT_MS?: string;
+  OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS?: string;
+  PATTERN_INPUT_MAX_BYTES?: string;
+  PATTERN_DAILY_PROVIDER_CALL_LIMIT?: string;
+  PATTERN_ARTIFACT_RETENTION_DAYS?: string;
+  /**
+   * Public keys trusted to sign ontology releases, same shape as
+   * CONTENT_RELEASE_KEYS. Ingestion fails closed while unset.
+   */
+  PATTERN_ONTOLOGY_KEYS?: string;
+  /** Separate from SERVICE_AUTH_TOKEN and from consumer sessions. */
+  PATTERN_ADMIN_TOKEN?: string;
 }

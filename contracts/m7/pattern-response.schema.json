@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-response.schema.json",
+  "title": "Consumer Pattern response",
+  "$defs": {
+    "publicProseUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 }
+      }
+    },
+    "publicChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "summary", "sections", "tensions", "resources", "counter_expression"],
+      "properties": {
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": { "text": { "type": "string" } }
+          }
+        },
+        "tensions": { "type": "array", "items": { "$ref": "#/$defs/publicProseUnit" } },
+        "resources": { "type": "array", "items": { "$ref": "#/$defs/publicProseUnit" } },
+        "counter_expression": { "$ref": "#/$defs/publicProseUnit" }
+      }
+    },
+    "publicSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "text"],
+      "properties": {
+        "title": { "type": "string" },
+        "text": { "type": "string" }
+      }
+    },
+    "patternResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "pattern_id",
+        "generated_at",
+        "locale",
+        "effective_accuracy",
+        "provenance",
+        "core_chapters",
+        "additional_signatures",
+        "uncertainty"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "pattern_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternId" },
+        "generated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["assembly_mode", "provider", "model_family", "raw_birth_details_sent"],
+          "properties": {
+            "assembly_mode": { "type": "string", "const": "constrained_model" },
+            "provider": { "type": "string" },
+            "model_family": { "type": "string" },
+            "raw_birth_details_sent": { "type": "boolean", "const": false }
+          }
+        },
+        "core_chapters": { "type": "array", "minItems": 3, "maxItems": 6, "items": { "$ref": "#/$defs/publicChapter" } },
+        "additional_signatures": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/publicSignature" } },
+        "uncertainty": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/publicProseUnit" }
+          ]
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternResponse"
+}

@@ -2,18 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   getAiSynthesisConsent,
+  getPatternGenerationConsent,
   grantAiSynthesisConsent,
   newIdempotencyKey,
   revokeAiSynthesisConsent,
+  revokePatternGenerationConsent,
   type AiSynthesisConsent,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
 import { formatInstant } from "../lib/reading-format.js";
 import { AccountDataControls } from "./AccountDataControls.js";
 import { AiConsentTerms } from "./AiConsent.js";
+import { PatternConsentTerms } from "./PatternConsent.js";
 import { ContextSourceControl } from "./ContextSourceControl.js";
 import { TopicExclusionsPanel } from "./TopicExclusionsPanel.js";
 import { Icon } from "./icons.js";
+import type { PatternConsent } from "@patternlike/shared";
 
 type ConsentPanelState =
   | { status: "loading" }
@@ -168,6 +172,116 @@ function AiSynthesisConsentPanel() {
   );
 }
 
+function PatternGenerationConsentPanel() {
+  const [state, setState] = useState<
+    | { status: "loading" }
+    | { status: "ready"; consent: PatternConsent }
+    | { status: "unreadable"; message: string }
+  >({ status: "loading" });
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [reloads, setReloads] = useState(0);
+  const revokeKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const consent = await getPatternGenerationConsent(controller.signal);
+        if (controller.signal.aborted) return;
+        setState({ status: "ready", consent });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setState({
+          status: "unreadable",
+          message:
+            error instanceof Error
+              ? error.message
+              : "The Pattern consent record could not be read in this session.",
+        });
+      }
+    })();
+    return () => controller.abort();
+  }, [reloads]);
+
+  const revoke = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      revokeKey.current ??= newIdempotencyKey("web-pattern-consent");
+      const next = await revokePatternGenerationConsent(revokeKey.current);
+      revokeKey.current = null;
+      setState({ status: "ready", consent: next.consent });
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError
+          ? withRequestId(error.message, error.requestId)
+          : error instanceof Error
+            ? error.message
+            : "Pattern consent could not be updated.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const granted = state.status === "ready" && state.consent.status === "granted";
+  // Same three states as the reading-generation panel above, for the same
+  // reason: `granted` is false while the read is in flight and false when it
+  // failed, so a binary chip tells a reader whose grant is active that nothing
+  // is being sent to the provider -- next to an error paragraph saying the read
+  // did not complete.
+  const chip = state.status === "ready" ? (granted ? "GRANTED" : "NOT GRANTED") : "UNKNOWN";
+
+  return (
+    <section className="ai-consent panel" aria-labelledby="pattern-consent-heading">
+      <div className="panel-heading">
+        <div>
+          <p className="kicker">Pattern generation</p>
+          <h2 id="pattern-consent-heading">Who writes your Pattern</h2>
+        </div>
+        <span className="panel-code">{chip}</span>
+      </div>
+      {state.status === "ready" ? (
+        <>
+          {granted && state.consent.granted_at ? (
+            <p className="ai-consent__since">Granted {formatInstant(state.consent.granted_at)}.</p>
+          ) : (
+            <p>Grant this from Your Pattern. This page only withdraws an existing grant.</p>
+          )}
+          <PatternConsentTerms consent={state.consent} />
+          {granted ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => void revoke()}
+              disabled={busy}
+            >
+              Withdraw Pattern consent
+            </button>
+          ) : null}
+        </>
+      ) : state.status === "unreadable" ? (
+        <p>{state.message}</p>
+      ) : (
+        <p>Reading Pattern consent.</p>
+      )}
+      <p className="privacy-action__status" role="status" aria-live="polite">
+        {problem ?? ""}
+      </p>
+      {state.status === "unreadable" ? (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => setReloads((value) => value + 1)}
+        >
+          Try again <Icon name="refresh" />
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 export function PrivacyView({
   hasChart,
   onSignOut,
@@ -209,6 +323,8 @@ export function PrivacyView({
       </section>
 
       <AiSynthesisConsentPanel />
+
+      <PatternGenerationConsentPanel />
 
       <TopicExclusionsPanel />
 

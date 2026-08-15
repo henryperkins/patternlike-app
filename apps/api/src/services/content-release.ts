@@ -327,21 +327,21 @@ function verifyParams(alg: SignatureAlgorithm, key: CryptoKey): SubtleCryptoSign
  * ES256 signatures are raw `r||s` (64 bytes), the JWS convention, not DER —
  * WebCrypto's ECDSA verify accepts only the former.
  */
-export async function verifyBundleSignature(
-  bundle: ContentReleaseBundle,
+export async function verifyRawSignature(
+  alg: SignatureAlgorithm,
+  keyId: string,
+  signatureB64Url: string,
+  payload: string,
   keys: Map<string, ReleasePublicKey>,
 ): Promise<RejectionReason | null> {
-  const configured = keys.get(bundle.signature.key_id);
+  const configured = keys.get(keyId);
   if (!configured) {
-    return reject(
-      "signature_key_unknown",
-      `No configured public key for key_id ${bundle.signature.key_id}`,
-    );
+    return reject("signature_key_unknown", `No configured public key for key_id ${keyId}`);
   }
-  if (configured.alg !== bundle.signature.alg) {
+  if (configured.alg !== alg) {
     return reject(
       "signature_alg_mismatch",
-      `Key ${bundle.signature.key_id} is configured for ${configured.alg}, bundle declares ${bundle.signature.alg}`,
+      `Key ${keyId} is configured for ${configured.alg}, bundle declares ${alg}`,
     );
   }
 
@@ -349,10 +349,10 @@ export async function verifyBundleSignature(
   if (!rawKey) {
     return reject(
       "signature_key_unusable",
-      `Configured public key for ${bundle.signature.key_id} is not valid base64url`,
+      `Configured public key for ${keyId} is not valid base64url`,
     );
   }
-  const signature = decodeBase64Url(bundle.signature.signature);
+  const signature = decodeBase64Url(signatureB64Url);
   if (!signature) {
     return reject("signature_malformed", "signature is not valid base64url");
   }
@@ -361,19 +361,14 @@ export async function verifyBundleSignature(
   if (!key) {
     return reject(
       "signature_key_unusable",
-      `Configured public key for ${bundle.signature.key_id} could not be imported as ${configured.alg}`,
+      `Configured public key for ${keyId} could not be imported as ${configured.alg}`,
     );
   }
 
-  const payload = new TextEncoder().encode(bundleSigningPayload(bundle));
+  const bytes = new TextEncoder().encode(payload);
   let verified = false;
   try {
-    verified = await crypto.subtle.verify(
-      verifyParams(configured.alg, key),
-      key,
-      signature,
-      payload,
-    );
+    verified = await crypto.subtle.verify(verifyParams(configured.alg, key), key, signature, bytes);
   } catch {
     return reject("signature_invalid", "Bundle signature could not be verified");
   }
@@ -381,6 +376,19 @@ export async function verifyBundleSignature(
     return reject("signature_invalid", "Bundle signature does not match the bundle body");
   }
   return null;
+}
+
+export async function verifyBundleSignature(
+  bundle: ContentReleaseBundle,
+  keys: Map<string, ReleasePublicKey>,
+): Promise<RejectionReason | null> {
+  return verifyRawSignature(
+    bundle.signature.alg,
+    bundle.signature.key_id,
+    bundle.signature.signature,
+    bundleSigningPayload(bundle),
+    keys,
+  );
 }
 
 function isNonEmptyString(value: unknown): value is string {

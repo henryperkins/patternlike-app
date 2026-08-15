@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-document-internal.schema.json",
+  "title": "Accepted internal Pattern document",
+  "$defs": {
+    "patternDocumentInternal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "pattern_id",
+        "generation_id",
+        "locale",
+        "effective_accuracy",
+        "plan_hash",
+        "candidate_hash",
+        "semantic_verdict_hash",
+        "artifact",
+        "compact_provenance"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "pattern_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternId" },
+        "generation_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "plan_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "candidate_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "semantic_verdict_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "artifact": { "type": "object" },
+        "compact_provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assembly_mode",
+            "provider",
+            "model_family",
+            "raw_birth_details_sent",
+            "ontology_version",
+            "selection_policy_version"
+          ],
+          "properties": {
+            "assembly_mode": { "type": "string", "const": "constrained_model" },
+            "provider": { "type": "string" },
+            "model_family": { "type": "string" },
+            "raw_birth_details_sent": { "type": "boolean", "const": false },
+            "ontology_version": { "type": "string" },
+            "selection_policy_version": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternDocumentInternal"
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/account-export.schema.json",
+  "title": "M7 portable account export successor",
+  "$defs": {
+    "portableSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "items"],
+      "properties": {
+        "status": { "type": "string", "enum": ["included", "omitted_by_request", "not_available"] },
+        "items": { "type": "array", "items": {} }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["omitted_by_request", "not_available"] } },
+            "required": ["status"]
+          },
+          "then": { "properties": { "items": { "maxItems": 0 } } }
+        }
+      ]
+    },
+    "exportedPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern_id", "status", "generated_at", "locale", "effective_accuracy", "artifact"],
+      "properties": {
+        "pattern_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternId" },
+        "status": { "type": "string", "const": "active" },
+        "generated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "artifact": { "type": "object" }
+      }
+    },
+    "accountExport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "export_id",
+        "generated_at",
+        "account",
+        "birth_profiles",
+        "chart_snapshots",
+        "preferences",
+        "timezone_changes",
+        "consents",
+        "context_sources",
+        "context_signals",
+        "readings",
+        "journal",
+        "patterns"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "export_id": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId" },
+        "generated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "account": { "type": "object" },
+        "birth_profiles": { "type": "array" },
+        "chart_snapshots": { "type": "array" },
+        "preferences": { "type": "object" },
+        "timezone_changes": { "type": "array" },
+        "consents": { "type": "array" },
+        "context_sources": { "type": "array" },
+        "context_signals": { "type": "array" },
+        "readings": { "$ref": "#/$defs/portableSection" },
+        "journal": { "$ref": "#/$defs/portableSection" },
+        "patterns": { "$ref": "#/$defs/portableSection" }
+      }
+    }
+  },
+  "$ref": "#/$defs/accountExport"
+}

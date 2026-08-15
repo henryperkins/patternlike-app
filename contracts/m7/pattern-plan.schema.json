@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-plan.schema.json",
+  "title": "Frozen Pattern plan",
+  "$defs": {
+    "patternPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "plan_hash", "sparse_pattern", "chapters", "additional_signatures", "omissions"],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "plan_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "sparse_pattern": { "type": "boolean" },
+        "chapters": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": { "type": "object" }
+        },
+        "additional_signatures": { "type": "array", "maxItems": 8, "items": { "type": "object" } },
+        "omissions": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternPlan"
+}

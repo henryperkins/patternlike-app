@@ -317,6 +317,20 @@ export const ENCRYPTED_COLUMNS = [
     keyVersionColumn: "notes_key_version",
     nonceColumn: "notes_nonce",
   },
+  {
+    table: "pattern_documents",
+    idColumn: "id",
+    encColumn: "wrapped_document_key_enc",
+    keyVersionColumn: "wrapped_document_key_version",
+    nonceColumn: "wrapped_document_key_nonce",
+  },
+  {
+    table: "pattern_generation_artifact_keys",
+    idColumn: "generation_id",
+    encColumn: "wrapped_key_enc",
+    keyVersionColumn: "wrapped_key_version",
+    nonceColumn: "wrapped_key_nonce",
+  },
 ] as const;
 
 /**
@@ -329,6 +343,21 @@ export const ENCRYPTED_COLUMNS = [
  */
 export const UNWRITTEN_ENCRYPTED_COLUMNS = [
   { table: "chart_snapshots", encColumn: "snapshot_enc", keyVersionColumn: "snapshot_key_version" },
+] as const;
+
+/**
+ * Ciphertext stored under a nested content key, not the user DEK.
+ *
+ * Rotation rewraps the matching wrapped-key column (in ENCRYPTED_COLUMNS) and
+ * leaves these bodies untouched. They still have to be named here: the schema
+ * tripwire treats every `*_enc BLOB` as a rotation decision.
+ */
+export const NESTED_CONTENT_CIPHERTEXT_COLUMNS = [
+  {
+    table: "pattern_documents",
+    encColumn: "document_enc",
+    wrappedKeyColumn: "wrapped_document_key_enc",
+  },
 ] as const;
 
 async function assertNoUnrotatedCiphertext(

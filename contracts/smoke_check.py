@@ -74,6 +74,10 @@ def apply_migrations(
         try:
             con.execute("BEGIN")
             for statement in statements:
+                # No statement is special-cased out of the transaction. A
+                # migration that needs foreign keys switched off cannot run on
+                # D1 at all, so the loader must not offer an escape the live
+                # database does not have.
                 con.execute(statement)
             con.execute("COMMIT")
         except Exception:
@@ -167,6 +171,25 @@ def insert_m3_reading(con: sqlite3.Connection, rid: str, uid: str, date: str) ->
         "VALUES (?, ?, ?, 'release-12', ?, 'sha256:f', 'c', 'deterministic', 'published', "
         "1, 'initial', 1, X'00', 1, 'n', ?, ?)",
         (rid, uid, date, f"user:{uid}:{date}:release-12:r1", NOW, NOW),
+    )
+
+
+def insert_context_signal(
+    con: sqlite3.Connection,
+    sid: str,
+    uid: str,
+    window: str,
+    consent_id: str | None,
+) -> None:
+    """An encrypted USR-06 check-in row, the shape that actually names a consent."""
+    con.execute(
+        "INSERT INTO context_signals (id, user_id, source_id, source_window, "
+        "evidence_lane, allowed_uses_json, confidence, sensitivity, permission_state, "
+        "consent_id, freshness_status, observed_at, ingested_at, value_encoding, "
+        "value_enc, value_key_version, value_nonce, normalized_hash, created_at, updated_at) "
+        "VALUES (?, ?, 'USR-06', ?, 'user_and_context', '[\"daily_reading\"]', 'high', "
+        "'personal', 'active', ?, 'fresh', ?, ?, 'encrypted', X'00', 1, 'n', 'sha256:h', ?, ?)",
+        (sid, uid, window, consent_id, NOW, NOW, NOW, NOW),
     )
 
 
@@ -826,6 +849,108 @@ def check_provider_budget_table() -> None:
     print("D1 OK  the UTC-day provider budget counts up from zero and never below it")
 
 
+def check_0007_over_consent_references() -> None:
+    """0007 rebuilds consents while child rows still name a consent.
+
+    This is the state production is in, and the one an empty database cannot
+    reach: `context_source_permissions.consent_id` and
+    `context_signals.consent_id` are written non-null by the USR-06 check-in and
+    product-source paths. FK enforcement is live inside the migration batch, so
+    the rebuild has to carry those references across DROP TABLE consents rather
+    than switch foreign keys off.
+    """
+    con = fresh(upto=6)
+    seed_user(con, USER_A, SUBJ_A)
+    con.execute(
+        "INSERT INTO consents (id, user_id, kind, status, source_id, policy_version, "
+        "granted_at, created_at, updated_at) "
+        "VALUES ('cns_checkin', ?, 'product_source', 'granted', 'USR-06', 'v1', ?, ?, ?)",
+        (USER_A, NOW, NOW, NOW),
+    )
+    con.execute(
+        "INSERT INTO consents (id, user_id, kind, status, policy_version, "
+        "granted_at, created_at, updated_at) "
+        "VALUES ('cns_synth', ?, 'ai_synthesis', 'granted', 'v1', ?, ?, ?)",
+        (USER_A, NOW, NOW, NOW),
+    )
+    con.execute(
+        "INSERT INTO context_source_permissions (user_id, source_id, enabled, "
+        "permission_state, permission_tier, consent_id, updated_at) "
+        "VALUES (?, 'USR-06', 1, 'active', 1, 'cns_checkin', ?)",
+        (USER_A, NOW),
+    )
+    con.execute(
+        "INSERT INTO context_source_permissions (user_id, source_id, enabled, "
+        "permission_state, permission_tier, consent_id, updated_at) "
+        "VALUES (?, 'never_linked', 0, 'never_granted', 0, NULL, ?)",
+        (USER_A, NOW),
+    )
+    insert_context_signal(con, "sig_linked", USER_A, "2026-08-01", "cns_synth")
+    insert_context_signal(con, "sig_unlinked", USER_A, "2026-08-02", None)
+    con.commit()
+
+    apply_migrations(con, start=7)
+
+    restored = con.execute(
+        "SELECT source_id, consent_id FROM context_source_permissions "
+        "WHERE user_id = ? ORDER BY source_id",
+        (USER_A,),
+    ).fetchall()
+    if restored != [("USR-06", "cns_checkin"), ("never_linked", None)]:
+        raise SystemExit(f"0007 lost context_source_permissions consent links: {restored}")
+    signals = con.execute(
+        "SELECT id, consent_id FROM context_signals WHERE user_id = ? ORDER BY id",
+        (USER_A,),
+    ).fetchall()
+    if signals != [("sig_linked", "cns_synth"), ("sig_unlinked", None)]:
+        raise SystemExit(f"0007 lost context_signals consent links: {signals}")
+    kinds = con.execute("SELECT COUNT(*) FROM consents").fetchone()[0]
+    if kinds != 2:
+        raise SystemExit(f"0007 did not carry every consent row across the rebuild: {kinds}")
+    if con.execute(
+        "SELECT name FROM sqlite_master WHERE name = 'consents_ref_stash_m7'"
+    ).fetchone():
+        raise SystemExit("0007 left its reference stash table behind")
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("foreign_key_check reported violations after 0007")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("quick_check failed after 0007")
+    print("D1 OK  0007 rebuilds consents with live child references intact")
+
+
+def check_0007_pattern_tables() -> None:
+    con = sqlite3.connect(":memory:")
+    apply_migrations(con)
+    kinds = [
+        row[0]
+        for row in con.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'consents'"
+        )
+    ]
+    assert kinds and "pattern_generation" in kinds[0], kinds
+    for table in (
+        "pattern_generation_claims",
+        "pattern_generation_jobs",
+        "pattern_documents",
+        "pattern_generation_artifact_keys",
+        "pattern_generation_artifacts",
+        "pattern_admin_access_events",
+        "pattern_ontology_releases",
+        "pattern_ontology_pointer",
+        "pattern_provider_daily_usage",
+    ):
+        row = con.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()
+        assert row, f"missing {table}"
+    pointer = con.execute("SELECT id, active_version FROM pattern_ontology_pointer").fetchone()
+    assert pointer == (1, None), pointer
+    con.execute("PRAGMA foreign_key_check")
+    assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+    print("D1 OK  0007 admits pattern_generation and creates Pattern tables")
+
+
 def main() -> int:
     check_fresh_schema()
     check_0004_over_populated_m5()
@@ -835,6 +960,8 @@ def main() -> int:
     check_0003_refuses_dependent_rows()
     check_v5_reading_rows()
     check_provider_budget_table()
+    check_0007_pattern_tables()
+    check_0007_over_consent_references()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

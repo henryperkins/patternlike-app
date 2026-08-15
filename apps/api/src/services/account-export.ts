@@ -8,11 +8,13 @@ import {
 } from "./export-envelope.js";
 
 export const M6_SCHEMA_VERSION = "0.6.0" as const;
+export const M7_EXPORT_SCHEMA_VERSION = "0.7.0" as const;
 const M0_SCHEMA_VERSION = "0.2.0" as const;
 
 export interface ExportOptions {
   include_readings: boolean;
   include_journal: boolean;
+  include_patterns: boolean;
 }
 
 function parseJson<T>(raw: string): T {
@@ -99,7 +101,7 @@ export async function assembleAccountExport(
 
   const { dek } = await loadUserKey(env, identity);
   const document: Record<string, unknown> = {
-    schema_version: M6_SCHEMA_VERSION,
+    schema_version: M7_EXPORT_SCHEMA_VERSION,
     export_id: exportId,
     generated_at: generatedAt,
     account: {
@@ -478,6 +480,61 @@ export async function assembleAccountExport(
   document.journal = options.include_journal
     ? { status: "not_available", items: [] }
     : { status: "omitted_by_request", items: [] };
+
+  // The Pattern is the one section whose prose is written by a model on the
+  // reader's behalf, so it takes an omission flag like readings and journal do.
+  // The contract already models the state -- `patterns` is the same
+  // portableSection, and the package ships an invalid fixture proving
+  // omitted_by_request must carry no items -- it was simply unreachable.
+  if (!options.include_patterns) {
+    document.patterns = { status: "omitted_by_request", items: [] };
+  } else {
+    // Gated exactly as the reader route is. `exportedPattern.status` is
+    // `const: "active"` in the contract and the spec says the export carries
+    // only active accepted artifacts, so a document the reader is refused --
+    // withdrawn with its ontology, deleted, or left behind by a chart
+    // correction -- has no representable status and must not ship at all.
+    const { decryptPatternDocument, loadActiveChart, loadActivePatternDocument } = await import(
+      "./pattern-state.js"
+    );
+    const { hashChartFingerprint, loadClaimForFingerprint } = await import("../db/pattern-claims.js");
+    const { isOntologyRecalled } = await import("../db/pattern-ontology.js");
+
+    const chart = await loadActiveChart(env, identity.userId);
+    const fingerprintHash = chart ? await hashChartFingerprint(chart.fingerprint) : null;
+    const patternRow = fingerprintHash
+      ? await loadActivePatternDocument(env, identity.userId, fingerprintHash)
+      : null;
+    const claim = fingerprintHash
+      ? await loadClaimForFingerprint(env, identity.userId, fingerprintHash)
+      : null;
+    const withheld =
+      !patternRow ||
+      claim?.status === "deleted" ||
+      claim?.status === "superseded" ||
+      claim?.status === "withdrawn" ||
+      (await isOntologyRecalled(env, patternRow.ontology_version));
+
+    if (withheld || !patternRow) {
+      document.patterns = { status: "not_available", items: [] };
+    } else {
+      const { projectPublicPattern } = await import("@patternlike/pattern-engine");
+      const internal = await decryptPatternDocument(env, identity, patternRow);
+      document.patterns = {
+        status: "included",
+        items: [
+          {
+            pattern_id: patternRow.id,
+            status: "active",
+            generated_at: patternRow.generated_at,
+            locale: patternRow.locale,
+            effective_accuracy: patternRow.effective_accuracy,
+            artifact: projectPublicPattern(internal, patternRow.generated_at),
+          },
+        ],
+      };
+    }
+  }
   assertBounded(document);
 
   const plaintext = new TextEncoder().encode(JSON.stringify(document));

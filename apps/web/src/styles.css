@@ -3718,6 +3718,39 @@ summary:focus-visible {
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
+
+.pattern-signatures {
+  margin-top: 34px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line-dark);
+}
+
+.pattern-signatures h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(22px, 2.4vw, 27px);
+  font-weight: 500;
+}
+
+.pattern-signatures article {
+  margin-top: 18px;
+}
+
+.pattern-provenance,
+.pattern-delete p {
+  max-width: 65ch;
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pattern-delete {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-dark);
+}
+
 /* Time Travel */
 .travel-page {
   width: min(100%, 1540px);

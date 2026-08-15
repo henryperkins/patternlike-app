@@ -1,0 +1,247 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API (M7 amendment)
+  version: 0.7.0
+  description: |
+    Additive M7 surfaces for AI-generated Your Pattern. Frozen M0–M6 documents
+    are unchanged. Editorial-cohort GET /v1/pattern remains the M4 contract.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+  - url: http://localhost:8787
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/pattern-state:
+    get:
+      operationId: getPatternState
+      x-normative-schema: 'm7:pattern-state.schema.json#/$defs/patternStateDocument'
+      responses:
+        '200':
+          description: Closed Pattern state for the current account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternState' }
+        '401': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /v1/consents/pattern-generation:
+    get:
+      operationId: getPatternGenerationConsent
+      x-normative-schema: 'm7:pattern-consent.schema.json#/$defs/patternConsent'
+      responses:
+        '200':
+          description: Current Pattern-generation terms and grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternConsent' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: revokePatternGenerationConsent
+      x-normative-schema: 'm7:pattern-consent.schema.json#/$defs/patternConsentRevocation'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Consent revoked; whether an accepted Pattern was retained
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternConsentRevocation' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /v1/pattern-generations:
+    post:
+      operationId: startPatternGeneration
+      x-normative-schema: 'm7:pattern-generation-request.schema.json#/$defs/patternGenerationRequest'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatternGenerationRequest' }
+      responses:
+        '202':
+          description: Consent granted or observed and generation reserved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternGenerationAccepted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/pattern-generations/{generation_id}:
+    get:
+      operationId: getPatternGeneration
+      x-normative-schema: 'm7:pattern-generation-status.schema.json#/$defs/patternGenerationStatus'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+      responses:
+        '200':
+          description: Owner-scoped generation status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternGenerationStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/pattern:
+    get:
+      operationId: getGeneratedPattern
+      x-normative-schema: 'm7:pattern-response.schema.json#/$defs/patternResponse'
+      responses:
+        '200':
+          description: One immutable AI Pattern document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteGeneratedPattern
+      x-normative-schema: 'm7:pattern-delete-request.schema.json#/$defs/patternDeleteRequest'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatternDeleteRequest' }
+      responses:
+        '202':
+          description: Pattern made inaccessible; physical artifact deletion may continue
+        '204':
+          description: Pattern already erased
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /internal/pattern-ontology-releases:
+    post:
+      operationId: ingestPatternOntologyRelease
+      security:
+        - serviceToken: []
+      x-normative-schema: 'm7:pattern-ontology-release.schema.json#/$defs/patternOntologyRelease'
+      responses:
+        '201': { description: Ontology release stored }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-generations/{generation_id}:
+    get:
+      operationId: adminGetPatternGeneration
+      security:
+        - adminToken: []
+      x-normative-schema: 'm7:pattern-generation-status.schema.json#/$defs/patternGenerationStatus'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+      responses:
+        '200': { description: Audited generation inspection }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+    serviceToken:
+      type: http
+      scheme: bearer
+    adminToken:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    GenerationId:
+      name: generation_id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+  responses:
+    Error:
+      description: Existing request-id error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: true
+          required: [code, message, request_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+    PatternState:
+      type: object
+      additionalProperties: true
+      required: [schema_version, state]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        state: { type: string }
+    PatternConsent:
+      type: object
+      additionalProperties: true
+      required: [schema_version, kind, status]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        kind: { type: string, const: 'pattern_generation' }
+        status: { type: string }
+    PatternConsentRevocation:
+      type: object
+      additionalProperties: false
+      required: [schema_version, consent, existing_pattern_retained]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        consent: { $ref: '#/components/schemas/PatternConsent' }
+        existing_pattern_retained: { type: boolean }
+    PatternGenerationRequest:
+      type: object
+      additionalProperties: false
+      required: [schema_version, consent_policy_version, confirm, reason]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        consent_policy_version: { type: string }
+        confirm: { type: string, const: 'GENERATE MY PATTERN' }
+        reason: { type: string }
+    PatternGenerationAccepted:
+      type: object
+      additionalProperties: true
+      required: [schema_version, consent, generation]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+    PatternGenerationStatus:
+      type: object
+      additionalProperties: true
+      required: [schema_version, generation_id, stage]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+    PatternResponse:
+      type: object
+      additionalProperties: true
+      required: [schema_version, pattern_id, core_chapters]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+    PatternDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm]
+      properties:
+        confirm: { type: string, const: 'DELETE PATTERN' }

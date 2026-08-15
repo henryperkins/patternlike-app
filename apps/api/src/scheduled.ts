@@ -2,6 +2,7 @@ import type { Env } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import { runReadingScheduler } from "./services/run-reading-scheduler.js";
 import { runPrivacyMaintenance } from "./services/privacy-maintenance.js";
+import { sweepPatternJobs } from "./services/pattern-sweep.js";
 import { safeLog } from "./services/safe-log.js";
 
 /** Cron does not enter Hono, so it owns the same direct fail-closed gate as Queue. */
@@ -28,6 +29,11 @@ export async function scheduled(
   }
   try {
     await runPrivacyMaintenance(env, scheduledAt);
+  } catch (error) {
+    if (laneFailure === undefined) laneFailure = error;
+  }
+  try {
+    await sweepPatternJobs(env, scheduledAt);
   } catch (error) {
     if (laneFailure === undefined) laneFailure = error;
   }

@@ -308,7 +308,7 @@ describe("account deletion", () => {
       env,
       IDENTITY_A,
       "idem-export-delete-race",
-      { include_readings: true, include_journal: true },
+      { include_readings: true, include_journal: true, include_patterns: true },
       exportNow,
     );
     if (reserved.kind !== "created") throw new Error("export reservation missing");
@@ -384,7 +384,7 @@ describe("account deletion", () => {
       env,
       IDENTITY_A,
       "idem-export-delete-cleanup-retry",
-      { include_readings: true, include_journal: true },
+      { include_readings: true, include_journal: true, include_patterns: true },
       exportNow,
     );
     if (reserved.kind !== "created") throw new Error("export reservation missing");
@@ -500,7 +500,7 @@ describe("account deletion", () => {
       env,
       IDENTITY_A,
       "idem-export-pre-put-race",
-      { include_readings: true, include_journal: true },
+      { include_readings: true, include_journal: true, include_patterns: true },
       now,
     );
     if (reserved.kind !== "created") throw new Error("export reservation missing");
@@ -563,7 +563,7 @@ describe("account deletion", () => {
       env,
       IDENTITY_A,
       "idem-export-delete-log",
-      { include_readings: true, include_journal: true },
+      { include_readings: true, include_journal: true, include_patterns: true },
       now,
     );
     if (exportRequest.kind !== "created") throw new Error("export reservation missing");
@@ -669,7 +669,7 @@ describe("account deletion", () => {
       env,
       IDENTITY_A,
       "idem-export-queued-delete",
-      { include_readings: true, include_journal: true },
+      { include_readings: true, include_journal: true, include_patterns: true },
     );
     if (reserved.kind !== "created") throw new Error("export reservation missing");
 

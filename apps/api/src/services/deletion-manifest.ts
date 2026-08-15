@@ -21,6 +21,19 @@ export const DELETION_ARTIFACT_FAMILIES: readonly DeletionArtifactFamily[] = [
       return results.map((row) => exportObjectKey(row.id));
     },
   },
+  {
+    family: "pattern_generations",
+    prefix: "pattern-generations/",
+    async collectKeys(env, userId) {
+      const { results } = await env.DB.prepare(
+        `SELECT object_key FROM pattern_generation_artifacts
+         WHERE user_id = ? ORDER BY object_key`,
+      )
+        .bind(userId)
+        .all<{ object_key: string }>();
+      return results.map((row) => row.object_key);
+    },
+  },
 ];
 
 export async function collectDeletionArtifactKeys(
@@ -57,6 +70,11 @@ export const DELETED_USER_TABLES = [
   "timezone_changes",
   "natal_feature_sets",
   "natal_features",
+  "pattern_generation_artifacts",
+  "pattern_generation_artifact_keys",
+  "pattern_documents",
+  "pattern_generation_jobs",
+  "pattern_generation_claims",
   "chart_snapshots",
   "birth_profiles",
   "context_signals",
@@ -84,9 +102,10 @@ export const RETAINED_USER_TABLES = [
  * the reader's data" an explicit, reviewed claim per table rather than an
  * inference from whichever tables `buildAccountExport` happens to SELECT.
  *
- * A table listed as portable must be reachable through a section of M6's
- * frozen closed `accountExport` document; that schema cannot grow top-level
- * sections, so a new portable table has to project into an existing one.
+ * A table listed as portable must be reachable through a section of the
+ * current export document. M6 is frozen and cannot grow sections; M7's
+ * successor adds `patterns` so `pattern_documents` projects there rather
+ * than into readings.
  */
 export const PORTABLE_USER_TABLES = [
   "users",
@@ -97,6 +116,7 @@ export const PORTABLE_USER_TABLES = [
   "context_source_permissions",
   "context_signals",
   "daily_readings",
+  "pattern_documents",
 ] as const;
 
 export const NON_PORTABLE_USER_TABLES = [
@@ -113,6 +133,11 @@ export const NON_PORTABLE_USER_TABLES = [
   /** M4: deterministic derived Pattern facts and their completion receipt. */
   "natal_features",
   "natal_feature_sets",
+  /** M7: operational generation state; the accepted Pattern is the portable artifact. */
+  "pattern_generation_claims",
+  "pattern_generation_jobs",
+  "pattern_generation_artifact_keys",
+  "pattern_generation_artifacts",
   /** M4: bounded recomputable Time Travel calculation cache. */
   "cycle_scan_receipts",
   /** M4: operational spend ledger; no selected date or natal fact. */
@@ -139,6 +164,12 @@ export async function deleteUserRows(
   // Break the daily-reading -> jobs parent link before deleting either side.
   await env.DB.prepare(
     "UPDATE daily_readings SET active_generation_job_id = NULL WHERE user_id = ?",
+  )
+    .bind(userId)
+    .run();
+
+  await env.DB.prepare(
+    "UPDATE pattern_admin_access_events SET target_user_id = NULL WHERE target_user_id = ?",
   )
     .bind(userId)
     .run();

@@ -18,6 +18,7 @@ import { loadPreferences } from "../db/preferences.js";
 import { readPatternObjects } from "../services/pattern-content.js";
 import { matchPatternObject } from "../services/pattern-matcher.js";
 import { loadReleaseBundle } from "../services/release-bundle.js";
+import { tryServeAiPattern } from "./pattern-ai.js";
 import { safeLog } from "../services/safe-log.js";
 
 export const patternRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -126,6 +127,8 @@ function evidence(features: readonly NatalFeature[]): PatternEvidence[] {
 
 patternRoutes.get("/v1/pattern", async (c) => {
   const requestId = c.get("requestId");
+  const ai = await tryServeAiPattern(c.env, c.get("userId"), c.get("cryptoSubject"), requestId, c.req.url);
+  if (ai) return ai;
   const query = parseQuery(c.req.url);
   if (!query) {
     return c.json(error(requestId, "invalid_pattern_query", "Only one valid cursor and limit 1-50 are accepted"), 400);

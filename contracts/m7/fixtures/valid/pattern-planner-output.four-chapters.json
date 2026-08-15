@@ -1,0 +1,91 @@
+{
+  "schema_version": "0.7.0",
+  "chapters": [
+    {
+      "chapter_key": "chapter_01",
+      "working_title": "Chapter 1 working title",
+      "purpose": "Integrate related calculated structures without presenting them as fate.",
+      "feature_aliases": [
+        "f001"
+      ],
+      "ontology_rule_ids": [
+        "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "derived_synthesis_ids": [],
+      "required_tension_ids": [
+        "ten_001"
+      ],
+      "required_resource_ids": [
+        "res_001"
+      ],
+      "required_counter_expression_ids": [
+        "ctr_001"
+      ]
+    },
+    {
+      "chapter_key": "chapter_02",
+      "working_title": "Chapter 2 working title",
+      "purpose": "Integrate related calculated structures without presenting them as fate.",
+      "feature_aliases": [
+        "f001"
+      ],
+      "ontology_rule_ids": [
+        "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "derived_synthesis_ids": [],
+      "required_tension_ids": [
+        "ten_001"
+      ],
+      "required_resource_ids": [
+        "res_001"
+      ],
+      "required_counter_expression_ids": [
+        "ctr_001"
+      ]
+    },
+    {
+      "chapter_key": "chapter_03",
+      "working_title": "Chapter 3 working title",
+      "purpose": "Integrate related calculated structures without presenting them as fate.",
+      "feature_aliases": [
+        "f001"
+      ],
+      "ontology_rule_ids": [
+        "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "derived_synthesis_ids": [],
+      "required_tension_ids": [
+        "ten_001"
+      ],
+      "required_resource_ids": [
+        "res_001"
+      ],
+      "required_counter_expression_ids": [
+        "ctr_001"
+      ]
+    },
+    {
+      "chapter_key": "chapter_04",
+      "working_title": "Chapter 4 working title",
+      "purpose": "Integrate related calculated structures without presenting them as fate.",
+      "feature_aliases": [
+        "f001"
+      ],
+      "ontology_rule_ids": [
+        "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "derived_synthesis_ids": [],
+      "required_tension_ids": [
+        "ten_001"
+      ],
+      "required_resource_ids": [
+        "res_001"
+      ],
+      "required_counter_expression_ids": [
+        "ctr_001"
+      ]
+    }
+  ],
+  "additional_signatures": [],
+  "omissions": []
+}

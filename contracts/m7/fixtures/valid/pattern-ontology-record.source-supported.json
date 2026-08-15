@@ -1,0 +1,31 @@
+{
+  "id": "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "meaning_class": "source_supported",
+  "locale": "en-US",
+  "feature_predicate": {
+    "type": "aspect",
+    "body_a": "sun",
+    "body_b": "mars",
+    "aspect": "square"
+  },
+  "normalized_proposition": "Solar and martial effort can meet as friction that asks for skill.",
+  "source_fragment_ids": [
+    "srcf_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "input_meaning_ids": [],
+  "transformation_class": null,
+  "tensions": [
+    "Urgency can outrun judgment."
+  ],
+  "counter_expressions": [
+    "The same friction can become disciplined courage."
+  ],
+  "prohibited_claims": [
+    "This guarantees conflict."
+  ],
+  "salience_band": "high",
+  "presentation_priority": 10,
+  "cluster_tags": [
+    "initiative"
+  ]
+}

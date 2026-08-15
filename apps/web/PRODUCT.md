@@ -16,7 +16,7 @@ Users need a coherent view of what may matter now, a way to revisit longer patte
 
 Pattern/Like combines stable natal patterns, temporary developmental cycles, a focused daily chapter, and a visible timeline. It exists to make astrology-informed reflection private, intelligible, and bounded by what the underlying calculation can actually support.
 
-Success means a user can understand a relevant theme in plain language, inspect the facts and editorial sources behind it, see uncertainty instead of false precision, and retain clear control over their data.
+Success means a user can understand a relevant theme in plain language, inspect the calculated facts and uncertainty behind the chart, see why a daily reading appeared, and retain clear control over their data. AI-written Pattern chapters do not expose claim-level evidence to the reader; inspectability there is the chart facts, uncertainty, consent, and data controls.
 
 ## Positioning
 
@@ -36,8 +36,8 @@ The core product loop spans Today, Your Pattern, Timing, Time Travel, and Contex
 - Exact, approximate, and unknown birth times are first-class inputs. Unsupported houses, angles, and time-sensitive claims must be suppressed or explicitly qualified.
 - The calculated daily sky — positions and lunar phase at the reader's local-day anchor, exact transit contacts inside that day, and collective sky events — is what makes a reading daily. It is calculated, never inferred by the model.
 - Every astrological claim in a published reading cites the calculated fact behind it. A paragraph may be carried by permitted personal context instead, and then it claims nothing about the sky.
-- A reading is written by a configured model and published only after deterministic validation. There is no reviewed-copy fallback, no previous-day reuse, no alternate model, and no second model reviewing the first: a reading that cannot be produced and validated says so honestly instead.
-- Sending anything to the model requires an explicit AI-synthesis consent, separate from research and model-training consent and revocable at any time. Revoking stops all future generation; it does not rewrite a reading already published.
+- A reading is written by a configured model and published only after deterministic validation. There is no reviewed-copy fallback, no previous-day reuse, no alternate model, and no second model reviewing the first daily reading: a reading that cannot be produced and validated says so honestly instead. Your Pattern is a separate publication contract: a planner pass, a frozen plan, a writer pass, deterministic validation, and an independent semantic verifier, published only as a complete document.
+- Sending anything to a model requires an explicit consent for that purpose. Daily readings use AI-synthesis consent. Your Pattern uses a separate Pattern-generation consent. Both are separate from research and model-training consent and are revocable at any time. Revoking stops future generation of that kind; it does not rewrite a reading or Pattern already published.
 - The model receives an accuracy label, the derived uncertainty, calculated facts, confirmed locale and local date, and the personal context the reader enabled. It never receives the birth instant, birthplace, coordinates, scheduling zone, account identifiers, or security material.
 - User context can rank themes, select domains, adapt framing, or schedule delivery; it cannot change the chart or be presented as an astrological discovery.
 - The product must not make predictive guarantees, diagnoses, causal claims, or claims that exceed the available birth data.
@@ -64,7 +64,7 @@ The voice is calm, precise, direct, and non-mystifying. It leads with ordinary l
 1. Facts before meaning: calculation and eligibility boundaries precede interpretation, and the model is given facts rather than trusted to produce them.
 2. Honest uncertainty: reduce or qualify claims instead of manufacturing precision.
 3. Private by design: minimize access, encrypt sensitive data, and keep control visible to the user.
-4. Inspectable by default: explain why content appeared without forcing technical detail into the primary reading experience.
+4. Inspectable by default: explain why calculated facts and daily readings appeared without forcing technical detail into the primary reading experience. AI-written Pattern paragraphs do not carry a claim-level “Why this?” disclosure; the chart facts, uncertainty, and data controls remain inspectable.
 5. Context stays in its lane: personalization may frame valid material but never rewrite astrological facts.
 
 ## Accessibility & Inclusion

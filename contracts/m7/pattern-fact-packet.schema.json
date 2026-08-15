@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-fact-packet.schema.json",
+  "title": "Provider-visible Pattern fact packet",
+  "$defs": {
+    "patternFactPacket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "locale",
+        "effective_accuracy",
+        "uncertainty",
+        "features",
+        "selection_constraints"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "uncertainty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["suppressed_classes", "required_language_rule_ids"],
+          "properties": {
+            "suppressed_classes": { "type": "array", "items": { "type": "string" } },
+            "required_language_rule_ids": {
+              "type": "array",
+              "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/ontologyRuleId" }
+            }
+          }
+        },
+        "features": {
+          "type": "array",
+          "maxItems": 40,
+          "items": { "$ref": "#/$defs/packetFeature" }
+        },
+        "clusters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/packetCluster" }
+        },
+        "selection_constraints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["core_chapters_min", "core_chapters_max", "additional_signatures_max", "sparse_pattern"],
+          "properties": {
+            "core_chapters_min": { "type": "integer", "minimum": 3, "maximum": 6 },
+            "core_chapters_max": { "type": "integer", "minimum": 3, "maximum": 6 },
+            "additional_signatures_max": { "type": "integer", "minimum": 0, "maximum": 8 },
+            "sparse_pattern": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "packetFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "feature_class", "fact", "coverage", "ontology_rule_ids", "cluster_ids"],
+      "properties": {
+        "alias": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/featureAlias" },
+        "feature_class": { "$ref": "https://patternlike.app/contracts/m4/common.schema.json#/$defs/featureClass" },
+        "fact": { "type": "object" },
+        "coverage": { "type": "string", "enum": ["mandatory_core", "mandatory_any", "eligible"] },
+        "ontology_rule_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/ontologyRuleId" }
+        },
+        "cluster_ids": {
+          "type": "array",
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/clusterId" }
+        }
+      }
+    },
+    "packetCluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cluster_id", "feature_aliases", "compatible_with"],
+      "properties": {
+        "cluster_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/clusterId" },
+        "feature_aliases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/featureAlias" }
+        },
+        "compatible_with": {
+          "type": "array",
+          "items": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/clusterId" }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternFactPacket"
+}

@@ -1,4 +1,4 @@
-const CACHE_NAME = "patternlike-shell-v1";
+const CACHE_NAME = "patternlike-shell-v2";
 const SHELL = ["/", "/index.html", "/mark.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

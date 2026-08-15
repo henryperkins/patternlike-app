@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-import { ENCRYPTED_COLUMNS, UNWRITTEN_ENCRYPTED_COLUMNS } from "./users.js";
+import { ENCRYPTED_COLUMNS, NESTED_CONTENT_CIPHERTEXT_COLUMNS, UNWRITTEN_ENCRYPTED_COLUMNS } from "./users.js";
 
 /**
  * The tripwire for the tightest constraint in the repository.
@@ -38,22 +38,33 @@ describe("encrypted column registration", () => {
     const unwritten = new Set(
       UNWRITTEN_ENCRYPTED_COLUMNS.map((c) => `${c.table}.${c.encColumn}`),
     );
+    const nested = new Set(
+      NESTED_CONTENT_CIPHERTEXT_COLUMNS.map((c) => `${c.table}.${c.encColumn}`),
+    );
 
-    const overlap = [...rotated].filter((c) => unwritten.has(c));
-    expect(overlap, "a column cannot be both rotated and unwritten").toEqual([]);
+    const overlap = [...rotated].filter((c) => unwritten.has(c) || nested.has(c));
+    expect(overlap, "a column cannot be both rotated and unwritten or nested").toEqual([]);
 
     const unregistered = [...inSchema].filter(
-      (c) => !rotated.has(c) && !unwritten.has(c),
+      (c) => !rotated.has(c) && !unwritten.has(c) && !nested.has(c),
     );
     expect(
       unregistered,
-      "add these to ENCRYPTED_COLUMNS in apps/api/src/db/users.ts, or to " +
-        "UNWRITTEN_ENCRYPTED_COLUMNS if nothing writes them yet. An unregistered " +
-        "encrypted column is left under a destroyed key at the next DEK rotation.",
+      "add these to ENCRYPTED_COLUMNS in apps/api/src/db/users.ts, to " +
+        "UNWRITTEN_ENCRYPTED_COLUMNS if nothing writes them yet, or to " +
+        "NESTED_CONTENT_CIPHERTEXT_COLUMNS if they sit under a wrapped content key.",
     ).toEqual([]);
 
-    const phantom = [...rotated, ...unwritten].filter((c) => !inSchema.has(c));
+    const phantom = [...rotated, ...unwritten, ...nested].filter((c) => !inSchema.has(c));
     expect(phantom, "these are registered but do not exist in the schema").toEqual([]);
+  });
+
+  it("nests Pattern document bodies under a wrapped key rather than the user DEK", () => {
+    expect(NESTED_CONTENT_CIPHERTEXT_COLUMNS.map((c) => `${c.table}.${c.encColumn}`))
+      .toEqual(["pattern_documents.document_enc"]);
+    const rotated = ENCRYPTED_COLUMNS.map((c) => `${c.table}.${c.encColumn}`);
+    expect(rotated).toContain("pattern_documents.wrapped_document_key_enc");
+    expect(rotated).toContain("pattern_generation_artifact_keys.wrapped_key_enc");
   });
 
   it("registers the three columns M3 adds", async () => {

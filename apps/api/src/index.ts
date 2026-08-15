@@ -16,12 +16,15 @@ import { consentRoutes } from "./routes/consents.js";
 import { readingRoutes } from "./routes/readings.js";
 import { timingRoutes } from "./routes/timing.js";
 import { patternRoutes } from "./routes/pattern.js";
+import { patternAiRoutes } from "./routes/pattern-ai.js";
 import { timeTravelRoutes } from "./routes/time-travel.js";
 import { lifeEventRoutes } from "./routes/life-events.js";
 import { deletionStatusRoutes, privacyRoutes } from "./routes/privacy.js";
 import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
+import { internalPatternRoutes } from "./routes/internal-pattern.js";
+import { adminPatternRoutes } from "./routes/admin-pattern.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
 import { scheduled } from "./scheduled.js";
@@ -61,6 +64,7 @@ api.route("/", preferenceRoutes);
 api.route("/", consentRoutes);
 api.route("/", readingRoutes);
 api.route("/", timingRoutes);
+api.route("/", patternAiRoutes);
 api.route("/", patternRoutes);
 api.route("/", timeTravelRoutes);
 api.route("/", lifeEventRoutes);
@@ -77,6 +81,12 @@ internal.use("*", configGuard);
 internal.use("*", serviceAuth);
 internal.route("/", contentReleaseRoutes);
 internal.route("/", internalGenerationRoutes);
+internal.route("/", internalPatternRoutes);
+
+const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
+admin.use("*", configGuard);
+admin.route("/", adminPatternRoutes);
+app.route("/admin", admin);
 
 // Mounted under a prefix, not "/". A sub-app routed at "/" contributes its
 // `use("*", ...)` middleware to every path in the parent.

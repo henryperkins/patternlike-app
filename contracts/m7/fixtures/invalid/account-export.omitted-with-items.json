@@ -1,0 +1,31 @@
+{
+  "schema_version": "0.7.0",
+  "export_id": "exp_testexport0001",
+  "generated_at": "2026-08-14T12:00:00Z",
+  "account": {
+    "user_id": "usr_testuser0001"
+  },
+  "birth_profiles": [],
+  "chart_snapshots": [],
+  "preferences": {},
+  "timezone_changes": [],
+  "consents": [],
+  "context_sources": [],
+  "context_signals": [],
+  "readings": {
+    "status": "omitted_by_request",
+    "items": []
+  },
+  "journal": {
+    "status": "not_available",
+    "items": []
+  },
+  "patterns": {
+    "status": "omitted_by_request",
+    "items": [
+      {
+        "pattern_id": "pat_dddddddddddddddddddddddddddddddd"
+      }
+    ]
+  }
+}

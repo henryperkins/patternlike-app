@@ -35,6 +35,46 @@ function mockApiResponses(responses: Record<string, MockResponse>) {
   ) {
     responses["GET /v1/preferences/topic-exclusions"] = emptyTopics;
   }
+  if (
+    !("GET /v1/consents/pattern-generation" in responses) &&
+    !("/v1/consents/pattern-generation" in responses)
+  ) {
+    responses["GET /v1/consents/pattern-generation"] = {
+      status: 200,
+      body: {
+        schema_version: "0.7.0",
+        kind: "pattern_generation",
+        status: "not_granted",
+        provider: "OpenAI",
+        purpose: "one_pattern_per_chart",
+        policy_version: "1.0.0",
+        enabled_categories: [
+          "calculated_natal_features",
+          "accuracy_and_suppression",
+          "confirmed_content_locale",
+          "activated_interpretation_ontology",
+          "generated_pattern_plan_and_draft_for_validation",
+        ],
+        granted_at: null,
+      },
+    };
+  }
+  if (
+    !("GET /v1/pattern-state" in responses) &&
+    !("/v1/pattern-state" in responses)
+  ) {
+    responses["GET /v1/pattern-state"] = {
+      status: 200,
+      body: {
+        schema_version: "0.7.0",
+        state: "editorial_catalog",
+        chart: null,
+        consent: null,
+        generation: null,
+        pattern: null,
+      },
+    };
+  }
   stubApiResponses(responses);
 }
 
