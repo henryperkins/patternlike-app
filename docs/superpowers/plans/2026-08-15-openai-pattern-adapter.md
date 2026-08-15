@@ -155,9 +155,11 @@ One related forward-compatibility note: the reference says `gateway.ai.cloudflar
 
 ---
 
-## Planned deployment: stored provider key, custom domain, and Access
+## Planned deployment: a stored provider key on the default endpoint
 
-The operator has stated that the **OpenAI provider key is already stored in AI Gateway (BYOK)**, and plans a custom domain **`gateway.lakefrontdev.com`** with **Cloudflare Access**. All three change what the shipped adapter must do, and two of them contradict code that has already landed. None of this is blocking — the gateway ships disabled — but the adapter cannot be enabled against this configuration as written.
+The operator has confirmed the configuration: the **OpenAI provider key is already stored in AI Gateway (BYOK)**, and there will be **no custom domain and no Cloudflare Access**. The Worker calls the default `gateway.ai.cloudflare.com` endpoint.
+
+One thing here contradicts code that has already landed — the stored key — and it is the only gateway-driven change this plan needs. Nothing is blocking today, because the gateway ships disabled, but the adapter cannot be enabled against a stored key as written.
 
 ### The shipped adapter conflicts with a stored provider key
 
@@ -167,42 +169,20 @@ Sending it anyway is not harmless. The reference states that when AI Gateway alr
 
 Two further consequences:
 
-- **`AI_GATEWAY_TOKEN` stops being optional.** BYOK's prerequisites require an authenticated gateway, so `cf-aig-authorization` (or an Access credential) becomes mandatory whenever the stored key is in use. The comment in `env.ts` describing the token as needed "only while the gateway has Authenticated Gateway on" is still true in the abstract but no longer describes this deployment.
+- **`AI_GATEWAY_TOKEN` stops being optional.** BYOK's prerequisites require an authenticated gateway, so `cf-aig-authorization` becomes mandatory whenever the stored key is in use. The comment in `env.ts` describing the token as needed "only while the gateway has Authenticated Gateway on" is still true in the abstract but no longer describes this deployment: here the two are the same condition. Configuration must refuse a stored-key mode with no token rather than discovering it as a 401 on a reader's Pattern.
 - **The key alias should be pinned.** With no `cf-aig-byok-alias` header the gateway uses the alias `default`. This codebase pins every other provider-identity value; leaving key selection to an implicit default is inconsistent, and it means adding a second stored key later silently changes nothing until someone notices which one is `default`.
 
-### A custom domain changes the URL this adapter builds
+### Custom domain and Cloudflare Access: decided against
 
-`AI_GATEWAY_ORIGIN` is a hardcoded constant and `responsesUrlFor` interpolates `accountId` and `gatewayId` into the path. With a custom domain, "the hostname identifies your account and gateway, so you can omit the account ID and gateway ID from request URLs." The `AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID` pair — including the 32-hex and path-segment validators added in `6f3d722` — does not describe this deployment at all. The configuration needs a third shape: a validated hostname, mutually exclusive with the id pair.
+Both were considered and **ruled out by the operator**. The Worker calls the default `gateway.ai.cloudflare.com` endpoint, and no Access policy sits in front of it.
 
-**Unresolved and must be settled empirically, not from the documentation.** The reference is internally inconsistent about whether the provider slug is followed by `/v1/`:
+This is the simplifying outcome, and it removes real work rather than deferring it:
 
-| Source | Documented form |
-| --- | --- |
-| OpenAI provider page | replace `https://api.openai.com/v1` with `…/{gateway_id}/openai` → `…/openai/responses` |
-| Custom domains page | `https://ai.example.com/openai/v1/chat/completions` |
-| Cloudflare Access page | `https://ai.example.com/openai/v1/chat/completions` |
+- **The shipped URL builder is already correct.** With no custom domain the account and gateway ids stay in the path, so `AI_GATEWAY_ORIGIN`, the 32-hex account validator, the path-segment gateway validator, and `responsesUrlFor` — all landed in `6f3d722` — describe this deployment exactly. No hostname configuration shape is needed.
+- **The `/v1/` path ambiguity does not arise.** It came only from the custom-domain and Access pages. For the default endpoint the reference is unambiguous and self-consistent: `…/{gateway_id}/openai/responses`, which is what the adapter builds. No empirical URL check is required before enabling.
+- **No Access service token, and no second Worker credential.** `cf-aig-authorization` remains the only gateway credential, and `cf.user_id` never enters gateway metadata because no request authenticates as a user.
 
-The shipped `responsesUrlFor` implements the first form, and the design comment explicitly warns that `…/openai/v1/responses` is a 404. The custom-domain pages show exactly that form. If the custom domain expects `/openai/v1/responses` and the adapter sends `/openai/responses`, the result is a 404 — which **this adapter maps to `publisher_model_unavailable`, a terminal failure blaming the model for a URL mistake**. Verify with a synthetic request against `gateway.lakefrontdev.com` before any Pattern traffic, and pin whichever form answers. Do not resolve this by reading the docs harder; they disagree.
-
-### Cloudflare Access blocks gateway-token traffic
-
-The decisive sentence: "Once a custom domain is protected by Access, every request to that domain must pass an Access policy. **Requests that only include an AI Gateway token, without a valid Access token, are blocked by Access before they reach the gateway.**" A Worker sending only `cf-aig-authorization` to `gateway.lakefrontdev.com` would be refused by Access, never reaching the gateway.
-
-The same page supplies the escape hatch: "keep sending gateway-token traffic to the default `gateway.ai.cloudflare.com` endpoint, which is not protected by Access."
-
-**Recommendation — two gateways, not two doors on one.** Access is identity-aware control over *users*: it authenticates a person and tags requests with `cf.user_id`. The Worker is not a user, so it should not go through Access. But simply pointing the Worker at the default endpoint of the *same* gateway is not free, because a custom domain is a second door to one gateway and every meaningful control is gateway-scoped: provider keys, spend limits (20 rules each), rate limiting, logging defaults, Guardrails, DLP, and cache. Sharing one gateway between production generation and human traffic has three consequences:
-
-- **The D1 ledger stops bounding the OpenAI bill.** Stored provider keys are per-gateway, so agent traffic through Access spends the *same* stored key as Pattern generation. `pattern_provider_daily_usage` counts only Worker calls, so the approved worst-case arithmetic — attempts × token bounds × rates × Patterns per day — would undercount actual spend by however much human usage occurred. That directly undermines the spend-approval gate.
-- **Human traffic can fail production.** Rate limits and spend limits are evaluated per gateway. A developer running a coding agent can exhaust a shared limit and produce a `429` that the adapter classifies as a provider outage, failing real readers' Patterns.
-- **Access is not a perimeter.** There is no documented way to disable the default `gateway.ai.cloudflare.com` endpoint, so the gateway remains reachable by anyone holding an `AI Gateway Run` token — which, per the account-scoping note above, cannot be restricted to a single gateway anyway.
-
-Use **two gateways on the account**: one for the Worker — no custom domain, no Access, logging off, its own stored key, and a spend limit sized to the approved ceiling — and one for humans and coding agents, carrying `gateway.lakefrontdev.com` and Access, with its own key, its own limits, and logging on for the attribution that justifies Access in the first place. Budgets, keys, rate limits, and logs then stop interfering, and the ledger bounds the bill again.
-
-This keeps the URL shape the shipped adapter already implements, avoids a second credential in the Worker, and sidesteps the `/v1/` ambiguity above — while Access still does the job it is for. Note the residual: an account-scoped `Run` token still reaches both gateways, and Cloudflare's own answer for true isolation is separate accounts. If the single-gateway shape is preferred anyway, the three consequences above must be recorded as accepted, and the spend arithmetic in the runbook must state that it bounds Worker calls only.
-
-If the Worker must instead go through the Access-protected domain, it needs an Access **service token**, and two details matter. Service-token requests "do not include `cf.user_id` because they do not represent an individual Access user," which is the outcome this design wants — a *user* JWT would write an identity into gateway metadata, and this design forbids identity at the provider boundary. And Access credentials are stripped before the upstream call: "before AI Gateway forwards the request to the upstream provider, it removes Cloudflare-only credentials such as the Access JWT and AI Gateway authorization headers." Adopting this path means a new Worker secret pair, a fourth configuration shape, and the URL verification above becoming blocking rather than advisory.
-
-Note also that `cf.` metadata keys are reserved and cannot be supplied by the client — so `cf.user_id` is not something the Worker could set or suppress. Avoiding it means not authenticating as a user, which the service-token path does.
+One consequence to keep in view rather than act on now. Everything that matters is gateway-scoped — stored provider keys, spend limits, rate limits, logging defaults, Guardrails, DLP, cache — so if coding-agent or other human traffic is ever pointed at *this* gateway later, it shares the stored OpenAI key and the limits with production generation. At that point `pattern_provider_daily_usage` would count Worker calls while the bill covered both, and a shared rate or spend limit could fail real readers' Patterns with a `429`. The fix then is a second gateway for that traffic, not a change to this adapter. Until such traffic exists, the ledger bounds the bill and the limits are the Worker's alone.
 
 ---
 
@@ -387,17 +367,17 @@ Resolution rules, all enforced in `resolvePublisherConfiguration` so a wrong com
 - `worker` mode keeps today's behavior exactly, so the direct path and the existing reading rollout are unaffected.
 - The alias is pinned explicitly and sent as `cf-aig-byok-alias`, never left to the implicit `default`.
 
-Also add the third gateway shape from the section above — a validated custom-domain hostname, mutually exclusive with the `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` pair — and refuse a configuration that sets both. Keep `responsesUrlFor` total across all three shapes.
+- `gateway_stored` with no `AI_GATEWAY_TOKEN` is refused, because BYOK requires an authenticated gateway. Discovering this as a 401 mid-generation would misreport a configuration error as a provider auth failure.
 
-- [ ] **Step 1: Write the failing credential and hostname tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; assert `worker` mode is byte-identical to today's request. Assert each refusal above with its message. Assert `responsesUrlFor` produces the direct origin, the id-path gateway URL, and the custom-domain URL, and that the id pair and hostname cannot both be set. Pin the path form settled by the empirical check in Step 3 — including whether the provider slug is followed by `/v1/`.
+`responsesUrlFor` and the `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` validators are **unchanged** — with no custom domain, the shipped id-path URL builder is exactly right for this deployment. This task is the credential mode only.
+
+- [ ] **Step 1: Write the failing credential tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; assert `worker` mode produces a byte-identical request to today's. Assert each refusal above with its message. Assert `responsesUrlFor` still produces the direct origin and the id-path gateway URL and is otherwise untouched.
 - [ ] **Step 2: Run and confirm failure.**
 
       npm exec -w @patternlike/api -- vitest run src/config.test.ts src/services/openai-reading-publisher.test.ts src/services/openai-pattern-publisher.test.ts
-
-- [ ] **Step 3: Settle the custom-domain path empirically before implementing.** Send one synthetic request — no real account, invented content — to `gateway.lakefrontdev.com` for both `…/openai/responses` and `…/openai/v1/responses`, and record which answers. The documentation disagrees with itself, and the wrong choice is a 404 this adapter reports as `publisher_model_unavailable`. Record the result in the rollout ledger.
-- [ ] **Step 4: Implement the credential mode and the hostname shape.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode.
-- [ ] **Step 5: Run both adapter lanes, config, and typecheck.**
-- [ ] **Step 6: Commit.** `api: declare the provider credential mode and custom-domain route`
+- [ ] **Step 3: Implement the credential mode.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode.
+- [ ] **Step 4: Run both adapter lanes, config, and typecheck.**
+- [ ] **Step 5: Commit.** `api: declare the provider credential mode`
 
 ---
 
@@ -537,6 +517,6 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 - After Task 6: an `openai` pin reaches a provider in test only; `PATTERN_AI_ROLLOUT` is still `off` everywhere.
 - After Task 10: the code is a rollout candidate. It is not deployed, no secret is set, and no rollout has moved.
 
-**Sign-off gates.** Q1 blocks Task 8. Q6 blocks Task 8a, and its two outcomes are a `0008` migration or a recorded amendment to §25.3 — not a silent third option. Task 5a needs a decision on the credential mode and on whether the Worker goes through the Access-protected custom domain or stays on the default endpoint; it also modifies the already-shipped reading adapter, so it is the one task in this plan that changes live-path code before Task 6. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. All decisions are recorded above with their evidence; none may be reversed silently during implementation.
+**Sign-off gates.** Q1 blocks Task 8. Q6 blocks Task 8a, and its two outcomes are a `0008` migration or a recorded amendment to §25.3 — not a silent third option. Task 5a needs sign-off because it modifies the already-shipped reading adapter, making it the one task in this plan that changes live-path code before Task 6; the credential mode itself is settled — the gateway stores the key. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. All decisions are recorded above with their evidence; none may be reversed silently during implementation.
 
 **A note on sourcing.** The adapter design's open questions cite the M7 design by section, and its summaries are not always the whole of what those sections say. Q2 was largely settled by §14.1 and carried an unmentioned enforceable requirement in §14.2; Q1's attempt count came with a correction-document protocol in §13.5; Q6 was a conformance gap against §25.3 rather than an open choice. Read `2026-08-14-ai-generated-pattern-design.md` at the cited section before implementing any task that leans on one, and treat `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` as normative above both design documents.
