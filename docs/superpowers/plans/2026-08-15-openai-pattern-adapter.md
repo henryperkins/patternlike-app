@@ -28,7 +28,9 @@ The design worries that changing the constant "changes the frozen command shape 
 
 **Counting rule, and where the count lives.** The command's three `*_attempts_max` fields have never been read, so nothing has ever fixed what they count, and §13.5 and §14.5 are worded differently — "at most three attempts" for the writer, "retries the identical candidate at most twice" for the verifier. Read literally those give 3 and 3; read as the field names suggest they give 3 and 2. **Decision: every `*_attempts_max` is a count of total provider calls for that pass, inclusive of the first.** The writer gets 3, the planner and verifier 2 each, and §14.5's "at most twice" is read as one initial call plus one retry. This is the reading that makes the field name true and the budget arithmetic checkable; record it in `pattern-command.ts` beside the fields so the next reader does not re-derive it.
 
-`pattern_generation_jobs` has **no per-pass attempt column** — `MAX_STAGE_CLAIMS` counts stage claims, which is a different quantity, and a claim can end without a provider call at all. Task 8b adds the three counters, incremented in the same guarded batch that advances the stage so a crash cannot lose the increment. Until they exist the maxima are unenforceable, so Task 8b lands before any attempt ceiling is claimed to hold.
+The storage already exists and is **wired to nothing**. `pattern_generation_jobs.planner_attempts`, `.writer_attempts` and `.verifier_attempts` are declared in `0007:236-238`, and `pattern-execute.ts:72-74` selects all three into the claimed job row — but nothing ever writes them. The only increment in the file (`:150`) is the generic stage-claim `attempts`, which is a different quantity: a claim can expire or fail before any provider call, so `MAX_STAGE_CLAIMS` is not a substitute.
+
+Read-but-never-written is worse than absent, because the columns' presence implies they work. No migration is required; Task 8b increments and enforces what `0007` already provides. Until it lands, all three maxima are unenforceable, so it precedes any claim that an attempt ceiling holds.
 
 The design's worst-case figure of **14 provider attempts per Pattern** must be derived from these counters rather than carried as a loose constant; with planner 2, writer 3, verifier 2 the arithmetic depends on how many writer↔verifier correction cycles are reachable, and the rollout runbook's spend approval is only as sound as that derivation. Task 10 states the derivation explicitly and reconciles it with 14, or records the corrected number.
 
@@ -495,27 +497,22 @@ Unlike M0's edit-in-place policy, `0007` is applied to production (ledger entry,
 
 - [ ] **Step 5: Commit.** `db: record Pattern provider usage by stage class`
 
-### Task 8b: Persist and consume the per-pass attempt counters
+### Task 8b: Consume the per-pass attempt counters that already exist
 
 **Files:**
 
-- Create: `db/d1/0009_pattern_pass_attempts.sql`
-- Modify: `db/d1/MIGRATIONS.json`
 - Modify: `apps/api/src/services/pattern-execute.ts`
 - Modify: `apps/api/src/services/pattern-command.ts`
-- Modify: `apps/api/test/helpers.ts`
 
-The three `*_attempts_max` fields are unenforceable today because nothing persists how many attempts a pass has made. `MAX_STAGE_CLAIMS` is not a substitute: it counts stage claims, and a claim can expire or fail before any provider call.
+**No migration.** `0007:236-238` already declares `planner_attempts`, `writer_attempts` and `verifier_attempts` on `pattern_generation_jobs`, all `INTEGER NOT NULL DEFAULT 0`, and `pattern-execute.ts:72-74` already selects them into the claimed job row. Nothing writes them, and nothing compares them to the command's maxima — so the ceilings are decorative in exactly the way `writer_attempts_max` was, one layer down. Do not add columns; a second set would diverge from the ones the job row already reads.
 
-Add `planner_attempts`, `writer_attempts`, and `verifier_attempts` to `pattern_generation_jobs`, defaulting to 0 with a `CHECK (>= 0)`. Increment inside the same guarded batch that advances the stage, so a crash between the provider call and the advance cannot lose the increment — the counter and the stage move together or neither moves. Enforce the counting rule fixed in Q1: each maximum is total provider calls for that pass, inclusive of the first.
-
-May be folded into `0008` if Task 8a has not yet been applied anywhere; keep it separate once `0008` exists remotely.
+Increment the counter for a pass inside the **same guarded batch that advances the stage**, so a crash between the provider call and the advance cannot lose the increment — counter and stage move together or neither moves. Enforce the counting rule fixed in Q1: each maximum is total provider calls for that pass, inclusive of the first.
 
 - [ ] **Step 1: Write the failing counter tests.** A pass that exhausts its maximum fails terminally with the right class and makes no further provider call. A crash between the provider call and the advance leaves counter and stage consistent. The writer correction loop consumes writer attempts and not verifier attempts. A semantic rejection with writer attempts remaining returns to the correction path per §14.5; with none remaining it fails terminally.
 - [ ] **Step 2: Run and confirm failure.**
-- [ ] **Step 3: Write the migration and the increment.**
+- [ ] **Step 3: Implement the increment and the ceiling enforcement.**
 - [ ] **Step 4: Run the Pattern lane, contracts, and typecheck.**
-- [ ] **Step 5: Commit.** `db: persist Pattern per-pass attempt counters`
+- [ ] **Step 5: Commit.** `api: enforce the Pattern per-pass attempt ceilings`
 
 ---
 
@@ -565,7 +562,7 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
     Task 1 (shared boundary) ─┬─> Task 4 (adapter) ──> Task 5 (interface, ──> Task 5a (credential mode) ──> Task 6 (rewire) ─┬─> Task 7  (provenance)
     Task 2 (packet) ──────────┤                          extracts the                                                        ├─> Task 8  (constants, needs Q1)
     Task 3 (prompts) ─────────┤                          semantic evaluator                                                  ├─> Task 8a (ledger 0008, needs Q6)
-    Task 3a (correction) ─────┘                          to break the cycle)                                                 └─> Task 8b (attempt counters 0009)
+    Task 3a (correction) ─────┘                          to break the cycle)                                                 └─> Task 8b (attempt ceilings, no migration)
                                                                   Task 6 + 7 + 8 + 8a + 8b ──> Task 9 (integration) ──> Task 10 (gate + runbook)
 
 **Checkpoints.**
