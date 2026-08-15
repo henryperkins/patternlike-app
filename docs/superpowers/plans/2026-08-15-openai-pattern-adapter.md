@@ -88,17 +88,41 @@ Two parts of §25.3 must not be conflated. The **ceiling** is shared: "planner, 
 
 Checked against `https://developers.cloudflare.com/ai-gateway/llms-full.txt` (fetched 2026-08-15). The gateway is optional and ships inert — `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` are `""` in both wrangler blocks — but when it is switched on it sits in the provider path for every Pattern pass, so its behavior is part of this plan's contract.
 
+Source anchors for the claims below are the current Cloudflare pages for
+`features/unified-billing/#credential-precedence`,
+`configuration/bring-your-own-keys`, `configuration/authentication`,
+`usage/worker-binding-methods`, `observability/logging`, `features/caching`,
+`configuration/request-handling`, `features/dynamic-routing`,
+`features/spend-limits`, `features/guardrails/usage-considerations`, and
+`features/dlp`. Re-open those pages on the implementation date; do not replace
+the generic provider-native credential rules with a coding-agent integration
+example.
+
 ### Verified against the source
 
-Everything the adapter already pins is confirmed, and two claims that read like guesses turn out to be exact:
+Most of what the adapter already pins is confirmed, with one important
+credential-precedence correction carried into Task 5a:
 
 - **The URL.** "Replace `https://api.openai.com/v1` … with `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai`", and the Responses endpoint is documented as `…/openai/responses`. `responsesUrlFor` is right, and the design's warning that `…/openai/v1/responses` is a 404 — read by this adapter as `publisher_model_unavailable`, a terminal failure blaming the model for a mistyped URL — is a real trap, not a hypothetical one.
 - **`cf-aig-max-attempts`** is documented "Retry attempts (**max 5**)". The adapter's comment that a gateway retry turns one queue delivery into up to five provider calls the ledger counts as one is exactly the documented ceiling.
 - **`cf-aig-collect-log`** turns the entire log entry on or off. **`cf-aig-collect-log-payload`** affects payload storage only — token counts, model, provider, status code, cost, and duration are still logged — and **defaults to `true`**. The rollout doc's description of the two is accurate, and the default is why sending `collect-log: false` explicitly matters rather than relying on a dashboard state.
-- **`cf-aig-authorization`** authenticates the request *to the gateway*; the provider key rides its own header and the gateway forwards it. Matches `env.ts`, including the "only while Authenticated Gateway is on" reading — the documented behavior table is explicit that with the setting off, a request with no header succeeds. The gateway token needs **`Run`** permission.
+- **`cf-aig-authorization`** authenticates the request *to the gateway*. The
+  documented behavior table is explicit that with Authenticated Gateway off, a
+  request without it succeeds; this deployment uses stored keys, whose
+  prerequisite is an authenticated gateway, so the token is mandatory here and
+  needs **`Run`** permission.
+- **Provider credential precedence is request key, then BYOK, then Unified
+  Billing.** On a provider-native request carrying `Authorization`, AI Gateway
+  forwards that provider key and does **not** consult the stored key. The
+  shipped reading adapter therefore bypasses BYOK; it does not send a decorative
+  key that AI Gateway ignores. Task 5a must remove `Authorization` in
+  `gateway_stored` mode before the stored alias can be used. The generic
+  precedence page governs this OpenAI provider-native path; a coding-agent page
+  saying an Anthropic variable is ignored is integration-specific and must not
+  be generalized.
 - **Request headers beat gateway settings.** The documented configuration hierarchy is "request-level headers take precedence over gateway-level settings," which is the assumption the entire header-pinning strategy rests on.
 - **`collect-log: false` dominates `collect-log-payload`.** "If `cf-aig-collect-log` is set to `false`, the entire log entry (including metadata) is skipped regardless of the `cf-aig-collect-log-payload` value." The adapter's choice of the broader header is correct, and the rollout doc's description of the two as a swap is accurate.
-- **Logs are on by default and persist.** "Logs… are enabled by default for each gateway," they record "the user prompt, model response… token usage, cost, duration, and the user agent," and "these logs persist, giving you the flexibility to store them for your preferred duration." There is no automatic expiry to fall back on — only a per-gateway storage limit that stops *new* logs once full.
+- **Logs are on by default and persist.** "Logs… are enabled by default for each gateway," they record "the user prompt, model response… token usage, cost, duration, and the user agent," and "these logs persist, giving you the flexibility to store them for your preferred duration." There is no time-based expiry to rely on. At the storage limit a gateway either stops saving new logs or, if the operator enabled Automatic Log Deletion, deletes the oldest logs to make room; neither is a privacy retention policy.
 
 ### Zero Data Retention does not apply to this deployment
 
@@ -106,21 +130,56 @@ Worth stating plainly because the dashboard exposes a **Zero Data Retention** to
 
 > "This setting only applies to Unified Billing requests that use Cloudflare-managed credentials. **It does not apply to BYOK or other AI Gateway requests.**"
 
-This deployment is BYOK — `OPENAI_API_KEY` is ours and rides `Authorization` for the gateway to forward — so ZDR is unavailable on this path, and `cf-aig-zdr` is a Unified Billing header. The source is also explicit that "ZDR does not control AI Gateway logging": they are two separate controls. `cf-aig-collect-log: false` is therefore the *only* mechanism keeping prompts and responses out of gateway storage. Do not record ZDR as a mitigation anywhere, and do not let a future reviewer treat the toggle as covering this traffic.
+The intended deployment is BYOK: after Task 5a, the provider-native request
+carries no provider `Authorization` header and AI Gateway supplies the stored
+OpenAI key. Until then the shipped adapter is pass-through, not BYOK, because
+the request key takes precedence. ZDR is unavailable on the intended BYOK path,
+and `cf-aig-zdr` is a Unified Billing header. The source is also explicit that
+"ZDR does not control AI Gateway logging": they are two separate controls.
+
+`cf-aig-collect-log: false` is the per-request mechanism that disables the
+**entire** gateway log entry. It is not literally the only way to keep payloads
+out — gateway logging can be disabled and `cf-aig-collect-log-payload: false`
+retains metadata while dropping bodies — but the platform contract requires no
+gateway entry at all, so the broader header is the correct invariant. None of
+these controls governs OpenAI's upstream retention; the rollout needs separate
+evidence for the provider account's data-retention posture. Do not record
+Cloudflare ZDR as a mitigation for BYOK traffic.
 
 ### Gateway features that must stay off, and why
 
 Two gateway features are marketed as safety features and would be tempting for a privacy-conscious operator to enable. Both are wrong here, and neither is visible from the Worker's code — they are dashboard state, so the runbook must assert them.
 
-**Guardrails must be off.** Guardrails evaluates "both prompts and responses" for text-generation models by running them through **Llama Guard 3 8B on Workers AI**. For this product that means the Pattern packet and the reader's generated prose are sent to an additional model, which the design's disclosure surface does not name — a consent question, not merely an operational one. Three further specifics make it actively unsafe here:
+**Guardrails must be off.** Guardrails can evaluate prompts, responses, or both.
+Its `S1`–`S13` checks use **Llama Guard 3 8B on Workers AI**; `P1` prompt
+injection is evaluated separately by **Prompt Guard 2 86M**. For this product
+that means the Pattern packet and/or the reader's generated prose are sent
+through additional Cloudflare models that the design's disclosure surface does
+not name — a consent question, not merely an operational one. Three further
+specifics make it actively unsafe here:
 
 - The hazard categories include **S6 Specialized Advice** and **S11 Suicide & Self-Harm**. This app writes psychological-timing prose about a reader's own patterns. A category set to `block` would kill legitimate Patterns, and category `P1 Prompt Injection` could reject authorized ontology text that this design already defends against in `pattern-prompt.ts`.
 - The failure mode is closed in the wrong direction: "if at least one hazard category is set to `block`, but AI Gateway is unable to receive a response from Workers AI, **the request will be blocked**." A Workers AI incident becomes a Pattern outage.
 - It adds roughly 500 ms per request, and long content is "automatically segment[ed]… into smaller chunks, processing each through separate Guardrail requests" — so a packet near `PATTERN_INPUT_MAX_BYTES` is fanned out into several additional inferences over private content.
 
-**DLP must be off.** DLP "scans the full request and response body" for non-streaming traffic — again, the reader's context going in and their Pattern coming out. It is also *redundant by construction* here: Task 2 makes the packet structurally incapable of carrying a chart id, birth value, consent id, or user id, so a correctly built request has nothing for DLP to find. Enabling it buys no detection the type system does not already guarantee, while adding an inspector of private content and a blocking failure mode. Note also that DLP matches write extra fields into the log entry.
+**DLP must be off.** DLP is an inspection service, not another model. Depending
+on policy scope it scans request text, response text, or both; for this
+non-streaming path that is the reader's context going in and their Pattern
+coming out. Task 2's runtime allowlist, not DLP, is the authority for excluding
+chart ids, birth values, consent ids, and user ids. Enabling DLP would add an
+undisclosed inspector and a blocking failure mode without replacing that
+guarantee. A DLP match also adds policy and detection fields to any gateway log
+entry.
 
-**Fallbacks are structurally unavailable, which is the outcome we want.** Fallbacks are configured on the Universal endpoint — which the reference marks **deprecated** — and this adapter uses provider-native endpoints. The design's "no automatic provider or model failover" is therefore enforced by the endpoint choice rather than by a setting anyone could toggle. Record it that way so a later migration to the Universal or REST endpoint is understood to reopen the question.
+**Cross-model fallbacks are structurally unavailable on this path, which is the
+outcome we want.** Current Dynamic Routes — including model and provider
+fallbacks — are invoked through the `/compat/chat/completions` endpoint; this
+adapter uses the provider-native Responses endpoint and no Dynamic Route.
+Same-provider gateway retries are different: gateway-level retry defaults apply
+to provider-native calls too, which is why every request pins
+`cf-aig-max-attempts: 1`. The runbook must record both "no Dynamic Route" and a
+spend-limit action of **Block**, never fallback. A future endpoint or routing
+change reopens the failover question.
 
 ### Gateway-originated failures share status codes with provider failures
 
@@ -129,26 +188,39 @@ This is a gap in the current failure taxonomy, which was written for a direct-to
 | Status | Provider meaning | Gateway meaning | Remedy differs how |
 | --- | --- | --- | --- |
 | `429` | Provider rate limit — transient, retry later | Gateway **rate limit** or **spend limit** | A spend limit persists until the window resets; retrying is futile until an operator raises the budget |
-| `401`/`403` | `OPENAI_API_KEY` invalid | Authenticated Gateway on with a missing or bad `cf-aig-authorization` | Rotate `AI_GATEWAY_TOKEN`, not the provider key |
+| `401`/`403` | Provider credential invalid | Authenticated Gateway on with a missing or bad `cf-aig-authorization` | Stored provider key and gateway token are different remedies |
 
-The spend-limit case carries a second consequence. Spend limits are evaluated "before sending a request to the provider," so a gateway 429 means **no provider call occurred** — while `pattern_provider_daily_usage` has already charged a unit immediately before the fetch. That is consistent with §25.3 ("failed, timed-out, and rejected responses still consume a unit"), so the charge stays, but the *diagnosis* must not read as a provider failure.
+The spend-limit case carries a second consequence. Spend limits are evaluated "before sending a request to the provider," so a gateway 429 means **no provider call occurred** — while `pattern_provider_daily_usage` has already charged a unit immediately before the fetch. That is consistent with §25.3 ("failed, timed-out, and rejected responses still consume a unit"), so the charge stays, but a routed unmarked `429` must stay `unknown` rather than claim a provider outage or a gateway spend-limit remedy.
 
-**Requirement:** when a route is configured, the adapter must classify gateway-originated failures distinctly from provider-originated ones, and the safe-log arm must carry which layer refused. Failing to do this makes a forgotten gateway spend limit look exactly like an OpenAI outage.
+**Requirement:** preserve the distinction where the platform documents enough
+evidence, and say `unknown` everywhere else. Cloudflare documents status
+behavior for authenticated-gateway and spend-limit failures, but it does not
+publish a universal origin header or body schema for gateway `401`, `403`,
+`404`, and `429` responses. The adapter therefore cannot promise to distinguish
+a gateway spend limit from an OpenAI rate limit on status alone.
 
-**Route presence is not the discriminator** — provider responses traverse the route too, so every status arrives through the same channel either way. The signal is the body: AI Gateway returns its own refusals as a structured error object with a numeric `code`, documented examples being `2016` (prompt blocked by Guardrails), `2017` (response blocked by Guardrails), `2029` (request blocked by DLP), and `2030` (response blocked by DLP). Cloudflare publishes no universal "this came from the gateway" header, so classification reads the structured body and nothing else.
-
-Because that list is open-ended and undocumented codes will appear, the layer is a **three-value** field — `gateway`, `provider`, `unknown` — never a boolean. `unknown` is the honest answer for a non-2xx whose body does not parse as a gateway error object, and it must be a distinct safe-log value rather than being folded into `provider`. Parse the code only; never copy the gateway's message text into a returned detail or a log. Task 4 covers it.
+**Route presence is not the discriminator** — provider responses traverse the
+route too, so every status arrives through the same channel either way. Use a
+closed allowlist of documented Cloudflare error codes, initially `2016` and
+`2017` for Guardrails and `2029` and `2030` for DLP, to classify `gateway`.
+Do not treat "numeric code" generically as a gateway signature: a provider can
+also return one, and undocumented future codes have no reviewed meaning. A
+direct, non-gateway response is `provider`; a routed non-2xx without an
+allowlisted Cloudflare marker is `unknown`. The safe-log arm carries this
+three-value layer, and no response message text is copied into a result or log.
+Operationally distinguishing an unknown `401` or `429` belongs in a synthetic
+gateway preflight and dashboard check, not an invented runtime guarantee.
 
 ### Response headers worth asserting
 
 The reference documents response headers that turn two of this design's stated invariants into checked ones:
 
-- **`cf-aig-cache-status`** indicates whether a request was served from cache; its documented values are `HIT` and `MISS`. The design's justification for `skip-cache: true` is that a cache hit would give two Patterns one `provider_request_id` and one `provider_response_hash` — "stored evidence naming a generation that did not happen." Treat a `HIT` as a terminal configuration failure. An earlier draft required the header to equal `MISS` exactly and failed on absence too; that is stricter than the documentation supports, since nothing guarantees the header is present on every response, and a legitimate absence would then fail a healthy request. **`must not be HIT`** is the invariant that is actually documented. Log an absent header so a gateway that silently stops reporting cache status is still visible.
-- **`cf-aig-dlp`** is returned when a DLP policy matches. Its presence proves DLP is enabled on the gateway despite the runbook. Treat it as a terminal misconfiguration rather than accepting a DLP-processed response.
+- **`cf-aig-cache-status`** indicates whether a request was served from cache; its documented values are `HIT` and `MISS`. The design's justification for `skip-cache: true` is that a cache hit would give two Patterns one `provider_request_id` and one `provider_response_hash` — "stored evidence naming a generation that did not happen." Treat a `HIT` as a terminal configuration failure. The documentation does not promise this header on every gateway-generated authentication, rate-limit, or routing error, so absence is not itself terminal. On a successful routed preflight, record whether the header is `MISS` or absent and pin the observed behavior in rollout evidence; at runtime the invariant is **must not be `HIT`**.
+- **`cf-aig-dlp`** is returned when a DLP policy **matches**, not merely when DLP is enabled. Its presence proves an undisclosed DLP policy processed and matched this request or response. Treat it as a terminal misconfiguration; its absence does not prove DLP is off, which is why the dashboard gate remains mandatory.
 
 ### Headers this adapter must never send
 
-Each of these is a documented feature that would quietly falsify something the Worker states. The Task 4 tests assert their **absence**, not just the presence of the three we pin.
+Each of these is a documented feature that would quietly falsify something the Worker states. The Task 4 tests assert their **absence**, not just the presence of the three we pin. Task 5a extends the outgoing-name allowlist with `cf-aig-byok-alias` only for `gateway_stored` mode; it remains absent in `worker` mode and on direct requests.
 
 | Header | Why it is forbidden here |
 | --- | --- |
@@ -159,19 +231,34 @@ Each of these is a documented feature that would quietly falsify something the W
 | `cf-aig-collect-log: true` | The header is a bidirectional override: "if logging is disabled at the gateway level, this header will **save** the log for that request." Sending `true` would defeat a correctly configured gateway. Only ever send `false`. |
 | `cf-aig-custom-cost` | Rewrites the cost the gateway records, which is the number any spend-limit backstop and any later audit reads. The Worker must not be able to understate its own spend. |
 
-### Two operational notes for the runbook
+### Operational notes for the runbook
 
-- **`default` is a magic gateway id.** The source documents that using `default` as the gateway ID auto-creates a gateway on first request. `AI_GATEWAY_ID_PATTERN` accepts it, so an operator can bring a never-reviewed gateway into existence by typo-adjacent configuration. Per-request `collect-log: false` still protects the payloads, but the gateway's own settings would be nobody's decision. Name the gateway explicitly.
+- **`default` is a magic gateway id.** The source documents that using `default` as the gateway ID auto-creates a gateway on the first **authenticated** request. `AI_GATEWAY_ID_PATTERN` accepts it, so an operator can bring a never-reviewed gateway into existence by typo-adjacent configuration. Per-request `collect-log: false` still protects the payloads, but the gateway's own settings would be nobody's decision. Name the gateway explicitly.
 - **Gateway spend limits are defense in depth, not the ledger.** Spend limit rules can cap spend per gateway, scoped by model, provider, or custom metadata, and they do apply to BYOK traffic "for models with known pricing." Useful as a backstop under the approved ceiling, but they cannot replace `pattern_provider_daily_usage` — §25.3 assigns the auditable record to the ledger — the custom-metadata scoping is unavailable to us because `cf-aig-metadata` is forbidden above, and they are documented as "eventually consistent," so "a burst of concurrent requests can briefly exceed the limit before enforcement catches up." If one is set, it must be reconciled with the 429 classification requirement above.
-- **The gateway token's blast radius is the whole account.** The reference is explicit that `AI Gateway Read`/`Run`/`Edit` "cannot be restricted to a single gateway," and that any token with `Run` "can send requests through every gateway in the account, including any configured with stored provider keys through BYOK, consuming those credentials." `AI_GATEWAY_TOKEN` is therefore an account-scoped credential, not a gateway-scoped one, and must be treated with the same care as `ROOT_KEK` in the secret inventory. Cloudflare's own recommendation for isolation is "separate Cloudflare accounts or a Worker-side AI Gateway binding rather than relying on token scope."
+- **The gateway token's blast radius is the whole account.** The reference is explicit that `AI Gateway Read`/`Run`/`Edit` "cannot be restricted to a single gateway," and that any token with `Run` "can send requests through every gateway in the account, including any configured with stored provider keys through BYOK, consuming those credentials." `AI_GATEWAY_TOKEN` is therefore an account-scoped credential, not a gateway-scoped one, and must be treated with the same care as `ROOT_KEK` in the secret inventory. Separate Cloudflare accounts are the isolation option that preserves this BYOK architecture; the binding alternative changes the credential and billing model, as below.
 
-### Open decision: gateway binding versus fetch
+### A Worker AI binding is not an alternative for this BYOK path
 
-Because this API *is* a Cloudflare Worker, the binding option Cloudflare recommends for isolation is available: "when an AI Gateway is accessed from a Cloudflare Worker using a binding, the `cf-aig-authorization` header does not need to be manually included. Requests made through bindings are pre-authenticated within the associated Cloudflare account." That would delete `AI_GATEWAY_TOKEN` from the secret inventory entirely and remove the account-wide blast radius above.
+Cloudflare bindings are pre-authenticated, so they do remove the manual
+`cf-aig-authorization` token. But the current Worker binding documentation is
+equally explicit that third-party models called through `env.AI.run()` use
+Unified Billing and **do not support BYOK**. To use a stored OpenAI key, the
+Worker must use a provider-native endpoint.
 
-It is **not** adopted by this plan, and the trade is real: the approved design specifies a direct `fetch` boundary, `test/mock-calc-service.ts` achieves hermetic tests by intercepting `fetch` by hostname, and a binding would need a different interception strategy across every Pattern test. Recording it as an open decision for the rollout owner rather than resolving it here. If the gateway is never enabled, the question never arises — the direct path uses no gateway credential at all.
+The binding is therefore not an open implementation choice inside this plan.
+Adopting it would mean changing from the operator's stored key to
+Cloudflare-managed credentials, re-evaluating ZDR and billing, translating the
+provider-native Responses request/response contract, and replacing the
+hermetic fetch seam. That is a separately approved provider architecture, not a
+Task 5a optimization.
 
-One related forward-compatibility note: the reference says `gateway.ai.cloudflare.com` provider-native endpoints "continue to work," but "for new integrations, we recommend using the REST API at `api.cloudflare.com`." That path changes the authentication model and the credential story, so it is not a drop-in. Flagging it so the choice is understood as deliberate rather than unexamined.
+One related forward-compatibility note: the reference says
+`gateway.ai.cloudflare.com` provider-native endpoints "continue to work," but
+"for new integrations, we recommend using the REST API at
+`api.cloudflare.com`." That path changes authentication, model naming, alias
+selection, billing, and the response boundary, so it is not a drop-in.
+Provider-native fetch is deliberate here because it supports the stored-key
+alias and the exact OpenAI Responses envelope the validators consume.
 
 ---
 
@@ -185,12 +272,38 @@ One thing here contradicts code that has already landed — the stored key — a
 
 BYOK's own instructions are: "Remove provider authorization headers from your requests. Note that you still need to pass `cf-aig-authorization`." The shipped `createOpenAiReadingPublisher` does the opposite — it *requires* `OPENAI_API_KEY`, refuses with `publisher_auth_failed` when absent, and sends `authorization: Bearer ${apiKey}` on every request. The Pattern adapter in Task 4 was specified to mirror it.
 
-Sending it anyway is not harmless. The reference states that when AI Gateway already holds the credentials through a stored provider key, the forwarded key "is ignored." So with **today's shipped adapter** pointed at this gateway — the state Task 5a exists to change, not the configuration it is written against — the Worker's `OPENAI_API_KEY` becomes **decorative**: still required by `resolvePublisherConfiguration`, still transmitted, and ignored by the gateway, which bills and authenticates on the stored key. An operator rotating the Worker secret would believe they had rotated the key while nothing changed. That is precisely the class of silent falsehood this codebase's configuration guards exist to prevent.
+Sending it anyway is not harmless. Current credential precedence says a
+provider key on the request wins: AI Gateway forwards `OPENAI_API_KEY` and does
+**not** consult BYOK. With today's shipped adapter pointed at this gateway, the
+stored key is silently bypassed. Rotating the gateway-stored key would appear
+successful while runtime traffic continued on the Worker secret. That is the
+configuration falsehood Task 5a must prevent.
 
 Two further consequences:
 
 - **`AI_GATEWAY_TOKEN` stops being optional.** BYOK's prerequisites require an authenticated gateway, so `cf-aig-authorization` becomes mandatory whenever the stored key is in use. The comment in `env.ts` describing the token as needed "only while the gateway has Authenticated Gateway on" is still true in the abstract but no longer describes this deployment: here the two are the same condition. Configuration must refuse a stored-key mode with no token rather than discovering it as a 401 on a reader's Pattern.
 - **The key alias should be pinned.** With no `cf-aig-byok-alias` header the gateway uses the alias `default`. This codebase pins every other provider-identity value; leaving key selection to an implicit default is inconsistent, and it means adding a second stored key later silently changes nothing until someone notices which one is `default`.
+
+### Credential cutover must not deploy an invalid intermediate state
+
+Production daily readings are already at `READING_V5_ROLLOUT=first_open` and
+require `OPENAI_API_KEY`. Task 5a therefore lands first with
+`OPENAI_CREDENTIAL_SOURCE=worker` in both Wrangler blocks, the current secret
+still present, and both gateway ids still empty. That deployment is
+byte-identical for the live reading path.
+
+Switching later to `gateway_stored` changes four things as one release unit:
+the two gateway ids become non-empty, `OPENAI_GATEWAY_KEY_ALIAS` becomes
+non-empty, `AI_GATEWAY_TOKEN` becomes available to that Worker version, and
+`OPENAI_API_KEY` is absent from that same version. Ordinary `wrangler secret
+delete` deploys immediately, so deleting the old key first would break `worker`
+mode; deploying `gateway_stored` first would be refused because the old key is
+still present. The rollout runbook must use a staged Worker version or another
+single-deployment mechanism that proves no invalid intermediate configuration
+receives traffic. If the available deployment tooling cannot produce that
+version atomically, add an explicitly temporary migration state that never
+sends `Authorization`, then remove it after the old secret is gone. Do not
+improvise the sequence in production.
 
 ### Custom domain and Cloudflare Access: decided against
 
@@ -328,9 +441,34 @@ Send the same three `cf-aig-*` headers the reading adapter pins, for the same th
 
 - [ ] **Step 1: Write the failing adapter tests.** One fetch maximum per pass. Hash computed over the exact response bytes before parsing, then the bytes discarded. Failure mapping: timeout/network/429/retryable-5xx to `publisher_unavailable`, 401/403 to `publisher_auth_failed`, model-not-found to `publisher_model_unavailable`, refusal part to `publisher_refused`, malformed or incomplete output to `publisher_output_invalid`. No provider text, header, URL, or exception message reaches a returned detail or a log.
 
-  **Gateway-layer classification.** Classification reads the structured error body's numeric `code`, not the route's presence — provider responses traverse the route too. Cover gateway and provider variants of the same status **as separate cases**: a spend-limit `429` against a provider rate-limit `429`, a `cf-aig-authorization` `401` against a provider-key `401`, and a gateway URL `404` against a model-not-found `404`. Assert the safe-log arm records the layer as `gateway`, `provider`, or `unknown`, that a non-2xx whose body does not parse as a gateway error object lands on `unknown` rather than defaulting to `provider`, and that no gateway message text reaches a detail or a log. Assert a gateway spend-limit `429` is not reported as a provider outage — the remedies differ, and no provider call occurred.
+  **Gateway-layer classification.** Route presence and status are not enough:
+  provider responses traverse the route, and Cloudflare does not document a
+  universal gateway-error body for `401`, `403`, `404`, or `429`. Assert a
+  direct non-2xx is `provider`; assert only the closed, documented Cloudflare
+  code allowlist (`2016`, `2017`, `2029`, `2030`) is `gateway`; and assert every
+  other routed non-2xx — including synthetic auth, spend-limit/rate-limit, and
+  bad-path examples — is `unknown`. A numeric code outside the allowlist stays
+  `unknown`. No gateway or provider message text reaches a detail or log. The
+  public failure remains coarse and the safe detail may preserve the status
+  class, but it must not claim an operator remedy the response cannot prove.
 
-  **Invariant assertions on response headers.** Assert `cf-aig-cache-status` equals `MISS` on every routed response, and that `HIT`, an absent header, and an unrecognised value each fail terminally — "not a hit" would pass silently if the header stopped being sent. Assert a present `cf-aig-dlp` header is treated as a terminal misconfiguration rather than an acceptable response, since it proves DLP is inspecting payloads the runbook says it must not. Assert the three `cf-aig-*` headers are present with a route and absent without one, **with their exact values** — `cf-aig-collect-log: false`, `cf-aig-max-attempts: 1`, `cf-aig-skip-cache: true`. A name-only allowlist would pass a request that sent `collect-log: true`, which is the single worst value to get wrong. Assert the **forbidden headers are absent on every request, with and without a route**: `cf-aig-metadata`, `cf-aig-request-timeout`, `cf-aig-retry-delay`, `cf-aig-backoff`, `cf-aig-cache-ttl`, and `cf-aig-cache-key`. Write this as an allowlist assertion over the outgoing header names rather than six negative checks, so a header added later fails the test by default. Assert the gateway URL is `…/openai/responses` and never `…/openai/v1/responses`.
+  **Invariant assertions on response headers.** Assert `cf-aig-cache-status:
+  HIT` fails terminally. Assert `MISS` succeeds and an absent or unrecognised
+  value maps only to a closed cache observation (`missing` or `unrecognized`) —
+  never the raw header — and does not replace the actual provider/gateway
+  outcome; the header is not documented on every gateway-generated error. Assert a
+  present `cf-aig-dlp` header is terminal because it proves a DLP policy
+  matched, while absence does not prove DLP is disabled. Assert the three
+  `cf-aig-*` request headers are present with a route and absent without one,
+  **with their exact values** — `cf-aig-collect-log: false`,
+  `cf-aig-max-attempts: 1`, `cf-aig-skip-cache: true`. A name-only allowlist
+  would pass `collect-log: true`, the worst value to get wrong. Assert the
+  **forbidden headers are absent on every request, with and without a route**:
+  `cf-aig-metadata`, `cf-aig-request-timeout`, `cf-aig-retry-delay`,
+  `cf-aig-backoff`, `cf-aig-cache-ttl`, and `cf-aig-cache-key`. Write this as
+  an outgoing-name allowlist so a later header fails by default; Task 5a
+  deliberately extends it with `cf-aig-byok-alias` in stored-key mode. Assert
+  the gateway URL is `…/openai/responses`, never `…/openai/v1/responses`.
 - [ ] **Step 2: Run and confirm failure.**
 - [ ] **Step 3: Implement the three pass methods.**
 - [ ] **Step 4: Extend the hermetic mock.** `mock-calc-service.ts` already routes `AI_GATEWAY_HOST`; add the Pattern pass scenarios keyed by request id or scenario header. Unknown hosts keep failing closed.
@@ -395,7 +533,7 @@ Extract the evaluator into its own module — `pattern-semantic.ts` — taking t
 - Modify: `apps/api/src/config.test.ts`
 - Modify: `apps/api/wrangler.toml`
 
-**Requires sign-off, and touches the shipped reading adapter.** Today "the Worker holds the provider key" is an unstated assumption compiled into both adapters. The operator's gateway stores the key, which makes that assumption false and the transmitted key decorative. Replace the assumption with a declared credential mode.
+**Requires sign-off, and touches the shipped reading adapter.** Today "the Worker holds the provider key" is an unstated assumption compiled into both adapters. On a provider-native request that key has first precedence, so sending it bypasses the operator's stored key. Replace the assumption with a declared credential mode.
 
 The mode is **selected by an explicit variable, never inferred** from whether `OPENAI_API_KEY` happens to be set — inference cannot tell "stored key in use" from "worker key forgotten," and those need opposite outcomes. Add `OPENAI_CREDENTIAL_SOURCE` (`worker` | `gateway_stored`, required whenever a rollout is not `off`) and `OPENAI_GATEWAY_KEY_ALIAS` (required when the source is `gateway_stored`, sent as `cf-aig-byok-alias`).
 
@@ -406,21 +544,22 @@ The mode is **selected by an explicit variable, never inferred** from whether `O
 Resolution rules, all enforced in `resolvePublisherConfiguration` so a wrong combination is a `503` on the next request rather than a runtime surprise:
 
 - `gateway_stored` without a configured gateway route is refused. A stored key only exists behind a gateway.
-- `gateway_stored` with `OPENAI_API_KEY` present is refused rather than tolerated. Accepting both is what creates the rotate-and-nothing-happens illusion; the refusal message must say the gateway holds the key.
+- `gateway_stored` with `OPENAI_API_KEY` present is refused rather than tolerated. A request key wins over BYOK, so accepting both would silently bypass the stored alias; the refusal message must name the conflicting variables without naming either value.
 - `worker` mode keeps today's behavior exactly, so the direct path and the existing reading rollout are unaffected.
 - The alias is pinned explicitly and sent as `cf-aig-byok-alias`, never left to the implicit `default`.
 
-- `gateway_stored` with no `AI_GATEWAY_TOKEN` is refused, because BYOK requires an authenticated gateway. Discovering this as a 401 mid-generation would misreport a configuration error as a provider auth failure.
+- `gateway_stored` with no `AI_GATEWAY_TOKEN` is refused, because BYOK requires an authenticated gateway. Discovering this as an ambiguous `401` mid-generation is too late.
 
 `responsesUrlFor` and the `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` validators are **unchanged** — with no custom domain, the shipped id-path URL builder is exactly right for this deployment. This task is the credential mode only.
 
-- [ ] **Step 1: Write the failing credential tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; assert `worker` mode produces a byte-identical request to today's. Assert each refusal above with its message. Assert `responsesUrlFor` still produces the direct origin and the id-path gateway URL and is otherwise untouched.
+- [ ] **Step 1: Write the failing credential tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; that absence is what permits BYOK to win under documented credential precedence. Extend the outgoing-header allowlist for exactly that one header in stored mode. Assert `worker` mode produces a byte-identical request to today's. Assert each refusal above with its message. Assert `responsesUrlFor` still produces the direct origin and the id-path gateway URL and is otherwise untouched.
 - [ ] **Step 2: Run and confirm failure.**
 
       npm exec -w @patternlike/api -- vitest run src/config.test.ts src/services/openai-reading-publisher.test.ts src/services/openai-pattern-publisher.test.ts
-- [ ] **Step 3: Implement the credential mode.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode.
-- [ ] **Step 4: Run both adapter lanes, config, and typecheck.**
-- [ ] **Step 5: Commit.** `api: declare the provider credential mode`
+- [ ] **Step 3: Implement the credential mode.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode. Set `OPENAI_CREDENTIAL_SOURCE="worker"` in both Wrangler blocks for this code deployment, leave the alias empty, and do not alter either rollout or secret.
+- [ ] **Step 4: Add the cutover invariant to the rollout handoff.** The later switch to `gateway_stored` must stage gateway ids, alias, gateway token, and removal of `OPENAI_API_KEY` in one Worker version, or use an explicitly temporary migration state that never sends provider `Authorization`. Ordinary immediate secret deletion is not a safe sequence.
+- [ ] **Step 5: Run both adapter lanes, config, and typecheck.**
+- [ ] **Step 6: Commit.** `api: declare the provider credential mode`
 
 ---
 
@@ -582,9 +721,16 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 
   **Record the derivation, not a constant.** Reproduce the 7 from the per-pass maxima and the reachable writer↔verifier correction cycles Task 8b makes concrete, and write the arithmetic down. Say explicitly which number the approved ceiling was computed against — the spend approval is only as sound as this derivation, and the design's 14 must be amended rather than quoted.
 
-  Include an AI Gateway subsection covering: that the pair is optional and empty is the shipped state; that the gateway token needs `Run` permission and is **account-scoped**, so it reaches every gateway in the account including any BYOK stored keys; that the gateway must be named explicitly rather than left as `default`, which auto-creates one; that gateway spend limits may be set as a backstop but never as a substitute for the §25.3 ledger; and — stated as a consequence to accept before enabling — that **Zero Data Retention does not apply to this BYOK path**, that ZDR and logging are separate controls, and that `cf-aig-collect-log: false` is consequently the only thing keeping prompts and readings out of gateway storage, which is durable and has no automatic expiry. The per-request log view being empty for Pattern traffic is the designed outcome, not an incident.
+  Include an AI Gateway subsection covering: that the pair is optional and empty is the shipped state; that the gateway token needs `Run` permission and is **account-scoped**, so it reaches every gateway in the account including any BYOK stored keys; that the gateway must be named explicitly rather than left as `default`, which auto-creates one on an authenticated request; that a Worker AI binding is **not** a BYOK alternative for third-party models; that request `Authorization` wins over the stored key and therefore must be absent in `gateway_stored` mode; that gateway spend limits may be set as a backstop but never as a substitute for the §25.3 ledger; and — stated as a consequence to accept before enabling — that **Zero Data Retention does not apply to this BYOK path**, that ZDR and gateway logging are separate controls, and that `cf-aig-collect-log: false` is the per-request control that suppresses the entire gateway entry. Record separately the OpenAI account's upstream retention posture. The per-request gateway log view being empty for Pattern traffic is the designed outcome, not an incident.
 
-  The subsection must carry an explicit **dashboard-state checklist**, because these are settings no Worker test can observe: Guardrails **off**, DLP **off**, no fallback configuration, and the gateway's own logging setting recorded. Guardrails and DLP each route the reader's packet and generated prose through an additional inspecting model, and Guardrails' `S6`/`S11` categories are live false-positive risks for psychological-timing prose. Record the verification of each as a gate, not an assumption.
+  The subsection must carry an explicit **dashboard-state checklist**, because these are settings no Worker test can observe: Guardrails **off**; DLP **off**; no Dynamic Route; any spend-limit action set to **Block**, not fallback; retry defaults documented even though every request overrides attempts to `1`; and the gateway's own logging and Automatic Log Deletion settings recorded. Guardrails routes configured prompt/response scopes through Llama Guard and, for `P1`, Prompt Guard; DLP is a separate content-inspection service. Both process private packet or prose bytes outside the disclosed provider boundary, and Guardrails' `S6`/`S11` categories are live false-positive risks for psychological-timing prose. Record the verification of each as a gate, not an assumption.
+
+  Carry a separate **credential cutover gate**. First prove the deployed
+  `worker` mode is byte-identical for the already-live reading path. Then stage
+  one Worker version in which gateway ids, stored-key alias, and
+  `AI_GATEWAY_TOKEN` are present while `OPENAI_API_KEY` is absent; do not expose
+  traffic to either invalid intermediate combination. Record the Worker version
+  id and the exact secret/var evidence without recording secret values.
 - [ ] **Step 3: Record the invariants that span files in `CLAUDE.md`.** `retryStage` as the sole attempt incrementer and the artifact-first probe that depends on it, attempt-scoped artifact identity, the derived-not-copied schema rule, the runtime allowlist at the provider boundary, and the Q1/Q3 decisions with their enforcement lines.
 - [ ] **Step 4: Commit.** `docs: add the Pattern adapter rollout runbook and invariants`
 

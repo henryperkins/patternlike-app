@@ -108,10 +108,15 @@ Everything around it is ready: the contracts are frozen
 
 Size this honestly. It is a **second LLM integration** with its own provider
 tuple, its own rollout switch and its own budget ledger — comparable in scope to
-the adapter plan, which excluded it deliberately. The adapter plan's AI Gateway
-section applies to it unchanged, including the forbidden headers, the
-gateway-versus-provider failure classification, and the stored-key credential
-mode.
+the adapter plan, which excluded it deliberately. Use the adapter plan's
+corrected AI Gateway section as a reviewed baseline, not as a block to copy
+unchanged. If this pipeline also uses provider-native BYOK, a request provider
+key would take precedence and bypass the stored key, so stored mode sends no
+provider `Authorization` and pins `cf-aig-byok-alias`. A Worker AI binding is
+not a BYOK substitute for third-party models. Reuse the forbidden-header and
+no-log posture, the closed allowlist of documented Cloudflare error codes, and
+the rule that every other routed failure is `unknown` rather than guessed to be
+gateway or provider.
 
 ### Slice C — The administrator authorization boundary (§31.9, §24)
 
@@ -160,9 +165,27 @@ From the adapter plan and from the operator, all recorded with their evidence:
   calls the default `gateway.ai.cloudflare.com` endpoint. This makes the shipped
   `responsesUrlFor` and both id validators correct as they stand.
 - **The OpenAI provider key is stored in AI Gateway (BYOK).** The Worker must
-  therefore *not* send `Authorization`, `AI_GATEWAY_TOKEN` becomes mandatory
-  rather than optional, and the key alias is pinned explicitly. Adapter plan
-  Task 5a covers this and touches the already-shipped reading adapter.
+  therefore *not* send provider `Authorization`: current Cloudflare credential
+  precedence gives a request key priority and would silently bypass BYOK.
+  `AI_GATEWAY_TOKEN` becomes mandatory rather than optional, and the key alias
+  is pinned explicitly. Adapter plan Task 5a covers this and touches the
+  already-shipped reading adapter.
+- **A Worker AI binding is not an alternative under the selected BYOK
+  architecture.** Third-party binding calls use Unified Billing and do not
+  support BYOK. Changing to one is a provider, billing, request-envelope and
+  privacy redesign rather than a fetch optimization.
+- **Gateway/provider failure attribution is deliberately incomplete.** Direct
+  responses are `provider`; only the closed documented Cloudflare code
+  allowlist is `gateway`; every other routed non-2xx is `unknown`. Status or a
+  generic numeric body code is not proof.
+- **The cache invariant is `must not be HIT`.** `HIT` is terminal; `MISS` is
+  expected on a successful routed preflight; absence on a gateway-generated
+  error does not replace that error with a cache misconfiguration.
+- **The live reading credential cutover is a versioned operation.** Task 5a
+  first deploys `OPENAI_CREDENTIAL_SOURCE=worker` byte-identically. A later
+  Worker version must make gateway ids, stored-key alias and
+  `AI_GATEWAY_TOKEN` present while making `OPENAI_API_KEY` absent, without
+  serving either invalid intermediate combination.
 - **Q1** writer attempts move to 3 with the command type widened to `2 | 3`.
 - **Q2** the verifier receives the full frozen plan per §14.1, and
   `resolvePatternPublisherConfiguration` must refuse equal writer/verifier prompt
@@ -193,6 +216,12 @@ code.
 - Prompt, packet, plan, draft and prose logging is forbidden. Safe-log arms carry
   event name, pass, model, prompt version, latency, token counts, failure class
   and hashes.
+- For a provider-native BYOK route, `cf-aig-collect-log: false`,
+  `cf-aig-max-attempts: 1`, and `cf-aig-skip-cache: true` are exact request
+  invariants. Guardrails and DLP are off, no Dynamic Route is attached, and a
+  spend-limit rule blocks rather than falls back. `cf-aig-collect-log: false`
+  suppresses the whole gateway entry; it does not establish the upstream
+  provider's retention posture.
 - Scoping advances no rollout and configures no secret.
 
 ## Method note, learned the expensive way in the previous session
@@ -206,8 +235,13 @@ supposed open choice into a conformance gap.
 
 **Open the cited section before relying on a characterisation of it**, and prefer
 the normative spec bundle over both design documents. The same caution applies to
-external references — the Cloudflare AI Gateway documentation contradicts itself
-about a URL path, which is recorded in the adapter plan.
+external references. For this OpenAI provider-native path, use the generic
+Cloudflare credential-precedence and BYOK pages; do not generalize an
+integration-specific coding-agent statement that a provider environment
+variable is ignored. Re-open the current AI Gateway docs on the implementation
+date: the binding, REST, retry, logging and Dynamic Route surfaces changed
+materially during 2026, and the adapter plan records which claims are contracts
+and which require a live preflight.
 
 ## Verification available to you
 
