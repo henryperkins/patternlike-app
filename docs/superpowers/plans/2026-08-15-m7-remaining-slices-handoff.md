@@ -43,9 +43,22 @@ reconciliation (31.8).
 
 Concretely: `contracts/m7` validates with 23 schemas, `0007` is applied to
 production, `packages/pattern-engine` is complete, all three public stages plus
-consent/ready/failed/withdrawn render in `PatternExperience.tsx`, every M7 table
-appears in the deletion manifest and export, ontology recall works, and
-`/admin/*` is present in `run_worker_first`.
+consent/ready/failed/withdrawn render in `PatternExperience.tsx`, ontology recall
+works, and `/admin/*` is present in `run_worker_first`.
+
+Two corrections to that summary, because both would mislead a scoping pass.
+**Deletion coverage is not blanket.** It holds for *user-owned* tables —
+`pattern_documents`, claims, jobs, artifacts, consents. The control-plane tables
+sit outside it by design: `pattern_ontology_*` and both usage ledgers
+(`pattern_provider_daily_usage`, `pattern_ontology_provider_daily_usage`) are not
+user-owned, and `pattern_admin_access_events` is *nullified* rather than deleted.
+That is the intended classification, not a gap — but do not restate it as "every
+M7 table is covered."
+
+**31.8 is complete except on one item.** Correction, cleanup, recall and
+reconciliation are built. The §29.11 disaster-recovery replay ledger that
+acceptance criterion 23 depends on is **not** in the tree. Slice D covers the
+drill; treat 31.8 as open on that item so it is not skipped.
 
 **31.6 is planned but unbuilt** — the stage machine exists and fail-closes any
 non-synthetic publisher pin at `pattern-execute.ts:637`; only the model calls are
@@ -70,7 +83,9 @@ path.
 
 §31.4's deliverable explicitly permits the manual route — "manually supplied
 synthetic ontology fixtures can be ingested and frozen by runtime jobs.
-Automated generation remains separate." Scope the smallest hand-authored
+Automated generation remains separate." Local tests already seed one through
+`syntheticOntologyRelease`, which confirms the gap is *content* rather than
+missing ingestion code. Scope the smallest hand-authored
 ontology that can be ingested, signed, activated and actually drive a Pattern
 end to end. Treat the authoring itself as editorial work with a review gate, not
 as a code task; the scoping question is what the minimum viable record set is,
@@ -206,7 +221,8 @@ python3 contracts/validate_schemas.py # needs jsonschema referencing pyyaml open
 
 Note that `npm test -w @patternlike/api -- <file>` appends the file to the end of
 an `&&` chain and hands vitest files to the `tsx --test` runner. Use
-`npx vitest run <file>` from `apps/api` for a single vitest file.
+`npm exec -w @patternlike/api -- vitest run <file>` from the repository root, or
+`npx vitest run <file>` from `apps/api`, for a single vitest file.
 
 ## Deliverable
 
