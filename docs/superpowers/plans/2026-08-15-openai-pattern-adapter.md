@@ -155,6 +155,49 @@ One related forward-compatibility note: the reference says `gateway.ai.cloudflar
 
 ---
 
+## Planned deployment: stored provider key, custom domain, and Access
+
+The operator has stated that the **OpenAI provider key is already stored in AI Gateway (BYOK)**, and plans a custom domain **`gateway.lakefrontdev.com`** with **Cloudflare Access**. All three change what the shipped adapter must do, and two of them contradict code that has already landed. None of this is blocking — the gateway ships disabled — but the adapter cannot be enabled against this configuration as written.
+
+### The shipped adapter conflicts with a stored provider key
+
+BYOK's own instructions are: "Remove provider authorization headers from your requests. Note that you still need to pass `cf-aig-authorization`." The shipped `createOpenAiReadingPublisher` does the opposite — it *requires* `OPENAI_API_KEY`, refuses with `publisher_auth_failed` when absent, and sends `authorization: Bearer ${apiKey}` on every request. The Pattern adapter in Task 4 was specified to mirror it.
+
+Sending it anyway is not harmless. The reference states that when AI Gateway already holds the credentials through a stored provider key, the forwarded key "is ignored." So under this deployment the Worker's `OPENAI_API_KEY` becomes **decorative**: still required by `resolvePublisherConfiguration`, still transmitted, and ignored by the gateway, which bills and authenticates on the stored key. An operator rotating the Worker secret would believe they had rotated the key while nothing changed. That is precisely the class of silent falsehood this codebase's configuration guards exist to prevent.
+
+Two further consequences:
+
+- **`AI_GATEWAY_TOKEN` stops being optional.** BYOK's prerequisites require an authenticated gateway, so `cf-aig-authorization` (or an Access credential) becomes mandatory whenever the stored key is in use. The comment in `env.ts` describing the token as needed "only while the gateway has Authenticated Gateway on" is still true in the abstract but no longer describes this deployment.
+- **The key alias should be pinned.** With no `cf-aig-byok-alias` header the gateway uses the alias `default`. This codebase pins every other provider-identity value; leaving key selection to an implicit default is inconsistent, and it means adding a second stored key later silently changes nothing until someone notices which one is `default`.
+
+### A custom domain changes the URL this adapter builds
+
+`AI_GATEWAY_ORIGIN` is a hardcoded constant and `responsesUrlFor` interpolates `accountId` and `gatewayId` into the path. With a custom domain, "the hostname identifies your account and gateway, so you can omit the account ID and gateway ID from request URLs." The `AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID` pair — including the 32-hex and path-segment validators added in `6f3d722` — does not describe this deployment at all. The configuration needs a third shape: a validated hostname, mutually exclusive with the id pair.
+
+**Unresolved and must be settled empirically, not from the documentation.** The reference is internally inconsistent about whether the provider slug is followed by `/v1/`:
+
+| Source | Documented form |
+| --- | --- |
+| OpenAI provider page | replace `https://api.openai.com/v1` with `…/{gateway_id}/openai` → `…/openai/responses` |
+| Custom domains page | `https://ai.example.com/openai/v1/chat/completions` |
+| Cloudflare Access page | `https://ai.example.com/openai/v1/chat/completions` |
+
+The shipped `responsesUrlFor` implements the first form, and the design comment explicitly warns that `…/openai/v1/responses` is a 404. The custom-domain pages show exactly that form. If the custom domain expects `/openai/v1/responses` and the adapter sends `/openai/responses`, the result is a 404 — which **this adapter maps to `publisher_model_unavailable`, a terminal failure blaming the model for a URL mistake**. Verify with a synthetic request against `gateway.lakefrontdev.com` before any Pattern traffic, and pin whichever form answers. Do not resolve this by reading the docs harder; they disagree.
+
+### Cloudflare Access blocks gateway-token traffic
+
+The decisive sentence: "Once a custom domain is protected by Access, every request to that domain must pass an Access policy. **Requests that only include an AI Gateway token, without a valid Access token, are blocked by Access before they reach the gateway.**" A Worker sending only `cf-aig-authorization` to `gateway.lakefrontdev.com` would be refused by Access, never reaching the gateway.
+
+The same page supplies the escape hatch: "keep sending gateway-token traffic to the default `gateway.ai.cloudflare.com` endpoint, which is not protected by Access."
+
+**Recommendation — split the two paths.** Access is identity-aware control over *users*: it authenticates a person against an identity provider and tags requests with `cf.user_id`. The Worker is not a user. Point human and coding-agent traffic at `gateway.lakefrontdev.com` behind Access, and leave the Worker on `gateway.ai.cloudflare.com` with `cf-aig-authorization`. That keeps the URL shape the shipped adapter already implements, avoids a second credential in the Worker, and sidesteps the `/v1/` ambiguity above entirely — while Access still does the job it is for.
+
+If the Worker must instead go through the Access-protected domain, it needs an Access **service token**, and two details matter. Service-token requests "do not include `cf.user_id` because they do not represent an individual Access user," which is the outcome this design wants — a *user* JWT would write an identity into gateway metadata, and this design forbids identity at the provider boundary. And Access credentials are stripped before the upstream call: "before AI Gateway forwards the request to the upstream provider, it removes Cloudflare-only credentials such as the Access JWT and AI Gateway authorization headers." Adopting this path means a new Worker secret pair, a fourth configuration shape, and the URL verification above becoming blocking rather than advisory.
+
+Note also that `cf.` metadata keys are reserved and cannot be supplied by the client — so `cf.user_id` is not something the Worker could set or suppress. Avoiding it means not authenticating as a user, which the service-token path does.
+
+---
+
 ## Global Constraints
 
 - The approved design is authoritative. Contract changes are out of scope: `contracts/m0` through `contracts/m6` stay byte-identical, and `contracts/m7` keeps its `schema_version`, every `$id`, every enum, and every required field. This plan expects **no** contract edit at all.
@@ -312,6 +355,42 @@ Add the interface, `createOpenAiPatternPublisher`, and `createSyntheticPatternPu
 - [ ] **Step 4: Run the lane and typecheck.**
 - [ ] **Step 5: Commit.** `api: add the Pattern publisher interface and two factories`
 
+### Task 5a: Make the provider credential model explicit
+
+**Files:**
+
+- Modify: `apps/api/src/services/reading-publisher.ts`
+- Modify: `apps/api/src/services/openai-reading-publisher.ts`
+- Modify: `apps/api/src/services/openai-pattern-publisher.ts`
+- Modify: `apps/api/src/env.ts`
+- Modify: `apps/api/src/config.test.ts`
+- Modify: `apps/api/wrangler.toml`
+
+**Requires sign-off, and touches the shipped reading adapter.** Today "the Worker holds the provider key" is an unstated assumption compiled into both adapters. The operator's gateway stores the key, which makes that assumption false and the transmitted key decorative. Replace the assumption with a declared credential mode.
+
+    export type ProviderCredentialMode =
+      | { source: "worker"; apiKey: string }      // Authorization: Bearer <key>
+      | { source: "gateway_stored"; alias: string }; // no Authorization header; cf-aig-byok-alias
+
+Resolution rules, all enforced in `resolvePublisherConfiguration` so a wrong combination is a `503` on the next request rather than a runtime surprise:
+
+- `gateway_stored` without a configured gateway route is refused. A stored key only exists behind a gateway.
+- `gateway_stored` with `OPENAI_API_KEY` present is refused rather than tolerated. Accepting both is what creates the rotate-and-nothing-happens illusion; the refusal message must say the gateway holds the key.
+- `worker` mode keeps today's behavior exactly, so the direct path and the existing reading rollout are unaffected.
+- The alias is pinned explicitly and sent as `cf-aig-byok-alias`, never left to the implicit `default`.
+
+Also add the third gateway shape from the section above — a validated custom-domain hostname, mutually exclusive with the `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` pair — and refuse a configuration that sets both. Keep `responsesUrlFor` total across all three shapes.
+
+- [ ] **Step 1: Write the failing credential and hostname tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; assert `worker` mode is byte-identical to today's request. Assert each refusal above with its message. Assert `responsesUrlFor` produces the direct origin, the id-path gateway URL, and the custom-domain URL, and that the id pair and hostname cannot both be set. Pin the path form settled by the empirical check in Step 3 — including whether the provider slug is followed by `/v1/`.
+- [ ] **Step 2: Run and confirm failure.**
+
+      npm exec -w @patternlike/api -- vitest run src/config.test.ts src/services/openai-reading-publisher.test.ts src/services/openai-pattern-publisher.test.ts
+
+- [ ] **Step 3: Settle the custom-domain path empirically before implementing.** Send one synthetic request — no real account, invented content — to `gateway.lakefrontdev.com` for both `…/openai/responses` and `…/openai/v1/responses`, and record which answers. The documentation disagrees with itself, and the wrong choice is a 404 this adapter reports as `publisher_model_unavailable`. Record the result in the rollout ledger.
+- [ ] **Step 4: Implement the credential mode and the hostname shape.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode.
+- [ ] **Step 5: Run both adapter lanes, config, and typecheck.**
+- [ ] **Step 6: Commit.** `api: declare the provider credential mode and custom-domain route`
+
 ---
 
 ## Phase C: Rewiring the stage machine
@@ -436,11 +515,11 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 
 ## Dependency and checkpoint map
 
-    Task 1 (shared boundary) ─┬─> Task 4 (adapter) ──> Task 5 (interface) ──> Task 6 (rewire) ─┬─> Task 7 (provenance)
-    Task 2 (packet) ──────────┤                                                                ├─> Task 8  (constants, needs Q1)
-    Task 3 (prompts) ─────────┤                                                                └─> Task 8a (ledger 0008, needs Q6)
+    Task 1 (shared boundary) ─┬─> Task 4 (adapter) ──> Task 5 (interface) ──> Task 5a (credential mode) ──> Task 6 (rewire) ─┬─> Task 7 (provenance)
+    Task 2 (packet) ──────────┤                                                                                              ├─> Task 8  (constants, needs Q1)
+    Task 3 (prompts) ─────────┤                                                                                              └─> Task 8a (ledger 0008, needs Q6)
     Task 3a (correction) ─────┘
-                                                        Task 6 + 7 + 8 + 8a ──> Task 9 (integration) ──> Task 10 (gate + runbook)
+                                                                        Task 6 + 7 + 8 + 8a ──> Task 9 (integration) ──> Task 10 (gate + runbook)
 
 **Checkpoints.**
 
@@ -450,6 +529,6 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 - After Task 6: an `openai` pin reaches a provider in test only; `PATTERN_AI_ROLLOUT` is still `off` everywhere.
 - After Task 10: the code is a rollout candidate. It is not deployed, no secret is set, and no rollout has moved.
 
-**Sign-off gates.** Q1 blocks Task 8. Q6 blocks Task 8a, and its two outcomes are a `0008` migration or a recorded amendment to §25.3 — not a silent third option. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. All decisions are recorded above with their evidence; none may be reversed silently during implementation.
+**Sign-off gates.** Q1 blocks Task 8. Q6 blocks Task 8a, and its two outcomes are a `0008` migration or a recorded amendment to §25.3 — not a silent third option. Task 5a needs a decision on the credential mode and on whether the Worker goes through the Access-protected custom domain or stays on the default endpoint; it also modifies the already-shipped reading adapter, so it is the one task in this plan that changes live-path code before Task 6. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. All decisions are recorded above with their evidence; none may be reversed silently during implementation.
 
 **A note on sourcing.** The adapter design's open questions cite the M7 design by section, and its summaries are not always the whole of what those sections say. Q2 was largely settled by §14.1 and carried an unmentioned enforceable requirement in §14.2; Q1's attempt count came with a correction-document protocol in §13.5; Q6 was a conformance gap against §25.3 rather than an open choice. Read `2026-08-14-ai-generated-pattern-design.md` at the cited section before implementing any task that leans on one, and treat `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` as normative above both design documents.
