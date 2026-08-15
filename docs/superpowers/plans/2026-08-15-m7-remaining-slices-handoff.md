@@ -87,21 +87,72 @@ path.
 synthetic ontology fixtures can be ingested and frozen by runtime jobs.
 Automated generation remains separate." Local tests already seed one through
 `syntheticOntologyRelease`, which confirms the gap is *content* rather than
-missing ingestion code. Scope the smallest hand-authored
-ontology that can be ingested, signed, activated and actually drive a Pattern
-end to end. Treat the authoring itself as editorial work with a review gate, not
-as a code task; the scoping question is what the minimum viable record set is,
-who authors it, how it is reviewed, and how it is signed and ingested.
+missing ingestion code.
 
-**Settle whether a hand-authored ontology may serve production, or only tests.**
-§31.4 permits manually supplied fixtures for ingestion, but the upstream design
-expects machine-generated and machine-authorized records, which is what Slice B
-builds. A hand-authored release that unblocks an end-to-end path in development
-is not automatically permitted to be the *active* release a real reader's
-Pattern is generated against. Get that answered before scoping the authoring
-effort: the answer decides whether Slice A is a test fixture or a production
-artifact with a signing and review chain, and those are different pieces of
-work.
+**This question is settled, and it is settled against the hand-authored
+production route. Do not re-open it; scope to the answer.** Slice A is an
+**internal-only signed synthetic ontology release**, valid at
+`PATTERN_AI_ROLLOUT=internal` and below. Slice B remains the gate for every
+external reader. The evidence, in the order that decides it:
+
+- §23.1 makes the ontology the model's *only* authority for astrological
+  meaning, and every runtime statement must resolve through source-supported
+  meanings to **immutable curated source fragments**. §23.2 puts those fragments
+  behind an out-of-scope curation process that resolves license and usage
+  metadata, and refuses "a corpus release lacking explicit machine-readable
+  authorization." Hand-authoring cannot manufacture that chain; it can only
+  assert it.
+- §23.9 signs only a candidate "that passes compilation, semantic evaluation,
+  and fixed-chart regression," and the ingestion route verifies evaluation
+  report hashes and a regression report hash. The §23.7 independent evaluator
+  and the §23.8 fixed-chart corpus **are Slice B** and do not exist.
+- The contract makes the dishonesty concrete rather than theoretical.
+  `pattern-ontology-release.schema.json` requires an `evaluation` object, and
+  `pattern-ontology-evaluation.schema.json` requires `compiler_passed`,
+  `evaluator_passed`, and `regression_passed`. `compileOntologyRelease` refuses
+  any release whose `evaluation.verdict` is not `pass` and whose
+  `unevaluated_fixture_count` is not `0`
+  (`packages/pattern-engine/src/ontology.ts:220-225`). A hand-authored release
+  offered to production must therefore ship a signed, immutable bundle
+  attesting that an evaluator and a regression corpus which do not exist
+  returned clean — the fixture already does exactly this
+  (`packages/pattern-engine/src/fixtures.ts:91-97`), which is correct for a
+  fixture and disqualifying for a reader-serving release.
+- Acceptance criterion 19 is written against "the machine-generated ontology
+  pipeline" proving source dependency, deterministic compilation, independent
+  evaluation, regression, signing, and activation. No hand-authored release can
+  evidence it, so a production Slice A would leave criterion 19 permanently
+  unmet while readers were being served.
+
+**Scope Slice A to this, then.** The smallest hand-authored record set that can
+be compiled, signed, activated, and drive a Pattern end to end for a designated
+internal account. Authoring is editorial work with a review gate, not a code
+task; the scoping questions are the minimum viable record set, who authors it,
+how it is reviewed, and how it is signed and ingested.
+
+**The one piece of engineering Slice A must add is the containment, and it is
+not free.** "Internal-only" has no representation today: `pattern_ontology_releases`
+has no provenance column, and `pattern-ontology-release.schema.json` is
+`additionalProperties: false` over a fixed required set, so nothing distinguishes
+a synthetic release from a Slice B one once it is in the table. Rollout mode alone
+is not the containment either — the release outlives the mode, and
+`consumerAdmissionEntry` admits `chart_correction` at `internal` without
+consulting the staff allowlist (`pattern-rollout.ts:86`). Scope:
+
+- a release-level provenance marker — a forward-only column on
+  `pattern_ontology_releases` is cheapest and stays out of the contract; an
+  optional property on the release schema is permissible as a manifest
+  `amendments` entry if the marker must travel with the signed bytes, and that
+  choice should be made deliberately rather than by whichever is edited first;
+- honest evaluation booleans on the synthetic release —
+  `evaluator_passed: false`, `regression_passed: false` — which the compiler
+  already tolerates, so the bundle stops attesting to runs that never happened;
+- a refusal at reservation, where §23.11 freezes the active ontology into the
+  command, when the frozen release is internal-only and the account is not on
+  `PATTERN_INTERNAL_ACCOUNT_IDS`; and
+- the rejection test that proves it: an internal-only release active while
+  rollout is `first_open` must refuse to reserve for an external account rather
+  than generate against it.
 
 Read §23 (Interpretation ontology) in full before scoping this.
 
@@ -111,6 +162,13 @@ Not built. Six components: source-corpus contract reader, generator prompt and
 provider adapter, deterministic ontology compiler driver, independent evaluator,
 fixed-chart regression runner, and machine signing plus internal ingestion
 client. Acceptance criterion 19 requires all six to be evidenced.
+
+**Slice A's answer makes this the production gate.** No external reader's Pattern
+may be generated against an ontology that has not been through this pipeline, so
+Slice B is not an optimization of Slice A's manual route — it is the only route
+to `first_open` or `enabled`. Size the slices with that ordering in mind: Slice A
+unblocks internal end-to-end work quickly, and none of the time it saves comes
+off Slice B.
 
 Everything around it is ready: the contracts are frozen
 (`pattern-source-corpus-release`, `pattern-source-fragment`,
@@ -212,6 +270,13 @@ From the adapter plan and from the operator, all recorded with their evidence:
   `AI_GATEWAY_TOKEN` present while making `OPENAI_API_KEY` absent, without
   serving either invalid intermediate combination.
 - **Q1** writer attempts move to 3 with the command type widened to `2 | 3`.
+  The two maxima keep **different scopes**: the writer's 3 is per job and spans
+  corrections (§13.5); the verifier's 2 is per candidate (§14.5). Worst-case
+  spend is `2 planner + 3 writer + (3 candidates × 2 verifier)` = **11** provider
+  calls per Pattern, which amends the M7 design's 14. A per-job verifier total
+  yielding **7** appeared in a draft and is wrong: it caps the job at two
+  candidates, so the writer's third attempt can never be verified. Do not quote
+  7 or 14 into any budget approval.
 - **Q2** the verifier receives the full frozen plan per §14.1, and
   `resolvePatternPublisherConfiguration` must refuse equal writer/verifier prompt
   versions per §14.2.
@@ -219,7 +284,10 @@ From the adapter plan and from the operator, all recorded with their evidence:
   `pattern-publisher.ts:152` makes the exposure structurally zero.
 - **Q4** the verifier finding vocabulary stays in code until a live corpus
   stabilises it.
-- **Q5** `MAX_STAGE_CLAIMS` rises 8 → 16, but only after the budget move.
+- **Q5** `MAX_STAGE_CLAIMS` rises 8 → 16, but only after the budget move, and
+  with the derivation written into the constant's comment: 11 provider
+  deliveries plus the publish delivery is a floor of 12 before any lease-expiry
+  or artifact-adopting churn.
 - **Q6** `pattern_provider_daily_usage` does not satisfy §25.3's per-stage-class
   recording. Outcome is a `0008` migration or a recorded amendment to §25.3 —
   **not** a third silent option.
@@ -288,7 +356,8 @@ an `&&` chain and hands vitest files to the `tsx --test` runner. Use
 A design document per slice under `docs/superpowers/specs/`, and — once a design
 is approved — its plan under `docs/superpowers/plans/`. Slice A first: it is the
 binding constraint, it is the smallest, and it is what makes an end-to-end
-Pattern possible at all. Surface the Slice C Access question early, since the
-answer changes that slice's size substantially.
+Pattern possible at all — for a designated internal account, which is as far as
+it goes. Surface the Slice C Access question early, since the answer changes that
+slice's size substantially.
 
 Commit with focused, imperative subjects and an area prefix per `AGENTS.md`.
