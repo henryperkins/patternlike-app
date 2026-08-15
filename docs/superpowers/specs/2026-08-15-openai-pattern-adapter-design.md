@@ -777,6 +777,26 @@ does for a normal advance. Backoff follows the M7 stage-aware schedule: 30
 seconds, then 2 minutes, then 10 minutes, with `retry_after_seconds` from a 429
 or 5xx acting as a floor.
 
+**Amendment (2026-08-15). `retryStage` does not cover the semantic rejection,
+and a third primitive is required.** As defined above it holds the stage and the
+`stage_generation` and increments the pass that just ran. A verdict of `reject`
+does neither: it moves `semantic_verifying` → `writing`, which is a stage change,
+and it consumes a **writer** attempt rather than a verifier one. Add
+`returnToWriter(env, job, token, availableAt)` — `ownershipProbes`, the correction
+document written as an artifact before the batch, `stage='writing'` with
+`stage_generation + 1`, `writer_attempts + 1`, and a nudge at the successor
+generation. A *deterministic* candidate rejection is not this primitive: its
+validation runs inline inside the `writing` delivery, so it stays an ordinary
+`retryStage("writer")`. Both consume a writer attempt, which is what §13.5 means
+by three attempts against one frozen plan.
+
+The decision between `returnToWriter` and terminal failure is taken in the
+verifier delivery and reads `writer_attempts` against `writer_attempts_max`, per
+§14.5's "if writer attempts remain". Returning unconditionally and letting the
+writing delivery hit its own ceiling records the wrong failure class at the wrong
+public stage, and loses `semantic_verification_failed` — the only class that
+names the verifier as the reason.
+
 Budget accounting. §25.3 of the M7 design requires the reservation to be
 "consumed immediately before each provider call", atomic, with failed,
 timed-out, and rejected responses all consuming a unit and no refunds. The
@@ -806,6 +826,26 @@ per Pattern is therefore 14 provider calls; against
 UTC day, and the rollout document must carry that calculation multiplied by the
 pinned input/output token bounds and current model rates before external users
 are enabled.
+
+**Amendment (2026-08-15). The worst case is 11, not 14.** The structure above is
+right and stands; only the verifier's per-candidate allowance changes. §14.5's
+"retries the identical candidate at most twice" is read here as two calls
+*inclusive of the first*, matching the reading applied to §12.4 and §13.5, rather
+than as two retries after it. That gives
+
+    2 planner + 3 writer + (3 candidates × 2 verifier) = 11 provider calls
+
+and 11 is the figure the rollout document must carry into the spend approval.
+The verifier's scope stays **per candidate**; that part is not amended. An
+implementation draft that flattened it to a per-job total of 2 and arrived at 7
+is wrong twice over: it understates the ceiling, and a per-job total of 2 caps
+the job at two candidates, so §13.5's third writer attempt could never be
+verified. With `verifier_attempts` reset by the transition into
+`semantic_verifying`, one column holds the per-candidate count, and the per-job
+verifier bound is the implied product of the two maxima. `MAX_STAGE_CLAIMS` at 16
+remains defensible on the corrected model: 11 provider deliveries plus the
+publish delivery is a floor of 12 before any lease-expiry or artifact-adopting
+churn.
 
 ## Idempotency and at-least-once safety
 
@@ -840,9 +880,16 @@ free and, more importantly, deterministic.
 can recompute and a retry cannot collide with. `putArtifact`'s digest input
 becomes `${generation_id}:${artifact_class}:${stage_generation}:${attempt}`,
 where `attempt` is the durable `<pass>_attempts` value read from the claimed
-row. A redelivery of the same delivery recomputes the same `k` because
-`retryStage` is the only thing that increments it, and it increments in the same
-guarded batch that returns the job to `queued`. A genuine retry recomputes `k+1`
+row. A redelivery of the same delivery recomputes the same `k` because **no
+transition writes the counter of the pass whose provider result it is
+committing**, and every write to `<pass>_attempts` commits inside the same
+guarded batch as the `(stage, stage_generation)` transition that authorizes the
+next call. (An earlier draft stated this as "`retryStage` is the only thing that
+increments it". That is no longer true — `returnToWriter` increments
+`writer_attempts`, and the `advance` into `semantic_verifying` resets
+`verifier_attempts` for the incoming candidate — and the shorter phrasing must
+not be carried into `CLAUDE.md`, where it would record an invariant the code does
+not hold.) A genuine retry recomputes `k+1`
 and therefore writes a fresh artifact rather than being silently discarded — the
 planner's second attempt is explicitly allowed to propose a different plan, and
 the current three-component identity would have thrown that away. A companion
@@ -906,7 +953,8 @@ The order of operations at every stage, stated once:
    and the body read;
 9. run the deterministic validator unchanged;
 10. write the response artifact (create-only) and read back its plaintext hash;
-11. `advance` with that hash, or `retryStage`, or `failJob`, each with
+11. `advance` with that hash, or `retryStage`, or — after a semantic rejection
+    with writer attempts remaining — `returnToWriter`, or `failJob`, each with
     `ownershipProbes` at the head of its batch;
 12. nudge, and swallow the send failure — the D1 row is the outbox.
 
