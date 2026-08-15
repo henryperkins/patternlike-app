@@ -22,13 +22,19 @@ M7 design §13.5 specifies three writer attempts against one frozen plan. The fr
 
 The design worries that changing the constant "changes the frozen command shape for jobs already enqueued." That risk is empty in production: `PATTERN_AI_ROLLOUT = "off"` in **both** wrangler blocks (`wrangler.toml:151`, `:268`), and production has no ontology release, so no Pattern command has ever been frozen there. Only dev/test rows can carry a `2`.
 
-**Decision:** the enqueuer writes `3`, and the command type widens to `writer_attempts_max: 2 | 3` so any dev-era row still decodes through `isPatternCommand`. Narrow back to `3` once no `2` rows remain. Note `planner_attempts_max` and `verifier_attempts_max` are also literal `2` and are **not** changed — the design specifies three attempts for the writer only.
+**Decision:** the enqueuer writes `3`, and the command type widens to `writer_attempts_max: 2 | 3` so any dev-era row still decodes through `isPatternCommand`. Narrow back to `3` once no `2` rows remain. Note `planner_attempts_max` and `verifier_attempts_max` are also literal `2` and are **not** changed — §13.5 specifies three attempts for the writer only.
 
-### Q2 — Verifier visibility of the plan: supply the full plan
+**What the attempt count implies, and what this plan originally missed.** §13.5 does not describe a bare retry. A deterministic or semantic rejection triggers another writer attempt carrying a *closed correction document* of finding codes, affected chapter and section keys, the policy rule violated, and the instruction to preserve the frozen plan and evidence assignments — and **rejected prose is never echoed into the correction prompt**. §14.5 closes the loop from the other side: a semantic rejection returns to the writer correction path if attempts remain, retaining the same frozen plan. No correction path exists in the codebase today (the only `correction` matches are the unrelated `chart_correction` lifecycle). Task 3a builds it.
 
-Detecting that the writer drifted from its assignment requires seeing the assignment. A reduced projection that strips `working_title` and `purpose` removes framing bias but also removes the verifier's ability to judge whether a section answers the chapter it was assigned.
+### Q2 — Verifier visibility of the plan: already settled upstream; the open part is narrower
 
-**Decision:** supply the full frozen plan, as the design specifies. Make the bias risk measurable rather than argued: the evaluation corpus records verifier pass-rate per prompt version, and a pass-rate that does not move when deliberately drifted candidates are injected is the signal to revisit. Task 9 adds that injected-drift case.
+Read against the M7 design, this is mostly not an open question. §14.1 enumerates the seven items the verifier receives and the frozen plan is one of them, and the adapter design's own "Verifier independence" section states that the design "accepts the framing bias." What is genuinely open is only the *further* narrowing — whether the plan should be projected down to chapter keys, aliases, and authorized rules without `working_title` or `purpose`.
+
+**Decision:** supply the full frozen plan, per §14.1. Do not treat this as a choice to re-litigate during implementation. Make the residual bias measurable rather than argued: Task 9 injects candidates deliberately drifted from their plan assignment, and a verifier pass-rate that does not move under injected drift is the signal to revisit the projection.
+
+**The enforceable requirement this question was hiding.** §14.2 is a hard constraint that my task breakdown originally missed: the verifier configuration must not be identical to the writer's, and at minimum the tuple `(provider, model, prompt_version)` must differ. Today writer and verifier share both model (`gpt-5.6-sol`) and reasoning (`high`); only the prompt version differs — `"1.0.0"` against `"1.0.0-verifier"` (`pattern-publisher.ts:25,31`) — and **nothing enforces that they stay different**. The separation is an accident of two constants, not a checked relationship. `resolvePatternPublisherConfiguration` must refuse a configuration where the two prompt versions are equal. Task 5 carries this.
+
+Also from §14.1: the verifier's inputs include derived-synthesis dependency graphs and the uncertainty policy, which Task 2's builder must supply. §14.5 completes the loop — a verifier transport failure retries the identical candidate at most twice, and a semantic rejection never re-runs the verifier against unchanged prose.
 
 ### Q3 — `assembly_mode` for the synthetic publisher: no schema bump
 
@@ -50,11 +56,15 @@ The design frames this as "the M7-to-M8 window is the only cheap time to decide.
 
 **Decision:** raise to 16. This is safe *because* of the budget move in Task 6: once a provider call is charged immediately before the fetch rather than at stage entry, `MAX_STAGE_CLAIMS` bounds claim churn only, and spend stays bounded independently by `PATTERN_DAILY_PROVIDER_CALL_LIMIT`. Raising it without the budget move would raise the spend ceiling too, so Task 6 and Task 8 land in that order.
 
-### Q6 — Cross-pass budget attribution: one ceiling, attribute in logs
+### Q6 — Cross-pass budget attribution: this is a conformance gap, not an open question
 
-`pattern_provider_daily_usage` (`db/d1/0007_ai_generated_pattern.sql:420`) is keyed on `utc_date` alone with a single `used_calls` column. A per-pass dimension means a new primary key, i.e. a migration.
+**This reverses an earlier reading of mine.** Checked against the M7 design rather than the adapter doc's summary, §25.3 is not silent: *"the ledger records used calls **by stage class** in bounded integer columns or separate rows without user identity."* The shipped `pattern_provider_daily_usage` (`db/d1/0007_ai_generated_pattern.sql:420`) is keyed on `utc_date` alone with a single undifferentiated `used_calls` column. The table does not satisfy §25.3, and pointing at the `pass` field in the safe-log arms does not fix that — §25.3 assigns the recording to the *ledger*, and a log is not a ledger.
 
-**Decision:** share one ceiling, attribute through the `pass` field in the safe-log arms, as the design specifies. A migration to buy per-pass sub-ceilings is not justified before a single live Pattern has been generated. Revisit before `enabled`, which is out of scope here.
+Two parts of §25.3 must not be conflated. The **ceiling** is shared: "planner, writer, and verifier share the approved Pattern ceiling unless the operator explicitly configures separate sub-ceilings." The **recording** is per stage class. One shared ceiling with per-stage-class counters satisfies both.
+
+**Decision:** add migration `0008` giving `pattern_provider_daily_usage` bounded per-stage-class counters alongside the existing `used_calls` total, which stays the quantity the shared ceiling is enforced against. Do it now: the table is empty in every environment, so this is the cheapest it will ever be, and the alternative — deferring past `internal` — means migrating a table that is actively being written by live generation. If instead the intent is that one column is sufficient, that is an **amendment to §25.3 of the M7 design** and must be recorded there, not decided inside this plan. Task 8a carries the migration.
+
+§25.3 also settles a second thing in this plan's favour: *"the reservation is atomic and consumed immediately before each provider call."* Task 6's budget move is therefore **conformance to the design, not an optimization** — the current charge-at-stage-entry is the deviation.
 
 ---
 
@@ -111,7 +121,7 @@ These functions carry no reading semantics — the only reading-specific line in
 - Create: `apps/api/src/services/pattern-packet.ts`
 - Create: `apps/api/src/services/pattern-packet.test.ts`
 
-Three builders producing the provider-visible input documents for planner, writer, and verifier from the fact packet, the frozen plan, the authorized ontology records, and nothing else.
+Three builders producing the provider-visible input documents for planner, writer, and verifier from the fact packet, the frozen plan, the authorized ontology records, and nothing else. The verifier builder supplies exactly the seven items §14.1 enumerates — validated candidate, frozen plan, exact normalized facts, exact authorized ontology records, derived-synthesis dependency graphs, uncertainty policy, and the strict verdict schema — and nothing beyond them. Per the adapter design's independence section, it must never receive the raw source corpus, the writer's rejected candidates, the writer's correction documents, or the planner's prompt or rejected attempts.
 
 Make the guarantee structural. The builders accept narrow input types that do not carry a chart id, fingerprint, birth value, consent id, user id, or alias map, so emitting one is a type error rather than a review miss. Do not accept the wide `selected` object and pick fields off it.
 
@@ -140,6 +150,25 @@ Schemas are **derived at module load** from the normative `contracts/m7` documen
 - [ ] **Step 3: Implement policies, builders, derivation, and the closed finding vocabulary.** Record the Q4 decision in a module comment: the list lives here until a live corpus stabilizes it.
 - [ ] **Step 4: Run the lane and typecheck.**
 - [ ] **Step 5: Commit.** `api: add Pattern prompt policies and derived strict schemas`
+
+### Task 3a: Add the writer correction path
+
+**Files:**
+
+- Modify: `apps/api/src/services/pattern-packet.ts`
+- Modify: `apps/api/src/services/pattern-packet.test.ts`
+- Modify: `apps/api/src/services/pattern-prompt.ts`
+- Modify: `apps/api/src/services/pattern-prompt.test.ts`
+
+§13.5's retry is not a bare re-send. A deterministic or semantic rejection produces a **closed correction document** — finding codes, affected chapter and section keys, the policy rule violated, and the instruction to preserve the frozen plan and evidence assignments — and the writer is called again with it. §14.5 supplies the other half: a semantic rejection returns here rather than re-running the verifier on unchanged prose.
+
+The load-bearing constraint is what the correction document must **not** contain: rejected prose is never echoed into the correction prompt. Nor is the verifier's rationale text, which is prose about prose. The document carries codes, keys, and rule identifiers only.
+
+- [ ] **Step 1: Write the failing correction-document tests.** Assert the builder emits only codes, chapter/section keys, and rule ids — prove it with a rejected candidate whose every sentence is a recognizable sentinel, and a deep scan showing no sentinel survives into the correction document or the rebuilt writer request. Assert the frozen plan and evidence assignments are carried through unchanged. Assert the writer may rephrase and reorganize sections within a chapter but cannot change chapter membership, chapter count, omitted features, or ontology authorization (§13.5).
+- [ ] **Step 2: Run and confirm failure.**
+- [ ] **Step 3: Implement the correction document builder and correction prompt variant.**
+- [ ] **Step 4: Run the lane and typecheck.**
+- [ ] **Step 5: Commit.** `api: add the Pattern writer correction document and prompt`
 
 ---
 
@@ -186,7 +215,7 @@ Add the interface, `createOpenAiPatternPublisher`, and `createSyntheticPatternPu
       pin: PatternPublisherPin;
     }
 
-- [ ] **Step 1: Write the failing interface and configuration tests.** Include the **Q3 regression test**: `checkSecureConfig` refuses `PATTERN_PUBLISHER=synthetic` outside development, so a `constrained_model` document authored by the stand-ins cannot exist in a reader-serving environment. Add the gateway refusals for the Pattern path — a half-configured pair is `publisher_not_configured`, never a fallback to the direct origin.
+- [ ] **Step 1: Write the failing interface and configuration tests.** Include the **Q3 regression test**: `checkSecureConfig` refuses `PATTERN_PUBLISHER=synthetic` outside development, so a `constrained_model` document authored by the stand-ins cannot exist in a reader-serving environment. Add the gateway refusals for the Pattern path — a half-configured pair is `publisher_not_configured`, never a fallback to the direct origin. Add the **§14.2 verifier-independence refusal**: `resolvePatternPublisherConfiguration` rejects a configuration where `OPENAI_PATTERN_VERIFIER_PROMPT_VERSION` equals `OPENAI_PATTERN_WRITER_PROMPT_VERSION`. Today the two differ only by the accident of two constants (`pattern-publisher.ts:25,31`); this makes the separation a checked relationship, so one model configuration cannot become sole author and judge without the deployment refusing.
 - [ ] **Step 2: Run and confirm failure.**
 - [ ] **Step 3: Implement both factories.** Comment the synthetic factory with the Q3 decision and its enforcement line.
 - [ ] **Step 4: Run the lane and typecheck.**
@@ -209,7 +238,7 @@ Four edit points, and nothing else in the file changes semantics:
 3. `:685` — `buildDeterministicWriterOutput(...)` becomes `publisherImpl.write(...)`. `validatePatternCandidate` at `:686` stays verbatim.
 4. `:717` — `evaluateSemanticVerdict(env, writer)` becomes `publisherImpl.verify(...)`.
 
-Then move `consumePatternProviderCallBudget` from stage entry to immediately before the fetch, so a delivery that never reaches the provider never spends a unit. Note this is **three** call sites, one per stage class (`:643`, `:670`, `:701`), not one — each moves independently and each must keep charging exactly once. Give artifact identity an attempt component, and compute every hash advanced into D1 over the bytes R2 actually committed — so a provider success followed by a failed D1 advance converges on the first response rather than a second one.
+Then move `consumePatternProviderCallBudget` from stage entry to immediately before the fetch, so a delivery that never reaches the provider never spends a unit. This is **conformance to §25.3** — "the reservation is atomic and consumed immediately before each provider call" — not an optimization; charge-at-stage-entry is the current deviation. Note it is **three** call sites, one per stage class (`:643`, `:670`, `:701`), not one — each moves independently and each must keep charging exactly once. §25.3 also fixes the failure semantics: failed, timed-out, and rejected responses still consume a unit, and retries are never refunded. Give artifact identity an attempt component, and compute every hash advanced into D1 over the bytes R2 actually committed — so a provider success followed by a failed D1 advance converges on the first response rather than a second one.
 
 - [ ] **Step 1: Write the failing rewiring tests.** An `openai` pin reaches the adapter instead of failing closed. A synthetic pin still produces the deterministic document in development. A delivery that fails eligibility or ontology recheck spends no budget. A provider success whose D1 advance fails, replayed, converges on the first artifact hash.
 - [ ] **Step 2: Run and confirm failure.**
@@ -247,6 +276,31 @@ Then move `consumePatternProviderCallBudget` from stage entry to immediately bef
 - [ ] **Step 3: Apply the constants.**
 - [ ] **Step 4: Run the Pattern lane and typecheck.**
 - [ ] **Step 5: Commit.** `api: adopt the resolved Pattern attempt and claim ceilings`
+
+### Task 8a: Bring the provider usage ledger into conformance with §25.3
+
+**Files:**
+
+- Create: `db/d1/0008_pattern_stage_class_usage.sql`
+- Modify: `db/d1/MIGRATIONS.json`
+- Modify: `apps/api/src/db/pattern-provider-usage.ts`
+- Modify: `apps/api/test/apply-migrations.ts`
+- Modify: `apps/api/test/helpers.ts`
+
+**Requires Q6 sign-off.** §25.3 requires the ledger to record used calls by stage class; `pattern_provider_daily_usage` has one undifferentiated `used_calls` column. Add bounded per-stage-class counters beside it. `used_calls` remains the total the shared ceiling is enforced against, so the ceiling semantics §25.3 also specifies are unchanged.
+
+Unlike M0's edit-in-place policy, `0007` is applied to production (ledger entry, commit `ff23d00`), so this is a forward-only `0008`. The table is empty in every environment today, which is why this lands now rather than after `internal`.
+
+- [ ] **Step 1: Write the failing ledger tests.** Each pass increments its own counter and the shared total. The shared ceiling is still enforced against the total. Existing rows — none in practice, but prove it — default to zero counters without violating the `CHECK (>= 0)` constraints.
+- [ ] **Step 2: Run and confirm failure.**
+- [ ] **Step 3: Write the migration and update the reservation helper.** Record the change in `MIGRATIONS.json` with its rationale. Add the table to the FK-ordered delete list in `test/helpers.ts` if it is not already there, or it will leak rows between suites.
+- [ ] **Step 4: Run the Pattern lane, the contract validator, and typecheck.**
+
+      npm exec -w @patternlike/api -- vitest run
+      npm run test:contracts
+      npm run typecheck -w @patternlike/api
+
+- [ ] **Step 5: Commit.** `db: record Pattern provider usage by stage class`
 
 ---
 
@@ -288,9 +342,10 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 ## Dependency and checkpoint map
 
     Task 1 (shared boundary) ─┬─> Task 4 (adapter) ──> Task 5 (interface) ──> Task 6 (rewire) ─┬─> Task 7 (provenance)
-    Task 2 (packet) ──────────┤                                                                └─> Task 8 (constants, needs Q1)
-    Task 3 (prompts) ─────────┘
-                                                              Task 6 + 7 + 8 ──> Task 9 (integration) ──> Task 10 (gate + runbook)
+    Task 2 (packet) ──────────┤                                                                ├─> Task 8  (constants, needs Q1)
+    Task 3 (prompts) ─────────┤                                                                └─> Task 8a (ledger 0008, needs Q6)
+    Task 3a (correction) ─────┘
+                                                        Task 6 + 7 + 8 + 8a ──> Task 9 (integration) ──> Task 10 (gate + runbook)
 
 **Checkpoints.**
 
@@ -300,4 +355,6 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 - After Task 6: an `openai` pin reaches a provider in test only; `PATTERN_AI_ROLLOUT` is still `off` everywhere.
 - After Task 10: the code is a rollout candidate. It is not deployed, no secret is set, and no rollout has moved.
 
-**Sign-off gates.** Q1 blocks Task 8. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. Both decisions are recorded above with their evidence; neither may be reversed silently during implementation.
+**Sign-off gates.** Q1 blocks Task 8. Q6 blocks Task 8a, and its two outcomes are a `0008` migration or a recorded amendment to §25.3 — not a silent third option. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. All decisions are recorded above with their evidence; none may be reversed silently during implementation.
+
+**A note on sourcing.** The adapter design's open questions cite the M7 design by section, and its summaries are not always the whole of what those sections say. Q2 was largely settled by §14.1 and carried an unmentioned enforceable requirement in §14.2; Q1's attempt count came with a correction-document protocol in §13.5; Q6 was a conformance gap against §25.3 rather than an open choice. Read `2026-08-14-ai-generated-pattern-design.md` at the cited section before implementing any task that leans on one, and treat `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` as normative above both design documents.
