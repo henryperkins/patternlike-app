@@ -68,6 +68,45 @@ Two parts of §25.3 must not be conflated. The **ceiling** is shared: "planner, 
 
 ---
 
+## AI Gateway integration
+
+Checked against `https://developers.cloudflare.com/ai-gateway/llms-full.txt` (fetched 2026-08-15). The gateway is optional and ships inert — `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` are `""` in both wrangler blocks — but when it is switched on it sits in the provider path for every Pattern pass, so its behavior is part of this plan's contract.
+
+### Verified against the source
+
+Everything the adapter already pins is confirmed, and two claims that read like guesses turn out to be exact:
+
+- **The URL.** "Replace `https://api.openai.com/v1` … with `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai`", and the Responses endpoint is documented as `…/openai/responses`. `responsesUrlFor` is right, and the design's warning that `…/openai/v1/responses` is a 404 — read by this adapter as `publisher_model_unavailable`, a terminal failure blaming the model for a mistyped URL — is a real trap, not a hypothetical one.
+- **`cf-aig-max-attempts`** is documented "Retry attempts (**max 5**)". The adapter's comment that a gateway retry turns one queue delivery into up to five provider calls the ledger counts as one is exactly the documented ceiling.
+- **`cf-aig-collect-log`** turns the entire log entry on or off. **`cf-aig-collect-log-payload`** affects payload storage only — token counts, model, provider, status code, cost, and duration are still logged — and **defaults to `true`**. The rollout doc's description of the two is accurate, and the default is why sending `collect-log: false` explicitly matters rather than relying on a dashboard state.
+- **`cf-aig-authorization`** authenticates the request *to the gateway*; the provider key rides its own header and the gateway forwards it. Matches `env.ts`. Operational detail for the runbook: the gateway token needs **`Run`** permission.
+
+### Zero Data Retention does not apply to this deployment
+
+Worth stating plainly because the dashboard exposes a **Zero Data Retention** toggle that sounds like exactly what a privacy-first app wants, and it does not cover Pattern traffic:
+
+> "This setting only applies to Unified Billing requests that use Cloudflare-managed credentials. **It does not apply to BYOK or other AI Gateway requests.**"
+
+This deployment is BYOK — `OPENAI_API_KEY` is ours and rides `Authorization` for the gateway to forward — so ZDR is unavailable on this path, and `cf-aig-zdr` is a Unified Billing header. The source is also explicit that "ZDR does not control AI Gateway logging": they are two separate controls. `cf-aig-collect-log: false` is therefore the *only* mechanism keeping prompts and responses out of gateway storage. Do not record ZDR as a mitigation anywhere, and do not let a future reviewer treat the toggle as covering this traffic.
+
+### Headers this adapter must never send
+
+Each of these is a documented feature that would quietly falsify something the Worker states. The Task 4 tests assert their **absence**, not just the presence of the three we pin.
+
+| Header | Why it is forbidden here |
+| --- | --- |
+| `cf-aig-metadata` | Documented as tagging requests "with user IDs or other identifiers", attached to the log entry. The design forbids user identity at the provider boundary outright; this is the most inviting way to violate it. |
+| `cf-aig-request-timeout` | Documented as triggering "fallbacks or a retry if a provider takes too long". That would manufacture a second provider call for one delivery, defeating `max-attempts: 1`. The Worker's per-pass `AbortController` is the single deadline authority. |
+| `cf-aig-retry-delay`, `cf-aig-backoff` | The retry triple that accompanies `max-attempts`. Harmless while attempts are 1, but their presence invites raising attempts. Omit all three-minus-one. |
+| `cf-aig-cache-ttl`, `cf-aig-cache-key` | Caching is refused via `skip-cache: true`; a TTL or custom key is a second, contradicting statement about caching. |
+
+### Two operational notes for the runbook
+
+- **`default` is a magic gateway id.** The source documents that using `default` as the gateway ID auto-creates a gateway on first request. `AI_GATEWAY_ID_PATTERN` accepts it, so an operator can bring a never-reviewed gateway into existence by typo-adjacent configuration. Per-request `collect-log: false` still protects the payloads, but the gateway's own settings would be nobody's decision. Name the gateway explicitly.
+- **Gateway spend limits are defense in depth, not the ledger.** Spend limit rules can cap spend per gateway, scoped by model, provider, or custom metadata. Useful as a backstop under the approved ceiling, but they cannot replace `pattern_provider_daily_usage` — §25.3 assigns the auditable record to the ledger — and the custom-metadata scoping is unavailable to us because `cf-aig-metadata` is forbidden above.
+
+---
+
 ## Global Constraints
 
 - The approved design is authoritative. Contract changes are out of scope: `contracts/m0` through `contracts/m6` stay byte-identical, and `contracts/m7` keeps its `schema_version`, every `$id`, every enum, and every required field. This plan expects **no** contract edit at all.
@@ -184,9 +223,9 @@ The load-bearing constraint is what the correction document must **not** contain
 
 The provider boundary for all three passes: headers, one `AbortController`, one fetch, hash-before-parse, the ordered post-200 gauntlet, typed failures. The gateway route is a required constructor parameter, never read from `env` here, exactly as `createOpenAiReadingPublisher` now takes it — a default would let a new call site route around the gateway by saying nothing.
 
-Send the same three `cf-aig-*` headers the reading adapter pins, for the same three reasons: `collect-log: false` because gateway logs store prompt and response verbatim, `max-attempts: 1` because a gateway retry makes one delivery into several calls the usage ledger counts as one, and `skip-cache: true` because a cache hit gives two Patterns one `provider_response_hash`.
+Send the same three `cf-aig-*` headers the reading adapter pins, for the same three reasons: `collect-log: false` because gateway logs store prompt and response verbatim and payload storage defaults to on, `max-attempts: 1` because a gateway retry makes one delivery into up to five calls the usage ledger counts as one, and `skip-cache: true` because a cache hit gives two Patterns one `provider_response_hash`. See the AI Gateway integration section for the verification of each against the Cloudflare source, and for the headers that must never be sent.
 
-- [ ] **Step 1: Write the failing adapter tests.** One fetch maximum per pass. Hash computed over the exact response bytes before parsing, then the bytes discarded. Failure mapping: timeout/network/429/retryable-5xx to `publisher_unavailable`, 401/403 to `publisher_auth_failed`, model-not-found to `publisher_model_unavailable`, refusal part to `publisher_refused`, malformed or incomplete output to `publisher_output_invalid`. No provider text, header, URL, or exception message reaches a returned detail or a log. Assert the three `cf-aig-*` headers are present with a route and absent without one.
+- [ ] **Step 1: Write the failing adapter tests.** One fetch maximum per pass. Hash computed over the exact response bytes before parsing, then the bytes discarded. Failure mapping: timeout/network/429/retryable-5xx to `publisher_unavailable`, 401/403 to `publisher_auth_failed`, model-not-found to `publisher_model_unavailable`, refusal part to `publisher_refused`, malformed or incomplete output to `publisher_output_invalid`. No provider text, header, URL, or exception message reaches a returned detail or a log. Assert the three `cf-aig-*` headers are present with a route and absent without one. Assert the **forbidden headers are absent on every request, with and without a route**: `cf-aig-metadata`, `cf-aig-request-timeout`, `cf-aig-retry-delay`, `cf-aig-backoff`, `cf-aig-cache-ttl`, and `cf-aig-cache-key`. Write this as an allowlist assertion over the outgoing header names rather than six negative checks, so a header added later fails the test by default. Assert the gateway URL is `…/openai/responses` and never `…/openai/v1/responses`.
 - [ ] **Step 2: Run and confirm failure.**
 - [ ] **Step 3: Implement the three pass methods.**
 - [ ] **Step 4: Extend the hermetic mock.** `mock-calc-service.ts` already routes `AI_GATEWAY_HOST`; add the Pattern pass scenarios keyed by request id or scenario header. Unknown hosts keep failing closed.
@@ -334,6 +373,8 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 
   Expected: all exit 0, and `contracts/m7` proven byte-identical — this plan expects no contract edit.
 - [ ] **Step 2: Write the rollout runbook.** Transcribe the design's ten ordered gates, each with its evidence requirement and stop condition, and an empty ledger table. Carry the design's worst-case spend requirement verbatim: 14 provider attempts per Pattern × pinned token bounds × current model rates × maximum new Patterns per UTC day, against `PATTERN_DAILY_PROVIDER_CALL_LIMIT`, approved in writing before any non-`off` rollout.
+
+  Include an AI Gateway subsection covering: that the pair is optional and empty is the shipped state; that the gateway token needs `Run` permission; that the gateway must be named explicitly rather than left as `default`, which auto-creates one; that gateway spend limits may be set as a backstop but never as a substitute for the §25.3 ledger; and — stated as a consequence to accept before enabling — that **Zero Data Retention does not apply to this BYOK path**, that ZDR and logging are separate controls, and that `cf-aig-collect-log: false` is consequently the only thing keeping prompts and readings out of gateway storage. The per-request log view being empty for Pattern traffic is the designed outcome, not an incident.
 - [ ] **Step 3: Record the invariants that span files in `CLAUDE.md`.** The four edit points, the derived-not-copied schema rule, the structural minimization guarantee, and the Q1/Q3 decisions with their enforcement lines.
 - [ ] **Step 4: Commit.** `docs: add the Pattern adapter rollout runbook and invariants`
 
