@@ -34,12 +34,14 @@ Read these before anything else:
 
 ## Where M7 actually stands
 
-Verified by inspection of the tree on 2026-08-15. Seven of the ten §31
-workstreams are complete: contracts and shared types (31.1), migration,
-deletion, export and crypto registration (31.2), consent and claim reservation
-(31.3), ontology ingestion and runtime reader (31.4), deterministic selection
-and planning (31.5), web experience (31.7), and correction, cleanup, recall and
-reconciliation (31.8).
+Verified by inspection of the tree on 2026-08-15. **Six of the ten §31
+workstreams are complete**, and a seventh is complete except on one item:
+contracts and shared types (31.1), migration, deletion, export and crypto
+registration (31.2), consent and claim reservation (31.3), ontology ingestion
+and runtime reader (31.4), deterministic selection and planning (31.5), and web
+experience (31.7) are done. Correction, cleanup, recall and reconciliation
+(31.8) is substantially built but **remains open** on the disaster-recovery
+replay ledger — see below, and do not read it as finished.
 
 Concretely: `contracts/m7` validates with 23 schemas, `0007` is applied to
 production, `packages/pattern-engine` is complete, all three public stages plus
@@ -91,6 +93,16 @@ end to end. Treat the authoring itself as editorial work with a review gate, not
 as a code task; the scoping question is what the minimum viable record set is,
 who authors it, how it is reviewed, and how it is signed and ingested.
 
+**Settle whether a hand-authored ontology may serve production, or only tests.**
+§31.4 permits manually supplied fixtures for ingestion, but the upstream design
+expects machine-generated and machine-authorized records, which is what Slice B
+builds. A hand-authored release that unblocks an end-to-end path in development
+is not automatically permitted to be the *active* release a real reader's
+Pattern is generated against. Get that answered before scoping the authoring
+effort: the answer decides whether Slice A is a test fixture or a production
+artifact with a signing and review chain, and those are different pieces of
+work.
+
 Read §23 (Interpretation ontology) in full before scoping this.
 
 ### Slice B — The automated ontology pipeline (§31.10)
@@ -132,6 +144,14 @@ What exists instead is a single shared static `PATTERN_ADMIN_TOKEN` compared
 in-route. Acceptance criterion 18 requires inspection to be "role-separated"; a
 shared token is not role separation.
 
+**Adding the identity flow is not enough — the token must go.** If OIDC or
+Access lands while the in-route token is still accepted, the endpoint retains a
+shared-secret path and criterion 18 is still unmet, with the added hazard that
+the surviving path is the one nobody is watching. Scope the removal explicitly:
+delete the `PATTERN_ADMIN_TOKEN` comparison, fail closed when the identity flow
+is unavailable rather than falling back, revoke the deployed secret, and add
+rejection coverage proving the old token cannot authorize a request.
+
 **Open question you must surface rather than assume.** §24.1 names two sanctioned
 ways to assign the role: a separate administrator identity provider **or a
 Cloudflare Access policy**. The operator has declined Cloudflare Access *for the
@@ -147,9 +167,14 @@ the path is acceptable and the gap is authentication, not routing.
 ### Slice D — Evidence gates that are runs, not commits
 
 - Criterion 23: a disaster-recovery restore drill proving pre-deletion snapshots
-  cannot resurrect Pattern content or reset a consumed claim. §31.8 mentions
+  cannot resurrect Pattern content or reset a consumed claim. **The §29.11
+  replay ledger this depends on does not exist in the tree**, and a drill cannot
+  be scheduled against absent runtime support — it would prove nothing. Treat
+  the ledger as a blocking dependency of this criterion with its own acceptance
+  criteria and a forward-only migration, and scope it before the drill rather
+  than discovering the gap during one. §31.8 anticipates exactly this:
   "privacy-erasure replay support for disaster recovery when the repository does
-  not already provide it" — establish whether any support exists before scoping.
+  not already provide it".
 - Criterion 20: all hard evaluation and privacy gates pass with zero exceptions.
 - Criterion 22: production migration, deploy, ontology activation, rollout and
   real-account certification, each separately reported.
@@ -183,7 +208,7 @@ From the adapter plan and from the operator, all recorded with their evidence:
   error does not replace that error with a cache misconfiguration.
 - **The live reading credential cutover is a versioned operation.** Task 5a
   first deploys `OPENAI_CREDENTIAL_SOURCE=worker` byte-identically. A later
-  Worker version must make gateway ids, stored-key alias and
+  Worker version must make gateway IDs, stored-key alias and
   `AI_GATEWAY_TOKEN` present while making `OPENAI_API_KEY` absent, without
   serving either invalid intermediate combination.
 - **Q1** writer attempts move to 3 with the command type widened to `2 | 3`.
