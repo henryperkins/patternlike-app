@@ -174,6 +174,48 @@ unset is refused), and Gate 7 exercises it live at the moment the rollout leaves
 Separately configure and deploy the production Queue consumer at
 `max_concurrency = 4`.
 
+### Optional — route through Cloudflare AI Gateway
+
+Off by default. `AI_GATEWAY_ACCOUNT_ID` and `AI_GATEWAY_ID` ship empty in both
+`wrangler.toml` blocks, and empty means the adapter calls `api.openai.com`
+directly, which is the launch decision the M5 design recorded and platform spec
+v0.5 §16.3 left open. Filling both in is the entire switch: the frozen publisher
+pin does not name a route, so commands frozen before and after describe the same
+prose, and nothing about the request body, the model, or the response parsing
+changes.
+
+```powershell
+# Both, or neither. One without the other is 503 configuration_error on every
+# path — deliberately, because falling back to direct calls would look like a
+# working deployment with an empty gateway dashboard.
+#   AI_GATEWAY_ACCOUNT_ID = "<32 lowercase hex>"   # wrangler whoami
+#   AI_GATEWAY_ID         = "<gateway id>"
+# Only if the gateway has Authenticated Gateway on:
+wrangler secret put AI_GATEWAY_TOKEN --config apps/api/wrangler.toml --env production
+```
+
+`AI_GATEWAY_TOKEN` is the `cf-aig-authorization` credential, not a provider key —
+the OpenAI key still rides `Authorization` for the gateway to forward. Setting it
+without the two ids is a misconfiguration, not a no-op, and is refused.
+
+What the adapter pins per request, overriding whatever the gateway dashboard
+says, because request-level `cf-aig-*` headers win:
+
+| Header | Value | Why it is not left to the dashboard |
+| --- | --- | --- |
+| `cf-aig-collect-log` | `false` | Gateway logs store the prompt and the response verbatim. Platform spec v0.2 §10 disables logging for private synthesis; the prompt is the reader's decrypted context and the response is their reading. |
+| `cf-aig-max-attempts` | `1` | A gateway retry makes one queue delivery up to five provider calls that `reading_provider_daily_usage` counts as one — the ledger the approved ceiling above is computed from. |
+| `cf-aig-skip-cache` | `true` | A cache hit would give two readings one `provider_request_id` and one `provider_response_hash`, which is stored evidence for a generation that did not happen. |
+
+**Consequence to accept before enabling:** with logging off, the gateway's
+per-request log view is empty for reading traffic. Rate limiting, spend limits,
+fallbacks, and DLP still apply; per-request prompt/response inspection does not.
+`safeLog` and `ProviderMetadata` remain the record, as the spec assigns. If you
+want metadata-only gateway logs instead — token counts, cost, latency, no
+payloads — that is `cf-aig-collect-log-payload: false` in place of
+`cf-aig-collect-log` in `openai-reading-publisher.ts`, and it is a privacy
+decision that belongs to whoever owns the spec sentence, not to the adapter.
+
 **Stop condition:** a preflight failure, or an unapproved ceiling.
 
 ---

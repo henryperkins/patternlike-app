@@ -45,8 +45,114 @@ export const READING_PREGEN_LEAD_MINUTES = 30;
 export const READING_PREGEN_SPREAD_MINUTES = 45;
 export const READING_SCHEDULER_BATCH_LIMIT = 100;
 
-/** The provider endpoint. Direct, with no gateway between. */
+/** The provider endpoint, used when no AI Gateway is configured. */
 export const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+
+/**
+ * The AI Gateway origin, when `AI_GATEWAY_ACCOUNT_ID` and `AI_GATEWAY_ID` name
+ * a gateway to route through.
+ *
+ * Provider-native, not the unified `/compat/chat/completions` endpoint and not
+ * the `api.cloudflare.com` REST API. Both of those speak Chat Completions, and
+ * this adapter reads the Responses envelope — `output` items, refusal parts,
+ * `incomplete_details`. A reshaped response would not fail loudly: it would
+ * turn every publish into `missing_output_text`.
+ *
+ * The route is deliberately NOT part of `PublisherConfigPin`. A proxy in front
+ * of the same Responses API with the same model, prompt version, and ceilings
+ * describes the same prose, so a command frozen before the gateway existed is
+ * still honestly described after it.
+ */
+export const AI_GATEWAY_ORIGIN = "https://gateway.ai.cloudflare.com";
+
+/**
+ * A resolved gateway route.
+ *
+ * `token` is the `cf-aig-authorization` credential, needed only while the
+ * gateway has Authenticated Gateway switched on. It is not the provider key:
+ * the OpenAI key still rides `Authorization`, which the gateway forwards.
+ */
+export interface AiGatewayRoute {
+  accountId: string;
+  gatewayId: string;
+  token: string | null;
+}
+
+export type AiGatewayOutcome =
+  | { ok: true; route: AiGatewayRoute | null }
+  | { ok: false; message: string };
+
+/** 32 lowercase hex characters, which is what a Cloudflare account id is. */
+const AI_GATEWAY_ACCOUNT_ID_PATTERN = /^[0-9a-f]{32}$/;
+/** One path segment, and unambiguously one: no dot, no slash, no escape. */
+const AI_GATEWAY_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/**
+ * Resolve the gateway route, or its absence.
+ *
+ * Shape is checked rather than trusted because both values are interpolated
+ * into a URL path. Refusing a malformed id here is what keeps `responsesUrlFor`
+ * total: it can only ever return the direct endpoint or a well-formed gateway
+ * one, never a URL assembled from whatever a var happened to contain.
+ *
+ * Half-configured is an error rather than a fallback. An operator who set one
+ * of the two ids meant to route through a gateway, and silently continuing to
+ * bill and log against the provider directly is the opposite of what they
+ * asked for — it would look like a working deployment with an empty dashboard.
+ */
+export function resolveAiGatewayRoute(env: Partial<Env>): AiGatewayOutcome {
+  const accountId = env.AI_GATEWAY_ACCOUNT_ID?.trim() ?? "";
+  const gatewayId = env.AI_GATEWAY_ID?.trim() ?? "";
+  const token = env.AI_GATEWAY_TOKEN?.trim() ?? "";
+
+  if (accountId === "" && gatewayId === "") {
+    if (token !== "") {
+      return {
+        ok: false,
+        message:
+          "AI_GATEWAY_TOKEN is set without AI_GATEWAY_ACCOUNT_ID and AI_GATEWAY_ID",
+      };
+    }
+    return { ok: true, route: null };
+  }
+  if (accountId === "" || gatewayId === "") {
+    return {
+      ok: false,
+      message: "AI_GATEWAY_ACCOUNT_ID and AI_GATEWAY_ID must be set together",
+    };
+  }
+  if (!AI_GATEWAY_ACCOUNT_ID_PATTERN.test(accountId)) {
+    return {
+      ok: false,
+      message: "AI_GATEWAY_ACCOUNT_ID must be 32 lowercase hexadecimal characters",
+    };
+  }
+  if (!AI_GATEWAY_ID_PATTERN.test(gatewayId)) {
+    return {
+      ok: false,
+      message:
+        "AI_GATEWAY_ID must be one path segment of lowercase letters, digits, - or _",
+    };
+  }
+  return {
+    ok: true,
+    route: { accountId, gatewayId, token: token === "" ? null : token },
+  };
+}
+
+/**
+ * The Responses endpoint for a route, or the direct one for `null`.
+ *
+ * Note the path. AI Gateway's base URL replaces `https://api.openai.com/v1`
+ * whole, so the Responses endpoint is `…/openai/responses`. `…/openai/v1/
+ * responses` is a 404, and a 404 is the one status this adapter reads as
+ * `publisher_model_unavailable` — a terminal failure blaming the model for a
+ * mistyped URL.
+ */
+export function responsesUrlFor(route: AiGatewayRoute | null): string {
+  if (route === null) return OPENAI_RESPONSES_URL;
+  return `${AI_GATEWAY_ORIGIN}/v1/${route.accountId}/${route.gatewayId}/openai/responses`;
+}
 
 /**
  * The deployed prompt contract. Bump for ANY wording change.
@@ -238,6 +344,14 @@ export function resolvePublisherConfiguration(
     const problem = checkPinnedInteger(raw, expected, key);
     if (problem) return misconfigured(problem);
   }
+
+  // Checked with the pinned values rather than with the required ones: the
+  // gateway is optional in every mode, so there is nothing to demand — but a
+  // value that IS present and malformed must fail here, where the answer is a
+  // 503 on the next request, rather than at the fetch, where it is a reading
+  // that failed for a reason no failure class describes.
+  const gateway = resolveAiGatewayRoute(env);
+  if (!gateway.ok) return misconfigured(gateway.message);
 
   const publisher = env.READING_PUBLISHER?.trim();
   if (publisher !== undefined && publisher !== "" && publisher !== READING_PUBLISHER_PROVIDER) {

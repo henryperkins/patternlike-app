@@ -103,6 +103,25 @@ export interface Env {
   /** Secret. Never a var, and never written to wrangler.toml. */
   OPENAI_API_KEY?: string;
 
+  /**
+   * Cloudflare AI Gateway, in front of the provider. Optional: absent means the
+   * adapter calls api.openai.com with nothing in between.
+   *
+   * Both ids or neither. One without the other is refused by checkSecureConfig
+   * rather than quietly falling back to the direct endpoint, which would look
+   * like a working deployment with an empty gateway dashboard. Both are
+   * interpolated into a URL path, so both are shape-checked.
+   */
+  AI_GATEWAY_ACCOUNT_ID?: string;
+  AI_GATEWAY_ID?: string;
+  /**
+   * Secret. The `cf-aig-authorization` credential, needed only while the
+   * gateway has Authenticated Gateway on — not the provider key, which still
+   * rides `Authorization` for the gateway to forward. Set without the two ids
+   * it is a misconfiguration, not a no-op.
+   */
+  AI_GATEWAY_TOKEN?: string;
+
   // -------------------------------------------------------------------------
   // M7 AI-generated Pattern
   // -------------------------------------------------------------------------

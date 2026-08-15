@@ -435,6 +435,19 @@ async function mockDailySky(request: Request): Promise<Response> {
 export const OPENAI_HOST = "api.openai.com";
 
 /**
+ * The AI Gateway host, reached instead when a route is configured.
+ *
+ * Given its own seam rather than folded into the provider one so that the
+ * gateway path is asserted rather than assumed. The route regex below is exact
+ * for the same reason: AI Gateway's base URL replaces `api.openai.com/v1`
+ * whole, so `/openai/responses` is right and `/openai/v1/responses` is a 404
+ * that the adapter would report as `publisher_model_unavailable`.
+ */
+export const AI_GATEWAY_HOST = "gateway.ai.cloudflare.com";
+const AI_GATEWAY_RESPONSES_PATH =
+  /^\/v1\/[0-9a-f]{32}\/[a-z0-9][a-z0-9_-]{0,63}\/openai\/responses$/;
+
+/**
  * Sentinel model ids that drive `POST /v1/responses` failure paths.
  *
  * The MODEL rather than a header, because the model is the one field the
@@ -672,6 +685,16 @@ export async function mockCalcService(request: Request): Promise<Response> {
     }
     return json(
       { error: { message: `no OpenAI seam for ${request.method} ${url.pathname}` } },
+      404,
+    );
+  }
+
+  if (url.hostname === AI_GATEWAY_HOST) {
+    if (AI_GATEWAY_RESPONSES_PATH.test(url.pathname) && request.method === "POST") {
+      return mockOpenAiResponses(request);
+    }
+    return json(
+      { error: { message: `no AI Gateway seam for ${request.method} ${url.pathname}` } },
       404,
     );
   }

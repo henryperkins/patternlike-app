@@ -24,6 +24,7 @@ import {
   OPENAI_READING_MAX_OUTPUT_TOKENS,
   OPENAI_READING_MODEL,
   READING_CONTEXT_MAX_BYTES,
+  type AiGatewayRoute,
   type PublisherConfigPin,
 } from "./reading-publisher.js";
 
@@ -102,7 +103,7 @@ function request(): ReadingGenerationRequest {
 }
 
 function publisher(apiKey = "sk-test-key") {
-  return createOpenAiReadingPublisher({ ...env, OPENAI_API_KEY: apiKey });
+  return createOpenAiReadingPublisher({ ...env, OPENAI_API_KEY: apiKey }, null);
 }
 
 async function publish(model: string, timeoutMs = 5_000) {
@@ -161,7 +162,7 @@ describe("OpenAI reading publisher", () => {
       return originalFetch(...args);
     }) as typeof fetch;
     try {
-      await createOpenAiReadingPublisher(counting).publish(request(), {
+      await createOpenAiReadingPublisher(counting, null).publish(request(), {
         requestId: "req_test_0002",
         timeoutMs: 5_000,
         configuration: pin(OPENAI_MOCK_SERVER_ERROR),
@@ -331,5 +332,122 @@ describe("OpenAI reading publisher", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.candidate.local_date).toBe("2999-01-01");
+  });
+});
+
+/**
+ * The AI Gateway route.
+ *
+ * Asserted on the wire rather than on the resolver, because every hazard here
+ * is a header or a path that only exists at the fetch: a wrong path segment, a
+ * missing privacy header, a gateway credential sent where the provider key
+ * belongs. The mock's gateway seam matches the exact route and 404s anything
+ * else, so a successful publish IS the proof that the URL is right.
+ */
+describe("OpenAI reading publisher through AI Gateway", () => {
+  const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
+
+  async function capture(route: AiGatewayRoute | null) {
+    const calls: Array<{ url: string; headers: Headers }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: typeof input === "string" ? input : String(input),
+        headers: new Headers(init?.headers),
+      });
+      return originalFetch(input as RequestInfo, init);
+    }) as typeof fetch;
+    try {
+      const result = await createOpenAiReadingPublisher(
+        { ...env, OPENAI_API_KEY: "sk-test-key" },
+        route,
+      ).publish(request(), {
+        requestId: "req_test_gateway",
+        timeoutMs: 5_000,
+        configuration: pin(OPENAI_READING_MODEL),
+      });
+      return { result, calls };
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  it("publishes through the gateway route rather than the provider host", async () => {
+    const { result, calls } = await capture({
+      accountId: ACCOUNT_ID,
+      gatewayId: "patternlike",
+      token: null,
+    });
+    // The mock 404s every path but the exact one, and the adapter reports a 404
+    // as a missing model. A pass here means the route is byte-for-byte right.
+    expect(result.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe(
+      `https://gateway.ai.cloudflare.com/v1/${ACCOUNT_ID}/patternlike/openai/responses`,
+    );
+  });
+
+  it("disables gateway logging on every request", async () => {
+    // Platform spec v0.2 §10. Gateway logs store the prompt and the response
+    // verbatim, which here is the reader's private context and their reading,
+    // persisted outside this Worker's encryption boundary. The gateway-level
+    // setting is not trusted: this header overrides it per request.
+    const { calls } = await capture({
+      accountId: ACCOUNT_ID,
+      gatewayId: "patternlike",
+      token: null,
+    });
+    expect(calls[0]!.headers.get("cf-aig-collect-log")).toBe("false");
+  });
+
+  it("pins one attempt and no cache, whatever the gateway settings say", async () => {
+    const { calls } = await capture({
+      accountId: ACCOUNT_ID,
+      gatewayId: "patternlike",
+      token: null,
+    });
+    // A gateway retry would make one queue delivery up to five provider calls
+    // that the daily usage ledger counts as one.
+    expect(calls[0]!.headers.get("cf-aig-max-attempts")).toBe("1");
+    // A cache hit would give two readings one provider_request_id and one
+    // provider_response_hash — evidence for a generation that did not happen.
+    expect(calls[0]!.headers.get("cf-aig-skip-cache")).toBe("true");
+  });
+
+  it("sends the gateway credential and the provider key on separate headers", async () => {
+    const { result, calls } = await capture({
+      accountId: ACCOUNT_ID,
+      gatewayId: "patternlike",
+      token: "cf-aig-test-token",
+    });
+    expect(result.ok).toBe(true);
+    // The provider key still rides Authorization for the gateway to forward.
+    // Swapping the two would authenticate to Cloudflare and reach OpenAI with a
+    // Cloudflare token, which is a 401 blamed on the wrong system.
+    expect(calls[0]!.headers.get("authorization")).toBe("Bearer sk-test-key");
+    expect(calls[0]!.headers.get("cf-aig-authorization")).toBe("Bearer cf-aig-test-token");
+  });
+
+  it("omits the gateway credential when the gateway is unauthenticated", async () => {
+    const { calls } = await capture({
+      accountId: ACCOUNT_ID,
+      gatewayId: "patternlike",
+      token: null,
+    });
+    expect(calls[0]!.headers.get("cf-aig-authorization")).toBeNull();
+  });
+
+  it("sends no gateway header at all on the direct route", async () => {
+    const { result, calls } = await capture(null);
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.url).toBe("https://api.openai.com/v1/responses");
+    for (const header of [
+      "cf-aig-authorization",
+      "cf-aig-collect-log",
+      "cf-aig-max-attempts",
+      "cf-aig-skip-cache",
+    ]) {
+      expect(calls[0]!.headers.get(header), header).toBeNull();
+    }
   });
 });

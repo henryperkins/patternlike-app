@@ -19,13 +19,15 @@
 
 import { contentHash, type ReadingGenerationOutput } from "@patternlike/shared";
 import type { Env } from "../env.js";
-import { buildResponsesRequest, OPENAI_RESPONSES_URL } from "./reading-prompt.js";
+import { buildResponsesRequest } from "./reading-prompt.js";
 import {
   readOpenAiIncompleteReason,
   readOpenAiResponseUsage,
 } from "./openai-responses-envelope.js";
 import {
   READING_PUBLISHER_PROVIDER,
+  responsesUrlFor,
+  type AiGatewayRoute,
   type PublishOptions,
   type PublisherFailureCode,
   type PublisherResult,
@@ -116,9 +118,19 @@ const REQUIRED_CANDIDATE_KEYS = [
   "uncertainty_note",
 ] as const;
 
+/**
+ * @param route The resolved AI Gateway route, or `null` for the direct
+ * endpoint. Required rather than defaulted, and resolved by the caller rather
+ * than read from `env` here: whether a deployment proxies its provider traffic
+ * is a configuration decision, and this adapter decides nothing. A default
+ * would also mean a new call site could route around the gateway — and the
+ * spend and log records it exists to produce — by saying nothing at all.
+ */
 export function createOpenAiReadingPublisher(
   env: Pick<Env, "OPENAI_API_KEY">,
+  route: AiGatewayRoute | null,
 ): ReadingPublisher {
+  const url = responsesUrlFor(route);
   return {
     async publish(
       request: ReadingGenerationRequest,
@@ -132,18 +144,53 @@ export function createOpenAiReadingPublisher(
         return failure("publisher_auth_failed", "authentication_failed");
       }
 
+      const headers: Record<string, string> = {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      };
+      if (route) {
+        // Platform spec v0.2 §10: "AI Gateway logging is disabled for private
+        // synthesis requests. The application records only provider/model ID,
+        // latency, token counts, route version, validation result, and response
+        // hash." The registry's llm_boundary says the same. Gateway logs are ON
+        // by default and store the prompt and the model response verbatim —
+        // which here is the reader's private context going in and their reading
+        // coming out, persisted outside this Worker's encryption boundary.
+        //
+        // `collect-log`, not `collect-log-payload`: the latter keeps a
+        // metadata-only entry, and the spec assigns that recording to the
+        // application, which safeLog and ProviderMetadata already do. Turning
+        // the whole entry off is what the sentence says, and it is the side to
+        // err on — the gateway dashboard showing nothing is recoverable, a
+        // stored reading is not.
+        headers["cf-aig-collect-log"] = "false";
+        // Request-level headers beat gateway settings, and that is the whole
+        // point of sending all of these: they are dashboard toggles that
+        // someone can turn on later, and each would quietly falsify something
+        // this Worker states.
+        //
+        // A gateway retry turns one queue delivery into up to five provider
+        // calls that reading_provider_daily_usage counts as one, which is the
+        // ledger the approved daily ceiling is computed from.
+        headers["cf-aig-max-attempts"] = "1";
+        // A cache hit gives two readings the same provider_request_id and the
+        // same provider_response_hash — stored evidence naming a generation
+        // that did not happen. It costs nothing to refuse: the packet carries
+        // this reader's facts and this local date, so an exact-match hit
+        // between two real readings is not a case that arises.
+        headers["cf-aig-skip-cache"] = "true";
+        if (route.token) headers["cf-aig-authorization"] = `Bearer ${route.token}`;
+      }
+
       const controller = new AbortController();
       const deadline = setTimeout(() => controller.abort(), options.timeoutMs);
 
       let response: Response;
       try {
-        response = await fetch(OPENAI_RESPONSES_URL, {
+        response = await fetch(url, {
           method: "POST",
           signal: controller.signal,
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            "content-type": "application/json",
-          },
+          headers,
           body: JSON.stringify(buildResponsesRequest(request, options.configuration)),
         });
       } catch (err) {

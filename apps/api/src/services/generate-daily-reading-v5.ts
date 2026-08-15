@@ -62,6 +62,7 @@ import {
   OPENAI_READING_REASONING,
   OPENAI_READING_TIMEOUT_MS,
   READING_CONTEXT_MAX_BYTES,
+  resolveAiGatewayRoute,
 } from "./reading-publisher.js";
 import { READING_PROMPT_VERSION } from "./reading-prompt.js";
 import { safeLog } from "./safe-log.js";
@@ -611,13 +612,22 @@ export async function generateDailyReadingV5(
   if (limit === null) {
     return fail("publisher_not_configured", "publisher_not_configured");
   }
+  // Before the budget is spent, not after: a half-configured gateway is the
+  // same class of problem as a missing call ceiling, and neither should consume
+  // a slot from the day's approved allowance to discover itself. checkSecureConfig
+  // has already refused this deployment on the HTTP path and in queue(), so
+  // reaching here at all means an operator changed a var mid-flight.
+  const gateway = resolveAiGatewayRoute(env);
+  if (!gateway.ok) {
+    return fail("publisher_not_configured", "publisher_not_configured");
+  }
   const budget = await consumeProviderCallBudget(env, utcDateFor(new Date()), limit);
   if (!budget.ok) {
     return fail("publisher_budget_exhausted", "provider_budget_exhausted");
   }
 
   const providerStartedAt = Date.now();
-  const publisher = await createOpenAiReadingPublisher(env).publish(prepared.request, {
+  const publisher = await createOpenAiReadingPublisher(env, gateway.route).publish(prepared.request, {
     requestId: newId("req"),
     timeoutMs: OPENAI_READING_TIMEOUT_MS,
     configuration: command.publisher,

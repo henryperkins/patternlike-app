@@ -129,6 +129,15 @@ OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
 #
 # The local canary sets this to `internal` in .dev.vars alongside a real key.
 READING_V5_ROLLOUT = "off"
+# Cloudflare AI Gateway, in front of the provider. Empty means direct calls to
+# api.openai.com, which is what the vitest pool reading this block gets.
+#
+# Both or neither: checkSecureConfig refuses one without the other rather than
+# silently calling the provider directly, which would look like a working
+# deployment with an empty gateway dashboard. AI_GATEWAY_TOKEN is a secret and
+# is set only when the gateway has Authenticated Gateway on.
+AI_GATEWAY_ACCOUNT_ID = ""
+AI_GATEWAY_ID = ""
 CHECK_IN_RETENTION_MONTHS = "13"
 TIME_TRAVEL_RECEIPT_EPOCH = "1"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
@@ -234,6 +243,18 @@ AUTH_STUB = "0"
 # all of them are set, which is the intended failure: half-configured generation
 # would reach a provider with values no frozen command described.
 READING_V5_ROLLOUT = "first_open"
+# Cloudflare AI Gateway. Empty is the shipped state: the M5 design recorded
+# direct provider calls as the launch decision and a gateway as an open one
+# (platform spec v0.5 §16.3). Filling both in is the whole switch — the frozen
+# publisher pin does not name a route, so commands frozen before and after
+# describe the same prose.
+#
+# The adapter sends `cf-aig-collect-log: false` on every gateway request,
+# because gateway logs store the prompt and the response verbatim and platform
+# spec v0.2 §10 disables logging for private synthesis. Turning logs on at the
+# gateway level does NOT override that; the request header wins, by design.
+AI_GATEWAY_ACCOUNT_ID = ""
+AI_GATEWAY_ID = ""
 CHECK_IN_RETENTION_MONTHS = "13"
 TIME_TRAVEL_RECEIPT_EPOCH = "1"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"

@@ -13,6 +13,7 @@ import {
   OPENAI_READING_MAX_OUTPUT_TOKENS,
   OPENAI_READING_MODEL,
   READING_CONTEXT_MAX_BYTES,
+  responsesUrlFor,
   type PublisherConfigPin,
 } from "./reading-publisher.js";
 
@@ -91,8 +92,22 @@ describe("provider request body", () => {
     expect(READING_PROMPT_VERSION).toBe("1.0.1");
   });
 
-  it("targets the Responses endpoint directly, with no gateway in between", () => {
+  it("targets the Responses endpoint directly when no gateway is configured", () => {
     expect(OPENAI_RESPONSES_URL).toBe("https://api.openai.com/v1/responses");
+    expect(responsesUrlFor(null)).toBe(OPENAI_RESPONSES_URL);
+  });
+
+  it("targets the AI Gateway Responses endpoint when a route is configured", () => {
+    // AI Gateway's base URL replaces `https://api.openai.com/v1` whole. The
+    // `/v1/` that survives is the gateway's own, not OpenAI's — writing
+    // `/openai/v1/responses` here would 404, and the adapter reads a 404 as a
+    // missing model, so the mistake would present as a terminal
+    // `publisher_model_unavailable` on every reading.
+    expect(
+      responsesUrlFor({ accountId: "a".repeat(32), gatewayId: "patternlike", token: null }),
+    ).toBe(
+      `https://gateway.ai.cloudflare.com/v1/${"a".repeat(32)}/patternlike/openai/responses`,
+    );
   });
 
   it("pins the model, reasoning, verbosity, and output ceiling from the frozen pin", () => {

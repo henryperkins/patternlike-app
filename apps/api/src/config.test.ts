@@ -3,6 +3,7 @@ import { checkSecureConfig } from "./middleware/config-guard.js";
 import { DEV_ROOT_KEK, resolveRootKey, isDevEnvironment } from "./crypto.js";
 import {
   OPENAI_READING_MODEL,
+  resolveAiGatewayRoute,
   resolvePublisherConfiguration,
 } from "./services/reading-publisher.js";
 
@@ -327,6 +328,109 @@ describe("publisher configuration", () => {
       ENVIRONMENT: "development",
       AUTH_STUB: "1",
       READING_V5_ROLLOUT: "internal",
+    });
+    expect(failure?.code).toBe("reading_publisher_misconfigured");
+  });
+});
+
+/**
+ * The AI Gateway route.
+ *
+ * Optional in every mode, which is exactly why it is validated in every mode: a
+ * value that is present and wrong must fail on the next request rather than at
+ * the fetch, where the reading fails for a reason no failure class describes.
+ * Both ids reach a URL path, so both are shape-checked rather than trusted.
+ */
+describe("AI Gateway configuration", () => {
+  const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
+  const base = {
+    ENVIRONMENT: "production",
+    ROOT_KEK: STRONG_KEK,
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+    READING_V5_ROLLOUT: "off",
+    CHECK_IN_RETENTION_MONTHS: "13",
+    TIME_TRAVEL_RECEIPT_EPOCH: "1",
+    TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+  };
+
+  it("treats an absent gateway as the direct route", () => {
+    expect(checkSecureConfig(base)).toBeNull();
+    const resolved = resolveAiGatewayRoute(base);
+    expect(resolved.ok && resolved.route).toBeNull();
+  });
+
+  it("treats empty strings as absent, so the shipped wrangler block is valid", () => {
+    const resolved = resolveAiGatewayRoute({
+      ...base,
+      AI_GATEWAY_ACCOUNT_ID: "",
+      AI_GATEWAY_ID: "",
+    });
+    expect(resolved.ok && resolved.route).toBeNull();
+  });
+
+  it("resolves a complete route", () => {
+    const resolved = resolveAiGatewayRoute({
+      ...base,
+      AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID,
+      AI_GATEWAY_ID: "patternlike",
+      AI_GATEWAY_TOKEN: "cf-aig-token",
+    });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(resolved.route).toEqual({
+      accountId: ACCOUNT_ID,
+      gatewayId: "patternlike",
+      token: "cf-aig-token",
+    });
+  });
+
+  it("refuses one id without the other rather than falling back to direct", () => {
+    // The fallback is the dangerous branch: an operator who set one of the two
+    // meant to route through a gateway, and a deployment that quietly kept
+    // calling the provider directly looks healthy while its dashboard, spend
+    // limits, and fallbacks are all silently inert.
+    for (const half of [
+      { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID },
+      { AI_GATEWAY_ID: "patternlike" },
+    ]) {
+      const failure = checkSecureConfig({ ...base, ...half });
+      expect(failure?.code).toBe("reading_publisher_misconfigured");
+      expect(failure?.message).toContain("must be set together");
+    }
+  });
+
+  it("refuses a token with nowhere to send it", () => {
+    const failure = checkSecureConfig({ ...base, AI_GATEWAY_TOKEN: "cf-aig-token" });
+    expect(failure?.code).toBe("reading_publisher_misconfigured");
+    expect(failure?.message ?? "").not.toContain("cf-aig-token");
+  });
+
+  it("refuses ids that are not one safe URL path segment", () => {
+    // Both are interpolated into the gateway path. Rejecting the shape here is
+    // what lets responsesUrlFor be total.
+    const malformed = [
+      { AI_GATEWAY_ACCOUNT_ID: "not-hex", AI_GATEWAY_ID: "patternlike" },
+      { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID.toUpperCase(), AI_GATEWAY_ID: "patternlike" },
+      { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID, AI_GATEWAY_ID: "../openai" },
+      { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID, AI_GATEWAY_ID: "gate way" },
+      { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID, AI_GATEWAY_ID: "Patternlike" },
+    ];
+    for (const vars of malformed) {
+      const failure = checkSecureConfig({ ...base, ...vars });
+      expect(failure?.code, JSON.stringify(vars)).toBe("reading_publisher_misconfigured");
+    }
+  });
+
+  it("validates the gateway while the rollout is off", () => {
+    // Same argument as every pinned publisher value: a typo must not lie
+    // dormant until the day someone enables generation.
+    const failure = checkSecureConfig({
+      ...base,
+      READING_V5_ROLLOUT: "off",
+      AI_GATEWAY_ACCOUNT_ID: "not-hex",
+      AI_GATEWAY_ID: "patternlike",
     });
     expect(failure?.code).toBe("reading_publisher_misconfigured");
   });
