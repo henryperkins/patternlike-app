@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-erasure-replay-event.schema.json",
+  "title": "Pattern erasure replay event",
+  "$defs": {
+    "patternErasureReplayEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "event_id",
+        "event_class",
+        "occurred_at",
+        "target_user_id",
+        "chart_fingerprint_hash",
+        "claim_id",
+        "generation_id",
+        "pattern_id",
+        "ontology_version",
+        "prior_claim_status",
+        "next_claim_status",
+        "content_hash",
+        "signature"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "event_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/replayEventId" },
+        "event_class": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/replayEventClass" },
+        "occurred_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "target_user_id": { "type": ["string", "null"] },
+        "chart_fingerprint_hash": { "type": ["string", "null"] },
+        "claim_id": { "type": ["string", "null"] },
+        "generation_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" }
+          ]
+        },
+        "pattern_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternId" }
+          ]
+        },
+        "ontology_version": { "type": ["string", "null"] },
+        "prior_claim_status": { "type": ["string", "null"] },
+        "next_claim_status": { "type": ["string", "null"] },
+        "content_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "signature": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternErasureReplayEvent"
+}

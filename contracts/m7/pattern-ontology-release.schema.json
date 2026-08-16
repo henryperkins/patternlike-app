@@ -28,7 +28,18 @@
           "minItems": 1,
           "items": { "$ref": "https://patternlike.app/contracts/m7/pattern-ontology-record.schema.json#/$defs/patternOntologyRecord" }
         },
-        "evaluation": { "$ref": "https://patternlike.app/contracts/m7/pattern-ontology-evaluation.schema.json#/$defs/patternOntologyEvaluation" }
+        "evaluation": { "$ref": "https://patternlike.app/contracts/m7/pattern-ontology-evaluation.schema.json#/$defs/patternOntologyEvaluation" },
+        "provenance": { "$ref": "#/$defs/patternOntologyProvenance" }
+      }
+    },
+    "patternOntologyProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin"],
+      "properties": {
+        "origin": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/provenanceOrigin" },
+        "authored_by": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "reviewed_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" }
       }
     }
   },

@@ -129,10 +129,18 @@ FIXTURE_SCHEMA = {
         "pattern-document-internal": M7_BASE
         + "pattern-document-internal.schema.json#/$defs/patternDocumentInternal",
         "pattern-response": M7_BASE + "pattern-response.schema.json#/$defs/patternResponse",
+        "pattern-admin-artifact-inventory": M7_BASE
+        + "pattern-admin-artifact-inventory.schema.json#/$defs/patternAdminArtifactInventory",
         "pattern-admin-artifact": M7_BASE
         + "pattern-admin-artifact.schema.json#/$defs/patternAdminArtifact",
+        "pattern-admin-generation": M7_BASE
+        + "pattern-admin-generation.schema.json#/$defs/patternAdminGeneration",
+        "pattern-admin-ontology-release": M7_BASE
+        + "pattern-admin-ontology-release.schema.json#/$defs/patternAdminOntologyRelease",
         "pattern-admin-access-event": M7_BASE
         + "pattern-admin-access-event.schema.json#/$defs/patternAdminAccessEvent",
+        "pattern-erasure-replay-event": M7_BASE
+        + "pattern-erasure-replay-event.schema.json#/$defs/patternErasureReplayEvent",
         "pattern-source-corpus-release": M7_BASE
         + "pattern-source-corpus-release.schema.json#/$defs/patternSourceCorpusRelease",
         "pattern-source-fragment": M7_BASE
@@ -190,6 +198,7 @@ POLICY_ONLY = {
         "pattern-fact-packet.journal-in-fact",
         "pattern-fact-packet.latitude-in-fact",
         "pattern-fact-packet.life-event-in-fact",
+        "pattern-ontology-evaluation.unevaluated-count",
     },
 }
 
@@ -1819,7 +1828,24 @@ def check_m7_openapi_projection() -> list[str]:
         ("/v1/pattern", "get"): {"200", "401", "404", "409", "410", "503"},
         ("/v1/pattern", "delete"): {"202", "204", "400", "401", "404", "409"},
         ("/internal/pattern-ontology-releases", "post"): {"201", "400", "401", "409", "503"},
-        ("/admin/pattern-generations/{generation_id}", "get"): {"200", "401", "404", "503"},
+        ("/internal/pattern-ontology-releases/{version}/recall", "post"): {
+            "200", "401", "409", "503"
+        },
+        ("/internal/pattern-generations/{generation_id}/reconcile", "post"): {
+            "200", "401", "404", "503"
+        },
+        ("/admin/pattern-generations/{generation_id}", "get"): {
+            "200", "400", "401", "404", "503"
+        },
+        ("/admin/pattern-generations/{generation_id}/artifacts", "get"): {
+            "200", "400", "401", "404", "503"
+        },
+        ("/admin/pattern-generations/{generation_id}/artifacts/{artifact_id}", "get"): {
+            "200", "400", "401", "404", "410", "503"
+        },
+        ("/admin/pattern-ontology-releases/{version}", "get"): {
+            "200", "400", "401", "404", "503"
+        },
     }
     errors: list[str] = []
     for (route, method), statuses in expected.items():
