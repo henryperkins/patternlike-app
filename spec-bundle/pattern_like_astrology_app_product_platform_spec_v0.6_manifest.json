@@ -1,0 +1,33 @@
+{
+  "//": [
+    "Text hashes are over LF-normalized bytes so a checkout on any platform verifies;",
+    "the DOCX and PDF are hashed as written. Both derived files are produced from the",
+    "Markdown by spec-bundle/render_v0_6.py - regenerate rather than edit them."
+  ],
+  "version": "0.6",
+  "date": "2026-08-16",
+  "supersedes": "0.5",
+  "supersedes_scope": "sections 2, 4, 7 Pattern generation and export successor, 9 Pattern API, 10 Pattern publication exception",
+  "source": "pattern_like_astrology_app_product_platform_spec_v0.6.md",
+  "renderer": "spec-bundle/render_v0_6.py",
+  "files": {
+    "pattern_like_astrology_app_product_platform_spec_v0.6.md": {
+      "sha256": "8f6a9cb59e5b9ca71ee383a24dcb731deadcde399644ff838b23e2976dcab351",
+      "bytes": 13812
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.6.docx": {
+      "sha256": "e6c0becb7688a4a01f438cff25e5c7d42d90c853b0c8f0eee96b91c72dad371d",
+      "bytes": 42893
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.6.pdf": {
+      "sha256": "cc7982ce301b0a3e601de2579d18899e1ab4a2a2b6efb5b5986dbac79587e8ee",
+      "bytes": 17222
+    }
+  },
+  "carried_forward_unchanged": {
+    "pattern_like_astrology_app_product_platform_spec_v0.5.md": "daily-reading sections this version does not restate remain in force as published",
+    "pattern_like_astrology_app_product_platform_spec_v0.2.md": "sections neither v0.5 nor v0.6 restates remain in force as published",
+    "pattern_like_astrology_app_data_source_registry_v0.2.yaml": "unchanged; the source registry is not amended by this version",
+    "pattern_like_astrology_app_platform_topology_v0.2.yaml": "unchanged"
+  }
+}
