@@ -198,6 +198,20 @@ wrangler secret put AI_GATEWAY_TOKEN --config apps/api/wrangler.toml --env produ
 the OpenAI key still rides `Authorization` for the gateway to forward. Setting it
 without the two ids is a misconfiguration, not a no-op, and is refused.
 
+**If a provider key is stored in the gateway (BYOK), this procedure bypasses it.**
+Cloudflare's documented credential precedence is *request key → BYOK → Unified
+Billing*: a provider `Authorization` header on the request is forwarded unchanged
+and the stored key is **not consulted**. The Worker as shipped always sends that
+header, so a stored key configured in the dashboard does nothing while this
+procedure is followed — the deployment looks BYOK and is not. Using the stored
+key requires omitting `Authorization`, which the current adapter cannot do; that
+is the subject of Task 5a in
+`docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md`, and it is a
+single-version cutover — gateway ids, key alias and `AI_GATEWAY_TOKEN` become
+present while `OPENAI_API_KEY` becomes absent in the same Worker version, because
+either intermediate combination is refused on every request. Do not attempt it by
+deleting the secret first.
+
 What the adapter pins per request, overriding whatever the gateway dashboard
 says, because request-level `cf-aig-*` headers win:
 
