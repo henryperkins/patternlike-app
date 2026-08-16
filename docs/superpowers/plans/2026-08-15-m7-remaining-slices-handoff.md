@@ -28,9 +28,11 @@ Read these before anything else:
 3. `CLAUDE.md` and `AGENTS.md`. The `CLAUDE.md` invariants are real and several
    are load-bearing here — especially envelope encryption, `ENCRYPTED_COLUMNS`,
    the D1 migration policy, `run_worker_first`, and the fail-closed config guard.
-4. `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` — the
-   normative product contract, which **outranks both design documents** where
-   they disagree.
+4. `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` — the
+   normative product contract for Your Pattern, which **outranks both design
+   documents** where they disagree. v0.5 remains the daily-reading contract.
+   `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` records
+   the freeze-versus-design decisions.
 
 ## Where M7 actually stands
 

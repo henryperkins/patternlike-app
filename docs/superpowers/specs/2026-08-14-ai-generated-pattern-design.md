@@ -1,10 +1,12 @@
 # AI-Generated Your Pattern — Product and Engineering Design
 
 **Date:** 2026-08-14  
-**Status:** Proposed after repository review; awaiting approval  
+**Status:** Proposed after repository review; **amended in place 2026-08-16**  
 **Repository baseline:** `henryperkins/patternlike-app` at `bd4ea0f20c46b77468e151599f477c34f01bea6d`  
 **Intended repository path:** `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`  
 **Scope:** Replace the current shared, human-authored Your Pattern catalog with one private, AI-generated Pattern for each accepted chart fingerprint. Preserve deterministic chart calculation, feature derivation, privacy, consent, provenance, export, deletion, and fail-closed publication controls. Define the machine-generated interpretation ontology that authorizes the model’s meanings. Source discovery, licensing, and source selection remain out of scope.
+
+**2026-08-16 amendment.** Where this document and the shipped `contracts/m7` / `0007` freeze disagreed, the freeze wins. The decisions, and the product-spec v0.6 restatement of Your Pattern, are recorded in [`2026-08-16-m7-spec-artifact-amendments.md`](2026-08-16-m7-spec-artifact-amendments.md). Sections 7.3, 9.1, 10.1, 19.4, 23.2, 23.3, 23.8, 23.9, 24.3, and 24.4 below are the amended text. Do not implement the pre-amendment lists.
 
 ## Contents
 
@@ -389,34 +391,30 @@ The package contains:
 - `pattern-ontology-evaluation.schema.json`
 - `account-export.schema.json`, as the M7 successor to M6
 - valid and invalid fixtures for every document
-- fixed synthetic chart/feature fixtures for selection, planning, writing, and verification
+- fixed synthetic chart/feature fixtures for selection, planning, writing, and verification, housed at `contracts/m7/fixtures/corpus/`
 - an OpenAPI amendment for the consumer and internal administrative routes
 - package-policy checks that JSON Schema alone cannot express; and
 - a manifest recording predecessor hashes and explicit supersession boundaries.
 
 ### 7.3 Contract policy invariants
 
-The M7 validator enforces at least these cross-document invariants:
+Cross-document invariants have named owners. “The M7 validator enforces” is not a single inventory.
 
-- every provider-visible feature alias resolves to exactly one frozen M4 feature;
-- no provider-visible alias can be reversed to a user ID or chart fingerprint from the packet itself;
-- every ontology rule reference exists in the pinned release;
-- every derived synthesis has a non-empty, acyclic dependency graph ending in source-supported meanings;
-- expression guidance contains no astrological proposition;
-- every mandatory feature is assigned in a validated plan;
-- every eligible feature is assigned or has one closed omission reason;
-- no suppressed or unsupported feature appears in a chapter or signature;
-- four to six core chapters are present;
-- every core chapter contains at least one tension and one counter-expression;
-- every writer prose unit has a private claim ledger;
-- every astrological prose unit cites at least one feature alias and one ontology rule;
-- no claim cites a rule not authorized for its cited feature;
-- an uncertainty requirement is represented in the final artifact;
-- reader projection contains no private claim ledger or administrative provenance;
+The contract validator (`contracts/validate_schemas.py` `_m7_policy_errors`) enforces:
+
+- forbidden keys anywhere in a fact packet;
+- consumer response must not contain `feature_aliases`, `ontology_rule_ids`, `claim_class`, or `nft_`;
+- `verdict: "pass"` implies `unevaluated_fixture_count === 0`.
+
+`packages/pattern-engine` enforces alias resolution, plan bounds, claim ledgers, acyclic synthesis, expression-guidance propositions, and coverage accounting.
+
+The Worker enforces:
+
 - a deleted, superseded, or withdrawn claim cannot also have an active document;
 - a generation-consumed tombstone cannot return to `available`;
-- the M7 export includes only active accepted Pattern artifacts and compact provenance; and
-- an ontology release cannot activate with unevaluated regression fixtures.
+- the M7 export includes only active accepted Pattern artifacts and compact provenance.
+
+The remaining bullets that earlier drafts listed as validator rules — every alias resolving to one M4 feature, every ontology rule existing in the pinned release, four-to-six chapters, tensions and counter-expressions, uncertainty representation — are runtime or compiler checks. A schema-valid fixture that fails one of those is not filed under `fixtures/invalid/` unless a policy-only stem exists for it.
 
 ### 7.4 OpenAPI supersession
 
@@ -555,6 +553,9 @@ The state enum is:
 - `failed`
 - `deleted`
 - `withdrawn`
+- `editorial_catalog`
+
+`editorial_catalog` is the dual-path rollout state: the account has not entered the AI path and the client keeps rendering M4 `PatternChapters`. It is a member of the closed enum, not drift.
 
 The document may include a generation ID, Pattern ID, public stage, safe failure class, retryable flag, generation timestamp, locale, and effective accuracy. It never contains provider errors, prompt text, source citations, evidence IDs, or private content.
 
@@ -650,7 +651,9 @@ The encrypted generation command pins:
 - retry budgets;
 - input-manifest hash;
 - artifact-retention policy version; and
-- reservation reason: `first_open`, `chart_correction`, or `manual_retry`.
+- reservation reason from the four-value `reservationReason` enum: `first_open`, `first_open_retry`, `failed_attempt_retry`, or `chart_correction`.
+
+`reservationReason` is not the consumer `generationReason`. The consumer request cannot send `chart_correction`. `chart_correction` at `PATTERN_AI_ROLLOUT=internal` is staff-gated against `PATTERN_INTERNAL_ACCOUNT_IDS`; it is not admitted for every user.
 
 This command is encrypted under the user DEK in `jobs.payload_enc`, following the current AAD convention. Nothing copies the command into queue messages or logs.
 
@@ -1734,11 +1737,13 @@ Request:
 }
 ```
 
-Allowed reasons are closed:
+Allowed consumer reasons are the three-value `generationReason` enum:
 
 ```text
 first_open | first_open_retry | failed_attempt_retry
 ```
+
+`chart_correction` is a `reservationReason` only. It is never accepted on this route. The command and the `0007` CHECK use the four-value union; this request does not.
 
 The route requires an idempotency key. It never accepts a chart ID, chart fingerprint, locale, ontology version, model, prompt, feature list, or provider option from the client.
 
@@ -2194,56 +2199,25 @@ Expression guidance may shape wording without asserting additional astrology.
 
 The ontology pipeline begins with an immutable source-corpus release supplied by an out-of-scope curation process.
 
-A source-corpus release contains:
+A source-corpus release contains the shipped required fields: corpus release ID and hash, locale, `license_resolved: true`, and a non-empty fragment list. Each fragment is the shipped flattened record: id, corpus release id, locale, normalized proposition, excerpt, `license_class` (`licensed_excerpt` or `internal_synthetic`), and allowed transformation classes. Title and author are optional strings. Edition, location, and source-specific exclusions are optional additive properties so a later licensed excerpt can carry them; a synthetic fragment may omit them.
 
-- corpus release ID and hash;
-- license and usage metadata already resolved by the curation process;
-- language;
-- immutable source-fragment IDs;
-- bounded excerpts or normalized propositions permitted for model use;
-- source title, author, edition, and location metadata when applicable;
-- allowed transformation classes; and
-- source-specific exclusions.
-
-The ontology pipeline does not search the web, acquire books, determine copyright status, infer a license, or decide whether a source is trustworthy. A corpus release lacking explicit machine-readable authorization is refused.
+The ontology pipeline does not search the web, acquire books, determine copyright status, infer a license, or decide whether a source is trustworthy. A corpus release lacking `license_resolved: true` is refused. That flag is the machine-readable authorization; it is not inferred from title or author.
 
 ### 23.3 Ontology record classes
 
-Every ontology rule contains one or more meaning nodes of exactly these classes:
+Every ontology rule is one flattened `patternOntologyRecord`. The required field set is the same for every `meaning_class`. Class-specific requirements are compiler policy, not extra schema fields.
+
+The shipped required fields are: `id`, `meaning_class`, `locale`, `feature_predicate`, `normalized_proposition`, `source_fragment_ids`, `input_meaning_ids`, `transformation_class`, `tensions`, `counter_expressions`, `prohibited_claims`, `salience_band`, `presentation_priority`, and `cluster_tags`.
 
 #### `source_supported`
 
-A normalized meaning directly supported by cited source fragments.
-
-Required fields include:
-
-- meaning ID;
-- locale;
-- feature predicate;
-- normalized proposition;
-- source fragment IDs;
-- expression range;
-- tensions;
-- counter-expressions;
-- prohibited claims; and
-- uncertainty compatibility.
+A normalized meaning directly supported by cited source fragments. The compiler requires a non-empty `source_fragment_ids` array, an empty `input_meaning_ids` array, and a null `transformation_class`.
 
 #### `derived_synthesis`
 
-A higher-order theme derived from two or more activated source-supported meanings.
+A higher-order theme derived from two or more activated source-supported meanings. The compiler requires at least two `input_meaning_ids` and a non-null `transformation_class`. `normalized_proposition` is the shipped field for the derived claim; `prohibited_claims` is the shipped field for prohibited extensions. The design-only names `derived_proposition`, `entailment_rationale`, `compatible_feature_relationships`, and `evaluator_verdict` are not on the record.
 
-Required fields include:
-
-- synthesis ID;
-- input meaning IDs;
-- transformation class;
-- derived proposition;
-- entailment rationale;
-- compatible feature relationships;
-- prohibited extensions; and
-- evaluator verdict.
-
-Allowed transformation classes are closed, for example:
+Allowed transformation classes are the shipped closed set:
 
 ```text
 intersection
@@ -2259,7 +2233,7 @@ A synthesis graph must be acyclic and must terminate exclusively in source-suppo
 
 #### `expression_guidance`
 
-Non-claim-bearing suggestions for titles, metaphors, examples, pacing, and plain-language rendering. Expression guidance cannot add a body, sign, house, aspect, life event, diagnosis, prediction, or psychological assertion.
+Non-claim-bearing suggestions for titles, metaphors, examples, pacing, and plain-language rendering. The compiler refuses a body, sign, house, aspect, life event, diagnosis, prediction, or psychological assertion in `normalized_proposition`, `tensions`, or `counter_expressions`. There is no class-specific schema shape.
 
 ### 23.4 Feature predicates
 
@@ -2339,7 +2313,7 @@ The generator and evaluator do not share the same prompt. Production should use 
 
 ### 23.8 Fixed-chart regression
 
-Every ontology candidate is exercised through the real deterministic selector, planner, writer, and validators against a synthetic fixed-chart corpus.
+Every ontology candidate is exercised through the real deterministic selector, planner, writer, and validators against a synthetic fixed-chart corpus. The corpus lives at `contracts/m7/fixtures/corpus/`. Runtime tests may keep inline fixtures; those are not the activation corpus.
 
 The corpus includes:
 
@@ -2368,7 +2342,9 @@ Activation gates include:
 
 ### 23.9 Machine signing and activation
 
-A candidate that passes compilation, semantic evaluation, and fixed-chart regression is canonicalized and signed by a dedicated ontology-release service identity. The signing key is not available to the generator or evaluator and is never stored in the repository, model prompt, R2 object body, or test snapshot.
+A candidate that passes compilation, semantic evaluation, and fixed-chart regression, and that declares `provenance.origin: "machine_pipeline"`, is an authorized external release. It is canonicalized and signed by a dedicated ontology-release service identity. The signing key is not available to the generator or evaluator and is never stored in the repository, model prompt, R2 object body, or test snapshot.
+
+An internal-only synthetic release may compile with `verdict: "pass"`, `evaluator_passed: false`, and `regression_passed: false`. That attestation is honest and is not an authorized external release. Absence of `provenance` is treated as internal-only. Reservation, not compilation, withholds it from accounts that are not on `PATTERN_INTERNAL_ACCOUNT_IDS`.
 
 The internal ingestion route verifies:
 
@@ -2443,18 +2419,26 @@ While retained, an auditor may inspect:
 
 The interface defaults to metadata. Opening exact content is still routine authorized access, but it is a separate auditable action rather than content automatically rendered in a generation list.
 
+Those are three documents, not one:
+
+- `GET /admin/pattern-generations/:generation_id` returns generation metadata and does not open content;
+- `GET /admin/pattern-generations/:generation_id/artifacts` returns the artifact inventory and does not open content;
+- `GET /admin/pattern-generations/:generation_id/artifacts/:artifact_id` returns `pattern-admin-artifact` and is the decrypt path.
+
+Every admin route requires a closed `purpose` query parameter. The consumer `patternGenerationStatus` document is not an admin document.
+
 ### 24.4 Purpose classes
 
-Every artifact read requires one closed purpose class:
+Every artifact read requires one closed purpose class. The shipped, frozen list is authoritative:
 
 ```text
-quality_investigation
-user_report_investigation
-safety_review
-provider_incident
-integrity_reconciliation
-legal_privacy_request
+quality_review
+safety_investigation
+incident_response
+retention_audit
 ```
+
+`legal_privacy_request` and the six-value draft list are withdrawn. A legal-privacy purpose is a future additive amendment if the product needs it.
 
 The administrator cannot enter arbitrary free text that might itself contain user data. A case-reference field, when required, is an opaque internal identifier with a constrained format.
 
@@ -3156,6 +3140,8 @@ This design was refined against the current implementation of:
 The central refinement from the earlier baseline is that Pattern should not be designed as a new greenfield AI subsystem. It should preserve the M4 deterministic feature authority and adopt the M5 frozen-command, encrypted-outbox, claim-lease, strict-provider, deterministic-validation, atomic-publication, and evaluation patterns—while remaining a separate consent purpose, queue, budget, document lifecycle, contract package, and no-reroll claim domain.
 
 ## 35. Specification self-review
+
+The 2026-08-16 amendment writes the product-spec restatement this section claimed was already done, and reconciles the frozen enums this document had listed incorrectly. After that amendment, the remaining operator questions are administrator identity (Access versus a separate OIDC tenant) and whether a later additive purpose class is needed for legal-privacy requests.
 
 This document was checked for:
 

@@ -5,6 +5,12 @@
 **Repository baseline:** `henryperkins/patternlike-app` at `c31d0df74322728a5d8ae04667200f5f6008d494`
 **Status:** Review only. No runtime, contract, or product-spec change in this document.
 
+**Resolution (2026-08-16).** The recommended spec work is recorded in
+[`docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md`](../superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md)
+and product-spec v0.6. The 2026-08-14 design is amended in place. Slice C and
+Slice D now have designs. Do not re-litigate the settled enums against this
+review’s “two owners” lists; those lists are what the amendment closed.
+
 This is a spec review, not a status report. Six of the ten §31 workstreams are
 already built. The remaining work cannot be implemented faithfully from the
 artifacts the design named, because several of those artifacts disagree with

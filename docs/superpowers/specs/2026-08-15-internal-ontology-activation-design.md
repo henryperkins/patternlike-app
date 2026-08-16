@@ -4,6 +4,13 @@
 
 **Status:** Draft for approval. No plan may be derived until this is approved.
 
+**2026-08-16 amendment.** Product-spec v0.6 and
+[`2026-08-16-m7-spec-artifact-amendments.md`](2026-08-16-m7-spec-artifact-amendments.md)
+ratify this slice’s provenance marker, honest evaluation booleans, flattened
+ontology record, and staff-gated `chart_correction`. Cite those documents, not
+the pre-amendment 2026-08-14 lists. `0008` is the replay ledger; a D1
+provenance-origin convenience column, if still wanted, takes `0009` or later.
+
 **Scope:** Produce and activate the first Pattern interpretation ontology — a
 hand-authored, signed, **internal-only** release — and build the containment that
 keeps it away from external readers. This unblocks an end-to-end Pattern for
