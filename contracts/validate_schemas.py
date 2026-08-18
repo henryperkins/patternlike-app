@@ -1859,8 +1859,55 @@ def check_m7_openapi_projection() -> list[str]:
                 f"M7 OpenAPI {method.upper()} {route} responses are "
                 f"{sorted(actual)}, expected {sorted(statuses)}"
             )
+
+    projection_fixtures = {
+        "PatternAdminGeneration": (
+            "pattern-admin-generation.metadata.json",
+            ("pattern-admin-generation.extra-property.json",),
+        ),
+        "PatternAdminArtifactInventory": (
+            "pattern-admin-artifact-inventory.one.json",
+            ("pattern-admin-artifact-inventory.bad-id.json",),
+        ),
+        "PatternAdminArtifact": (
+            "pattern-admin-artifact.planner.json",
+            ("pattern-admin-artifact.bad-class.json",),
+        ),
+        "PatternAdminOntologyRelease": (
+            "pattern-admin-ontology-release.metadata.json",
+            ("pattern-admin-ontology-release.unknown-origin.json",),
+        ),
+    }
+    components = ((spec.get("components") or {}).get("schemas") or {})
+    for component_name, (valid_name, invalid_names) in projection_fixtures.items():
+        component = components.get(component_name)
+        if not isinstance(component, dict):
+            errors.append(f"M7 OpenAPI has no {component_name} response component")
+            continue
+        validator = Draft202012Validator(component, format_checker=FormatChecker())
+        valid_doc = json.loads(
+            (M7 / "fixtures" / "valid" / valid_name).read_text(encoding="utf-8")
+        )
+        violations = sorted(validator.iter_errors(valid_doc), key=lambda e: list(e.path))
+        if violations:
+            errors.append(
+                f"M7 OpenAPI {component_name} rejects normative valid fixture "
+                f"{valid_name}: {violations[0].json_path} {violations[0].message}"
+            )
+        for invalid_name in invalid_names:
+            invalid_doc = json.loads(
+                (M7 / "fixtures" / "invalid" / invalid_name).read_text(encoding="utf-8")
+            )
+            if validator.is_valid(invalid_doc):
+                errors.append(
+                    f"M7 OpenAPI {component_name} accepts normative invalid fixture "
+                    f"{invalid_name}"
+                )
     if not errors:
-        print("OK  projection    M7 OpenAPI declares Pattern generation and admin statuses")
+        print(
+            "OK  projection    M7 OpenAPI declares Pattern generation/admin statuses "
+            "and compatible admin documents"
+        )
     return errors
 
 

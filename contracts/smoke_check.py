@@ -999,8 +999,39 @@ def check_0008_replay_ledger() -> None:
         raise SystemExit("0008 accepted next_claim_status=available")
     except sqlite3.IntegrityError:
         pass
+
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, next_claim_status, "
+            "content_hash, signature, created_at"
+            ") VALUES ("
+            "'prel_22222222222222222222222222222222', 'pattern_deleted', ?, "
+            "'deleted', "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'sig', ?)",
+            (NOW, NOW),
+        ),
+        "0008 requires target, fingerprint, and claim outside recall/account deletion",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
+            "claim_id, next_claim_status, content_hash, signature, created_at"
+            ") VALUES ("
+            "'prel_33333333333333333333333333333333', 'pattern_deleted', ?, "
+            "'usr_0123456789abcdef0123456789abcdef', "
+            "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
+            "'pgc_dddddddddddddddddddddddddddddddd', 'withdrawn', "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'sig', ?)",
+            (NOW, NOW),
+        ),
+        "0008 binds lifecycle event classes to their terminal status",
+    )
     assert con.execute("PRAGMA foreign_key_check").fetchall() == []
-    print("D1 OK  0008 creates the erasure replay ledger and refuses available")
+    print("D1 OK  0008 creates a constrained erasure replay ledger")
 
 
 def main() -> int:
