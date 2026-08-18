@@ -1,9 +1,9 @@
 # AI-Generated Your Pattern — Product and Engineering Design
 
-**Date:** 2026-08-14  
-**Status:** Proposed after repository review; **amended in place 2026-08-16**  
-**Repository baseline:** `henryperkins/patternlike-app` at `bd4ea0f20c46b77468e151599f477c34f01bea6d`  
-**Intended repository path:** `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`  
+**Date:** 2026-08-14<br>
+**Status:** Proposed after repository review; **amended in place 2026-08-16**<br>
+**Repository baseline:** `henryperkins/patternlike-app` at `bd4ea0f20c46b77468e151599f477c34f01bea6d`<br>
+**Intended repository path:** `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`<br>
 **Scope:** Replace the current shared, human-authored Your Pattern catalog with one private, AI-generated Pattern for each accepted chart fingerprint. Preserve deterministic chart calculation, feature derivation, privacy, consent, provenance, export, deletion, and fail-closed publication controls. Define the machine-generated interpretation ontology that authorizes the model’s meanings. Source discovery, licensing, and source selection remain out of scope.
 
 **2026-08-16 amendment.** Where this document and the shipped `contracts/m7` / `0007` freeze disagreed, the freeze wins. The decisions, and the product-spec v0.6 restatement of Your Pattern, are recorded in [`2026-08-16-m7-spec-artifact-amendments.md`](2026-08-16-m7-spec-artifact-amendments.md). Sections 7.3, 9.1, 10.1, 19.4, 23.2, 23.3, 23.8, 23.9, 24.3, and 24.4 below are the amended text. Do not implement the pre-amendment lists.
