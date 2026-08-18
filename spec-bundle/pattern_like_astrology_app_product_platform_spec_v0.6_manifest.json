@@ -10,17 +10,27 @@
   "supersedes_scope": "sections 2, 4, 7 Pattern generation and export successor, 9 Pattern API, 10 Pattern publication exception",
   "source": "pattern_like_astrology_app_product_platform_spec_v0.6.md",
   "renderer": "spec-bundle/render_v0_6.py",
+  "build_inputs": {
+    "render_v0_6.py": {
+      "sha256": "433336323f24f0c16a75ff06844c6335a367ff1432619ce6f83ee16c1ef65c31",
+      "bytes": 17679
+    },
+    "render_v0_6.requirements.txt": {
+      "sha256": "57e2d97e864b7a4114e4b8a99635b9b702d7a01a5c05be114fc413e50c467088",
+      "bytes": 63
+    }
+  },
   "files": {
     "pattern_like_astrology_app_product_platform_spec_v0.6.md": {
       "sha256": "8f6a9cb59e5b9ca71ee383a24dcb731deadcde399644ff838b23e2976dcab351",
       "bytes": 13812
     },
     "pattern_like_astrology_app_product_platform_spec_v0.6.docx": {
-      "sha256": "e6c0becb7688a4a01f438cff25e5c7d42d90c853b0c8f0eee96b91c72dad371d",
-      "bytes": 42893
+      "sha256": "f65d5dced631abb470a2beb4f942a134fe07ceabbb94200357f4f3df4863058a",
+      "bytes": 40472
     },
     "pattern_like_astrology_app_product_platform_spec_v0.6.pdf": {
-      "sha256": "cc7982ce301b0a3e601de2579d18899e1ab4a2a2b6efb5b5986dbac79587e8ee",
+      "sha256": "4b2f7a0bcca276da17357740b12bb10027c6f5de3b726e19560ae132bc590813",
       "bytes": 17222
     }
   },

@@ -382,6 +382,7 @@ def write_pdf(blocks) -> None:
         bottomMargin=0.9 * inch,
         title="Pattern/Like Product, UX, Data, and Platform Design Specification v0.6",
         author="Pattern/Like",
+        invariant=1,
     )
     document.build(
         story,
