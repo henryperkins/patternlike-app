@@ -23,7 +23,13 @@ CREATE TABLE pattern_erasure_replay_events (
   generation_id TEXT,
   pattern_id TEXT,
   ontology_version TEXT,
-  prior_claim_status TEXT,
+  prior_claim_status TEXT
+    CHECK (
+      prior_claim_status IS NULL
+      OR prior_claim_status IN (
+        'available', 'reserved', 'accepted', 'deleted', 'superseded', 'withdrawn'
+      )
+    ),
   next_claim_status TEXT,
   content_hash TEXT NOT NULL
     CHECK (content_hash GLOB 'sha256:*' AND length(content_hash) = 71),
@@ -36,8 +42,28 @@ CREATE TABLE pattern_erasure_replay_events (
       AND next_claim_status IS NULL
     )
     OR (
-      event_class != 'ontology_recalled'
+      event_class = 'claim_consumed'
       AND next_claim_status IN ('accepted', 'deleted', 'superseded', 'withdrawn')
+    )
+    OR (
+      event_class IN ('pattern_deleted', 'account_deleted')
+      AND next_claim_status = 'deleted'
+    )
+    OR (
+      event_class = 'chart_correction_erased'
+      AND next_claim_status = 'superseded'
+    )
+    OR (
+      event_class = 'pattern_withdrawn'
+      AND next_claim_status = 'withdrawn'
+    )
+  ),
+  CHECK (event_class = 'ontology_recalled' OR target_user_id IS NOT NULL),
+  CHECK (
+    event_class IN ('ontology_recalled', 'account_deleted')
+    OR (
+      chart_fingerprint_hash IS NOT NULL
+      AND claim_id IS NOT NULL
     )
   )
 );

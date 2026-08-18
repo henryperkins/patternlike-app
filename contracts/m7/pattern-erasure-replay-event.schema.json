@@ -27,9 +27,24 @@
         "event_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/replayEventId" },
         "event_class": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/replayEventClass" },
         "occurred_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
-        "target_user_id": { "type": ["string", "null"] },
-        "chart_fingerprint_hash": { "type": ["string", "null"] },
-        "claim_id": { "type": ["string", "null"] },
+        "target_user_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/userId" }
+          ]
+        },
+        "chart_fingerprint_hash": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" }
+          ]
+        },
+        "claim_id": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/claimId" }
+          ]
+        },
         "generation_id": {
           "oneOf": [
             { "type": "null" },
@@ -42,12 +57,96 @@
             { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternId" }
           ]
         },
-        "ontology_version": { "type": ["string", "null"] },
-        "prior_claim_status": { "type": ["string", "null"] },
-        "next_claim_status": { "type": ["string", "null"] },
+        "ontology_version": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "prior_claim_status": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "enum": ["available", "reserved", "accepted", "deleted", "superseded", "withdrawn"]
+            }
+          ]
+        },
+        "next_claim_status": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "enum": ["accepted", "deleted", "superseded", "withdrawn"]
+            }
+          ]
+        },
         "content_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
         "signature": { "type": "string", "minLength": 1 }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "event_class": { "const": "ontology_recalled" } },
+            "required": ["event_class"]
+          },
+          "then": {
+            "properties": { "next_claim_status": { "type": "null" } }
+          },
+          "else": {
+            "properties": {
+              "target_user_id": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/userId" },
+              "next_claim_status": {
+                "type": "string",
+                "enum": ["accepted", "deleted", "superseded", "withdrawn"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_class": {
+                "enum": ["ontology_recalled", "account_deleted"]
+              }
+            },
+            "required": ["event_class"]
+          },
+          "else": {
+            "properties": {
+              "chart_fingerprint_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+              "claim_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/claimId" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "event_class": { "enum": ["pattern_deleted", "account_deleted"] } },
+            "required": ["event_class"]
+          },
+          "then": {
+            "properties": { "next_claim_status": { "const": "deleted" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "event_class": { "const": "chart_correction_erased" } },
+            "required": ["event_class"]
+          },
+          "then": {
+            "properties": { "next_claim_status": { "const": "superseded" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "event_class": { "const": "pattern_withdrawn" } },
+            "required": ["event_class"]
+          },
+          "then": {
+            "properties": { "next_claim_status": { "const": "withdrawn" } }
+          }
+        }
+      ]
     }
   },
   "$ref": "#/$defs/patternErasureReplayEvent"
