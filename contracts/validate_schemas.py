@@ -1832,7 +1832,7 @@ def check_m7_openapi_projection() -> list[str]:
             "200", "401", "409", "503"
         },
         ("/internal/pattern-generations/{generation_id}/reconcile", "post"): {
-            "200", "401", "404", "503"
+            "202", "401", "404", "503"
         },
         ("/admin/pattern-generations/{generation_id}", "get"): {
             "200", "400", "401", "404", "503"
@@ -1863,7 +1863,11 @@ def check_m7_openapi_projection() -> list[str]:
     projection_fixtures = {
         "PatternAdminGeneration": (
             "pattern-admin-generation.metadata.json",
-            ("pattern-admin-generation.extra-property.json",),
+            (
+                "pattern-admin-generation.bad-hash.json",
+                "pattern-admin-generation.extra-property.json",
+                "pattern-admin-generation.unknown-stage.json",
+            ),
         ),
         "PatternAdminArtifactInventory": (
             "pattern-admin-artifact-inventory.one.json",

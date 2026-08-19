@@ -1000,6 +1000,34 @@ def check_0008_replay_ledger() -> None:
     except sqlite3.IntegrityError:
         pass
 
+    def insert_null_replay_status(marker: str, event_class: str) -> None:
+        con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
+            "claim_id, next_claim_status, content_hash, signature, created_at"
+            ") VALUES (?, ?, ?, "
+            "'usr_0123456789abcdef0123456789abcdef', "
+            "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
+            "'pgc_dddddddddddddddddddddddddddddddd', NULL, "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'sig', ?)",
+            (f"prel_{marker * 32}", event_class, NOW, NOW),
+        )
+
+    for marker, event_class in (
+        ("4", "claim_consumed"),
+        ("5", "pattern_deleted"),
+        ("6", "chart_correction_erased"),
+        ("7", "pattern_withdrawn"),
+        ("8", "account_deleted"),
+    ):
+        expect_integrity_error(
+            lambda marker=marker, event_class=event_class: insert_null_replay_status(
+                marker, event_class
+            ),
+            f"0008 requires next_claim_status for {event_class}",
+        )
+
     expect_integrity_error(
         lambda: con.execute(
             "INSERT INTO pattern_erasure_replay_events ("

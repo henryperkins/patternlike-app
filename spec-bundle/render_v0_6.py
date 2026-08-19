@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import zipfile
 from functools import partial
 
@@ -406,6 +407,23 @@ def digest(path: str):
     return hashlib.sha256(data).hexdigest(), len(data)
 
 
+def check_text_digest_line_endings() -> bool:
+    """Prove text build-input hashes do not depend on checkout line endings."""
+    with tempfile.TemporaryDirectory() as directory:
+        for suffix in (".md", ".json", ".py", ".txt"):
+            lf_path = os.path.join(directory, f"lf{suffix}")
+            crlf_path = os.path.join(directory, f"crlf{suffix}")
+            io.open(lf_path, "wb").write(b"first\nsecond\n")
+            io.open(crlf_path, "wb").write(b"first\r\nsecond\r\n")
+            if digest(lf_path) != digest(crlf_path):
+                print(
+                    f"line-ending-sensitive build-input digest for {suffix}",
+                    file=sys.stderr,
+                )
+                return False
+    return True
+
+
 def write_manifest() -> None:
     files = {}
     for path in (SOURCE, DOCX, PDF):
@@ -443,6 +461,8 @@ def write_manifest() -> None:
 
 
 def main() -> int:
+    if not check_text_digest_line_endings():
+        return 1
     blocks = parse_blocks(io.open(SOURCE, encoding="utf-8").read())
     artifact_paths = (DOCX, PDF, MANIFEST)
 
