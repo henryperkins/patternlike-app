@@ -150,7 +150,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/GenerationId'
       responses:
-        '200': { description: Generation reconciled }
+        '202': { description: Generation reconciliation accepted }
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }

@@ -18,11 +18,35 @@
       "properties": {
         "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
         "generation_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" },
-        "stage": { "type": "string", "minLength": 1 },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "reserved",
+            "planning",
+            "plan_validating",
+            "writing",
+            "candidate_validating",
+            "semantic_verifying",
+            "publishing",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
         "created_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
         "ontology_version": { "type": "string", "minLength": 1 },
-        "plan_hash": { "type": ["string", "null"] },
-        "candidate_hash": { "type": ["string", "null"] },
+        "plan_hash": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" }
+          ]
+        },
+        "candidate_hash": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" }
+          ]
+        },
         "artifact_count": { "type": "integer", "minimum": 0 },
         "exact_artifacts_retained": { "type": "boolean" }
       }
