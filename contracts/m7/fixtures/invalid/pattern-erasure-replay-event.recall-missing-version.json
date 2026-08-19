@@ -12,5 +12,6 @@
   "prior_claim_status": null,
   "next_claim_status": null,
   "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "signing_key_id": "replay-key-2026-08",
   "signature": "test-signature"
 }

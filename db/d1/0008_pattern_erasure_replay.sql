@@ -33,10 +33,16 @@ CREATE TABLE pattern_erasure_replay_events (
   next_claim_status TEXT,
   content_hash TEXT NOT NULL
     CHECK (content_hash GLOB 'sha256:*' AND length(content_hash) = 71),
+  signing_key_id TEXT NOT NULL
+    CHECK (length(signing_key_id) BETWEEN 1 AND 128),
   signature TEXT NOT NULL,
   replica_put_at TEXT NOT NULL,
   created_at TEXT NOT NULL,
   CHECK ((event_class = 'ontology_recalled') = (next_claim_status IS NULL)),
+  CHECK (
+    event_class != 'ontology_recalled'
+    OR (ontology_version IS NOT NULL AND length(ontology_version) > 0)
+  ),
   CHECK (
     (
       event_class = 'ontology_recalled'

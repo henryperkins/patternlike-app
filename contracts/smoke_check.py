@@ -967,11 +967,12 @@ def check_0008_replay_ledger() -> None:
     }
     assert "user_id" not in columns, columns
     assert "target_user_id" in columns, columns
+    assert "signing_key_id" in columns, columns
     con.execute(
         "INSERT INTO pattern_erasure_replay_events ("
         "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
         "claim_id, generation_id, pattern_id, ontology_version, prior_claim_status, "
-        "next_claim_status, content_hash, signature, replica_put_at, created_at"
+        "next_claim_status, content_hash, signing_key_id, signature, replica_put_at, created_at"
         ") VALUES ("
         "'prel_ffffffffffffffffffffffffffffffff', 'pattern_deleted', ?, "
         "'usr_0123456789abcdef0123456789abcdef', "
@@ -981,19 +982,19 @@ def check_0008_replay_ledger() -> None:
         "'pat_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', "
         "'1.0.0', 'accepted', 'deleted', "
         "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-        "'sig', ?, ?)",
+        "'test-key', 'sig', ?, ?)",
         (NOW, NOW, NOW),
     )
     try:
         con.execute(
             "INSERT INTO pattern_erasure_replay_events ("
             "event_id, event_class, occurred_at, next_claim_status, "
-            "content_hash, signature, replica_put_at, created_at"
+            "content_hash, signing_key_id, signature, replica_put_at, created_at"
             ") VALUES ("
             "'prel_11111111111111111111111111111111', 'pattern_deleted', ?, "
             "'available', "
             "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "'sig', ?, ?)",
+            "'test-key', 'sig', ?, ?)",
             (NOW, NOW, NOW),
         )
         raise SystemExit("0008 accepted next_claim_status=available")
@@ -1004,13 +1005,14 @@ def check_0008_replay_ledger() -> None:
         con.execute(
             "INSERT INTO pattern_erasure_replay_events ("
             "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
-            "claim_id, next_claim_status, content_hash, signature, replica_put_at, created_at"
+            "claim_id, next_claim_status, content_hash, signing_key_id, signature, "
+            "replica_put_at, created_at"
             ") VALUES (?, ?, ?, "
             "'usr_0123456789abcdef0123456789abcdef', "
             "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
             "'pgc_dddddddddddddddddddddddddddddddd', NULL, "
             "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "'sig', ?, ?)",
+            "'test-key', 'sig', ?, ?)",
             (f"prel_{marker * 32}", event_class, NOW, NOW, NOW),
         )
 
@@ -1032,12 +1034,12 @@ def check_0008_replay_ledger() -> None:
         lambda: con.execute(
             "INSERT INTO pattern_erasure_replay_events ("
             "event_id, event_class, occurred_at, next_claim_status, "
-            "content_hash, signature, replica_put_at, created_at"
+            "content_hash, signing_key_id, signature, replica_put_at, created_at"
             ") VALUES ("
             "'prel_22222222222222222222222222222222', 'pattern_deleted', ?, "
             "'deleted', "
             "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "'sig', ?, ?)",
+            "'test-key', 'sig', ?, ?)",
             (NOW, NOW, NOW),
         ),
         "0008 requires target, fingerprint, and claim outside recall/account deletion",
@@ -1046,14 +1048,15 @@ def check_0008_replay_ledger() -> None:
         lambda: con.execute(
             "INSERT INTO pattern_erasure_replay_events ("
             "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
-            "claim_id, next_claim_status, content_hash, signature, replica_put_at, created_at"
+            "claim_id, next_claim_status, content_hash, signing_key_id, signature, "
+            "replica_put_at, created_at"
             ") VALUES ("
             "'prel_33333333333333333333333333333333', 'pattern_deleted', ?, "
             "'usr_0123456789abcdef0123456789abcdef', "
             "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
             "'pgc_dddddddddddddddddddddddddddddddd', 'withdrawn', "
             "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "'sig', ?, ?)",
+            "'test-key', 'sig', ?, ?)",
             (NOW, NOW, NOW),
         ),
         "0008 binds lifecycle event classes to their terminal status",
@@ -1062,14 +1065,14 @@ def check_0008_replay_ledger() -> None:
         lambda: con.execute(
             "INSERT INTO pattern_erasure_replay_events ("
             "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
-            "claim_id, next_claim_status, content_hash, signature, created_at"
+            "claim_id, next_claim_status, content_hash, signing_key_id, signature, created_at"
             ") VALUES ("
             "'prel_99999999999999999999999999999999', 'pattern_deleted', ?, "
             "'usr_0123456789abcdef0123456789abcdef', "
             "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
             "'pgc_dddddddddddddddddddddddddddddddd', 'deleted', "
             "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "'sig', ?)",
+            "'test-key', 'sig', ?)",
             (NOW, NOW),
         ),
         "0008 requires proof that the R2 write-ahead succeeded",
@@ -1078,11 +1081,11 @@ def check_0008_replay_ledger() -> None:
         lambda: con.execute(
             "INSERT INTO pattern_erasure_replay_events ("
             "event_id, event_class, occurred_at, next_claim_status, "
-            "content_hash, signature, replica_put_at, created_at"
+            "content_hash, signing_key_id, signature, replica_put_at, created_at"
             ") VALUES ("
             "'prel_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'ontology_recalled', ?, NULL, "
             "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "'sig', ?, ?)",
+            "'test-key', 'sig', ?, ?)",
             (NOW, NOW, NOW),
         ),
         "0008 requires ontology_version on a recall tombstone",

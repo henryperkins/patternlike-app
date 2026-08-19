@@ -20,6 +20,7 @@
         "prior_claim_status",
         "next_claim_status",
         "content_hash",
+        "signing_key_id",
         "signature"
       ],
       "properties": {
@@ -82,6 +83,12 @@
           ]
         },
         "content_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "signing_key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
         "signature": { "type": "string", "minLength": 1 }
       },
       "allOf": [
@@ -91,7 +98,10 @@
             "required": ["event_class"]
           },
           "then": {
-            "properties": { "next_claim_status": { "type": "null" } }
+            "properties": {
+              "ontology_version": { "type": "string", "minLength": 1 },
+              "next_claim_status": { "type": "null" }
+            }
           },
           "else": {
             "properties": {

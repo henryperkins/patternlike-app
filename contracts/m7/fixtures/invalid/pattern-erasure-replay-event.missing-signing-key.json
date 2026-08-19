@@ -1,6 +1,6 @@
 {
   "schema_version": "0.7.0",
-  "event_id": "prel_22222222222222222222222222222222",
+  "event_id": "prel_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "event_class": "pattern_deleted",
   "occurred_at": "2026-08-16T12:00:00Z",
   "target_user_id": "usr_01JAMPLEUSER00000001",
@@ -10,8 +10,7 @@
   "pattern_id": "pat_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "ontology_version": "1.0.0",
   "prior_claim_status": "accepted",
-  "next_claim_status": "withdrawn",
+  "next_claim_status": "deleted",
   "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-  "signing_key_id": "replay-key-2026-08",
   "signature": "test-signature"
 }
