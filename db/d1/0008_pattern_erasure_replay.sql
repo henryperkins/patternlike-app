@@ -36,6 +36,7 @@ CREATE TABLE pattern_erasure_replay_events (
   signature TEXT NOT NULL,
   replica_put_at TEXT,
   created_at TEXT NOT NULL,
+  CHECK ((event_class = 'ontology_recalled') = (next_claim_status IS NULL)),
   CHECK (
     (
       event_class = 'ontology_recalled'
