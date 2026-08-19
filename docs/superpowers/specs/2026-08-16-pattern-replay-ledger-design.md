@@ -19,10 +19,17 @@ finding 8 / decision 11.
 - `0008` creates `pattern_erasure_replay_events`. Later M7 migrations
   (per-stage-class usage, a D1 provenance-origin convenience column) take
   `0009` or later.
-- The D1 table is the live write-ahead. The restore source is a create-only
-  R2 replica (`pattern-erasure-replay/`) that is **outside** D1 Time Travel.
-  Replaying from the restored D1 table would prove nothing: the snapshot
-  contains the pre-deletion rows.
+- The create-only R2 object (`pattern-erasure-replay/`) is the durable
+  write-ahead and restore authority. It is **outside** D1 Time Travel. The D1
+  row is a live receipt written only after the R2 put succeeds. Replaying from
+  the restored D1 table would prove nothing: the snapshot contains the
+  pre-deletion rows.
+- R2-first ordering is deliberately privacy-conservative. A crash after the
+  R2 put but before the D1 batch leaves a signed intent that replay may apply
+  even though the lost live database never committed the transition. That can
+  suppress content or consume a claim; it cannot resurrect content or permit
+  a reroll. The reverse ordering has an unrecoverable window in which D1
+  commits an erasure that never reaches the only store surviving a restore.
 - Records are signed with a dedicated `PATTERN_REPLAY_LEDGER_KEYS` allowlist,
   canonicalized the same way ontology releases are: JCS over the record
   minus `content_hash` and `signature`.
@@ -104,13 +111,20 @@ No other properties. No content fields.
    `PATTERN_REPLAY_LEDGER_KEYS`. Production refuses to write or replay
    when the allowlist is missing. Development may skip verification only
    when `ENVIRONMENT` is `development` or `test`.
-4. The same guarded batch that mutates a claim inserts the D1 row and
-   puts the signed JSON to R2 at
-   `pattern-erasure-replay/{event_id}.json` with create-only semantics.
-   A colliding object with different bytes is an integrity defect.
-5. R2 success is not proof the D1 row committed; the D1 row is the
-   outbox. `POST /internal/pattern-erasure-replay/sweep` re-puts rows
-   whose replica is missing. A restore uses the replica, not the table.
+4. After authorization and lifecycle preconditions pass, but before any D1
+   mutation, the Worker puts the signed JSON to R2 at
+   `pattern-erasure-replay/{event_id}.json` with create-only semantics. A
+   colliding object with different bytes is an integrity defect.
+5. Only after that put succeeds does one guarded D1 batch mutate the claim and
+   insert the matching receipt with non-null `replica_put_at`. No R2 operation
+   occurs inside a D1 batch; Cloudflare provides no cross-service transaction.
+6. If the D1 batch fails, the R2 object remains the durable lifecycle intent.
+   An exact retry uses the same event ID and bytes.
+   `POST /internal/pattern-erasure-replay/sweep` lists signed replica objects
+   and applies any whose D1 receipt or terminal transition is missing. It never
+   tries to reconstruct the write-ahead from D1.
+7. The originating request succeeds only after the D1 batch commits. A restore
+   still uses the replica, not the table.
 
 `PATTERN_REPLAY_LEDGER_KEYS` is a new secret. It is not
 `PATTERN_ONTOLOGY_KEYS` and not `ROOT_KEK`.
@@ -161,15 +175,17 @@ do not classify it: there is no `user_id` column and no FK to `users`.
 
 A design is implementable when:
 
-1. a claim transition writes a signed event and a replica object in the
-   same batch, or the claim transition does not commit;
-2. sweep re-puts a committed row whose replica is missing;
-3. apply on a database whose claim is `available` and whose replica
+1. a signed create-only R2 object commits before the corresponding D1 claim
+   transition, and a failed R2 put leaves D1 unchanged;
+2. the guarded D1 transition inserts a receipt with non-null `replica_put_at`;
+3. a crash between the R2 put and D1 batch leaves an intent that exact retry
+   or sweep applies without returning any claim to `available`;
+4. apply on a database whose claim is `available` and whose replica
    says `deleted` leaves the claim `deleted` with `consumed_at` set;
-4. apply never returns a claim to `available`;
-5. account deletion writes `account_deleted` and leaves the ledger
+5. apply never returns a claim to `available`;
+6. account deletion writes `account_deleted` and leaves the ledger
    rows in place;
-6. `python3 contracts/validate_schemas.py` accepts the event schema
+7. `python3 contracts/validate_schemas.py` accepts the event schema
    and its fixtures.
 
 Criterion 23 remains a Slice D drill against this runtime.

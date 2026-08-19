@@ -266,8 +266,10 @@ any D1 provenance-origin convenience column take `0009` or share a later
 migration; they do not collide with this number.
 
 The ledger is not user-owned. Account deletion **writes** a ledger event;
-it does not delete ledger rows. The D1 table is the live write-ahead. The
-restore source is a create-only R2 replica outside D1 Time Travel.
+it does not delete ledger rows. A create-only R2 object is the durable
+write-ahead and restore authority outside D1 Time Travel. The D1 table stores
+the live receipt only after that put succeeds, so no D1-to-R2 crash window can
+drop an erasure from the restore source.
 
 ### 12. OpenAPI — twelve surfaces
 
