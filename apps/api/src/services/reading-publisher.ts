@@ -140,6 +140,105 @@ export function resolveAiGatewayRoute(env: Partial<Env>): AiGatewayOutcome {
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// Provider credential mode
+// ---------------------------------------------------------------------------
+
+/**
+ * How this deployment authenticates to OpenAI.
+ *
+ * `worker` sends the Worker's own key as `Authorization`. `gateway_stored`
+ * sends NO provider `Authorization` at all and names a stored key by alias, so
+ * AI Gateway supplies the credential from BYOK.
+ *
+ * The distinction is load-bearing, not cosmetic. On a provider-native request a
+ * key on the request has FIRST precedence: AI Gateway forwards it and never
+ * consults the stored key. So a deployment that means to use BYOK but still
+ * sends `Authorization` silently bypasses the stored key -- and rotating the
+ * gateway-stored key would appear to succeed while every request kept using the
+ * Worker secret.
+ */
+export type ProviderCredentialMode =
+  | { source: "worker"; apiKey: string }
+  | { source: "gateway_stored"; alias: string };
+
+export type ProviderCredentialOutcome =
+  | { ok: true; mode: ProviderCredentialMode }
+  | { ok: false; message: string };
+
+export const OPENAI_CREDENTIAL_SOURCES = ["worker", "gateway_stored"] as const;
+
+/**
+ * Resolve the credential mode, or refuse.
+ *
+ * Selected by an explicit variable and NEVER inferred from whether
+ * `OPENAI_API_KEY` happens to be set: inference cannot tell "the stored key is
+ * in use" from "the worker key was forgotten", and those two need opposite
+ * outcomes -- one is correct, the other must refuse to serve.
+ *
+ * Every refusal names the conflicting variables and never their values.
+ */
+export function resolveProviderCredentialMode(
+  env: Partial<Env>,
+  route: AiGatewayRoute | null,
+): ProviderCredentialOutcome {
+  const source = env.OPENAI_CREDENTIAL_SOURCE?.trim() ?? "";
+  const apiKey = env.OPENAI_API_KEY?.trim() ?? "";
+  const alias = env.OPENAI_GATEWAY_KEY_ALIAS?.trim() ?? "";
+
+  if (source === "") {
+    return { ok: false, message: "OPENAI_CREDENTIAL_SOURCE is required when a rollout is enabled" };
+  }
+  if (!(OPENAI_CREDENTIAL_SOURCES as readonly string[]).includes(source)) {
+    return { ok: false, message: "OPENAI_CREDENTIAL_SOURCE must be worker or gateway_stored" };
+  }
+
+  if (source === "worker") {
+    if (apiKey === "") {
+      return { ok: false, message: "OPENAI_API_KEY is required when OPENAI_CREDENTIAL_SOURCE=worker" };
+    }
+    // Today's behaviour exactly. The direct path and the live reading rollout
+    // are unaffected by this task.
+    return { ok: true, mode: { source: "worker", apiKey } };
+  }
+
+  // A stored key only exists behind a gateway.
+  if (route === null) {
+    return {
+      ok: false,
+      message:
+        "OPENAI_CREDENTIAL_SOURCE=gateway_stored requires AI_GATEWAY_ACCOUNT_ID and AI_GATEWAY_ID",
+    };
+  }
+  // BYOK's prerequisite is an authenticated gateway. Discovering this as an
+  // ambiguous 401 in the middle of a generation is far too late.
+  if (route.token === null) {
+    return {
+      ok: false,
+      message: "OPENAI_CREDENTIAL_SOURCE=gateway_stored requires AI_GATEWAY_TOKEN",
+    };
+  }
+  // Refused rather than tolerated: a request key wins over BYOK, so accepting
+  // both would silently bypass the stored alias this mode exists to use.
+  if (apiKey !== "") {
+    return {
+      ok: false,
+      message: "OPENAI_API_KEY must not be set when OPENAI_CREDENTIAL_SOURCE=gateway_stored",
+    };
+  }
+  // Pinned explicitly rather than left to the implicit `default` alias: adding a
+  // second stored key later would otherwise change nothing until somebody
+  // noticed which one `default` pointed at.
+  if (alias === "") {
+    return {
+      ok: false,
+      message: "OPENAI_GATEWAY_KEY_ALIAS is required when OPENAI_CREDENTIAL_SOURCE=gateway_stored",
+    };
+  }
+  return { ok: true, mode: { source: "gateway_stored", alias } };
+}
+
 /**
  * The Responses endpoint for a route, or the direct one for `null`.
  *
@@ -194,7 +293,7 @@ export interface PublisherConfig {
   pregenLeadMinutes: number;
   pregenSpreadMinutes: number;
   schedulerBatchLimit: number;
-  apiKey: string;
+  credential: ProviderCredentialMode;
 }
 
 export type PublisherConfigOutcome =
@@ -383,7 +482,6 @@ export function resolvePublisherConfiguration(
       "OPENAI_READING_PROMPT_VERSION must be the exact compiled prompt version",
     );
   }
-  const apiKey = env.OPENAI_API_KEY?.trim();
   const required: Array<[unknown, string]> = [
     [publisher, "READING_PUBLISHER"],
     [model, "OPENAI_READING_MODEL"],
@@ -397,9 +495,13 @@ export function resolvePublisherConfiguration(
     [env.READING_PREGEN_SPREAD_MINUTES?.trim(), "READING_PREGEN_SPREAD_MINUTES"],
     [env.READING_SCHEDULER_BATCH_LIMIT?.trim(), "READING_SCHEDULER_BATCH_LIMIT"],
     [callLimit, "READING_DAILY_PROVIDER_CALL_LIMIT"],
-    // Named, never valued: the message reaches the caller.
-    [apiKey, "OPENAI_API_KEY"],
+    // OPENAI_API_KEY is deliberately NOT listed here any more. Whether it is
+    // required, forbidden, or irrelevant depends on the credential mode, which
+    // resolveProviderCredentialMode decides below and names in its own refusal.
   ];
+  const credential = resolveProviderCredentialMode(env, gateway.route);
+  if (!credential.ok) return misconfigured(credential.message);
+
   const missing = required.filter(([value]) => value === undefined || value === null || value === "");
   if (missing.length > 0) {
     return misconfigured(
@@ -432,7 +534,7 @@ export function resolvePublisherConfiguration(
       pregenLeadMinutes: READING_PREGEN_LEAD_MINUTES,
       pregenSpreadMinutes: READING_PREGEN_SPREAD_MINUTES,
       schedulerBatchLimit: READING_SCHEDULER_BATCH_LIMIT,
-      apiKey: apiKey!,
+      credential: credential.mode,
     },
   };
 }

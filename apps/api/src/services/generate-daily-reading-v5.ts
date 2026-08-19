@@ -63,6 +63,7 @@ import {
   OPENAI_READING_TIMEOUT_MS,
   READING_CONTEXT_MAX_BYTES,
   resolveAiGatewayRoute,
+  resolveProviderCredentialMode,
 } from "./reading-publisher.js";
 import { READING_PROMPT_VERSION } from "./reading-prompt.js";
 import { safeLog } from "./safe-log.js";
@@ -621,13 +622,20 @@ export async function generateDailyReadingV5(
   if (!gateway.ok) {
     return fail("publisher_not_configured", "publisher_not_configured");
   }
+  // Same reason as the gateway check above: a credential mode that cannot be
+  // resolved is a configuration problem, and discovering it should not cost a
+  // slot from the day's approved allowance.
+  const credential = resolveProviderCredentialMode(env, gateway.route);
+  if (!credential.ok) {
+    return fail("publisher_not_configured", "publisher_not_configured");
+  }
   const budget = await consumeProviderCallBudget(env, utcDateFor(new Date()), limit);
   if (!budget.ok) {
     return fail("publisher_budget_exhausted", "provider_budget_exhausted");
   }
 
   const providerStartedAt = Date.now();
-  const publisher = await createOpenAiReadingPublisher(env, gateway.route).publish(prepared.request, {
+  const publisher = await createOpenAiReadingPublisher(credential.mode, gateway.route).publish(prepared.request, {
     requestId: newId("req"),
     timeoutMs: OPENAI_READING_TIMEOUT_MS,
     configuration: command.publisher,

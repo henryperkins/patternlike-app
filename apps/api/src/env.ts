@@ -102,6 +102,15 @@ export interface Env {
   READING_DAILY_PROVIDER_CALL_LIMIT?: string;
   /** Secret. Never a var, and never written to wrangler.toml. */
   OPENAI_API_KEY?: string;
+  /**
+   * `worker` | `gateway_stored`. Required whenever a rollout is not `off`.
+   * Never inferred from whether OPENAI_API_KEY is set -- inference cannot tell
+   * "stored key in use" from "worker key forgotten", and those need opposite
+   * outcomes. See resolveProviderCredentialMode.
+   */
+  OPENAI_CREDENTIAL_SOURCE?: string;
+  /** The BYOK alias, sent as cf-aig-byok-alias. Required for gateway_stored. */
+  OPENAI_GATEWAY_KEY_ALIAS?: string;
 
   /**
    * Cloudflare AI Gateway, in front of the provider. Optional: absent means the

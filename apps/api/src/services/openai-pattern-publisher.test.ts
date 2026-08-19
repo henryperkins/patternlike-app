@@ -108,7 +108,7 @@ describe("OpenAI Pattern publisher", () => {
   describe("one request per pass", () => {
     it("makes exactly one fetch and returns the parsed document, bytes, and hash", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", { pass: "planner" }, OPTIONS);
 
       expect(calls).toHaveLength(1);
@@ -126,7 +126,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("never retries, on any status", async () => {
       stubFetch(() => new Response("{}", { status: 500 }));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       await publisher.run("writer", {}, OPTIONS);
       expect(calls).toHaveLength(1);
     });
@@ -136,7 +136,7 @@ describe("OpenAI Pattern publisher", () => {
       // differently, which only holds if the hash is over the raw bytes.
       const spaced = ` ${JSON.stringify(envelope(PLAN))} `;
       stubFetch(() => new Response(spaced, { status: 200 }));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const first = await publisher.run("planner", {}, OPTIONS);
 
       stubFetch(() => ok(PLAN));
@@ -154,7 +154,7 @@ describe("OpenAI Pattern publisher", () => {
   describe("outgoing headers", () => {
     it("pins the three gateway headers with their exact values on a routed request", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
       await publisher.run("planner", {}, OPTIONS);
 
       const { headers } = calls[0]!;
@@ -168,7 +168,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("sends no gateway header at all without a route", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       await publisher.run("planner", {}, OPTIONS);
 
       for (const name of Object.keys(calls[0]!.headers)) {
@@ -200,7 +200,7 @@ describe("OpenAI Pattern publisher", () => {
       for (const route of [null, ROUTE]) {
         calls = [];
         stubFetch(() => ok(PLAN));
-        const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, route);
+        const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, route);
         await publisher.run("writer", {}, OPTIONS);
 
         const names = Object.keys(calls[0]!.headers);
@@ -212,7 +212,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("builds the gateway path without the doubled /v1 that 404s", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
       await publisher.run("planner", {}, OPTIONS);
       expect(calls[0]!.url).toBe(
         `https://gateway.ai.cloudflare.com/v1/${"a".repeat(32)}/patternlike/openai/responses`,
@@ -222,7 +222,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("sends the pass's own schema name and token ceiling", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       await publisher.run("writer", {}, OPTIONS);
       const body = calls[0]!.body as { text: { format: { name: string } }; max_output_tokens: number };
       expect(body.text.format.name).toBe("patternlike_pattern_document_v7");
@@ -248,7 +248,7 @@ describe("OpenAI Pattern publisher", () => {
             status,
           }),
       );
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, OPTIONS);
 
       expect(result.ok).toBe(false);
@@ -260,7 +260,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("refuses without an API key before spending a round trip", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "  " }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "  " }, null);
       const result = await publisher.run("planner", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -275,7 +275,7 @@ describe("OpenAI Pattern publisher", () => {
           throw Object.assign(new Error("boom"), { name: "TypeError" });
         }),
       );
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -296,7 +296,7 @@ describe("OpenAI Pattern publisher", () => {
             { status: 200 },
           ),
       );
-      let publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      let publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       let result = await publisher.run("writer", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("publisher_refused");
@@ -313,7 +313,7 @@ describe("OpenAI Pattern publisher", () => {
             { status: 200 },
           ),
       );
-      publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       result = await publisher.run("writer", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.safe_detail_code).toBe("max_output_tokens_exhausted");
@@ -321,7 +321,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("rejects a body that is not a JSON object", async () => {
       stubFetch(() => new Response("not json at all", { status: 200 }));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.safe_detail_code).toBe("invalid_json");
@@ -337,7 +337,7 @@ describe("OpenAI Pattern publisher", () => {
             { status: 200 },
           ),
       );
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.safe_detail_code).toBe("schema_mismatch");
@@ -347,7 +347,7 @@ describe("OpenAI Pattern publisher", () => {
   describe("gateway-layer classification", () => {
     it("calls a direct non-2xx a provider failure", async () => {
       stubFetch(() => new Response("{}", { status: 429 }));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, OPTIONS);
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.origin_layer).toBe("provider");
@@ -362,7 +362,7 @@ describe("OpenAI Pattern publisher", () => {
               status: 403,
             }),
         );
-        const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+        const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
         const result = await publisher.run("planner", {}, OPTIONS);
         expect(result.ok).toBe(false);
         if (result.ok) return;
@@ -380,7 +380,7 @@ describe("OpenAI Pattern publisher", () => {
       ]) {
         calls = [];
         stubFetch(() => new Response(body, { status: 429 }));
-        const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+        const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
         const result = await publisher.run("planner", {}, OPTIONS);
         expect(result.ok).toBe(false);
         if (result.ok) return;
@@ -395,7 +395,7 @@ describe("OpenAI Pattern publisher", () => {
   describe("response-header invariants", () => {
     it("fails terminally on a cache HIT", async () => {
       stubFetch(() => ok(PLAN, { "cf-aig-cache-status": "HIT" }));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
       const result = await publisher.run("planner", {}, OPTIONS);
       // A hit gives two Patterns one provider_request_id and one response hash:
       // stored evidence naming a generation that did not happen.
@@ -412,7 +412,7 @@ describe("OpenAI Pattern publisher", () => {
         ["SOMETHING_NEW", "unrecognized"],
       ] as Array<[string | null, string]>) {
         stubFetch(() => ok(PLAN, header ? { "cf-aig-cache-status": header } : {}));
-        const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+        const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
         const result = await publisher.run("planner", {}, OPTIONS);
         expect(result.ok, `${header} should succeed`).toBe(true);
         if (!result.ok) return;
@@ -425,7 +425,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("fails terminally when a DLP policy matched", async () => {
       stubFetch(() => ok(PLAN, { "cf-aig-dlp": "policy-matched" }));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
       const result = await publisher.run("planner", {}, OPTIONS);
       // Its presence proves an undisclosed inspector processed this content.
       expect(result.ok).toBe(false);
@@ -438,7 +438,7 @@ describe("OpenAI Pattern publisher", () => {
   describe("correlation id", () => {
     it("never sends the Worker's own request id to the provider", async () => {
       stubFetch(() => ok(PLAN));
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, ROUTE);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, ROUTE);
       await publisher.run("planner", { pass: "planner" }, {
         ...OPTIONS,
         requestId: "ZZCORRELATIONZZ",
@@ -455,7 +455,7 @@ describe("OpenAI Pattern publisher", () => {
       "answers the %s pass through the mock, routed on the schema name",
       async (pass) => {
         vi.unstubAllGlobals();
-        const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+        const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
         const result = await publisher.run(pass, { pass }, OPTIONS);
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -468,7 +468,7 @@ describe("OpenAI Pattern publisher", () => {
       vi.unstubAllGlobals();
       const sentinel = pin();
       sentinel.planner_model = OPENAI_MOCK_AUTH_FAILED;
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, { ...OPTIONS, configuration: sentinel });
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -479,7 +479,7 @@ describe("OpenAI Pattern publisher", () => {
 
     it("refuses an unmocked host rather than reaching the network", async () => {
       vi.unstubAllGlobals();
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, {
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, {
         accountId: "b".repeat(32),
         gatewayId: "patternlike",
         token: null,
@@ -522,7 +522,7 @@ describe("OpenAI Pattern publisher", () => {
         }),
       );
 
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, { ...OPTIONS, timeoutMs: 50 });
 
       // The invariant is that a typed failure arrives at all, inside the deadline.
@@ -539,12 +539,63 @@ describe("OpenAI Pattern publisher", () => {
       vi.unstubAllGlobals();
       const sentinel = pin();
       sentinel.planner_model = OPENAI_MOCK_ECHO_WRONG_DATE;
-      const publisher = createOpenAiPatternTransport({ OPENAI_API_KEY: "sk-test" }, null);
+      const publisher = createOpenAiPatternTransport({ source: "worker" as const, apiKey: "sk-test" }, null);
       const result = await publisher.run("planner", {}, { ...OPTIONS, configuration: sentinel });
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect((result.parsed as { schema_version?: string }).schema_version).toBe("0.7.0");
+    });
+  });
+
+  describe("credential mode", () => {
+    const STORED = { source: "gateway_stored" as const, alias: "primary" };
+
+    it("sends NO provider authorization in stored mode, which is what lets BYOK win", async () => {
+      stubFetch(() => ok(PLAN));
+      const publisher = createOpenAiPatternTransport(STORED, ROUTE);
+      await publisher.run("planner", {}, OPTIONS);
+
+      const { headers } = calls[0]!;
+      // On a provider-native request a key on the request has FIRST precedence:
+      // the gateway forwards it and never consults the stored key. Sending one
+      // here would silently bypass the alias below.
+      expect(headers).not.toHaveProperty("authorization");
+      expect(headers["cf-aig-byok-alias"]).toBe("primary");
+      expect(headers["cf-aig-authorization"]).toBe("Bearer gwtoken");
+    });
+
+    it("sends the alias only in stored mode, and only with a route", async () => {
+      stubFetch(() => ok(PLAN));
+      await createOpenAiPatternTransport(
+        { source: "worker", apiKey: "sk-test" },
+        ROUTE,
+      ).run("planner", {}, OPTIONS);
+      expect(calls[0]!.headers).not.toHaveProperty("cf-aig-byok-alias");
+      expect(calls[0]!.headers.authorization).toBe("Bearer sk-test");
+
+      calls = [];
+      stubFetch(() => ok(PLAN));
+      await createOpenAiPatternTransport(STORED, null).run("planner", {}, OPTIONS);
+      // No route means no gateway, so there is nothing to name an alias to.
+      expect(calls[0]!.headers).not.toHaveProperty("cf-aig-byok-alias");
+    });
+
+    it("keeps worker mode byte-identical to today", async () => {
+      stubFetch(() => ok(PLAN));
+      await createOpenAiPatternTransport({ source: "worker", apiKey: "sk-test" }, ROUTE).run(
+        "planner",
+        {},
+        OPTIONS,
+      );
+      expect(Object.keys(calls[0]!.headers).sort()).toEqual([
+        "authorization",
+        "cf-aig-authorization",
+        "cf-aig-collect-log",
+        "cf-aig-max-attempts",
+        "cf-aig-skip-cache",
+        "content-type",
+      ]);
     });
   });
 });

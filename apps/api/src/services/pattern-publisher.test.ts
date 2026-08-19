@@ -229,7 +229,7 @@ describe("Pattern publisher factories", () => {
         return new Response("{}", { status: 200 });
       }) as typeof fetch;
       try {
-        const publisher = createOpenAiPatternPublisher({ OPENAI_API_KEY: "sk-test" }, null);
+        const publisher = createOpenAiPatternPublisher({ source: "worker" as const, apiKey: "sk-test" }, null);
         const result = await publisher.plan({}, options(false));
         expect(result.ok).toBe(false);
         if (result.ok) return;

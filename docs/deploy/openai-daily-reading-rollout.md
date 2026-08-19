@@ -387,3 +387,67 @@ not run.
 | 8 first open | | | |
 | 9 load probe | | | |
 | 10 scheduler | | | |
+
+## Provider credential mode and the BYOK cutover
+
+`OPENAI_CREDENTIAL_SOURCE` declares how this Worker authenticates to OpenAI. It
+is `worker` today in both Wrangler blocks, which is byte-identical to the
+behaviour that shipped before it existed: the Worker's own `OPENAI_API_KEY`
+rides `Authorization`, and AI Gateway forwards it.
+
+The mode is **selected explicitly and never inferred** from whether
+`OPENAI_API_KEY` happens to be set. Inference cannot distinguish "the stored key
+is in use" from "the worker key was forgotten", and those two need opposite
+outcomes — one is a correct BYOK deployment, the other must refuse to serve.
+
+### Why sending the key at all defeats BYOK
+
+On a provider-native request, a provider key on the request has **first
+precedence**: AI Gateway forwards it and does *not* consult the stored key. A
+deployment that intends BYOK but still sends `Authorization` therefore bypasses
+the stored key silently — and rotating the gateway-stored key would appear to
+succeed while every request kept running on the Worker secret. `gateway_stored`
+mode sends no provider `Authorization` at all; that absence is what lets the
+stored credential win.
+
+### The cutover is one Worker version, not a sequence of edits
+
+Moving from `worker` to `gateway_stored` changes four things, and **all four
+must land in a single Worker version**:
+
+1. `AI_GATEWAY_ACCOUNT_ID` and `AI_GATEWAY_ID` become non-empty;
+2. `OPENAI_GATEWAY_KEY_ALIAS` becomes non-empty;
+3. `AI_GATEWAY_TOKEN` is available to that version (BYOK requires an
+   authenticated gateway, so the token stops being optional); and
+4. `OPENAI_API_KEY` is **absent** from that same version.
+
+No intermediate state is valid, and the ordinary tooling cannot produce one
+safely: `wrangler secret delete` deploys immediately, so deleting the key first
+breaks `worker` mode for live readings, while deploying `gateway_stored` first
+is refused outright because the key is still present. Use a staged Worker
+version, or an explicitly temporary migration state that never sends provider
+`Authorization` and is removed once the old secret is gone. Do not improvise the
+sequence against production.
+
+### What the configuration refuses
+
+Each of these is a `503 configuration_error` on the next request rather than a
+runtime surprise, and each names the conflicting variables and never their
+values:
+
+| Condition | Why it is refused |
+| --- | --- |
+| `OPENAI_CREDENTIAL_SOURCE` absent while a rollout is not `off` | The mode is never inferred |
+| `worker` with no `OPENAI_API_KEY` | Nothing to authenticate with |
+| `gateway_stored` with no gateway route | A stored key only exists behind a gateway |
+| `gateway_stored` with no `AI_GATEWAY_TOKEN` | BYOK requires an authenticated gateway; an ambiguous 401 mid-generation is too late |
+| `gateway_stored` with `OPENAI_API_KEY` still set | The request key would win and silently bypass the stored alias |
+| `gateway_stored` with no `OPENAI_GATEWAY_KEY_ALIAS` | Leaving the alias implicit means a second stored key later changes which credential runs, silently |
+
+### Zero Data Retention does not cover this path
+
+Cloudflare's ZDR toggle applies only to Unified Billing requests using
+Cloudflare-managed credentials. It does **not** apply to BYOK. Do not record it
+as a mitigation for Pattern or reading traffic; `cf-aig-collect-log: false`,
+which both adapters send on every routed request, is the control that keeps
+prompts and responses out of gateway logs.

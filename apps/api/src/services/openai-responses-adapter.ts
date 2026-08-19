@@ -19,7 +19,12 @@ export {
   OPENAI_RESPONSES_URL,
   AI_GATEWAY_ORIGIN,
 } from "./reading-publisher.js";
-export type { AiGatewayRoute, AiGatewayOutcome } from "./reading-publisher.js";
+export type {
+  AiGatewayRoute,
+  AiGatewayOutcome,
+  ProviderCredentialMode,
+} from "./reading-publisher.js";
+export { resolveProviderCredentialMode } from "./reading-publisher.js";
 
 export type PublisherFailureCode =
   | "publisher_unavailable"

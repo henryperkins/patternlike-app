@@ -18,7 +18,6 @@
  */
 
 import { contentHash, type ReadingGenerationOutput } from "@patternlike/shared";
-import type { Env } from "../env.js";
 import { buildResponsesRequest } from "./reading-prompt.js";
 import {
   readOpenAiIncompleteReason,
@@ -36,6 +35,7 @@ import {
   responsesUrlFor,
   retryAfterSeconds,
   type AiGatewayRoute,
+  type ProviderCredentialMode,
 } from "./openai-responses-adapter.js";
 import type { ReadingGenerationRequest } from "@patternlike/shared";
 
@@ -61,7 +61,7 @@ const REQUIRED_CANDIDATE_KEYS = [
  * spend and log records it exists to produce — by saying nothing at all.
  */
 export function createOpenAiReadingPublisher(
-  env: Pick<Env, "OPENAI_API_KEY">,
+  credential: ProviderCredentialMode,
   route: AiGatewayRoute | null,
 ): ReadingPublisher {
   const url = responsesUrlFor(route);
@@ -70,18 +70,18 @@ export function createOpenAiReadingPublisher(
       request: ReadingGenerationRequest,
       options: PublishOptions,
     ): Promise<PublisherResult> {
-      const apiKey = env.OPENAI_API_KEY?.trim();
-      if (!apiKey) {
-        // Refused here rather than sent as an empty Authorization header: a
-        // 401 from the provider costs a round trip to learn what this Worker
-        // already knows.
+      if (credential.source === "worker" && credential.apiKey.trim() === "") {
+        // Refused here rather than sent as an empty Authorization header: a 401
+        // costs a round trip to learn what this Worker already knows. The
+        // configuration layer refuses this too, so reaching here means a caller
+        // constructed the mode by hand.
         return failure("publisher_auth_failed", "authentication_failed");
       }
 
-      const headers: Record<string, string> = {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      };
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (credential.source === "worker") {
+        headers.authorization = `Bearer ${credential.apiKey}`;
+      }
       if (route) {
         // Platform spec v0.2 §10: "AI Gateway logging is disabled for private
         // synthesis requests. The application records only provider/model ID,
@@ -114,6 +114,12 @@ export function createOpenAiReadingPublisher(
         // between two real readings is not a case that arises.
         headers["cf-aig-skip-cache"] = "true";
         if (route.token) headers["cf-aig-authorization"] = `Bearer ${route.token}`;
+        // Named explicitly so a second stored key later cannot silently change
+        // which credential runs. Sent ONLY in stored mode -- the absence of a
+        // provider Authorization header above is what lets BYOK win at all.
+        if (credential.source === "gateway_stored") {
+          headers["cf-aig-byok-alias"] = credential.alias;
+        }
       }
 
       const controller = new AbortController();

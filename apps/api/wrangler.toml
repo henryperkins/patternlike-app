@@ -138,6 +138,27 @@ READING_V5_ROLLOUT = "off"
 # is set only when the gateway has Authenticated Gateway on.
 AI_GATEWAY_ACCOUNT_ID = ""
 AI_GATEWAY_ID = ""
+# OPENAI_CREDENTIAL_SOURCE — `worker` or `gateway_stored`. Required whenever a
+#            rollout is not `off`. NEVER inferred from whether OPENAI_API_KEY is
+#            set: inference cannot tell "the stored key is in use" from "the
+#            worker key was forgotten", and those need opposite outcomes.
+#            `worker` is today's behaviour exactly — the Worker's own key rides
+#            Authorization. Moving to `gateway_stored` is a SEPARATE release and
+#            must change four things in ONE Worker version: both gateway ids
+#            become non-empty, OPENAI_GATEWAY_KEY_ALIAS becomes non-empty,
+#            AI_GATEWAY_TOKEN becomes available, and OPENAI_API_KEY is absent
+#            from that same version. `wrangler secret delete` deploys
+#            immediately, so deleting the old key first breaks `worker` mode,
+#            and deploying `gateway_stored` first is refused while the key is
+#            still present. Do not improvise that sequence in production.
+OPENAI_CREDENTIAL_SOURCE = "worker"
+# OPENAI_GATEWAY_KEY_ALIAS — the BYOK alias, sent as cf-aig-byok-alias. Empty in
+#            `worker` mode; required in `gateway_stored`. Pinned explicitly
+#            rather than left to the gateway's implicit `default` alias, so
+#            adding a second stored key later cannot silently change which
+#            credential runs.
+OPENAI_GATEWAY_KEY_ALIAS = ""
+
 CHECK_IN_RETENTION_MONTHS = "13"
 TIME_TRAVEL_RECEIPT_EPOCH = "1"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
@@ -255,6 +276,27 @@ READING_V5_ROLLOUT = "first_open"
 # gateway level does NOT override that; the request header wins, by design.
 AI_GATEWAY_ACCOUNT_ID = ""
 AI_GATEWAY_ID = ""
+# OPENAI_CREDENTIAL_SOURCE — `worker` or `gateway_stored`. Required whenever a
+#            rollout is not `off`. NEVER inferred from whether OPENAI_API_KEY is
+#            set: inference cannot tell "the stored key is in use" from "the
+#            worker key was forgotten", and those need opposite outcomes.
+#            `worker` is today's behaviour exactly — the Worker's own key rides
+#            Authorization. Moving to `gateway_stored` is a SEPARATE release and
+#            must change four things in ONE Worker version: both gateway ids
+#            become non-empty, OPENAI_GATEWAY_KEY_ALIAS becomes non-empty,
+#            AI_GATEWAY_TOKEN becomes available, and OPENAI_API_KEY is absent
+#            from that same version. `wrangler secret delete` deploys
+#            immediately, so deleting the old key first breaks `worker` mode,
+#            and deploying `gateway_stored` first is refused while the key is
+#            still present. Do not improvise that sequence in production.
+OPENAI_CREDENTIAL_SOURCE = "worker"
+# OPENAI_GATEWAY_KEY_ALIAS — the BYOK alias, sent as cf-aig-byok-alias. Empty in
+#            `worker` mode; required in `gateway_stored`. Pinned explicitly
+#            rather than left to the gateway's implicit `default` alias, so
+#            adding a second stored key later cannot silently change which
+#            credential runs.
+OPENAI_GATEWAY_KEY_ALIAS = ""
+
 CHECK_IN_RETENTION_MONTHS = "13"
 TIME_TRAVEL_RECEIPT_EPOCH = "1"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"

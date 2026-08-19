@@ -18,13 +18,13 @@
  */
 
 import { contentHash } from "@patternlike/shared";
-import type { Env } from "../env.js";
 import {
   extractOutputText,
   responsesUrlFor,
   retryAfterSeconds,
   type AiGatewayRoute,
   type PublisherFailureCode,
+  type ProviderCredentialMode,
   type PublisherSafeDetailCode,
 } from "./openai-responses-adapter.js";
 import {
@@ -170,7 +170,7 @@ function readCacheObservation(response: Response): PatternCacheObservation | "hi
  * log records it exists to produce — by saying nothing at all.
  */
 export function createOpenAiPatternTransport(
-  env: Pick<Env, "OPENAI_API_KEY">,
+  credential: ProviderCredentialMode,
   route: AiGatewayRoute | null,
 ): OpenAiPatternTransport {
   const url = responsesUrlFor(route);
@@ -182,19 +182,20 @@ export function createOpenAiPatternTransport(
       options: PatternPassOptions,
       correction = false,
     ): Promise<PatternPassResult> {
-      const apiKey = env.OPENAI_API_KEY?.trim();
-      if (!apiKey) {
+      // An allowlist by construction. Every name here is one of seven; a header
+      // added later has to be added here too, which is the point.
+      if (credential.source === "worker" && credential.apiKey.trim() === "") {
         // Refused here rather than sent as an empty Authorization header: a 401
-        // costs a round trip to learn what this Worker already knows.
+        // costs a round trip to learn what this Worker already knows. The
+        // configuration layer refuses this too, so reaching here means a caller
+        // constructed the mode by hand.
         return fail("publisher_auth_failed", "authentication_failed", "provider");
       }
 
-      // An allowlist by construction. Every name here is one of six; a header
-      // added later has to be added here too, which is the point.
-      const headers: Record<string, string> = {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      };
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (credential.source === "worker") {
+        headers.authorization = `Bearer ${credential.apiKey}`;
+      }
       if (route) {
         // Gateway logs are on by default and store the prompt and the model
         // response verbatim — here, a reader's calculated pattern going in and
@@ -211,6 +212,13 @@ export function createOpenAiPatternTransport(
         // not happen.
         headers["cf-aig-skip-cache"] = "true";
         if (route.token) headers["cf-aig-authorization"] = `Bearer ${route.token}`;
+        // Sent ONLY in stored mode. The absence of a provider Authorization
+        // header above is what lets the stored key win under credential
+        // precedence; the alias names which stored key, rather than leaving it
+        // to the implicit `default`.
+        if (credential.source === "gateway_stored") {
+          headers["cf-aig-byok-alias"] = credential.alias;
+        }
       }
 
       const controller = new AbortController();

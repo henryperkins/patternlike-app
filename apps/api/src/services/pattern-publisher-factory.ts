@@ -20,10 +20,12 @@ import type {
   PatternSemanticVerdict,
   PatternWriterOutput,
 } from "@patternlike/shared";
-import type { Env } from "../env.js";
 import { contentHash } from "@patternlike/shared";
 import { buildDeterministicPlan, buildDeterministicWriterOutput } from "@patternlike/pattern-engine";
-import type { AiGatewayRoute } from "./openai-responses-adapter.js";
+import type {
+  AiGatewayRoute,
+  ProviderCredentialMode,
+} from "./openai-responses-adapter.js";
 import { createOpenAiPatternTransport } from "./openai-pattern-publisher.js";
 import { evaluateSemanticVerdict } from "./pattern-semantic.js";
 import {
@@ -53,10 +55,10 @@ function budgetExhausted<T>(): PatternPassOutcome<T> {
  * returns before any request is built, so a spent ceiling costs nothing.
  */
 export function createOpenAiPatternPublisher(
-  env: Pick<Env, "OPENAI_API_KEY">,
+  credential: ProviderCredentialMode,
   route: AiGatewayRoute | null,
 ): PatternPublisher {
-  const transport = createOpenAiPatternTransport(env, route);
+  const transport = createOpenAiPatternTransport(credential, route);
 
   async function run<T>(
     pass: PatternStageClass,

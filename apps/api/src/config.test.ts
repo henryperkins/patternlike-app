@@ -5,6 +5,7 @@ import {
   OPENAI_READING_MODEL,
   resolveAiGatewayRoute,
   resolvePublisherConfiguration,
+  resolveProviderCredentialMode,
 } from "./services/reading-publisher.js";
 
 const STRONG_KEK = "a-real-root-kek-with-enough-entropy-32+";
@@ -211,6 +212,7 @@ describe("publisher configuration", () => {
     OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
     READING_V5_ROLLOUT: "internal",
     READING_PUBLISHER: "openai",
+    OPENAI_CREDENTIAL_SOURCE: "worker",
     OPENAI_READING_MODEL: OPENAI_READING_MODEL,
     OPENAI_READING_REASONING: "high",
     OPENAI_READING_PROMPT_VERSION: "1.0.1",
@@ -239,7 +241,7 @@ describe("publisher configuration", () => {
     expect(resolved.config?.pin.max_output_tokens).toBe(4000);
     expect(resolved.config?.timeoutMs).toBe(90_000);
     expect(resolved.config?.dailyCallLimit).toBe(250);
-    expect(resolved.config?.apiKey).toBe("sk-test-key");
+    expect(resolved.config?.credential).toEqual({ source: "worker", apiKey: "sk-test-key" });
   });
 
   it("permits every publisher value and the key to be absent while off", () => {
@@ -433,5 +435,108 @@ describe("AI Gateway configuration", () => {
       AI_GATEWAY_ID: "patternlike",
     });
     expect(failure?.code).toBe("reading_publisher_misconfigured");
+  });
+});
+
+describe("provider credential mode", () => {
+  const base = {
+    ENVIRONMENT: "production",
+    ROOT_KEK: STRONG_KEK,
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+  };
+  const route = { accountId: "a".repeat(32), gatewayId: "patternlike", token: "gw" };
+
+  it("refuses an absent or unknown source", () => {
+    expect(resolveProviderCredentialMode(base as never, null).ok).toBe(false);
+    const bad = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "somehow_else" } as never,
+      null,
+    );
+    expect(bad.ok).toBe(false);
+    if (bad.ok) return;
+    expect(bad.message).toContain("must be worker or gateway_stored");
+  });
+
+  it("resolves worker mode to today's behaviour", () => {
+    const outcome = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "worker", OPENAI_API_KEY: "sk-live" } as never,
+      null,
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.mode).toEqual({ source: "worker", apiKey: "sk-live" });
+  });
+
+  it("refuses worker mode with no key", () => {
+    const outcome = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "worker" } as never,
+      null,
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("OPENAI_API_KEY is required");
+  });
+
+  it("refuses gateway_stored without a gateway, because a stored key only exists behind one", () => {
+    const outcome = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "gateway_stored", OPENAI_GATEWAY_KEY_ALIAS: "primary" } as never,
+      null,
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("AI_GATEWAY_ACCOUNT_ID and AI_GATEWAY_ID");
+  });
+
+  it("refuses gateway_stored without a gateway token", () => {
+    const outcome = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "gateway_stored", OPENAI_GATEWAY_KEY_ALIAS: "primary" } as never,
+      { ...route, token: null },
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    // BYOK requires an authenticated gateway; an ambiguous 401 mid-generation
+    // is far too late to learn that.
+    expect(outcome.message).toContain("AI_GATEWAY_TOKEN");
+  });
+
+  it("refuses gateway_stored while OPENAI_API_KEY is still set, naming both variables and neither value", () => {
+    const outcome = resolveProviderCredentialMode(
+      {
+        ...base,
+        OPENAI_CREDENTIAL_SOURCE: "gateway_stored",
+        OPENAI_GATEWAY_KEY_ALIAS: "primary",
+        OPENAI_API_KEY: "sk-should-not-be-here",
+      } as never,
+      route,
+    );
+    // A request key wins over BYOK, so tolerating both would silently bypass
+    // the stored alias this mode exists to use.
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("OPENAI_API_KEY");
+    expect(outcome.message).toContain("gateway_stored");
+    expect(outcome.message).not.toContain("sk-should-not-be-here");
+  });
+
+  it("refuses gateway_stored with no alias rather than falling back to the implicit default", () => {
+    const outcome = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "gateway_stored" } as never,
+      route,
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("OPENAI_GATEWAY_KEY_ALIAS");
+  });
+
+  it("resolves a complete gateway_stored configuration", () => {
+    const outcome = resolveProviderCredentialMode(
+      { ...base, OPENAI_CREDENTIAL_SOURCE: "gateway_stored", OPENAI_GATEWAY_KEY_ALIAS: "primary" } as never,
+      route,
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.mode).toEqual({ source: "gateway_stored", alias: "primary" });
   });
 });

@@ -1,4 +1,3 @@
-import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { contentHash, type ReadingGenerationRequest } from "@patternlike/shared";
@@ -103,7 +102,7 @@ function request(): ReadingGenerationRequest {
 }
 
 function publisher(apiKey = "sk-test-key") {
-  return createOpenAiReadingPublisher({ ...env, OPENAI_API_KEY: apiKey }, null);
+  return createOpenAiReadingPublisher({ source: "worker", apiKey }, null);
 }
 
 async function publish(model: string, timeoutMs = 5_000) {
@@ -152,17 +151,16 @@ describe("OpenAI reading publisher", () => {
 
   it("makes exactly one provider request per publish", async () => {
     let calls = 0;
-    const counting = {
-      ...env,
-      OPENAI_API_KEY: "sk-test-key",
-    };
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
       calls += 1;
       return originalFetch(...args);
     }) as typeof fetch;
     try {
-      await createOpenAiReadingPublisher(counting, null).publish(request(), {
+      await createOpenAiReadingPublisher(
+        { source: "worker", apiKey: "sk-test-key" },
+        null,
+      ).publish(request(), {
         requestId: "req_test_0002",
         timeoutMs: 5_000,
         configuration: pin(OPENAI_MOCK_SERVER_ERROR),
@@ -359,7 +357,7 @@ describe("OpenAI reading publisher through AI Gateway", () => {
     }) as typeof fetch;
     try {
       const result = await createOpenAiReadingPublisher(
-        { ...env, OPENAI_API_KEY: "sk-test-key" },
+        { source: "worker", apiKey: "sk-test-key" },
         route,
       ).publish(request(), {
         requestId: "req_test_gateway",
