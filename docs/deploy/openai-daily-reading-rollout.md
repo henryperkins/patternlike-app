@@ -451,3 +451,54 @@ Cloudflare-managed credentials. It does **not** apply to BYOK. Do not record it
 as a mitigation for Pattern or reading traffic; `cf-aig-collect-log: false`,
 which both adapters send on every routed request, is the control that keeps
 prompts and responses out of gateway logs.
+
+### Gateway identity: `default`, decided
+
+The account runs one AI Gateway, and its id is literally `default`
+(`AI_GATEWAY_ID = "default"` at cutover). **The operator has decided to keep
+it.** Do not "fix" this by creating a named gateway; that decision was made
+deliberately on 2026-08-19 and re-opening it costs a re-review of every setting
+below for no benefit.
+
+The general advice to name a gateway explicitly exists because `default` is a
+magic id: Cloudflare auto-creates a gateway under that name on the first
+authenticated request, so an operator can bring a never-reviewed gateway into
+existence by typo-adjacent configuration. That risk is spent here — this
+gateway exists and has been reviewed. Its state as verified on 2026-08-19:
+
+| Setting | Value | Why it is right |
+| --- | --- | --- |
+| `authentication` | `true` | Required for BYOK; makes `cf-aig-authorization` mandatory |
+| stored provider key | one, `provider_slug: openai`, alias `default` | The BYOK credential the cutover switches to |
+| `guardrails` | **absent** | Not configured, so not evaluating. Must stay absent |
+| DLP | **absent** | Not configured. Must stay absent |
+| dynamic routes | **0** | Provider-native path only; no fallbacks |
+| `retry_max_attempts` | `3` | Overridden per request by `cf-aig-max-attempts: 1` |
+| `cache_ttl` | `300` | Overridden per request by `cf-aig-skip-cache: true` |
+| `collect_logs` / `logpush` | `true` / `true` | Overridden per request by `cf-aig-collect-log: false` |
+| `zdr` | `false` | Expected — ZDR does not apply to BYOK anyway |
+
+Three of those settings are ON at the gateway and OFF only because every
+request overrides them. That is the documented precedence order and it is what
+the adapters rely on, but it means **a dropped header is a silent policy
+change**, not a visible failure: lose `cf-aig-max-attempts` and one delivery
+becomes up to three provider calls the ledger counts as one; lose
+`cf-aig-collect-log` and a reader's Pattern prose is written to gateway logs
+that `logpush` then exports. The outgoing-header allowlist tests in
+`openai-pattern-publisher.test.ts` are what keep that from happening quietly.
+
+**The residual risk of sharing `default` is other traffic, not the name.**
+Everything that matters is gateway-scoped — the stored key, rate limits, spend
+limits, logging, cache. If coding-agent or other human traffic is ever pointed
+at this gateway, it shares the stored OpenAI key and those limits with
+production generation: `pattern_provider_daily_usage` would count only the
+Worker's calls while the bill covered both, and a shared rate or spend limit
+could fail a real reader's Pattern with a `429`. The fix at that point is a
+second gateway for that traffic, not a change to this one.
+
+One nuance to keep in view: this gateway reports `is_default: false`, so the
+gateway *named* `default` is not the account's default-flagged gateway. The AI
+Gateway REST API on `api.cloudflare.com` routes third-party model requests
+through "your account's default gateway, created automatically on first use" —
+which may therefore auto-create a *different* gateway rather than reusing this
+one. Unified Billing credit balance is `0`, so that path is inert today.
