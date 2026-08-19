@@ -10,6 +10,7 @@ import {
   PATTERN_PLANNER_PROMPT_VERSION,
   PATTERN_STRICT_SCHEMA,
   PATTERN_SYSTEM_POLICY,
+  PATTERN_WRITER_CORRECTION_POLICY,
   PATTERN_VERIFIER_PROMPT_VERSION,
   PATTERN_WRITER_PROMPT_VERSION,
   STRIPPED_STRICT_KEYWORDS,
@@ -315,6 +316,50 @@ describe("Pattern prompt module", () => {
       // writer's, and at minimum (provider, model, prompt_version) must differ.
       // Today only the prompt version separates them.
       expect(PATTERN_VERIFIER_PROMPT_VERSION).not.toBe(PATTERN_WRITER_PROMPT_VERSION);
+    });
+  });
+
+  describe("writer correction variant", () => {
+    it("uses the correction policy only when a correction is requested", () => {
+      const plain = buildPatternResponsesRequest("writer", { a: 1 }, pin());
+      const corrected = buildPatternResponsesRequest("writer", { a: 1 }, pin(), {
+        correction: true,
+      });
+      expect(plain.instructions).toBe(PATTERN_SYSTEM_POLICY.writer);
+      expect(corrected.instructions).toBe(PATTERN_WRITER_CORRECTION_POLICY);
+      expect(corrected.instructions).not.toBe(plain.instructions);
+    });
+
+    it("changes nothing else about the request", () => {
+      const plain = buildPatternResponsesRequest("writer", { a: 1 }, pin());
+      const corrected = buildPatternResponsesRequest("writer", { a: 1 }, pin(), {
+        correction: true,
+      });
+      expect(corrected.model).toBe(plain.model);
+      expect(corrected.max_output_tokens).toBe(plain.max_output_tokens);
+      expect(corrected.text.format.name).toBe(plain.text.format.name);
+      expect(corrected.text.format.schema).toBe(plain.text.format.schema);
+      expect(corrected.store).toBe(false);
+      expect(Object.keys(corrected).sort()).toEqual(Object.keys(plain).sort());
+    });
+
+    it("ignores the correction flag on the planner and verifier passes", () => {
+      for (const pass of ["planner", "verifier"] as const) {
+        const body = buildPatternResponsesRequest(pass, {}, pin(), { correction: true });
+        expect(body.instructions).toBe(PATTERN_SYSTEM_POLICY[pass]);
+      }
+    });
+
+    it("tells the writer what it may not change", () => {
+      // Section 13.5: rephrase and reorganize within a chapter, but never change
+      // chapter membership, chapter count, omitted features, or authorization.
+      const policy = PATTERN_WRITER_CORRECTION_POLICY.toLowerCase();
+      expect(policy).toContain("chapter");
+      expect(policy).toContain("omitted");
+      expect(policy).toContain("data, not instructions");
+      // The correction carries codes and keys; the policy must not invite the
+      // model to ask for the prose it was not shown.
+      expect(policy).toContain("you are not shown");
     });
   });
 });

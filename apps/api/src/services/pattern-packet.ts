@@ -140,6 +140,17 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "uncertainty",
   "assignments",
   "signature_assignments",
+  "correction",
+  "attempt",
+  "items",
+  "code",
+  "origin",
+  "target_key",
+  "preserve",
+  "chapter_keys",
+  "signature_keys",
+  "omitted_feature_aliases",
+  "authorized_ontology_rule_ids",
   "bounds",
   "locale",
   "effective_accuracy",
@@ -334,6 +345,8 @@ export interface PatternWriterInput {
   effective_accuracy: string;
   uncertainty: { suppressed_classes: string[]; required_language_rule_ids: string[] };
   bounds: PatternPacketLimits["bounds"];
+  /** Present only on a retry against the same frozen plan (section 13.5). */
+  correction?: PatternCorrectionDocument;
 }
 
 /** One plan unit's aliases and the normalized facts behind them. */
@@ -709,6 +722,142 @@ function finish<T>(document: T, limits: PatternPacketLimits): PatternPacketResul
 // Builders
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Writer correction document
+// ---------------------------------------------------------------------------
+
+/**
+ * A code, not a sentence. Bounded to the contract's 64-character finding cap.
+ *
+ * Shape-checked rather than trusted because the two sources disagree about what
+ * they carry: a semantic finding's `code` is a member of the closed vocabulary,
+ * but a deterministic `ValidationFailure` is `{code, message}` where `message`
+ * is sometimes a chapter key and sometimes an explanatory sentence. A value that
+ * does not look like a code cannot be actioned by the writer anyway, so it is
+ * dropped rather than forwarded.
+ */
+const CORRECTION_CODE_SHAPE = /^[a-z][a-z0-9_]{0,63}$/;
+
+/** `chapter_01`, `chapter_01_section_02`, or `signature_01`. Nothing else. */
+const CORRECTION_KEY_SHAPE = /^(chapter_\d{2}(_section_\d{2})?|signature_\d{2})$/;
+
+/** `f001`. The alias grammar the selector mints. */
+const CORRECTION_ALIAS_SHAPE = /^f\d{3}$/;
+
+export interface PatternCorrectionItem {
+  code: string;
+  origin: "deterministic" | "semantic";
+  target_key: string | null;
+  feature_aliases: string[];
+  ontology_rule_ids: string[];
+}
+
+/**
+ * What the writer is told about a rejected attempt.
+ *
+ * Section 13.5: finding codes, affected chapter and section keys, the policy
+ * rule violated, and the instruction to preserve the frozen plan and evidence
+ * assignments. `preserve` is that instruction made checkable rather than
+ * phrased — chapter membership, chapter count, omitted features, and ontology
+ * authorization are exactly what the writer may not change.
+ *
+ * Rejected prose is never echoed here, and neither is the verifier's rationale,
+ * which is prose about prose.
+ */
+export interface PatternCorrectionDocument {
+  schema_version: "0.7.0";
+  attempt: number;
+  items: PatternCorrectionItem[];
+  preserve: {
+    plan_hash: string;
+    chapter_keys: string[];
+    signature_keys: string[];
+    omitted_feature_aliases: string[];
+    authorized_ontology_rule_ids: string[];
+  };
+}
+
+/** A deterministic candidate-validation failure, structurally. */
+export interface PatternDeterministicFailure {
+  code: string;
+  message: string;
+}
+
+/** A semantic verdict finding, structurally. `rationale` is read and discarded. */
+export interface PatternSemanticFindingInput {
+  code: string;
+  severity?: string;
+  target_key?: string | null;
+  feature_aliases?: readonly string[];
+  ontology_rule_ids?: readonly string[];
+  rationale?: string;
+}
+
+function safeKey(value: unknown): string | null {
+  return typeof value === "string" && CORRECTION_KEY_SHAPE.test(value) ? value : null;
+}
+
+function safeAliases(values: readonly string[] | undefined): string[] {
+  return (values ?? []).filter((value) => CORRECTION_ALIAS_SHAPE.test(value));
+}
+
+/**
+ * Build the closed correction document for the next writer attempt.
+ *
+ * Every field is either a shape-checked code, a shape-checked key, or an id the
+ * writer already holds. Nothing is copied from the rejected candidate, and the
+ * only text-bearing fields on the inputs — `message` and `rationale` — are read
+ * for a key and otherwise discarded.
+ */
+export function buildCorrectionDocument(
+  plan: PatternPlan,
+  rejection: {
+    deterministic?: readonly PatternDeterministicFailure[];
+    semantic?: readonly PatternSemanticFindingInput[];
+  },
+  attempt: number,
+): PatternCorrectionDocument {
+  const items: PatternCorrectionItem[] = [];
+
+  for (const failure of rejection.deterministic ?? []) {
+    if (!CORRECTION_CODE_SHAPE.test(failure.code)) continue;
+    items.push({
+      code: failure.code,
+      origin: "deterministic",
+      // The validator puts a chapter key in `message` for keyed failures and an
+      // explanatory sentence for the rest. Reading it as a key recovers the
+      // signal without ever letting the sentence through.
+      target_key: safeKey(failure.message),
+      feature_aliases: [],
+      ontology_rule_ids: [],
+    });
+  }
+
+  for (const finding of rejection.semantic ?? []) {
+    if (!CORRECTION_CODE_SHAPE.test(finding.code)) continue;
+    items.push({
+      code: finding.code,
+      origin: "semantic",
+      target_key: safeKey(finding.target_key),
+      feature_aliases: safeAliases(finding.feature_aliases),
+      ontology_rule_ids: [...(finding.ontology_rule_ids ?? [])],
+    });
+  }
+
+  return {
+    schema_version: "0.7.0",
+    attempt,
+    items,
+    preserve: {
+      plan_hash: plan.plan_hash,
+      chapter_keys: plan.chapters.map((chapter) => chapter.chapter_key),
+      signature_keys: plan.additional_signatures.map((signature) => signature.signature_key),
+      omitted_feature_aliases: plan.omissions.map((omission) => omission.feature_alias),
+      authorized_ontology_rule_ids: [...citedRuleIds(plan)],
+    },
+  };
+}
+
 /** Every ontology rule id the frozen plan cites, across chapters and signatures. */
 function citedRuleIds(plan: PatternPlan): Set<string> {
   const ids = new Set<string>();
@@ -757,6 +906,7 @@ export function buildWriterInput(
   packet: PatternFactPacket,
   ontologyRecords: readonly PatternOntologyRecord[],
   limits: PatternPacketLimits,
+  correction?: PatternCorrectionDocument,
 ): PatternPacketResult<PatternWriterInput> {
   const authorizedRuleIds = citedRuleIds(plan);
   // The uncertainty rules are ontology rule ids too, and a valid plan need never
@@ -807,6 +957,7 @@ export function buildWriterInput(
         required_language_rule_ids: [...packet.uncertainty.required_language_rule_ids],
       },
       bounds: { ...limits.bounds },
+      ...(correction ? { correction } : {}),
     } satisfies PatternWriterInput,
     limits,
   );

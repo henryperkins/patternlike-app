@@ -248,6 +248,27 @@ const VERIFIER_POLICY = [
   "Return only the structured object the schema describes.",
 ].join("\n");
 
+/**
+ * The writer policy for a retry against the same frozen plan.
+ *
+ * Section 13.5's retry is not a bare re-send: the writer is told what was wrong
+ * in codes and keys and asked again. It is deliberately not shown the prose that
+ * was rejected, so the policy says so outright — a model told only "fix section
+ * chapter_01_section_02" and given no text will otherwise spend its reasoning
+ * looking for text that is not there, or ask for it.
+ */
+export const PATTERN_WRITER_CORRECTION_POLICY = [
+  WRITER_POLICY,
+  "",
+  "This is a correction attempt against the same frozen plan.",
+  "The correction document lists finding codes, the chapter or section keys they affect, and the ontology rule ids involved.",
+  "You are not shown the rejected prose, and you will not be. Do not ask for it and do not try to reconstruct it.",
+  "Write the affected chapters and sections again from the plan, the facts, and the ontology records you already have.",
+  "You may rephrase and reorganize sections inside a chapter.",
+  "You may not change chapter membership, the number of chapters, the omitted features, or which ontology rules are authorized.",
+  "Every key listed under preserve must come back exactly as it is given.",
+].join("\n");
+
 export const PATTERN_SYSTEM_POLICY: Record<PatternPass, string> = {
   planner: PLANNER_POLICY,
   writer: WRITER_POLICY,
@@ -309,11 +330,18 @@ export function buildPatternResponsesRequest(
   pass: PatternPass,
   document: unknown,
   pin: PatternPublisherPin,
+  options: { correction?: boolean } = {},
 ): PatternResponsesRequestBody {
+  // A correction is still the writer pass for every pinned value -- same model,
+  // same token ceiling, same schema. Only the policy differs.
+  const instructions =
+    options.correction && pass === "writer"
+      ? PATTERN_WRITER_CORRECTION_POLICY
+      : PATTERN_SYSTEM_POLICY[pass];
   return {
     model: pin[`${pass}_model`],
     store: false,
-    instructions: PATTERN_SYSTEM_POLICY[pass],
+    instructions,
     input: [
       {
         role: "user",

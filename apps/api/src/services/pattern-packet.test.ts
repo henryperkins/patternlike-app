@@ -8,6 +8,7 @@ import type {
 
 import {
   PATTERN_PACKET_LIMITS_DEFAULT,
+  buildCorrectionDocument,
   buildPlannerInput,
   findPatternInputViolation,
   buildVerifierInput,
@@ -528,6 +529,193 @@ describe("Pattern provider packet builders", () => {
       // The writer is told to honour these rules; filtering by cited ids alone
       // made that instruction point at nothing.
       expect(result.document.ontology_records.map((r) => r.id)).toContain("ont.sun.aries");
+    });
+  });
+
+  describe("writer correction document", () => {
+    const PROSE = "ZZPROSEZZ";
+
+    /** A rejected candidate whose every sentence is a recognizable sentinel. */
+    function rejectedCandidate() {
+      const c = candidate();
+      c.title = `${PROSE} title`;
+      c.chapters[0]!.title = `${PROSE} chapter title`;
+      c.chapters[0]!.summary = `${PROSE} summary`;
+      c.chapters[0]!.sections[0]!.text = `${PROSE} section prose`;
+      c.chapters[0]!.tensions[0]!.text = `${PROSE} tension prose`;
+      c.chapters[0]!.counter_expression.text = `${PROSE} counter prose`;
+      return c;
+    }
+
+    it("carries codes, keys, and rule ids only -- never prose", () => {
+      const document = buildCorrectionDocument(
+        plan(),
+        {
+          deterministic: [
+            { code: "section_count", message: "chapter_01" },
+            { code: "chapter_mismatch", message: "writer chapters must match the frozen plan" },
+          ],
+          semantic: [
+            {
+              code: "claim_not_entailed",
+              severity: "error",
+              target_key: "chapter_01_section_01",
+              feature_aliases: ["f001"],
+              ontology_rule_ids: ["ont.sun.aries"],
+              rationale: `${PROSE} the verifier explained at length why this failed`,
+            },
+          ],
+        },
+        2,
+      );
+
+      const blob = JSON.stringify(document);
+      expect(blob).not.toContain(PROSE);
+      // The verifier's rationale is prose about prose and never travels.
+      expect(blob).not.toContain("rationale");
+      // A deterministic message that is an explanation rather than a key is dropped.
+      expect(blob).not.toContain("writer chapters must match");
+    });
+
+    it("recovers a chapter key from a deterministic message but drops an explanation", () => {
+      const document = buildCorrectionDocument(
+        plan(),
+        {
+          deterministic: [
+            { code: "section_count", message: "chapter_01" },
+            { code: "schema_version", message: "writer schema_version must be 0.7.0" },
+          ],
+        },
+        2,
+      );
+      const byCode = new Map(document.items.map((i) => [i.code, i]));
+      expect(byCode.get("section_count")?.target_key).toBe("chapter_01");
+      expect(byCode.get("schema_version")?.target_key).toBeNull();
+    });
+
+    it("drops a finding whose code is prose rather than a code", () => {
+      const document = buildCorrectionDocument(
+        plan(),
+        { deterministic: [{ code: `${PROSE} not a code at all`, message: "chapter_01" }] },
+        2,
+      );
+      expect(document.items).toHaveLength(0);
+      expect(JSON.stringify(document)).not.toContain(PROSE);
+    });
+
+    it("drops a target key that is not a chapter, section, or signature key", () => {
+      const document = buildCorrectionDocument(
+        plan(),
+        {
+          semantic: [
+            {
+              code: "one_sided_labeling",
+              severity: "error",
+              target_key: `${PROSE} smuggled through target_key`,
+              feature_aliases: [],
+              ontology_rule_ids: [],
+              rationale: "",
+            },
+          ],
+        },
+        2,
+      );
+      expect(document.items[0]?.target_key).toBeNull();
+      expect(JSON.stringify(document)).not.toContain(PROSE);
+    });
+
+    it("states what the writer must preserve, derived from the frozen plan", () => {
+      const withSignature = plan();
+      withSignature.additional_signatures.push({
+        signature_key: "signature_01",
+        working_title: "A signature",
+        feature_aliases: ["f002"],
+        ontology_rule_ids: ["ont.sun.aries"],
+      });
+      withSignature.omissions.push({
+        feature_alias: "f009",
+        reason: "capacity_omitted",
+        covered_by: null,
+      });
+
+      const document = buildCorrectionDocument(withSignature, { deterministic: [] }, 3);
+      expect(document.preserve.plan_hash).toBe(withSignature.plan_hash);
+      expect(document.preserve.chapter_keys).toEqual(["chapter_01"]);
+      expect(document.preserve.signature_keys).toEqual(["signature_01"]);
+      expect(document.preserve.omitted_feature_aliases).toEqual(["f009"]);
+      expect(document.preserve.authorized_ontology_rule_ids).toContain("ont.sun.aries");
+      expect(document.attempt).toBe(3);
+    });
+
+    it("survives into a writer document with the plan and assignments unchanged", () => {
+      const correction = buildCorrectionDocument(
+        plan(),
+        {
+          semantic: [
+            {
+              code: "possibility_stated_as_certainty",
+              severity: "error",
+              target_key: "chapter_01",
+              feature_aliases: ["f001"],
+              ontology_rule_ids: ["ont.sun.aries"],
+              rationale: `${PROSE} rationale`,
+            },
+          ],
+        },
+        2,
+      );
+
+      const plain = buildWriterInput(plan(), packet(), records(), PATTERN_PACKET_LIMITS_DEFAULT);
+      const corrected = buildWriterInput(
+        plan(),
+        packet(),
+        records(),
+        PATTERN_PACKET_LIMITS_DEFAULT,
+        correction,
+      );
+      expect(plain.ok && corrected.ok).toBe(true);
+      if (!plain.ok || !corrected.ok) return;
+
+      // The frozen plan and the evidence assignments are carried through
+      // byte-identically; only the correction is added.
+      expect(corrected.document.plan).toEqual(plain.document.plan);
+      expect(corrected.document.assignments).toEqual(plain.document.assignments);
+      expect(corrected.document.correction).toEqual(correction);
+      expect(corrected.serialized).not.toContain(PROSE);
+    });
+
+    it("never echoes the rejected candidate into the rebuilt writer document", () => {
+      // The whole point of the correction path: the writer is told what was
+      // wrong, never shown the prose that was wrong.
+      const rejected = rejectedCandidate();
+      const correction = buildCorrectionDocument(
+        plan(),
+        {
+          semantic: [
+            {
+              code: "voice_boundary_exceeded",
+              severity: "error",
+              target_key: rejected.chapters[0]!.sections[0]!.section_key,
+              feature_aliases: [],
+              ontology_rule_ids: [],
+              rationale: rejected.chapters[0]!.sections[0]!.text,
+            },
+          ],
+        },
+        2,
+      );
+      const result = buildWriterInput(
+        plan(),
+        packet(),
+        records(),
+        PATTERN_PACKET_LIMITS_DEFAULT,
+        correction,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.serialized).not.toContain(PROSE);
+      // The section key it points at does survive -- that is the whole signal.
+      expect(result.serialized).toContain("chapter_01_section_01");
     });
   });
 });
