@@ -1074,6 +1074,19 @@ def check_0008_replay_ledger() -> None:
         ),
         "0008 requires proof that the R2 write-ahead succeeded",
     )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, next_claim_status, "
+            "content_hash, signature, replica_put_at, created_at"
+            ") VALUES ("
+            "'prel_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'ontology_recalled', ?, NULL, "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'sig', ?, ?)",
+            (NOW, NOW, NOW),
+        ),
+        "0008 requires ontology_version on a recall tombstone",
+    )
     assert con.execute("PRAGMA foreign_key_check").fetchall() == []
     print("D1 OK  0008 creates a constrained erasure replay ledger")
 
