@@ -33,6 +33,10 @@ import { hashesEqual } from "./content-release.js";
 import { resolvePatternPublisherConfiguration } from "./pattern-publisher.js";
 import { readPatternAiRollout } from "./pattern-rollout.js";
 import {
+  evaluateSemanticVerdict as evaluateSemanticVerdictImpl,
+  resolveSemanticForceReject,
+} from "./pattern-semantic.js";
+import {
   artifactAad,
   decryptUnderContentKey,
   encryptUnderContentKey,
@@ -522,28 +526,16 @@ async function eligibility(
   return "ok";
 }
 
+/**
+ * Thin wrapper over the extracted evaluator, kept until Task 6 rewires the
+ * stage machine onto the publisher interface. The logic lives in
+ * `pattern-semantic.ts`; duplicating it here would be two copies of the one
+ * thing that decides whether prose is publishable.
+ */
 function evaluateSemanticVerdict(env: Env, writer: PatternWriterOutput): PatternSemanticVerdict {
-  const forceReject = env.AUTH_STUB === "1" && env.PATTERN_SEMANTIC_FORCE_REJECT === "1";
-  const empty = writer.chapters.length === 0;
-  if (!forceReject && !empty) {
-    return { schema_version: "0.7.0", verdict: "pass", findings: [] };
-  }
-  return {
-    schema_version: "0.7.0",
-    verdict: "reject",
-    findings: [
-      {
-        code: "semantic_verification_failed",
-        severity: "error",
-        target_key: null,
-        feature_aliases: [],
-        ontology_rule_ids: [],
-        rationale: forceReject
-          ? "Forced semantic rejection"
-          : "Writer produced no chapters",
-      },
-    ],
-  };
+  return evaluateSemanticVerdictImpl(writer, {
+    forceReject: resolveSemanticForceReject(env),
+  });
 }
 
 export async function executePatternJob(

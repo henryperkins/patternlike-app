@@ -10,6 +10,12 @@
 import type { Env } from "../env.js";
 import { isDevEnvironment } from "../crypto.js";
 import { readPatternAiRollout, type PatternAiRollout } from "./pattern-rollout.js";
+import { resolveAiGatewayRoute } from "./reading-publisher.js";
+import type {
+  PatternPlan,
+  PatternSemanticVerdict,
+  PatternWriterOutput,
+} from "@patternlike/shared";
 
 export const PATTERN_PUBLISHER_OPENAI = "openai" as const;
 export const PATTERN_PUBLISHER_SYNTHETIC = "synthetic" as const;
@@ -31,6 +37,32 @@ export const OPENAI_PATTERN_VERIFIER_REASONING = "high" as const;
 export const OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 export const OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = 120_000;
 export const OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = 4000;
+
+/**
+ * Section 14.2: the verifier configuration must not be identical to the
+ * writer's, and at minimum `(provider, model, prompt_version)` must differ.
+ *
+ * Checked against the COMPILED CONSTANTS, not the environment. The environment
+ * values are already pinned to these constants for equality, so an operator
+ * cannot make them collide -- but nothing stopped a source edit from making the
+ * two constants equal, and then one model configuration would be sole author and
+ * judge of the same prose with every pin check still passing. The separation was
+ * an accident of two literals; this makes it a checked relationship.
+ *
+ * Both passes share a provider, so the separation has to come from the model or
+ * the prompt version. Today it is the prompt version.
+ */
+export function verifierIndependenceProblem(
+  writerModel: string,
+  writerPromptVersion: string,
+  verifierModel: string,
+  verifierPromptVersion: string,
+): string | null {
+  if (writerModel === verifierModel && writerPromptVersion === verifierPromptVersion) {
+    return "The Pattern verifier configuration must differ from the writer's in model or prompt version (design section 14.2)";
+  }
+  return null;
+}
 
 export const PATTERN_INPUT_MAX_BYTES = 98_304;
 export const PATTERN_DAILY_PROVIDER_CALL_LIMIT = 100;
@@ -183,6 +215,29 @@ export function resolvePatternPublisherConfiguration(
     }
   }
 
+  // Section 14.2: the verifier configuration must not be identical to the
+  // writer's, and at minimum (provider, model, prompt_version) must differ.
+  // Today only the prompt version separates them, and nothing checked that it
+  // stayed separate -- so one model configuration could become sole author and
+  // judge of the same prose through a one-character edit. Now the deployment
+  // refuses instead.
+  if (publisherName === PATTERN_PUBLISHER_OPENAI) {
+    const independence = verifierIndependenceProblem(
+      OPENAI_PATTERN_WRITER_MODEL,
+      OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+      OPENAI_PATTERN_VERIFIER_MODEL,
+      OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
+    );
+    if (independence) return misconfigured(independence);
+
+    // A half-configured gateway pair is a refusal, never a quiet fall back to
+    // the direct origin: an operator who set one of the two ids meant to route
+    // through a gateway, and billing and logging the Pattern passes directly
+    // instead would look like a working deployment with an empty dashboard.
+    const gateway = resolveAiGatewayRoute(env);
+    if (!gateway.ok) return misconfigured(gateway.message);
+  }
+
   const pin: PatternPublisherPin = {
     publisher: publisherName,
     planner_model: OPENAI_PATTERN_PLANNER_MODEL,
@@ -215,4 +270,68 @@ export function resolvePatternPublisherConfiguration(
       apiKey: env.OPENAI_API_KEY?.trim() || null,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// The publisher interface
+//
+// Types only, and deliberately no import from the adapter or the prompt module.
+// `openai-pattern-publisher.ts` and `pattern-prompt.ts` both import from here at
+// runtime, so an import back would close a cycle -- the temporal-dead-zone
+// hazard `reading-prompt.ts` documents. The two factories therefore live in
+// `pattern-publisher-factory.ts`, which may import in one direction freely.
+// ---------------------------------------------------------------------------
+
+/** The stage class a provider call is charged against in the usage ledger. */
+export type PatternStageClass = "planner" | "writer" | "verifier";
+
+export interface PatternPassOptions {
+  /** The Worker's own correlation id. Never sent to the provider. */
+  requestId: string;
+  timeoutMs: number;
+  pin: PatternPublisherPin;
+  /**
+   * Charged immediately before the fetch, by the publisher rather than the call
+   * site. Resolves `ok: false` when the day's ceiling is spent, and the
+   * publisher must then make no request at all.
+   *
+   * A synthetic publisher is constructed with a reserve that always succeeds and
+   * never charges: the ledger counts provider calls, and there is no provider.
+   */
+  reserve: (stageClass: PatternStageClass) => Promise<{ ok: boolean }>;
+}
+
+/**
+ * One pass, resolved.
+ *
+ * `raw` is the exact provider response bytes, which Task 6 writes to the
+ * encrypted response artifact and a redelivery may adopt. It is `null` for a
+ * synthetic pass, where no provider spoke. It must never reach a log.
+ */
+export type PatternPassOutcome<T> =
+  | { ok: true; value: T; raw: string | null; metadata: PatternPassProvenance }
+  | {
+      ok: false;
+      code: string;
+      safe_detail_code: string;
+      retry_after_seconds: number | null;
+      origin_layer: "provider" | "gateway" | "unknown" | "none";
+    };
+
+/** Closed provenance for one pass. No provider prose, ever. */
+export interface PatternPassProvenance {
+  provider: PatternPublisherName;
+  pass: PatternStageClass;
+  model: string;
+  prompt_version: string;
+  provider_request_id: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  provider_response_hash: string | null;
+}
+
+export interface PatternPublisher {
+  plan(input: unknown, options: PatternPassOptions): Promise<PatternPassOutcome<PatternPlan>>;
+  write(input: unknown, options: PatternPassOptions): Promise<PatternPassOutcome<PatternWriterOutput>>;
+  verify(input: unknown, options: PatternPassOptions): Promise<PatternPassOutcome<PatternSemanticVerdict>>;
 }

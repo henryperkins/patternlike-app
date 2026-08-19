@@ -97,7 +97,7 @@ export interface PatternPassOptions {
   configuration: PatternPublisherPin;
 }
 
-export interface OpenAiPatternPublisher {
+export interface OpenAiPatternTransport {
   run(
     pass: PatternPass,
     document: unknown,
@@ -169,10 +169,10 @@ function readCacheObservation(response: Response): PatternCacheObservation | "hi
  * default would let a new call site route around the gateway — and the spend and
  * log records it exists to produce — by saying nothing at all.
  */
-export function createOpenAiPatternPublisher(
+export function createOpenAiPatternTransport(
   env: Pick<Env, "OPENAI_API_KEY">,
   route: AiGatewayRoute | null,
-): OpenAiPatternPublisher {
+): OpenAiPatternTransport {
   const url = responsesUrlFor(route);
 
   return {
