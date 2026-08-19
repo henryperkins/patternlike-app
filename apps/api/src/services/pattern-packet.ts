@@ -65,17 +65,58 @@ const FORBIDDEN_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Id prefixes minted anywhere in the system. A value carrying one of these has
- * escaped the alias indirection, which is the whole point of `aliasMap`.
+ * Every id prefix minted anywhere in the system.
+ *
+ * Enumerated from `newId(...)` call sites rather than from the handful that
+ * looked reachable: a value carrying any of these has escaped the alias
+ * indirection, which is the whole point of `aliasMap`, and "reachable today" is
+ * not a property this list should depend on. `cht_` (chart) and `cns_` (consent)
+ * were the two the module header already promised to exclude while the list
+ * omitted them.
+ *
+ * Matched as a SUBSTRING, not a prefix. `contracts/validate_schemas.py:840`
+ * scans `if prefix in encoded` over the serialized document, and an anchored
+ * check misses every id embedded mid-sentence — which is exactly where one would
+ * appear, since ontology prose, working titles, purposes, and section text all
+ * travel verbatim. A single leading space defeated the anchored form.
+ *
+ * A false positive here is a terminal refusal an operator can see. That is the
+ * correct direction to fail for a privacy boundary.
  */
 const FORBIDDEN_VALUE_PREFIXES: readonly string[] = [
-  "nft_",
-  "usr_",
+  "asp_",
+  "aud_",
+  "cht_",
+  "clm_",
+  "cns_",
   "cs_",
-  "pgen_",
+  "csr_",
   "cyc_",
   "cyp_",
+  "del_",
+  "dsf_",
+  "evt_",
+  "exp_",
+  "gen_",
+  "idn_",
+  "job_",
+  "nft_",
+  "paae_",
+  "par_",
+  "pat_",
+  "pgc_",
+  "pgen_",
   "prel_",
+  "rdg_",
+  "req_",
+  "rfb_",
+  "rsc_",
+  "ses_",
+  "sig_",
+  "trc_",
+  "tts_",
+  "tzc_",
+  "usr_",
 ];
 
 /**
@@ -98,6 +139,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "derived_synthesis_graph",
   "uncertainty",
   "assignments",
+  "signature_assignments",
   "bounds",
   "locale",
   "effective_accuracy",
@@ -286,6 +328,7 @@ export interface PatternWriterInput {
   pass: "writer";
   plan: PatternPlan;
   assignments: PatternWriterAssignment[];
+  signature_assignments: PatternWriterSignatureAssignment[];
   ontology_records: PatternOntologyRecord[];
   locale: string;
   effective_accuracy: string;
@@ -303,6 +346,14 @@ export interface PatternWriterAssignment {
   required_tension_ids: string[];
   required_resource_ids: string[];
   required_counter_expression_ids: string[];
+}
+
+/** One additional-signature plan unit's aliases and the facts behind them. */
+export interface PatternWriterSignatureAssignment {
+  signature_key: string;
+  feature_aliases: string[];
+  facts: PatternNormalizedFact[];
+  ontology_rule_ids: string[];
 }
 
 export interface PatternNormalizedFact {
@@ -340,6 +391,32 @@ export interface PatternDerivedSynthesisEdge {
  * the provider, and the post-serialisation walk would only catch names it
  * already knows.
  */
+function isScalar(value: unknown): boolean {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+/**
+ * A fact value is a scalar or an array of scalars. Anything else is dropped.
+ *
+ * Every real shape `featureFact` produces is exactly that — `member_bodies` and
+ * `suppressed_features` are string arrays, the rest are scalars — so nothing
+ * legitimate is lost. Copying the top level only would let an object nested
+ * under an allowed key travel whole, and the flat key allowlist would then be
+ * the only thing between it and the provider: it contains generic names like
+ * `id`, `title`, `text`, and `reason` that are legal elsewhere in the document
+ * and would be accepted at that depth too.
+ */
+function copyFactValue(value: unknown): unknown | undefined {
+  if (isScalar(value)) return value;
+  if (Array.isArray(value) && value.every(isScalar)) return [...value];
+  return undefined;
+}
+
 function copyFact(fact: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of [
@@ -357,7 +434,9 @@ function copyFact(fact: Record<string, unknown>): Record<string, unknown> {
     "accuracy",
     "suppressed_features",
   ]) {
-    if (Object.hasOwn(fact, key)) out[key] = fact[key];
+    if (!Object.hasOwn(fact, key)) continue;
+    const value = copyFactValue(fact[key]);
+    if (value !== undefined) out[key] = value;
   }
   return out;
 }
@@ -573,7 +652,10 @@ function walk(
   }
   if (typeof value === "string") {
     for (const prefix of FORBIDDEN_VALUE_PREFIXES) {
-      if (value.startsWith(prefix)) {
+      // Substring, not prefix. An id embedded in prose is the likely case, and
+      // free text reaches here verbatim from ontology propositions, working
+      // titles, purposes, chapter titles, summaries, and section prose.
+      if (value.includes(prefix)) {
         return { code: "pattern_input_forbidden_key", key: prefix };
       }
     }
@@ -604,10 +686,19 @@ function walk(
  * do not send means the cap bounds nothing you can point at.
  */
 function finish<T>(document: T, limits: PatternPacketLimits): PatternPacketResult<T> {
-  const offender = walk(document, []);
+  // Serialize FIRST, then walk what serialization produced.
+  //
+  // This is a post-serialisation walk, and the ordering is the whole point: a
+  // value carrying `toJSON` — a Date, or any class instance whose `toJSON` sits
+  // on the prototype — presents no own enumerable keys to `Object.entries`, so a
+  // walk over the live object graph inspects nothing while `JSON.stringify`
+  // sends whatever `toJSON` returned. Checking bytes that are not the bytes sent
+  // is not a check.
+  const serialized = JSON.stringify(document);
+
+  const offender = findPatternInputViolation(JSON.parse(serialized) as unknown);
   if (offender) return { ok: false, code: offender.code, key: offender.key };
 
-  const serialized = JSON.stringify(document);
   const bytes = new TextEncoder().encode(serialized).length;
   if (bytes > limits.maxBytes) return { ok: false, code: "pattern_input_too_large" };
 
@@ -617,6 +708,18 @@ function finish<T>(document: T, limits: PatternPacketLimits): PatternPacketResul
 // ---------------------------------------------------------------------------
 // Builders
 // ---------------------------------------------------------------------------
+
+/** Every ontology rule id the frozen plan cites, across chapters and signatures. */
+function citedRuleIds(plan: PatternPlan): Set<string> {
+  const ids = new Set<string>();
+  for (const chapter of plan.chapters) {
+    for (const id of chapter.ontology_rule_ids) ids.add(id);
+  }
+  for (const signature of plan.additional_signatures) {
+    for (const id of signature.ontology_rule_ids) ids.add(id);
+  }
+  return ids;
+}
 
 /**
  * The packet as the selector produced it, plus the records its aliases activated.
@@ -655,29 +758,37 @@ export function buildWriterInput(
   ontologyRecords: readonly PatternOntologyRecord[],
   limits: PatternPacketLimits,
 ): PatternPacketResult<PatternWriterInput> {
-  const authorizedRuleIds = new Set<string>();
-  for (const chapter of plan.chapters) {
-    for (const id of chapter.ontology_rule_ids) authorizedRuleIds.add(id);
-  }
-  for (const signature of plan.additional_signatures) {
-    for (const id of signature.ontology_rule_ids) authorizedRuleIds.add(id);
-  }
+  const authorizedRuleIds = citedRuleIds(plan);
+  // The uncertainty rules are ontology rule ids too, and a valid plan need never
+  // cite them: they come from the packet's uncertainty features, not from a
+  // chapter. Filtering by cited ids alone therefore drops the records the writer
+  // is required to honour, and the policy line asking it to honour them would
+  // point at nothing.
+  for (const id of packet.uncertainty.required_language_rule_ids) authorizedRuleIds.add(id);
 
-  // Facts are filtered per chapter by that chapter's aliases, so an alias the
-  // plan never assigns has no route into the document.
-  const assignments: PatternWriterAssignment[] = plan.chapters.map((chapter) => {
-    const aliases = new Set(chapter.feature_aliases);
-    return {
-      chapter_key: chapter.chapter_key,
-      feature_aliases: [...chapter.feature_aliases],
-      facts: normalizedFacts(packet, aliases),
-      ontology_rule_ids: [...chapter.ontology_rule_ids],
-      derived_synthesis_ids: [...chapter.derived_synthesis_ids],
-      required_tension_ids: [...chapter.required_tension_ids],
-      required_resource_ids: [...chapter.required_resource_ids],
-      required_counter_expression_ids: [...chapter.required_counter_expression_ids],
-    };
-  });
+  // Facts are filtered per unit by that unit's aliases, so an alias the plan
+  // never assigns has no route into the document.
+  const assignments: PatternWriterAssignment[] = plan.chapters.map((chapter) => ({
+    chapter_key: chapter.chapter_key,
+    feature_aliases: [...chapter.feature_aliases],
+    facts: normalizedFacts(packet, new Set(chapter.feature_aliases)),
+    ontology_rule_ids: [...chapter.ontology_rule_ids],
+    derived_synthesis_ids: [...chapter.derived_synthesis_ids],
+    required_tension_ids: [...chapter.required_tension_ids],
+    required_resource_ids: [...chapter.required_resource_ids],
+    required_counter_expression_ids: [...chapter.required_counter_expression_ids],
+  }));
+
+  // Signatures are plan units too. Without these, an alias assigned only to an
+  // additional signature has no facts anywhere in the document, and the writer
+  // is asked to write a signature about a feature it cannot see.
+  const signature_assignments: PatternWriterSignatureAssignment[] =
+    plan.additional_signatures.map((signature) => ({
+      signature_key: signature.signature_key,
+      feature_aliases: [...signature.feature_aliases],
+      facts: normalizedFacts(packet, new Set(signature.feature_aliases)),
+      ontology_rule_ids: [...signature.ontology_rule_ids],
+    }));
 
   return finish(
     {
@@ -685,6 +796,7 @@ export function buildWriterInput(
       pass: "writer",
       plan: copyPlan(plan),
       assignments,
+      signature_assignments,
       ontology_records: ontologyRecords
         .filter((record) => authorizedRuleIds.has(record.id))
         .map(copyRecord),
@@ -716,15 +828,33 @@ export function buildVerifierInput(
   ontologyRecords: readonly PatternOntologyRecord[],
   limits: PatternPacketLimits,
 ): PatternPacketResult<PatternVerifierInput> {
-  const authorizedRuleIds = new Set<string>();
-  for (const chapter of plan.chapters) {
-    for (const id of chapter.ontology_rule_ids) authorizedRuleIds.add(id);
-  }
-  for (const signature of plan.additional_signatures) {
-    for (const id of signature.ontology_rule_ids) authorizedRuleIds.add(id);
+  const authorizedRuleIds = citedRuleIds(plan);
+  for (const id of packet.uncertainty.required_language_rule_ids) authorizedRuleIds.add(id);
+
+  const byId = new Map(ontologyRecords.map((record) => [record.id, record]));
+
+  // Close over `input_meaning_ids`. Section 14.4 asks the verifier whether "a
+  // derived synthesis exceeds its dependencies", which it cannot judge against a
+  // dependency it was not shown — and a plan is valid citing only the synthesis,
+  // not its inputs, so the cited set alone leaves those edges dangling.
+  //
+  // This widens what the verifier SEES, never what the writer may CITE. Citation
+  // authority stays with the plan, which is why the same closure is not applied
+  // to the writer document.
+  const closed = new Set(authorizedRuleIds);
+  const queue = [...closed];
+  while (queue.length > 0) {
+    const record = byId.get(queue.shift()!);
+    if (!record) continue;
+    for (const input of record.input_meaning_ids) {
+      if (!closed.has(input)) {
+        closed.add(input);
+        queue.push(input);
+      }
+    }
   }
 
-  const authorized = ontologyRecords.filter((record) => authorizedRuleIds.has(record.id));
+  const authorized = ontologyRecords.filter((record) => closed.has(record.id));
 
   // The dependency graph is the derived-synthesis records and the meanings they
   // are derived from. No named type exists for it anywhere; this edge list is

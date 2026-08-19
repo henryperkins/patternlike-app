@@ -400,4 +400,134 @@ describe("Pattern provider packet builders", () => {
       expect(blob).not.toContain("f003");
     });
   });
+
+  describe("regressions from the adversarial review", () => {
+    it("refuses a chart id or consent id, not only the prefixes that looked reachable", () => {
+      // The original list held nft_/usr_/cs_/pgen_/cyc_/cyp_/prel_ while the
+      // module header promised no chart identifier and no consent id. Chart ids
+      // are minted cht_ and consent ids cns_, so both passed both lines.
+      for (const id of ["cht_0123456789abcdef", "cns_0123456789abcdef", "pat_abc", "gen_abc"]) {
+        const poisoned = packet();
+        poisoned.features[0]!.alias = id;
+        const result = buildPlannerInput(poisoned, records(), PATTERN_PACKET_LIMITS_DEFAULT);
+        expect(result.ok, `${id} must be refused`).toBe(false);
+      }
+    });
+
+    it("refuses an id embedded mid-sentence, not only one at offset zero", () => {
+      // Free text travels verbatim, so an id appears in prose, not at offset 0.
+      // A single leading space defeated the anchored check.
+      const poisoned = records();
+      poisoned[0]!.normalized_proposition = `Feature nft_${"a".repeat(32)} indicates directness.`;
+      const result = buildPlannerInput(packet(), poisoned, PATTERN_PACKET_LIMITS_DEFAULT);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.code).toBe("pattern_input_forbidden_key");
+    });
+
+    it("refuses an id embedded in a plan working title or purpose", () => {
+      const poisoned = plan();
+      poisoned.chapters[0]!.working_title = `About usr_${"b".repeat(8)}`;
+      const result = buildWriterInput(poisoned, packet(), records(), PATTERN_PACKET_LIMITS_DEFAULT);
+      expect(result.ok).toBe(false);
+    });
+
+    it("inspects the bytes it sends, not the live object graph", () => {
+      // A value carrying toJSON presents no own enumerable keys, so a walk over
+      // the object graph sees nothing while JSON.stringify sends what toJSON
+      // returned. The walk therefore runs on the serialized form.
+      const smuggler = {
+        toJSON() {
+          return { consent_id: SENTINEL };
+        },
+      };
+      const poisoned = packet();
+      (poisoned.features[0]!.fact as Record<string, unknown>).body = smuggler as never;
+      const result = buildPlannerInput(poisoned, records(), PATTERN_PACKET_LIMITS_DEFAULT);
+      // copyFactValue drops the non-scalar outright, which is the first line.
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.serialized).not.toContain(SENTINEL);
+
+      // And the walk itself, driven directly, catches what serialization emits.
+      expect(findPatternInputViolation(JSON.parse(JSON.stringify({ fact: smuggler })))).not.toBeNull();
+    });
+
+    it("drops a nested object smuggled under an allowed fact key", () => {
+      const poisoned = packet();
+      (poisoned.features[0]!.fact as Record<string, unknown>).body = {
+        id: SENTINEL,
+        title: SENTINEL,
+      };
+      const result = buildPlannerInput(poisoned, records(), PATTERN_PACKET_LIMITS_DEFAULT);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.serialized).not.toContain(SENTINEL);
+    });
+
+    it("gives the writer facts for aliases assigned to an additional signature", () => {
+      const p = packet();
+      p.features.push({
+        alias: "f007",
+        feature_class: "position",
+        fact: { body: "venus", longitude: 44.4, sign: 2, house: 5 },
+        coverage: "eligible",
+        ontology_rule_ids: ["ont.sun.aries"],
+        cluster_ids: [],
+      });
+      const withSignature = plan();
+      withSignature.additional_signatures.push({
+        signature_key: "signature_01",
+        working_title: "A signature",
+        feature_aliases: ["f007"],
+        ontology_rule_ids: ["ont.sun.aries"],
+      });
+
+      const result = buildWriterInput(withSignature, p, records(), PATTERN_PACKET_LIMITS_DEFAULT);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      // Without signature_assignments the writer is asked to write a signature
+      // about a feature whose facts appear nowhere in the document.
+      expect(result.document.signature_assignments).toHaveLength(1);
+      expect(result.document.signature_assignments[0]!.facts.map((f) => f.alias)).toEqual(["f007"]);
+    });
+
+    it("supplies every ontology record the verifier graph names as an input", () => {
+      // A plan may cite a derived synthesis without citing its inputs, which
+      // left graph edges pointing at records the verifier was never shown --
+      // while section 14.4 asks it whether a synthesis exceeds its dependencies.
+      const citedSynthesisOnly = plan();
+      citedSynthesisOnly.chapters[0]!.ontology_rule_ids = ["ont.mars.saturn.square"];
+
+      const result = buildVerifierInput(
+        candidate(),
+        citedSynthesisOnly,
+        packet(),
+        records(),
+        PATTERN_PACKET_LIMITS_DEFAULT,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const present = new Set(result.document.ontology_records.map((r) => r.id));
+      for (const edge of result.document.derived_synthesis_graph) {
+        for (const input of edge.inputs) {
+          expect(present.has(input), `input ${input} must be supplied`).toBe(true);
+        }
+      }
+    });
+
+    it("keeps the required uncertainty-language records a plan need never cite", () => {
+      const p = packet();
+      p.uncertainty.required_language_rule_ids = ["ont.sun.aries"];
+      const citingNothingElse = plan();
+      citingNothingElse.chapters[0]!.ontology_rule_ids = ["ont.mars.saturn.square"];
+
+      const result = buildWriterInput(citingNothingElse, p, records(), PATTERN_PACKET_LIMITS_DEFAULT);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      // The writer is told to honour these rules; filtering by cited ids alone
+      // made that instruction point at nothing.
+      expect(result.document.ontology_records.map((r) => r.id)).toContain("ont.sun.aries");
+    });
+  });
 });
