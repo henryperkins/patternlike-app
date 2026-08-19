@@ -35,9 +35,11 @@ recorded evidence and an empty ledger table, not a feature design.
 
 ## Criterion 23 — restore drill
 
-Prerequisites: `0008` applied to production; `PATTERN_REPLAY_LEDGER_KEYS`
-set; replica bucket populated by live claim transitions (or by a
-staging clone that has performed a real deletion).
+Prerequisites: `0008` applied to production;
+`PATTERN_REPLAY_LEDGER_SIGNING_KEY` set on the live writer;
+`PATTERN_REPLAY_LEDGER_KEYS` set on writer and restore environments; replica
+bucket populated by live claim transitions (or by a staging clone that has
+performed a real deletion).
 
 Procedure, recorded with bookmarks and hashes:
 

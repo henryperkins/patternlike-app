@@ -30,8 +30,9 @@ finding 8 / decision 11.
   suppress content or consume a claim; it cannot resurrect content or permit
   a reroll. The reverse ordering has an unrecoverable window in which D1
   commits an erasure that never reaches the only store surviving a restore.
-- Records are signed with a dedicated `PATTERN_REPLAY_LEDGER_KEYS` allowlist,
-  canonicalized the same way ontology releases are: JCS over the record
+- Records are signed with a dedicated
+  `PATTERN_REPLAY_LEDGER_SIGNING_KEY` and verified through the
+  `PATTERN_REPLAY_LEDGER_KEYS` allowlist, canonicalized as JCS over the record
   minus `content_hash` and `signature`.
 - Records contain identifiers and status transitions only. No prose, packet,
   plan, prompt, or artifact ciphertext.
@@ -64,14 +65,14 @@ replace `pattern_admin_access_events`.
 
 Closed `event_class` set:
 
-| Class | Written when | Claim effect |
+| Class | Written when | Replay effect |
 |---|---|---|
 | `claim_consumed` | a fingerprint claim leaves `available`/`reserved` for a terminal status | set `consumed_at` if null; set status to `next_claim_status` |
-| `pattern_deleted` | the reader deletes an accepted Pattern | status `deleted` |
-| `chart_correction_erased` | a chart correction erases the prior Pattern | status `superseded` |
-| `pattern_withdrawn` | critical ontology recall withdraws an accepted Pattern | status `withdrawn` |
-| `ontology_recalled` | a release is recalled (may name many users via follow-up `pattern_withdrawn` rows) | no direct claim write; audit of the recall |
-| `account_deleted` | account erasure begins | every claim for `target_user_id` becomes `deleted` if not already terminal |
+| `pattern_deleted` | the reader deletes an accepted Pattern | erase the document and artifact key; move `accepted` to `deleted` |
+| `chart_correction_erased` | a chart correction erases the prior Pattern | erase the document and artifact key; move `accepted` to `superseded` |
+| `pattern_withdrawn` | critical ontology recall withdraws an accepted Pattern | erase the document and artifact key; move `accepted` to `withdrawn` |
+| `ontology_recalled` | a release is recalled (may name many users via follow-up `pattern_withdrawn` rows) | mark the release recalled, clear its active pointer, and retain a version tombstone |
+| `account_deleted` | account erasure begins | erase every Pattern document and artifact key for `target_user_id`; move every claim to `deleted` |
 
 `next_claim_status` is required for every class except `ontology_recalled`,
 and is one of `accepted`, `deleted`, `superseded`, `withdrawn`. `accepted`
@@ -94,40 +95,59 @@ Required fields:
 - `claim_id` (nullable only for those two classes)
 - `generation_id` (nullable)
 - `pattern_id` (nullable)
-- `ontology_version` (nullable)
+- `ontology_version` (non-null for `ontology_recalled`, otherwise nullable)
 - `prior_claim_status` (nullable)
 - `next_claim_status` (nullable exactly when `event_class` is
   `ontology_recalled`)
 - `content_hash`
+- `signing_key_id`
 - `signature`
 
 No other properties. No content fields.
 
 ## Signing and replica
 
-1. The Worker canonicalizes the record minus `content_hash` and `signature`.
-2. `content_hash` is `sha256:` plus the hex digest of those bytes.
-3. `signature` is Ed25519 over the same bytes, verified against
-   `PATTERN_REPLAY_LEDGER_KEYS`. Production refuses to write or replay
-   when the allowlist is missing. Development may skip verification only
-   when `ENVIRONMENT` is `development` or `test`.
-4. After authorization and lifecycle preconditions pass, but before any D1
+1. Before creating bytes, the Worker derives `event_id` as `prel_` plus the
+   first 32 lowercase hex characters of SHA-256 over the JCS array
+   `["pattern-erasure-replay-event-v1", event_class, semantic_operation_key]`.
+   The semantic key is stable: the claim/generation identity for consumption,
+   the owner-scoped idempotency record for reader deletion, the chart-correction
+   operation ID, recall-event-plus-claim for withdrawal, `ontology_version` for
+   recall, and the deletion-request ID for account deletion.
+2. The Worker first reads the deterministic R2 key. If an object exists, it
+   verifies the hash and signature and requires every semantic field to match,
+   then adopts the stored bytes, including `occurred_at` and `signing_key_id`.
+   A mismatch is an integrity defect. If no object exists, the Worker pins
+   `occurred_at`, chooses the active signing key, and creates the record. A
+   create race is resolved by reading and adopting the winning identical object.
+3. The Worker canonicalizes the record minus `content_hash` and `signature`.
+4. `content_hash` is `sha256:` plus the hex digest of those bytes.
+5. `signature` is Ed25519 over the same bytes. `signing_key_id` selects a
+   public key from `PATTERN_REPLAY_LEDGER_KEYS`; the active private key comes
+   from `PATTERN_REPLAY_LEDGER_SIGNING_KEY`. Production refuses to write when
+   the signer is missing or does not match its allowlisted public key, and
+   refuses to replay an unknown key ID. Development may skip signing only when
+   `ENVIRONMENT` is `development` or `test`.
+6. After authorization and lifecycle preconditions pass, but before any D1
    mutation, the Worker puts the signed JSON to R2 at
    `pattern-erasure-replay/{event_id}.json` with create-only semantics. A
    colliding object with different bytes is an integrity defect.
-5. Only after that put succeeds does one guarded D1 batch mutate the claim and
+7. Only after that put succeeds does one guarded D1 batch mutate live state and
    insert the matching receipt with non-null `replica_put_at`. No R2 operation
    occurs inside a D1 batch; Cloudflare provides no cross-service transaction.
-6. If the D1 batch fails, the R2 object remains the durable lifecycle intent.
-   An exact retry uses the same event ID and bytes.
+8. If the D1 batch fails, the R2 object remains the durable lifecycle intent.
+   An exact retry derives the same key and adopts the stored bytes.
    `POST /internal/pattern-erasure-replay/sweep` lists signed replica objects
    and applies any whose D1 receipt or terminal transition is missing. It never
    tries to reconstruct the write-ahead from D1.
-7. The originating request succeeds only after the D1 batch commits. A restore
+9. The originating request succeeds only after the D1 batch commits. A restore
    still uses the replica, not the table.
 
-`PATTERN_REPLAY_LEDGER_KEYS` is a new secret. It is not
-`PATTERN_ONTOLOGY_KEYS` and not `ROOT_KEK`.
+The signing key is separate from the verification keyring so a restore
+environment need not hold private material. Old public keys remain allowlisted
+for at least the longest R2 retention and restore-drill window.
+`PATTERN_REPLAY_LEDGER_SIGNING_KEY` and `PATTERN_REPLAY_LEDGER_KEYS` are not
+`PATTERN_ONTOLOGY_KEYS` or `ROOT_KEK`.
 
 ## Replay procedure
 
@@ -139,17 +159,30 @@ narrative.
    object’s signature and `content_hash`. Refuse the drill on one
    failure.
 3. Order events by `occurred_at`, then `event_id`.
-4. For each event, apply the claim effect in one guarded batch opened
-   and closed by `assertion_probe`:
-   - if no claim row exists, insert a terminal row with the pinned
-     fingerprint and `consumed_at = occurred_at`;
-   - if the row is `available` or `reserved`, move it to
-     `next_claim_status` and set `consumed_at`;
-   - if the row is already terminal, leave it terminal. A status
-     mismatch is logged as `pattern_erasure_replay_already_terminal`
-     and is not a failure.
-5. Never set `status = 'available'`.
-6. Only then start the Worker.
+4. Apply each event idempotently in a guarded batch opened and closed by
+   `assertion_probe`:
+   - `ontology_recalled` requires `ontology_version`, marks an existing release
+     `recalled`, clears the pointer if it names that version, and leaves the
+     replay receipt as a tombstone even when the restored snapshot predates the
+     release row. Ontology ingestion must refuse a version named by such a
+     tombstone.
+   - `claim_consumed` inserts the pinned terminal claim when absent, or moves
+     only `available`/`reserved` to `next_claim_status`. It does not rewrite an
+     already terminal claim.
+   - `pattern_deleted`, `chart_correction_erased`, and `pattern_withdrawn`
+     delete the matching `pattern_documents` row and erase the generation
+     artifact key before traffic. They move `available`, `reserved`, or
+     `accepted` to the event’s terminal status; an already-erased claim never
+     moves back to `accepted` or `available`.
+   - `account_deleted` deletes all Pattern documents for `target_user_id`,
+     erases every generation artifact key for that target, and moves all of
+     their claims to `deleted`.
+   Physical R2 artifact deletion may follow, but key erasure and D1 document
+   deletion are in the pre-traffic guarded mutation.
+5. After all events, assert that no recalled version is active, no erased
+   Pattern document is readable, and no affected artifact key remains wrapped.
+6. Never set `status = 'available'`.
+7. Only then start the Worker.
 
 ## Migration
 
@@ -163,7 +196,11 @@ do not classify it: there is no `user_id` column and no FK to `users`.
 
 ## Configuration
 
-- `PATTERN_REPLAY_LEDGER_KEYS` — required outside development.
+- `PATTERN_REPLAY_LEDGER_SIGNING_KEY` — active Ed25519 private key plus
+  `signing_key_id`; required for production writers, absent from restore-only
+  environments.
+- `PATTERN_REPLAY_LEDGER_KEYS` — public verification keyring by
+  `signing_key_id`; required outside development.
 - Replica R2 binding `PATTERN_REPLAY_LEDGER` — a bucket that operators
   exclude from the D1 restore set by construction (it is not D1).
 - `POST /internal/pattern-erasure-replay/sweep` and
@@ -180,12 +217,16 @@ A design is implementable when:
 2. the guarded D1 transition inserts a receipt with non-null `replica_put_at`;
 3. a crash between the R2 put and D1 batch leaves an intent that exact retry
    or sweep applies without returning any claim to `available`;
-4. apply on a database whose claim is `available` and whose replica
-   says `deleted` leaves the claim `deleted` with `consumed_at` set;
-5. apply never returns a claim to `available`;
-6. account deletion writes `account_deleted` and leaves the ledger
+4. a retry derives the same R2 key and adopts the original signed bytes,
+   including timestamp and signing-key identity;
+5. applying `pattern_deleted` over a restored `accepted` claim erases the
+   document and key and leaves the claim `deleted`;
+6. applying `ontology_recalled` marks the release recalled, clears its pointer,
+   and prevents later ingestion of the tombstoned version;
+7. apply never returns a claim to `available`;
+8. account deletion writes `account_deleted` and leaves the ledger
    rows in place;
-7. `python3 contracts/validate_schemas.py` accepts the event schema
+9. `python3 contracts/validate_schemas.py` accepts the event schema
    and its fixtures.
 
 Criterion 23 remains a Slice D drill against this runtime.

@@ -271,6 +271,13 @@ write-ahead and restore authority outside D1 Time Travel. The D1 table stores
 the live receipt only after that put succeeds, so no D1-to-R2 crash window can
 drop an erasure from the restore source.
 
+Event IDs are deterministic from a domain-separated semantic operation key;
+an exact retry adopts the already signed R2 bytes and their timestamp. Each
+record names its Ed25519 `signing_key_id`. Replay is not claim-only:
+`pattern_deleted` over a restored accepted claim erases the document and key,
+and `ontology_recalled` clears the active pointer and leaves an ingestion
+tombstone for that version.
+
 ### 12. OpenAPI — twelve surfaces
 
 **Decision.** The M7 OpenAPI amendment describes all twelve §19.8 surfaces.
