@@ -60,12 +60,22 @@ export const PATTERN_OUTPUT_SCHEMA_NAME: Record<PatternPass, string> = {
  * The only two keywords stripped.
  *
  * `pattern`, `minItems`, `maxItems`, `enum`, and the single nested `anyOf` in
- * the writer schema all stay. NOTE: the design records that this repository has
- * no live proof the pinned model tier accepts `pattern` in strict mode, and that
- * if a preflight against the authorized account rejects it, `pattern` is
- * stripped alongside the length keywords. That preflight cannot run offline.
- * Adding it here is a one-line change plus the multiplicity assertion in the
- * test; do not assume the two-keyword list is settled until the preflight runs.
+ * the writer schema all stay.
+ *
+ * `pattern` was the open question: the design recorded that this repository had
+ * no live proof the pinned model tier accepts it in strict mode, and that if a
+ * preflight rejected it, `pattern` would be stripped alongside the length
+ * keywords. **That preflight has now run and `pattern` is accepted.**
+ *
+ * Evidence, 2026-08-19, against the authorized account through the AI Gateway
+ * BYOK path (`billing.payer: "openai"`, so the stored key served it):
+ * two identical strict requests to `gpt-5.6-sol`, one with
+ * `{"type":"string","pattern":"^chapter_[0-9]{2}$"}` and one without. Both
+ * returned 200; the `pattern` variant completed and emitted `{"k":"chapter_17"}`
+ * — accepted AND honoured, not merely tolerated. The strip list is therefore
+ * settled at two keywords, and the test's exact-multiplicity assertion holds.
+ *
+ * Re-run the preflight if the pinned model tier changes.
  */
 export const STRIPPED_STRICT_KEYWORDS: readonly string[] = ["minLength", "maxLength"];
 
