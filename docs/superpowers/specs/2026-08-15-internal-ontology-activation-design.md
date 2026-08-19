@@ -208,11 +208,12 @@ with an explicit purely-additive assertion. This one follows its shape.
 
 A D1 column mirroring `provenance.origin` is **operational convenience, not the
 gate**. `loadActiveOntology` already returns the full `release`, so the runtime
-refusal reads the signed value directly and needs no column. If a migration is
-being written anyway — the adapter plan proposes `0008` for the per-stage-class
-usage ledger — mirroring the column there is nearly free and makes admin listing
-and operator queries legible. If no migration is being written, defer it. **Note
-the numbering collision:** whichever of these lands first takes `0008`.
+refusal reads the signed value directly and needs no column. Migration `0008`
+is now the erasure-replay ledger and Task 8 reserves `0009` for the adapter's
+correction-artifact CHECK rebuild. If the adapter's per-stage-class usage
+ledger lands as `0010`, mirroring the provenance column there is nearly free
+and makes admin listing and operator queries legible. Otherwise defer it; do
+not reopen either reserved migration.
 
 ### Absence is internal-only
 

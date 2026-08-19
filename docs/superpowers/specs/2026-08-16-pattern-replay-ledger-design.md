@@ -72,7 +72,7 @@ Closed `event_class` set:
 | `chart_correction_erased` | a chart correction erases the prior Pattern | erase the document and artifact key; move `accepted` to `superseded` |
 | `pattern_withdrawn` | critical ontology recall withdraws an accepted Pattern | erase the document and artifact key; move `accepted` to `withdrawn` |
 | `ontology_recalled` | a release is recalled (may name many users via follow-up `pattern_withdrawn` rows) | mark the release recalled, clear its active pointer, and retain a version tombstone |
-| `account_deleted` | account erasure begins | erase every Pattern document and artifact key for `target_user_id`; move every claim to `deleted` |
+| `account_deleted` | account erasure begins | run the full account-deletion object, manifest, row, key-erasure, and tombstone workflow; Pattern claims are deleted with the other user-owned rows |
 
 `next_claim_status` is required for every class except `ontology_recalled`,
 and is one of `accepted`, `deleted`, `superseded`, `withdrawn`. `accepted`
@@ -131,7 +131,10 @@ No other properties. No content fields.
 6. After authorization and lifecycle preconditions pass, but before any D1
    mutation, the Worker puts the signed JSON to R2 at
    `pattern-erasure-replay/{event_id}.json` with create-only semantics. A
-   colliding object with different bytes is an integrity defect.
+   failed conditional create always returns to step 2: a valid object with the
+   same deterministic semantic fields wins and is adopted even when its
+   timestamp or signing key differs from the losing candidate. Invalid bytes
+   or a semantic mismatch are integrity defects.
 7. Only after that put succeeds does one guarded D1 batch mutate live state and
    insert the matching receipt with non-null `replica_put_at`. No R2 operation
    occurs inside a D1 batch; Cloudflare provides no cross-service transaction.
@@ -158,7 +161,9 @@ narrative.
 2. List `pattern-erasure-replay/` in the replica bucket. Verify every
    object’s signature and `content_hash`. Refuse the drill on one
    failure.
-3. Order events by `occurred_at`, then `event_id`.
+3. Order non-account events by `occurred_at`, then `event_id`. Apply
+   `account_deleted` events in a final pass so no older or same-timestamp event
+   can recreate user-owned state after account erasure.
 4. Apply each event idempotently in a guarded batch opened and closed by
    `assertion_probe`:
    - `ontology_recalled` requires `ontology_version`, marks an existing release
@@ -171,12 +176,20 @@ narrative.
      already terminal claim.
    - `pattern_deleted`, `chart_correction_erased`, and `pattern_withdrawn`
      delete the matching `pattern_documents` row and erase the generation
-     artifact key before traffic. They move `available`, `reserved`, or
-     `accepted` to the event’s terminal status; an already-erased claim never
-     moves back to `accepted` or `available`.
-   - `account_deleted` deletes all Pattern documents for `target_user_id`,
-     erases every generation artifact key for that target, and moves all of
-     their claims to `deleted`.
+     artifact key before traffic. If the pinned claim is absent, they insert
+     its terminal tombstone; otherwise they move `available`, `reserved`, or
+     `accepted` to the event’s terminal status. An already-erased claim never
+     moves back to `accepted` or `available`, so causal safety does not depend
+     on timestamp tie-breaking.
+   - `account_deleted` invokes the complete deletion manifest against the
+     restored account: fence and delete registered objects; delete sessions,
+     identities, jobs, Pattern claims, and every other table in
+     `DELETED_USER_TABLES`; null retained administrator references; erase all
+     wrapped DEKs; and leave the existing `users` / `user_keys` /
+     `deletion_requests` proof state in its normal deleted-tombstone shape.
+     When the restored snapshot predates the deletion request, the offline
+     replay applies those idempotent primitives directly and uses `event_id` as
+     the proof identity; a crash restarts the ordered sequence before traffic.
    Physical R2 artifact deletion may follow, but key erasure and D1 document
    deletion are in the pre-traffic guarded mutation.
 5. After all events, assert that no recalled version is active, no erased
@@ -224,8 +237,10 @@ A design is implementable when:
 6. applying `ontology_recalled` marks the release recalled, clears its pointer,
    and prevents later ingestion of the tombstoned version;
 7. apply never returns a claim to `available`;
-8. account deletion writes `account_deleted` and leaves the ledger
-   rows in place;
+8. account deletion writes `account_deleted`, runs the full deletion manifest
+   and cryptographic-erasure workflow, removes Pattern claims with the other
+   user-owned rows, and leaves only normal proof tombstones plus the replay
+   ledger row;
 9. `python3 contracts/validate_schemas.py` accepts the event schema
    and its fixtures.
 

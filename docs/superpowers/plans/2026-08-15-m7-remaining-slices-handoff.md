@@ -291,8 +291,9 @@ From the adapter plan and from the operator, all recorded with their evidence:
   deliveries plus the publish delivery is a floor of 12 before any lease-expiry
   or artifact-adopting churn.
 - **Q6** `pattern_provider_daily_usage` does not satisfy §25.3's per-stage-class
-  recording. Outcome is a `0008` migration or a recorded amendment to §25.3 —
-  **not** a third silent option.
+  recording. `0008` is the replay ledger and `0009` is reserved for the
+  correction-artifact CHECK rebuild, so the outcome is a `0010` migration or a
+  recorded amendment to §25.3 — **not** a third silent option.
 
 Outstanding sign-offs carried in the adapter plan: Q1 blocks its Task 8, Q6
 blocks its Task 8a, and Task 5a needs a go-ahead because it modifies live-path
@@ -300,9 +301,11 @@ code.
 
 ## Constraints that bind everything you scope
 
-- `contracts/m0` through `contracts/m6` stay byte-identical. `contracts/m7` keeps
-  its `schema_version`, every `$id`, every enum and every required field;
-  additive changes are recorded in the manifest's `amendments` array.
+- `contracts/m0` through `contracts/m6` stay byte-identical. `contracts/m7`
+  keeps its `schema_version`, every `$id`, every existing enum member, and
+  every existing required field; additive properties, definitions, and enum
+  members such as `correction_document` are recorded in the manifest's
+  `amendments` array.
 - `packages/pattern-engine` keeps its purity contract. Nothing new lands in
   `packages/shared`, which the AGPL calc service imports.
 - No new encrypted column without adding it to `ENCRYPTED_COLUMNS` in

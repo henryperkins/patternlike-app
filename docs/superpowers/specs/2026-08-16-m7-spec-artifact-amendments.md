@@ -262,8 +262,9 @@ It does not return record bodies.
 **Decision.** The disaster-recovery replay source is specified in
 [`2026-08-16-pattern-replay-ledger-design.md`](2026-08-16-pattern-replay-ledger-design.md).
 `0008` is that ledger. The adapter plan’s per-stage-class usage ledger and
-any D1 provenance-origin convenience column take `0009` or share a later
-migration; they do not collide with this number.
+the `correction_document` CHECK rebuild do not share it:
+`correction_document` takes `0009`, while per-stage-class usage and any D1
+provenance-origin convenience column take `0010` or later.
 
 The ledger is not user-owned. Account deletion **writes** a ledger event;
 it does not delete ledger rows. A create-only R2 object is the durable
@@ -276,7 +277,9 @@ an exact retry adopts the already signed R2 bytes and their timestamp. Each
 record names its Ed25519 `signing_key_id`. Replay is not claim-only:
 `pattern_deleted` over a restored accepted claim erases the document and key,
 and `ontology_recalled` clears the active pointer and leaves an ingestion
-tombstone for that version.
+tombstone for that version. Destructive claim events materialize a terminal
+claim when it is absent, and `account_deleted` runs the full deletion manifest
+and cryptographic-erasure workflow in a final replay pass.
 
 ### 12. OpenAPI — twelve surfaces
 

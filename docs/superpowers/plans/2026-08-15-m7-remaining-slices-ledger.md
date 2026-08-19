@@ -131,8 +131,9 @@ The unimplemented-spec-artifacts review inserted spec work in front of
 A–D. That work has landed: product-spec v0.6, in-place 2026-08-14
 amendments, additive `contracts/m7` documents, and `0008` as the replay
 ledger. Slice A and B designs remain drafts; they now cite the amendment
-rather than the pre-amendment lists. `0008` is taken; the adapter’s
-per-stage-class usage ledger is `0009` or later.
+rather than the pre-amendment lists. `0008` is the replay ledger, `0009` is
+reserved for the correction-artifact CHECK rebuild, and the adapter’s
+per-stage-class usage ledger is `0010` or later.
 
 ## Slice C — Administrator authorization boundary (§31.9, §24)
 
