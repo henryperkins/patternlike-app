@@ -205,33 +205,22 @@ export type PublisherConfigOutcome =
 // Provider result
 // ---------------------------------------------------------------------------
 
-export type PublisherFailureCode =
-  | "publisher_unavailable"
-  | "publisher_output_invalid"
-  | "publisher_refused"
-  | "publisher_auth_failed"
-  | "publisher_model_unavailable";
-
 /**
- * The closed vocabulary a failure may carry.
- *
- * No provider response text, header, URL, or exception message is ever copied
- * into a result or a log line. A metric needs to distinguish a timeout from a
- * refusal; it does not need the sentence the provider used to say so.
+ * The failure vocabulary lives in `openai-responses-adapter.ts` so readings and
+ * Patterns cannot drift apart on it. Re-exported here because this module is
+ * where every existing caller reads it from, and a type-only re-export is
+ * erased at build time — so the value edge stays one-way, adapter to here.
  */
-export type PublisherSafeDetailCode =
-  | "request_timeout"
-  | "network_error"
-  | "rate_limited"
-  | "provider_5xx"
-  | "authentication_failed"
-  | "model_not_available"
-  | "provider_refusal"
-  | "max_output_tokens_exhausted"
-  | "missing_output_text"
-  | "multiple_output_text"
-  | "invalid_json"
-  | "schema_mismatch";
+import type {
+  PublisherFailureCode,
+  PublisherSafeDetailCode,
+} from "./openai-responses-adapter.js";
+
+export type {
+  PublisherFailureCode,
+  PublisherSafeDetailCode,
+  PublisherFailure,
+} from "./openai-responses-adapter.js";
 
 export interface ProviderMetadata {
   provider: typeof READING_PUBLISHER_PROVIDER;

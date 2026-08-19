@@ -26,84 +26,18 @@ import {
 } from "./openai-responses-envelope.js";
 import {
   READING_PUBLISHER_PROVIDER,
-  responsesUrlFor,
-  type AiGatewayRoute,
   type PublishOptions,
-  type PublisherFailureCode,
   type PublisherResult,
-  type PublisherSafeDetailCode,
   type ReadingPublisher,
 } from "./reading-publisher.js";
+import {
+  extractOutputText,
+  failure,
+  responsesUrlFor,
+  retryAfterSeconds,
+  type AiGatewayRoute,
+} from "./openai-responses-adapter.js";
 import type { ReadingGenerationRequest } from "@patternlike/shared";
-
-function failure(
-  code: PublisherFailureCode,
-  safe_detail_code: PublisherSafeDetailCode,
-  retry_after_seconds: number | null = null,
-): PublisherResult {
-  return { ok: false, code, safe_detail_code, retry_after_seconds };
-}
-
-/** A whole number of seconds, or nothing. A date-formatted value is discarded. */
-function retryAfterSeconds(response: Response): number | null {
-  const raw = response.headers.get("retry-after");
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  const parsed = Number(trimmed);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
-}
-
-interface ResponsesContentItem {
-  type?: unknown;
-  text?: unknown;
-}
-
-interface ResponsesOutputItem {
-  type?: unknown;
-  content?: unknown;
-}
-
-/**
- * The one message item, and the one text inside it.
- *
- * `output` also carries reasoning items, which is why this walks the array
- * rather than reading `output[0]`. Two message items or two text parts are
- * treated as a defect rather than concatenated: a candidate assembled from
- * fragments is not the candidate the schema described.
- */
-function extractOutputText(
-  body: unknown,
-): { ok: true; text: string } | { ok: false; result: PublisherResult } {
-  const output = (body as { output?: unknown })?.output;
-  if (!Array.isArray(output)) {
-    return { ok: false, result: failure("publisher_output_invalid", "missing_output_text") };
-  }
-
-  const texts: string[] = [];
-  let refused = false;
-  for (const item of output as ResponsesOutputItem[]) {
-    if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
-    for (const part of item.content as ResponsesContentItem[]) {
-      if (!part) continue;
-      if (part.type === "refusal") refused = true;
-      if (part.type === "output_text" && typeof part.text === "string") texts.push(part.text);
-    }
-  }
-
-  // A refusal is the provider declining, not a malformed answer. It gets its own
-  // failure class because the retry policy for the two is different.
-  if (refused && texts.length === 0) {
-    return { ok: false, result: failure("publisher_refused", "provider_refusal") };
-  }
-  if (texts.length === 0) {
-    return { ok: false, result: failure("publisher_output_invalid", "missing_output_text") };
-  }
-  if (texts.length > 1) {
-    return { ok: false, result: failure("publisher_output_invalid", "multiple_output_text") };
-  }
-  return { ok: true, text: texts[0]! };
-}
 
 /** The top-level keys the strict schema requires. Depth is the validator's job. */
 const REQUIRED_CANDIDATE_KEYS = [
