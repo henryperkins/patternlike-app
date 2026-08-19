@@ -402,7 +402,7 @@ def digest(path: str):
     data = io.open(path, "rb").read()
     # LF-normalized for text so a checkout on any platform verifies; binaries
     # are hashed as they are.
-    if path.endswith((".md", ".json")):
+    if path.endswith((".md", ".json", ".py", ".txt")):
         data = data.replace(b"\r\n", b"\n")
     return hashlib.sha256(data).hexdigest(), len(data)
 
