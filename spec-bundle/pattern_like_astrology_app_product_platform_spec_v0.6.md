@@ -105,7 +105,11 @@ v0.2 section 9 remains the baseline table. M7 adds these consumer surfaces and d
 
 Internal ontology ingestion, recall, and reconciliation, and administrative inspection, are not consumer surfaces. They are specified in the M7 OpenAPI amendment and are not authorized by the consumer session.
 
-All mutating endpoints require an idempotency key.
+All consumer mutating endpoints require an idempotency key. The M7 internal
+operations are semantically keyed instead: signed ontology bytes plus
+`ontology_version` identify ingestion, `ontology_version` identifies recall,
+and `generation_id` identifies reconciliation. Exact replay must converge;
+these service-token routes do not accept a separate caller-generated key.
 
 ## 10. Pattern publication and the second-model exception
 
