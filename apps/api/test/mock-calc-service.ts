@@ -567,9 +567,53 @@ function groundedCandidate(packet: Packet, options: { wrongDate?: boolean; ungro
   };
 }
 
+/**
+ * The three Pattern structured-output names.
+ *
+ * All three passes share one model, so the pass cannot be read off `model` the
+ * way the reading scenarios are. `text.format.name` is the only field on the
+ * wire that names the pass, which is why the router keys on it.
+ */
+const PATTERN_SCHEMA_NAMES: Record<string, "planner" | "writer" | "verifier"> = {
+  patternlike_pattern_plan_v7: "planner",
+  patternlike_pattern_document_v7: "writer",
+  patternlike_pattern_verdict_v7: "verifier",
+};
+
+/** A minimal valid document for each pass, shaped as the contract shapes it. */
+function patternPassDocument(pass: "planner" | "writer" | "verifier"): unknown {
+  if (pass === "planner") {
+    return {
+      schema_version: "0.7.0",
+      chapters: [],
+      additional_signatures: [],
+      omissions: [],
+    };
+  }
+  if (pass === "writer") {
+    return {
+      schema_version: "0.7.0",
+      title: "A mock Pattern",
+      chapters: [],
+      additional_signatures: [],
+      uncertainty_note: null,
+    };
+  }
+  return { schema_version: "0.7.0", verdict: "pass", findings: [] };
+}
+
 async function mockOpenAiResponses(request: Request): Promise<Response> {
   const body = (await request.json()) as ResponsesBody;
   const model = body.model;
+
+  // Pattern passes route on the schema name. Failure sentinels below still key
+  // on `model`, so a Pattern test drives a failure exactly as a reading test
+  // does -- by pinning a sentinel model -- and the two never collide.
+  const patternPass = PATTERN_SCHEMA_NAMES[body.text?.format?.name ?? ""];
+
+  if (patternPass && !model.startsWith("mock-openai-")) {
+    return json(responsesEnvelope(model, outputText(patternPassDocument(patternPass))));
+  }
 
   if (model === OPENAI_MOCK_NETWORK_ERROR) {
     // A rejected fetch, not a response. The adapter must not read this as a
