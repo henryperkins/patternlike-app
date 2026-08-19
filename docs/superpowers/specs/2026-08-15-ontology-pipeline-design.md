@@ -4,6 +4,13 @@
 
 **Status:** Draft for approval. No plan may be derived until this is approved.
 
+**2026-08-16 amendment.** Product-spec v0.6 and
+[`2026-08-16-m7-spec-artifact-amendments.md`](2026-08-16-m7-spec-artifact-amendments.md)
+ratify `provenance.origin: "machine_pipeline"`, the optional evaluation
+report hashes, compiler policy for class-specific record fields, and
+`contracts/m7/fixtures/corpus/` as the §23.8 home. Cite those documents, not
+the pre-amendment 2026-08-14 lists.
+
 **Scope:** Build the six-component pipeline that turns an immutable source-corpus
 release into a signed, evaluated, regression-tested ontology release and
 activates it — without human record approval. This is the only route to

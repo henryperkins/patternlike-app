@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.7.0",
+  "event_id": "prel_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "event_class": "ontology_recalled",
+  "occurred_at": "2026-08-16T12:00:00Z",
+  "target_user_id": null,
+  "chart_fingerprint_hash": null,
+  "claim_id": null,
+  "generation_id": null,
+  "pattern_id": null,
+  "ontology_version": null,
+  "prior_claim_status": null,
+  "next_claim_status": null,
+  "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "signing_key_id": "replay-key-2026-08",
+  "signature": "test-signature"
+}

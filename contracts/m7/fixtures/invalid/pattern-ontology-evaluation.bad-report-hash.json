@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.7.0",
+  "ontology_version": "1.0.0",
+  "verdict": "pass",
+  "compiler_passed": true,
+  "evaluator_passed": true,
+  "regression_passed": true,
+  "unevaluated_fixture_count": 0,
+  "evaluation_report_hash": "not-a-content-hash"
+}

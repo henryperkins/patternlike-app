@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.7.0",
+  "ontology_version": "1.0.0-internal",
+  "verdict": "pass",
+  "compiler_passed": true,
+  "evaluator_passed": false,
+  "regression_passed": false,
+  "unevaluated_fixture_count": 0
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.7.0",
+  "event_id": "prel_ffffffffffffffffffffffffffffffff",
+  "event_class": "pattern_restored",
+  "occurred_at": "2026-08-16T12:00:00Z",
+  "target_user_id": "usr_01JAMPLEUSER00000001",
+  "chart_fingerprint_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "claim_id": "pgc_dddddddddddddddddddddddddddddddd",
+  "generation_id": "pgen_cccccccccccccccccccccccccccccccc",
+  "pattern_id": "pat_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "ontology_version": "1.0.0",
+  "prior_claim_status": "deleted",
+  "next_claim_status": "available",
+  "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "signing_key_id": "replay-key-2026-08",
+  "signature": "test-signature"
+}

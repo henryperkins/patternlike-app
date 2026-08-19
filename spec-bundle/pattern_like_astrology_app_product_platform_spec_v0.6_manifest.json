@@ -1,0 +1,43 @@
+{
+  "//": [
+    "Text hashes are over LF-normalized bytes so a checkout on any platform verifies;",
+    "the DOCX and PDF are hashed as written. Both derived files are produced from the",
+    "Markdown by spec-bundle/render_v0_6.py - regenerate rather than edit them."
+  ],
+  "version": "0.6",
+  "date": "2026-08-16",
+  "supersedes": "0.5",
+  "supersedes_scope": "sections 2, 4, 7 Pattern generation and export successor, 9 Pattern API, 10 Pattern publication exception",
+  "source": "pattern_like_astrology_app_product_platform_spec_v0.6.md",
+  "renderer": "spec-bundle/render_v0_6.py",
+  "build_inputs": {
+    "render_v0_6.py": {
+      "sha256": "a5d2b9f05e2a46d16d081eef24873c5527a2fbff1f9aeaddc63df91f4bc25d15",
+      "bytes": 18516
+    },
+    "render_v0_6.requirements.txt": {
+      "sha256": "57e2d97e864b7a4114e4b8a99635b9b702d7a01a5c05be114fc413e50c467088",
+      "bytes": 63
+    }
+  },
+  "files": {
+    "pattern_like_astrology_app_product_platform_spec_v0.6.md": {
+      "sha256": "3032f15cd88a0755998eaf0c975ab05e858c730693ed6a926f203997339ffe37",
+      "bytes": 14133
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.6.docx": {
+      "sha256": "a55a255aa416423ae961b6a23cf501baa75dfc9a98544a65a0b7c631795dba00",
+      "bytes": 40595
+    },
+    "pattern_like_astrology_app_product_platform_spec_v0.6.pdf": {
+      "sha256": "605ecd682c4c11795f01e62da4fe9bb9b5003bed39defe2a35294e656216fc71",
+      "bytes": 17386
+    }
+  },
+  "carried_forward_unchanged": {
+    "pattern_like_astrology_app_product_platform_spec_v0.5.md": "daily-reading sections this version does not restate remain in force as published",
+    "pattern_like_astrology_app_product_platform_spec_v0.2.md": "sections neither v0.5 nor v0.6 restates remain in force as published",
+    "pattern_like_astrology_app_data_source_registry_v0.2.yaml": "unchanged; the source registry is not amended by this version",
+    "pattern_like_astrology_app_platform_topology_v0.2.yaml": "unchanged"
+  }
+}

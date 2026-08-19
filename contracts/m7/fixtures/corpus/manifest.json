@@ -1,0 +1,23 @@
+{
+  "home": "contracts/m7/fixtures/corpus",
+  "schema_version": "0.7.0",
+  "status": "inventory",
+  "note": "This directory is the §7.2 / §23.8 fixed-chart corpus home. Slice B authors the linked chart → feature set → selection → packet → plan → writer → verdict → public response chains. Runtime inline fixtures are not this corpus.",
+  "required_profiles": [
+    "exact-birth-time",
+    "approximate-birth-time",
+    "unknown-birth-time",
+    "sparse-feature-set",
+    "dense-feature-set",
+    "houses-on",
+    "houses-off",
+    "repeated-body-aspect-network",
+    "conflicting-source-meanings",
+    "unsupported-ontology-gap",
+    "every-suppression-class",
+    "adversarial-instruction-fragment",
+    "maximum-depth-derived-synthesis",
+    "supported-locale"
+  ],
+  "authored_chains": []
+}

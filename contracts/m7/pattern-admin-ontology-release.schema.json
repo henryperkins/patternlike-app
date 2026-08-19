@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-admin-ontology-release.schema.json",
+  "title": "Administrative ontology release metadata",
+  "$defs": {
+    "patternAdminOntologyRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "ontology_version",
+        "status",
+        "bundle_hash",
+        "corpus_release_hash",
+        "locale",
+        "provenance_origin",
+        "record_count",
+        "evaluation"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "ontology_version": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["candidate", "active", "superseded", "recalled"] },
+        "bundle_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "corpus_release_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "provenance_origin": {
+          "oneOf": [
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/provenanceOrigin" },
+            { "type": "string", "const": "absent" }
+          ]
+        },
+        "record_count": { "type": "integer", "minimum": 0 },
+        "evaluation": { "$ref": "https://patternlike.app/contracts/m7/pattern-ontology-evaluation.schema.json#/$defs/patternOntologyEvaluation" }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternAdminOntologyRelease"
+}

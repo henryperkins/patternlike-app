@@ -130,16 +130,105 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+  /internal/pattern-ontology-releases/{version}/recall:
+    post:
+      operationId: recallPatternOntologyRelease
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/OntologyVersion'
+      responses:
+        '200': { description: Release recalled; accepted Patterns withdrawn }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /internal/pattern-generations/{generation_id}/reconcile:
+    post:
+      operationId: reconcilePatternGeneration
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+      responses:
+        '202': { description: Generation reconciliation accepted }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /admin/pattern-generations/{generation_id}:
     get:
       operationId: adminGetPatternGeneration
       security:
-        - adminToken: []
-      x-normative-schema: 'm7:pattern-generation-status.schema.json#/$defs/patternGenerationStatus'
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-generation.schema.json#/$defs/patternAdminGeneration'
       parameters:
         - $ref: '#/components/parameters/GenerationId'
+        - $ref: '#/components/parameters/AdminPurpose'
       responses:
-        '200': { description: Audited generation inspection }
+        '200':
+          description: Generation metadata; does not open exact content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminGeneration' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-generations/{generation_id}/artifacts:
+    get:
+      operationId: adminListPatternArtifacts
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-artifact-inventory.schema.json#/$defs/patternAdminArtifactInventory'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Artifact inventory; does not open exact content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminArtifactInventory' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-generations/{generation_id}/artifacts/{artifact_id}:
+    get:
+      operationId: adminGetPatternArtifact
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-artifact.schema.json#/$defs/patternAdminArtifact'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+        - $ref: '#/components/parameters/ArtifactId'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Decrypted artifact; a separate auditable action
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminArtifact' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-ontology-releases/{version}:
+    get:
+      operationId: adminGetPatternOntologyRelease
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-ontology-release.schema.json#/$defs/patternAdminOntologyRelease'
+      parameters:
+        - $ref: '#/components/parameters/OntologyVersion'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Ontology release metadata; does not return record bodies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminOntologyRelease' }
+        '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
@@ -158,6 +247,17 @@ components:
     adminToken:
       type: http
       scheme: bearer
+      description: >
+        Deprecated transitional shared secret. Slice C deletes this scheme
+        together with PATTERN_ADMIN_TOKEN. New admin paths use adminSession.
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: pl_admin_session
+      description: >
+        Specified administrator session. HttpOnly, Secure, SameSite=Strict,
+        Path=/admin. Minted by Cloudflare Access or a separate administrator
+        OIDC tenant; the operator has not chosen which.
   parameters:
     IdempotencyKey:
       name: Idempotency-Key
@@ -169,6 +269,23 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^part_[0-9a-f]{32}$' }
+    OntologyVersion:
+      name: version
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    AdminPurpose:
+      name: purpose
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [quality_review, safety_investigation, incident_response, retention_audit]
   responses:
     Error:
       description: Existing request-id error envelope
@@ -245,3 +362,141 @@ components:
       required: [confirm]
       properties:
         confirm: { type: string, const: 'DELETE PATTERN' }
+    PatternAdminGeneration:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generation_id, stage, created_at, ontology_version, artifact_count, exact_artifacts_retained]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        generation_id: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+        stage:
+          type: string
+          enum:
+            - reserved
+            - planning
+            - plan_validating
+            - writing
+            - candidate_validating
+            - semantic_verifying
+            - publishing
+            - succeeded
+            - failed
+            - cancelled
+        created_at: { type: string, format: date-time }
+        ontology_version: { type: string, minLength: 1 }
+        plan_hash:
+          type: [string, 'null']
+          pattern: '^sha256:[0-9a-f]{64}$'
+        candidate_hash:
+          type: [string, 'null']
+          pattern: '^sha256:[0-9a-f]{64}$'
+        artifact_count: { type: integer, minimum: 0 }
+        exact_artifacts_retained: { type: boolean }
+    PatternAdminArtifactInventory:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generation_id, artifacts]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        generation_id: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+        artifacts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [artifact_id, artifact_class, created_at, expires_at, deleted_at]
+            properties:
+              artifact_id: { type: string, pattern: '^part_[0-9a-f]{32}$' }
+              artifact_class:
+                type: string
+                enum:
+                  - fact_packet
+                  - planner_request
+                  - planner_response
+                  - validated_plan
+                  - writer_request
+                  - writer_response
+                  - rejected_candidate
+                  - candidate_validation
+                  - verifier_request
+                  - verifier_response
+                  - semantic_verdict
+                  - accepted_internal_document
+              created_at: { type: string, format: date-time }
+              expires_at: { type: string, format: date-time }
+              deleted_at: { type: [string, 'null'], format: date-time }
+    PatternAdminArtifact:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generation_id, artifact_id, artifact_class, created_at, expires_at, content]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        generation_id: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+        artifact_id: { type: string, pattern: '^part_[0-9a-f]{32}$' }
+        artifact_class:
+          type: string
+          enum:
+            - fact_packet
+            - planner_request
+            - planner_response
+            - validated_plan
+            - writer_request
+            - writer_response
+            - rejected_candidate
+            - candidate_validation
+            - verifier_request
+            - verifier_response
+            - semantic_verdict
+            - accepted_internal_document
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        content: { type: object }
+    PatternAdminOntologyRelease:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - ontology_version
+        - status
+        - bundle_hash
+        - corpus_release_hash
+        - locale
+        - provenance_origin
+        - record_count
+        - evaluation
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        ontology_version: { type: string, minLength: 1 }
+        status: { type: string, enum: [candidate, active, superseded, recalled] }
+        bundle_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+        corpus_release_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+        locale:
+          type: string
+          minLength: 2
+          maxLength: 35
+          pattern: '^[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$'
+        provenance_origin:
+          type: string
+          enum: [synthetic_internal, machine_pipeline, absent]
+        record_count: { type: integer, minimum: 0 }
+        evaluation:
+          type: object
+          additionalProperties: false
+          required:
+            - schema_version
+            - ontology_version
+            - verdict
+            - compiler_passed
+            - evaluator_passed
+            - regression_passed
+            - unevaluated_fixture_count
+          properties:
+            schema_version: { type: string, const: '0.7.0' }
+            ontology_version: { type: string, minLength: 1 }
+            verdict: { type: string, enum: [pass, reject] }
+            compiler_passed: { type: boolean }
+            evaluator_passed: { type: boolean }
+            regression_passed: { type: boolean }
+            unevaluated_fixture_count: { type: integer, minimum: 0 }
+            evaluation_report_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+            regression_report_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }

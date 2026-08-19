@@ -60,6 +60,12 @@
         "featureAlias",
         "generationId",
         "generationReason",
+        "reservationReason",
+        "purposeClass",
+        "replayEventClass",
+        "replayEventId",
+        "artifactId",
+        "provenanceOrigin",
         "meaningClass",
         "omissionReason",
         "ontologyRuleId",
@@ -191,6 +197,35 @@
       ]
     },
     {
+      "file": "pattern-admin-generation.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-admin-generation.schema.json",
+      "defines": [
+        "patternAdminGeneration"
+      ]
+    },
+    {
+      "file": "pattern-admin-artifact-inventory.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-admin-artifact-inventory.schema.json",
+      "defines": [
+        "patternAdminArtifactInventory",
+        "patternAdminArtifactInventoryItem"
+      ]
+    },
+    {
+      "file": "pattern-admin-ontology-release.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-admin-ontology-release.schema.json",
+      "defines": [
+        "patternAdminOntologyRelease"
+      ]
+    },
+    {
+      "file": "pattern-erasure-replay-event.schema.json",
+      "id": "https://patternlike.app/contracts/m7/pattern-erasure-replay-event.schema.json",
+      "defines": [
+        "patternErasureReplayEvent"
+      ]
+    },
+    {
       "file": "pattern-admin-access-event.schema.json",
       "id": "https://patternlike.app/contracts/m7/pattern-admin-access-event.schema.json",
       "defines": [
@@ -230,6 +265,7 @@
       "file": "pattern-ontology-release.schema.json",
       "id": "https://patternlike.app/contracts/m7/pattern-ontology-release.schema.json",
       "defines": [
+        "patternOntologyProvenance",
         "patternOntologyRelease"
       ]
     },
@@ -247,7 +283,7 @@
     {
       "file": "openapi/openapi.yaml",
       "version": "0.7.0",
-      "describes": "Consumer Pattern generation, Pattern consent, AI-cohort Pattern document, internal ontology ingestion, and administrative artifact inspection."
+      "describes": "Consumer Pattern generation, Pattern consent, AI-cohort Pattern document, internal ontology ingest/recall/reconcile, and administrative metadata, inventory, decrypt, and ontology-release inspection."
     }
   ],
   "compatibility": {
@@ -266,6 +302,11 @@
       "date": "2026-08-15",
       "change": "Added patternConsentRevocation to pattern-consent.schema.json and pointed DELETE /v1/consents/pattern-generation at it.",
       "reason": "Design spec 19.3 documents the revoke response as a {schema_version, consent, existing_pattern_retained} envelope and the route emits one, but the OpenAPI response and x-normative-schema both named the bare patternConsent, which the envelope does not validate against. Purely additive: no existing def, enum, required field, or $id changed."
+    },
+    {
+      "date": "2026-08-16",
+      "change": "Reconciled unimplemented M7 spec artifacts: optional provenance on ontology releases; optional evaluation report hashes; optional source-fragment edition/location/exclusions; reservationReason and related common defs; admin metadata/inventory/ontology-release documents; erasure-replay event with signing-key identity and a required ontology version for recall tombstones; OpenAPI paths for recall, reconcile, artifact inventory, artifact decrypt, and admin ontology release; policy-only fixture for verdict pass with unevaluated_fixture_count !== 0.",
+      "reason": "docs/reviews/2026-08-16-m7-unimplemented-spec-artifacts.md required these additive documents before slices A–D implement the wrong artifact. Purely additive: no existing $id, required field, or enum member changed. purpose_class continues to be the shipped four-value list, now referenced from common.schema.json#/$defs/purposeClass."
     }
   ]
 }

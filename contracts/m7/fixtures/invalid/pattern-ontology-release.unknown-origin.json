@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.7.0",
+  "ontology_version": "1.0.0",
+  "bundle_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "corpus_release_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "locale": "en-US",
+  "status": "active",
+  "records": [
+    {
+      "id": "ont_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "meaning_class": "source_supported",
+      "locale": "en-US",
+      "feature_predicate": {
+        "type": "aspect",
+        "aspect": "square"
+      },
+      "normalized_proposition": "A square can describe usable friction.",
+      "source_fragment_ids": [
+        "srcf_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "input_meaning_ids": [],
+      "transformation_class": null,
+      "tensions": [
+        "Pressure without reflection."
+      ],
+      "counter_expressions": [
+        "Deliberate use of heat."
+      ],
+      "prohibited_claims": [
+        "Inevitability."
+      ],
+      "salience_band": "medium",
+      "presentation_priority": 20,
+      "cluster_tags": []
+    }
+  ],
+  "evaluation": {
+    "schema_version": "0.7.0",
+    "ontology_version": "1.0.0",
+    "verdict": "pass",
+    "compiler_passed": true,
+    "evaluator_passed": false,
+    "regression_passed": false,
+    "unevaluated_fixture_count": 0
+  },
+  "provenance": {
+    "origin": "hand_authored_production"
+  }
+}

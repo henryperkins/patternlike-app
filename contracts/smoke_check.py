@@ -217,6 +217,7 @@ def check_fresh_schema() -> None:
         "reading_provider_daily_usage",
         "natal_feature_sets", "cycle_scan_receipts",
         "time_travel_daily_usage",
+        "pattern_erasure_replay_events",
     }
     missing = expected - tables
     if missing:
@@ -259,6 +260,7 @@ def check_fresh_schema() -> None:
         "uq_time_travel_daily_usage_user_date",
         "uq_context_signals_usr09_current",
         "uq_context_signals_usr09_revision",
+        "idx_pattern_erasure_replay_occurred",
     ):
         if name not in indexes:
             raise SystemExit(f"Missing index {name}")
@@ -951,6 +953,147 @@ def check_0007_pattern_tables() -> None:
     print("D1 OK  0007 admits pattern_generation and creates Pattern tables")
 
 
+def check_0008_replay_ledger() -> None:
+    con = sqlite3.connect(":memory:")
+    apply_migrations(con)
+    row = con.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        ("pattern_erasure_replay_events",),
+    ).fetchone()
+    assert row, "missing pattern_erasure_replay_events"
+    columns = {
+        info[1]
+        for info in con.execute("PRAGMA table_info(pattern_erasure_replay_events)")
+    }
+    assert "user_id" not in columns, columns
+    assert "target_user_id" in columns, columns
+    assert "signing_key_id" in columns, columns
+    con.execute(
+        "INSERT INTO pattern_erasure_replay_events ("
+        "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
+        "claim_id, generation_id, pattern_id, ontology_version, prior_claim_status, "
+        "next_claim_status, content_hash, signing_key_id, signature, replica_put_at, created_at"
+        ") VALUES ("
+        "'prel_ffffffffffffffffffffffffffffffff', 'pattern_deleted', ?, "
+        "'usr_0123456789abcdef0123456789abcdef', "
+        "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
+        "'pgc_dddddddddddddddddddddddddddddddd', "
+        "'pgen_cccccccccccccccccccccccccccccccc', "
+        "'pat_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', "
+        "'1.0.0', 'accepted', 'deleted', "
+        "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+        "'test-key', 'sig', ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    try:
+        con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, next_claim_status, "
+            "content_hash, signing_key_id, signature, replica_put_at, created_at"
+            ") VALUES ("
+            "'prel_11111111111111111111111111111111', 'pattern_deleted', ?, "
+            "'available', "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'test-key', 'sig', ?, ?)",
+            (NOW, NOW, NOW),
+        )
+        raise SystemExit("0008 accepted next_claim_status=available")
+    except sqlite3.IntegrityError:
+        pass
+
+    def insert_null_replay_status(marker: str, event_class: str) -> None:
+        con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
+            "claim_id, next_claim_status, content_hash, signing_key_id, signature, "
+            "replica_put_at, created_at"
+            ") VALUES (?, ?, ?, "
+            "'usr_0123456789abcdef0123456789abcdef', "
+            "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
+            "'pgc_dddddddddddddddddddddddddddddddd', NULL, "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'test-key', 'sig', ?, ?)",
+            (f"prel_{marker * 32}", event_class, NOW, NOW, NOW),
+        )
+
+    for marker, event_class in (
+        ("4", "claim_consumed"),
+        ("5", "pattern_deleted"),
+        ("6", "chart_correction_erased"),
+        ("7", "pattern_withdrawn"),
+        ("8", "account_deleted"),
+    ):
+        expect_integrity_error(
+            lambda marker=marker, event_class=event_class: insert_null_replay_status(
+                marker, event_class
+            ),
+            f"0008 requires next_claim_status for {event_class}",
+        )
+
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, next_claim_status, "
+            "content_hash, signing_key_id, signature, replica_put_at, created_at"
+            ") VALUES ("
+            "'prel_22222222222222222222222222222222', 'pattern_deleted', ?, "
+            "'deleted', "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'test-key', 'sig', ?, ?)",
+            (NOW, NOW, NOW),
+        ),
+        "0008 requires target, fingerprint, and claim outside recall/account deletion",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
+            "claim_id, next_claim_status, content_hash, signing_key_id, signature, "
+            "replica_put_at, created_at"
+            ") VALUES ("
+            "'prel_33333333333333333333333333333333', 'pattern_deleted', ?, "
+            "'usr_0123456789abcdef0123456789abcdef', "
+            "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
+            "'pgc_dddddddddddddddddddddddddddddddd', 'withdrawn', "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'test-key', 'sig', ?, ?)",
+            (NOW, NOW, NOW),
+        ),
+        "0008 binds lifecycle event classes to their terminal status",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, target_user_id, chart_fingerprint_hash, "
+            "claim_id, next_claim_status, content_hash, signing_key_id, signature, created_at"
+            ") VALUES ("
+            "'prel_99999999999999999999999999999999', 'pattern_deleted', ?, "
+            "'usr_0123456789abcdef0123456789abcdef', "
+            "'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', "
+            "'pgc_dddddddddddddddddddddddddddddddd', 'deleted', "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'test-key', 'sig', ?)",
+            (NOW, NOW),
+        ),
+        "0008 requires proof that the R2 write-ahead succeeded",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO pattern_erasure_replay_events ("
+            "event_id, event_class, occurred_at, next_claim_status, "
+            "content_hash, signing_key_id, signature, replica_put_at, created_at"
+            ") VALUES ("
+            "'prel_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'ontology_recalled', ?, NULL, "
+            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+            "'test-key', 'sig', ?, ?)",
+            (NOW, NOW, NOW),
+        ),
+        "0008 requires ontology_version on a recall tombstone",
+    )
+    assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+    print("D1 OK  0008 creates a constrained erasure replay ledger")
+
+
 def main() -> int:
     check_fresh_schema()
     check_0004_over_populated_m5()
@@ -962,6 +1105,7 @@ def main() -> int:
     check_provider_budget_table()
     check_0007_pattern_tables()
     check_0007_over_consent_references()
+    check_0008_replay_ledger()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

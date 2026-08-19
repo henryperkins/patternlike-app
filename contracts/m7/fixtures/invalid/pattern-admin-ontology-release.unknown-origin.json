@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.7.0",
+  "ontology_version": "1.0.0",
+  "status": "active",
+  "bundle_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "corpus_release_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "locale": "en-US",
+  "provenance_origin": "hand_authored_production",
+  "record_count": 1,
+  "evaluation": {
+    "schema_version": "0.7.0",
+    "ontology_version": "1.0.0",
+    "verdict": "pass",
+    "compiler_passed": true,
+    "evaluator_passed": false,
+    "regression_passed": false,
+    "unevaluated_fixture_count": 0
+  }
+}

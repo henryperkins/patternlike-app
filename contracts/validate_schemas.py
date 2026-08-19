@@ -129,10 +129,18 @@ FIXTURE_SCHEMA = {
         "pattern-document-internal": M7_BASE
         + "pattern-document-internal.schema.json#/$defs/patternDocumentInternal",
         "pattern-response": M7_BASE + "pattern-response.schema.json#/$defs/patternResponse",
+        "pattern-admin-artifact-inventory": M7_BASE
+        + "pattern-admin-artifact-inventory.schema.json#/$defs/patternAdminArtifactInventory",
         "pattern-admin-artifact": M7_BASE
         + "pattern-admin-artifact.schema.json#/$defs/patternAdminArtifact",
+        "pattern-admin-generation": M7_BASE
+        + "pattern-admin-generation.schema.json#/$defs/patternAdminGeneration",
+        "pattern-admin-ontology-release": M7_BASE
+        + "pattern-admin-ontology-release.schema.json#/$defs/patternAdminOntologyRelease",
         "pattern-admin-access-event": M7_BASE
         + "pattern-admin-access-event.schema.json#/$defs/patternAdminAccessEvent",
+        "pattern-erasure-replay-event": M7_BASE
+        + "pattern-erasure-replay-event.schema.json#/$defs/patternErasureReplayEvent",
         "pattern-source-corpus-release": M7_BASE
         + "pattern-source-corpus-release.schema.json#/$defs/patternSourceCorpusRelease",
         "pattern-source-fragment": M7_BASE
@@ -190,6 +198,7 @@ POLICY_ONLY = {
         "pattern-fact-packet.journal-in-fact",
         "pattern-fact-packet.latitude-in-fact",
         "pattern-fact-packet.life-event-in-fact",
+        "pattern-ontology-evaluation.unevaluated-count",
     },
 }
 
@@ -1819,7 +1828,24 @@ def check_m7_openapi_projection() -> list[str]:
         ("/v1/pattern", "get"): {"200", "401", "404", "409", "410", "503"},
         ("/v1/pattern", "delete"): {"202", "204", "400", "401", "404", "409"},
         ("/internal/pattern-ontology-releases", "post"): {"201", "400", "401", "409", "503"},
-        ("/admin/pattern-generations/{generation_id}", "get"): {"200", "401", "404", "503"},
+        ("/internal/pattern-ontology-releases/{version}/recall", "post"): {
+            "200", "401", "409", "503"
+        },
+        ("/internal/pattern-generations/{generation_id}/reconcile", "post"): {
+            "202", "401", "404", "503"
+        },
+        ("/admin/pattern-generations/{generation_id}", "get"): {
+            "200", "400", "401", "404", "503"
+        },
+        ("/admin/pattern-generations/{generation_id}/artifacts", "get"): {
+            "200", "400", "401", "404", "503"
+        },
+        ("/admin/pattern-generations/{generation_id}/artifacts/{artifact_id}", "get"): {
+            "200", "400", "401", "404", "410", "503"
+        },
+        ("/admin/pattern-ontology-releases/{version}", "get"): {
+            "200", "400", "401", "404", "503"
+        },
     }
     errors: list[str] = []
     for (route, method), statuses in expected.items():
@@ -1833,8 +1859,59 @@ def check_m7_openapi_projection() -> list[str]:
                 f"M7 OpenAPI {method.upper()} {route} responses are "
                 f"{sorted(actual)}, expected {sorted(statuses)}"
             )
+
+    projection_fixtures = {
+        "PatternAdminGeneration": (
+            "pattern-admin-generation.metadata.json",
+            (
+                "pattern-admin-generation.bad-hash.json",
+                "pattern-admin-generation.extra-property.json",
+                "pattern-admin-generation.unknown-stage.json",
+            ),
+        ),
+        "PatternAdminArtifactInventory": (
+            "pattern-admin-artifact-inventory.one.json",
+            ("pattern-admin-artifact-inventory.bad-id.json",),
+        ),
+        "PatternAdminArtifact": (
+            "pattern-admin-artifact.planner.json",
+            ("pattern-admin-artifact.bad-class.json",),
+        ),
+        "PatternAdminOntologyRelease": (
+            "pattern-admin-ontology-release.metadata.json",
+            ("pattern-admin-ontology-release.unknown-origin.json",),
+        ),
+    }
+    components = ((spec.get("components") or {}).get("schemas") or {})
+    for component_name, (valid_name, invalid_names) in projection_fixtures.items():
+        component = components.get(component_name)
+        if not isinstance(component, dict):
+            errors.append(f"M7 OpenAPI has no {component_name} response component")
+            continue
+        validator = Draft202012Validator(component, format_checker=FormatChecker())
+        valid_doc = json.loads(
+            (M7 / "fixtures" / "valid" / valid_name).read_text(encoding="utf-8")
+        )
+        violations = sorted(validator.iter_errors(valid_doc), key=lambda e: list(e.path))
+        if violations:
+            errors.append(
+                f"M7 OpenAPI {component_name} rejects normative valid fixture "
+                f"{valid_name}: {violations[0].json_path} {violations[0].message}"
+            )
+        for invalid_name in invalid_names:
+            invalid_doc = json.loads(
+                (M7 / "fixtures" / "invalid" / invalid_name).read_text(encoding="utf-8")
+            )
+            if validator.is_valid(invalid_doc):
+                errors.append(
+                    f"M7 OpenAPI {component_name} accepts normative invalid fixture "
+                    f"{invalid_name}"
+                )
     if not errors:
-        print("OK  projection    M7 OpenAPI declares Pattern generation and admin statuses")
+        print(
+            "OK  projection    M7 OpenAPI declares Pattern generation/admin statuses "
+            "and compatible admin documents"
+        )
     return errors
 
 

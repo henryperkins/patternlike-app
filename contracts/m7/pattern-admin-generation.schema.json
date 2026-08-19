@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-admin-generation.schema.json",
+  "title": "Administrative Pattern generation metadata",
+  "$defs": {
+    "patternAdminGeneration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "generation_id",
+        "stage",
+        "created_at",
+        "ontology_version",
+        "artifact_count",
+        "exact_artifacts_retained"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "generation_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "reserved",
+            "planning",
+            "plan_validating",
+            "writing",
+            "candidate_validating",
+            "semantic_verifying",
+            "publishing",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "created_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "ontology_version": { "type": "string", "minLength": 1 },
+        "plan_hash": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" }
+          ]
+        },
+        "candidate_hash": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" }
+          ]
+        },
+        "artifact_count": { "type": "integer", "minimum": 0 },
+        "exact_artifacts_retained": { "type": "boolean" }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternAdminGeneration"
+}

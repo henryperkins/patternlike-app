@@ -14,8 +14,11 @@ Companion documents:
 - `docs/superpowers/plans/2026-08-15-m7-remaining-slices-handoff.md` — the
   scoping brief for slices A–D. It records settled decisions and constraints,
   and it is **not** itself a design or a plan for any slice.
-- `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` —
-  normative product contract, outranks both design documents.
+- `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` —
+  normative product contract for Your Pattern; outranks both design documents.
+- `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` —
+  settled freeze-versus-design decisions. Cite it where the 2026-08-14 text
+  used to disagree with `contracts/m7`.
 
 ## Where M7 stands
 
@@ -36,8 +39,8 @@ release and no ontology release.
 | 1 | OpenAI Pattern adapter — the model calls | 31.6 | ✅ `specs/2026-08-15-openai-pattern-adapter-design.md` | ✅ `plans/2026-08-15-openai-pattern-adapter.md` | Specified, **0% implemented**, 3 sign-offs open |
 | A | Activated internal-only ontology | 31.4 (content) | ✅ `specs/2026-08-15-internal-ontology-activation-design.md` | ❌ none | Design drafted, awaiting approval |
 | B | Automated ontology pipeline | 31.10 | ✅ `specs/2026-08-15-ontology-pipeline-design.md` | ❌ none | Design drafted, awaiting approval; **depends on slice 1** |
-| C | Administrator authorization boundary | 31.9, §24 | ❌ none | ❌ none | Partially built, boundary missing |
-| D | Evidence gates + §29.11 replay ledger | 31.8 (residual) | ❌ none | ❌ none | Not started |
+| C | Administrator authorization boundary | 31.9, §24 | ✅ `specs/2026-08-16-admin-authorization-design.md` | ❌ none | Design drafted; blocked on Access vs OIDC |
+| D | Evidence gates + §29.11 replay ledger | 31.8 (residual) | ✅ `specs/2026-08-16-m7-evidence-gates-design.md` + `specs/2026-08-16-pattern-replay-ledger-design.md` | ❌ none | Ledger specified (`0008`); drill not runnable until that runtime exists |
 
 Also missing: `docs/deploy/openai-pattern-rollout.md`. `docs/deploy/` holds only
 `api-production.md` and `openai-daily-reading-rollout.md`. The Pattern rollout
@@ -121,6 +124,16 @@ only route to `first_open` or `enabled` — not an optimization of Slice A. Size
 as a second LLM integration with its own provider tuple, rollout switch and
 budget ledger; `0007` already created `pattern_ontology_provider_daily_usage`
 for it, and its five contracts are frozen.
+
+## Spec-artifact amendments (2026-08-16)
+
+The unimplemented-spec-artifacts review inserted spec work in front of
+A–D. That work has landed: product-spec v0.6, in-place 2026-08-14
+amendments, additive `contracts/m7` documents, and `0008` as the replay
+ledger. Slice A and B designs remain drafts; they now cite the amendment
+rather than the pre-amendment lists. `0008` is the replay ledger, `0009` is
+reserved for the correction-artifact CHECK rebuild, and the adapter’s
+per-stage-class usage ledger is `0010` or later.
 
 ## Slice C — Administrator authorization boundary (§31.9, §24)
 

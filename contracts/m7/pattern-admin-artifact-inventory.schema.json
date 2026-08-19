@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m7/pattern-admin-artifact-inventory.schema.json",
+  "title": "Administrative Pattern artifact inventory",
+  "$defs": {
+    "patternAdminArtifactInventoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "artifact_class", "created_at", "expires_at", "deleted_at"],
+      "properties": {
+        "artifact_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/artifactId" },
+        "artifact_class": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/artifactClass" },
+        "created_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "expires_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "deleted_at": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" }
+          ]
+        }
+      }
+    },
+    "patternAdminArtifactInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "generation_id", "artifacts"],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/schemaVersion" },
+        "generation_id": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/patternAdminArtifactInventoryItem" }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternAdminArtifactInventory"
+}

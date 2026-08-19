@@ -45,6 +45,7 @@ const TABLES = [
   "pattern_generation_jobs",
   "pattern_generation_claims",
   "pattern_admin_access_events",
+  "pattern_erasure_replay_events",
   "pattern_ontology_evaluation_runs",
   "pattern_ontology_recall_events",
   "pattern_ontology_pointer",

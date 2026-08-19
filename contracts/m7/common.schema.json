@@ -79,6 +79,31 @@
       "type": "string",
       "enum": ["first_open", "first_open_retry", "failed_attempt_retry"]
     },
+    "reservationReason": {
+      "type": "string",
+      "enum": ["first_open", "first_open_retry", "failed_attempt_retry", "chart_correction"]
+    },
+    "purposeClass": {
+      "type": "string",
+      "enum": ["quality_review", "safety_investigation", "incident_response", "retention_audit"]
+    },
+    "replayEventClass": {
+      "type": "string",
+      "enum": [
+        "claim_consumed",
+        "pattern_deleted",
+        "chart_correction_erased",
+        "pattern_withdrawn",
+        "ontology_recalled",
+        "account_deleted"
+      ]
+    },
+    "replayEventId": { "type": "string", "pattern": "^prel_[0-9a-f]{32}$" },
+    "artifactId": { "type": "string", "pattern": "^part_[0-9a-f]{32}$" },
+    "provenanceOrigin": {
+      "type": "string",
+      "enum": ["synthetic_internal", "machine_pipeline"]
+    },
     "verdict": { "type": "string", "enum": ["pass", "reject"] },
     "artifactClass": {
       "type": "string",

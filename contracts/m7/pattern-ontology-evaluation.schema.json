@@ -22,7 +22,9 @@
         "compiler_passed": { "type": "boolean" },
         "evaluator_passed": { "type": "boolean" },
         "regression_passed": { "type": "boolean" },
-        "unevaluated_fixture_count": { "type": "integer", "minimum": 0 }
+        "unevaluated_fixture_count": { "type": "integer", "minimum": 0 },
+        "evaluation_report_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+        "regression_report_hash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" }
       }
     }
   },
