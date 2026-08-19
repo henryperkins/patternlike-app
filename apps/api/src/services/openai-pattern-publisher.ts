@@ -239,14 +239,27 @@ export function createOpenAiPatternPublisher(
       }
 
       if (!response.ok) {
-        clearTimeout(deadline);
         const retryAfter = retryAfterSeconds(response);
         // Read once, for the numeric code only. Nothing else survives.
+        //
+        // The deadline stays ARMED across this read and is cleared in `finally`.
+        // Clearing it first disarms the only `controller.abort()` in the
+        // function, and a peer that sends non-2xx headers and then stalls the
+        // body — a chunked response with no terminating chunk, a common proxy
+        // failure — would park this await forever: no timer left to fire, no
+        // other cancellation source, so `run()` never yields its typed failure
+        // and the claimed job holds its lease and its already-spent budget until
+        // the queue consumer is killed.
         let errorBody = "";
         try {
           errorBody = await response.text();
         } catch {
+          // Aborted by the deadline, or the body never arrived. The status is
+          // already known and still classifies the failure; only the origin
+          // degrades, because the Cloudflare code was in the bytes we did not get.
           errorBody = "";
+        } finally {
+          clearTimeout(deadline);
         }
         const origin = classifyOrigin(routed, errorBody);
 

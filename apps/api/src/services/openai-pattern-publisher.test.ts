@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createOpenAiPatternPublisher } from "./openai-pattern-publisher.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 import type { AiGatewayRoute } from "./openai-responses-adapter.js";
-import { OPENAI_MOCK_AUTH_FAILED } from "../../test/mock-calc-service.js";
+import {
+  OPENAI_MOCK_AUTH_FAILED,
+  OPENAI_MOCK_ECHO_WRONG_DATE,
+} from "../../test/mock-calc-service.js";
 
 const ROUTE: AiGatewayRoute = {
   accountId: "a".repeat(32),
@@ -484,6 +487,64 @@ describe("OpenAI Pattern publisher", () => {
       const result = await publisher.run("planner", {}, OPTIONS);
       // The gateway host IS mocked, so this proves the gateway path is wired.
       expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("regressions from the adversarial review", () => {
+    it("keeps the deadline armed across the error-body read", async () => {
+      // A peer that sends non-2xx headers and then stalls the body. Clearing the
+      // timer before this read disarmed the only controller.abort() in the
+      // function, so run() never settled and the claimed job held its lease and
+      // its already-spent budget until the consumer was killed.
+      //
+      // The stub honours init.signal the way real fetch does -- aborting errors
+      // the body stream -- because a locally constructed Response is not
+      // attached to the caller's controller and would prove nothing.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_input: unknown, init: RequestInit = {}) => {
+          const signal = init.signal;
+          // Modelled at the surface the adapter uses: headers have arrived, so
+          // status and headers read fine, but the body never completes and only
+          // an abort ever settles it. A locally constructed Response would not
+          // be attached to the caller's controller and would prove nothing.
+          return {
+            ok: false,
+            status: 503,
+            headers: new Headers(),
+            text: () =>
+              new Promise<string>((_resolve, reject) => {
+                signal?.addEventListener("abort", () => {
+                  reject(new DOMException("Aborted", "AbortError"));
+                });
+              }),
+          } as unknown as Response;
+        }),
+      );
+
+      const publisher = createOpenAiPatternPublisher({ OPENAI_API_KEY: "sk-test" }, null);
+      const result = await publisher.run("planner", {}, { ...OPTIONS, timeoutMs: 50 });
+
+      // The invariant is that a typed failure arrives at all, inside the deadline.
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.code).toBe("publisher_unavailable");
+    }, 3000);
+
+    it("still answers a Pattern pass when the pinned model is an unhandled sentinel", async () => {
+      // The mock's pass router originally sat above the sentinel handlers behind
+      // a "model does not look like a sentinel" guard, which excluded sentinels
+      // that have no handler too -- so this request fell into the reading packet
+      // path, threw on a packet it does not have, and came back provider_5xx.
+      vi.unstubAllGlobals();
+      const sentinel = pin();
+      sentinel.planner_model = OPENAI_MOCK_ECHO_WRONG_DATE;
+      const publisher = createOpenAiPatternPublisher({ OPENAI_API_KEY: "sk-test" }, null);
+      const result = await publisher.run("planner", {}, { ...OPTIONS, configuration: sentinel });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect((result.parsed as { schema_version?: string }).schema_version).toBe("0.7.0");
     });
   });
 });

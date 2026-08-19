@@ -611,10 +611,6 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   // does -- by pinning a sentinel model -- and the two never collide.
   const patternPass = PATTERN_SCHEMA_NAMES[body.text?.format?.name ?? ""];
 
-  if (patternPass && !model.startsWith("mock-openai-")) {
-    return json(responsesEnvelope(model, outputText(patternPassDocument(patternPass))));
-  }
-
   if (model === OPENAI_MOCK_NETWORK_ERROR) {
     // A rejected fetch, not a response. The adapter must not read this as a
     // refusal: nothing reached the provider.
@@ -693,6 +689,20 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   }
   if (model === OPENAI_MOCK_WRONG_SHAPE) {
     return json(responsesEnvelope(model, outputText({ headline: "no schema_version here" })));
+  }
+
+  // Pattern passes answer here, AFTER every failure sentinel has had its turn.
+  //
+  // Placed last rather than first on purpose: an earlier check needed a guard
+  // to let sentinels through, and the obvious guard -- "the model does not look
+  // like a sentinel" -- excluded every sentinel including the ones with no
+  // handler, so a Pattern request pinned to, say, OPENAI_MOCK_ECHO_WRONG_DATE
+  // fell into the reading packet path below, threw on a packet it does not
+  // have, and surfaced as a retryable provider_5xx. Ordering removes the guard
+  // and the whole class of mistake: a sentinel that is handled wins above, and
+  // anything else recognisably a Pattern pass is answered here.
+  if (patternPass) {
+    return json(responsesEnvelope(model, outputText(patternPassDocument(patternPass))));
   }
 
   const packet = JSON.parse(body.input[0]!.content[0]!.text) as Packet;
