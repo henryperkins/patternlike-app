@@ -10,11 +10,31 @@
 
 **Authoritative design:** `docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md`, as amended by `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` and product-spec v0.6. If implementation evidence requires a behavioral change, stop and amend/reapprove the design before changing code.
 
+**Approval record (2026-08-19):** Q1–Q6 and the human-free generation
+invariant are approved. Task 5a's live-reading credential change is separately
+approved. No implementation-plan sign-off gate remains; rollout gates still
+apply independently.
+
 ---
 
-## Resolved open questions
+## Human-free generation invariant
 
-The design lists six points that "may not be resolved silently during implementation." Each is resolved below with its evidence. **Q1 and Q3 change a committed constant or a contract posture and need explicit sign-off before Task 8 and Task 5 respectively; the other four are recorded engineering decisions.**
+Every individual Pattern is selected, planned, written, validated, verified,
+and published or failed by machines. No task may add a human review, editing,
+moderation, approval, or release queue; no administrator may change a candidate,
+override the verifier, or authorize publication. Reader consent and a
+reader-requested retry start work but do not approve content. Operational
+rollout and audited incident inspection remain outside the generation path.
+State-machine coverage must prove every exhausted branch publishes, retries,
+fails, or cancels without a `pending_review`-style state, and administrator
+surfaces must have no mutation that can alter candidate content or publication
+eligibility.
+
+## Resolved questions
+
+The design listed six points that could not be resolved silently during
+implementation. The decisions below were approved on 2026-08-19 and are closed;
+none may be reinterpreted while implementing the plan.
 
 ### Q1 — Writer attempt ceiling: adopt 3, widen the type
 
@@ -22,7 +42,7 @@ M7 design §13.5 specifies three writer attempts against one frozen plan. The fr
 
 The design worries that changing the constant "changes the frozen command shape for jobs already enqueued." That risk is empty in production: `PATTERN_AI_ROLLOUT = "off"` in **both** wrangler blocks (`wrangler.toml:151`, `:268`), and production has no ontology release, so no Pattern command has ever been frozen there. Only dev/test rows can carry a `2`.
 
-**Decision:** the enqueuer writes `3`, and the command type widens to `writer_attempts_max: 2 | 3` so any dev-era row still decodes through `isPatternCommand`. Narrow back to `3` once no `2` rows remain. Note `planner_attempts_max` and `verifier_attempts_max` are also literal `2` and are **not** changed — §13.5 specifies three attempts for the writer only.
+**Decision:** the enqueuer writes `3`, and the command type widens to `writer_attempts_max: 2 | 3` so any dev-era row still decodes through `isPatternCommand`. Narrow back to `3` once no `2` rows remain. Note `planner_attempts_max` and `verifier_attempts_max` are also literal `2` and are **not** changed — §13.5 specifies three attempts for the writer only. The current `isPatternCommand` checks only `command_version`; Task 8 must make that decoder validate all three maxima while accepting both `2` and `3` for the writer, rather than relying on the TypeScript union as runtime validation.
 
 **What the attempt count implies, and what this plan originally missed.** §13.5 does not describe a bare retry. A deterministic or semantic rejection triggers another writer attempt carrying a *closed correction document* of finding codes, affected chapter and section keys, the policy rule violated, and the instruction to preserve the frozen plan and evidence assignments — and **rejected prose is never echoed into the correction prompt**. §14.5 closes the loop from the other side: a semantic rejection returns to the writer correction path if attempts remain, retaining the same frozen plan. No correction path exists in the codebase today (the only `correction` matches are the unrelated `chart_correction` lifecycle). Task 3a builds it.
 
@@ -50,9 +70,13 @@ The design's **14** is the same structure read differently: it takes §14.5's "a
 
 The alternative is a `verifier_attempts_at_candidate` column recording the counter's value at candidate entry, which keeps a per-job verifier total in the row and is the more legible option if `0010` is being written anyway (Task 8a). Do **not** take the third option of deriving the per-candidate count by counting `verifier_request` rows in `pattern_generation_artifacts` at the current `stage_generation`. It needs no migration, which is why it will be proposed, but it couples an attempt ceiling to an inventory the §18.5 retention sweep deletes, so a long-lived job could reset its own ceiling.
 
-### Q2 — Verifier visibility of the plan: already settled upstream; the open part is narrower
+### Q2 — Verifier visibility of the plan: use the full frozen plan
 
-Read against the M7 design, this is mostly not an open question. §14.1 enumerates the seven items the verifier receives and the frozen plan is one of them, and the adapter design's own "Verifier independence" section states that the design "accepts the framing bias." What is genuinely open is only the *further* narrowing — whether the plan should be projected down to chapter keys, aliases, and authorized rules without `working_title` or `purpose`.
+Section 14.1 enumerates the seven items the verifier receives, including the
+frozen plan, and the adapter design's own "Verifier independence" section
+accepts the framing bias. The rejected alternative was a narrower projection
+containing chapter keys, aliases, and authorized rules without `working_title`
+or `purpose`.
 
 **Decision:** supply the full frozen plan, per §14.1. Do not treat this as a choice to re-litigate during implementation. Make the residual bias measurable rather than argued: Task 9 injects candidates deliberately drifted from their plan assignment, and a verifier pass-rate that does not move under injected drift is the signal to revisit the projection.
 
@@ -78,11 +102,24 @@ The design frames this as "the M7-to-M8 window is the only cheap time to decide.
 
 `pattern-sweep.ts:19` sets `MAX_STAGE_CLAIMS = 8`. The pinned attempt budgets are unreachable beneath it.
 
-**Decision: raise it, and derive the number rather than inheriting it.** The design's 16 is "14 provider attempts plus lease-expiry headroom." Q1 corrects 14 to 11, which lowers the floor but does not vacate it: every provider call occupies its own delivery, and the publishing delivery is a twelfth, so the worst case needs **at least 12 claims before any churn at all**. `MAX_STAGE_CLAIMS = 8` blocks it. A middle draft of this plan argued from the vacated 7 that "8 may already suffice"; that reasoning is void along with the 7.
+**Decision: raise it to 16 and record the derivation.** Every provider call
+occupies its own delivery. The approved 11-call worst case plus the publishing
+delivery needs **12 claims before any churn at all**; four additional claims
+provide bounded lease-expiry and artifact-adoption recovery. The current
+`MAX_STAGE_CLAIMS = 8` blocks the approved retry budgets.
 
-Twelve is the floor, not the answer. Add lease-expiry recovery, redeliveries that adopt a stored artifact and spend nothing, and `retryStage` returns that re-arm the same `stage_generation`, and the design's 16 is defensible on the corrected model — but derive it after Task 6 exists rather than asserting it here, and write the derivation into the constant's comment.
+Task 8 sets the constant only after Task 6 establishes lease-expiry recovery,
+artifact adoption that spends nothing, and `retryStage` returns that re-arm the
+same `stage_generation`. Write the 12-plus-4 derivation into the constant's
+comment.
 
-**Claim churn is a different quantity from provider calls**, and it is the one the constant actually bounds. Derive the headroom above 12 from the lease duration and from Task 6's step 4, where an adopted artifact consumes a claim but no call. Raising the ceiling is safe with respect to *spend* once Task 6 moves the charge to step 7 and `PATTERN_DAILY_PROVIDER_CALL_LIMIT` bounds it independently; it is not automatically safe with respect to a wedging chart, which is the risk the constant exists for. Land Task 6 first either way, and rewrite the constant's doc comment — it currently says the command pins "two planner, two writer, and two verifier attempts," which Q1 makes wrong on the writer and wrong on the verifier's scope.
+**Claim churn is a different quantity from provider calls**, and it is the one
+the constant actually bounds. The four recovery claims cover the Task 6 cases
+where lease recovery or adoption consumes a claim but no call. Raising the
+ceiling is safe with respect to *spend* once Task 6 moves the charge to step 7
+and `PATTERN_DAILY_PROVIDER_CALL_LIMIT` bounds it independently; the fixed 16
+still bounds a wedging chart. Land Task 6 first and rewrite the constant's stale
+comment about two attempts for every pass and budget charged on stage entry.
 
 ### Q6 — Cross-pass budget attribution: this is a conformance gap, not an open question
 
@@ -546,7 +583,7 @@ Extract the evaluator into its own module — `pattern-semantic.ts` — taking t
 - Modify: `apps/api/wrangler.toml`
 - Modify: `docs/deploy/openai-daily-reading-rollout.md`
 
-**Requires sign-off, and touches the shipped reading adapter.** Today "the Worker holds the provider key" is an unstated assumption compiled into both adapters. On a provider-native request that key has first precedence, so sending it bypasses the operator's stored key. Replace the assumption with a declared credential mode.
+**Approved 2026-08-19; touches the shipped reading adapter.** Today "the Worker holds the provider key" is an unstated assumption compiled into both adapters. On a provider-native request that key has first precedence, so sending it bypasses the operator's stored key. Replace the assumption with a declared credential mode.
 
 The mode is **selected by an explicit variable, never inferred** from whether `OPENAI_API_KEY` happens to be set — inference cannot tell "stored key in use" from "worker key forgotten," and those need opposite outcomes. Add `OPENAI_CREDENTIAL_SOURCE` (`worker` | `gateway_stored`, required whenever a rollout is not `off`) and `OPENAI_GATEWAY_KEY_ALIAS` (required when the source is `gateway_stored`, sent as `cf-aig-byok-alias`).
 
@@ -654,11 +691,17 @@ The publisher-selection edit is unchanged from the earlier draft: the fail-close
 - Modify: `db/d1/MIGRATIONS.json`
 - Modify: `apps/api/test/apply-migrations.ts`
 
-**Requires Q1 sign-off.** Widen `writer_attempts_max` to `2 | 3` and have the enqueuer write `3` (Q1). Leave `planner_attempts_max` and `verifier_attempts_max` at literal `2` — the verifier's `2` is now per candidate rather than per job, which changes what the field means without changing what it holds. Record both scopes beside the fields.
+**Q1 approved 2026-08-19.** Widen `writer_attempts_max` to `2 | 3` and have the enqueuer write `3` (Q1). Leave `planner_attempts_max` and `verifier_attempts_max` at literal `2` — the verifier's `2` is now per candidate rather than per job, which changes what the field means without changing what it holds. Record both scopes beside the fields. Make `isPatternCommand` validate the maxima at runtime: writer `2 | 3`, planner `2`, verifier `2`.
 
-`MAX_STAGE_CLAIMS` must rise, and the number is derived here rather than inherited. Q1's corrected worst case is 11 provider calls, each in its own delivery, plus the publishing delivery: **12 claims before any churn**, against a current ceiling of 8. Add lease-expiry recovery, artifact-adopting redeliveries that spend nothing, and `retryStage` returns, then set the constant and put the arithmetic in its doc comment. The design's 16 is defensible on this model; what is not defensible is landing 16 with the old comment, which still says the command pins "two planner, two writer, and two verifier attempts" and explains the ceiling by a budget charged on stage entry that Task 6 has moved.
+`MAX_STAGE_CLAIMS` rises to the approved 16. Q1's worst case is 11 provider
+calls, each in its own delivery, plus the publishing delivery: **12 claims
+before any churn**, against a current ceiling of 8. Task 6 supplies four bounded
+recovery claims for lease expiry, artifact-adopting redeliveries that spend
+nothing, and `retryStage` returns. Put the 12-plus-4 arithmetic in the constant's
+doc comment; the current comment incorrectly describes two attempts for every
+pass and budget charged on stage entry.
 
-- [ ] **Step 1: Write the failing constant, contract, and migration tests.** A stored dev-era command carrying `writer_attempts_max: 2` still decodes through `isPatternCommand`. A newly frozen command carries `3`. A job driven through the full 11-call worst case is not failed as `stage_attempts_exhausted` by the sweep, while spend stays bounded by `PATTERN_DAILY_PROVIDER_CALL_LIMIT`. The contract accepts `artifact_class: "correction_document"` and still rejects an unknown correction class. A populated `pattern_generation_artifacts` table survives the CHECK rebuild byte-for-byte.
+- [ ] **Step 1: Write the failing constant, contract, and migration tests.** A stored dev-era command carrying `writer_attempts_max: 2` still decodes through `isPatternCommand`. A newly frozen command carries `3`. The decoder rejects every other writer maximum and any planner or verifier maximum other than `2`. A job driven through the full 11-call worst case is not failed as `stage_attempts_exhausted` by the sweep, while spend stays bounded by `PATTERN_DAILY_PROVIDER_CALL_LIMIT`. The contract accepts `artifact_class: "correction_document"` and still rejects an unknown correction class. A populated `pattern_generation_artifacts` table survives the CHECK rebuild byte-for-byte.
 - [ ] **Step 2: Run and confirm failure.**
 - [ ] **Step 3: Apply the constants and additive artifact-class amendment.** Record the enum addition in `SCHEMA_MANIFEST.json`. Migration `0009` rebuilds `pattern_generation_artifacts` with the widened CHECK under live foreign-key enforcement; it does not edit applied `0007`.
 - [ ] **Step 4: Run the Pattern lane, contracts, migration smoke, and typecheck.**
@@ -673,7 +716,7 @@ The publisher-selection edit is unchanged from the earlier draft: the fail-close
 - Modify: `apps/api/src/db/pattern-provider-usage.ts`
 - Modify: `apps/api/test/apply-migrations.ts`
 
-**Requires Q6 sign-off.** §25.3 requires the ledger to record used calls by stage class; `pattern_provider_daily_usage` has one undifferentiated `used_calls` column. Add bounded per-stage-class counters beside it. `used_calls` remains the total the shared ceiling is enforced against, so the ceiling semantics §25.3 also specifies are unchanged.
+**Q6 approved 2026-08-19.** §25.3 requires the ledger to record used calls by stage class; `pattern_provider_daily_usage` has one undifferentiated `used_calls` column. Add bounded per-stage-class counters beside it. `used_calls` remains the total the shared ceiling is enforced against, so the ceiling semantics §25.3 also specifies are unchanged.
 
 Unlike M0's edit-in-place policy, `0007` is applied to production (ledger entry, commit `ff23d00`), `0008` is the erasure-replay ledger, and Task 8 reserves `0009` for the correction-artifact CHECK rebuild, so this is a forward-only `0010`. The table is empty in every environment today, which is why this lands now rather than after `internal`.
 
@@ -782,8 +825,8 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 ## Dependency and checkpoint map
 
     Task 1 (shared boundary) ─┬─> Task 4 (adapter) ──> Task 5 (interface, ──> Task 5a (credential mode) ──> Task 6 (protocol) ┬─> Task 7  (provenance)
-    Task 2 (packet) ──────────┤                          extracts the                                                        ├─> Task 8  (constants, needs Q1)
-    Task 3 (prompts) ─────────┤                          semantic evaluator                                                  ├─> Task 8a (ledger 0010, needs Q6)
+    Task 2 (packet) ──────────┤                          extracts the                                                        ├─> Task 8  (constants, Q1 approved)
+    Task 3 (prompts) ─────────┤                          semantic evaluator                                                  ├─> Task 8a (ledger 0010, Q6 approved)
     Task 3a (correction) ─────┘                          to break the cycle)                                                 └─> Task 8b (attempt ceilings, no migration)
                                                                   Task 6 + 7 + 8 + 8a + 8b ──> Task 9 (integration) ──> Task 10 (gate + runbook)
 
@@ -795,6 +838,15 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 - After Task 6: an `openai` pin reaches a provider in test only; `PATTERN_AI_ROLLOUT` is still `off` everywhere.
 - After Task 10: the code is a rollout candidate. It is not deployed, no secret is set, and no rollout has moved.
 
-**Sign-off gates.** Q1 blocks Task 8, and its counting rule now also governs Q5 and the Task 10 spend figure — adopting it means amending the design's 14 to 11, which the design owner must accept rather than inherit. The amendment is narrow: it changes the reading of §14.5's "at most twice" from two retries after the first to two calls inclusive, and it leaves the design's per-candidate verifier scope intact rather than replacing it with a per-job total. Q6 blocks Task 8a, and its two outcomes are a `0010` migration or a recorded amendment to §25.3 — not a silent third option. Task 5a needs sign-off because it modifies the already-shipped reading adapter, making it the one task in this plan that changes live-path code before Task 6; the credential mode itself is settled — the gateway stores the key. Q3 blocks Task 5's regression test only in the sense that reversing the decision would require a `schema_version` bump and a much larger plan. All decisions are recorded above with their evidence; none may be reversed silently during implementation.
+**Decision and sign-off status (2026-08-19).** Q1–Q6 and Task 5a are approved;
+no implementation-plan sign-off gate remains. The approved counting rule is
+two verifier calls per candidate inclusive of the first, 11 worst-case provider
+calls per Pattern, and a per-candidate verifier scope. Q6 resolves to the
+forward-only `0010` migration; amending §25.3 instead is no longer an open
+alternative. The
+human-free generation invariant is also binding: none of these tasks may add a
+human review or publication gate. Deployment, secret mutation, and rollout
+remain separately controlled operational actions and are not authorized by
+this design approval.
 
-**A note on sourcing.** Four documents govern this work and all are normative, in this order: `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` outranks everything for Your Pattern; `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` settles freeze-versus-design conflicts; `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` (the M7 design) is normative for attempt, budget, verification, and rollout rules and is the source of every `§` reference in this plan; `docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md` (the adapter design) is normative for the adapter's own structure and defers to the M7 design elsewhere. Neither design document is historical. The adapter design's open questions cite the M7 design by section, and its summaries are not always the whole of what those sections say. Q2 was largely settled by §14.1 and carried an unmentioned enforceable requirement in §14.2; Q1's attempt count came with a correction-document protocol in §13.5; Q6 was a conformance gap against §25.3 rather than an open choice. Read the amendment and the cited M7 section before implementing any task that leans on one.
+**A note on sourcing.** Four documents govern this work and all are normative, in this order: `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` outranks everything for Your Pattern; `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` settles freeze-versus-design conflicts; `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` (the M7 design) is normative for attempt, budget, verification, and rollout rules and is the source of every `§` reference in this plan; `docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md` (the adapter design) is normative for the adapter's own structure and defers to the M7 design elsewhere. Neither design document is historical. The adapter design's resolved questions cite the M7 design by section, and its summaries are not always the whole of what those sections say. Q2 was largely settled by §14.1 and carried an unmentioned enforceable requirement in §14.2; Q1's attempt count came with a correction-document protocol in §13.5; Q6 was a conformance gap against §25.3 rather than an open choice. Read the amendment and the cited M7 section before implementing any task that leans on one.

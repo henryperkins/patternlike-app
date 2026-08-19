@@ -36,7 +36,7 @@ release and no ontology release.
 
 | # | Slice | §31 | Design | Plan | State |
 | --- | --- | --- | --- | --- | --- |
-| 1 | OpenAI Pattern adapter — the model calls | 31.6 | ✅ `specs/2026-08-15-openai-pattern-adapter-design.md` | ✅ `plans/2026-08-15-openai-pattern-adapter.md` | Specified, **0% implemented**, 3 sign-offs open |
+| 1 | OpenAI Pattern adapter — the model calls | 31.6 | ✅ `specs/2026-08-15-openai-pattern-adapter-design.md` | ✅ `plans/2026-08-15-openai-pattern-adapter.md` | Specified; Q1–Q6 and Task 5a approved; no design sign-off open |
 | A | Activated internal-only ontology | 31.4 (content) | ✅ `specs/2026-08-15-internal-ontology-activation-design.md` | ❌ none | Design drafted, awaiting approval |
 | B | Automated ontology pipeline | 31.10 | ✅ `specs/2026-08-15-ontology-pipeline-design.md` | ❌ none | Design drafted, awaiting approval; **depends on slice 1** |
 | C | Administrator authorization boundary | 31.9, §24 | ✅ `specs/2026-08-16-admin-authorization-design.md` | ❌ none | Design drafted; blocked on Access vs OIDC |
@@ -67,17 +67,20 @@ Partial: provenance. `projectPublicPattern` already reads `provider` and
 `model_family` from the document (`packages/pattern-engine/src/projection.ts:46-47`);
 only the execute-side literals at `pattern-execute.ts:772-774` remain.
 
-**Open sign-offs.** Q1 (writer attempt ceiling) blocks its Task 8, Q6 (per-stage-class
-usage ledger) blocks its Task 8a, and Task 5a needs a go-ahead because it modifies
-live reading-path code.
+**Decision status (2026-08-19).** Q1–Q6 and the human-free generation invariant
+are approved. Task 5a's live reading-path credential change is separately
+approved. No adapter design or implementation-plan sign-off remains open;
+deployment and rollout controls remain independent.
 
-**Known defects in its design, to fix before implementation.** The design's
-worst-case provider spend is stated as 14 in the rollout gate and as 11 in an
-inline amendment; the M7 design's own attempt/retry vocabulary (§12.4 and §13.5
-say "attempts", §14.5 says "retries … at most twice") supports **14**, and
-`MAX_STAGE_CLAIMS = 16` is only defensible on the 11. Open questions 1 and 6 are
-answered by §13.5 and §25.3 respectively and should be closed rather than carried.
-The design predates the BYOK decision: it still says "No new environment variable
+**Resolved documentation conflicts.** The approved M7 amendment and the
+2026-08-19 decision fix worst-case provider spend at **11**, not 7 or 14, and
+derive `MAX_STAGE_CLAIMS = 16` from 12 healthy claims plus four bounded recovery
+claims. Q1 and Q6 are closed in the adapter design rather than carried as open
+questions. Individual Pattern generation is fully machine-run; design-time
+sign-off and operational inspection are not runtime approval gates.
+
+**Known defects still to fix before implementation.** The design predates the
+BYOK decision: it still says "No new environment variable
 is required" and pins `Authorization` on every request, both of which the plan's
 Task 5a contradicts. Four design requirements have no plan owner —
 `projection.ts`, configuration refusals 3–5, `test/helpers.ts`, and the

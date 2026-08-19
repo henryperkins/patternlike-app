@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-15
 
-**Status:** Draft for implementation planning
+**Status:** Draft for implementation planning; Q1–Q6 and the human-free
+generation invariant approved 2026-08-19. Task 5a's live-reading credential
+change was separately approved 2026-08-19; no design sign-off gate remains.
 
 **Scope:** Supply the missing OpenAI provider adapter for M7 Your Pattern — the
 planner, writer, and semantic-verifier calls, their prompts, their strict
@@ -44,7 +46,9 @@ The approved choices are:
   second one;
 - `compact_provenance.provider` and `model_family` become derived from the pin
   that actually ran, replacing the string literals at
-  `apps/api/src/services/pattern-execute.ts:774-781`; and
+  `apps/api/src/services/pattern-execute.ts:774-781`;
+- generation is fully machine-run: no human reviews, edits, approves, releases,
+  or otherwise intervenes in an individual Pattern job; and
 - rollout does not move. Production stays at `PATTERN_AI_ROLLOUT=off` until the
   adapter, the ontology release, and the recorded worst-case spend are all in
   place.
@@ -71,9 +75,12 @@ Success means:
 4. a provider timeout, refusal, budget exhaustion, or exhausted attempt budget
    produces an honest failed state with a coarse public stage and no prose;
 5. the stored provenance names the publisher and model family that actually
-   ran; and
+   ran;
 6. every provider request and response exists as an encrypted, expiring R2
-   artifact under a closed `artifact_class`, and nowhere else.
+   artifact under a closed `artifact_class`, and nowhere else; and
+7. bounded machine retries, deterministic gates, and the independent model
+   verifier decide publication or failure without a human review queue or
+   per-Pattern approval action.
 
 Explicit non-goals. This design does not change the deterministic selection or
 validation engine: `packages/pattern-engine` keeps its purity contract
@@ -815,21 +822,10 @@ Two consequences follow and must be implemented together with the move. First,
 the comment at `apps/api/src/services/pattern-sweep.ts:6-19`, which explains
 `MAX_STAGE_CLAIMS` in terms of budget consumed on stage entry, becomes stale and
 must be rewritten. Second, `MAX_STAGE_CLAIMS = 8` is now too small. The minimum
-successful path is three deliveries. The worst case is 2 planner attempts + 3
-writer attempts + up to 3 verifier candidates each with up to 2 transport
-retries = 14 provider attempts, hence at least 14 deliveries, plus headroom for
-lease-expiry recovery. `MAX_STAGE_CLAIMS` must rise to at least 16, or the
-pinned per-pass budgets can never be exercised and a job that needs them
-terminates as `stage_attempts_exhausted` instead. The recorded worst-case spend
-per Pattern is therefore 14 provider calls; against
-`PATTERN_DAILY_PROVIDER_CALL_LIMIT = 100` that is seven worst-case Patterns per
-UTC day, and the rollout document must carry that calculation multiplied by the
-pinned input/output token bounds and current model rates before external users
-are enabled.
-
-**Amendment (2026-08-15). The worst case is 11, not 14.** The structure above is
-right and stands; only the verifier's per-candidate allowance changes. §14.5's
-"retries the identical candidate at most twice" is read here as two calls
+successful path is three deliveries. The approved worst case is two planner
+calls, three writer calls, and up to three verifier candidates with two calls
+each. §14.5's "retries the identical candidate at most twice" is read here as
+two calls
 *inclusive of the first*, matching the reading applied to §12.4 and §13.5, rather
 than as two retries after it. That gives
 
@@ -843,9 +839,13 @@ the job at two candidates, so §13.5's third writer attempt could never be
 verified. With `verifier_attempts` reset by the transition into
 `semantic_verifying`, one column holds the per-candidate count, and the per-job
 verifier bound is the implied product of the two maxima. `MAX_STAGE_CLAIMS` at 16
-remains defensible on the corrected model: 11 provider deliveries plus the
-publish delivery is a floor of 12 before any lease-expiry or artifact-adopting
-churn.
+is therefore required: 11 provider deliveries plus the publish delivery is a
+floor of 12, leaving four bounded claims for lease-expiry or artifact-adopting
+recovery. The earlier 14-call reading treated "at most twice" as two retries
+after an initial call and is superseded by the approved inclusive counting
+rule. The rollout document must multiply the approved 11-call ceiling by the
+pinned input/output token bounds and current model rates before external users
+are enabled.
 
 ## Idempotency and at-least-once safety
 
@@ -1312,10 +1312,11 @@ sequence, following §27.4 of the M7 design:
    `wrangler.toml` blocks. Gate: the full candidate gate passes and the
    production Worker's behavior is byte-identically unchanged, because rollout
    `off` short-circuits before any publisher work.
-2. no migration is required — `0007_ai_generated_pattern.sql` is already applied
-   and already reserves every artifact class, attempt counter, and usage row this
-   design uses. Gate: confirm `PRAGMA foreign_key_check` is empty and the six
-   reserved artifact classes are still accepted by the CHECK constraint.
+2. apply the forward-only adapter migrations after the already-applied `0007`:
+   `0009` adds `correction_document` to the artifact-class CHECK, and `0010`
+   adds per-stage-class provider-usage counters. Gate: populated artifact rows
+   survive the CHECK rebuild byte-for-byte and `PRAGMA foreign_key_check` is
+   empty.
 3. deploy the Worker with rollout `off` and no provider path reachable. Gate:
    `GET /health` and an authenticated Pattern status read behave as before.
 4. verify `gpt-5.6-sol` in the authorized account's live `/v1/models`, and
@@ -1328,7 +1329,7 @@ sequence, following §27.4 of the M7 design:
    absence and each half-configured gateway, proven against production
    configuration before the values are set.
 6. approve the numeric daily ceiling. Record the worst-case calculation
-   explicitly: 14 provider attempts per Pattern × the pinned input and output
+   explicitly: 11 provider calls per Pattern × the pinned input and output
    token bounds × current model rates × the maximum new Patterns per UTC day,
    against `PATTERN_DAILY_PROVIDER_CALL_LIMIT`. Gate: an approved number, in
    writing, before any non-`off` rollout.
@@ -1366,43 +1367,67 @@ provider failures, a rising `candidate_invalid` or `semantic_verification_failed
 rate, and unexpected token growth. Prompt, packet, plan, draft, and prose logging
 is forbidden.
 
-## Open questions
+## Human-free generation invariant
 
-These are points where the ground truth is silent or self-contradictory. None
-may be resolved silently during implementation.
+**Approved 2026-08-19.** An individual Pattern job is machine-run from evidence
+selection through publication or terminal failure:
 
-1. **Writer attempt ceiling.** §13.5 of the M7 design specifies three writer
-   attempts against one frozen plan; the frozen command sets
-   `writer_attempts_max: 2` (`apps/api/src/services/pattern-command.ts:53`,
-   `apps/api/src/services/pattern-enqueue.ts:264`). The field has never been
-   read, so nothing surfaced the disagreement. Changing the command constant
-   changes the frozen command shape for jobs already enqueued; three is the
-   design's number and two is the code's.
-2. **Verifier visibility of the plan.** §14.1 supplies the frozen plan to the
-   verifier. Whether it should instead receive a reduced projection — chapter
-   keys, assigned aliases, and authorized rules, without `working_title` or
-   `purpose` — trades framing bias against the verifier's ability to detect
-   assignment drift. This design supplies the full plan and records the
-   alternative.
-3. **`assembly_mode` for the synthetic publisher.** The value is a single-member
-   literal, so a dev or test synthetic run publishes a document claiming
-   `constrained_model` for prose no model wrote. Adding `deterministic_stand_in`
-   is a new enum value and therefore a `schema_version` bump under the manifest
-   rules, which would ripple through every `0.7.0` const in the package. The
-   M7-to-M8 window is the only cheap time to decide.
-4. **Verifier finding vocabulary.** `code` is a free-form string in the contract
-   with no enum. This design compiles a closed list in `pattern-prompt.ts` and
-   rejects codes outside it; whether that list belongs in `contracts/m7` as a
-   new `$def` — which the manifest would permit additively — is unresolved.
-5. **`MAX_STAGE_CLAIMS`.** Raising it to 16 is required for the pinned per-pass
-   budgets to be reachable, but it also raises the number of claims a wedging
-   chart can consume. The bound now serves only claim churn, not spend, since
-   budget follows the provider call.
-6. **Cross-pass budget attribution.** `pattern_provider_daily_usage` has one
-   `used_calls` column and no pass dimension. §25.3 permits separate sub-ceilings
-   per stage class if an operator configures them; this design shares one
-   ceiling and relies on the `pass` field in the safe-log arms for attribution.
-   Whether a per-pass ledger is needed before `enabled` is open.
+```text
+deterministic selection
+→ model planner
+→ deterministic plan validation
+→ model writer
+→ deterministic candidate validation
+→ independently configured model verifier
+→ deterministic publish-or-fail checks
+```
+
+No human reviews, edits, approves, moderates, releases, or chooses content for an
+individual Pattern. A failed job follows only the bounded machine retry and
+terminal-failure rules; it never enters a manual moderation or approval queue.
+Reader consent and a reader-requested retry authorize a job but do not approve
+its content. Operational rollout decisions and audited incident inspection are
+outside the generation path and cannot mutate a candidate, change a verdict, or
+authorize publication. Design-time sign-off is likewise not a runtime gate.
+
+## Resolved questions
+
+**Approved 2026-08-19.** Q1–Q6 are closed and may not be reinterpreted during
+implementation:
+
+1. **Writer attempt ceiling and counting rule.** The planner receives at most
+   two provider calls per job, the writer receives at most three per job against
+   one frozen plan, and the verifier receives at most two per candidate; every
+   maximum includes the first call. New commands freeze
+   `writer_attempts_max: 3`, while the type accepts `2 | 3` until pre-approval
+   development rows carrying `2` are gone.
+   The current `isPatternCommand` checks only `command_version`; implementation
+   must make the decoder validate the maxima truthfully while accepting both
+   writer values. The worst-case bound is therefore
+   `2 + 3 + (3 × 2) = 11` provider calls, not 7 or 14.
+2. **Verifier visibility and independence.** Supply the complete frozen plan,
+   as §14.1 requires. `resolvePatternPublisherConfiguration` refuses a writer
+   and verifier with an identical `(provider, model, prompt_version)` tuple, as
+   §14.2 requires. Do not introduce a reduced plan projection in this slice.
+3. **Synthetic `assembly_mode`.** Keep the frozen
+   `assembly_mode: "constrained_model"` contract and do not bump
+   `schema_version`. `PATTERN_PUBLISHER=synthetic` remains development-only and
+   is refused in every reader-serving environment.
+4. **Verifier finding vocabulary.** Keep the closed finding-code vocabulary in
+   `pattern-prompt.ts` and reject unknown codes at runtime. Leave the frozen
+   contract's bounded string open until live evaluation evidence stabilizes the
+   vocabulary; do not add a `$def` now.
+5. **Stage-claim ceiling.** Raise `MAX_STAGE_CLAIMS` from 8 to 16 only after
+   provider charging moves to immediately before fetch. Eleven provider-call
+   deliveries plus publishing require 12 healthy claims; the remaining four
+   claims are bounded recovery headroom for lease expiry and artifact adoption.
+   The constant bounds claim churn, while `PATTERN_DAILY_PROVIDER_CALL_LIMIT`
+   independently bounds spend.
+6. **Cross-pass budget attribution.** Add forward-only migration `0010` with
+   bounded planner, writer, and verifier counters beside `used_calls` in
+   `pattern_provider_daily_usage`. Continue enforcing the shared daily ceiling
+   against `used_calls`; the stage-class counters provide the recording §25.3
+   requires and do not create separate sub-ceilings.
 
 ## Out of scope
 

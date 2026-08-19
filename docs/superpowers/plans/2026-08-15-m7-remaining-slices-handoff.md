@@ -271,6 +271,12 @@ From the adapter plan and from the operator, all recorded with their evidence:
   Worker version must make gateway IDs, stored-key alias and
   `AI_GATEWAY_TOKEN` present while making `OPENAI_API_KEY` absent, without
   serving either invalid intermediate combination.
+- **Individual Pattern generation is human-free.** Deterministic selection and
+  validation, the model planner and writer, the independently configured model
+  verifier, and trusted application publish checks alone decide publication or
+  failure. No human review, editing, moderation, approval, or release queue may
+  be added. Operational controls and audited inspection cannot alter a
+  candidate, override a verdict, or authorize publication.
 - **Q1** writer attempts move to 3 with the command type widened to `2 | 3`.
   The two maxima keep **different scopes**: the writer's 3 is per job and spans
   corrections (§13.5); the verifier's 2 is per candidate (§14.5). Worst-case
@@ -295,9 +301,10 @@ From the adapter plan and from the operator, all recorded with their evidence:
   correction-artifact CHECK rebuild, so the outcome is a `0010` migration or a
   recorded amendment to §25.3 — **not** a third silent option.
 
-Outstanding sign-offs carried in the adapter plan: Q1 blocks its Task 8, Q6
-blocks its Task 8a, and Task 5a needs a go-ahead because it modifies live-path
-code.
+Decision status as of 2026-08-19: Q1–Q6 and the human-free generation invariant
+are approved. Task 5a's live reading-path credential change is separately
+approved. No adapter design or implementation-plan sign-off remains open;
+deployment, secret mutation, and rollout remain separately controlled actions.
 
 ## Constraints that bind everything you scope
 

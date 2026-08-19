@@ -290,6 +290,21 @@ and the admin ontology-release route are specified ahead of Slice C.
 Admin paths document `adminSession` as the specified scheme and keep
 `adminToken` defined as deprecated transitional until Slice C deletes it.
 
+### 13. Human-free Pattern generation
+
+**Decision approved 2026-08-19.** Individual Pattern generation has no human
+review, editing, moderation, approval, or release step. Deterministic selection
+and validation, the model planner and writer, an independently configured model
+verifier, and trusted application publication checks alone decide whether a job
+publishes or fails. Exhausted machine retries end in terminal failure rather
+than a manual review queue.
+
+Reader consent and reader-requested retry authorize work but do not approve
+content. Operational rollout controls and audited incident inspection remain
+outside the generation path and cannot modify a candidate, override a verdict,
+or authorize publication. A design or deployment sign-off is not a per-Pattern
+runtime gate.
+
 ## Operator questions this amendment does not answer
 
 - Cloudflare Access versus a separate administrator OIDC tenant for
@@ -308,7 +323,7 @@ deferred to the adapter’s additive enum amendment.
 | B | `machine_pipeline` provenance, report hashes, compiler policy for class-specific fields, `contracts/m7/fixtures/corpus/` |
 | C | Shipped `purpose_class`, three admin documents, `adminSession`, token removal, identity decision gate |
 | D | Replay ledger design and `0008`; criterion 23 is a drill against that runtime, not a runbook against a missing table |
-| 1 | Writer attempts = 3; `correction_document` additive enum; §14.2 configuration refusal |
+| 1 | Writer attempts = 3; `correction_document` additive enum; §14.2 configuration refusal; human-free generation invariant |
 
 ## Verification
 
