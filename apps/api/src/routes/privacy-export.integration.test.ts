@@ -584,7 +584,7 @@ describe("account export", () => {
   });
 
   it("keeps a successor artifact when an expired worker resumes its PUT", async () => {
-    const firstNow = new Date("2026-08-13T12:00:00.000Z");
+    const firstNow = new Date();
     const accepted = await postExport(USER_A, "idem-export-r2-fence");
     const message: PrivacyMessage = {
       kind: "privacy",
