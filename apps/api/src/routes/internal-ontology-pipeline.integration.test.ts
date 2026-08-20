@@ -547,6 +547,42 @@ describe("machine ontology ingestion", () => {
     );
   });
 
+  it("returns 503 when the evaluation artifact keyring is missing", async () => {
+    const prepared = await prepareMachineRelease(
+      "ontology-machine-keyring-missing",
+      key,
+    );
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING = "";
+
+    const response = await postRelease(prepared.signed);
+
+    expect(response.status).toBe(503);
+    expect((response.body.error as { code: string }).code).toBe(
+      "ontology_evaluation_artifact_keyring_missing",
+    );
+    expect((await activePointer()).active_version).toBe(
+      "ontology-prior-active",
+    );
+  });
+
+  it("returns 503 when the evaluation artifact keyring is malformed", async () => {
+    const prepared = await prepareMachineRelease(
+      "ontology-machine-keyring-invalid",
+      key,
+    );
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING = "{";
+
+    const response = await postRelease(prepared.signed);
+
+    expect(response.status).toBe(503);
+    expect((response.body.error as { code: string }).code).toBe(
+      "ontology_evaluation_artifact_keyring_invalid",
+    );
+    expect((await activePointer()).active_version).toBe(
+      "ontology-prior-active",
+    );
+  });
+
   it.each([
     ["corpus_release_hash", "ontology_evidence_corpus_mismatch"],
     ["bundle_hash", "ontology_evidence_bundle_mismatch"],

@@ -1,4 +1,11 @@
-import type { OntologySignerBinding } from "./services/ontology-signing-client.js";
+/** Service-binding RPC into the isolated ontology-signer Worker. */
+export interface OntologySignerBinding {
+  signOntology(request: {
+    payload: string;
+    payload_hash: string;
+    key_id: string;
+  }): Promise<unknown>;
+}
 
 /** Opaque queue nudge; the encrypted generation command remains in D1. */
 export interface GenerationMessage {

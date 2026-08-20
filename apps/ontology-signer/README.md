@@ -30,3 +30,21 @@ unimportable keys fail closed.
 
 Never place this secret in API configuration, `.dev.vars` outside this
 workspace, logs, responses, D1, R2, corpus material, or provider requests.
+
+## Deploy
+
+The API's `ONTOLOGY_SIGNER` service binding fails upload until this Worker
+exists. Deploy it first:
+
+```bash
+npm run deploy:signer
+npx wrangler secret put PATTERN_ONTOLOGY_SIGNING_KEY \
+  --config apps/ontology-signer/wrangler.toml --env production
+```
+
+Locally, resolve the binding by running both configs together from the
+repository root:
+
+```bash
+npx wrangler dev -c apps/api/wrangler.toml -c apps/ontology-signer/wrangler.toml
+```

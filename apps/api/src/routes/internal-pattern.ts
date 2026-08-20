@@ -28,6 +28,11 @@ function error(requestId: string, code: string, message: string) {
   return { error: { code, message, request_id: requestId } };
 }
 
+const ONTOLOGY_EVIDENCE_CONFIGURATION_CODES = new Set([
+  "ontology_evaluation_artifact_keyring_missing",
+  "ontology_evaluation_artifact_keyring_invalid",
+]);
+
 internalPatternRoutes.post("/pattern-ontology-releases", async (c) => {
   const requestId = c.get("requestId");
   if (!c.env.PATTERN_ONTOLOGY_KEYS && c.env.ENVIRONMENT !== "development" && c.env.AUTH_STUB !== "1") {
@@ -130,9 +135,18 @@ internalPatternRoutes.post("/pattern-ontology-releases", async (c) => {
       );
     } catch (cause) {
       if (cause instanceof PatternOntologyEvidenceError) {
+        const configuration = ONTOLOGY_EVIDENCE_CONFIGURATION_CODES.has(
+          cause.code,
+        );
         return c.json(
-          error(requestId, cause.code, "Machine ontology evidence was refused"),
-          409,
+          error(
+            requestId,
+            cause.code,
+            configuration
+              ? "Ontology evaluation artifact keyring is not configured"
+              : "Machine ontology evidence was refused",
+          ),
+          configuration ? 503 : 409,
         );
       }
       throw cause;

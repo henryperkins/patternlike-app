@@ -18,6 +18,106 @@ import type { VerifiedPatternOntologyEvidence } from "../services/pattern-ontolo
 
 export const ONTOLOGY_OBJECT_PREFIX = "pattern-ontology/";
 
+/**
+ * Public vs internal is re-derived on every read from evidence + receipt
+ * agreement, not from a stored flag. Both loaders interpolate this fragment
+ * so enqueue and execute cannot drift onto different scopes.
+ */
+const ONTOLOGY_ACTIVATION_SCOPE_SQL = `CASE
+              WHEN e.activation_scope = 'public'
+               AND e.run_status = 'succeeded'
+               AND e.evidence_status = 'committed'
+               AND e.evaluation_artifact_status = 'committed'
+               AND e.compiler_passed = 1
+               AND e.evaluator_passed = 1
+               AND e.unevaluated_fixture_count = 0
+               AND e.corpus_license_class = 'licensed_excerpt'
+               AND e.corpus_public_capable = 1
+               AND e.corpus_release_hash = r.corpus_release_hash
+               AND json_extract(
+                 r.evaluation_json,
+                 '$.evaluation_report_hash'
+               ) = e.evaluation_report_hash
+               AND length(e.evaluation_artifact_envelope_hash) = 71
+               AND length(e.evaluation_artifact_ciphertext_hash) = 71
+               AND e.evaluation_artifact_object_key =
+                 'pattern-ontology/pipeline/' || e.run_id ||
+                 '/evaluation-report.enc'
+               AND EXISTS (
+                 SELECT 1
+                 FROM pattern_ontology_evaluation_runs receipt
+                 WHERE receipt.ontology_version = r.version
+                   AND receipt.verdict = 'pass'
+                   AND json_valid(receipt.summary_json)
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.run_id'
+                   ) = e.run_id
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.ontology_version'
+                   ) = e.ontology_version
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.activation_scope'
+                   ) = e.activation_scope
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.bundle_hash'
+                   ) = e.bundle_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.corpus_release_id'
+                   ) = e.corpus_release_id
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.corpus_release_hash'
+                   ) = e.corpus_release_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.corpus_license_class'
+                   ) = e.corpus_license_class
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.corpus_public_capable'
+                   ) = e.corpus_public_capable
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.evaluation_report_hash'
+                   ) = e.evaluation_report_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.evaluation_artifact_object_key'
+                   ) = e.evaluation_artifact_object_key
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.evaluation_artifact_envelope_hash'
+                   ) = e.evaluation_artifact_envelope_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.evaluation_artifact_ciphertext_hash'
+                   ) = e.evaluation_artifact_ciphertext_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.signing_key_id'
+                   ) = e.signing_key_id
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.compiler_passed'
+                   ) = e.compiler_passed
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.evaluator_passed'
+                   ) = e.evaluator_passed
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.unevaluated_fixture_count'
+                   ) = e.unevaluated_fixture_count
+               )
+              THEN 'public'
+              ELSE 'internal'
+            END AS activation_scope`;
+
 export interface ActiveOntology {
   version: string;
   bundleHash: string;
@@ -69,100 +169,7 @@ export async function loadActiveOntology(env: Env): Promise<ActiveOntology | nul
   const pointer = await env.DB.prepare(
     `SELECT p.active_version AS version, r.bundle_hash, r.corpus_release_hash,
             r.locale, r.object_key, r.status,
-            CASE
-              WHEN e.activation_scope = 'public'
-               AND e.run_status = 'succeeded'
-               AND e.evidence_status = 'committed'
-               AND e.evaluation_artifact_status = 'committed'
-               AND e.compiler_passed = 1
-               AND e.evaluator_passed = 1
-               AND e.unevaluated_fixture_count = 0
-               AND e.corpus_license_class = 'licensed_excerpt'
-               AND e.corpus_public_capable = 1
-               AND e.corpus_release_hash = r.corpus_release_hash
-               AND json_extract(
-                 r.evaluation_json,
-                 '$.evaluation_report_hash'
-               ) = e.evaluation_report_hash
-               AND length(e.evaluation_artifact_envelope_hash) = 71
-               AND length(e.evaluation_artifact_ciphertext_hash) = 71
-               AND e.evaluation_artifact_object_key =
-                 'pattern-ontology/pipeline/' || e.run_id ||
-                 '/evaluation-report.enc'
-               AND EXISTS (
-                 SELECT 1
-                 FROM pattern_ontology_evaluation_runs receipt
-                 WHERE receipt.ontology_version = r.version
-                   AND receipt.verdict = 'pass'
-                   AND json_valid(receipt.summary_json)
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.run_id'
-                   ) = e.run_id
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.ontology_version'
-                   ) = e.ontology_version
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.activation_scope'
-                   ) = e.activation_scope
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.bundle_hash'
-                   ) = e.bundle_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_release_id'
-                   ) = e.corpus_release_id
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_release_hash'
-                   ) = e.corpus_release_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_license_class'
-                   ) = e.corpus_license_class
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_public_capable'
-                   ) = e.corpus_public_capable
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_report_hash'
-                   ) = e.evaluation_report_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_artifact_object_key'
-                   ) = e.evaluation_artifact_object_key
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_artifact_envelope_hash'
-                   ) = e.evaluation_artifact_envelope_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_artifact_ciphertext_hash'
-                   ) = e.evaluation_artifact_ciphertext_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.signing_key_id'
-                   ) = e.signing_key_id
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.compiler_passed'
-                   ) = e.compiler_passed
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluator_passed'
-                   ) = e.evaluator_passed
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.unevaluated_fixture_count'
-                   ) = e.unevaluated_fixture_count
-               )
-              THEN 'public'
-              ELSE 'internal'
-            END AS activation_scope
+            ${ONTOLOGY_ACTIVATION_SCOPE_SQL}
      FROM pattern_ontology_pointer p
      LEFT JOIN pattern_ontology_releases r ON r.version = p.active_version
      LEFT JOIN pattern_ontology_pipeline_evidence e
@@ -199,100 +206,7 @@ export async function loadOntologyByVersion(
   const row = await env.DB.prepare(
     `SELECT r.version, r.bundle_hash, r.corpus_release_hash, r.locale,
             r.object_key, r.status,
-            CASE
-              WHEN e.activation_scope = 'public'
-               AND e.run_status = 'succeeded'
-               AND e.evidence_status = 'committed'
-               AND e.evaluation_artifact_status = 'committed'
-               AND e.compiler_passed = 1
-               AND e.evaluator_passed = 1
-               AND e.unevaluated_fixture_count = 0
-               AND e.corpus_license_class = 'licensed_excerpt'
-               AND e.corpus_public_capable = 1
-               AND e.corpus_release_hash = r.corpus_release_hash
-               AND json_extract(
-                 r.evaluation_json,
-                 '$.evaluation_report_hash'
-               ) = e.evaluation_report_hash
-               AND length(e.evaluation_artifact_envelope_hash) = 71
-               AND length(e.evaluation_artifact_ciphertext_hash) = 71
-               AND e.evaluation_artifact_object_key =
-                 'pattern-ontology/pipeline/' || e.run_id ||
-                 '/evaluation-report.enc'
-               AND EXISTS (
-                 SELECT 1
-                 FROM pattern_ontology_evaluation_runs receipt
-                 WHERE receipt.ontology_version = r.version
-                   AND receipt.verdict = 'pass'
-                   AND json_valid(receipt.summary_json)
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.run_id'
-                   ) = e.run_id
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.ontology_version'
-                   ) = e.ontology_version
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.activation_scope'
-                   ) = e.activation_scope
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.bundle_hash'
-                   ) = e.bundle_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_release_id'
-                   ) = e.corpus_release_id
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_release_hash'
-                   ) = e.corpus_release_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_license_class'
-                   ) = e.corpus_license_class
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.corpus_public_capable'
-                   ) = e.corpus_public_capable
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_report_hash'
-                   ) = e.evaluation_report_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_artifact_object_key'
-                   ) = e.evaluation_artifact_object_key
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_artifact_envelope_hash'
-                   ) = e.evaluation_artifact_envelope_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluation_artifact_ciphertext_hash'
-                   ) = e.evaluation_artifact_ciphertext_hash
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.signing_key_id'
-                   ) = e.signing_key_id
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.compiler_passed'
-                   ) = e.compiler_passed
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.evaluator_passed'
-                   ) = e.evaluator_passed
-                   AND json_extract(
-                     receipt.summary_json,
-                     '$.unevaluated_fixture_count'
-                   ) = e.unevaluated_fixture_count
-               )
-              THEN 'public'
-              ELSE 'internal'
-            END AS activation_scope
+            ${ONTOLOGY_ACTIVATION_SCOPE_SQL}
      FROM pattern_ontology_releases r
      LEFT JOIN pattern_ontology_pipeline_evidence e
        ON e.ontology_version = r.version AND e.bundle_hash = r.bundle_hash

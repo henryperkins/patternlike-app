@@ -418,6 +418,7 @@ bucket_name = "pattern-artifacts"
 [[env.production.services]]
 binding = "ONTOLOGY_SIGNER"
 service = "patternlike-ontology-signer-production"
+# Target Worker must already exist. Deploy with `npm run deploy:signer` first.
 
 # Redeclared because named environments do not inherit top-level bindings — the
 # same reason D1 and R2 appear twice above. A production deploy that inherited

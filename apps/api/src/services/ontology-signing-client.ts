@@ -1,11 +1,14 @@
 import type { PatternOntologyRelease } from "@patternlike/shared";
 import { compileOntologyRelease } from "@patternlike/pattern-engine";
+import type { OntologySignerBinding } from "../env.js";
 import { hashesEqual, type SignatureAlgorithm } from "./content-release.js";
 import {
   computeOntologyBundleHash,
   ontologySigningPayload,
   type OntologyBundleSignature,
 } from "./pattern-ontology-verify.js";
+
+export type { OntologySignerBinding };
 
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -38,10 +41,6 @@ export type OntologySigningServiceResult =
       };
     }
   | { ok: false; error: { code: string } };
-
-export interface OntologySignerBinding {
-  signOntology(request: OntologySigningRequest): Promise<unknown>;
-}
 
 export class OntologySigningClientError extends Error {
   constructor(readonly code: string) {
