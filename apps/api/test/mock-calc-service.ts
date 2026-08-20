@@ -13,6 +13,15 @@
  * Place labels beginning with TRIGGER_ drive the failure paths.
  */
 
+import type {
+  PatternFactPacket,
+  PatternFactPacketFeature,
+  PatternOntologyRecord,
+  PatternPlan,
+  PatternPlannerOutput,
+  PatternWriterOutput,
+} from "@patternlike/shared";
+
 /** Sentinel place labels that make the mock fail in a specific way. */
 export const TRIGGER_CALC_ERROR = "TRIGGER_CALC_ERROR";
 export const TRIGGER_INVALID_PROFILE = "TRIGGER_INVALID_PROFILE";
@@ -495,6 +504,181 @@ interface Packet {
   composition: { allowed_paragraph_roles: string[]; uncertainty_note_required: boolean };
 }
 
+interface PatternPlannerRequestDocument {
+  packet: PatternFactPacket;
+  ontology_records: PatternOntologyRecord[];
+}
+
+interface PatternWriterFact {
+  alias: PatternFactPacketFeature["alias"];
+  feature_class: PatternFactPacketFeature["feature_class"];
+  fact: PatternFactPacketFeature["fact"];
+}
+
+interface PatternWriterAssignment {
+  feature_aliases: string[];
+  facts: PatternWriterFact[];
+  ontology_rule_ids: string[];
+}
+
+interface PatternWriterRequestDocument {
+  plan: PatternPlan;
+  assignments: PatternWriterAssignment[];
+  signature_assignments: PatternWriterAssignment[];
+  ontology_records: PatternOntologyRecord[];
+  locale: PatternFactPacket["locale"];
+  effective_accuracy: PatternFactPacket["effective_accuracy"];
+  uncertainty: PatternFactPacket["uncertainty"];
+}
+
+function fixedWords(count: number): string {
+  const words = [
+    "This",
+    "reflective",
+    "description",
+    "stays",
+    "grounded",
+    "in",
+    "the",
+    "selected",
+    "pattern",
+    "evidence",
+  ];
+  return Array.from({ length: count }, (_, index) => words[index % words.length]).join(" ");
+}
+
+function validPatternPlan(document: PatternPlannerRequestDocument): PatternPlannerOutput {
+  const packet = document.packet;
+  const records = new Map(document.ontology_records.map((record) => [record.id, record]));
+  const uncertainty = packet.features.filter((feature) => feature.feature_class === "uncertainty");
+  const eligible = packet.features.filter((feature) => feature.feature_class !== "uncertainty");
+  const chapterCount = packet.selection_constraints.core_chapters_min;
+  const buckets = Array.from({ length: chapterCount }, () => [] as PatternFactPacketFeature[]);
+
+  eligible.forEach((feature, index) => buckets[index % chapterCount]!.push(feature));
+  buckets[0]!.push(...uncertainty);
+
+  return {
+    schema_version: "0.7.0",
+    chapters: buckets.map((features, index) => {
+      const ontologyRuleIds = [...new Set(features.flatMap((feature) => feature.ontology_rule_ids))];
+      const firstRuleId = ontologyRuleIds[0]!;
+      const derivedSynthesisIds = ontologyRuleIds.filter(
+        (id) => records.get(id)?.meaning_class === "derived_synthesis",
+      );
+      return {
+        chapter_key: `chapter_${String(index + 1).padStart(2, "0")}`,
+        working_title: `A grounded theme ${index + 1}`,
+        purpose: "Describe the selected evidence without adding facts or predictions.",
+        feature_aliases: features.map((feature) => feature.alias),
+        ontology_rule_ids: ontologyRuleIds,
+        derived_synthesis_ids: derivedSynthesisIds,
+        required_tension_ids: [`${firstRuleId}#tension`],
+        required_resource_ids: [`${firstRuleId}#resource`],
+        required_counter_expression_ids: [`${firstRuleId}#counter`],
+      };
+    }),
+    additional_signatures: [],
+    omissions: [],
+  };
+}
+
+function validPatternWriter(document: PatternWriterRequestDocument): PatternWriterOutput {
+  const rulesByAlias = new Map<string, string[]>();
+  const featureClassByAlias = new Map<string, PatternFactPacketFeature["feature_class"]>();
+  for (const assignment of [...document.assignments, ...document.signature_assignments]) {
+    for (const fact of assignment.facts) {
+      rulesByAlias.set(fact.alias, assignment.ontology_rule_ids);
+      featureClassByAlias.set(fact.alias, fact.feature_class);
+    }
+  }
+
+  const unit = (
+    claimClass: "tension" | "resource" | "counter_expression" | "uncertainty",
+    aliases: string[],
+    ruleIds: string[],
+    wordCount: number,
+  ) => ({
+    text: fixedWords(wordCount),
+    claim_class: claimClass,
+    feature_aliases: aliases,
+    ontology_rule_ids: ruleIds,
+    derived_synthesis_ids: [],
+  });
+
+  const chapters = document.plan.chapters.map((chapter) => ({
+    chapter_key: chapter.chapter_key,
+    title: chapter.working_title,
+    summary: fixedWords(50),
+    sections: [1, 2].map((section) => ({
+      section_key: `${chapter.chapter_key}_section_${String(section).padStart(2, "0")}`,
+      text: fixedWords(110),
+      claim_class: "reflective_interpretation" as const,
+      feature_aliases: [...chapter.feature_aliases],
+      ontology_rule_ids: [...chapter.ontology_rule_ids],
+      derived_synthesis_ids: [...chapter.derived_synthesis_ids],
+    })),
+    tensions: [unit("tension", chapter.feature_aliases, chapter.ontology_rule_ids, 40)],
+    resources: [unit("resource", chapter.feature_aliases, chapter.ontology_rule_ids, 40)],
+    counter_expression: unit(
+      "counter_expression",
+      chapter.feature_aliases,
+      chapter.ontology_rule_ids,
+      40,
+    ),
+  }));
+
+  const uncertaintyAlias = [...featureClassByAlias].find(
+    ([, featureClass]) => featureClass === "uncertainty",
+  )?.[0];
+  const fallbackAlias = document.plan.chapters[0]?.feature_aliases[0];
+  const noteAlias = uncertaintyAlias ?? fallbackAlias;
+
+  return {
+    schema_version: "0.7.0",
+    title: "Your Pattern",
+    chapters,
+    additional_signatures: document.plan.additional_signatures.map((signature) => ({
+      signature_key: signature.signature_key,
+      title: signature.working_title,
+      text: fixedWords(90),
+      feature_aliases: [...signature.feature_aliases],
+      ontology_rule_ids: [...signature.ontology_rule_ids],
+    })),
+    uncertainty_note:
+      document.uncertainty.required_language_rule_ids.length > 0 && noteAlias
+        ? unit(
+            "uncertainty",
+            [noteAlias],
+            rulesByAlias.get(noteAlias) ?? document.uncertainty.required_language_rule_ids,
+            50,
+          )
+        : null,
+  };
+}
+
+function isFullPlannerRequest(value: unknown): value is PatternPlannerRequestDocument {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const document = value as Partial<PatternPlannerRequestDocument>;
+  return (
+    !!document.packet &&
+    Array.isArray(document.packet.features) &&
+    Array.isArray(document.ontology_records)
+  );
+}
+
+function isFullWriterRequest(value: unknown): value is PatternWriterRequestDocument {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const document = value as Partial<PatternWriterRequestDocument>;
+  return (
+    !!document.plan &&
+    Array.isArray(document.plan.chapters) &&
+    Array.isArray(document.assignments) &&
+    Array.isArray(document.signature_assignments) &&
+    Array.isArray(document.ontology_records)
+  );
+}
+
 /** One Responses envelope, shaped as the real API shapes it. */
 function responsesEnvelope(model: string, content: unknown[]): unknown {
   return {
@@ -580,24 +764,39 @@ const PATTERN_SCHEMA_NAMES: Record<string, "planner" | "writer" | "verifier"> = 
   patternlike_pattern_verdict_v7: "verifier",
 };
 
-/** A minimal valid document for each pass, shaped as the contract shapes it. */
-function patternPassDocument(pass: "planner" | "writer" | "verifier"): unknown {
+/**
+ * A valid answer for each Pattern pass, derived from the exact provider input.
+ *
+ * Empty arrays satisfy the strict output schema but are not valid Pattern
+ * documents: the deterministic validators also enforce chapter selection,
+ * evidence accounting, prose bounds, and claim ledgers. Build a complete
+ * provider answer from the request so this seam represents a model that
+ * returned a semantically usable structured output.
+ */
+function patternPassDocument(
+  pass: "planner" | "writer" | "verifier",
+  input: unknown,
+): unknown {
   if (pass === "planner") {
-    return {
-      schema_version: "0.7.0",
-      chapters: [],
-      additional_signatures: [],
-      omissions: [],
-    };
+    return isFullPlannerRequest(input)
+      ? validPatternPlan(input)
+      : {
+          schema_version: "0.7.0",
+          chapters: [],
+          additional_signatures: [],
+          omissions: [],
+        };
   }
   if (pass === "writer") {
-    return {
-      schema_version: "0.7.0",
-      title: "A mock Pattern",
-      chapters: [],
-      additional_signatures: [],
-      uncertainty_note: null,
-    };
+    return isFullWriterRequest(input)
+      ? validPatternWriter(input)
+      : {
+          schema_version: "0.7.0",
+          title: "A mock Pattern",
+          chapters: [],
+          additional_signatures: [],
+          uncertainty_note: null,
+        };
   }
   return { schema_version: "0.7.0", verdict: "pass", findings: [] };
 }
@@ -702,7 +901,10 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   // and the whole class of mistake: a sentinel that is handled wins above, and
   // anything else recognisably a Pattern pass is answered here.
   if (patternPass) {
-    return json(responsesEnvelope(model, outputText(patternPassDocument(patternPass))));
+    const input = JSON.parse(body.input[0]!.content[0]!.text) as unknown;
+    return json(
+      responsesEnvelope(model, outputText(patternPassDocument(patternPass, input))),
+    );
   }
 
   const packet = JSON.parse(body.input[0]!.content[0]!.text) as Packet;

@@ -123,15 +123,8 @@ describe("Pattern stage protocol", () => {
 
     // Before Task 6 an `openai` pin failed `publisher_unavailable` before a
     // request was ever built. Three independent traces show the adapter ran.
-    //
-    // The intercepted planner answer is deliberately a document the packet
-    // cannot support, so the pass ends `plan_invalid` -- which is the point:
-    // the model proposes and the deterministic validator disposes, unchanged.
-    expect(outcome).toEqual({
-      ok: false,
-      reason: "terminal",
-      failureClass: "plan_invalid",
-    });
+    expect(outcome).toEqual({ ok: true, terminal: false });
+    expect(await stageOf(generationId)).toBe("writing");
     // Charged immediately before the fetch, so this counts the fetch.
     expect(await providerCalls()).toBe(1);
     // Steps 5 and 6: the exact bytes sent, committed before the call.
