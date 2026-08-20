@@ -106,7 +106,19 @@ export function createOpenAiPatternPublisher(
 
   return {
     plan: (input, options) => run<PatternPlan>("planner", input, options),
-    write: (input, options) => run<PatternWriterOutput>("writer", input, options),
+    // The correction document is itself the closed runtime signal for the
+    // correction policy; no mutable configuration or caller-supplied flag can
+    // make the prompt disagree with the exact writer document being sent.
+    write: (input, options) =>
+      run<PatternWriterOutput>(
+        "writer",
+        input,
+        options,
+        !!input &&
+          typeof input === "object" &&
+          !Array.isArray(input) &&
+          "correction" in input,
+      ),
     verify: (input, options) => run<PatternSemanticVerdict>("verifier", input, options),
   };
 }

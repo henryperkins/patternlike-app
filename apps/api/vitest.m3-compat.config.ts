@@ -34,6 +34,6 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     include: ["test/m3-rollout-compat.test.ts"],
-    setupFiles: ["./test/apply-migrations.ts"],
+    setupFiles: ["./test/apply-supplied-migrations.ts"],
   },
 });

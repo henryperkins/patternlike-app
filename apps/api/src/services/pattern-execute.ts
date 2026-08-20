@@ -46,9 +46,11 @@ import {
 } from "./pattern-publisher-factory.js";
 import {
   PATTERN_PACKET_LIMITS_DEFAULT,
+  buildCorrectionDocument,
   buildPlannerInput,
   buildVerifierInput,
   buildWriterInput,
+  type PatternCorrectionDocument,
   type PatternPacketLimits,
 } from "./pattern-packet.js";
 import { readPatternAiRollout } from "./pattern-rollout.js";
@@ -164,8 +166,8 @@ async function runPublisherPass<T>(
 //   8. call the provider once
 //   9. run the deterministic validator, unchanged
 //  10. write the response artifact (create-only) and read back its plaintext hash
-//  11. advance with that hash, or retryStage, or failJob -- each with
-//      ownershipProbes at the head of its batch
+//  11. advance with that hash, retryStage, returnToWriter, or failJob -- each
+//      with ownershipProbes at the head of its batch
 //  12. nudge, and swallow the send failure: the D1 row is the outbox
 //
 // Step 4 precedes step 7, so an adopted artifact spends nothing. Step 7 is
@@ -475,13 +477,14 @@ async function putArtifact(
   value: unknown,
   expiresAt: string,
   attempt: number,
+  stageGeneration = job.stage_generation,
 ): Promise<string> {
   if (!env.ARTIFACTS) throw new Error("ARTIFACTS binding missing");
   const key = await unwrapArtifactKey(env, identity, job.generation_id);
   const artifactId = await patternArtifactId(
     job.generation_id,
     artifactClass,
-    job.stage_generation,
+    stageGeneration,
     attempt,
   );
   const objectKey = `pattern-generations/${job.generation_id}/${artifactId}.json.enc`;
@@ -842,6 +845,7 @@ async function advance(
         `UPDATE pattern_generation_jobs
          SET stage = ?, stage_generation = stage_generation + 1, plan_hash = COALESCE(?, plan_hash),
              candidate_hash = COALESCE(?, candidate_hash), updated_at = ?,
+             verifier_attempts = CASE WHEN ? = 'semantic_verifying' THEN 0 ELSE verifier_attempts END,
              finished_at = CASE WHEN ? THEN ? ELSE finished_at END,
              public_failure_stage = COALESCE(?, public_failure_stage),
              failure_class = COALESCE(?, failure_class)
@@ -852,6 +856,7 @@ async function advance(
         extra.plan_hash ?? null,
         extra.candidate_hash ?? null,
         now,
+        next,
         terminal ? 1 : 0,
         now,
         extra.public_failure_stage ?? null,
@@ -876,8 +881,10 @@ async function advance(
  * buying a second response.
  *
  * The increment commits inside the same guarded batch as the transition that
- * authorizes the next call, which is what makes the artifact-first probe adopt
- * rather than duplicate.
+ * authorizes the next call. Before that transition, a redelivery recomputes the
+ * same k and adopts a stored response. After it, the durable k+1 deliberately
+ * names a new attempt; an indistinguishable old queue message may spend that
+ * attempt, but the pass and daily ceilings still bound it.
  *
  * Because `dispatched_at` is cleared and the row returns to `queued`, the
  * undispatched lane of `sweepPatternJobs` recovers a lost nudge here exactly as
@@ -907,6 +914,61 @@ export async function retryStage(
          SET ${column} = ${column} + 1, updated_at = ?
          WHERE generation_id = ? AND stage_generation = ?
            AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
+      ).bind(now, job.generation_id, job.stage_generation),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cross-stage correction transition after a semantic rejection.
+ *
+ * The verifier result authorizes another WRITER call, so this increments the
+ * writer's zero-based next-attempt index while leaving the verifier index
+ * untouched. The correction artifact is committed at the successor writing
+ * coordinate before the guarded batch; a crash after that write can therefore
+ * adopt the same closed document without ever reconstructing it from rejected
+ * prose.
+ */
+export async function returnToWriter(
+  env: Env,
+  identity: UserIdentity,
+  job: PatternJobRow,
+  token: string,
+  correction: PatternCorrectionDocument,
+  expiresAt: string,
+  availableAt: Date | null,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const nextStageGeneration = job.stage_generation + 1;
+  const nextWriterAttempt = job.writer_attempts + 1;
+  await putArtifact(
+    env,
+    identity,
+    job,
+    "correction_document",
+    correction,
+    expiresAt,
+    nextWriterAttempt,
+    nextStageGeneration,
+  );
+
+  try {
+    await env.DB.batch([
+      ...ownershipProbes(env, job, token),
+      env.DB.prepare(
+        `UPDATE jobs SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
+                dispatched_at = NULL, available_at = ?
+         WHERE id = ? AND claim_token = ? AND status = 'running'`,
+      ).bind(availableAt ? availableAt.toISOString() : null, job.job_id, token),
+      env.DB.prepare(
+        `UPDATE pattern_generation_jobs
+         SET stage = 'writing', stage_generation = stage_generation + 1,
+             writer_attempts = writer_attempts + 1, candidate_hash = NULL, updated_at = ?
+         WHERE generation_id = ? AND stage_generation = ?
+           AND stage IN ('semantic_verifying', 'publishing')`,
       ).bind(now, job.generation_id, job.stage_generation),
     ]);
     return true;
@@ -1319,6 +1381,13 @@ export async function executePatternJob(
         });
       }
       if (!planCheck.ok) {
+        if (attempt + 1 < command.planner_attempts_max) {
+          if (!(await retryStage(env, claimed.job, claimed.token, "planner", null))) {
+            return { ok: false, reason: "duplicate", failureClass: "duplicate" };
+          }
+          await nudgeNextStage(env, claimed.job, claimed.job.stage_generation);
+          return { ok: true, terminal: false };
+        }
         await failJob(env, claimed.job, claimed.token, "plan_invalid", "organizing_evidence");
         return { ok: false, reason: "terminal", failureClass: "plan_invalid" };
       }
@@ -1378,7 +1447,30 @@ export async function executePatternJob(
       if (adopted) {
         writer = adopted.value;
       } else {
-        const input = buildWriterInput(plan, selected.packet, records, limits);
+        // A provider/shape retry during a correction attempt advances the
+        // writer index without producing a new rejection. Keep carrying the
+        // most recent correction at this writing coordinate instead of
+        // silently falling back to the base prompt. The command ceiling is at
+        // most three, so this bounded reverse probe reads at most two objects.
+        let correction: { value: PatternCorrectionDocument } | null = null;
+        for (let correctionAttempt = attempt; correctionAttempt > 0; correctionAttempt -= 1) {
+          correction = await getArtifactAt<PatternCorrectionDocument>(
+            env,
+            identity,
+            command.generation_id,
+            "correction_document",
+            claimed.job.stage_generation,
+            correctionAttempt,
+          );
+          if (correction) break;
+        }
+        const input = buildWriterInput(
+          plan,
+          selected.packet,
+          records,
+          limits,
+          correction?.value,
+        );
         if (!input.ok) return refuseInput("writer", input);
         await writeRequestArtifact("writer", input.document, attempt);
         const outcome = await runPublisherPass(pin, "writer", attempt, () =>
@@ -1409,6 +1501,28 @@ export async function executePatternJob(
         });
       }
       if (!candidate.ok) {
+        if (attempt + 1 < command.writer_attempts_max) {
+          const nextAttempt = attempt + 1;
+          const correction = buildCorrectionDocument(
+            plan,
+            { deterministic: candidate.failures },
+            nextAttempt,
+          );
+          await putArtifact(
+            env,
+            identity,
+            claimed.job,
+            "correction_document",
+            correction,
+            expiresAt,
+            nextAttempt,
+          );
+          if (!(await retryStage(env, claimed.job, claimed.token, "writer", null))) {
+            return { ok: false, reason: "duplicate", failureClass: "duplicate" };
+          }
+          await nudgeNextStage(env, claimed.job, claimed.job.stage_generation);
+          return { ok: true, terminal: false };
+        }
         await failJob(env, claimed.job, claimed.token, "candidate_invalid", "writing");
         return { ok: false, reason: "terminal", failureClass: "candidate_invalid" };
       }
@@ -1530,8 +1644,29 @@ export async function executePatternJob(
       await putArtifact(env, identity, claimed.job, "semantic_verdict", verdict, expiresAt, attempt);
 
       if (verdict.verdict !== "pass") {
-        // Task 8b returns this to the writer while writer attempts remain. Until
-        // then a semantic rejection is terminal, as it is today.
+        const nextWriterAttempt = claimed.job.writer_attempts + 1;
+        if (nextWriterAttempt < command.writer_attempts_max) {
+          const correction = buildCorrectionDocument(
+            plan,
+            { semantic: verdict.findings },
+            nextWriterAttempt,
+          );
+          if (
+            !(await returnToWriter(
+              env,
+              identity,
+              claimed.job,
+              claimed.token,
+              correction,
+              expiresAt,
+              null,
+            ))
+          ) {
+            return { ok: false, reason: "duplicate", failureClass: "duplicate" };
+          }
+          await nudgeNextStage(env, claimed.job, claimed.job.stage_generation + 1);
+          return { ok: true, terminal: false };
+        }
         await failJob(env, claimed.job, claimed.token, "semantic_verification_failed", "checking_claims");
         return { ok: false, reason: "terminal", failureClass: "semantic_verification_failed" };
       }

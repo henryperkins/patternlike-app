@@ -49,11 +49,20 @@ export interface GeneratePatternCommandV1 {
   corpus_release_hash: string;
   reservation_reason: PatternReservationReason;
   publisher: PatternPublisherPin;
-  /** Inclusive provider-call ceiling for the planner pass across this job. */
+  /**
+   * Inclusive provider-call ceiling for the planner pass across this job.
+   * `planner_attempts` is the zero-based NEXT-attempt index checked before call.
+   */
   planner_attempts_max: 2;
-  /** Inclusive writer-call ceiling across one job and its frozen plan. */
+  /**
+   * Inclusive writer-call ceiling across one job and its frozen plan.
+   * `writer_attempts` is the zero-based NEXT-attempt index checked before call.
+   */
   writer_attempts_max: 2 | 3;
-  /** Inclusive verifier-call ceiling per candidate, reset on candidate entry. */
+  /**
+   * Inclusive verifier-call ceiling per candidate, reset on candidate entry.
+   * `verifier_attempts` is the zero-based NEXT-attempt index checked before call.
+   */
   verifier_attempts_max: 2;
   artifact_retention_days: number;
 }

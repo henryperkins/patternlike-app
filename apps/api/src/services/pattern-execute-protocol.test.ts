@@ -27,7 +27,12 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
-import { OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY } from "../../test/mock-calc-service.js";
+import {
+  OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY,
+  OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY,
+  OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY,
+  PATTERN_CORRECTION_SMUGGLED_PROSE,
+} from "../../test/mock-calc-service.js";
 import { findSemanticVerdictProblem } from "./pattern-semantic.js";
 import {
   executePatternJob,
@@ -88,6 +93,14 @@ async function providerCalls(): Promise<number> {
     `SELECT COALESCE(SUM(used_calls), 0) AS n FROM pattern_provider_daily_usage`,
   ).first<{ n: number }>();
   return row?.n ?? 0;
+}
+
+async function clearBackoff(generationId: string): Promise<void> {
+  const job = await loadPatternJob(env, generationId);
+  if (!job) throw new Error("pattern job missing");
+  await env.DB.prepare(`UPDATE jobs SET available_at = NULL WHERE id = ?`)
+    .bind(job.job_id)
+    .run();
 }
 
 async function stageOf(generationId: string): Promise<string> {
@@ -155,13 +168,19 @@ describe("Pattern stage protocol", () => {
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-openai-plan-invalid");
 
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    expect((await loadPatternJob(env, generationId))?.planner_attempts).toBe(1);
+    expect(await stageOf(generationId)).toBe("reserved");
+    expect(await providerCalls()).toBe(1);
+
+    await clearBackoff(generationId);
     expect(await deliver(generationId)).toEqual({
       ok: false,
       reason: "terminal",
       failureClass: "plan_invalid",
     });
     expect(await stageOf(generationId)).toBe("failed");
-    expect(await providerCalls()).toBe(1);
+    expect(await providerCalls()).toBe(2);
   });
 
   it("logs a closed failed-attempt event with its pass and durable attempt", async () => {
@@ -315,13 +334,13 @@ describe("Pattern stage protocol", () => {
   });
 
   it("adopts the stored response on a redelivery, spending no second call", async () => {
-    // The planner pass runs once under the stand-in, which commits a
-    // `planner_response` at (stage_generation, attempt 0). Before redelivery we
+    // The planner pass runs once through the real provider seam, which commits
+    // a `planner_response` at (stage_generation, attempt 0). Before redelivery we
     // remove the request artifact. If the response probe misses, rerunning the
     // publisher must rebuild that request; adoption leaves it absent. This
     // keeps the assertion meaningful now that the frozen command pin wins over
     // a live publisher change.
-    enablePatternAi();
+    enablePatternOpenAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-adoption");
 
@@ -333,6 +352,8 @@ describe("Pattern stage protocol", () => {
     const advanced = await loadPatternJob(env, generationId);
     const firstPlanHash = advanced!.plan_hash;
     expect(firstPlanHash).toEqual(expect.any(String));
+    expect(await providerCalls()).toBe(1);
+    expect(advanced!.planner_attempts).toBe(0);
 
     // The hash advanced into D1 names bytes that exist in R2.
     const stored = await getArtifactAt<{ schema_version: string }>(
@@ -381,7 +402,7 @@ describe("Pattern stage protocol", () => {
 
     // Same attempt index, no publisher rerun, and the same committed response
     // bytes named again.
-    expect(await providerCalls()).toBe(0);
+    expect(await providerCalls()).toBe(1);
     expect(
       await getArtifactAt(
         env,
@@ -394,6 +415,7 @@ describe("Pattern stage protocol", () => {
     ).toBeNull();
     const redelivered = await loadPatternJob(env, generationId);
     expect(redelivered!.plan_hash).toBe(firstPlanHash);
+    expect(redelivered!.planner_attempts).toBe(0);
     expect(await stageOf(generationId)).toBe("writing");
   });
 
@@ -455,6 +477,182 @@ describe("Pattern stage protocol", () => {
     expect(await patternArtifactId(generationId, "planner_response", stageGeneration, 0)).not.toBe(
       await patternArtifactId(generationId, "planner_response", stageGeneration, 1),
     );
+  });
+
+  it("retries a deterministic candidate rejection in place with a closed correction", async () => {
+    enablePatternOpenAi();
+    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY;
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-candidate-correction");
+
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    const writing = await loadPatternJob(env, generationId);
+    expect(writing?.stage).toBe("writing");
+
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    const retry = await loadPatternJob(env, generationId);
+    expect(retry).toEqual(
+      expect.objectContaining({
+        stage: "writing",
+        stage_generation: writing!.stage_generation,
+        writer_attempts: 1,
+        verifier_attempts: 0,
+      }),
+    );
+    const correction = await getArtifactAt<{
+      attempt: number;
+      items: Array<{ origin: string }>;
+    }>(
+      env,
+      IDENTITY_A,
+      generationId,
+      "correction_document",
+      writing!.stage_generation,
+      1,
+    );
+    expect(correction?.value.attempt).toBe(1);
+    expect(correction?.value.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ origin: "deterministic" })]),
+    );
+
+    await clearBackoff(generationId);
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    expect(await loadPatternJob(env, generationId)).toEqual(
+      expect.objectContaining({
+        stage: "semantic_verifying",
+        writer_attempts: 1,
+        verifier_attempts: 0,
+      }),
+    );
+    expect(await providerCalls()).toBe(3);
+  });
+
+  it("runs all three candidates with two verifier calls each and stops at exactly 11 fetches", async () => {
+    enablePatternOpenAi();
+    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY;
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-full-rejection-loop");
+
+    // Planner attempt 0 is deterministically rejected; attempt 1 succeeds.
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    await clearBackoff(generationId);
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+
+    for (let candidate = 0; candidate < 3; candidate += 1) {
+      const writing = await loadPatternJob(env, generationId);
+      expect(writing).toEqual(
+        expect.objectContaining({
+          stage: "writing",
+          writer_attempts: candidate,
+        }),
+      );
+      expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+      const verifying = await loadPatternJob(env, generationId);
+      expect(verifying).toEqual(
+        expect.objectContaining({
+          stage: "semantic_verifying",
+          writer_attempts: candidate,
+          verifier_attempts: 0,
+        }),
+      );
+      const writerRequest = await getArtifactAt<unknown>(
+        env,
+        IDENTITY_A,
+        generationId,
+        "writer_request",
+        writing!.stage_generation,
+        candidate,
+      );
+      expect(writerRequest).not.toBeNull();
+      expect(JSON.stringify(writerRequest?.value)).not.toContain(
+        PATTERN_CORRECTION_SMUGGLED_PROSE,
+      );
+
+      expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+      expect(await loadPatternJob(env, generationId)).toEqual(
+        expect.objectContaining({
+          stage: "semantic_verifying",
+          writer_attempts: candidate,
+          verifier_attempts: 1,
+        }),
+      );
+      await clearBackoff(generationId);
+
+      const rejection = await deliver(generationId);
+      if (candidate < 2) {
+        expect(rejection).toEqual({ ok: true, terminal: false });
+        const returned = await loadPatternJob(env, generationId);
+        expect(returned).toEqual(
+          expect.objectContaining({
+            stage: "writing",
+            writer_attempts: candidate + 1,
+            // The verifier result did not consume a verifier attempt. Entry
+            // into the next candidate resets this index, not the return itself.
+            verifier_attempts: 1,
+          }),
+        );
+        const correction = await getArtifactAt<{ attempt: number; items: unknown[] }>(
+          env,
+          IDENTITY_A,
+          generationId,
+          "correction_document",
+          returned!.stage_generation,
+          candidate + 1,
+        );
+        expect(correction?.value.attempt).toBe(candidate + 1);
+        expect(JSON.stringify(correction?.value)).not.toContain(
+          "REJECTED PROSE MUST NEVER ENTER THE CORRECTION DOCUMENT",
+        );
+        expect(JSON.stringify(correction?.value)).not.toContain(
+          PATTERN_CORRECTION_SMUGGLED_PROSE,
+        );
+      } else {
+        expect(rejection).toEqual({
+          ok: false,
+          reason: "terminal",
+          failureClass: "semantic_verification_failed",
+        });
+      }
+    }
+
+    const terminal = await env.DB.prepare(
+      `SELECT stage, planner_attempts, writer_attempts, verifier_attempts,
+              failure_class, public_failure_stage
+       FROM pattern_generation_jobs WHERE generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{
+        stage: string;
+        planner_attempts: number;
+        writer_attempts: number;
+        verifier_attempts: number;
+        failure_class: string;
+        public_failure_stage: string;
+      }>();
+    expect(terminal).toEqual({
+      stage: "failed",
+      planner_attempts: 1,
+      writer_attempts: 2,
+      verifier_attempts: 1,
+      failure_class: "semantic_verification_failed",
+      public_failure_stage: "checking_claims",
+    });
+    expect(await providerCalls()).toBe(11);
+    const usage = await env.DB.prepare(
+      `SELECT used_calls, planner_calls, writer_calls, verifier_calls
+       FROM pattern_provider_daily_usage`,
+    ).first<{
+      used_calls: number;
+      planner_calls: number;
+      writer_calls: number;
+      verifier_calls: number;
+    }>();
+    expect(usage).toEqual({
+      used_calls: 11,
+      planner_calls: 2,
+      writer_calls: 3,
+      verifier_calls: 6,
+    });
   });
 
   it("fails terminally rather than overwriting a reserved identity holding other bytes", async () => {
@@ -521,6 +719,62 @@ describe("Pattern stage protocol", () => {
     expect(await providerCalls()).toBe(0);
     expect(await stageOf(generationId)).toBe("failed");
   });
+
+  it.each([
+    {
+      pass: "writer",
+      column: "writer_attempts",
+      maximum: 3,
+      setupCalls: 1,
+      publicStage: "writing",
+    },
+    {
+      pass: "verifier",
+      column: "verifier_attempts",
+      maximum: 2,
+      setupCalls: 2,
+      publicStage: "checking_claims",
+    },
+  ] as const)(
+    "fails terminally before another $pass fetch when its next-attempt index is spent",
+    async ({ pass, column, maximum, setupCalls, publicStage }) => {
+      enablePatternOpenAi();
+      await seedActiveOntology();
+      const generationId = await reserve(`idem-protocol-${pass}-attempts-exhausted`);
+
+      for (let call = 0; call < setupCalls; call += 1) {
+        expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+      }
+      expect(await providerCalls()).toBe(setupCalls);
+      await env.DB.prepare(
+        `UPDATE pattern_generation_jobs SET ${column} = ? WHERE generation_id = ?`,
+      )
+        .bind(maximum, generationId)
+        .run();
+
+      expect(await deliver(generationId)).toEqual({
+        ok: false,
+        reason: "terminal",
+        failureClass: `${pass}_attempts_exhausted`,
+      });
+      expect(await providerCalls()).toBe(setupCalls);
+      const terminal = await env.DB.prepare(
+        `SELECT stage, failure_class, public_failure_stage
+         FROM pattern_generation_jobs WHERE generation_id = ?`,
+      )
+        .bind(generationId)
+        .first<{
+          stage: string;
+          failure_class: string;
+          public_failure_stage: string;
+        }>();
+      expect(terminal).toEqual({
+        stage: "failed",
+        failure_class: `${pass}_attempts_exhausted`,
+        public_failure_stage: publicStage,
+      });
+    },
+  );
 
   it("refuses to verify a candidate the job row does not name", async () => {
     enablePatternAi();

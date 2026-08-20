@@ -485,6 +485,30 @@ export const OPENAI_MOCK_UNGROUNDED = "mock-openai-ungrounded";
  * request value an integration test can use to select a provider scenario.
  */
 export const OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY = "sk-test-pattern-plan-invalid";
+export const OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY =
+  "sk-test-pattern-candidate-invalid-once";
+export const OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY =
+  "sk-test-pattern-full-rejection-loop";
+export const PATTERN_CORRECTION_SMUGGLED_PROSE =
+  "ZZPROSEZZ rejected candidate sentence";
+
+type PatternScenarioState = Record<"planner" | "writer" | "verifier", number>;
+
+const patternScenarioStates = new Map<string, PatternScenarioState>();
+
+function nextPatternScenarioCall(
+  authorization: string,
+  pass: "planner" | "writer" | "verifier",
+): number {
+  const state = patternScenarioStates.get(authorization) ?? {
+    planner: 0,
+    writer: 0,
+    verifier: 0,
+  };
+  state[pass] += 1;
+  patternScenarioStates.set(authorization, state);
+  return state[pass];
+}
 
 interface ResponsesBody {
   model: string;
@@ -534,6 +558,11 @@ interface PatternWriterRequestDocument {
   locale: PatternFactPacket["locale"];
   effective_accuracy: PatternFactPacket["effective_accuracy"];
   uncertainty: PatternFactPacket["uncertainty"];
+  correction?: {
+    schema_version: "0.7.0";
+    attempt: number;
+    items: unknown[];
+  };
 }
 
 function fixedWords(count: number): string {
@@ -659,6 +688,16 @@ function validPatternWriter(document: PatternWriterRequestDocument): PatternWrit
             50,
           )
         : null,
+  };
+}
+
+function invalidPatternWriter(document: PatternWriterRequestDocument): PatternWriterOutput {
+  const writer = validPatternWriter(document);
+  return {
+    ...writer,
+    chapters: writer.chapters.map((chapter, index) =>
+      index === 0 ? { ...chapter, sections: [] } : chapter,
+    ),
   };
 }
 
@@ -814,6 +853,7 @@ function patternPassDocument(
 async function mockOpenAiResponses(request: Request): Promise<Response> {
   const body = (await request.json()) as ResponsesBody;
   const model = body.model;
+  const authorization = request.headers.get("authorization") ?? "";
 
   // Pattern passes route on the schema name. Failure sentinels below still key
   // on `model`, so a Pattern test drives a failure exactly as a reading test
@@ -822,12 +862,96 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
 
   if (
     patternPass === "planner" &&
-    request.headers.get("authorization") ===
-      `Bearer ${OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY}`
+    authorization === `Bearer ${OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY}`
   ) {
     return json(
       responsesEnvelope(model, outputText(patternPassDocument("planner", {}))),
     );
+  }
+
+  if (
+    patternPass &&
+    (authorization === `Bearer ${OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY}` ||
+      authorization === `Bearer ${OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY}`)
+  ) {
+    const input = JSON.parse(body.input[0]!.content[0]!.text) as unknown;
+    const call = nextPatternScenarioCall(authorization, patternPass);
+
+    if (
+      authorization === `Bearer ${OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY}` &&
+      patternPass === "writer"
+    ) {
+      const isCorrection =
+        isFullWriterRequest(input) &&
+        input.correction?.attempt === 1 &&
+        body.instructions.includes("correction attempt");
+      const writer = isFullWriterRequest(input)
+        ? validPatternWriter(input)
+        : (patternPassDocument("writer", input) as PatternWriterOutput);
+      const invalid = isFullWriterRequest(input)
+        ? invalidPatternWriter(input)
+        : writer;
+      return json(
+        responsesEnvelope(
+          model,
+          outputText(call === 1 || !isCorrection ? invalid : writer),
+        ),
+      );
+    }
+
+    if (authorization === `Bearer ${OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY}`) {
+      if (patternPass === "planner") {
+        return json(
+          responsesEnvelope(
+            model,
+            outputText(
+              call === 1
+                ? patternPassDocument("planner", {})
+                : patternPassDocument("planner", input),
+            ),
+          ),
+        );
+      }
+      if (patternPass === "writer") {
+        const correctionReady =
+          call === 1 ||
+          (isFullWriterRequest(input) &&
+            input.correction?.attempt === call - 1 &&
+            body.instructions.includes("correction attempt"));
+        const writer = patternPassDocument("writer", input) as PatternWriterOutput;
+        const invalid = isFullWriterRequest(input)
+          ? invalidPatternWriter(input)
+          : writer;
+        return json(
+          responsesEnvelope(
+            model,
+            outputText(correctionReady ? writer : invalid),
+          ),
+        );
+      }
+      if (call % 2 === 1) {
+        return json(responsesEnvelope(model, outputText({})));
+      }
+      return json(
+        responsesEnvelope(
+          model,
+          outputText({
+            schema_version: "0.7.0",
+            verdict: "reject",
+            findings: [
+              {
+                code: "claim_not_entailed",
+                severity: "error",
+                target_key: "chapter_01_section_01",
+                feature_aliases: [],
+                ontology_rule_ids: [PATTERN_CORRECTION_SMUGGLED_PROSE],
+                rationale: "REJECTED PROSE MUST NEVER ENTER THE CORRECTION DOCUMENT",
+              },
+            ],
+          }),
+        ),
+      );
+    }
   }
 
   if (model === OPENAI_MOCK_NETWORK_ERROR) {

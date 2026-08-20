@@ -818,6 +818,7 @@ export function buildCorrectionDocument(
   attempt: number,
 ): PatternCorrectionDocument {
   const items: PatternCorrectionItem[] = [];
+  const authorizedOntologyRuleIds = citedRuleIds(plan);
 
   for (const failure of rejection.deterministic ?? []) {
     if (!CORRECTION_CODE_SHAPE.test(failure.code)) continue;
@@ -840,7 +841,9 @@ export function buildCorrectionDocument(
       origin: "semantic",
       target_key: safeKey(finding.target_key),
       feature_aliases: safeAliases(finding.feature_aliases),
-      ontology_rule_ids: [...(finding.ontology_rule_ids ?? [])],
+      ontology_rule_ids: (finding.ontology_rule_ids ?? []).filter((id) =>
+        authorizedOntologyRuleIds.has(id),
+      ),
     });
   }
 
@@ -853,7 +856,7 @@ export function buildCorrectionDocument(
       chapter_keys: plan.chapters.map((chapter) => chapter.chapter_key),
       signature_keys: plan.additional_signatures.map((signature) => signature.signature_key),
       omitted_feature_aliases: plan.omissions.map((omission) => omission.feature_alias),
-      authorized_ontology_rule_ids: [...citedRuleIds(plan)],
+      authorized_ontology_rule_ids: [...authorizedOntologyRuleIds],
     },
   };
 }
