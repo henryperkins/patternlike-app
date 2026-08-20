@@ -28,6 +28,9 @@ alphanumeric. At most eight keys may coexist for rotation. Extra JSON fields,
 padding or non-base64url key bytes, unsupported algorithms, empty keyrings, and
 unimportable keys fail closed.
 
+Canonical candidate payloads are capped at 256 KiB; larger requests fail closed
+with `payload_too_large`.
+
 Never place this secret in API configuration, `.dev.vars` outside this
 workspace, logs, responses, D1, R2, corpus material, or provider requests.
 

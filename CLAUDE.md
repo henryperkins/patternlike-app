@@ -36,7 +36,7 @@ There is no linter or formatter — `npm run typecheck` is the only mechanical s
 
 ## Architecture
 
-Five workspaces (`apps/*`, `packages/*`), one product request path plus an isolated signing sidecar:
+Seven workspaces (`apps/*`, `packages/*`), one product request path plus an isolated signing sidecar:
 
 `apps/web` (React 19 + Vite PWA) → `apps/api` (Hono on Cloudflare Workers, D1) → `apps/calc-stub` (Node + Swiss Ephemeris, AGPL, deployed to Fly). The calc binding is plain HTTP (`CALC_SERVICE_URL` + optional `CALC_SERVICE_AUTH_TOKEN`) so the runtime can move without touching contracts. `apps/ontology-signer` is not on that path: the API reaches its single `signOntology` RPC through the `ONTOLOGY_SIGNER` service binding. `packages/shared` holds wire types, id minting, canonical JSON, and the launch body/aspect lists used by both sides.
 
