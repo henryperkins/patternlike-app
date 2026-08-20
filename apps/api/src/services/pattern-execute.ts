@@ -1202,11 +1202,12 @@ export async function executePatternJob(
     // success. A synthetic pass gets a reserve that never charges, because the
     // ledger counts provider calls and there is no provider.
     const reserve = openai
-      ? async (_stageClass: PatternStageClass) => {
+      ? async (stageClass: PatternStageClass) => {
           const budget = await consumePatternProviderCallBudget(
             env,
             utcDateFor(now),
             config.dailyCallLimit,
+            stageClass,
           );
           return { ok: budget.ok };
         }

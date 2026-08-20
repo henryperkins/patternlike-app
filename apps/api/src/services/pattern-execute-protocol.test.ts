@@ -256,6 +256,21 @@ describe("Pattern stage protocol", () => {
       }),
     );
     expect(await providerCalls()).toBe(3);
+    const usage = await env.DB.prepare(
+      `SELECT used_calls, planner_calls, writer_calls, verifier_calls
+       FROM pattern_provider_daily_usage`,
+    ).first<{
+      used_calls: number;
+      planner_calls: number;
+      writer_calls: number;
+      verifier_calls: number;
+    }>();
+    expect(usage).toEqual({
+      used_calls: 3,
+      planner_calls: 1,
+      writer_calls: 1,
+      verifier_calls: 1,
+    });
   });
 
   it("does not replace a frozen OpenAI author with the live synthetic publisher", async () => {
