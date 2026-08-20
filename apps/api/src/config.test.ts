@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { checkSecureConfig } from "./middleware/config-guard.js";
+import {
+  checkSecureConfig,
+  resolveOntologyPipelineConfiguration,
+} from "./middleware/config-guard.js";
 import { DEV_ROOT_KEK, resolveRootKey, isDevEnvironment } from "./crypto.js";
 import {
   OPENAI_READING_MODEL,
@@ -538,5 +541,148 @@ describe("provider credential mode", () => {
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     expect(outcome.mode).toEqual({ source: "gateway_stored", alias: "primary" });
+  });
+});
+
+describe("ontology pipeline configuration", () => {
+  const enabled = {
+    ENVIRONMENT: "production",
+    ROOT_KEK: STRONG_KEK,
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+    TIME_TRAVEL_RECEIPT_EPOCH: "1",
+    TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+    ONTOLOGY_PIPELINE_ROLLOUT: "internal",
+    OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
+    OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.0",
+    OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
+    OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
+    OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
+    OPENAI_ONTOLOGY_EVALUATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION: "1.0.0-evaluator",
+    OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS: "120000",
+    OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS: "4000",
+    ONTOLOGY_PIPELINE_INPUT_MAX_BYTES: "98304",
+    ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT: "500",
+    ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS: "7",
+    ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
+    OPENAI_CREDENTIAL_SOURCE: "worker",
+    OPENAI_API_KEY: "sk-test-key",
+  };
+
+  it("freezes equal acknowledged model pins to the 100% regression threshold", () => {
+    expect(checkSecureConfig(enabled)).toBeNull();
+    const resolved = resolveOntologyPipelineConfiguration(enabled);
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok || !resolved.config) return;
+    expect(resolved.rollout).toBe("internal");
+    expect(resolved.config.configurationEqual).toBe(true);
+    expect(resolved.config.regressionMinimumPassRate).toBe(1);
+    expect(resolved.config.credential).toEqual({ source: "worker", apiKey: "sk-test-key" });
+  });
+
+  it("permits no pipeline pins while the rollout is off", () => {
+    const off = { ...enabled, ONTOLOGY_PIPELINE_ROLLOUT: "off" };
+    for (const key of Object.keys(enabled)) {
+      if (key.startsWith("OPENAI_ONTOLOGY_") || key.startsWith("ONTOLOGY_PIPELINE_")) {
+        delete (off as Record<string, string | undefined>)[key];
+      }
+    }
+    off.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+    expect(checkSecureConfig(off)).toBeNull();
+    const resolved = resolveOntologyPipelineConfiguration(off);
+    expect(resolved.ok && resolved.config).toBeNull();
+  });
+
+  it("refuses an unknown pipeline rollout in every environment", () => {
+    expect(
+      checkSecureConfig({ ENVIRONMENT: "development", ONTOLOGY_PIPELINE_ROLLOUT: "enabled" })?.code,
+    ).toBe("ontology_pipeline_rollout_invalid");
+    expect(checkSecureConfig({ ...enabled, ONTOLOGY_PIPELINE_ROLLOUT: "external" })?.code).toBe(
+      "ontology_pipeline_rollout_invalid",
+    );
+  });
+
+  it.each([
+    ["OPENAI_ONTOLOGY_GENERATOR_MODEL", undefined],
+    ["OPENAI_ONTOLOGY_GENERATOR_MODEL", "gpt-4o"],
+    ["OPENAI_ONTOLOGY_GENERATOR_REASONING", undefined],
+    ["OPENAI_ONTOLOGY_GENERATOR_REASONING", "medium"],
+    ["OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION", undefined],
+    ["OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION", "0.9.0"],
+    ["OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS", undefined],
+    ["OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS", "60000"],
+    ["OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS", undefined],
+    ["OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS", "8000.5"],
+    ["OPENAI_ONTOLOGY_EVALUATOR_MODEL", undefined],
+    ["OPENAI_ONTOLOGY_EVALUATOR_MODEL", "gpt-4o"],
+    ["OPENAI_ONTOLOGY_EVALUATOR_REASONING", undefined],
+    ["OPENAI_ONTOLOGY_EVALUATOR_REASONING", "medium"],
+    ["OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION", undefined],
+    ["OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION", "0.9.0"],
+    ["OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS", undefined],
+    ["OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS", "60000"],
+    ["OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS", undefined],
+    ["OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS", "4000.5"],
+    ["ONTOLOGY_PIPELINE_INPUT_MAX_BYTES", undefined],
+    ["ONTOLOGY_PIPELINE_INPUT_MAX_BYTES", "65536"],
+    ["ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT", undefined],
+    ["ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT", "0"],
+    ["ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS", undefined],
+    ["ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS", "30"],
+    ["OPENAI_CREDENTIAL_SOURCE", undefined],
+    ["OPENAI_API_KEY", undefined],
+  ] as const)("refuses an enabled pipeline when %s is %s", (key, value) => {
+    expect(checkSecureConfig({ ...enabled, [key]: value })?.code).toBe(
+      "ontology_pipeline_misconfigured",
+    );
+  });
+
+  it("refuses a matching prompt pair before it can make one configuration author and judge", () => {
+    expect(
+      checkSecureConfig({
+        ...enabled,
+        OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION: "1.0.0",
+      })?.code,
+    ).toBe("ontology_pipeline_misconfigured");
+  });
+
+  it.each([undefined, "", "0", "true", "2"])(
+    "refuses equal model pins without the explicit acknowledgement %s",
+    (acknowledgement) => {
+      expect(
+        checkSecureConfig({
+          ...enabled,
+          ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: acknowledgement,
+        })?.code,
+      ).toBe("ontology_pipeline_misconfigured");
+    },
+  );
+
+  it("validates a present pipeline pin while off", () => {
+    expect(
+      checkSecureConfig({
+        ...enabled,
+        ONTOLOGY_PIPELINE_ROLLOUT: "off",
+        ONTOLOGY_PIPELINE_INPUT_MAX_BYTES: "not-a-number",
+      })?.code,
+    ).toBe("ontology_pipeline_misconfigured");
+  });
+
+  it("carries gateway-stored credentials without a provider authorization key", () => {
+    const resolved = resolveOntologyPipelineConfiguration({
+      ...enabled,
+      OPENAI_CREDENTIAL_SOURCE: "gateway_stored",
+      OPENAI_API_KEY: undefined,
+      OPENAI_GATEWAY_KEY_ALIAS: "ontology-key",
+      AI_GATEWAY_ACCOUNT_ID: "a".repeat(32),
+      AI_GATEWAY_ID: "patternlike",
+      AI_GATEWAY_TOKEN: "cf-aig-token",
+    });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok || !resolved.config) return;
+    expect(resolved.config.credential).toEqual({ source: "gateway_stored", alias: "ontology-key" });
   });
 });

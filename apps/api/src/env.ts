@@ -80,6 +80,26 @@ export interface Env {
    * Configure only with `wrangler secret put`; never add it to wrangler vars.
    */
   ONTOLOGY_PIPELINE_ARTIFACT_KEYRING?: string;
+  /** Staged machine-ontology pipeline rollout: `off` | `internal`. */
+  ONTOLOGY_PIPELINE_ROLLOUT?: string;
+  /** Exact acknowledgement required while the generator and evaluator model pins match. */
+  ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS?: string;
+  OPENAI_ONTOLOGY_GENERATOR_MODEL?: string;
+  OPENAI_ONTOLOGY_GENERATOR_REASONING?: string;
+  OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION?: string;
+  OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS?: string;
+  OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS?: string;
+  OPENAI_ONTOLOGY_EVALUATOR_MODEL?: string;
+  OPENAI_ONTOLOGY_EVALUATOR_REASONING?: string;
+  OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION?: string;
+  OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS?: string;
+  OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS?: string;
+  /** Hard ceiling on the serialized corpus and candidate packets, in UTF-8 bytes. */
+  ONTOLOGY_PIPELINE_INPUT_MAX_BYTES?: string;
+  /** Operator-approved UTC-day ceiling across generator, evaluator, and regression calls. */
+  ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT?: string;
+  /** Failed-run artifact TTL. It is pinned to seven days outside development. */
+  ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS?: string;
   /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
   CHECK_IN_RETENTION_MONTHS?: string;
   /** Positive cache epoch; bump before any result-changing calculation deploy. */

@@ -17,7 +17,9 @@ export type ConfigurationCode =
   | "check_in_retention_misconfigured"
   | "time_travel_misconfigured"
   | "pattern_rollout_invalid"
-  | "pattern_publisher_misconfigured";
+  | "pattern_publisher_misconfigured"
+  | "ontology_pipeline_rollout_invalid"
+  | "ontology_pipeline_misconfigured";
 
 type OperationalFailureClass =
   | GenerationFailureCode
