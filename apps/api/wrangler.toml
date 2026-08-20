@@ -31,6 +31,15 @@ bucket_name = "pattern-artifacts-dev"
 binding = "ONTOLOGY_SIGNER"
 service = "patternlike-ontology-signer"
 
+# Evaluation artifacts are AES-256-GCM envelopes. Decrypting them uses
+# ONTOLOGY_PIPELINE_ARTIFACT_KEYRING, a Worker secret, never a var:
+#   wrangler secret put ONTOLOGY_PIPELINE_ARTIFACT_KEYRING
+#   wrangler secret put ONTOLOGY_PIPELINE_ARTIFACT_KEYRING --env production
+# Shape: {"version":1,"keys":{"<key_id>":"<unpadded base64url 32-byte AES key>"}}
+# Machine ingestions fail closed if this secret is missing or malformed.
+# Synthetic/internal ingestions do not read it. Named environments do not
+# inherit secrets, so the production Worker needs its own put.
+
 # Daily-reading generation. Producer and consumer are the same Worker: enqueue
 # reserves the day in D1 and sends an opaque {job_id, reading_id}, and the
 # consumer claims that job and publishes.

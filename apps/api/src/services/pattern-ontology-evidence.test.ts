@@ -10,10 +10,13 @@ import { resetDb } from "../../test/helpers.js";
 import {
   buildTestCorpusManifest,
   buildTestEvaluationArtifact,
+  buildTestEvaluationReport,
   putTestCorpusManifest,
   putTestEvaluationArtifact,
+  testOntologyPipelineArtifactKeyring,
   type TestCorpusLicenseClass,
   type TestCorpusManifest,
+  type TestEvaluationArtifactOptions,
   type TestEvaluationArtifactEnvelope,
 } from "../../test/ontology-pipeline-fixtures.js";
 import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
@@ -45,6 +48,21 @@ async function hashBytes(bytes: Uint8Array): Promise<string> {
     byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
+function decodeBase64Url(value: string): Uint8Array {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (value.length % 4)) % 4);
+  return Uint8Array.from(
+    atob(padded),
+    (character) => character.charCodeAt(0),
+  );
+}
+
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 async function release(version = "ontology-evidence-1"): Promise<MachineRelease> {
   const value = syntheticOntologyRelease(version) as MachineRelease;
   value.provenance = { origin: "machine_pipeline" };
@@ -60,6 +78,8 @@ async function evidenceFixture(
     activationScope?: "internal" | "public";
     corpusLicenseClass?: TestCorpusLicenseClass;
     corpusPublicCapable?: boolean;
+    evaluationReport?: string;
+    artifactOptions?: TestEvaluationArtifactOptions;
     inputOverrides?: Partial<EvidenceInputWithEnvelope>;
   } = {},
 ): Promise<EvidenceFixture> {
@@ -74,17 +94,14 @@ async function evidenceFixture(
   );
   const corpusObjectKey = await putTestCorpusManifest(env.ARTIFACTS!, corpus);
   value.corpus_release_hash = corpus.corpus_hash;
-  const evaluationReport = canonicalJson({
-    compiler_passed: true,
-    evaluator_passed: true,
-    ontology_version: value.ontology_version,
-    schema_version: "0.7.0",
-    unevaluated_fixture_count: 0,
-  });
+  const evaluationReport =
+    options.evaluationReport ??
+    buildTestEvaluationReport(value.ontology_version);
   const artifact = await buildTestEvaluationArtifact(
     runId,
     value.ontology_version,
     evaluationReport,
+    options.artifactOptions,
   );
   value.evaluation.evaluation_report_hash = artifact.plaintextHash;
   value.bundle_hash = await computeOntologyBundleHash(value);
@@ -133,6 +150,8 @@ async function replaceArtifactEnvelope(
 describe("machine ontology evidence", () => {
   beforeEach(async () => {
     await resetDb();
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
+      testOntologyPipelineArtifactKeyring();
   });
 
   it("commits and verifies a succeeded public-capable receipt against real R2 bytes", async () => {
@@ -190,6 +209,224 @@ describe("machine ontology evidence", () => {
     await expect(
       verifyPatternOntologyEvidence(env, value, input.signingKeyId),
     ).resolves.toMatchObject({ runId: input.runId });
+  });
+
+  it("does not consult regression fields inside the decrypted report", async () => {
+    const value = await release("ontology-evidence-report-regression-ignored");
+    const report = buildTestEvaluationReport(value.ontology_version, {
+      regression_passed: false,
+      regression_report_hash: null,
+    });
+    const { input } = await evidenceFixture(value, {
+      evaluationReport: report,
+    });
+
+    await commitOntologyPipelineEvidence(env, input);
+
+    await expect(
+      verifyPatternOntologyEvidence(env, value, input.signingKeyId),
+    ).resolves.toMatchObject({ runId: input.runId });
+  });
+
+  it("refuses a self-consistent envelope encrypted under an untrusted key", async () => {
+    const value = await release("ontology-evidence-untrusted-artifact-key");
+    const attackerKey = Uint8Array.from(
+      { length: 32 },
+      (_, index) => 255 - index,
+    );
+    const { input } = await evidenceFixture(value, {
+      artifactOptions: { rawKey: attackerKey },
+    });
+
+    await expect(
+      commitOntologyPipelineEvidence(env, input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_authentication_failed",
+    });
+  });
+
+  it("refuses ciphertext authenticated with different AAD", async () => {
+    const value = await release("ontology-evidence-wrong-artifact-aad");
+    const { input } = await evidenceFixture(value, {
+      artifactOptions: {
+        additionalData: canonicalJson({
+          run_id: "different-authenticated-identity",
+        }),
+      },
+    });
+
+    await expect(
+      commitOntologyPipelineEvidence(env, input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_authentication_failed",
+    });
+  });
+
+  it("refuses an evaluation envelope naming an unknown artifact key", async () => {
+    const value = await release("ontology-evidence-unknown-artifact-key");
+    const { input } = await evidenceFixture(value, {
+      artifactOptions: { keyId: "unknown-artifact-key" },
+    });
+
+    await expect(
+      commitOntologyPipelineEvidence(env, input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_key_unknown",
+    });
+  });
+
+  it.each([
+    [
+      "missing",
+      undefined,
+      "ontology_evaluation_artifact_keyring_missing",
+    ],
+    [
+      "malformed JSON",
+      "{",
+      "ontology_evaluation_artifact_keyring_invalid",
+    ],
+    [
+      "open shape",
+      JSON.stringify({ version: 1, keys: {}, extra: true }),
+      "ontology_evaluation_artifact_keyring_invalid",
+    ],
+    [
+      "wrong key length",
+      JSON.stringify({
+        version: 1,
+        keys: { "test-evaluation-envelope-key": "AA" },
+      }),
+      "ontology_evaluation_artifact_keyring_invalid",
+    ],
+  ] as const)(
+    "refuses a %s artifact keyring",
+    async (_label, keyring, code) => {
+      const value = await release(
+        `ontology-evidence-keyring-${_label.replaceAll(" ", "-").toLowerCase()}`,
+      );
+      const { input } = await evidenceFixture(value);
+      env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING = keyring;
+
+      await expect(
+        commitOntologyPipelineEvidence(env, input),
+      ).rejects.toMatchObject({ code });
+    },
+  );
+
+  it("refuses a ciphertext whose authentication tag no longer verifies", async () => {
+    const value = await release("ontology-evidence-artifact-tag");
+    const fixture = await evidenceFixture(value);
+    const envelope = structuredClone(fixture.artifact.envelope);
+    const ciphertext = decodeBase64Url(envelope.ciphertext);
+    ciphertext[0] = ciphertext[0]! ^ 1;
+    envelope.ciphertext = toBase64Url(ciphertext);
+    envelope.ciphertext_hash = await hashBytes(ciphertext);
+    fixture.input.evaluationArtifactCiphertextHash =
+      envelope.ciphertext_hash;
+    await replaceArtifactEnvelope(fixture, envelope);
+
+    await expect(
+      commitOntologyPipelineEvidence(env, fixture.input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_authentication_failed",
+    });
+  });
+
+  it("refuses decrypted plaintext whose declared hash is self-consistently wrong", async () => {
+    const value = await release("ontology-evidence-artifact-plaintext-hash");
+    const { input } = await evidenceFixture(value, {
+      artifactOptions: {
+        declaredPlaintextHash: `sha256:${"9".repeat(64)}`,
+      },
+    });
+
+    await expect(
+      commitOntologyPipelineEvidence(env, input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_plaintext_hash_mismatch",
+    });
+  });
+
+  it("refuses a decrypted evaluation report that is not canonical JSON", async () => {
+    const value = await release("ontology-evidence-report-noncanonical");
+    const report = JSON.stringify({
+      schema_version: "0.7.0",
+      ontology_version: value.ontology_version,
+      compiler_passed: true,
+      evaluator_passed: true,
+      unevaluated_fixture_count: 0,
+    });
+    expect(report).not.toBe(canonicalJson(JSON.parse(report)));
+    const { input } = await evidenceFixture(value, {
+      evaluationReport: report,
+    });
+
+    await expect(
+      commitOntologyPipelineEvidence(env, input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_report_noncanonical",
+    });
+  });
+
+  it.each([
+    [
+      "compiler_passed",
+      false,
+      "ontology_evaluation_report_gate_mismatch",
+    ],
+    [
+      "evaluator_passed",
+      false,
+      "ontology_evaluation_report_gate_mismatch",
+    ],
+    [
+      "unevaluated_fixture_count",
+      1,
+      "ontology_evaluation_report_gate_mismatch",
+    ],
+    [
+      "ontology_version",
+      "ontology-different",
+      "ontology_evaluation_report_identity_mismatch",
+    ],
+    [
+      "schema_version",
+      "0.6.0",
+      "ontology_evaluation_report_invalid",
+    ],
+  ] as const)(
+    "refuses a decrypted evaluation report with wrong %s",
+    async (field, fieldValue, code) => {
+      const value = await release(`ontology-evidence-report-${field}`);
+      const report = buildTestEvaluationReport(value.ontology_version, {
+        [field]: fieldValue,
+      });
+      const { input } = await evidenceFixture(value, {
+        evaluationReport: report,
+      });
+
+      await expect(
+        commitOntologyPipelineEvidence(env, input),
+      ).rejects.toMatchObject({ code });
+    },
+  );
+
+  it("re-authenticates the encrypted report during ingestion verification", async () => {
+    const value = await release("ontology-evidence-ingestion-reauth");
+    const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
+      testOntologyPipelineArtifactKeyring(
+        undefined,
+        Uint8Array.from({ length: 32 }, (_, index) => index + 1),
+      );
+
+    await expect(
+      verifyPatternOntologyEvidence(env, value, input.signingKeyId),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_authentication_failed",
+    });
   });
 
   it("makes an identical evidence commit idempotent and changed evidence immutable", async () => {
@@ -265,6 +502,42 @@ describe("machine ontology evidence", () => {
       commitOntologyPipelineEvidence(env, fixture.input),
     ).rejects.toMatchObject({
       code: "ontology_evaluation_artifact_noncanonical",
+    });
+  });
+
+  it("explicitly refuses a BOM-prefixed decrypted evaluation report", async () => {
+    const value = await release("ontology-evidence-report-bom");
+    const report =
+      "\uFEFF" + buildTestEvaluationReport(value.ontology_version);
+    const { input } = await evidenceFixture(value, {
+      evaluationReport: report,
+    });
+
+    await expect(
+      commitOntologyPipelineEvidence(env, input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_report_invalid",
+    });
+  });
+
+  it("explicitly refuses a BOM-prefixed evaluation artifact envelope", async () => {
+    const value = await release("ontology-evidence-artifact-bom");
+    const fixture = await evidenceFixture(value);
+    const canonical = new TextEncoder().encode(fixture.artifact.bytes);
+    const prefixed = new Uint8Array(canonical.byteLength + 3);
+    prefixed.set([0xef, 0xbb, 0xbf]);
+    prefixed.set(canonical, 3);
+    await env.ARTIFACTS!.put(
+      fixture.input.evaluationArtifactObjectKey,
+      prefixed,
+    );
+    fixture.input.evaluationArtifactEnvelopeHash =
+      await hashBytes(prefixed);
+
+    await expect(
+      commitOntologyPipelineEvidence(env, fixture.input),
+    ).rejects.toMatchObject({
+      code: "ontology_evaluation_artifact_invalid",
     });
   });
 
@@ -390,6 +663,22 @@ describe("machine ontology evidence", () => {
       commitOntologyPipelineEvidence(env, fixture.input),
     ).rejects.toMatchObject({
       code: "ontology_corpus_manifest_noncanonical",
+    });
+  });
+
+  it("explicitly refuses a BOM-prefixed corpus manifest", async () => {
+    const value = await release("ontology-evidence-corpus-bom");
+    const fixture = await evidenceFixture(value);
+    const canonical = new TextEncoder().encode(canonicalJson(fixture.corpus));
+    const prefixed = new Uint8Array(canonical.byteLength + 3);
+    prefixed.set([0xef, 0xbb, 0xbf]);
+    prefixed.set(canonical, 3);
+    await env.ARTIFACTS!.put(fixture.corpusObjectKey, prefixed);
+
+    await expect(
+      commitOntologyPipelineEvidence(env, fixture.input),
+    ).rejects.toMatchObject({
+      code: "ontology_corpus_manifest_invalid",
     });
   });
 

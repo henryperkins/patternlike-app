@@ -67,6 +67,12 @@ export interface Env {
    * from this Env by construction and exists only in the signer Worker.
    */
   ONTOLOGY_SIGNER: OntologySignerBinding;
+  /**
+   * Secret v1 JSON keyring for decrypting ontology evaluation artifacts:
+   * `{"version":1,"keys":{"<key_id>":"<base64url 32-byte AES key>"}}`.
+   * Configure only with `wrangler secret put`; never add it to wrangler vars.
+   */
+  ONTOLOGY_PIPELINE_ARTIFACT_KEYRING?: string;
   /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
   CHECK_IN_RETENTION_MONTHS?: string;
   /** Positive cache epoch; bump before any result-changing calculation deploy. */

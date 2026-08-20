@@ -7,6 +7,7 @@ const SOURCE_FRAGMENT_ID = /^srcf_[0-9a-f]{32}$/;
 const LOCALE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*$/;
 const MAX_CORPUS_MANIFEST_BYTES = 4 * 1024 * 1024;
 const CORPUS_OBJECT_PREFIX = "pattern-ontology-corpora/";
+const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
 const TOP_LEVEL_FIELDS = new Set([
   "schema_version",
   "corpus_release_id",
@@ -154,12 +155,19 @@ export async function readVerifiedPatternOntologyCorpus(
   if (object.size > MAX_CORPUS_MANIFEST_BYTES) {
     fail("ontology_corpus_manifest_invalid");
   }
+  const rawBytes = new Uint8Array(await object.arrayBuffer());
+  if (
+    rawBytes.byteLength >= UTF8_BOM.length &&
+    UTF8_BOM.every((byte, index) => rawBytes[index] === byte)
+  ) {
+    fail("ontology_corpus_manifest_invalid");
+  }
   let bytes: string;
   try {
     bytes = new TextDecoder("utf-8", {
       fatal: true,
       ignoreBOM: false,
-    }).decode(await object.arrayBuffer());
+    }).decode(rawBytes);
   } catch {
     fail("ontology_corpus_manifest_invalid");
   }

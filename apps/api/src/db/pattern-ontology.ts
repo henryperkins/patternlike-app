@@ -577,13 +577,11 @@ export async function storeOntologyRelease(
              )
              OR
              (
+               -- Matching superseded bytes are an unconditional replay no-op.
+               -- The pointer assertion above applies only to a newly activated
+               -- target, so recalling the newer release cannot turn a stale
+               -- replay into a 500.
                target.status = 'superseded'
-               AND EXISTS (
-                 SELECT 1
-                 FROM pattern_ontology_releases active
-                 WHERE active.version = pointer.active_version
-                   AND active.status = 'active'
-               )
              )
            )
        )`,

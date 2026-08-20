@@ -16,6 +16,9 @@ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const EVALUATION_OBJECT_PREFIX = "pattern-ontology/pipeline/";
 const MAX_EVALUATION_ARTIFACT_BYTES = 4 * 1024 * 1024;
+const MAX_ARTIFACT_KEYRING_BYTES = 8 * 1024;
+const MAX_ARTIFACT_KEYS = 8;
+const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
 const EVALUATION_ENVELOPE_FIELDS = new Set([
   "schema_version",
   "artifact_class",
@@ -27,6 +30,7 @@ const EVALUATION_ENVELOPE_FIELDS = new Set([
   "ciphertext",
 ]);
 const ENCRYPTION_FIELDS = new Set(["alg", "key_id", "nonce"]);
+const ARTIFACT_KEYRING_FIELDS = new Set(["version", "keys"]);
 
 export type OntologyActivationScope = "internal" | "public";
 export type OntologyCorpusLicenseClass =
@@ -173,6 +177,153 @@ async function sha256(bytes: Uint8Array): Promise<string> {
     byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
+function hasUtf8Bom(bytes: Uint8Array): boolean {
+  return (
+    bytes.byteLength >= UTF8_BOM.length &&
+    UTF8_BOM.every((byte, index) => bytes[index] === byte)
+  );
+}
+
+function parseArtifactKeyring(
+  raw: string | undefined,
+): Map<string, Uint8Array> {
+  if (!raw) fail("ontology_evaluation_artifact_keyring_missing");
+  if (raw.length > MAX_ARTIFACT_KEYRING_BYTES) {
+    fail("ontology_evaluation_artifact_keyring_invalid");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    fail("ontology_evaluation_artifact_keyring_invalid");
+  }
+  if (
+    !isRecord(parsed) ||
+    !hasExactFields(parsed, ARTIFACT_KEYRING_FIELDS) ||
+    parsed.version !== 1 ||
+    !isRecord(parsed.keys)
+  ) {
+    fail("ontology_evaluation_artifact_keyring_invalid");
+  }
+  const entries = Object.entries(parsed.keys);
+  if (entries.length === 0 || entries.length > MAX_ARTIFACT_KEYS) {
+    fail("ontology_evaluation_artifact_keyring_invalid");
+  }
+  const keys = new Map<string, Uint8Array>();
+  for (const [keyId, encoded] of entries) {
+    if (!KEY_ID.test(keyId) || typeof encoded !== "string") {
+      fail("ontology_evaluation_artifact_keyring_invalid");
+    }
+    const key = decodeBase64Url(encoded);
+    if (!key || key.byteLength !== 32) {
+      fail("ontology_evaluation_artifact_keyring_invalid");
+    }
+    keys.set(keyId, key);
+  }
+  return keys;
+}
+
+interface EvaluationArtifactIdentity {
+  schemaVersion: "ontology-evaluation-artifact/v1";
+  artifactClass: "evaluation_report";
+  runId: string;
+  ontologyVersion: string;
+  plaintextHash: string;
+  keyId: string;
+  nonce: string;
+}
+
+function evaluationArtifactIdentity(
+  runId: unknown,
+  ontologyVersion: unknown,
+  plaintextHash: unknown,
+  keyId: unknown,
+  nonce: unknown,
+): EvaluationArtifactIdentity {
+  if (
+    typeof runId !== "string" ||
+    typeof ontologyVersion !== "string" ||
+    typeof plaintextHash !== "string" ||
+    typeof keyId !== "string" ||
+    typeof nonce !== "string"
+  ) {
+    fail("ontology_evaluation_artifact_invalid");
+  }
+  return {
+    schemaVersion: "ontology-evaluation-artifact/v1",
+    artifactClass: "evaluation_report",
+    runId,
+    ontologyVersion,
+    plaintextHash,
+    keyId,
+    nonce,
+  };
+}
+
+function evaluationArtifactAad(
+  identity: EvaluationArtifactIdentity,
+): Uint8Array {
+  // This closed JCS object is the one authenticated identity for v1 artifacts.
+  // ciphertext_hash is intentionally excluded to avoid a circular dependency.
+  return new TextEncoder().encode(canonicalJson({
+    artifact_class: identity.artifactClass,
+    encryption: {
+      key_id: identity.keyId,
+      nonce: identity.nonce,
+    },
+    ontology_version: identity.ontologyVersion,
+    plaintext_hash: identity.plaintextHash,
+    run_id: identity.runId,
+    schema_version: identity.schemaVersion,
+  }));
+}
+
+function verifyEvaluationReport(
+  plaintext: Uint8Array,
+  ontologyVersion: string,
+): void {
+  if (hasUtf8Bom(plaintext)) fail("ontology_evaluation_report_invalid");
+  let bytes: string;
+  try {
+    bytes = new TextDecoder("utf-8", {
+      fatal: true,
+      ignoreBOM: false,
+    }).decode(plaintext);
+  } catch {
+    fail("ontology_evaluation_report_invalid");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bytes);
+  } catch {
+    fail("ontology_evaluation_report_invalid");
+  }
+  if (!isRecord(parsed)) fail("ontology_evaluation_report_invalid");
+  if (canonicalJson(parsed) !== bytes) {
+    fail("ontology_evaluation_report_noncanonical");
+  }
+  if (
+    parsed.schema_version !== "0.7.0" ||
+    typeof parsed.ontology_version !== "string" ||
+    typeof parsed.compiler_passed !== "boolean" ||
+    typeof parsed.evaluator_passed !== "boolean" ||
+    typeof parsed.unevaluated_fixture_count !== "number" ||
+    !Number.isInteger(parsed.unevaluated_fixture_count)
+  ) {
+    fail("ontology_evaluation_report_invalid");
+  }
+  if (parsed.ontology_version !== ontologyVersion) {
+    fail("ontology_evaluation_report_identity_mismatch");
+  }
+  if (
+    parsed.compiler_passed !== true ||
+    parsed.evaluator_passed !== true ||
+    parsed.unevaluated_fixture_count !== 0
+  ) {
+    fail("ontology_evaluation_report_gate_mismatch");
+  }
+}
+
 interface ExpectedEvaluationArtifact {
   runId: string;
   ontologyVersion: string;
@@ -196,6 +347,9 @@ async function verifyEvaluationArtifact(
   const envelopeHash = await sha256(rawBytes);
   if (!hashesEqual(envelopeHash, expected.envelopeHash)) {
     fail("ontology_evaluation_artifact_envelope_hash_mismatch");
+  }
+  if (hasUtf8Bom(rawBytes)) {
+    fail("ontology_evaluation_artifact_invalid");
   }
   let bytes: string;
   try {
@@ -261,6 +415,55 @@ async function verifyEvaluationArtifact(
   ) {
     fail("ontology_evaluation_artifact_ciphertext_hash_mismatch");
   }
+  const keyring = parseArtifactKeyring(
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING,
+  );
+  const rawKey = keyring.get(parsed.encryption.key_id);
+  if (!rawKey) fail("ontology_evaluation_artifact_key_unknown");
+  let key: CryptoKey;
+  try {
+    key = await crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"],
+    );
+  } catch {
+    fail("ontology_evaluation_artifact_keyring_invalid");
+  }
+  const identity = evaluationArtifactIdentity(
+    parsed.run_id,
+    parsed.ontology_version,
+    parsed.plaintext_hash,
+    parsed.encryption.key_id,
+    parsed.encryption.nonce,
+  );
+  let plaintext: Uint8Array;
+  try {
+    plaintext = new Uint8Array(
+      await crypto.subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv: nonce,
+          additionalData: evaluationArtifactAad(identity),
+          tagLength: 128,
+        },
+        key,
+        ciphertext,
+      ),
+    );
+  } catch {
+    fail("ontology_evaluation_artifact_authentication_failed");
+  }
+  const plaintextHash = await sha256(plaintext);
+  if (
+    !hashesEqual(plaintextHash, parsed.plaintext_hash) ||
+    !hashesEqual(plaintextHash, expected.plaintextHash)
+  ) {
+    fail("ontology_evaluation_artifact_plaintext_hash_mismatch");
+  }
+  verifyEvaluationReport(plaintext, expected.ontologyVersion);
 }
 
 async function verifyCorpus(

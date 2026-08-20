@@ -25,8 +25,10 @@ import {
 import {
   buildTestCorpusManifest,
   buildTestEvaluationArtifact,
+  buildTestEvaluationReport,
   putTestCorpusManifest,
   putTestEvaluationArtifact,
+  testOntologyPipelineArtifactKeyring,
 } from "../../test/ontology-pipeline-fixtures.js";
 import {
   commitOntologyPipelineEvidence,
@@ -103,13 +105,7 @@ async function prepareMachineRelease(
     corpus,
   );
   release.corpus_release_hash = corpus.corpus_hash;
-  const evaluationReport = canonicalJson({
-    schema_version: "0.7.0",
-    ontology_version: version,
-    compiler_passed: true,
-    evaluator_passed: true,
-    unevaluated_fixture_count: 0,
-  });
+  const evaluationReport = buildTestEvaluationReport(version);
   const runId = `ontrun_${version}`;
   const artifact = await buildTestEvaluationArtifact(
     runId,
@@ -211,6 +207,8 @@ describe("machine ontology ingestion", () => {
     await seedActiveOntology("ontology-prior-active");
     key = await generateSigningKey("ontology-pipeline-key");
     env.PATTERN_ONTOLOGY_KEYS = releaseKeysVar([key]);
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
+      testOntologyPipelineArtifactKeyring();
   });
 
   afterEach(async () => {
@@ -451,6 +449,53 @@ describe("machine ontology ingestion", () => {
     expect((await activePointer()).active_version).toBe(
       second.release.ontology_version,
     );
+  });
+
+  it("keeps a stale superseded replay inert after the newer release is recalled", async () => {
+    const oldRelease = await prepareMachineRelease(
+      "ontology-machine-stale-after-recall-old",
+      key,
+    );
+    const newRelease = await prepareMachineRelease(
+      "ontology-machine-stale-after-recall-new",
+      key,
+    );
+    expect((await postRelease(oldRelease.signed)).status).toBe(201);
+    expect((await postRelease(newRelease.signed)).status).toBe(201);
+    const recall = await SELF.fetch(
+      `http://api.test/internal/pattern-ontology-releases/${newRelease.release.ontology_version}/recall`,
+      { method: "POST" },
+    );
+    expect(recall.status).toBe(200);
+    expect(await activePointer()).toEqual({
+      active_version: null,
+      bundle_hash: null,
+    });
+
+    const replay = await postRelease(oldRelease.signed);
+
+    expect(replay.status, JSON.stringify(replay.body)).toBe(201);
+    expect(replay.body.status).toBe("superseded");
+    expect(await activePointer()).toEqual({
+      active_version: null,
+      bundle_hash: null,
+    });
+    const oldState = await env.DB.prepare(
+      `SELECT r.status,
+              (
+                SELECT COUNT(*)
+                FROM pattern_ontology_evaluation_runs e
+                WHERE e.ontology_version = r.version
+              ) AS evaluation_count
+       FROM pattern_ontology_releases r
+       WHERE r.version = ?`,
+    )
+      .bind(oldRelease.release.ontology_version)
+      .first<{ status: string; evaluation_count: number }>();
+    expect(oldState).toEqual({
+      status: "superseded",
+      evaluation_count: 1,
+    });
   });
 
   it("converges concurrent identical first ingestions without a 500", async () => {
