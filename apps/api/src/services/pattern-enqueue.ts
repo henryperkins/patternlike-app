@@ -38,6 +38,7 @@ import {
 } from "./pattern-publisher.js";
 import {
   consumerAdmissionEntry,
+  isInternalPatternAccount,
   patternRolloutAllows,
   readPatternAiRollout,
 } from "./pattern-rollout.js";
@@ -157,6 +158,20 @@ export async function enqueuePatternGeneration(
 
   const ontology = await loadActiveOntology(env);
   if (!ontology) {
+    return {
+      ok: false,
+      status: 409,
+      code: "ontology_unavailable",
+      message: "No activated Pattern ontology is available",
+    };
+  }
+  const publicMachineRelease =
+    ontology.release.provenance?.origin === "machine_pipeline" &&
+    ontology.activationScope === "public";
+  if (
+    !publicMachineRelease &&
+    !isInternalPatternAccount(env, identity.userId)
+  ) {
     return {
       ok: false,
       status: 409,

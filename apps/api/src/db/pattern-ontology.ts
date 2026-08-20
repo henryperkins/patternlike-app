@@ -1,4 +1,8 @@
-import { canonicalJson, type PatternOntologyRelease } from "@patternlike/shared";
+import {
+  canonicalJson,
+  sha256Hex,
+  type PatternOntologyRelease,
+} from "@patternlike/shared";
 import { compileOntologyRelease } from "@patternlike/pattern-engine";
 import type { Env } from "../env.js";
 import { isDevEnvironment } from "../crypto.js";
@@ -10,6 +14,7 @@ import {
   verifyOntologySignature,
   type SignedOntologyRelease,
 } from "../services/pattern-ontology-verify.js";
+import type { VerifiedPatternOntologyEvidence } from "../services/pattern-ontology-evidence.js";
 
 export const ONTOLOGY_OBJECT_PREFIX = "pattern-ontology/";
 
@@ -18,6 +23,7 @@ export interface ActiveOntology {
   bundleHash: string;
   corpusReleaseHash: string;
   locale: string;
+  activationScope: "internal" | "public";
   release: PatternOntologyRelease;
 }
 
@@ -61,9 +67,20 @@ async function readVerifiedRelease(
 
 export async function loadActiveOntology(env: Env): Promise<ActiveOntology | null> {
   const pointer = await env.DB.prepare(
-    `SELECT p.active_version AS version, r.bundle_hash, r.corpus_release_hash, r.locale, r.object_key, r.status
+    `SELECT p.active_version AS version, r.bundle_hash, r.corpus_release_hash,
+            r.locale, r.object_key, r.status,
+            CASE
+              WHEN e.activation_scope = 'public'
+               AND e.run_status = 'succeeded'
+               AND e.evidence_status = 'committed'
+               AND e.evaluation_artifact_status = 'committed'
+              THEN 'public'
+              ELSE 'internal'
+            END AS activation_scope
      FROM pattern_ontology_pointer p
      LEFT JOIN pattern_ontology_releases r ON r.version = p.active_version
+     LEFT JOIN pattern_ontology_pipeline_evidence e
+       ON e.ontology_version = r.version AND e.bundle_hash = r.bundle_hash
      WHERE p.id = 1`,
   ).first<{
     version: string | null;
@@ -72,6 +89,7 @@ export async function loadActiveOntology(env: Env): Promise<ActiveOntology | nul
     locale: string | null;
     object_key: string | null;
     status: string | null;
+    activation_scope: "internal" | "public";
   }>();
   if (!pointer?.version || !pointer.object_key || !pointer.bundle_hash || pointer.status !== "active") {
     return null;
@@ -83,6 +101,7 @@ export async function loadActiveOntology(env: Env): Promise<ActiveOntology | nul
     bundleHash: pointer.bundle_hash,
     corpusReleaseHash: pointer.corpus_release_hash!,
     locale: pointer.locale!,
+    activationScope: pointer.activation_scope,
     release,
   };
 }
@@ -92,8 +111,20 @@ export async function loadOntologyByVersion(
   version: string,
 ): Promise<ActiveOntology | null> {
   const row = await env.DB.prepare(
-    `SELECT version, bundle_hash, corpus_release_hash, locale, object_key, status
-     FROM pattern_ontology_releases WHERE version = ?`,
+    `SELECT r.version, r.bundle_hash, r.corpus_release_hash, r.locale,
+            r.object_key, r.status,
+            CASE
+              WHEN e.activation_scope = 'public'
+               AND e.run_status = 'succeeded'
+               AND e.evidence_status = 'committed'
+               AND e.evaluation_artifact_status = 'committed'
+              THEN 'public'
+              ELSE 'internal'
+            END AS activation_scope
+     FROM pattern_ontology_releases r
+     LEFT JOIN pattern_ontology_pipeline_evidence e
+       ON e.ontology_version = r.version AND e.bundle_hash = r.bundle_hash
+     WHERE r.version = ?`,
   )
     .bind(version)
     .first<{
@@ -103,6 +134,7 @@ export async function loadOntologyByVersion(
       locale: string;
       object_key: string;
       status: string;
+      activation_scope: "internal" | "public";
     }>();
   if (!row || row.status === "recalled" || !env.ARTIFACTS) return null;
   const release = await readVerifiedRelease(env, row.object_key, row.bundle_hash);
@@ -112,6 +144,7 @@ export async function loadOntologyByVersion(
     bundleHash: row.bundle_hash,
     corpusReleaseHash: row.corpus_release_hash,
     locale: row.locale,
+    activationScope: row.activation_scope,
     release,
   };
 }
@@ -120,6 +153,7 @@ export async function storeOntologyRelease(
   env: Env,
   release: SignedOntologyRelease,
   objectKey: string,
+  evidence?: VerifiedPatternOntologyEvidence,
 ): Promise<void> {
   const compiled = compileOntologyRelease(stripOntologySignature(release));
   if (!compiled.ok) {
@@ -138,30 +172,45 @@ export async function storeOntologyRelease(
     throw new Error("ontology_keys_not_configured");
   }
   if (!env.ARTIFACTS) throw new Error("ARTIFACTS binding missing");
+  const isMachinePipeline =
+    release.provenance?.origin === "machine_pipeline";
+  if (isMachinePipeline && !evidence) {
+    throw new Error("ontology_pipeline_evidence_missing");
+  }
+  if (!isMachinePipeline && evidence) {
+    throw new Error("ontology_pipeline_evidence_unexpected");
+  }
 
   const existing = await env.DB.prepare(
-    `SELECT version, bundle_hash, status FROM pattern_ontology_releases WHERE version = ?`,
+    `SELECT version, bundle_hash, status, object_key
+     FROM pattern_ontology_releases WHERE version = ?`,
   )
     .bind(release.ontology_version)
-    .first<{ version: string; bundle_hash: string; status: string }>();
+    .first<{
+      version: string;
+      bundle_hash: string;
+      status: string;
+      object_key: string;
+    }>();
   if (existing?.status === "recalled") {
     throw new Error("ontology_version_recalled");
   }
   if (existing && !hashesEqual(existing.bundle_hash, computed)) {
     throw new Error("ontology_version_immutable");
   }
+  if (existing && existing.object_key !== objectKey) {
+    throw new Error("ontology_version_immutable");
+  }
 
   const serialized = canonicalJson(stored);
-  if (!existing) {
-    const put = await env.ARTIFACTS.put(objectKey, serialized, {
-      onlyIf: new Headers({ "if-none-match": "*" }),
-      httpMetadata: { contentType: "application/json" },
-    });
-    if (!put) {
-      const already = await env.ARTIFACTS.get(objectKey);
-      if (!already || (await already.text()) !== serialized) {
-        throw new Error("ontology_version_immutable");
-      }
+  const put = await env.ARTIFACTS.put(objectKey, serialized, {
+    onlyIf: new Headers({ "if-none-match": "*" }),
+    httpMetadata: { contentType: "application/json" },
+  });
+  if (!put) {
+    const already = await env.ARTIFACTS.get(objectKey);
+    if (!already || (await already.text()) !== serialized) {
+      throw new Error("ontology_version_immutable");
     }
   }
 
@@ -175,6 +224,64 @@ export async function storeOntologyRelease(
        )`,
     ).bind(release.ontology_version),
   ];
+  let evaluationRunId: string | null = null;
+  if (evidence) {
+    evaluationRunId = `poer_${(
+      await sha256Hex(
+        `${evidence.runId}:${release.ontology_version}:${computed}`,
+      )
+    ).slice(0, 32)}`;
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'machine ontology evidence changed before activation'
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM pattern_ontology_pipeline_evidence
+           WHERE run_id = ?
+             AND ontology_version = ?
+             AND bundle_hash = ?
+             AND corpus_release_id = ?
+             AND corpus_release_hash = ?
+             AND evaluation_report_hash = ?
+             AND signing_key_id = ?
+             AND activation_scope = ?
+             AND run_status = 'succeeded'
+             AND evidence_status = 'committed'
+             AND evaluation_artifact_status = 'committed'
+             AND compiler_passed = 1
+             AND evaluator_passed = 1
+             AND unevaluated_fixture_count = 0
+         )`,
+      ).bind(
+        evidence.runId,
+        release.ontology_version,
+        computed,
+        evidence.corpusReleaseId,
+        release.corpus_release_hash,
+        evidence.evaluationReportHash,
+        release.signature!.key_id,
+        evidence.activationScope,
+      ),
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'machine ontology evaluation receipt identity collision'
+         WHERE EXISTS (
+           SELECT 1 FROM pattern_ontology_evaluation_runs
+           WHERE id = ?
+             AND (
+               ontology_version != ?
+               OR verdict != 'pass'
+               OR summary_json != ?
+             )
+         )`,
+      ).bind(
+        evaluationRunId,
+        release.ontology_version,
+        evidence.evidenceSummary,
+      ),
+    );
+  }
   if (!existing) {
     statements.push(
       env.DB.prepare(
@@ -200,6 +307,20 @@ export async function storeOntologyRelease(
       ).bind(release.ontology_version, existing.bundle_hash),
     );
   }
+  if (evidence && evaluationRunId) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO pattern_ontology_evaluation_runs (
+           id, ontology_version, verdict, summary_json, created_at
+         ) VALUES (?, ?, 'pass', ?, ?)`,
+      ).bind(
+        evaluationRunId,
+        release.ontology_version,
+        evidence.evidenceSummary,
+        now,
+      ),
+    );
+  }
   statements.push(
     env.DB.prepare(
       `UPDATE pattern_ontology_releases SET status = 'superseded'
@@ -209,6 +330,33 @@ export async function storeOntologyRelease(
       `UPDATE pattern_ontology_pointer SET active_version = ?, updated_at = ? WHERE id = 1`,
     ).bind(release.ontology_version, now),
   );
+  if (evidence && evaluationRunId) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'machine ontology activation receipt missing'
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM pattern_ontology_evaluation_runs e
+           JOIN pattern_ontology_releases r
+             ON r.version = e.ontology_version
+           JOIN pattern_ontology_pointer p
+             ON p.id = 1 AND p.active_version = r.version
+           WHERE e.id = ?
+             AND e.ontology_version = ?
+             AND e.verdict = 'pass'
+             AND e.summary_json = ?
+             AND r.bundle_hash = ?
+             AND r.status = 'active'
+         )`,
+      ).bind(
+        evaluationRunId,
+        release.ontology_version,
+        evidence.evidenceSummary,
+        computed,
+      ),
+    );
+  }
   await env.DB.batch(statements);
 }
 

@@ -215,6 +215,8 @@ export interface PatternOntologyEvaluation {
   evaluator_passed: boolean;
   regression_passed: boolean;
   unevaluated_fixture_count: number;
+  evaluation_report_hash?: string;
+  regression_report_hash?: string;
 }
 
 export interface PatternOntologyRelease {
@@ -226,6 +228,11 @@ export interface PatternOntologyRelease {
   status: "candidate" | "active" | "superseded" | "recalled";
   records: PatternOntologyRecord[];
   evaluation: PatternOntologyEvaluation;
+  provenance?: {
+    origin: "synthetic_internal" | "machine_pipeline";
+    authored_by?: string;
+    reviewed_at?: string;
+  };
 }
 
 export interface PatternFactPacketFeature {
