@@ -11,6 +11,7 @@ Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculatio
 | Path | Role |
 | --- | --- |
 | `apps/api` | Cloudflare Worker (Hono) — birth/chart M1 path |
+| `apps/ontology-signer` | Isolated no-route Worker; holds the ontology signing key |
 | `apps/calc-stub` | Portable AGPL Swiss Ephemeris calculation service |
 | `apps/web` | React/Vite PWA — onboarding, chart evidence, and privacy surface |
 | `packages/shared` | Shared types, fingerprint helpers, constants |

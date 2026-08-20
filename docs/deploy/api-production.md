@@ -184,16 +184,34 @@ auth0 test login <client-id>     # runs Universal Login, returns an ID token
 > id, so it fails `verifyIdToken` exactly like the audience trap above. The
 > session exchange wants the **ID token** that `test login` produces.
 
-## 2. Deploy, then set secrets
+## 2. Deploy the signer, apply 0011, then deploy the API
 
-Order matters: `wrangler secret put` against a Worker that does not exist yet
-prompts interactively to create one, which hangs a non-interactive shell.
+The API Worker now declares `ONTOLOGY_SIGNER`. Cloudflare refuses that upload
+until `patternlike-ontology-signer-production` exists. Secrets cannot be put
+on a Worker that does not exist yet.
 
 ```bash
-npm run deploy -w @patternlike/api          # wrangler deploy --env production
+# 1. Create the signer Worker (no routes, workers_dev off).
+npm run deploy:signer
+
+# 2. Signing key lives only here. Named environments do not inherit secrets.
+npx wrangler secret put PATTERN_ONTOLOGY_SIGNING_KEY \
+  --config apps/ontology-signer/wrangler.toml --env production
+
+# 3. Terminal evidence table. Bookmark and export first, same as 0002/0008.
+npx wrangler d1 migrations apply patternlike-ops --env production --remote \
+  --config apps/api/wrangler.toml
+
+# 4. Evaluation-artifact AES keyring on the API Worker (already exists).
+# Shape: {"version":1,"keys":{"<key_id>":"<unpadded base64url 32-byte AES key>"}}
+npx wrangler secret put ONTOLOGY_PIPELINE_ARTIFACT_KEYRING \
+  --config apps/api/wrangler.toml --env production
+
+# 5. API + PWA. This is the deploy that first names the signer binding.
+npm run deploy:api
 ```
 
-Then, from `apps/api/`:
+Then, from `apps/api/`, the existing API secrets if they are not already set:
 
 ```bash
 # ROOT_KEK — >=32 chars, must not be the dev placeholder. Record it in a

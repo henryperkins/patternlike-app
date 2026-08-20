@@ -13,6 +13,22 @@ report hashes, compiler policy for class-specific record fields, and
 `contracts/m7/fixtures/corpus/` as the §23.8 home. Cite those documents, not
 the pre-amendment 2026-08-14 lists.
 
+**2026-08-20 implementation notes (Tasks 8–9).** The isolated signer and
+evidence-gated activation landed ahead of Tasks 1–7. Until the stage machine
+writes a receipt, production machine ingestions fail closed with
+`ontology_pipeline_evidence_missing`. Evaluation artifacts are
+`ontology-evaluation-artifact/v1` AES-256-GCM envelopes; the AAD is canonical
+JSON of `{artifact_class, encryption:{key_id,nonce}, ontology_version,
+plaintext_hash, run_id, schema_version}` and deliberately omits
+`ciphertext_hash`. Recovered plaintext is a `schema_version` `0.7.0` evaluation
+report whose `compiler_passed` / `evaluator_passed` /
+`unevaluated_fixture_count` gates are checked on those bytes.
+`regression_passed` and `regression_report_hash` remain on the frozen contract
+and may be signed; they are not an admission or blocking gate. Signed object
+bytes stay `status: "candidate"`; activation is the D1 status/pointer flip.
+Deploy `patternlike-ontology-signer-production` and apply `0011` before the API
+deploy that binds `ONTOLOGY_SIGNER`.
+
 **Scope:** Build the six-component pipeline that turns an immutable source-corpus
 release into a signed, evaluated, regression-tested ontology release and
 activates it — without human record approval. This is the only route to

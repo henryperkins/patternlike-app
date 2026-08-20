@@ -46,6 +46,7 @@ const TABLES = [
   "pattern_generation_claims",
   "pattern_admin_access_events",
   "pattern_erasure_replay_events",
+  "pattern_ontology_pipeline_evidence",
   "pattern_ontology_evaluation_runs",
   "pattern_ontology_recall_events",
   "pattern_ontology_pointer",
@@ -75,6 +76,7 @@ const TABLES = [
 
 export async function resetDb(): Promise<void> {
   await env.DB.prepare("DROP TRIGGER IF EXISTS fail_pattern_correction_reconcile").run();
+  await env.DB.prepare("DROP TRIGGER IF EXISTS fail_machine_ontology_evaluation_receipt").run();
   // daily_readings.supersedes_reading_id self-references, so a bare DELETE can
   // hit a predecessor while its successor still points at it.
   //
@@ -515,6 +517,10 @@ export function enablePatternAi(): void {
   env.PATTERN_PUBLISHER = "synthetic";
   env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100";
   env.PATTERN_ARTIFACT_RETENTION_DAYS = "30";
+  // The general Pattern fixtures seed an unmarked ontology, which is
+  // deliberately internal-only. Keep USER_A on the test allowlist unless a
+  // containment test explicitly clears it.
+  env.PATTERN_INTERNAL_ACCOUNT_IDS = USER_A;
 }
 
 /**

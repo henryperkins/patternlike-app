@@ -10,10 +10,10 @@ Run from the repository root. Node 20+ (CI uses 22), Python 3.11+ with `pip inst
 
 ```bash
 npm install
-npm run typecheck          # strict tsc --noEmit across all four workspaces
-npm test                   # shared + calc-stub + api + web, then test:contracts
+npm run typecheck          # strict tsc --noEmit across every workspace
+npm test                   # shared + calc-stub + ontology-signer + api + web, then test:contracts
 npm run test:contracts     # python: JSON Schema/fixture validation + D1 SQL smoke apply
-npm run build              # shared/calc tsc, Worker dry-run deploy, Vite build
+npm run build              # shared/calc/signer tsc-or-dry-run, Vite build, API production dry-run
 
 npm run calc:dev           # calc service      :8080
 npm run db:local -w @patternlike/api   # apply db/d1/0001_m0_core.sql to local D1
@@ -36,9 +36,9 @@ There is no linter or formatter — `npm run typecheck` is the only mechanical s
 
 ## Architecture
 
-Four workspaces (`apps/*`, `packages/*`), one request path:
+Seven workspaces (`apps/*`, `packages/*`), one product request path plus an isolated signing sidecar:
 
-`apps/web` (React 19 + Vite PWA) → `apps/api` (Hono on Cloudflare Workers, D1) → `apps/calc-stub` (Node + Swiss Ephemeris, AGPL, deployed to Fly). The calc binding is plain HTTP (`CALC_SERVICE_URL` + optional `CALC_SERVICE_AUTH_TOKEN`) so the runtime can move without touching contracts. `packages/shared` holds wire types, id minting, canonical JSON, and the launch body/aspect lists used by both sides.
+`apps/web` (React 19 + Vite PWA) → `apps/api` (Hono on Cloudflare Workers, D1) → `apps/calc-stub` (Node + Swiss Ephemeris, AGPL, deployed to Fly). The calc binding is plain HTTP (`CALC_SERVICE_URL` + optional `CALC_SERVICE_AUTH_TOKEN`) so the runtime can move without touching contracts. `apps/ontology-signer` is not on that path: the API reaches its single `signOntology` RPC through the `ONTOLOGY_SIGNER` service binding. `packages/shared` holds wire types, id minting, canonical JSON, and the launch body/aspect lists used by both sides.
 
 `contracts/m0/` is the frozen source of truth (JSON Schema + OpenAPI + valid/invalid fixtures); `db/d1/0001_m0_core.sql` is the operational schema; `spec-bundle/` is the normative product spec v0.2.
 
@@ -84,6 +84,14 @@ Time Travel never touches `cycle_instances` or `cycle_passes`. Its only durable 
 USR-09 Life-event timeline is a **separate consent** from USR-06, granted only `["time_travel"]`. Both ride M0's frozen `contextSourcesDocument`; `PUT /v1/context-sources` is a one-source compare-and-set on both the document's and the source's `updated_at`, and an omitted source is untouched rather than disabled. Events live in `context_signals` under the existing per-user DEK — no new encrypted column, so `ENCRYPTED_COLUMNS` already covers them. `normalized_hash` is salted from a random value stored *inside* the ciphertext, and `buildAccountExport` strips `hash_salt` from **both** sources before it writes. Pause/resume mints a new `consent_id`; Time Travel follows `supersedes_consent_id` so events written under the prior grant reappear after resume, and stay hidden while the source is paused or revoked.
 
 `services/deletion-manifest.ts` now classifies every directly user-owned table as portable or non-portable in addition to deleted or retained. `natal_feature_sets`, `cycle_scan_receipts`, and `time_travel_daily_usage` are non-portable derived or operational state; a new user-owned table missing from either list fails `deletion-manifest.test.ts`.
+
+### Isolated ontology signing
+
+`apps/ontology-signer` holds `PATTERN_ONTOLOGY_SIGNING_KEY`. The API Worker `Env` has no such field; it only has the `ONTOLOGY_SIGNER` service binding. The signer has no `fetch` handler, no route, and no D1/R2/provider/corpus binding. Deploy it *before* any API deploy that declares the binding, or the API upload fails on an unknown Worker.
+
+Machine ingestions (`provenance.origin === "machine_pipeline"`) compile, verify the signature over the original **candidate** bytes, decrypt the evaluation artifact with `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING`, and only then write. R2 stores those candidate bytes byte-identical; activation is the D1 status/pointer flip in one guarded batch. `regression_passed` / `regression_report_hash` may ride the frozen contract and even be signed — they do not admit or block a release. Missing or malformed artifact-keyring configuration is `503`, not a 409 about the release.
+
+`db/d1/0011_ontology_pipeline_evidence.sql` is the terminal evidence receipt Task 9 needs (0009/0010 remain reserved for the adapter). `loadActiveOntology` LEFT JOINs that table, so apply 0011 before shipping the Worker that reads it. Bookmark and export first, same as 0002/0008. Until Tasks 1–7 land, nothing in production writes the receipt, so machine ingestions correctly answer `ontology_pipeline_evidence_missing`.
 
 ### Sign-in
 
@@ -155,8 +163,10 @@ The repo is **not** under a single license — see `LICENSING.md`. Only `apps/ca
 - Calc service: Fly.io, `fly deploy` from the repository root → `patternlike-calc` (iad, always-on, 2 machines). The Dockerfile copies root-level `package.json`, `package-lock.json`, and `packages/shared`, so never `cd` into the app dir or pass `--build-context`.
 - `fly.web.toml` / `patternlike-app` is the **superseded** Fly copy of the PWA, retired 2026-08-08 by scaling to 0 machines. The app and its name still exist, so `fly deploy -c fly.web.toml` would resurrect it; `fly apps destroy patternlike-app` releases the name for good.
 - The `app`/`primary_region` lines in each Fly config are load-bearing. Fly Launch rewrote `fly.toml` once (commit `5e6acec`), pointing the calc Dockerfile at the web app's name, which turns a bare `fly deploy` into "replace the PWA with the calc service". After anything regenerates a Fly config, diff those two lines and the `[[http_service.checks]]` block before deploying.
-- Worker secrets go in after the first deploy (`wrangler secret put` prompts interactively on a Worker that does not exist yet): `ROOT_KEK`, `CALC_SERVICE_AUTH_TOKEN`, and `SERVICE_AUTH_TOKEN` for `/internal/*`.
+- Worker secrets go in after the first deploy (`wrangler secret put` prompts interactively on a Worker that does not exist yet): `ROOT_KEK`, `CALC_SERVICE_AUTH_TOKEN`, and `SERVICE_AUTH_TOKEN` for `/internal/*`. Ontology extras, each on the Worker that owns them: `PATTERN_ONTOLOGY_SIGNING_KEY` on `patternlike-ontology-signer-production` (`npm run deploy:signer` first), and `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING` on the API Worker. Named environments do not inherit secrets.
+- **The ontology signer must exist before the first API deploy that declares `ONTOLOGY_SIGNER`.** `npm run deploy:signer`, then `wrangler secret put PATTERN_ONTOLOGY_SIGNING_KEY --config apps/ontology-signer/wrangler.toml --env production`, then API. Locally, `npx wrangler dev -c apps/api/wrangler.toml -c apps/ontology-signer/wrangler.toml` from the repository root resolves the service binding; a lone `npm run dev:api` cannot.
 - **Queues must exist before the first deploy that declares them**, or the upload fails on an unknown queue. All four were created 2026-08-09: `patternlike-daily-readings` and `…-dlq` for production, `…-dev` and `…-dev-dlq` for the default environment. Named environments do not inherit bindings, so both blocks declare their own producer and consumer.
 - `db/d1/0002_m3_daily_reading_pipeline.sql` **is applied** to the remote database (ledger entry 2026-08-09 10:38 UTC). Verified after the fact: the three new tables exist, every new column on `users`/`jobs`/`daily_readings`/`reading_sources`/`cycle_instances` is present, `assertion_probe` is empty, `PRAGMA foreign_key_check` returns zero rows, and `PRAGMA quick_check` is `ok`. Migrations from here go through `wrangler d1 migrations apply patternlike-ops --env production --remote` and the ordered runbook in `docs/superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md` §5 — bookmark and export first.
 - The remote ledger is now at **0008** (`0008_pattern_erasure_replay.sql`, applied 2026-08-19 18:26:07 UTC); `d1 migrations list` reports nothing pending. 0008 is purely additive — one table, two indexes, deliberately no FK to `users` — so the runbook's step 1 (quiesce writers) did not apply and no existing table was touched: row counts across all 41 data tables were identical before and after, with only the `d1_migrations` row added. Rollback point for that apply was Time Travel bookmark `00000079-00000000-000050cc-ad0358d50e1344ac82666ad9faebbc79` plus a full SQL export held outside the repository. **No runtime code writes `pattern_erasure_replay_events` yet** — the schema is intentionally ahead of the code, so its emptiness is the expected state and not a failed backfill.
+- `db/d1/0011_ontology_pipeline_evidence.sql` is **not applied** remotely. Apply it before the first production API deploy that JOINs `pattern_ontology_pipeline_evidence` (this branch). Bookmark and export first. 0009/0010 remain reserved for the adapter; do not invent them to close the numbering gap. Until Tasks 1–7 land, the table stays empty and machine ingestions fail closed on missing evidence.
 - Production has **no content release** (`content_releases` is empty) and `CONTENT_RELEASE_KEYS` is unset, so generation there answers `release_not_active` until an editorial bundle is signed and ingested.

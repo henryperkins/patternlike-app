@@ -1,3 +1,12 @@
+/** Service-binding RPC into the isolated ontology-signer Worker. */
+export interface OntologySignerBinding {
+  signOntology(request: {
+    payload: string;
+    payload_hash: string;
+    key_id: string;
+  }): Promise<unknown>;
+}
+
 /** Opaque queue nudge; the encrypted generation command remains in D1. */
 export interface GenerationMessage {
   job_id: string;
@@ -60,6 +69,17 @@ export interface Env {
    * jobs.payload_enc.
    */
   PATTERN_QUEUE: Queue<PatternGenerationMessage>;
+  /**
+   * Service-binding-only ontology signer. The private signing key is absent
+   * from this Env by construction and exists only in the signer Worker.
+   */
+  ONTOLOGY_SIGNER: OntologySignerBinding;
+  /**
+   * Secret v1 JSON keyring for decrypting ontology evaluation artifacts:
+   * `{"version":1,"keys":{"<key_id>":"<base64url 32-byte AES key>"}}`.
+   * Configure only with `wrangler secret put`; never add it to wrangler vars.
+   */
+  ONTOLOGY_PIPELINE_ARTIFACT_KEYRING?: string;
   /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
   CHECK_IN_RETENTION_MONTHS?: string;
   /** Positive cache epoch; bump before any result-changing calculation deploy. */

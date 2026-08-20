@@ -9,13 +9,14 @@
   ],
   "scripts": {
     "//build": "@patternlike/web builds BEFORE @patternlike/api: the api build is a production dry-run deploy, and [env.production.assets] reads apps/web/dist, which must already exist.",
-    "build": "npm run build -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/web -w @patternlike/api",
-    "typecheck": "npm run typecheck -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web",
-    "test": "npm run test -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/api -w @patternlike/web && npm run test:content && npm run test:contracts",
+    "build": "npm run build -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/ontology-signer -w @patternlike/web -w @patternlike/api",
+    "typecheck": "npm run typecheck -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/ontology-signer -w @patternlike/api -w @patternlike/web",
+    "test": "npm run test -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/ontology-signer -w @patternlike/api -w @patternlike/web && npm run test:content && npm run test:contracts",
     "//test:content": "Editorial candidate gate. Node test runner, no workspace: the builder is repository tooling and the candidates are review material, not shipped code.",
     "test:content": "node --test \"scripts/pattern-release/*.test.mjs\"",
     "test:contracts": "python contracts/validate_schemas.py && python contracts/m0/smoke_check.py && python contracts/smoke_check.py",
     "deploy:api": "npm run build -w @patternlike/web && npm run deploy -w @patternlike/api",
+    "deploy:signer": "npm run deploy -w @patternlike/ontology-signer",
     "dev:api": "npm run dev -w @patternlike/api",
     "db:local": "npm run db:local -w @patternlike/api",
     "calc:dev": "npm run dev -w @patternlike/calc-stub",
@@ -29,6 +30,7 @@
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
+    "esbuild@0.28.2": true,
     "workerd@1.20260730.1": true,
     "sweph@2.10.3-7": true,
     "browser-tabs-lock@1.3.0": true

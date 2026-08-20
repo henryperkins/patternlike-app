@@ -49,6 +49,7 @@ jobs:
       # the whole workspace shipped with no test coverage in CI.
       - run: npm run test -w @patternlike/reading-engine
       - run: npm run test -w @patternlike/calc-stub
+      - run: npm run test -w @patternlike/ontology-signer
       - run: npm run test -w @patternlike/api
       - run: npm run test -w @patternlike/web
       # Gates the deploy configuration. `npm run build` ends in

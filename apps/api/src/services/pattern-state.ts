@@ -16,7 +16,7 @@ import {
   type PatternClaimRow,
 } from "../db/pattern-claims.js";
 import { loadPatternGenerationGrant, patternConsentDocument } from "../db/pattern-consents.js";
-import { isOntologyRecalled, loadActiveOntology } from "../db/pattern-ontology.js";
+import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
 import { decryptUnderContentKey, unwrapContentKey } from "./pattern-crypto.js";
 import { publicStageFor, type PatternDomainStage } from "./pattern-command.js";
 import {
@@ -324,7 +324,12 @@ export async function buildPatternState(
     }
   }
 
-  if (!ontology) {
+  if (
+    !ontologyServesAccount(
+      ontology,
+      isInternalPatternAccount(env, identity.userId),
+    )
+  ) {
     return emptyState("ontology_unavailable", chartBlock, consent);
   }
   if (consent.status !== "granted") {

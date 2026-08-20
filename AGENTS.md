@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`apps/api/` is the Hono Cloudflare Worker, `apps/calc-stub/` the AGPL Swiss Ephemeris service, and `packages/shared/` the shared TypeScript library. Frozen schemas, OpenAPI files, and fixtures live in `contracts/m0/`; D1 migrations in `db/d1/`; normative specs in `spec-bundle/`; licensing decisions in `docs/legal/`. Keep TypeScript tests beside their subjects as `src/**/*.test.ts`.
+`apps/api/` is the Hono Cloudflare Worker, `apps/ontology-signer/` the isolated ontology-signing Worker, `apps/calc-stub/` the AGPL Swiss Ephemeris service, and `packages/shared/` the shared TypeScript library. Frozen schemas, OpenAPI files, and fixtures live in `contracts/m0/`; D1 migrations in `db/d1/`; normative specs in `spec-bundle/`; licensing decisions in `docs/legal/`. Keep TypeScript tests beside their subjects as `src/**/*.test.ts`.
 
 ## Build, Test, and Development Commands
 
