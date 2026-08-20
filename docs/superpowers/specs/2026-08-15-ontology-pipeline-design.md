@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-15
 
-**Status:** Draft for approval. No plan may be derived until this is approved.
+**Status:** Approved for implementation on 2026-08-20. All design questions are
+resolved below; the implementation plan is
+[`2026-08-20-automated-ontology-pipeline.md`](../plans/2026-08-20-automated-ontology-pipeline.md).
 
 **2026-08-16 amendment.** Product-spec v0.6 and
 [`2026-08-16-m7-spec-artifact-amendments.md`](2026-08-16-m7-spec-artifact-amendments.md)
@@ -16,6 +18,14 @@ release into a signed, evaluated, regression-tested ontology release and
 activates it — without human record approval. This is the only route to
 `PATTERN_AI_ROLLOUT=first_open` or `enabled`, and the only thing that can
 evidence acceptance criterion 19.
+
+**Human-free invariant.** No person approves, edits, selects, or publishes an
+individual ontology record or Pattern in this path. The immutable source corpus
+and configuration pins are inputs; generation, compilation, independent
+evaluation, fixed-chart regression, signing, ingestion, activation, and every
+reader Pattern are machine-run. Operational deployment approval may authorize a
+version or rollout state, but it cannot waive a failed record or alter generated
+content.
 
 ## Decision summary
 
@@ -225,12 +235,10 @@ Worker through a service binding with a single method: given a canonical payload
 and a key id, return a signature. It never sees a prompt, never calls a provider,
 and never writes D1 or R2. The pipeline Worker holds no signing key at all.
 
-This is the most expensive decision in the design and it is the operator's to
-confirm. The recorded alternative, if a second Worker is refused, is to sign in a
-CI job holding the key — still machine signing, so §31.10's "without human record
-approval" survives — with the deviation from §23.9 written into the release
-evidence. What the design will not do is put the key in the pipeline Worker and
-describe the result as isolated.
+This is the most expensive decision in the design and is approved. CI-held
+signing is no longer an implementation alternative. The pipeline Worker never
+receives the signing key, and the signing Worker has no provider, corpus, D1, or
+R2 bindings.
 
 ### Evaluator independence is a checked relationship
 
@@ -401,29 +409,34 @@ routed failure — and if the pipeline also uses provider-native BYOK, a request
 provider key would take precedence and bypass the stored key, so stored mode
 sends no provider `Authorization` and pins `cf-aig-byok-alias`.
 
-## Open questions
+## Resolved questions
 
-1. **The second Worker for signing.** Recommended, and the only thing that
-   literally satisfies §23.9. Costs a deploy target, a service binding and a
-   secret. The alternative is CI-held signing with the deviation recorded. The
-   operator decides.
-2. **Who supplies the first real corpus.** §23.2 puts curation out of scope, and
-   this slice cannot produce an externally-servable ontology without one. If no
-   licensed corpus exists, Slice B can still be built and proven against an
-   `internal_synthetic` corpus — but then its output is still not servable to
-   external readers, and the production gate moves to corpus acquisition rather
-   than engineering. **This is the question most likely to change the slice's
-   value, and it should be answered before the plan.**
-3. **Fixture corpus size and the pinned structural-acceptance threshold.** §23.8
-   names the chart classes but not the counts or the threshold. Both drive the
-   cost of every run and must be pinned before the budget is approved.
-4. **Whether a failed run's partial artifacts are retained.** They contain corpus
-   excerpts and generated records. Retention aids debugging and enlarges the
-   window in which licensed text sits in R2.
-5. **Successor releases.** §23.5 says the generator receives existing active
-   records when producing a successor. Whether the first production run is a
-   successor to the Slice A synthetic release or a fresh lineage is unresolved,
-   and it interacts with Slice A's open question 5 on retirement.
+1. **Signing isolation:** use the second Worker and a service binding. CI-held
+   signing is not an approved fallback.
+2. **First corpus:** implementation and hermetic end-to-end certification use a
+   contract-valid `internal_synthetic` corpus. Public activation additionally
+   requires an immutable corpus release whose fragments are authorized as
+   `licensed_excerpt` with machine-readable license and usage metadata. Corpus
+   acquisition remains outside engineering, but the required artifact shape and
+   stop condition are fixed; absence stops before signing and ingestion. No
+   human record approval is introduced.
+3. **Fixture corpus and threshold:** the first supported locale is `en-US`, with
+   30 activation fixtures: 10 exact-, 10 approximate-, and 10 unknown-birth-time
+   charts. The manifest must cover every §23.8 axis across that set. Structural
+   acceptance is at least 90% independently in each birth-time class, while all
+   hard gates remain zero-tolerance. If generator and evaluator model pins are
+   equal, structural acceptance rises to 100% in every class. Adding a locale
+   requires another complete 30-fixture lane for that locale.
+4. **Failed-run retention:** encrypted request, response, candidate, and report
+   artifacts from a failed run expire after seven days. Closed failure metadata
+   and aggregate usage remain; corpus excerpts and generated records are never
+   logged. Successful signed release evidence follows the release-retention and
+   recall rules rather than the failed-run TTL.
+5. **Successors:** the first `machine_pipeline` release is a fresh lineage and
+   receives no Slice A records as predecessor input. Its activation recalls the
+   Slice A release and triggers withdrawal for documents based on it. Later
+   machine releases are successors to the active machine release and may receive
+   those active records exactly as §23.5 specifies.
 
 ## Out of scope
 

@@ -1,5 +1,14 @@
 # M7 AI-generated Pattern — Remaining Slices Scoping Handoff
 
+**Historical scoping brief.** Do not use this file for current task status. The
+repository was reconciled on 2026-08-20 in
+`2026-08-15-m7-remaining-slices-ledger.md`; Slice A and B designs are approved,
+their open questions are resolved, and their executable plans are
+`2026-08-20-internal-ontology-activation.md` and
+`2026-08-20-automated-ontology-pipeline.md`. The adapter plan records Tasks
+1–5a complete and Tasks 6–10 open. Operational order and evidence live in
+`docs/deploy/openai-pattern-rollout.md`.
+
 Paste everything below the rule into a fresh session. It is written to be read
 by the agent picking the work up, not about them.
 
@@ -59,14 +68,11 @@ user-owned, and `pattern_admin_access_events` is *nullified* rather than deleted
 That is the intended classification, not a gap — but do not restate it as "every
 M7 table is covered."
 
-**31.8 is complete except on one item.** Correction, cleanup, recall and
-reconciliation are built. The §29.11 disaster-recovery replay ledger that
-acceptance criterion 23 depends on is **not** in the tree. Slice D covers the
-drill; treat 31.8 as open on that item so it is not skipped.
-
-**31.6 is planned but unbuilt** — the stage machine exists and fail-closes any
-non-synthetic publisher pin at `pattern-execute.ts:637`; only the model calls are
-missing, and that is the adapter plan above. Not your slice.
+**Historical 2026-08-15 snapshot:** 31.8 then lacked the replay ledger and 31.6
+was planned but unbuilt. That is no longer the exact repository state: `0008`
+and its contract now exist without their runtime/replayer, while adapter Tasks
+1–5a are complete and Tasks 6–10 remain. Use the banner's current ledger rather
+than this scoping snapshot for execution.
 
 `PATTERN_AI_ROLLOUT` is `off` in both wrangler blocks. Nothing you scope may
 change that.

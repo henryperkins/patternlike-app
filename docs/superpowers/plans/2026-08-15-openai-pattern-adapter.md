@@ -4,16 +4,17 @@
 
 **Goal:** Replace the three deterministic stand-ins behind M7 Your Pattern with a real OpenAI provider adapter — planner, writer, and semantic verifier — so an eligible consented reader receives a Pattern organized, written, and independently checked by a model inside the evidence envelope the deterministic selector already produces, instead of the `publisher_unavailable` terminal failure that any non-synthetic pin produces today.
 
-**Architecture:** Keep the existing stage machine, queue, lease, and artifact envelope exactly as they are. Add one shared Responses boundary lifted from the reading publisher, one minimizing packet builder, one prompt module whose strict schemas are derived at module load from `contracts/m7`, and one provider adapter behind a `PatternPublisher` interface with two implementations — `openai` and the existing deterministic stand-ins, which become a selectable publisher rather than dead code. `pattern-execute.ts` changes at exactly four call sites. The deterministic engine proposes nothing and disposes everything: `validatePatternPlan` and `validatePatternCandidate` run unchanged, afterwards.
+**Architecture:** Preserve the existing eligibility, lease-ownership, and atomic-publication invariants. Add one shared Responses boundary lifted from the reading publisher, one minimizing packet builder, one prompt module whose strict schemas are derived at module load from `contracts/m7`, and one provider adapter behind a `PatternPublisher` interface with two implementations — `openai` and the existing deterministic stand-ins. Rewire `pattern-execute.ts` through the twelve-step artifact-first protocol in Task 6, including attempt-scoped identity, guarded retries, writer return, and immediately-before-fetch accounting; the earlier "exactly four call sites" framing is withdrawn. The deterministic engine proposes nothing and disposes everything: `validatePatternPlan` and `validatePatternCandidate` remain authoritative after model output.
 
 **Tech Stack:** TypeScript, Hono, Cloudflare Workers, Queues, D1 and R2, Vitest with the Workers pool, Node test through tsx, Python jsonschema validation, OpenAI Responses API, and npm workspaces.
 
 **Authoritative design:** `docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md`, as amended by `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` and product-spec v0.6. If implementation evidence requires a behavioral change, stop and amend/reapprove the design before changing code.
 
-**Approval record (2026-08-19):** Q1–Q6 and the human-free generation
-invariant are approved. Task 5a's live-reading credential change is separately
-approved. No implementation-plan sign-off gate remains; rollout gates still
-apply independently.
+**Approval and implementation record:** Q1–Q6 and the human-free generation
+invariant were approved on 2026-08-19. Tasks 1–5a are implemented and were
+reverified at current HEAD on 2026-08-20; Tasks 6–10 remain open. No
+implementation-plan sign-off gate remains; rollout gates still apply
+independently.
 
 ---
 
@@ -389,6 +390,8 @@ One consequence to keep in view rather than act on now. Everything that matters 
 
 ### Task 1: Extract the shared Responses boundary
 
+**Status:** Complete in `8558e82`; reverified at current HEAD on 2026-08-20.
+
 **Files:**
 
 - Create: `apps/api/src/services/openai-responses-adapter.ts`
@@ -400,21 +403,24 @@ Lift verbatim from `openai-reading-publisher.ts`: `extractOutputText` (`:75-106`
 
 These functions carry no reading semantics — the only reading-specific line in `extractOutputText` is its return type, which becomes a generic parameter. Copying instead of extracting would let the two drift on the one behavior that is expensive to rediscover: a refusal part accompanied by text, two text parts, reasoning items ahead of the message.
 
-- [ ] **Step 1: Write the failing shared-boundary test.** Cover the envelope cases directly: a refusal part alongside an `output_text` part resolves to refusal; two text parts is `publisher_output_invalid`, not a silent first-wins; reasoning items preceding the message are skipped; `incomplete_details.reason` of `max_output_tokens` maps to its own safe detail and not to malformed JSON. Assert `responsesUrlFor(null)` is the direct origin and a route yields `…/openai/responses`, never `…/openai/v1/responses`.
-- [ ] **Step 2: Run and confirm failure.**
+- [x] **Step 1: Write the failing shared-boundary test.** Cover the envelope cases directly: a refusal part alongside an `output_text` part resolves to refusal; two text parts is `publisher_output_invalid`, not a silent first-wins; reasoning items preceding the message are skipped; `incomplete_details.reason` of `max_output_tokens` maps to its own safe detail and not to malformed JSON. Assert `responsesUrlFor(null)` is the direct origin and a route yields `…/openai/responses`, never `…/openai/v1/responses`.
+- [x] **Step 2: Run and confirm failure.**
 
       npm exec -w @patternlike/api -- vitest run src/services/openai-responses-adapter.test.ts
 
-- [ ] **Step 3: Extract, and prove the reading publisher unchanged.** Move the functions, re-point `openai-reading-publisher.ts` at the new module, and change no reading behavior. The existing reading suite is the regression proof — it must pass untouched.
-- [ ] **Step 4: Run both lanes.**
+- [x] **Step 3: Extract, and prove the reading publisher unchanged.** Move the functions, re-point `openai-reading-publisher.ts` at the new module, and change no reading behavior. The existing reading suite is the regression proof — it must pass untouched.
+- [x] **Step 4: Run both lanes.**
 
       npm exec -w @patternlike/api -- vitest run src/services/openai-responses-adapter.test.ts src/services/openai-reading-publisher.test.ts src/config.test.ts
       npm run typecheck -w @patternlike/api
 
   Expected: all pass, and the reading publisher's test file has **no diff**.
-- [ ] **Step 5: Commit.** `api: extract the shared OpenAI Responses boundary`
+- [x] **Step 5: Commit.** `api: extract the shared OpenAI Responses boundary`
 
 ### Task 2: Add the minimizing Pattern packet builders
+
+**Status:** Complete in `6b52c6c`, hardened in `5191a1f`; reverified at current
+HEAD on 2026-08-20.
 
 **Files:**
 
@@ -427,16 +433,19 @@ Three builders producing the provider-visible input documents for planner, write
 
 So build each document from an **explicit allowlist** of keys, copying named fields into a fresh object rather than spreading or passing through. Then, after serialisation and before the request is built, walk the serialised structure and reject any key outside the allowlist, plus any occurrence of the forbidden identifier names. Narrow input types stay — they catch the easy mistakes at compile time — but they are the second line, not the guarantee. Do not accept the wide `selected` object and pick fields off it.
 
-- [ ] **Step 1: Write the failing minimization tests.** Assert each builder's output serializes to a document containing none of the forbidden identifiers, using a deep scan over the serialized JSON against a fixture whose every private value is a recognizable sentinel. Assert `aliasMap` is absent from all three. Assert the byte size is bounded by `PATTERN_INPUT_MAX_BYTES` and that exceeding it is a typed refusal, not a truncation. **Include the two cases that motivate the runtime check, separately.** First: pass the full wide `selected` object where the narrow type is declared — TypeScript permits it — and assert the builder *omits* every non-allowlisted field, so nothing extra is emitted. Second: hand the post-serialisation walk a document that already contains an unexpected key and assert it *rejects*. One test cannot prove both, because a builder that correctly omits leaves the validator nothing to catch.
-- [ ] **Step 2: Run and confirm failure.**
+- [x] **Step 1: Write the failing minimization tests.** Assert each builder's output serializes to a document containing none of the forbidden identifiers, using a deep scan over the serialized JSON against a fixture whose every private value is a recognizable sentinel. Assert `aliasMap` is absent from all three. Assert the byte size is bounded by `PATTERN_INPUT_MAX_BYTES` and that exceeding it is a typed refusal, not a truncation. **Include the two cases that motivate the runtime check, separately.** First: pass the full wide `selected` object where the narrow type is declared — TypeScript permits it — and assert the builder *omits* every non-allowlisted field, so nothing extra is emitted. Second: hand the post-serialisation walk a document that already contains an unexpected key and assert it *rejects*. One test cannot prove both, because a builder that correctly omits leaves the validator nothing to catch.
+- [x] **Step 2: Run and confirm failure.**
 
       npm exec -w @patternlike/api -- vitest run src/services/pattern-packet.test.ts
 
-- [ ] **Step 3: Implement the three builders.** Deterministic key order so the same packet yields identical bytes across calls — the artifact hash depends on it.
-- [ ] **Step 4: Run the lane and typecheck.**
-- [ ] **Step 5: Commit.** `api: add minimizing Pattern provider packet builders`
+- [x] **Step 3: Implement the three builders.** Deterministic key order so the same packet yields identical bytes across calls — the artifact hash depends on it.
+- [x] **Step 4: Run the lane and typecheck.**
+- [x] **Step 5: Commit.** `api: add minimizing Pattern provider packet builders`
 
 ### Task 3: Add the Pattern prompt module and derived strict schemas
+
+**Status:** Complete in `0d7b5fa`, with the live strict-mode preflight recorded
+in `31d3621`; reverified at current HEAD on 2026-08-20.
 
 **Files:**
 
@@ -447,13 +456,15 @@ Three system policies, three request builders, three output-schema names, the cl
 
 Schemas are **derived from a bundled JSON import** of the normative `contracts/m7` documents — `import schema from "../../../../contracts/m7/....json"`, exactly as `reading-prompt.ts:22` already does — with the two keywords OpenAI strict mode does not support stripped at module load. Wrangler bundles those imports; a runtime filesystem read would not work in Workers. Do not check in a second copy: that is a contract that drifts silently.
 
-- [ ] **Step 1: Write the failing prompt and derivation tests.** Assert each derived schema is the contract schema minus exactly the unsupported keywords, with every `required` and every `additionalProperties: false` preserved. Assert the request shape: exact model, reasoning effort, `max_output_tokens`, `store: false`, no background, no tools, no browsing/file-search/code/MCP fields, and `text.format` of type `json_schema` with `strict: true`. Assert prompt-injection resistance: ontology rule text and packet values that read as instructions cannot alter system policy, schema, tools, model, or request fields.
-- [ ] **Step 2: Run and confirm failure.**
-- [ ] **Step 3: Implement policies, builders, derivation, and the closed finding vocabulary.** Record the Q4 decision in a module comment: the list lives here until a live corpus stabilizes it.
-- [ ] **Step 4: Run the lane and typecheck.**
-- [ ] **Step 5: Commit.** `api: add Pattern prompt policies and derived strict schemas`
+- [x] **Step 1: Write the failing prompt and derivation tests.** Assert each derived schema is the contract schema minus exactly the unsupported keywords, with every `required` and every `additionalProperties: false` preserved. Assert the request shape: exact model, reasoning effort, `max_output_tokens`, `store: false`, no background, no tools, no browsing/file-search/code/MCP fields, and `text.format` of type `json_schema` with `strict: true`. Assert prompt-injection resistance: ontology rule text and packet values that read as instructions cannot alter system policy, schema, tools, model, or request fields.
+- [x] **Step 2: Run and confirm failure.**
+- [x] **Step 3: Implement policies, builders, derivation, and the closed finding vocabulary.** Record the Q4 decision in a module comment: the list lives here until a live corpus stabilizes it.
+- [x] **Step 4: Run the lane and typecheck.**
+- [x] **Step 5: Commit.** `api: add Pattern prompt policies and derived strict schemas`
 
 ### Task 3a: Add the writer correction path
+
+**Status:** Complete in `adc22fc`; reverified at current HEAD on 2026-08-20.
 
 **Files:**
 
@@ -466,17 +477,20 @@ Schemas are **derived from a bundled JSON import** of the normative `contracts/m
 
 The load-bearing constraint is what the correction document must **not** contain: rejected prose is never echoed into the correction prompt. Nor is the verifier's rationale text, which is prose about prose. The document carries codes, keys, and rule identifiers only.
 
-- [ ] **Step 1: Write the failing correction-document tests.** Assert the builder emits only codes, chapter/section keys, and rule ids — prove it with a rejected candidate whose every sentence is a recognizable sentinel, and a deep scan showing no sentinel survives into the correction document or the rebuilt writer request. Assert the frozen plan and evidence assignments are carried through unchanged. Assert the writer may rephrase and reorganize sections within a chapter but cannot change chapter membership, chapter count, omitted features, or ontology authorization (§13.5).
-- [ ] **Step 2: Run and confirm failure.**
-- [ ] **Step 3: Implement the correction document builder and correction prompt variant.**
-- [ ] **Step 4: Run the lane and typecheck.**
-- [ ] **Step 5: Commit.** `api: add the Pattern writer correction document and prompt`
+- [x] **Step 1: Write the failing correction-document tests.** Assert the builder emits only codes, chapter/section keys, and rule ids — prove it with a rejected candidate whose every sentence is a recognizable sentinel, and a deep scan showing no sentinel survives into the correction document or the rebuilt writer request. Assert the frozen plan and evidence assignments are carried through unchanged. Assert the writer may rephrase and reorganize sections within a chapter but cannot change chapter membership, chapter count, omitted features, or ontology authorization (§13.5).
+- [x] **Step 2: Run and confirm failure.**
+- [x] **Step 3: Implement the correction document builder and correction prompt variant.**
+- [x] **Step 4: Run the lane and typecheck.**
+- [x] **Step 5: Commit.** `api: add the Pattern writer correction document and prompt`
 
 ---
 
 ## Phase B: The provider boundary
 
 ### Task 4: Add the OpenAI Pattern publisher
+
+**Status:** Complete in `69a49fb`, hardened in `d070e2c` and live-preflight
+validated in `31d3621`; reverified at current HEAD on 2026-08-20.
 
 **Files:**
 
@@ -488,7 +502,7 @@ The provider boundary for all three passes: headers, one `AbortController`, one 
 
 Send the same three `cf-aig-*` headers the reading adapter pins, for the same three reasons: `collect-log: false` because gateway logs store prompt and response verbatim and payload storage defaults to on, `max-attempts: 1` because a gateway retry makes one delivery into up to five calls the usage ledger counts as one, and `skip-cache: true` because a cache hit gives two Patterns one `provider_response_hash`. See the AI Gateway integration section for the verification of each against the Cloudflare source, and for the headers that must never be sent.
 
-- [ ] **Step 1: Write the failing adapter tests.** One fetch maximum per pass. Hash computed over the exact response bytes before parsing. The bytes are **not** discarded at the adapter boundary: Task 6 step 10 writes them to the encrypted response artifact and step 4 may later adopt them, so `PassResult` carries the exact bytes alongside the parsed candidate and the hash, and the caller discards them once R2 has committed. They must never reach a failure detail, a returned error, or a log. Failure mapping: timeout/network/429/retryable-5xx to `publisher_unavailable`, 401/403 to `publisher_auth_failed`, model-not-found to `publisher_model_unavailable`, refusal part to `publisher_refused`, malformed or incomplete output to `publisher_output_invalid`. No provider text, header, URL, or exception message reaches a returned detail or a log.
+- [x] **Step 1: Write the failing adapter tests.** One fetch maximum per pass. Hash computed over the exact response bytes before parsing. The bytes are **not** discarded at the adapter boundary: Task 6 step 10 writes them to the encrypted response artifact and step 4 may later adopt them, so `PassResult` carries the exact bytes alongside the parsed candidate and the hash, and the caller discards them once R2 has committed. They must never reach a failure detail, a returned error, or a log. Failure mapping: timeout/network/429/retryable-5xx to `publisher_unavailable`, 401/403 to `publisher_auth_failed`, model-not-found to `publisher_model_unavailable`, refusal part to `publisher_refused`, malformed or incomplete output to `publisher_output_invalid`. No provider text, header, URL, or exception message reaches a returned detail or a log.
 
   **Gateway-layer classification.** Route presence and status are not enough:
   provider responses traverse the route, and Cloudflare does not document a
@@ -518,13 +532,15 @@ Send the same three `cf-aig-*` headers the reading adapter pins, for the same th
   an outgoing-name allowlist so a later header fails by default; Task 5a
   deliberately extends it with `cf-aig-byok-alias` in stored-key mode. Assert
   the gateway URL is `…/openai/responses`, never `…/openai/v1/responses`.
-- [ ] **Step 2: Run and confirm failure.**
-- [ ] **Step 3: Implement the three pass methods.**
-- [ ] **Step 4: Extend the hermetic mock.** `mock-calc-service.ts` already routes `AI_GATEWAY_HOST`; add the Pattern pass scenarios keyed by request id or scenario header. Unknown hosts keep failing closed.
-- [ ] **Step 5: Run the lane and typecheck.**
-- [ ] **Step 6: Commit.** `api: add the OpenAI Pattern provider adapter`
+- [x] **Step 2: Run and confirm failure.**
+- [x] **Step 3: Implement the three pass methods.**
+- [x] **Step 4: Extend the hermetic mock.** `mock-calc-service.ts` already routes `AI_GATEWAY_HOST`; add the Pattern pass scenarios keyed by request id or scenario header. Unknown hosts keep failing closed.
+- [x] **Step 5: Run the lane and typecheck.**
+- [x] **Step 6: Commit.** `api: add the OpenAI Pattern provider adapter`
 
 ### Task 5: Add the PatternPublisher interface and two factories
+
+**Status:** Complete in `86783ab`; reverified at current HEAD on 2026-08-20.
 
 **Files:**
 
@@ -565,13 +581,15 @@ Extract the evaluator into its own module — `pattern-semantic.ts` — taking t
       reserve: (stageClass: PatternStageClass) => Promise<{ ok: boolean }>;
     }
 
-- [ ] **Step 1: Write the failing interface and configuration tests.** Include the **Q3 regression test**: `checkSecureConfig` refuses `PATTERN_PUBLISHER=synthetic` outside development, so a `constrained_model` document authored by the stand-ins cannot exist in a reader-serving environment. Add the gateway refusals for the Pattern path — a half-configured pair is `publisher_not_configured`, never a fallback to the direct origin. Add the **§14.2 verifier-independence refusal**: `resolvePatternPublisherConfiguration` rejects a configuration where `OPENAI_PATTERN_VERIFIER_PROMPT_VERSION` equals `OPENAI_PATTERN_WRITER_PROMPT_VERSION`. Today the two differ only by the accident of two constants (`pattern-publisher.ts:25,31`); this makes the separation a checked relationship, so one model configuration cannot become sole author and judge without the deployment refusing.
-- [ ] **Step 2: Run and confirm failure.**
-- [ ] **Step 3: Implement both factories.** Comment the synthetic factory with the Q3 decision and its enforcement line.
-- [ ] **Step 4: Run the lane and typecheck.**
-- [ ] **Step 5: Commit.** `api: add the Pattern publisher interface and two factories`
+- [x] **Step 1: Write the failing interface and configuration tests.** Include the **Q3 regression test**: `checkSecureConfig` refuses `PATTERN_PUBLISHER=synthetic` outside development, so a `constrained_model` document authored by the stand-ins cannot exist in a reader-serving environment. Add the gateway refusals for the Pattern path — a half-configured pair is `publisher_not_configured`, never a fallback to the direct origin. Add the **§14.2 verifier-independence refusal**: `resolvePatternPublisherConfiguration` rejects a configuration where `OPENAI_PATTERN_VERIFIER_PROMPT_VERSION` equals `OPENAI_PATTERN_WRITER_PROMPT_VERSION`. Today the two differ only by the accident of two constants (`pattern-publisher.ts:25,31`); this makes the separation a checked relationship, so one model configuration cannot become sole author and judge without the deployment refusing.
+- [x] **Step 2: Run and confirm failure.**
+- [x] **Step 3: Implement both factories.** Comment the synthetic factory with the Q3 decision and its enforcement line.
+- [x] **Step 4: Run the lane and typecheck.**
+- [x] **Step 5: Commit.** `api: add the Pattern publisher interface and two factories`
 
 ### Task 5a: Make the provider credential model explicit
+
+**Status:** Complete in `d2975e0`; reverified at current HEAD on 2026-08-20.
 
 **Files:**
 
@@ -602,14 +620,14 @@ Resolution rules, all enforced in `resolvePublisherConfiguration` so a wrong com
 
 `responsesUrlFor` and the `AI_GATEWAY_ACCOUNT_ID`/`AI_GATEWAY_ID` validators are **unchanged** — with no custom domain, the shipped id-path URL builder is exactly right for this deployment. This task is the credential mode only.
 
-- [ ] **Step 1: Write the failing credential tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; that absence is what permits BYOK to win under documented credential precedence. Extend the outgoing-header allowlist for exactly that one header in stored mode. Assert `worker` mode produces a byte-identical request to today's. Assert each refusal above with its message. Assert `responsesUrlFor` still produces the direct origin and the id-path gateway URL and is otherwise untouched.
-- [ ] **Step 2: Run and confirm failure.**
+- [x] **Step 1: Write the failing credential tests.** Assert `gateway_stored` sends **no** `authorization` header and does send `cf-aig-byok-alias`; that absence is what permits BYOK to win under documented credential precedence. Extend the outgoing-header allowlist for exactly that one header in stored mode. Assert `worker` mode produces a byte-identical request to today's. Assert each refusal above with its message. Assert `responsesUrlFor` still produces the direct origin and the id-path gateway URL and is otherwise untouched.
+- [x] **Step 2: Run and confirm failure.**
 
       npm exec -w @patternlike/api -- vitest run src/config.test.ts src/services/openai-reading-publisher.test.ts src/services/openai-pattern-publisher.test.ts
-- [ ] **Step 3: Implement the credential mode.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode. Set `OPENAI_CREDENTIAL_SOURCE="worker"` in both Wrangler blocks for this code deployment, leave the alias empty, and do not alter either rollout or secret.
-- [ ] **Step 4: Add the cutover invariant to the rollout handoff.** The later switch to `gateway_stored` must stage gateway ids, alias, gateway token, and removal of `OPENAI_API_KEY` in one Worker version, or use an explicitly temporary migration state that never sends provider `Authorization`. Ordinary immediate secret deletion is not a safe sequence.
-- [ ] **Step 5: Run both adapter lanes, config, and typecheck.**
-- [ ] **Step 6: Commit.** `api: declare the provider credential mode`
+- [x] **Step 3: Implement the credential mode.** The reading adapter changes shape here; its existing suite must still pass unchanged in `worker` mode. Set `OPENAI_CREDENTIAL_SOURCE="worker"` in both Wrangler blocks for this code deployment, leave the alias empty, and do not alter either rollout or secret.
+- [x] **Step 4: Add the cutover invariant to the rollout handoff.** The later switch to `gateway_stored` must stage gateway ids, alias, gateway token, and removal of `OPENAI_API_KEY` in one Worker version, or use an explicitly temporary migration state that never sends provider `Authorization`. Ordinary immediate secret deletion is not a safe sequence.
+- [x] **Step 5: Run both adapter lanes, config, and typecheck.**
+- [x] **Step 6: Commit.** `api: declare the provider credential mode`
 
 ---
 
@@ -617,15 +635,21 @@ Resolution rules, all enforced in `resolvePublisherConfiguration` so a wrong com
 
 ### Task 6: Implement the design's stage protocol
 
+**Status:** Complete on 2026-08-20. Three files beyond the one this task
+originally listed, each recorded under *As built* below.
+
 **Files:**
 
 - Modify: `apps/api/src/services/pattern-execute.ts`
+- Modify: `apps/api/src/services/pattern-publisher.ts`
+- Modify: `apps/api/src/services/openai-pattern-publisher.ts`
+- Create: `apps/api/src/services/pattern-execute-protocol.test.ts`
 
 **This task was previously framed as "four edit points, and nothing else changes semantics." That framing was wrong and is withdrawn.** The adapter design's *Idempotency and at-least-once safety* section specifies a twelve-step protocol, three new behaviours, and a function that does not exist yet; the earlier draft compressed all of it into one sentence about an "attempt component" and then raised it as an open question. The design is not silent — the plan had dropped the section. Implement the design's protocol; do not invent a third option.
 
 Read `2026-08-15-openai-pattern-adapter-design.md` § *Idempotency and at-least-once safety* in full before starting. The failure it exists to prevent is concrete: today `advance()` throws on a transient D1 error, nothing commits, the expired-lease lane re-sends the **same** `stage_generation`, the re-run charges budget and calls the provider again, `putArtifact` computes the same three-component id, the create-only put fails, `head()` returns silently (`:269-272`), and `advance` then writes a hash computed over the *second* response — so the next stage fails `plan_missing`. Deterministic stand-ins make the two responses identical and hide it. With a model it is a reader whose Pattern dies on a D1 blip.
 
-**Create `retryStage(env, job, token, pass, availableAt)`.** It does not exist — `pattern-execute.ts` has only `advance` and `failJob`. It runs `ownershipProbes`, returns the job to `queued` on the **same** `stage_generation`, increments `<pass>_attempts` in that same guarded batch, and nudges the same generation. It is the **only** thing that increments an attempt counter, which is precisely what lets a redelivery recompute the same `k`.
+**Create `retryStage(env, job, token, pass, availableAt)`.** It does not exist — `pattern-execute.ts` has only `advance` and `failJob`. It runs `ownershipProbes`, returns the job to `queued` on the **same** `stage_generation`, increments `<pass>_attempts` in that same guarded batch, and nudges the same generation. It owns same-stage retry increments. Task 8b adds the other counter-writing transition, `returnToWriter`, for semantic rejection; `advance` never increments the counter of the pass whose result it commits.
 
 **Attempt-scoped artifact identity.** `putArtifact`'s digest input becomes `${generation_id}:${artifact_class}:${stage_generation}:${attempt}` (today `:255` has only the first three). Add `patternArtifactId(generationId, artifactClass, stageGeneration, attempt)` and `getArtifactAt(...)` beside the existing `getArtifact`, which keeps selecting the newest artifact of a class and stays the right tool for reading `validated_plan` across a stage boundary. A redelivery recomputes the same `k` and adopts the stored response; a genuine retry uses `k+1` and is *allowed* to differ — the planner's second attempt may legitimately propose a different plan, and the current three-component id would silently discard it. This changes ids written by current code, which is harmless: rollout is `off` in both blocks, no production generation exists, and artifacts expire at 30 days.
 
@@ -654,11 +678,122 @@ Step 7 is where §25.3's "consumed immediately before each provider call" lands,
 
 The publisher-selection edit is unchanged from the earlier draft: the fail-closed guard at `:637-640` becomes publisher selection, with a half-configured gateway a terminal `publisher_not_configured`. The three stand-in call sites become `publisherImpl.plan/write/verify`, and `validatePatternPlan` / `validatePatternCandidate` still run immediately after, unchanged.
 
-- [ ] **Step 1: Write the failing protocol tests.** An `openai` pin reaches the adapter instead of failing closed. A synthetic pin still produces the deterministic document in development. A delivery failing eligibility or ontology recheck spends no budget. **A provider success whose `advance` then fails, redelivered, adopts the stored artifact: same `k`, no second fetch, no second budget unit, and the hash advanced into D1 names the first response's committed bytes.** A genuine `retryStage` retry writes at `k+1` and may differ. A mismatched `plaintext_sha256` under a reserved identity throws rather than returning silently. `k >= max` fails terminally with no provider call.
-- [ ] **Step 2: Run and confirm failure.**
-- [ ] **Step 3: Implement `retryStage`, attempt-scoped identity, the artifact-first probe, and the conflict check.** Touch nothing on the load-bearing list in Global Constraints.
-- [ ] **Step 4: Run the Pattern lane and typecheck.**
+- [x] **Step 1: Write the failing protocol tests.** An `openai` pin reaches the adapter instead of failing closed. A synthetic pin still produces the deterministic document in development. A delivery failing eligibility or ontology recheck spends no budget. **A provider success whose `advance` then fails, redelivered, adopts the stored artifact: same `k`, no second fetch, no second budget unit, and the hash advanced into D1 names the first response's committed bytes.** A genuine `retryStage` retry writes at `k+1` and may differ. A mismatched `plaintext_sha256` under a reserved identity throws rather than returning silently. `k >= max` fails terminally with no provider call.
+- [x] **Step 2: Run and confirm failure.** 8 of 8 failed.
+- [x] **Step 3: Implement `retryStage`, attempt-scoped identity, the artifact-first probe, and the conflict check.** Touch nothing on the load-bearing list in Global Constraints.
+- [x] **Step 4: Run the Pattern lane and typecheck.** `npm run typecheck` clean across all four workspaces; `npm test -w @patternlike/api` 1195 passed across 72 files; `npm run test:contracts` and the D1 migration smoke checks pass.
 - [ ] **Step 5: Commit.** `api: implement the Pattern stage idempotency protocol`
+
+#### As built
+
+Four deviations from the task as written, each recorded rather than assumed.
+
+**The pin reached is the live configuration's, not the frozen command's.** The
+executor resolves `resolvePatternPublisherConfiguration(env)` and dispatches on
+`config.pin.publisher`, exactly as the fail-closed guard it replaces did. The
+frozen `command.publisher` pin is still not read. That means an operator who
+flips `PATTERN_PUBLISHER` mid-generation changes the author of a Pattern already
+in flight. It is pre-existing behaviour, it is not what this task was asked to
+change, and Task 7 — which derives provenance from *the pin that ran* — is where
+it should be settled.
+
+**Two configuration refusals moved into `pattern-publisher.ts`.** Design
+refusal 1 requires the gateway route to be *carried on `PatternPublisherConfig`*
+"so the adapter is handed one explicitly rather than defaulting", and Task 6
+cannot construct an OpenAI publisher without a route and a credential. Both are
+now resolved at configuration time and carried on the config. The same change
+removes `OPENAI_API_KEY` from the `openai` pin's `required` list and replaces it
+with `resolveProviderCredentialMode`: requiring the key literally made
+`OPENAI_CREDENTIAL_SOURCE=gateway_stored` — the approved 2026-08-19 credential
+model — unreachable for Pattern, because BYOK requires the key to be *absent*.
+The openai pin now requires `OPENAI_CREDENTIAL_SOURCE` to be set explicitly
+rather than inferred, which is why `pattern-publisher.test.ts`'s environment
+fixture gains it.
+
+**`provider_4xx` was added to `PatternSafeDetailCode`.** The design's failure
+table needs it — "other 4xx" is terminal `publisher_request_invalid`, while a
+post-200 shape failure is retryable — but the adapter mapped both to
+`schema_mismatch`, so the executor could not tell them apart and would have spent
+the whole pass ceiling re-sending a request that can never succeed.
+
+**The verifier writes two artifacts.** `verifier_response` is the coordinate the
+artifact-first probe needs, uniform with `planner_response` and `writer_response`;
+`semantic_verdict` remains the verdict of record under the class an operator and
+the retention sweep look for. Same bytes, two roles.
+
+Deterministic `plan_invalid` and `candidate_invalid` remain terminal, unchanged
+from before this task. `retryStage` exists, is exported, and is wired to
+retryable *provider* failures; Task 8b routes the deterministic rejections
+through it and adds `returnToWriter`.
+
+#### What the review caught, and what it changed
+
+A five-lens adversarial review of the diff raised ten findings. Six were real
+and are fixed in this task; the rest are recorded rather than silently dropped.
+
+**Fixed — the verdict is a model document now, and one read of it is not
+enough.** `verdict.verdict !== "pass"` was the entire check. It honours a `pass`
+carrying a `severity: "error"` finding, which the design calls incoherent rather
+than a pass, and it records a malformed body — `{"result":"ok"}`, `verdict`
+`undefined` — as `semantic_verification_failed`, the one failure class that
+tells an operator the verifier was the reason. `findSemanticVerdictProblem` in
+`pattern-semantic.ts` now checks the contract shape, the closed
+`PATTERN_FINDING_CODES` vocabulary the design puts out of band, and the
+pass/error coherence rule, and a failure is `publisher_output_invalid` — so it
+retries within the pass ceiling instead of dying as a semantic rejection.
+
+**Fixed — the candidate is bound before the verifier sees it.** `getArtifact`
+selects the *newest* `writer_response`; the job row names the exact one the
+writer stage advanced with. The verifier arm now compares the two and fails
+`candidate_missing` on disagreement, and publication uses the bound hash rather
+than recomputing one over whatever was read back. The design requires exactly
+this: "the verdict must be bound to the exact `candidate_hash` the job row
+holds."
+
+**Fixed — a malformed model document no longer throws its way to
+`execution_error`.** `validatePatternPlan` dereferences `output.chapters.length`
+and `validatePatternCandidate` dereferences `output.title.length`. That was safe
+while every document came from a deterministic builder. A planner answering
+`{"schema_version":"0.7.0"}` would have thrown a `TypeError` into the outer catch
+and died terminally with the pass's remaining attempt unspent. Both calls are now
+wrapped and a throw is classified as `publisher_output_invalid`.
+
+**Fixed — the retry backoff was measured from the wrong clock.** `now` is bound
+at delivery entry, before the claim, the decrypt, the rechecks, the selection and
+a provider call that may take the full 120-second timeout. A pass that timed out
+at attempt 0 was told to wait thirty seconds from a moment ninety seconds in the
+past — no backoff at all, and a 429's `retry_after_seconds` floor silently
+ignored with it.
+
+**Fixed — `getArtifactAt` trusted D1's claim about bytes it had already
+decrypted.** It returned `row.plaintext_sha256` rather than hashing the plaintext
+in its hand, and that value becomes `plan_hash`, `candidate_hash` or
+`semantic_verdict_hash` on every adopting redelivery. It now recomputes and
+treats a disagreement as an integrity conflict.
+
+**Fixed — a create-only put whose inventory insert lands nowhere.**
+`ON CONFLICT(object_key) DO NOTHING` meant a surviving row for an object that no
+longer exists would keep its stale hash while `putArtifact` returned the hash of
+the bytes it had just written. The fresh-write path now requires the insert to
+affect a row; the torn-write repair path deliberately does not, because losing
+that race to a concurrent repair is the expected outcome.
+
+**Recorded, not fixed.** Three findings are real but belong elsewhere:
+
+- **`retryStage`'s backoff needs a cron that production does not run.**
+  `[env.production.triggers]` is an explicit `crons = []`, so `sweepPatternJobs`
+  never fires in production and a backed-off job waits forever. Enabling it is a
+  separate gated configuration change shared with the daily-reading scheduler,
+  so it is now a decision recorded at Gate 3 of
+  `docs/deploy/openai-pattern-rollout.md` rather than a code change here.
+- **`publisher_budget_exhausted` surfaces to the reader as `retryable: true`**,
+  against its taxonomy row. The reader-facing derivation predates this task and
+  is not specific to budget; it belongs with Task 9's failure-taxonomy work.
+- **The artifact-first probe keys on the D1 inventory row while the create-only
+  reservation is the R2 put.** A delivery whose inventory insert throws after the
+  object commits still dies `execution_error`; only the *redelivery* is repaired,
+  by `adoptReservedArtifact`. Making the probe authoritative over the reservation
+  means an R2 read on every probe miss, which is a Task 9 decision.
 
 
 ### Task 7: Derive provenance from the pin that ran
@@ -716,11 +851,11 @@ pass and budget charged on stage entry.
 - Modify: `apps/api/src/db/pattern-provider-usage.ts`
 - Modify: `apps/api/test/apply-migrations.ts`
 
-**Q6 approved 2026-08-19.** §25.3 requires the ledger to record used calls by stage class; `pattern_provider_daily_usage` has one undifferentiated `used_calls` column. Add bounded per-stage-class counters beside it. `used_calls` remains the total the shared ceiling is enforced against, so the ceiling semantics §25.3 also specifies are unchanged.
+**Q6 approved 2026-08-19.** §25.3 requires the ledger to record used calls by stage class; `pattern_provider_daily_usage` has one undifferentiated `used_calls` column. Add bounded planner, writer, and verifier counters beside it. The same migration adds generator, evaluator, and regression counters to `pattern_ontology_provider_daily_usage`, avoiding an asymmetric second provider ledger before Slice B starts. `used_calls` remains each ledger's total and the value its shared ceiling is enforced against, so the ceiling semantics §25.3 also specifies are unchanged.
 
 Unlike M0's edit-in-place policy, `0007` is applied to production (ledger entry, commit `ff23d00`), `0008` is the erasure-replay ledger, and Task 8 reserves `0009` for the correction-artifact CHECK rebuild, so this is a forward-only `0010`. The table is empty in every environment today, which is why this lands now rather than after `internal`.
 
-- [ ] **Step 1: Write the failing ledger tests.** Each pass increments its own counter and the shared total. The shared ceiling is still enforced against the total. Existing rows — none in practice, but prove it — default to zero counters without violating the `CHECK (>= 0)` constraints.
+- [ ] **Step 1: Write the failing ledger tests.** Each Pattern pass increments its own counter and the shared total. The migration gives ontology rows zeroed generator/evaluator/regression counters, ready for Slice B's helper. The shared ceilings remain enforced against each table's total. Existing rows — none in practice, but prove it — default to zero counters without violating the `CHECK (>= 0)` constraints.
 - [ ] **Step 2: Run and confirm failure.**
 - [ ] **Step 3: Write the migration and update the reservation helper.** Record the change in `MIGRATIONS.json` with its rationale. `pattern_provider_daily_usage` is already in the FK-ordered delete list in `test/helpers.ts:52`, and `0010` adds columns rather than a table, so no test-helper change is needed.
 - [ ] **Step 4: Run the Pattern lane, the contract validator, and typecheck.**
@@ -790,7 +925,9 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
 
 **Files:**
 
-- Create: `docs/deploy/openai-pattern-rollout.md`
+- Create: `apps/api/scripts/verify-openai-pattern-model.ts`
+- Modify: `apps/api/package.json`
+- Modify: `docs/deploy/openai-pattern-rollout.md`
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: Run the full gate.**
@@ -803,11 +940,18 @@ Drive the worker's `queue()` export with `createMessageBatch` + `getQueueResult`
   Expected: all exit 0; `contracts/m0` through `m6` are byte-identical, and
   `contracts/m7` differs only by Task 8's recorded additive
   `correction_document` amendment and fixtures.
-- [ ] **Step 2: Write the rollout runbook.** Transcribe the design's ten ordered gates, each with its evidence requirement and stop condition, and an empty ledger table. State the worst-case spend from the counting model Q1 fixed — **11** provider calls per Pattern (`2 planner + 3 writer + (3 candidates × 2 verifier)`, each maximum inclusive of the first call, the writer's scoped per job and the verifier's per candidate) × pinned token bounds × current model rates × maximum new Patterns per UTC day, against `PATTERN_DAILY_PROVIDER_CALL_LIMIT`, approved in writing before any non-`off` rollout.
+
+  Add a reproducible `publisher:pattern:model:verify` command before closing
+  this step. It performs the authorized-account model lookup and the minimal
+  strict-schema `pattern` probe already recorded in `pattern-prompt.ts`, prints
+  no response prose, and exits nonzero on either failure. The 2026-08-19 probe
+  is evidence for the current code decision; rollout requires a fresh run for
+  the deployed account and model.
+- [ ] **Step 2: Complete the rollout runbook evidence.** The baseline runbook already carries the internal/public branches, ordered gates, evidence requirements, and stop conditions. Reconcile it against the implementation that landed and fill only evidence actually produced. State the worst-case spend from the counting model Q1 fixed — **11** provider calls per Pattern (`2 planner + 3 writer + (3 candidates × 2 verifier)`, each maximum inclusive of the first call, the writer's scoped per job and the verifier's per candidate) × pinned token bounds × current model rates × maximum new Patterns per UTC day, against `PATTERN_DAILY_PROVIDER_CALL_LIMIT`, approved in writing before any non-`off` rollout.
 
   **Record the derivation, not a constant.** Reproduce the 11 from the two scopes and the writer↔verifier correction cycles Task 8b makes concrete, and write the arithmetic down. Say explicitly which number the approved ceiling was computed against — the spend approval is only as sound as this derivation. Two wrong numbers are in circulation and both must be named so neither is quoted back: the design's **14**, which is this same loop with §14.5's "at most twice" read as two retries after the first, and needs amending to 11 under the inclusive reading; and an intermediate draft's **7**, which flattened the verifier to a per-job total and thereby made the writer's third attempt unreachable. 7 understates the ceiling by a third and must not appear in the runbook.
 
-  Include an AI Gateway subsection covering: that the pair is optional and empty is the shipped state; that the gateway token needs `Run` permission and is **account-scoped**, so it reaches every gateway in the account including any BYOK stored keys; that the gateway must be named explicitly rather than left as `default`, which auto-creates one on an authenticated request; that a Worker AI binding is **not** a BYOK alternative for third-party models; that request `Authorization` wins over the stored key and therefore must be absent in `gateway_stored` mode; that gateway spend limits may be set as a backstop but never as a substitute for the §25.3 ledger; and — stated as a consequence to accept before enabling — that **Zero Data Retention does not apply to this BYOK path**, that ZDR and gateway logging are separate controls, and that `cf-aig-collect-log: false` is the per-request control that suppresses the entire gateway entry. Record separately the OpenAI account's upstream retention posture. The per-request gateway log view being empty for Pattern traffic is the designed outcome, not an incident.
+  Include an AI Gateway subsection covering: that the pair is optional and empty is the shipped state; that the gateway token needs `Run` permission and is **account-scoped**, so it reaches every gateway in the account including any BYOK stored keys; that the existing reviewed gateway's id is deliberately `default` by the operator's 2026-08-19 decision (record its identity before cutover so the magic id cannot auto-create an unreviewed replacement); that a Worker AI binding is **not** a BYOK alternative for third-party models; that request `Authorization` wins over the stored key and therefore must be absent in `gateway_stored` mode; that gateway spend limits may be set as a backstop but never as a substitute for the §25.3 ledger; and — stated as a consequence to accept before enabling — that **Zero Data Retention does not apply to this BYOK path**, that ZDR and gateway logging are separate controls, and that `cf-aig-collect-log: false` is the per-request control that suppresses the entire gateway entry. Record separately the OpenAI account's upstream retention posture. The per-request gateway log view being empty for Pattern traffic is the designed outcome, not an incident.
 
   The subsection must carry an explicit **dashboard-state checklist**, because these are settings no Worker test can observe: Guardrails **off**; DLP **off**; no Dynamic Route; any spend-limit action set to **Block**, not fallback; retry defaults documented even though every request overrides attempts to `1`; and the gateway's own logging and Automatic Log Deletion settings recorded. Guardrails routes configured prompt/response scopes through Llama Guard and, for `P1`, Prompt Guard; DLP is a separate content-inspection service. Both process private packet or prose bytes outside the disclosed provider boundary, and Guardrails' `S6`/`S11` categories are live false-positive risks for psychological-timing prose. Record the verification of each as a gate, not an assumption.
 

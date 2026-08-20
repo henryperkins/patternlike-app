@@ -2,6 +2,8 @@
 
 **Date:** 2026-08-15
 
+**Last reconciled with repository HEAD:** 2026-08-20
+
 **Purpose:** One record of what M7 work remains, which slices have approved
 design and plan artifacts, and which do not. This is a ledger, not a design and
 not a plan. It is the index the other documents hang off.
@@ -25,47 +27,70 @@ Companion documents:
 Six of the ten §31 workstreams are complete: contracts and shared types (31.1),
 migration/deletion/export/crypto registration (31.2), consent and claim
 reservation (31.3), ontology ingestion and runtime reader (31.4), deterministic
-selection and planning (31.5), and web experience (31.7). Correction, cleanup,
-recall and reconciliation (31.8) is built **except** the §29.11 disaster-recovery
-replay ledger, which is not in the tree.
+selection and planning (31.5), and web experience (31.7). The first half of the
+31.6 adapter plan — Tasks 1 through 5a — is also complete. The live executor
+rewire, attempt/idempotency protocol, migrations `0009` and `0010`, integration
+gate, and rollout evidence remain Tasks 6 through 10.
 
-`PATTERN_AI_ROLLOUT` is `off` in both wrangler blocks. Production has no content
-release and no ontology release.
+Correction, cleanup, recall and reconciliation (31.8) has the `0008` schema and
+frozen replay contract, but no runtime writer, restore replayer, or completed
+restore drill. A migration file is not a working replay system.
+
+`PATTERN_AI_ROLLOUT` is `off` in both committed Wrangler blocks. This ledger no
+longer treats a historical production observation as current: the deployed
+Worker version, migration list, secrets, content releases, and active ontology
+pointer must be re-queried and recorded at rollout Gates 2–5.
 
 ## Slice ledger
 
 | # | Slice | §31 | Design | Plan | State |
 | --- | --- | --- | --- | --- | --- |
-| 1 | OpenAI Pattern adapter — the model calls | 31.6 | ✅ `specs/2026-08-15-openai-pattern-adapter-design.md` | ✅ `plans/2026-08-15-openai-pattern-adapter.md` | Specified; Q1–Q6 and Task 5a approved; no design sign-off open |
-| A | Activated internal-only ontology | 31.4 (content) | ✅ `specs/2026-08-15-internal-ontology-activation-design.md` | ❌ none | Design drafted, awaiting approval |
-| B | Automated ontology pipeline | 31.10 | ✅ `specs/2026-08-15-ontology-pipeline-design.md` | ❌ none | Design drafted, awaiting approval; **depends on slice 1** |
+| 1 | OpenAI Pattern adapter — the model calls | 31.6 | ✅ `specs/2026-08-15-openai-pattern-adapter-design.md` | ✅ `plans/2026-08-15-openai-pattern-adapter.md` | Tasks 1–6 complete; Tasks 7–10 open |
+| A | Activated internal-only ontology | 31.4 (content) | ✅ approved `specs/2026-08-15-internal-ontology-activation-design.md` | ✅ `plans/2026-08-20-internal-ontology-activation.md` | Ready to implement; optional internal canary only |
+| B | Automated ontology pipeline | 31.10 | ✅ approved `specs/2026-08-15-ontology-pipeline-design.md` | ✅ `plans/2026-08-20-automated-ontology-pipeline.md` | Ready to implement after slice 1; required for external readers |
 | C | Administrator authorization boundary | 31.9, §24 | ✅ `specs/2026-08-16-admin-authorization-design.md` | ❌ none | Design drafted; blocked on Access vs OIDC |
-| D | Evidence gates + §29.11 replay ledger | 31.8 (residual) | ✅ `specs/2026-08-16-m7-evidence-gates-design.md` + `specs/2026-08-16-pattern-replay-ledger-design.md` | ❌ none | Ledger specified (`0008`); drill not runnable until that runtime exists |
+| D | Evidence gates + §29.11 replay ledger | 31.8 (residual) | ✅ `specs/2026-08-16-m7-evidence-gates-design.md` + `specs/2026-08-16-pattern-replay-ledger-design.md` | consolidated in `docs/deploy/openai-pattern-rollout.md`; runtime plan still absent | `0008` and contracts exist; runtime/replay drill remain open |
 
-Also missing: `docs/deploy/openai-pattern-rollout.md`. `docs/deploy/` holds only
-`api-production.md` and `openai-daily-reading-rollout.md`. The Pattern rollout
-runbook is a deliverable of slice 1 (its Task 10) and carries the ten ordered
-rollout gates, the spend approval, and the AI Gateway dashboard checklist.
+`docs/deploy/openai-pattern-rollout.md` is now the operational source of truth.
+It separates the shortest internal path from the public path, carries the
+ordered gates and stop conditions, and links each engineering gate to its plan.
+Its evidence cells are intentionally empty until the corresponding action is
+actually executed.
 
 ## Slice 1 — OpenAI Pattern adapter
 
-The only slice with both artifacts. Every deliverable in its design is unbuilt;
-everything the design describes as *already existing* is real and verified.
+Tasks 1–5a are implemented. The tree contains the shared Responses boundary,
+three minimizing packet builders, prompt policies and derived strict schemas,
+the closed correction document, the OpenAI Pattern publisher, the publisher
+interface/factories, and the explicit `worker | gateway_stored` credential
+model. Commits and completed checkboxes are recorded in the adapter plan. The
+focused adapter/credential lane passed 222 tests across seven files on
+2026-08-20.
 
-Unbuilt: `openai-responses-adapter.ts`, `pattern-prompt.ts`,
-`openai-pattern-publisher.ts`, `pattern-packet.ts`; the `PatternPublisher`
-interface and both factories; the four `pattern-execute.ts` edit points (the
-fail-closed guard is still at `:637` and the three stand-ins are still called at
-`:648`, `:685`, `:717`); the retry primitives `retryStage` and `returnToWriter`;
-attempt-ceiling enforcement; the budget move to immediately-before-fetch (three
-consumes remain at stage entry, `:643`, `:670`, `:701`); the whole idempotency
-protocol (`putArtifact`'s digest is still three-component at `:255` and `head()`
-still returns silently at `:269-272`); five configuration refusals; two safe-log
-arms; `MAX_STAGE_CLAIMS` still `8`; and every new test.
+Task 6 landed on 2026-08-20. `pattern-execute.ts` now constructs a publisher
+from the factory instead of fail-closing on a non-synthetic pin, so an `openai`
+pin reaches the adapter and makes a real provider call. With it came
+attempt-scoped artifact identity (`patternArtifactId`, `getArtifactAt`), the
+artifact-first probe, a `putArtifact` that compares the full reserved identity
+and throws instead of returning silently, hashes taken from the committed bytes,
+`retryStage`, and budget consumed inside the publisher immediately before the
+fetch rather than at stage entry. Two configuration refusals the design requires
+moved into `resolvePatternPublisherConfiguration` — the gateway route and the
+credential mode are now carried on `PatternPublisherConfig` — which also makes
+`OPENAI_CREDENTIAL_SOURCE=gateway_stored` reachable for Pattern for the first
+time.
+
+Unbuilt: Task 7's executed-pin provenance; Task 8's attempt/claim constants and
+`0009`; Task 8a's per-stage usage counters and `0010`; Task 8b's attempt ceilings
+and writer↔verifier return; Task 9's queue-level failure/idempotency suite; and
+Task 10's full candidate gate and recorded rollout evidence. `MAX_STAGE_CLAIMS`
+is still `8`, the deterministic rejections are still terminal rather than
+`retryStage` returns, and nothing increments the per-pass counters except
+`retryStage`, so the pinned attempt budgets remain unenforced end to end.
 
 Partial: provenance. `projectPublicPattern` already reads `provider` and
-`model_family` from the document (`packages/pattern-engine/src/projection.ts:46-47`);
-only the execute-side literals at `pattern-execute.ts:772-774` remain.
+`model_family` from the document; Task 7 owns the remaining execute-side
+literals.
 
 **Decision status (2026-08-19).** Q1–Q6 and the human-free generation invariant
 are approved. Task 5a's live reading-path credential change is separately
@@ -79,12 +104,11 @@ claims. Q1 and Q6 are closed in the adapter design rather than carried as open
 questions. Individual Pattern generation is fully machine-run; design-time
 sign-off and operational inspection are not runtime approval gates.
 
-**Known defects still to fix before implementation.** The design predates the
-BYOK decision: it still says "No new environment variable
-is required" and pins `Authorization` on every request, both of which the plan's
-Task 5a contradicts. Four design requirements have no plan owner —
-`projection.ts`, configuration refusals 3–5, `test/helpers.ts`, and the
-`SCHEMA_MANIFEST.json` amendments entry.
+**Remaining plan ownership.** Tasks 6–10 own every adapter-runtime requirement,
+including `projection.ts` behavior through executed-pin provenance, the
+configuration refusals, migration smoke coverage, and the manifest amendment.
+The 2026-08-19 credential decision supersedes any pre-amendment sentence that
+assumes every request carries provider `Authorization`.
 
 ## Slice A — Activated internal-only ontology
 
@@ -106,17 +130,23 @@ process that hand-authoring can only assert; §23.7's independent evaluator and
 release would have to attest that runs which never happened returned clean.
 Acceptance criterion 19 cannot be evidenced by any hand-authored release.
 
-**The engineering it requires** is containment, which does not exist today:
-`pattern_ontology_releases` has no provenance column, and
-`pattern-ontology-release.schema.json` is `additionalProperties: false`, so
-nothing distinguishes a synthetic release from a Slice B one once stored. Rollout
-mode is not the containment either — the release outlives the mode, and
-`consumerAdmissionEntry` admits `chart_correction` at `internal` without
-consulting the staff allowlist (`pattern-rollout.ts:86`).
+The additive contract marker already exists: ontology releases can carry signed
+`provenance.origin`, and evaluation reports can carry the two report hashes.
+What remains is to add the shared TypeScript field, enforce provenance at
+reservation, add the closed log event and tests, build the authored synthetic
+corpus/release toolchain, sign, ingest, and certify it. Rollout mode alone is not
+containment — the release outlives the mode, and `consumerAdmissionEntry` admits
+`chart_correction` without consulting the staff allowlist.
+
+Slice A is not a per-Pattern human approval path. Human authoring/review happens
+once, outside runtime, when preparing an internal-only ontology release. Every
+individual Pattern remains fully machine-run. Slice A may be skipped entirely
+if the team implements Slice B first.
 
 ## Slice B — Automated ontology pipeline (§31.10)
 
-Not built. Six components, all six required by acceptance criterion 19:
+Not built. Its design is approved and its open questions are resolved. Six
+components, all six required by acceptance criterion 19:
 source-corpus contract reader, generator prompt and provider adapter,
 deterministic ontology compiler driver, independent evaluator, fixed-chart
 regression runner, and machine signing plus internal ingestion client.
@@ -130,13 +160,12 @@ for it, and its five contracts are frozen.
 
 ## Spec-artifact amendments (2026-08-16)
 
-The unimplemented-spec-artifacts review inserted spec work in front of
-A–D. That work has landed: product-spec v0.6, in-place 2026-08-14
-amendments, additive `contracts/m7` documents, and `0008` as the replay
-ledger. Slice A and B designs remain drafts; they now cite the amendment
-rather than the pre-amendment lists. `0008` is the replay ledger, `0009` is
-reserved for the correction-artifact CHECK rebuild, and the adapter’s
-per-stage-class usage ledger is `0010` or later.
+The unimplemented-spec-artifacts review inserted spec work in front of A–D.
+That work has landed: product-spec v0.6, in-place 2026-08-14 amendments,
+additive `contracts/m7` documents, and `0008` as the replay-ledger schema.
+Slice A and B designs are now approved and have implementation plans. `0009`
+remains reserved for the correction-artifact CHECK rebuild, and `0010` for
+per-stage-class usage; later Slice B schema must use the next available number.
 
 ## Slice C — Administrator authorization boundary (§31.9, §24)
 
@@ -166,10 +195,9 @@ Routing is fine as-is: §24.2 permits "a separate protected hostname **or path**
 
 - **Criterion 23** — a disaster-recovery restore drill proving pre-deletion
   snapshots cannot resurrect Pattern content or reset a consumed claim. The
-  §29.11 replay ledger this depends on **does not exist**; a drill against absent
-  runtime support would prove nothing. Treat the ledger as a blocking dependency
-  with its own acceptance criteria and a forward-only migration, and scope it
-  before the drill.
+  `0008` table and frozen event contract exist; the R2-first runtime writer,
+  restore replayer, and drill evidence do not. A drill against schema alone
+  proves nothing.
 - **Criterion 20** — all hard evaluation and privacy gates pass with zero
   exceptions.
 - **Criterion 22** — production migration, deploy, ontology activation, rollout
@@ -180,14 +208,13 @@ of `docs/deploy/openai-daily-reading-rollout.md`.
 
 ## Ordering
 
-    Slice A ──> Slice 1 can produce an end-to-end Pattern (internal accounts only)
+    Slice 1 Tasks 6–9 ─┬─> Slice A ──> first end-to-end Pattern (internal only)
+                       └─> Slice B ──> first_open or enabled
     Slice C ──> independent; ask the Access question now, it changes the size
-    Slice B ──> the only route to first_open or enabled
     Slice D ──> after B, since criterion 22 certifies a real rollout
 
-Slice A first: it is the smallest, it is the binding constraint, and it is what
-makes an end-to-end Pattern possible at all. None of the time it saves comes off
-Slice B.
+Slice A and the remaining adapter work may proceed in parallel, but both must be
+complete before the internal canary. Slice B is the only path to public rollout.
 
 ## Constraints binding every slice
 

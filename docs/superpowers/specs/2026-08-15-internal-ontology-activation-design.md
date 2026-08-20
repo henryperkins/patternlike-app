@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-15
 
-**Status:** Draft for approval. No plan may be derived until this is approved.
+**Status:** Approved for implementation on 2026-08-20. All design questions are
+resolved below; the implementation plan is
+[`2026-08-20-internal-ontology-activation.md`](../plans/2026-08-20-internal-ontology-activation.md).
 
 **2026-08-16 amendment.** Product-spec v0.6 and
 [`2026-08-16-m7-spec-artifact-amendments.md`](2026-08-16-m7-spec-artifact-amendments.md)
@@ -15,6 +17,13 @@ provenance-origin convenience column, if still wanted, takes `0009` or later.
 hand-authored, signed, **internal-only** release — and build the containment that
 keeps it away from external readers. This unblocks an end-to-end Pattern for
 designated internal accounts and nothing beyond that.
+
+**Human-free generation boundary.** Authoring and signing this release are
+one-time control-plane preparation, not a step in any Pattern generation. Once
+the release is active, reservation, planning, writing, verification, validation,
+and publication are fully machine-run. No Pattern waits for review, approval,
+editing, or publication by a person. Teams that do not want the optional manual
+canary may skip Slice A and go directly to the Slice B machine pipeline.
 
 ## Decision summary
 
@@ -151,12 +160,13 @@ compiler-ignored, and the schema types them as plain booleans with no `const`, s
 (`packages/pattern-engine/src/fixtures.ts:91-97`), which is correct for a fixture
 and disqualifying for anything a reader is served from.
 
-**Nothing distinguishes a synthetic release from a pipeline one once stored.**
-`pattern-ontology-release.schema.json` is `additionalProperties: false` over
-exactly eight required properties, none of which is provenance, and
-`pattern_ontology_releases` has columns for version, bundle hash, corpus release
-hash, locale, status, object key, evaluation JSON and timestamps — and no
-provenance column.
+**The contract marker has landed; runtime containment has not.** The 2026-08-16
+additive amendment added optional signed `provenance.origin` to
+`pattern-ontology-release.schema.json`, with `synthetic_internal` and
+`machine_pipeline` as the closed values. The shared TypeScript release type does
+not yet carry it, and `reservePatternGeneration` does not inspect it. The D1 row
+still has no convenience provenance column, which is acceptable because the
+gate reads the verified signed release body.
 
 **Rollout mode is not containment.** A release outlives the mode that admitted
 it, and `consumerAdmissionEntry` (`apps/api/src/services/pattern-rollout.ts:81-88`)
@@ -170,7 +180,7 @@ through `consumerAdmissionEntry` inherits that hole.
 
 ### The marker travels in the signed bytes
 
-Add an optional `provenance` property to the release body:
+Use the optional `provenance` property already present in the release contract:
 
 ```jsonc
 "provenance": {
@@ -249,10 +259,11 @@ that ran, passed."** It is not a claim that the release was evaluated. The
 provenance marker is what carries that truth, which is another reason the marker
 belongs in signed bytes rather than in an operator's memory.
 
-`unevaluated_fixture_count: 0` is likewise forced by the compiler and is honest
-under a narrow reading — there is no fixture corpus, so no fixture is
-unevaluated. That reading is thin, and it is recorded as an open question below
-rather than smoothed over.
+`unevaluated_fixture_count: 0` is likewise forced by the compiler and means
+exactly that this internal release has no fixture corpus. It is not evidence of
+a regression pass; `regression_passed: false` and
+`provenance.origin: "synthetic_internal"` carry that truth. This decision does
+not create an exception to the external-release gate.
 
 ### The refusal is taken at reservation
 
@@ -441,24 +452,16 @@ condition this slice removes.
 
 ## Contracts
 
-One additive amendment to `contracts/m7`:
+The additive contract work is complete: `pattern-ontology-release.schema.json`
+contains the optional provenance object, `SCHEMA_MANIFEST.json` records the
+2026-08-16 amendment, and valid/invalid fixtures cover both origins and an
+unknown origin. `schema_version` remains `0.7.0`; no `$id`, required field, or
+pre-M7 contract changed.
 
-- `pattern-ontology-release.schema.json` gains the optional `provenance` object
-  described above. `schema_version` stays `0.7.0`; no `$id`, enum, or required
-  field changes.
-- `SCHEMA_MANIFEST.json` gains one `amendments` entry in the shape of the
-  existing one — `date`, `change`, `reason` — with the reason closing on an
-  explicit purely-additive assertion naming what did not change.
-- A fixture under `contracts/m7/fixtures/valid/` carrying
-  `provenance.origin: "synthetic_internal"`, and a rejection case under
-  `fixtures/invalid/` carrying an unknown origin value, per the repository's
-  contract-change rule.
-- `contracts/m0` through `contracts/m6` stay byte-identical.
-
-The runtime structural gate in `ontology.ts` does not check unknown keys, so an
-un-amended contract would tolerate the property at runtime while the frozen
-contract rejected it. That divergence is the reason the amendment is mandatory
-rather than cosmetic.
+Implementation still has one type-alignment task:
+`packages/shared/src/m7-types.ts` must add the optional property to
+`PatternOntologyRelease`. A schema/type parity test owns that change so the
+runtime cannot silently discard the signed marker.
 
 ## Verification strategy
 
@@ -533,28 +536,25 @@ Rollback is `recallOntologyVersion`, which marks the version unsafe, triggers th
 §21.8 withdrawal process, and permanently prevents reactivation under the same
 identity — plus `PATTERN_AI_ROLLOUT=off` if generation must stop entirely.
 
-## Open questions
+## Resolved questions
 
-1. **`unevaluated_fixture_count: 0` on a release with no fixture corpus.** The
-   compiler requires `0`. Reading "no fixtures exist, therefore none are
-   unevaluated" is defensible but thin, and the alternative — a compiler change
-   admitting a null or a synthetic exemption — is a change to the one gate that
-   does run. This design takes the thin reading and lets the provenance marker
-   carry the truth. Worth an explicit decision rather than a silent one.
-2. ~~Who authors and who reviews the content.~~ **Resolved 2026-08-15:** drafted
-   in this workstream and reviewed editorially by the operator before it is
-   built, signed, or ingested. The plan carries an authoring task whose output is
-   a review artifact, not a merge-and-ship deliverable.
-3. ~~Whether the D1 provenance column lands now or later.~~ **Resolved
-   2026-08-15:** the signed release property is the gate and the mirrored D1
-   column is **deferred**. Revisit only if operator queries or admin listing need
-   provenance without reading the R2 bundle.
-4. **Locale.** The authored release is `en-US` only. Whether a second locale is
-   in scope for internal certification, or waits for Slice B, is unresolved.
-5. **Retirement.** When Slice B produces its first `machine_pipeline` release,
-   whether the synthetic release is superseded or recalled. Superseded keeps its
-   bytes readable for any job that froze it; recalled triggers withdrawal. The
-   answer depends on whether internal Patterns generated against it are kept.
+1. **Empty fixture corpus:** `unevaluated_fixture_count: 0` is accepted only for
+   `synthetic_internal`, alongside `evaluator_passed: false` and
+   `regression_passed: false`. It is never evidence for criterion 19 and needs no
+   compiler exception.
+2. **Author and reviewer:** the release is drafted and reviewed once as an
+   internal control-plane artifact. This is not a per-Pattern review gate and no
+   reviewer participates in generation.
+3. **D1 provenance:** deferred. The signed release property is the authorization
+   gate; add a mirrored column only for a demonstrated operator-query need.
+4. **Locale:** Slice A is `en-US` only. No second locale is needed for the
+   internal canary; every additional locale waits for Slice B's full evaluation
+   and fixed-chart lane.
+5. **Retirement:** the first activated `machine_pipeline` release recalls the
+   Slice A release rather than merely superseding it. Any internal Pattern based
+   on the recalled release follows the existing withdrawal process. The first
+   machine release starts a fresh lineage and never consumes Slice A records as
+   predecessor input.
 
 ## Out of scope
 
