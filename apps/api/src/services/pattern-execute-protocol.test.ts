@@ -11,7 +11,7 @@
  * which is the quantity every one of these assertions is actually about.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env, SELF } from "cloudflare:test";
 import { contentHash } from "@patternlike/shared";
 
@@ -109,6 +109,7 @@ describe("Pattern stage protocol", () => {
 
   afterEach(() => {
     disablePatternAi();
+    vi.restoreAllMocks();
   });
 
   it("reaches the OpenAI adapter instead of failing closed on a non-synthetic pin", async () => {
@@ -116,6 +117,7 @@ describe("Pattern stage protocol", () => {
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-openai-reached");
     const job = await loadPatternJob(env, generationId);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
 
     const outcome = await deliver(generationId);
 
@@ -142,6 +144,45 @@ describe("Pattern stage protocol", () => {
       0,
     );
     expect(request).not.toBeNull();
+    expect(info).toHaveBeenCalledWith(
+      "pattern_publisher_call_completed",
+      expect.objectContaining({
+        provider: "openai",
+        pass: "planner",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+      }),
+    );
+  });
+
+  it("logs a closed failed-attempt event with its pass and durable attempt", async () => {
+    enablePatternOpenAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-openai-budget-log");
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      `INSERT INTO pattern_provider_daily_usage (utc_date, used_calls, created_at, updated_at)
+       VALUES (?, 100, ?, ?)`,
+    )
+      .bind(now.slice(0, 10), now, now)
+      .run();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(await deliver(generationId)).toEqual({
+      ok: false,
+      reason: "terminal",
+      failureClass: "publisher_budget_exhausted",
+    });
+    expect(warn).toHaveBeenCalledWith(
+      "pattern_publisher_attempt_failed",
+      expect.objectContaining({
+        provider: "openai",
+        pass: "planner",
+        attempt: 0,
+        failure_class: "publisher_budget_exhausted",
+        safe_detail_code: "daily_call_limit_reached",
+      }),
+    );
   });
 
   it("still produces the deterministic document under a synthetic pin", async () => {
@@ -152,6 +193,83 @@ describe("Pattern stage protocol", () => {
     expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
     expect(await stageOf(generationId)).toBe("writing");
     // The ledger counts provider calls, and a stand-in is not a provider.
+    expect(await providerCalls()).toBe(0);
+  });
+
+  it("keeps the frozen synthetic author and stores honest provenance after a live pin change", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-frozen-synthetic-provenance");
+
+    // The command froze the synthetic publisher. Changing live configuration
+    // while the job is in flight must not silently replace its author.
+    enablePatternOpenAi();
+    for (const expectedStage of ["writing", "semantic_verifying", "succeeded"]) {
+      expect(await deliver(generationId)).toEqual({ ok: true, terminal: expectedStage === "succeeded" });
+      expect(await stageOf(generationId)).toBe(expectedStage);
+    }
+
+    const stored = await env.DB.prepare(
+      `SELECT compact_provenance_json FROM pattern_documents WHERE generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{ compact_provenance_json: string }>();
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored!.compact_provenance_json)).toEqual(
+      expect.objectContaining({
+        provider: "synthetic",
+        model_family: "synthetic",
+      }),
+    );
+    expect(await providerCalls()).toBe(0);
+  });
+
+  it("stores OpenAI writer provenance from the frozen pin that ran", async () => {
+    enablePatternOpenAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-openai-provenance");
+
+    for (const expectedStage of ["writing", "semantic_verifying", "succeeded"]) {
+      expect(await deliver(generationId)).toEqual({ ok: true, terminal: expectedStage === "succeeded" });
+      expect(await stageOf(generationId)).toBe(expectedStage);
+    }
+
+    const stored = await env.DB.prepare(
+      `SELECT compact_provenance_json FROM pattern_documents WHERE generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{ compact_provenance_json: string }>();
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored!.compact_provenance_json)).toEqual(
+      expect.objectContaining({
+        provider: "OpenAI",
+        model_family: "gpt",
+      }),
+    );
+    expect(await providerCalls()).toBe(3);
+  });
+
+  it("does not replace a frozen OpenAI author with the live synthetic publisher", async () => {
+    enablePatternOpenAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-frozen-openai-author");
+
+    // The live synthetic configuration has no provider credential. The frozen
+    // OpenAI command must therefore fail closed rather than publish stand-in
+    // prose under OpenAI provenance.
+    enablePatternAi();
+    expect(await deliver(generationId)).toEqual({
+      ok: false,
+      reason: "terminal",
+      failureClass: "publisher_not_configured",
+    });
+    expect(await stageOf(generationId)).toBe("failed");
+    const documents = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM pattern_documents WHERE generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{ n: number }>();
+    expect(documents?.n).toBe(0);
     expect(await providerCalls()).toBe(0);
   });
 
@@ -174,11 +292,11 @@ describe("Pattern stage protocol", () => {
 
   it("adopts the stored response on a redelivery, spending no second call", async () => {
     // The planner pass runs once under the stand-in, which commits a
-    // `planner_response` at (stage_generation, attempt 0). The redelivery then
-    // runs under a LIVE provider pin: if the artifact-first probe did not hit,
-    // this delivery would call OpenAI and charge a unit. It does neither, which
-    // is the whole property -- a redelivery after a lost `advance` is free and,
-    // more importantly, deterministic.
+    // `planner_response` at (stage_generation, attempt 0). Before redelivery we
+    // remove the request artifact. If the response probe misses, rerunning the
+    // publisher must rebuild that request; adoption leaves it absent. This
+    // keeps the assertion meaningful now that the frozen command pin wins over
+    // a live publisher change.
     enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-adoption");
@@ -204,6 +322,22 @@ describe("Pattern stage protocol", () => {
     expect(stored).not.toBeNull();
     expect(stored!.plaintextHash).toBe(firstPlanHash);
 
+    const requestRow = await env.DB.prepare(
+      `SELECT object_key FROM pattern_generation_artifacts
+       WHERE generation_id = ? AND artifact_class = 'planner_request'`,
+    )
+      .bind(generationId)
+      .first<{ object_key: string }>();
+    expect(requestRow).not.toBeNull();
+    expect(env.ARTIFACTS).toBeDefined();
+    await env.ARTIFACTS!.delete(requestRow!.object_key);
+    await env.DB.prepare(
+      `DELETE FROM pattern_generation_artifacts
+       WHERE generation_id = ? AND artifact_class = 'planner_request'`,
+    )
+      .bind(generationId)
+      .run();
+
     // Rewind exactly what a lost `advance` leaves behind: the artifact is on
     // disk, the durable row never moved.
     await env.DB.prepare(
@@ -219,12 +353,21 @@ describe("Pattern stage protocol", () => {
       .bind(before!.job_id)
       .run();
 
-    enablePatternOpenAi();
     expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
 
-    // Same attempt index, no fetch, no budget unit, and the same committed
+    // Same attempt index, no publisher rerun, and the same committed response
     // bytes named again.
     expect(await providerCalls()).toBe(0);
+    expect(
+      await getArtifactAt(
+        env,
+        IDENTITY_A,
+        generationId,
+        "planner_request",
+        stageGeneration,
+        0,
+      ),
+    ).toBeNull();
     const redelivered = await loadPatternJob(env, generationId);
     expect(redelivered!.plan_hash).toBe(firstPlanHash);
     expect(await stageOf(generationId)).toBe("writing");

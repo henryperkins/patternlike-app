@@ -2,6 +2,11 @@ import { newId } from "@patternlike/shared";
 import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { PublisherSafeDetailCode } from "./reading-publisher.js";
+import type {
+  PatternPublisherFailureCode,
+  PatternPublisherSafeDetailCode,
+  PatternStageClass,
+} from "./pattern-publisher.js";
 
 export type ConfigurationCode =
   | "reading_rollout_invalid"
@@ -141,6 +146,28 @@ export type SafeLogEvent =
       latency_ms: number;
       failure_class: GenerationFailureCode;
       safe_detail_code: PublisherSafeDetailCode | "schema_mismatch";
+    }
+  | {
+      event: "pattern_publisher_call_completed";
+      provider: "openai";
+      pass: PatternStageClass;
+      model: string;
+      prompt_version: string;
+      latency_ms: number;
+      input_tokens: number;
+      output_tokens: number;
+      provider_response_hash: string;
+    }
+  | {
+      event: "pattern_publisher_attempt_failed";
+      provider: "openai";
+      pass: PatternStageClass;
+      model: string;
+      prompt_version: string;
+      latency_ms: number;
+      attempt: number;
+      failure_class: PatternPublisherFailureCode;
+      safe_detail_code: PatternPublisherSafeDetailCode;
     };
 
 /**
@@ -200,6 +227,32 @@ export function safeLog(input: SafeLogEvent): string {
         model: input.model,
         prompt_version: input.prompt_version,
         latency_ms: input.latency_ms,
+        failure_class: input.failure_class,
+        safe_detail_code: input.safe_detail_code,
+      });
+      break;
+    case "pattern_publisher_call_completed":
+      console.info(input.event, {
+        trace_id,
+        provider: input.provider,
+        pass: input.pass,
+        model: input.model,
+        prompt_version: input.prompt_version,
+        latency_ms: input.latency_ms,
+        input_tokens: input.input_tokens,
+        output_tokens: input.output_tokens,
+        provider_response_hash: input.provider_response_hash,
+      });
+      break;
+    case "pattern_publisher_attempt_failed":
+      console.warn(input.event, {
+        trace_id,
+        provider: input.provider,
+        pass: input.pass,
+        model: input.model,
+        prompt_version: input.prompt_version,
+        latency_ms: input.latency_ms,
+        attempt: input.attempt,
         failure_class: input.failure_class,
         safe_detail_code: input.safe_detail_code,
       });

@@ -30,11 +30,14 @@ import {
 } from "./pattern-command.js";
 import { hashesEqual } from "./content-release.js";
 import {
+  OPENAI_PATTERN_WRITER_MODEL,
   PATTERN_PUBLISHER_OPENAI,
   resolvePatternPublisherConfiguration,
+  type PatternPassOutcome,
   type PatternPassOptions,
   type PatternPublisher,
   type PatternPublisherConfig,
+  type PatternPublisherPin,
   type PatternStageClass,
 } from "./pattern-publisher.js";
 import {
@@ -62,6 +65,87 @@ import {
 import { safeLog } from "./safe-log.js";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * Coarse public families for the exact writer-model pins this build can run.
+ *
+ * The exact model id stays in the encrypted provider artifact metadata. The
+ * clear compact provenance carries only this compiled family label, and an
+ * unknown OpenAI model fails closed rather than being guessed from its name.
+ */
+const MODEL_FAMILY_BY_WRITER_MODEL: Readonly<Record<string, string>> = {
+  [OPENAI_PATTERN_WRITER_MODEL]: "gpt",
+};
+
+function provenanceFromExecutedPin(pin: PatternPublisherPin): {
+  provider: string;
+  model_family: string;
+} {
+  if (pin.publisher !== PATTERN_PUBLISHER_OPENAI) {
+    return { provider: "synthetic", model_family: "synthetic" };
+  }
+  const modelFamily = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
+  if (!modelFamily) throw new Error("unsupported Pattern writer model family");
+  return { provider: "OpenAI", model_family: modelFamily };
+}
+
+/**
+ * Emit cost/failure telemetry at the executor boundary, before deterministic
+ * validation. A model answer rejected by validation still consumed the call.
+ * Adopted response artifacts bypass this helper and therefore emit no second
+ * provider event.
+ */
+async function runPublisherPass<T>(
+  pin: PatternPublisherPin,
+  pass: PatternStageClass,
+  attempt: number,
+  invoke: () => Promise<PatternPassOutcome<T>>,
+): Promise<PatternPassOutcome<T>> {
+  const startedAt = Date.now();
+  const outcome = await invoke();
+  if (pin.publisher !== PATTERN_PUBLISHER_OPENAI) return outcome;
+
+  const latencyMs = Math.max(0, Date.now() - startedAt);
+  if (!outcome.ok) {
+    safeLog({
+      event: "pattern_publisher_attempt_failed",
+      provider: PATTERN_PUBLISHER_OPENAI,
+      pass,
+      model: pin[`${pass}_model`],
+      prompt_version: pin[`${pass}_prompt_version`],
+      latency_ms: latencyMs,
+      attempt,
+      failure_class: outcome.code,
+      safe_detail_code: outcome.safe_detail_code,
+    });
+    return outcome;
+  }
+
+  const metadata = outcome.metadata;
+  if (
+    metadata.provider !== PATTERN_PUBLISHER_OPENAI ||
+    metadata.pass !== pass ||
+    metadata.model !== pin[`${pass}_model`] ||
+    metadata.prompt_version !== pin[`${pass}_prompt_version`] ||
+    metadata.input_tokens === null ||
+    metadata.output_tokens === null ||
+    metadata.provider_response_hash === null
+  ) {
+    throw new Error("Pattern publisher returned inconsistent provenance");
+  }
+  safeLog({
+    event: "pattern_publisher_call_completed",
+    provider: metadata.provider,
+    pass: metadata.pass,
+    model: metadata.model,
+    prompt_version: metadata.prompt_version,
+    latency_ms: latencyMs,
+    input_tokens: metadata.input_tokens,
+    output_tokens: metadata.output_tokens,
+    provider_response_hash: metadata.provider_response_hash,
+  });
+  return outcome;
+}
 
 // ---------------------------------------------------------------------------
 // The stage protocol
@@ -1055,7 +1139,10 @@ export async function executePatternJob(
       return { ok: false, reason: "terminal", failureClass: "publisher_not_configured" };
     }
     const config: PatternPublisherConfig = resolved.config;
-    const pin = config.pin;
+    // The command pin is the author frozen at reservation. Live configuration
+    // supplies credentials, routing, timeouts and the daily ceiling; it must not
+    // silently replace the publisher or model while a generation is in flight.
+    const pin = command.publisher;
 
     const ontology = await loadOntologyByVersion(env, command.ontology_version);
     if (!ontology || !hashesEqual(ontology.bundleHash, command.ontology_bundle_hash)) {
@@ -1196,7 +1283,9 @@ export async function executePatternJob(
         const input = buildPlannerInput(selected.packet, records, limits);
         if (!input.ok) return refuseInput("planner", input);
         await writeRequestArtifact("planner", input.document, attempt);
-        const outcome = await publisherImpl.plan(input.document, passOptions("planner"));
+        const outcome = await runPublisherPass(pin, "planner", attempt, () =>
+          publisherImpl.plan(input.document, passOptions("planner")),
+        );
         if (!outcome.ok) {
           return handlePassFailure(
             env,
@@ -1291,7 +1380,9 @@ export async function executePatternJob(
         const input = buildWriterInput(plan, selected.packet, records, limits);
         if (!input.ok) return refuseInput("writer", input);
         await writeRequestArtifact("writer", input.document, attempt);
-        const outcome = await publisherImpl.write(input.document, passOptions("writer"));
+        const outcome = await runPublisherPass(pin, "writer", attempt, () =>
+          publisherImpl.write(input.document, passOptions("writer")),
+        );
         if (!outcome.ok) {
           return handlePassFailure(
             env,
@@ -1389,7 +1480,9 @@ export async function executePatternJob(
         const input = buildVerifierInput(writer, plan, selected.packet, records, limits);
         if (!input.ok) return refuseInput("verifier", input);
         await writeRequestArtifact("verifier", input.document, attempt);
-        const outcome = await publisherImpl.verify(input.document, passOptions("verifier"));
+        const outcome = await runPublisherPass(pin, "verifier", attempt, () =>
+          publisherImpl.verify(input.document, passOptions("verifier")),
+        );
         if (!outcome.ok) {
           return handlePassFailure(
             env,
@@ -1445,6 +1538,7 @@ export async function executePatternJob(
         env,
         identity,
         command,
+        pin,
         claimed,
         writer,
         plan,
@@ -1472,6 +1566,7 @@ async function publishPattern(
   env: Env,
   identity: UserIdentity,
   command: GeneratePatternCommandV1,
+  executedPin: PatternPublisherPin,
   claimed: { token: string; job: PatternJobRow },
   writer: PatternWriterOutput,
   plan: PatternPlan,
@@ -1483,6 +1578,7 @@ async function publishPattern(
   const generatedAt = now.toISOString();
   const documentKey = randomKey();
   const nonce = randomNonce();
+  const publisherProvenance = provenanceFromExecutedPin(executedPin);
   const internal = {
     schema_version: "0.7.0" as const,
     pattern_id: patternId,
@@ -1499,8 +1595,8 @@ async function publishPattern(
     artifact: writer,
     compact_provenance: {
       assembly_mode: "constrained_model" as const,
-      provider: "OpenAI",
-      model_family: "gpt",
+      provider: publisherProvenance.provider,
+      model_family: publisherProvenance.model_family,
       raw_birth_details_sent: false as const,
       ontology_version: command.ontology_version,
       selection_policy_version: command.selection_policy_version,

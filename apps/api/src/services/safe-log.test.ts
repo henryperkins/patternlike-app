@@ -91,4 +91,90 @@ describe("safe logging", () => {
       "trace_id",
     ]);
   });
+
+  it("projects only closed Pattern completed-call metrics with the pass", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const hostile = {
+      event: "pattern_publisher_call_completed",
+      provider: "openai",
+      pass: "writer",
+      model: "gpt-5.6-sol",
+      prompt_version: "1.0.0",
+      latency_ms: 120,
+      input_tokens: 4210,
+      output_tokens: 512,
+      provider_response_hash: `sha256:${"b".repeat(64)}`,
+      prompt_text: SENTINEL,
+      packet: { private: SENTINEL },
+      plan: { private: SENTINEL },
+      draft: SENTINEL,
+      response_prose: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(info).toHaveBeenCalledOnce();
+    const payload = info.mock.calls[0]![1] as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual([
+      "input_tokens",
+      "latency_ms",
+      "model",
+      "output_tokens",
+      "pass",
+      "prompt_version",
+      "provider",
+      "provider_response_hash",
+      "trace_id",
+    ]);
+    for (const forbidden of ["prompt_text", "packet", "plan", "draft", "response_prose"]) {
+      expect(payload).not.toHaveProperty(forbidden);
+    }
+    expect(JSON.stringify(info.mock.calls)).not.toContain(SENTINEL);
+  });
+
+  it("projects only closed Pattern failure metrics with pass and attempt", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "pattern_publisher_attempt_failed",
+      provider: "openai",
+      pass: "planner",
+      model: "gpt-5.6-sol",
+      prompt_version: "1.0.0",
+      latency_ms: 91,
+      attempt: 1,
+      failure_class: "publisher_unavailable",
+      safe_detail_code: "network_error",
+      prompt_text: SENTINEL,
+      packet: { private: SENTINEL },
+      plan_document: { private: SENTINEL },
+      draft: SENTINEL,
+      response_prose: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    const payload = warn.mock.calls[0]![1] as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual([
+      "attempt",
+      "failure_class",
+      "latency_ms",
+      "model",
+      "pass",
+      "prompt_version",
+      "provider",
+      "safe_detail_code",
+      "trace_id",
+    ]);
+    for (const forbidden of [
+      "prompt_text",
+      "packet",
+      "plan_document",
+      "draft",
+      "response_prose",
+    ]) {
+      expect(payload).not.toHaveProperty(forbidden);
+    }
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
 });

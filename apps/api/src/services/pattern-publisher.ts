@@ -21,6 +21,10 @@ import type {
   PatternSemanticVerdict,
   PatternWriterOutput,
 } from "@patternlike/shared";
+import type {
+  PublisherFailureCode,
+  PublisherSafeDetailCode,
+} from "./openai-responses-adapter.js";
 
 export const PATTERN_PUBLISHER_OPENAI = "openai" as const;
 export const PATTERN_PUBLISHER_SYNTHETIC = "synthetic" as const;
@@ -74,6 +78,19 @@ export const PATTERN_DAILY_PROVIDER_CALL_LIMIT = 100;
 export const PATTERN_ARTIFACT_RETENTION_DAYS = 30;
 
 export type PatternPublisherName = typeof PATTERN_PUBLISHER_OPENAI | typeof PATTERN_PUBLISHER_SYNTHETIC;
+
+/** Closed failures returned by either Pattern publisher implementation. */
+export type PatternPublisherFailureCode =
+  | PublisherFailureCode
+  | "publisher_budget_exhausted";
+
+/** Closed, prose-free detail codes safe to project into operational logs. */
+export type PatternPublisherSafeDetailCode =
+  | PublisherSafeDetailCode
+  | "gateway_cache_hit"
+  | "gateway_dlp_match"
+  | "provider_4xx"
+  | "daily_call_limit_reached";
 
 export interface PatternPublisherPin {
   publisher: PatternPublisherName;
@@ -353,8 +370,8 @@ export type PatternPassOutcome<T> =
   | { ok: true; value: T; raw: string | null; metadata: PatternPassProvenance }
   | {
       ok: false;
-      code: string;
-      safe_detail_code: string;
+      code: PatternPublisherFailureCode;
+      safe_detail_code: PatternPublisherSafeDetailCode;
       retry_after_seconds: number | null;
       origin_layer: "provider" | "gateway" | "unknown" | "none";
     };
