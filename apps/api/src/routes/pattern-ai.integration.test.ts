@@ -700,7 +700,10 @@ describe("M7 AI-generated Pattern", () => {
     });
     const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
     expect(await drain(generationId)).toBe("succeeded");
-    const digest = await sha256Hex(`${generationId}:fact_packet:0`);
+    // Four components since Task 6: the attempt index joins the identity, so a
+    // genuine retry writes a fresh artifact instead of colliding with the one
+    // before it and being silently discarded.
+    const digest = await sha256Hex(`${generationId}:fact_packet:0:0`);
     const row = await env.DB.prepare(
       `SELECT id FROM pattern_generation_artifacts
        WHERE generation_id = ? AND artifact_class = 'fact_packet'`,

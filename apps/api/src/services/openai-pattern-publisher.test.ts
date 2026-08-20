@@ -238,7 +238,13 @@ describe("OpenAI Pattern publisher", () => {
       [429, "publisher_unavailable", "rate_limited"],
       [500, "publisher_unavailable", "provider_5xx"],
       [503, "publisher_unavailable", "provider_5xx"],
-      [400, "publisher_output_invalid", "schema_mismatch"],
+      // Its own detail, not `schema_mismatch`. The two codes are identical to
+      // the provider and opposite to the caller: a post-200 shape failure is a
+      // model output another sample can fix, and a 400 is a request this Worker
+      // built wrong that every retry reproduces exactly.
+      [400, "publisher_output_invalid", "provider_4xx"],
+      [409, "publisher_output_invalid", "provider_4xx"],
+      [422, "publisher_output_invalid", "provider_4xx"],
     ];
 
     it.each(cases)("maps %i without leaking provider text", async (status, code, detail) => {

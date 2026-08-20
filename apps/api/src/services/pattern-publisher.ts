@@ -10,7 +10,12 @@
 import type { Env } from "../env.js";
 import { isDevEnvironment } from "../crypto.js";
 import { readPatternAiRollout, type PatternAiRollout } from "./pattern-rollout.js";
-import { resolveAiGatewayRoute } from "./reading-publisher.js";
+import {
+  resolveAiGatewayRoute,
+  resolveProviderCredentialMode,
+  type AiGatewayRoute,
+  type ProviderCredentialMode,
+} from "./reading-publisher.js";
 import type {
   PatternPlan,
   PatternSemanticVerdict,
@@ -97,6 +102,28 @@ export interface PatternPublisherConfig {
   dailyCallLimit: number;
   artifactRetentionDays: number;
   apiKey: string | null;
+  /**
+   * The gateway the Pattern passes travel through, or `null` for the direct
+   * origin.
+   *
+   * Carried here rather than resolved at the call site so the adapter is handed
+   * a route explicitly instead of defaulting to one. A half-configured pair is
+   * refused above, never quietly downgraded to the direct origin -- an operator
+   * who set one of the two ids meant to route through a gateway, and billing the
+   * passes directly instead looks like a working deployment with an empty
+   * dashboard.
+   */
+  gatewayRoute: AiGatewayRoute | null;
+  /**
+   * How this deployment authenticates to OpenAI, or `null` under the synthetic
+   * pin, which authenticates to nothing.
+   *
+   * Resolved from `OPENAI_CREDENTIAL_SOURCE` rather than inferred from whether
+   * `OPENAI_API_KEY` happens to be set: inference cannot tell "the gateway holds
+   * the key" from "the worker key was forgotten", and those two need opposite
+   * outcomes.
+   */
+  credential: ProviderCredentialMode | null;
 }
 
 export type PatternPublisherConfigOutcome =
@@ -201,6 +228,11 @@ export function resolvePatternPublisherConfiguration(
   if (!callLimit) return misconfigured("PATTERN_DAILY_PROVIDER_CALL_LIMIT is required when Pattern rollout is enabled");
 
   if (publisherName === PATTERN_PUBLISHER_OPENAI) {
+    // `OPENAI_API_KEY` is deliberately NOT in this list. Under
+    // `OPENAI_CREDENTIAL_SOURCE=gateway_stored` the key must be ABSENT -- a key
+    // on the request wins over the gateway-stored one -- so requiring it here
+    // made BYOK, the approved credential model, unreachable for Pattern.
+    // `resolveProviderCredentialMode` below owns the whole question.
     const required = [
       env.OPENAI_PATTERN_PLANNER_MODEL,
       env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
@@ -208,12 +240,14 @@ export function resolvePatternPublisherConfiguration(
       env.OPENAI_PATTERN_WRITER_PROMPT_VERSION,
       env.OPENAI_PATTERN_VERIFIER_MODEL,
       env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
-      env.OPENAI_API_KEY,
     ];
     if (required.some((value) => !value?.trim())) {
       return misconfigured("The Pattern openai publisher is enabled but not fully configured");
     }
   }
+
+  let gatewayRoute: AiGatewayRoute | null = null;
+  let credential: ProviderCredentialMode | null = null;
 
   // Section 14.2: the verifier configuration must not be identical to the
   // writer's, and at minimum (provider, model, prompt_version) must differ.
@@ -236,6 +270,11 @@ export function resolvePatternPublisherConfiguration(
     // instead would look like a working deployment with an empty dashboard.
     const gateway = resolveAiGatewayRoute(env);
     if (!gateway.ok) return misconfigured(gateway.message);
+    gatewayRoute = gateway.route;
+
+    const resolved = resolveProviderCredentialMode(env, gatewayRoute);
+    if (!resolved.ok) return misconfigured(resolved.message);
+    credential = resolved.mode;
   }
 
   const pin: PatternPublisherPin = {
@@ -268,6 +307,8 @@ export function resolvePatternPublisherConfiguration(
       dailyCallLimit: callLimit,
       artifactRetentionDays: PATTERN_ARTIFACT_RETENTION_DAYS,
       apiKey: env.OPENAI_API_KEY?.trim() || null,
+      gatewayRoute,
+      credential,
     },
   };
 }

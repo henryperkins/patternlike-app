@@ -26,6 +26,7 @@ function env(overrides: Record<string, string | undefined> = {}) {
     PATTERN_INPUT_MAX_BYTES: "98304",
     PATTERN_ARTIFACT_RETENTION_DAYS: "30",
     OPENAI_API_KEY: "sk-test",
+    OPENAI_CREDENTIAL_SOURCE: "worker",
     OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_PLANNER_REASONING: "high",
     OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.0",
@@ -181,6 +182,79 @@ describe("Pattern publisher configuration", () => {
         env({ AI_GATEWAY_ACCOUNT_ID: "a".repeat(32), AI_GATEWAY_ID: "patternlike" }),
       );
       expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      // Carried on the config, not re-resolved at the call site: the adapter is
+      // handed a route explicitly rather than defaulting to the direct origin.
+      expect(outcome.config?.gatewayRoute).toEqual({
+        accountId: "a".repeat(32),
+        gatewayId: "patternlike",
+        token: null,
+      });
+    });
+  });
+
+  describe("provider credential mode", () => {
+    it("refuses an openai pin with no credential source rather than inferring one", () => {
+      const outcome = resolvePatternPublisherConfiguration(
+        env({ OPENAI_CREDENTIAL_SOURCE: undefined }),
+      );
+      expect(outcome.ok).toBe(false);
+      if (outcome.ok) return;
+      expect(outcome.message).toContain("OPENAI_CREDENTIAL_SOURCE is required");
+    });
+
+    it("carries the worker credential on the config", () => {
+      const outcome = resolvePatternPublisherConfiguration(env());
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      expect(outcome.config?.credential).toEqual({ source: "worker", apiKey: "sk-test" });
+    });
+
+    it("resolves gateway_stored, which requires the key to be ABSENT", () => {
+      // The regression this pins: requiring OPENAI_API_KEY for the openai pin
+      // made BYOK unreachable, because a key on the request wins over the
+      // gateway-stored one and `resolveProviderCredentialMode` refuses both.
+      const outcome = resolvePatternPublisherConfiguration(
+        env({
+          OPENAI_CREDENTIAL_SOURCE: "gateway_stored",
+          OPENAI_API_KEY: undefined,
+          OPENAI_GATEWAY_KEY_ALIAS: "pattern-key",
+          AI_GATEWAY_ACCOUNT_ID: "a".repeat(32),
+          AI_GATEWAY_ID: "patternlike",
+          AI_GATEWAY_TOKEN: "aig-token",
+        }),
+      );
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      expect(outcome.config?.credential).toEqual({
+        source: "gateway_stored",
+        alias: "pattern-key",
+      });
+    });
+
+    it("refuses gateway_stored while a worker key is still set", () => {
+      const outcome = resolvePatternPublisherConfiguration(
+        env({
+          OPENAI_CREDENTIAL_SOURCE: "gateway_stored",
+          OPENAI_GATEWAY_KEY_ALIAS: "pattern-key",
+          AI_GATEWAY_ACCOUNT_ID: "a".repeat(32),
+          AI_GATEWAY_ID: "patternlike",
+          AI_GATEWAY_TOKEN: "aig-token",
+        }),
+      );
+      expect(outcome.ok).toBe(false);
+      if (outcome.ok) return;
+      expect(outcome.message).toContain("OPENAI_API_KEY must not be set");
+    });
+
+    it("leaves the synthetic pin with no credential at all", () => {
+      const outcome = resolvePatternPublisherConfiguration(
+        env({ ENVIRONMENT: "development", PATTERN_PUBLISHER: "synthetic" }),
+      );
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      expect(outcome.config?.credential).toBeNull();
+      expect(outcome.config?.gatewayRoute).toBeNull();
     });
   });
 

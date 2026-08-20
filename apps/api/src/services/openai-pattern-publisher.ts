@@ -43,7 +43,8 @@ import { PATTERN_PUBLISHER_OPENAI, type PatternPublisherPin } from "./pattern-pu
 export type PatternSafeDetailCode =
   | PublisherSafeDetailCode
   | "gateway_cache_hit"
-  | "gateway_dlp_match";
+  | "gateway_dlp_match"
+  | "provider_4xx";
 
 /**
  * Which layer produced a non-2xx.
@@ -286,8 +287,12 @@ export function createOpenAiPatternTransport(
           return fail("publisher_unavailable", "provider_5xx", origin, retryAfter);
         }
         // Any other 4xx is a request this adapter built wrong, which a retry
-        // reproduces exactly.
-        return fail("publisher_output_invalid", "schema_mismatch", origin);
+        // reproduces exactly. Its own detail rather than `schema_mismatch`:
+        // that code is the caller's signal that a RETRY may help, because a
+        // post-200 shape failure is a model output the next sample can fix.
+        // Collapsing the two spends the whole pass ceiling re-sending a request
+        // that can never succeed.
+        return fail("publisher_output_invalid", "provider_4xx", origin);
       }
 
       // A DLP match proves an undisclosed inspector processed this request or

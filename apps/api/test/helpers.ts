@@ -517,6 +517,28 @@ export function enablePatternAi(): void {
   env.PATTERN_ARTIFACT_RETENTION_DAYS = "30";
 }
 
+/**
+ * The same rollout, pinned to the live OpenAI publisher.
+ *
+ * Every pin `resolvePatternPublisherConfiguration` requires for the `openai`
+ * name has to be set explicitly: the hermetic baseline leaves all of them empty
+ * on purpose, so no suite reaches a provider by forgetting something.
+ * `mockCalcService` intercepts the request, so this exercises the adapter
+ * without leaving the isolate.
+ */
+export function enablePatternOpenAi(): void {
+  enablePatternAi();
+  env.PATTERN_PUBLISHER = "openai";
+  env.OPENAI_CREDENTIAL_SOURCE = "worker";
+  env.OPENAI_API_KEY = "sk-test-pattern";
+  env.OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
+  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0";
+  env.OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
+  env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.0";
+  env.OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
+  env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
+}
+
 export function disablePatternAi(): void {
   env.PATTERN_AI_ROLLOUT = "off";
   env.PATTERN_PUBLISHER = "";
@@ -524,4 +546,15 @@ export function disablePatternAi(): void {
   env.PATTERN_ARTIFACT_RETENTION_DAYS = "";
   env.PATTERN_SEMANTIC_FORCE_REJECT = "";
   env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
+  // The provider credentials too. `OPENAI_API_KEY` is shared with the daily
+  // reading publisher, so a Pattern suite that left it set would hand a
+  // capability to every suite that ran after it.
+  env.OPENAI_CREDENTIAL_SOURCE = "";
+  env.OPENAI_API_KEY = "";
+  env.OPENAI_PATTERN_PLANNER_MODEL = "";
+  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "";
+  env.OPENAI_PATTERN_WRITER_MODEL = "";
+  env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "";
+  env.OPENAI_PATTERN_VERIFIER_MODEL = "";
+  env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "";
 }
