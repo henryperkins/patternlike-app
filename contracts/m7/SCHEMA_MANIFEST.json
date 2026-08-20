@@ -307,6 +307,11 @@
       "date": "2026-08-16",
       "change": "Reconciled unimplemented M7 spec artifacts: optional provenance on ontology releases; optional evaluation report hashes; optional source-fragment edition/location/exclusions; reservationReason and related common defs; admin metadata/inventory/ontology-release documents; erasure-replay event with signing-key identity and a required ontology version for recall tombstones; OpenAPI paths for recall, reconcile, artifact inventory, artifact decrypt, and admin ontology release; policy-only fixture for verdict pass with unevaluated_fixture_count !== 0.",
       "reason": "docs/reviews/2026-08-16-m7-unimplemented-spec-artifacts.md required these additive documents before slices A–D implement the wrong artifact. Purely additive: no existing $id, required field, or enum member changed. purpose_class continues to be the shipped four-value list, now referenced from common.schema.json#/$defs/purposeClass."
+    },
+    {
+      "date": "2026-08-20",
+      "change": "Added correction_document to common.schema.json#/$defs/artifactClass for the closed writer correction path.",
+      "reason": "M7 design section 13.5 requires deterministic and semantic rejections to carry a closed correction document into another writer attempt. Additive only: schema_version, $id values, required fields, and every existing enum member remain unchanged."
     }
   ]
 }

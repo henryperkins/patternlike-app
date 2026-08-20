@@ -267,7 +267,7 @@ export async function enqueuePatternGeneration(
     reservation_reason: reasonToReservation(input.reason),
     publisher: publisher.config.pin,
     planner_attempts_max: 2,
-    writer_attempts_max: 2,
+    writer_attempts_max: 3,
     verifier_attempts_max: 2,
     artifact_retention_days: publisher.config.artifactRetentionDays,
   };

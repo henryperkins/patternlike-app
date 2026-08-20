@@ -6,17 +6,13 @@ import { readPatternAiRollout } from "./pattern-rollout.js";
 
 /**
  * Claims one job may take across every stage before the sweep stops re-arming
- * it and fails it instead. The frozen command pins two planner, two writer, and
- * two verifier attempts plus a publish, so a healthy job never approaches this.
- *
- * The ceiling exists because provider budget is consumed on stage entry and
- * never refunded by policy. Without it, a consumer that dies between
- * `claimStage` committing and `advance`/`failJob` leaves a lease that expires,
- * the next tick re-sends the same stage, the stage charges the budget again --
- * and one deterministically wedging chart drains the whole account's daily
- * ceiling one cron tick at a time, forever.
+ * it and fails it instead. The approved worst case makes 11 provider calls,
+ * each in its own delivery, plus the publishing delivery: 12 claims before any
+ * churn. Four further claims cover bounded lease expiry, artifact-adopting
+ * redeliveries that spend nothing, and `retryStage` returns: 12 + 4 = 16.
+ * Provider spend is bounded independently by PATTERN_DAILY_PROVIDER_CALL_LIMIT.
  */
-const MAX_STAGE_CLAIMS = 8;
+const MAX_STAGE_CLAIMS = 16;
 
 export type PatternReconcileResult =
   | { ok: false; status: 404; code: "not_found" }

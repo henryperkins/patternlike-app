@@ -49,16 +49,29 @@ export interface GeneratePatternCommandV1 {
   corpus_release_hash: string;
   reservation_reason: PatternReservationReason;
   publisher: PatternPublisherPin;
+  /** Inclusive provider-call ceiling for the planner pass across this job. */
   planner_attempts_max: 2;
-  writer_attempts_max: 2;
+  /** Inclusive writer-call ceiling across one job and its frozen plan. */
+  writer_attempts_max: 2 | 3;
+  /** Inclusive verifier-call ceiling per candidate, reset on candidate entry. */
   verifier_attempts_max: 2;
   artifact_retention_days: number;
 }
 
 export function isPatternCommand(value: unknown): value is GeneratePatternCommandV1 {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const record = value as { command_version?: unknown };
-  return record.command_version === PATTERN_COMMAND_VERSION;
+  const record = value as {
+    command_version?: unknown;
+    planner_attempts_max?: unknown;
+    writer_attempts_max?: unknown;
+    verifier_attempts_max?: unknown;
+  };
+  return (
+    record.command_version === PATTERN_COMMAND_VERSION &&
+    record.planner_attempts_max === 2 &&
+    (record.writer_attempts_max === 2 || record.writer_attempts_max === 3) &&
+    record.verifier_attempts_max === 2
+  );
 }
 
 export function publicStageFor(stage: PatternDomainStage): "organizing_evidence" | "writing" | "checking_claims" | null {

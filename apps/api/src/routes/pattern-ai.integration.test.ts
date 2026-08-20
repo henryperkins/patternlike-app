@@ -33,8 +33,11 @@ import { enqueuePatternGeneration } from "../services/pattern-enqueue.js";
 import { hashChartFingerprint } from "../db/pattern-claims.js";
 import { loadActiveOntology } from "../db/pattern-ontology.js";
 import { insertPatternConsentGrant } from "../db/pattern-consents.js";
-import { rotateUserDek } from "../db/users.js";
-import { PATTERN_JOB_TYPE } from "../services/pattern-command.js";
+import { decryptPayload, rotateUserDek } from "../db/users.js";
+import {
+  PATTERN_JOB_TYPE,
+  type GeneratePatternCommandV1,
+} from "../services/pattern-command.js";
 import { assembleAccountExport } from "../services/account-export.js";
 import {
   computeOntologyBundleHash,
@@ -148,6 +151,58 @@ describe("M7 AI-generated Pattern", () => {
     expect(withCursor.body.error).toEqual(
       expect.objectContaining({ code: "invalid_pattern_query" }),
     );
+  });
+
+  it("freezes the approved three-attempt writer ceiling in a new command", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+
+    const reserved = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-writer-attempt-ceiling" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(reserved.status, JSON.stringify(reserved.body)).toBe(202);
+    const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
+    const row = await env.DB.prepare(
+      `SELECT j.id AS job_id, j.payload_enc, j.payload_key_version, j.payload_nonce
+       FROM jobs j
+       JOIN pattern_generation_jobs p ON p.job_id = j.id
+       WHERE p.generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{
+        job_id: string;
+        payload_enc: ArrayBuffer;
+        payload_key_version: number;
+        payload_nonce: string;
+      }>();
+    expect(row).not.toBeNull();
+    let binary = "";
+    for (const byte of new Uint8Array(row!.payload_enc)) binary += String.fromCharCode(byte);
+    const command = await decryptPayload<GeneratePatternCommandV1>(
+      env,
+      IDENTITY_A,
+      {
+        key_version: row!.payload_key_version,
+        nonce: row!.payload_nonce,
+        ciphertext: btoa(binary),
+      },
+      {
+        subject: IDENTITY_A.cryptoSubject,
+        field: "jobs.payload_enc",
+        recordId: row!.job_id,
+      },
+    );
+
+    expect(command.planner_attempts_max).toBe(2);
+    expect(command.writer_attempts_max).toBe(3);
+    expect(command.verifier_attempts_max).toBe(2);
   });
 
   it("does not consume the claim when generation is cancelled, and delete blocks regeneration", async () => {
@@ -480,6 +535,59 @@ describe("M7 AI-generated Pattern", () => {
       .bind(generationId)
       .first<{ n: number }>();
     expect(marked?.n).toBe(100);
+  });
+
+  it("keeps an eleven-call job recoverable beneath the stage-claim ceiling", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const reserved = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-eleven-call-claim-ceiling" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(reserved.status, JSON.stringify(reserved.body)).toBe(202);
+    const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
+    const job = await env.DB.prepare(
+      `SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{ job_id: string }>();
+    const now = new Date("2026-08-20T12:00:00Z");
+    await env.DB.prepare(
+      `UPDATE jobs
+       SET status = 'running', attempts = 11, claim_token = 'clm_expired_worst_case',
+           lease_expires_at = ?, result_class = NULL
+       WHERE id = ?`,
+    )
+      .bind(new Date(now.getTime() - 60_000).toISOString(), job!.job_id)
+      .run();
+
+    await sweepPatternJobs(env, now);
+
+    const after = await env.DB.prepare(
+      `SELECT j.status, j.result_class, p.stage, p.failure_class
+       FROM jobs j
+       JOIN pattern_generation_jobs p ON p.job_id = j.id
+       WHERE p.generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{
+        status: string;
+        result_class: string | null;
+        stage: string;
+        failure_class: string | null;
+      }>();
+    expect(after).toEqual({
+      status: "running",
+      result_class: null,
+      stage: "reserved",
+      failure_class: null,
+    });
   });
 
   it("refuses publication when semantic verification rejects", async () => {

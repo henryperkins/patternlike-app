@@ -116,6 +116,7 @@
         "writer_response",
         "rejected_candidate",
         "candidate_validation",
+        "correction_document",
         "verifier_request",
         "verifier_response",
         "semantic_verdict",
