@@ -1,3 +1,5 @@
+import type { OntologySignerBinding } from "./services/ontology-signing-client.js";
+
 /** Opaque queue nudge; the encrypted generation command remains in D1. */
 export interface GenerationMessage {
   job_id: string;
@@ -60,6 +62,11 @@ export interface Env {
    * jobs.payload_enc.
    */
   PATTERN_QUEUE: Queue<PatternGenerationMessage>;
+  /**
+   * Service-binding-only ontology signer. The private signing key is absent
+   * from this Env by construction and exists only in the signer Worker.
+   */
+  ONTOLOGY_SIGNER: OntologySignerBinding;
   /** Raw USR-06 retention in calendar months; integer 1..13, default 13. */
   CHECK_IN_RETENTION_MONTHS?: string;
   /** Positive cache epoch; bump before any result-changing calculation deploy. */

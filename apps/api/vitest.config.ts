@@ -24,6 +24,13 @@ export default defineConfig({
           ...HERMETIC_TEST_BINDINGS,
           TEST_MIGRATIONS: migrations,
         },
+        // The production binding exposes RPC methods on the isolated signer.
+        // Most API tests never call it; a fetch-only local stub keeps Wrangler's
+        // real service declaration resolvable without introducing test key
+        // material into the API Worker.
+        serviceBindings: {
+          ONTOLOGY_SIGNER: async () => new Response("ontology signer test stub", { status: 501 }),
+        },
         // Every outbound fetch from the Worker — including invokeCalc's POST to
         // CALC_SERVICE_URL — lands here instead of the network, so tests are
         // hermetic and the calculation result is deterministic on its input.

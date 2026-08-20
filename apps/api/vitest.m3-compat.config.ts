@@ -23,6 +23,10 @@ export default defineConfig({
           TEST_MIGRATIONS: migrations,
           READING_V5_ROLLOUT: "off",
         },
+        serviceBindings: {
+          ONTOLOGY_SIGNER: async () =>
+            new Response("ontology signer test stub", { status: 501 }),
+        },
         outboundService: mockCalcService,
       },
     }),
