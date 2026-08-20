@@ -27,6 +27,7 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
+import { OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY } from "../../test/mock-calc-service.js";
 import { findSemanticVerdictProblem } from "./pattern-semantic.js";
 import {
   executePatternJob,
@@ -146,6 +147,21 @@ describe("Pattern stage protocol", () => {
         prompt_version: "1.0.0",
       }),
     );
+  });
+
+  it("fails closed when OpenAI returns a schema-valid plan the packet cannot support", async () => {
+    enablePatternOpenAi();
+    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY;
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-openai-plan-invalid");
+
+    expect(await deliver(generationId)).toEqual({
+      ok: false,
+      reason: "terminal",
+      failureClass: "plan_invalid",
+    });
+    expect(await stageOf(generationId)).toBe("failed");
+    expect(await providerCalls()).toBe(1);
   });
 
   it("logs a closed failed-attempt event with its pass and durable attempt", async () => {

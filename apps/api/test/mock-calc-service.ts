@@ -480,6 +480,11 @@ export const OPENAI_MOCK_INCOMPLETE_MAX_OUTPUT = "mock-openai-incomplete-max-out
 export const OPENAI_MOCK_WRONG_SHAPE = "mock-openai-wrong-shape";
 export const OPENAI_MOCK_ECHO_WRONG_DATE = "mock-openai-wrong-date";
 export const OPENAI_MOCK_UNGROUNDED = "mock-openai-ungrounded";
+/**
+ * Pattern configuration pins model ids, so the credential is the only opaque
+ * request value an integration test can use to select a provider scenario.
+ */
+export const OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY = "sk-test-pattern-plan-invalid";
 
 interface ResponsesBody {
   model: string;
@@ -663,6 +668,8 @@ function isFullPlannerRequest(value: unknown): value is PatternPlannerRequestDoc
   return (
     !!document.packet &&
     Array.isArray(document.packet.features) &&
+    !!document.packet.selection_constraints &&
+    Number.isInteger(document.packet.selection_constraints.core_chapters_min) &&
     Array.isArray(document.ontology_records)
   );
 }
@@ -673,9 +680,12 @@ function isFullWriterRequest(value: unknown): value is PatternWriterRequestDocum
   return (
     !!document.plan &&
     Array.isArray(document.plan.chapters) &&
+    Array.isArray(document.plan.additional_signatures) &&
     Array.isArray(document.assignments) &&
     Array.isArray(document.signature_assignments) &&
-    Array.isArray(document.ontology_records)
+    Array.isArray(document.ontology_records) &&
+    !!document.uncertainty &&
+    Array.isArray(document.uncertainty.required_language_rule_ids)
   );
 }
 
@@ -809,6 +819,16 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   // on `model`, so a Pattern test drives a failure exactly as a reading test
   // does -- by pinning a sentinel model -- and the two never collide.
   const patternPass = PATTERN_SCHEMA_NAMES[body.text?.format?.name ?? ""];
+
+  if (
+    patternPass === "planner" &&
+    request.headers.get("authorization") ===
+      `Bearer ${OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY}`
+  ) {
+    return json(
+      responsesEnvelope(model, outputText(patternPassDocument("planner", {}))),
+    );
+  }
 
   if (model === OPENAI_MOCK_NETWORK_ERROR) {
     // A rejected fetch, not a response. The adapter must not read this as a
