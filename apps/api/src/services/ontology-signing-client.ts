@@ -10,6 +10,16 @@ import {
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
+const SIGNER_ERROR_CODES = new Set([
+  "request_malformed",
+  "payload_too_large",
+  "payload_malformed",
+  "payload_noncanonical",
+  "forbidden_field",
+  "payload_hash_mismatch",
+  "signer_configuration_invalid",
+  "signing_key_unknown",
+]);
 
 export interface OntologySigningRequest {
   payload: string;
@@ -30,7 +40,7 @@ export type OntologySigningServiceResult =
   | { ok: false; error: { code: string } };
 
 export interface OntologySignerBinding {
-  signOntology(request: OntologySigningRequest): Promise<OntologySigningServiceResult>;
+  signOntology(request: OntologySigningRequest): Promise<unknown>;
 }
 
 export class OntologySigningClientError extends Error {
@@ -44,22 +54,66 @@ function fail(code: string): never {
   throw new OntologySigningClientError(code);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasExactFields(
+  value: Record<string, unknown>,
+  fields: ReadonlySet<string>,
+): boolean {
+  const keys = Object.keys(value);
+  return keys.length === fields.size && keys.every((key) => fields.has(key));
+}
+
 function validateResponse(
-  value: OntologySigningServiceResult,
+  value: unknown,
   keyId: string,
   payloadHash: string,
 ): OntologyBundleSignature {
-  if (!value.ok) fail(`ontology_signer_${value.error.code}`);
+  if (!isRecord(value) || typeof value.ok !== "boolean") {
+    fail("ontology_signer_response_invalid");
+  }
+  if (value.ok === false) {
+    if (
+      !hasExactFields(value, new Set(["ok", "error"])) ||
+      !isRecord(value.error) ||
+      !hasExactFields(value.error, new Set(["code"])) ||
+      typeof value.error.code !== "string" ||
+      !SIGNER_ERROR_CODES.has(value.error.code)
+    ) {
+      fail("ontology_signer_response_invalid");
+    }
+    fail(`ontology_signer_${value.error.code}`);
+  }
+  if (
+    !hasExactFields(value, new Set(["ok", "signature"])) ||
+    !isRecord(value.signature) ||
+    !hasExactFields(
+      value.signature,
+      new Set(["alg", "key_id", "signature", "signed_payload_hash"]),
+    )
+  ) {
+    fail("ontology_signer_response_invalid");
+  }
   const signature = value.signature;
   if (
     (signature.alg !== "Ed25519" && signature.alg !== "ES256") ||
+    typeof signature.key_id !== "string" ||
     signature.key_id !== keyId ||
+    typeof signature.signature !== "string" ||
     !BASE64URL.test(signature.signature) ||
+    typeof signature.signed_payload_hash !== "string" ||
     !hashesEqual(signature.signed_payload_hash, payloadHash)
   ) {
     fail("ontology_signer_response_invalid");
   }
-  return signature;
+  return {
+    alg: signature.alg,
+    key_id: signature.key_id,
+    signature: signature.signature,
+    signed_payload_hash: signature.signed_payload_hash,
+  };
 }
 
 /**
@@ -75,6 +129,9 @@ export async function signOntologyCandidate(
   if (!KEY_ID.test(keyId)) fail("ontology_signing_key_invalid");
   if (release.provenance?.origin !== "machine_pipeline") {
     fail("ontology_origin_not_machine_pipeline");
+  }
+  if (release.status !== "candidate") {
+    fail("ontology_status_not_candidate");
   }
 
   const compiled = compileOntologyRelease(release);

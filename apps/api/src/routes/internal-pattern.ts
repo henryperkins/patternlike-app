@@ -67,6 +67,16 @@ internalPatternRoutes.post("/pattern-ontology-releases", async (c) => {
       400,
     );
   }
+  if (rawOrigin === "machine_pipeline" && release.status !== "candidate") {
+    return c.json(
+      error(
+        requestId,
+        "ontology_status_not_candidate",
+        "Machine ontology releases must be signed as candidates",
+      ),
+      400,
+    );
+  }
   const keys = parseOntologyKeys(c.env.PATTERN_ONTOLOGY_KEYS);
   if (keys.size > 0) {
     const failed = await verifyOntologySignature(signed, keys);
@@ -132,7 +142,7 @@ internalPatternRoutes.post("/pattern-ontology-releases", async (c) => {
   try {
     await storeOntologyRelease(
       c.env,
-      { ...signed, status: "active" },
+      signed,
       objectKey,
       evidence,
     );
@@ -163,15 +173,16 @@ internalPatternRoutes.post("/pattern-ontology-releases", async (c) => {
     throw cause;
   }
   const pointer = await c.env.DB.prepare(
-    `SELECT bundle_hash FROM pattern_ontology_releases WHERE version = ?`,
+    `SELECT bundle_hash, status
+     FROM pattern_ontology_releases WHERE version = ?`,
   )
     .bind(signed.ontology_version)
-    .first<{ bundle_hash: string }>();
+    .first<{ bundle_hash: string; status: string }>();
   return c.json(
     {
       ontology_version: signed.ontology_version,
       bundle_hash: pointer?.bundle_hash ?? signed.bundle_hash,
-      status: "active",
+      status: pointer?.status ?? "candidate",
       r2_uri: objectKey,
     },
     201,

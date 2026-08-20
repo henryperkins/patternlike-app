@@ -1,7 +1,7 @@
 import { canonicalJson, contentHash } from "@patternlike/shared";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
-export const MAX_SIGNING_PAYLOAD_BYTES = 256 * 1024;
+const MAX_SIGNING_PAYLOAD_BYTES = 256 * 1024;
 
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -144,7 +144,7 @@ function validatePayload(payload: string):
     typeof parsed.ontology_version !== "string" ||
     typeof parsed.corpus_release_hash !== "string" ||
     typeof parsed.locale !== "string" ||
-    typeof parsed.status !== "string" ||
+    parsed.status !== "candidate" ||
     !Array.isArray(parsed.records) ||
     !isRecord(parsed.evaluation)
   ) {
@@ -231,7 +231,7 @@ function signingParams(
     : { name: key.algorithm.name };
 }
 
-export async function signOntologyPayload(
+async function signOntologyPayload(
   value: unknown,
   signingKeySecret: string,
 ): Promise<OntologySigningResult> {

@@ -27,6 +27,7 @@ CREATE TABLE pattern_ontology_pipeline_evidence (
   bundle_hash TEXT NOT NULL,
   evaluation_report_hash TEXT NOT NULL,
   evaluation_artifact_object_key TEXT NOT NULL UNIQUE,
+  evaluation_artifact_envelope_hash TEXT NOT NULL,
   evaluation_artifact_ciphertext_hash TEXT NOT NULL,
   evaluation_artifact_status TEXT NOT NULL
     CHECK (evaluation_artifact_status IN ('pending', 'committed')),
@@ -42,6 +43,48 @@ CREATE TABLE pattern_ontology_pipeline_evidence (
     (corpus_license_class = 'licensed_excerpt' AND corpus_public_capable = 1)
     OR
     (corpus_license_class = 'internal_synthetic' AND corpus_public_capable = 0)
+  ),
+  CHECK (
+    activation_scope != 'public'
+    OR (
+      corpus_license_class = 'licensed_excerpt'
+      AND corpus_public_capable = 1
+    )
+  ),
+  CHECK (
+    length(corpus_release_hash) = 71
+    AND substr(corpus_release_hash, 1, 7) = 'sha256:'
+    AND substr(corpus_release_hash, 8) NOT GLOB '*[^0-9a-f]*'
+  ),
+  CHECK (
+    length(bundle_hash) = 71
+    AND substr(bundle_hash, 1, 7) = 'sha256:'
+    AND substr(bundle_hash, 8) NOT GLOB '*[^0-9a-f]*'
+  ),
+  CHECK (
+    length(evaluation_report_hash) = 71
+    AND substr(evaluation_report_hash, 1, 7) = 'sha256:'
+    AND substr(evaluation_report_hash, 8) NOT GLOB '*[^0-9a-f]*'
+  ),
+  CHECK (
+    length(evaluation_artifact_envelope_hash) = 71
+    AND substr(evaluation_artifact_envelope_hash, 1, 7) = 'sha256:'
+    AND substr(evaluation_artifact_envelope_hash, 8) NOT GLOB '*[^0-9a-f]*'
+  ),
+  CHECK (
+    length(evaluation_artifact_ciphertext_hash) = 71
+    AND substr(evaluation_artifact_ciphertext_hash, 1, 7) = 'sha256:'
+    AND substr(evaluation_artifact_ciphertext_hash, 8) NOT GLOB '*[^0-9a-f]*'
+  ),
+  CHECK (
+    evidence_status != 'committed'
+    OR (
+      run_status = 'succeeded'
+      AND evaluation_artifact_status = 'committed'
+      AND compiler_passed = 1
+      AND evaluator_passed = 1
+      AND unevaluated_fixture_count = 0
+    )
   )
 );
 
@@ -49,3 +92,11 @@ CREATE INDEX idx_pattern_ontology_evidence_activation
   ON pattern_ontology_pipeline_evidence(
     ontology_version, bundle_hash, evidence_status, run_status
   );
+
+CREATE TRIGGER pattern_ontology_pipeline_evidence_committed_immutable
+BEFORE UPDATE ON pattern_ontology_pipeline_evidence
+FOR EACH ROW
+WHEN OLD.evidence_status = 'committed'
+BEGIN
+  SELECT RAISE(ABORT, 'committed ontology pipeline evidence is immutable');
+END;

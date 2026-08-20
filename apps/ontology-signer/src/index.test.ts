@@ -7,11 +7,14 @@ import {
   type ReleasePublicKey,
   type SignatureAlgorithm,
 } from "../../api/src/services/content-release.js";
-import OntologySigner, {
-  MAX_SIGNING_PAYLOAD_BYTES,
+import OntologySigner from "./index.js";
+import * as signerWorkerModule from "./index.js";
+import {
   type OntologySigningRequest,
   type OntologySigningResult,
 } from "./index.js";
+
+const MAX_SIGNING_PAYLOAD_BYTES = 256 * 1024;
 
 interface TestSigningKey {
   alg: SignatureAlgorithm;
@@ -101,6 +104,10 @@ async function sign(request: unknown): Promise<OntologySigningResult> {
 }
 
 describe("ontology signing Worker", () => {
+  it("exports only the RPC entrypoint from the production Worker module", () => {
+    expect(Object.keys(signerWorkerModule)).toEqual(["default"]);
+  });
+
   it("has no fetch route", () => {
     expect(Object.prototype.hasOwnProperty.call(OntologySigner.prototype, "fetch")).toBe(false);
   });
@@ -151,6 +158,20 @@ describe("ontology signing Worker", () => {
     expect(result).toEqual({
       ok: false,
       error: { code: "payload_noncanonical" },
+    });
+  });
+
+  it("refuses to sign a machine payload whose status is not candidate", async () => {
+    const key = await generateKey("ontology-ed25519", "Ed25519");
+    env.PATTERN_ONTOLOGY_SIGNING_KEY = signingSecret([key]);
+    const body = candidateBody();
+    body.status = "active";
+
+    const result = await sign(await requestFor(body));
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "payload_malformed" },
     });
   });
 
