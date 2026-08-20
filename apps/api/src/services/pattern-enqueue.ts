@@ -13,7 +13,7 @@ import type { Env, PatternGenerationMessage } from "../env.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { loadPreferences } from "../db/preferences.js";
 import { ensureNatalFeatureSet } from "../db/natal-features.js";
-import { loadActiveOntology } from "../db/pattern-ontology.js";
+import { loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
 import {
   insertPatternConsentGrant,
   latestPatternConsentVersion,
@@ -157,20 +157,11 @@ export async function enqueuePatternGeneration(
   }
 
   const ontology = await loadActiveOntology(env);
-  if (!ontology) {
-    return {
-      ok: false,
-      status: 409,
-      code: "ontology_unavailable",
-      message: "No activated Pattern ontology is available",
-    };
-  }
-  const publicMachineRelease =
-    ontology.release.provenance?.origin === "machine_pipeline" &&
-    ontology.activationScope === "public";
   if (
-    !publicMachineRelease &&
-    !isInternalPatternAccount(env, identity.userId)
+    !ontologyServesAccount(
+      ontology,
+      isInternalPatternAccount(env, identity.userId),
+    )
   ) {
     return {
       ok: false,

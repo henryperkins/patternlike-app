@@ -8,7 +8,7 @@ import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { loadUserIdentity } from "../db/users.js";
 import { loadPatternGenerationGrant, patternConsentDocument } from "../db/pattern-consents.js";
-import { isOntologyRecalled, loadActiveOntology } from "../db/pattern-ontology.js";
+import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
 import { enqueuePatternGeneration } from "../services/pattern-enqueue.js";
 import {
   buildPatternState,
@@ -24,6 +24,7 @@ import {
 import { publicStageFor, type PatternDomainStage } from "../services/pattern-command.js";
 import { hashChartFingerprint, loadAnyClaim, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { loadPreferences } from "../db/preferences.js";
+import { isInternalPatternAccount } from "../services/pattern-rollout.js";
 
 export const patternAiRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -233,7 +234,12 @@ export async function tryServeAiPattern(
   if (!grant) {
     return Response.json(error(requestId, "pattern_generation_consent_required", "Pattern generation consent is required"), { status: 409 });
   }
-  if (!(await loadActiveOntology(env))) {
+  if (
+    !ontologyServesAccount(
+      await loadActiveOntology(env),
+      isInternalPatternAccount(env, userId),
+    )
+  ) {
     return Response.json(error(requestId, "ontology_unavailable", "No activated Pattern ontology is available"), { status: 409 });
   }
   return Response.json(error(requestId, "pattern_not_generated", "No accepted Pattern exists"), { status: 404 });

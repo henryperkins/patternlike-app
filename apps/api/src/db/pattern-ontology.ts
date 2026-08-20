@@ -127,6 +127,27 @@ export interface ActiveOntology {
   release: PatternOntologyRelease;
 }
 
+/**
+ * External readers may generate only from a public machine-pipeline
+ * ontology. Internal accounts may still use Slice A / degraded-internal
+ * releases. Enqueue, pattern-state, and GET /v1/pattern must share this
+ * predicate so the client never offers a generate action the API then
+ * refuses.
+ */
+export function ontologyServesAccount(
+  ontology: ActiveOntology | null,
+  internalAccount: boolean,
+): ontology is ActiveOntology {
+  if (!ontology) return false;
+  if (
+    ontology.release.provenance?.origin === "machine_pipeline" &&
+    ontology.activationScope === "public"
+  ) {
+    return true;
+  }
+  return internalAccount;
+}
+
 function asSignedRelease(value: unknown): SignedOntologyRelease | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as SignedOntologyRelease;

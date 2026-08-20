@@ -360,6 +360,13 @@ describe("machine ontology ingestion", () => {
     expect(
       ((await reservation.json()) as { error: { code: string } }).error.code,
     ).toBe("ontology_unavailable");
+    const state = await SELF.fetch("http://api.test/v1/pattern-state", {
+      headers: { "x-user-id": USER_A },
+    });
+    expect(state.status).toBe(200);
+    expect(
+      ((await state.json()) as { state: string }).state,
+    ).toBe("ontology_unavailable");
   });
 
   it("falls back to internal scope when the atomic evaluation receipt is missing", async () => {
@@ -401,6 +408,13 @@ describe("machine ontology ingestion", () => {
     expect(reservation.status).toBe(409);
     expect(
       ((await reservation.json()) as { error: { code: string } }).error.code,
+    ).toBe("ontology_unavailable");
+    const state = await SELF.fetch("http://api.test/v1/pattern-state", {
+      headers: { "x-user-id": USER_A },
+    });
+    expect(state.status).toBe(200);
+    expect(
+      ((await state.json()) as { state: string }).state,
     ).toBe("ontology_unavailable");
   });
 
@@ -801,6 +815,13 @@ describe("machine ontology ingestion", () => {
         error: { code: string };
       };
       expect(body.error.code).toBe("ontology_unavailable");
+      const state = await SELF.fetch("http://api.test/v1/pattern-state", {
+        headers: { "x-user-id": USER_A },
+      });
+      expect(state.status).toBe(200);
+      expect(
+        ((await state.json()) as { state: string }).state,
+      ).toBe("ontology_unavailable");
     },
   );
 });
