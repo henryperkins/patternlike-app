@@ -115,8 +115,13 @@ interface ArtifactRow {
   deleted_at: string | null;
 }
 
-interface FailedRunPurgeRow {
+type FailedRunPurgeLane = "retention_unmarked" | "retention_marked";
+
+interface FailedRunPurgeAssignment {
+  id: string;
   run_id: string;
+  lane: FailedRunPurgeLane;
+  attempt_result: "success" | "failure" | null;
 }
 
 type ParsedEnvelope = SealedOntologyPipelineArtifact & {
@@ -129,8 +134,15 @@ const MAX_ENVELOPE_BYTES = 6 * 1024 * 1024;
 export const ONTOLOGY_PIPELINE_ARTIFACT_CLEANUP_LIMIT = 4;
 const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_MARKER_ACTION =
   "ontology_pipeline.artifacts_purge_verified";
+const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ASSIGNMENT_ACTION =
+  "ontology_pipeline.artifacts_purge_assigned";
+const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_INVOCATION_ACTION =
+  "ontology_pipeline.artifacts_purge_invoked";
+const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION =
+  "ontology_pipeline.artifacts_purge_attempted";
 const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE = "ontology_pipeline_run";
-const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESCAN_MS = 15 * 60 * 1_000;
+const ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ACTOR =
+  "ontology-pipeline-maintenance";
 const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
@@ -917,30 +929,28 @@ export async function sweepExpiredOntologyPipelineArtifacts(
     }
   }
 
-  const unmarked = await loadUnmarkedFailedRunPurgeCandidate(env, at);
-  // Load the rescan candidate before writing a new marker. This avoids doing a
-  // redundant second list for a run whose first complete purge just finished.
-  const marked = await loadMarkedFailedRunPurgeCandidate(env, now, at);
-  const candidates = [
-    ...(unmarked ? [{ ...unmarked, markComplete: true }] : []),
-    ...(marked ? [{ ...marked, markComplete: false }] : []),
-  ];
-  if (!env.ARTIFACTS) {
-    return { deleted, failed: failed + candidates.length };
-  }
+  await assignFailedRunPurgeCandidates(env, at);
+  const candidates = await loadFailedRunPurgeAssignments(env, at);
   for (const candidate of candidates) {
+    if (candidate.attempt_result !== null) {
+      if (candidate.attempt_result === "failure") failed += 1;
+      continue;
+    }
     try {
       deleted += await purgeFailedRunArtifactPrefix(
         env,
         candidate.run_id,
         at,
         limit,
-        candidate.markComplete,
+        candidate.lane === "retention_unmarked",
       );
+      await recordFailedRunPurgeAttempt(env, candidate, at, "success");
     } catch (cause) {
+      await recordFailedRunPurgeAttempt(env, candidate, at, "failure");
       // D1-after-R2 failures must escape so the scheduler reports a failed
-      // lane and retries the still-live inventory tombstone. R2 failures keep
-      // the prefix unmarked and are safely retried on the next invocation.
+      // lane and retries the still-live inventory tombstone. Every selected
+      // run still receives a durable least-recent-attempt receipt, so an R2
+      // failure cannot hold the head of either retention lane indefinitely.
       if (cause instanceof OntologyPipelineArtifactR2PurgeError) {
         failed += 1;
         continue;
@@ -957,75 +967,204 @@ function failedRunArtifactPrefix(runId: string): string {
   return `pattern-ontology/pipeline/${runId}/`;
 }
 
-async function loadUnmarkedFailedRunPurgeCandidate(
-  env: Pick<Env, "DB">,
-  at: string,
-): Promise<FailedRunPurgeRow | null> {
-  return env.DB.prepare(
-    `SELECT run.run_id
-     FROM pattern_ontology_pipeline_runs run
-     WHERE run.stage = 'failed'
-       AND run.failed_artifact_expires_at IS NOT NULL
-       AND julianday(run.failed_artifact_expires_at) <= julianday(?)
-       AND NOT EXISTS (
-         SELECT 1 FROM audit_events marker
-         WHERE marker.action = ? AND marker.resource_type = ?
-           AND marker.resource_id = run.run_id
-       )
-     ORDER BY run.failed_artifact_expires_at, run.run_id
-     LIMIT 1`,
-  ).bind(
-    at,
-    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_MARKER_ACTION,
-    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
-  ).first<FailedRunPurgeRow>();
+function purgeInvocationId(at: string): string {
+  return `ontology_pipeline_artifacts_purge_invoked:${at}`;
 }
 
-async function loadMarkedFailedRunPurgeCandidate(
-  env: Pick<Env, "DB">,
-  now: Date,
+function purgeAssignmentIdPrefix(
   at: string,
-): Promise<FailedRunPurgeRow | null> {
-  const count = await env.DB.prepare(
-    `SELECT COUNT(*) AS count
-     FROM pattern_ontology_pipeline_runs run
-     WHERE run.stage = 'failed'
-       AND run.failed_artifact_expires_at IS NOT NULL
-       AND julianday(run.failed_artifact_expires_at) <= julianday(?)
-       AND EXISTS (
-         SELECT 1 FROM audit_events marker
-         WHERE marker.action = ? AND marker.resource_type = ?
-           AND marker.resource_id = run.run_id
-       )`,
-  ).bind(
+  lane: FailedRunPurgeLane,
+): string {
+  return `ontology_pipeline_artifacts_purge_assignment:${at}:${lane}:`;
+}
+
+async function assignFailedRunPurgeCandidates(
+  env: Pick<Env, "DB">,
+  at: string,
+): Promise<void> {
+  const invocationId = purgeInvocationId(at);
+  const unmarkedIdPrefix = purgeAssignmentIdPrefix(
     at,
-    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_MARKER_ACTION,
-    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
-  ).first<{ count: number }>();
-  if (!count || count.count < 1) return null;
-  const bucket = Math.floor(
-    now.getTime() / ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESCAN_MS,
+    "retention_unmarked",
   );
-  const offset = ((bucket % count.count) + count.count) % count.count;
-  return env.DB.prepare(
-    `SELECT run.run_id
-     FROM pattern_ontology_pipeline_runs run
-     WHERE run.stage = 'failed'
-       AND run.failed_artifact_expires_at IS NOT NULL
-       AND julianday(run.failed_artifact_expires_at) <= julianday(?)
-       AND EXISTS (
-         SELECT 1 FROM audit_events marker
-         WHERE marker.action = ? AND marker.resource_type = ?
-           AND marker.resource_id = run.run_id
+  const markedIdPrefix = purgeAssignmentIdPrefix(at, "retention_marked");
+  await env.DB.prepare(
+    `WITH
+       unmarked(run_id) AS (
+         SELECT run.run_id
+         FROM pattern_ontology_pipeline_runs run
+         WHERE run.stage = 'failed'
+           AND run.failed_artifact_expires_at IS NOT NULL
+           AND julianday(run.failed_artifact_expires_at) <= julianday(?)
+           AND NOT EXISTS (
+             SELECT 1 FROM audit_events marker
+             WHERE marker.action = ? AND marker.resource_type = ?
+               AND marker.resource_id = run.run_id
+           )
+         ORDER BY COALESCE(
+           (
+             SELECT MAX(attempt.created_at) FROM audit_events attempt
+             WHERE attempt.action = ? AND attempt.resource_type = ?
+               AND attempt.resource_id = run.run_id
+           ),
+           run.failed_artifact_expires_at
+         ),
+         CASE WHEN EXISTS (
+           SELECT 1 FROM audit_events attempt
+           WHERE attempt.action = ? AND attempt.resource_type = ?
+             AND attempt.resource_id = run.run_id
+         ) THEN 1 ELSE 0 END,
+         run.run_id
+         LIMIT 1
+       ),
+       marked(run_id) AS (
+         SELECT run.run_id
+         FROM pattern_ontology_pipeline_runs run
+         WHERE run.stage = 'failed'
+           AND run.failed_artifact_expires_at IS NOT NULL
+           AND julianday(run.failed_artifact_expires_at) <= julianday(?)
+           AND EXISTS (
+             SELECT 1 FROM audit_events marker
+             WHERE marker.action = ? AND marker.resource_type = ?
+               AND marker.resource_id = run.run_id
+           )
+         ORDER BY COALESCE(
+           (
+             SELECT MAX(attempt.created_at) FROM audit_events attempt
+             WHERE attempt.action = ? AND attempt.resource_type = ?
+               AND attempt.resource_id = run.run_id
+           ),
+           (
+             SELECT MIN(marker.created_at) FROM audit_events marker
+             WHERE marker.action = ? AND marker.resource_type = ?
+               AND marker.resource_id = run.run_id
+           ),
+           run.failed_artifact_expires_at
+         ),
+         CASE WHEN EXISTS (
+           SELECT 1 FROM audit_events attempt
+           WHERE attempt.action = ? AND attempt.resource_type = ?
+             AND attempt.resource_id = run.run_id
+         ) THEN 1 ELSE 0 END,
+         run.run_id
+         LIMIT 1
+       ),
+       assigned(id, resource_id, detail_class) AS (
+         SELECT ? || run_id, run_id, 'retention_unmarked' FROM unmarked
+         UNION ALL
+         SELECT ? || run_id, run_id, 'retention_marked' FROM marked
+       ),
+       events(
+         id, action, resource_type, resource_id, detail_class
+       ) AS (
+         SELECT id, ?, ?, resource_id, detail_class FROM assigned
+         UNION ALL
+         SELECT ?, ?, 'ontology_pipeline_maintenance', ?,
+                'retention_sweep'
        )
-     ORDER BY run.failed_artifact_expires_at, run.run_id
-     LIMIT 1 OFFSET ?`,
+     INSERT INTO audit_events (
+       id, actor_type, actor_id, action, resource_type, resource_id,
+       result, detail_class, created_at
+     )
+     SELECT event.id, 'service', ?, event.action, event.resource_type,
+            event.resource_id, 'success', event.detail_class, ?
+     FROM events event
+     WHERE NOT EXISTS (
+       SELECT 1 FROM audit_events invocation WHERE invocation.id = ?
+     )`,
   ).bind(
     at,
     ONTOLOGY_PIPELINE_ARTIFACT_PURGE_MARKER_ACTION,
     ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
-    offset,
-  ).first<FailedRunPurgeRow>();
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    at,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_MARKER_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_MARKER_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    unmarkedIdPrefix,
+    markedIdPrefix,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ASSIGNMENT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    invocationId,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_INVOCATION_ACTION,
+    at,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ACTOR,
+    at,
+    invocationId,
+  ).run();
+}
+
+async function loadFailedRunPurgeAssignments(
+  env: Pick<Env, "DB">,
+  at: string,
+): Promise<FailedRunPurgeAssignment[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT assignment.id, assignment.resource_id AS run_id,
+            assignment.detail_class AS lane, attempt.result AS attempt_result
+     FROM audit_events assignment
+     LEFT JOIN audit_events attempt
+       ON attempt.id = assignment.id || ':attempted'
+      AND attempt.action = ?
+      AND attempt.resource_type = ?
+      AND attempt.resource_id = assignment.resource_id
+     WHERE assignment.action = ?
+       AND assignment.actor_type = 'service' AND assignment.actor_id = ?
+       AND assignment.resource_type = ? AND assignment.created_at = ?
+       AND (
+         (assignment.detail_class = 'retention_unmarked'
+           AND assignment.id = ? || assignment.resource_id)
+         OR
+         (assignment.detail_class = 'retention_marked'
+           AND assignment.id = ? || assignment.resource_id)
+       )
+     ORDER BY assignment.detail_class, assignment.resource_id`,
+  ).bind(
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ASSIGNMENT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ACTOR,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    at,
+    purgeAssignmentIdPrefix(at, "retention_unmarked"),
+    purgeAssignmentIdPrefix(at, "retention_marked"),
+  ).all<FailedRunPurgeAssignment>();
+  return results;
+}
+
+async function recordFailedRunPurgeAttempt(
+  env: Pick<Env, "DB">,
+  assignment: FailedRunPurgeAssignment,
+  at: string,
+  result: "success" | "failure",
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO audit_events (
+       id, actor_type, actor_id, action, resource_type, resource_id,
+       result, detail_class, created_at
+     )
+     SELECT ?, 'service', ?, ?, ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (
+       SELECT 1 FROM audit_events attempt WHERE attempt.id = ?
+     )`,
+  ).bind(
+    `${assignment.id}:attempted`,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ACTOR,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_ATTEMPT_ACTION,
+    ONTOLOGY_PIPELINE_ARTIFACT_PURGE_RESOURCE,
+    assignment.run_id,
+    result,
+    assignment.lane,
+    at,
+    `${assignment.id}:attempted`,
+  ).run();
 }
 
 async function purgeFailedRunArtifactPrefix(

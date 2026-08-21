@@ -513,6 +513,39 @@ describe("scheduled Worker entry point", () => {
         return typeof value === "function" ? value.bind(target) : value;
       },
     }) as R2Bucket;
+    let failedPassD1Calls = 0;
+    const failedPassDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          failedPassD1Calls += 1;
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
+    await worker.scheduled(
+      createScheduledController({
+        scheduledTime: expiresAt.getTime(),
+        cron: ONTOLOGY_MAINTENANCE_CRON,
+      }),
+      ontologyScheduledEnv(queue, {
+        ARTIFACTS: failingBucket,
+        DB: failedPassDb,
+      }),
+      createExecutionContext(),
+    );
+    expect(failedPassD1Calls).toBeLessThan(50);
+    expect(await env.ARTIFACTS!.get(objectKey)).not.toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
+    ).bind(artifactId).first()).toEqual({ deleted_at: null });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM audit_events
+       WHERE action = 'ontology_pipeline.artifacts_purge_attempted'`,
+    ).first()).toEqual({ count: 2 });
+
+    // A retry of the same cron occurrence replays the durable assignments but
+    // cannot create more receipts, repeat prefix deletes, or select new runs.
     await worker.scheduled(
       createScheduledController({
         scheduledTime: expiresAt.getTime(),
@@ -521,15 +554,20 @@ describe("scheduled Worker entry point", () => {
       ontologyScheduledEnv(queue, { ARTIFACTS: failingBucket }),
       createExecutionContext(),
     );
-    expect(await env.ARTIFACTS!.get(objectKey)).not.toBeNull();
     expect(await env.DB.prepare(
-      `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
-    ).bind(artifactId).first()).toEqual({ deleted_at: null });
+      `SELECT COUNT(*) AS count FROM audit_events
+       WHERE action = 'ontology_pipeline.artifacts_purge_attempted'`,
+    ).first()).toEqual({ count: 2 });
+    expect(await env.ARTIFACTS!.head(unmarkedOrphanKey)).not.toBeNull();
+    expect(await env.ARTIFACTS!.head(markedOrphanKey)).not.toBeNull();
 
     // Add real lease and outbox work only after the failed R2 pass, so the
     // measured retry covers the maximum work of every ontology lane together.
-    const expiredStartedAt = new Date(expiresAt.getTime() - 10 * 60_000);
-    const expiredClaimedAt = new Date(expiresAt.getTime() - 5 * 60_000 - 1_000);
+    const recoveredAt = new Date(expiresAt.getTime() + 15 * 60_000);
+    const expiredStartedAt = new Date(recoveredAt.getTime() - 10 * 60_000);
+    const expiredClaimedAt = new Date(
+      recoveredAt.getTime() - 5 * 60_000 - 1_000,
+    );
     const expiredRun = await reserveOntologyRun(
       pipelineEnv,
       expiredStartedAt,
@@ -557,7 +595,7 @@ describe("scheduled Worker entry point", () => {
     }) as D1Database;
     await worker.scheduled(
       createScheduledController({
-        scheduledTime: expiresAt.getTime(),
+        scheduledTime: recoveredAt.getTime(),
         cron: ONTOLOGY_MAINTENANCE_CRON,
       }),
       ontologyScheduledEnv(queue, { DB: countedDb }),
@@ -567,16 +605,19 @@ describe("scheduled Worker entry point", () => {
     expect(await env.DB.prepare(
       `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
     ).bind(artifactId).first()).toEqual({
-      deleted_at: expiresAt.toISOString(),
+      deleted_at: recoveredAt.toISOString(),
     });
     expect(await env.ARTIFACTS!.head(unmarkedOrphanKey)).toBeNull();
     expect(await env.ARTIFACTS!.head(markedOrphanKey)).toBeNull();
-    expect(totalD1Calls).toBe(12);
     expect(totalD1Calls).toBeLessThan(50);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM audit_events
+       WHERE action = 'ontology_pipeline.artifacts_purge_attempted'`,
+    ).first()).toEqual({ count: 4 });
 
     await expect(worker.scheduled(
       createScheduledController({
-        scheduledTime: expiresAt.getTime(),
+        scheduledTime: recoveredAt.getTime(),
         cron: ONTOLOGY_MAINTENANCE_CRON,
       }),
       pipelineEnv,

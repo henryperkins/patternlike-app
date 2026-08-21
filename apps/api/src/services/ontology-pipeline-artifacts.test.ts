@@ -58,8 +58,10 @@ const STAGES = [
   "ingesting",
 ] as const;
 
-async function seedRunAt(stage: OntologyPipelineStage): Promise<SeededRun> {
-  const suffix = crypto.randomUUID();
+async function seedRunAt(
+  stage: OntologyPipelineStage,
+  suffix = crypto.randomUUID(),
+): Promise<SeededRun> {
   const runId = `oprun_artifacts_${suffix}`;
   const corpusReleaseId = `corpus-artifacts-${suffix}`;
   const corpusHash = await contentHash(`artifact-corpus-${suffix}`);
@@ -258,6 +260,54 @@ async function putInventoriedPastArtifact(
     new Date(PURGE_FAILED_AT.getTime() - 60_000).toISOString(),
   ).run();
   return { id, objectKey };
+}
+
+async function failRunForRetention(
+  run: SeededRun,
+  failedAt = PURGE_FAILED_AT,
+): Promise<void> {
+  const claim = await claimRun(
+    run,
+    `ontology-retention-owner-${run.runId}`,
+  );
+  expect(await failOntologyPipelineRun(
+    env,
+    claim,
+    "execution_error",
+    failedAt,
+  )).toBe(true);
+}
+
+async function markRunPrefixPurged(
+  run: SeededRun,
+  createdAt: Date,
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO audit_events (
+       id, actor_type, actor_id, action, resource_type, resource_id,
+       result, detail_class, created_at
+     ) VALUES (?, 'service', 'ontology-pipeline-maintenance',
+               'ontology_pipeline.artifacts_purge_verified',
+               'ontology_pipeline_run', ?, 'success',
+               'retention_complete', ?)`,
+  ).bind(
+    `ontology_pipeline_artifacts_purged:${run.runId}`,
+    run.runId,
+    createdAt.toISOString(),
+  ).run();
+}
+
+async function purgeAttemptReceiptCount(runId?: string): Promise<number> {
+  const whereRun = runId === undefined ? "" : " AND resource_id = ?";
+  const statement = env.DB.prepare(
+    `SELECT COUNT(*) AS count FROM audit_events
+     WHERE action = 'ontology_pipeline.artifacts_purge_attempted'
+       AND resource_type = 'ontology_pipeline_run'${whereRun}`,
+  );
+  const row = runId === undefined
+    ? await statement.first<{ count: number }>()
+    : await statement.bind(runId).first<{ count: number }>();
+  return row?.count ?? 0;
 }
 
 beforeEach(() => {
@@ -1046,8 +1096,9 @@ describe("ontology pipeline encrypted artifacts", () => {
       PURGE_FAILED_AT.getTime() + 7 * 24 * 60 * 60_000,
     );
     const prefix = `pattern-ontology/pipeline/${run.runId}/`;
+    const firstSweepAt = new Date(expiresAt.getTime() + 60_000);
 
-    await sweepExpiredOntologyPipelineArtifacts(env, expiresAt);
+    await sweepExpiredOntologyPipelineArtifacts(env, firstSweepAt);
     expect((await env.ARTIFACTS!.list({ prefix })).objects).toHaveLength(2);
     expect(await env.DB.prepare(
       `SELECT id FROM audit_events
@@ -1057,7 +1108,7 @@ describe("ontology pipeline encrypted artifacts", () => {
 
     await sweepExpiredOntologyPipelineArtifacts(
       env,
-      new Date(expiresAt.getTime() + 15 * 60_000),
+      new Date(firstSweepAt.getTime() + 15 * 60_000),
     );
     expect((await env.ARTIFACTS!.list({ prefix })).objects).toHaveLength(0);
     expect(await env.DB.prepare(
@@ -1080,6 +1131,7 @@ describe("ontology pipeline encrypted artifacts", () => {
     const expiresAt = new Date(
       PURGE_FAILED_AT.getTime() + 7 * 24 * 60 * 60_000,
     );
+    const firstSweepAt = new Date(expiresAt.getTime() + 2 * 60_000);
     const failingBucket = new Proxy(env.ARTIFACTS!, {
       get(target, property, receiver) {
         if (property === "delete") {
@@ -1092,7 +1144,7 @@ describe("ontology pipeline encrypted artifacts", () => {
 
     await sweepExpiredOntologyPipelineArtifacts(
       overriddenEnv({ ARTIFACTS: failingBucket }),
-      expiresAt,
+      firstSweepAt,
     );
     expect(await env.ARTIFACTS!.head(objectKey)).not.toBeNull();
     expect(await env.DB.prepare(
@@ -1101,8 +1153,221 @@ describe("ontology pipeline encrypted artifacts", () => {
          AND resource_id = ?`,
     ).bind(run.runId).first()).toBeNull();
 
-    await sweepExpiredOntologyPipelineArtifacts(env, expiresAt);
+    await sweepExpiredOntologyPipelineArtifacts(
+      env,
+      new Date(firstSweepAt.getTime() + 15 * 60_000),
+    );
     expect(await env.ARTIFACTS!.head(objectKey)).toBeNull();
+  });
+
+  it("rotates past an oldest unmarked R2 failure and replays one timestamp idempotently", async () => {
+    const oldest = await seedRunAt("generating", "aa-starved-oldest");
+    const later = await seedRunAt("generating", "bb-starved-later");
+    const oldestKey = await putR2OnlyArtifact(oldest, "candidate_chunk");
+    const laterKey = await putR2OnlyArtifact(later, "candidate_chunk");
+    await failRunForRetention(
+      oldest,
+      new Date(PURGE_FAILED_AT.getTime() - 60_000),
+    );
+    await failRunForRetention(later);
+    const sweepAt = new Date(
+      PURGE_FAILED_AT.getTime() + 7 * 24 * 60 * 60_000 + 1_000,
+    );
+    const oldestPrefix = `pattern-ontology/pipeline/${oldest.runId}/`;
+    let oldestDeleteAttempts = 0;
+    const selectivelyFailingBucket = new Proxy(env.ARTIFACTS!, {
+      get(target, property, receiver) {
+        if (property === "delete") {
+          return async (keys: string | string[]) => {
+            const keyList = typeof keys === "string" ? [keys] : keys;
+            if (keyList.some((key) => key.startsWith(oldestPrefix))) {
+              oldestDeleteAttempts += 1;
+              throw new Error("oldest prefix is permanently unavailable");
+            }
+            await target.delete(keys);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as R2Bucket;
+    const failingEnv = overriddenEnv({ ARTIFACTS: selectivelyFailingBucket });
+
+    await sweepExpiredOntologyPipelineArtifacts(failingEnv, sweepAt);
+    expect(oldestDeleteAttempts).toBe(1);
+    expect(await purgeAttemptReceiptCount(oldest.runId)).toBe(1);
+    expect(await env.ARTIFACTS!.head(oldestKey)).not.toBeNull();
+    expect(await env.ARTIFACTS!.head(laterKey)).not.toBeNull();
+
+    // A retry for the exact same scheduled occurrence must replay its durable
+    // assignment without selecting or attempting additional work.
+    await sweepExpiredOntologyPipelineArtifacts(failingEnv, sweepAt);
+    expect(oldestDeleteAttempts).toBe(1);
+    expect(await purgeAttemptReceiptCount(oldest.runId)).toBe(1);
+    expect(await env.ARTIFACTS!.head(laterKey)).not.toBeNull();
+
+    await sweepExpiredOntologyPipelineArtifacts(
+      failingEnv,
+      new Date(sweepAt.getTime() + 15 * 60_000),
+    );
+    expect(await env.ARTIFACTS!.head(oldestKey)).not.toBeNull();
+    expect(await env.ARTIFACTS!.head(laterKey)).toBeNull();
+
+    // The suite shares immutable D1 pipeline history. Finish this deliberately
+    // failing fixture so it cannot become unrelated unmarked work later.
+    await env.ARTIFACTS!.delete(oldestKey);
+    await markRunPrefixPurged(
+      oldest,
+      new Date(sweepAt.getTime() + 15 * 60_000 + 1),
+    );
+  });
+
+  it("does not starve a fixed old marked run while the marked set grows", async () => {
+    const fixed = await seedRunAt("generating", "zz-fixed-marked");
+    const fixedKey = await putR2OnlyArtifact(fixed, "candidate_chunk");
+    await failRunForRetention(fixed);
+    const expiresAt = new Date(
+      PURGE_FAILED_AT.getTime() + 7 * 24 * 60 * 60_000,
+    );
+    const intervalMs = 15 * 60_000;
+    const firstDueBucket = Math.ceil(expiresAt.getTime() / intervalMs);
+    const adjustment = (1 - (firstDueBucket % 60) + 60) % 60;
+    const firstSweepAt = new Date(
+      (firstDueBucket + adjustment) * intervalMs,
+    );
+    await markRunPrefixPurged(
+      fixed,
+      new Date(firstSweepAt.getTime() - intervalMs),
+    );
+    // Permanent failed runs from earlier cases remain legitimate marked
+    // candidates. Give only those pre-existing fixtures a later cursor so
+    // this regression isolates the fixed run against a continuously growing
+    // marked set instead of depending on suite execution history.
+    const priorAttemptAt = new Date(
+      firstSweepAt.getTime() + 24 * 60 * 60_000,
+    ).toISOString();
+    await env.DB.prepare(
+      `INSERT INTO audit_events (
+         id, actor_type, actor_id, action, resource_type, resource_id,
+         result, detail_class, created_at
+       )
+       SELECT 'ontology_pipeline_test_prior_purge_attempt:' || run.run_id || ?,
+              'service', 'ontology-pipeline-maintenance',
+              'ontology_pipeline.artifacts_purge_attempted',
+              'ontology_pipeline_run', run.run_id, 'success',
+              'retention_marked', ?
+       FROM pattern_ontology_pipeline_runs run
+       WHERE run.stage = 'failed' AND run.run_id <> ?
+         AND run.failed_artifact_expires_at IS NOT NULL
+         AND julianday(run.failed_artifact_expires_at) <= julianday(?)
+         AND EXISTS (
+           SELECT 1 FROM audit_events marker
+           WHERE marker.action = 'ontology_pipeline.artifacts_purge_verified'
+             AND marker.resource_type = 'ontology_pipeline_run'
+             AND marker.resource_id = run.run_id
+         )`,
+    ).bind(
+      `:${firstSweepAt.toISOString()}`,
+      priorAttemptAt,
+      fixed.runId,
+      firstSweepAt.toISOString(),
+    ).run();
+    const fixedPrefix = `pattern-ontology/pipeline/${fixed.runId}/`;
+    let fixedDeleteAttempts = 0;
+    let fixedListAttempts = 0;
+    const selectivelyFailingBucket = new Proxy(env.ARTIFACTS!, {
+      get(target, property, receiver) {
+        if (property === "list") {
+          return async (options?: R2ListOptions) => {
+            if (options?.prefix === fixedPrefix) fixedListAttempts += 1;
+            return target.list(options);
+          };
+        }
+        if (property === "delete") {
+          return async (keys: string | string[]) => {
+            const keyList = typeof keys === "string" ? [keys] : keys;
+            if (keyList.some((key) => key.startsWith(fixedPrefix))) {
+              fixedDeleteAttempts += 1;
+              throw new Error("fixed marked prefix is unavailable");
+            }
+            await target.delete(keys);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as R2Bucket;
+    const failingEnv = overriddenEnv({ ARTIFACTS: selectivelyFailingBucket });
+
+    await sweepExpiredOntologyPipelineArtifacts(failingEnv, firstSweepAt);
+    for (let index = 1; index <= 5; index += 1) {
+      const tick = new Date(firstSweepAt.getTime() + index * intervalMs);
+      const growing = await seedRunAt(
+        "generating",
+        `aa-growing-marked-${index}`,
+      );
+      await putR2OnlyArtifact(growing, "candidate_chunk");
+      await failRunForRetention(growing);
+      await markRunPrefixPurged(growing, new Date(tick.getTime() - 1));
+      await sweepExpiredOntologyPipelineArtifacts(failingEnv, tick);
+    }
+
+    // A cardinality/modulus cursor repeatedly selects the newly prepended
+    // rows here. Least-recent-attempt ordering keeps returning to the fixed
+    // failed prefix even while the candidate set grows.
+    expect(fixedListAttempts).toBeGreaterThanOrEqual(2);
+    expect(fixedDeleteAttempts).toBe(fixedListAttempts);
+    expect(await purgeAttemptReceiptCount(fixed.runId)).toBe(
+      fixedDeleteAttempts,
+    );
+    expect(await env.ARTIFACTS!.head(fixedKey)).not.toBeNull();
+  });
+
+  it("rotates a truncated failed prefix and later revisits it to drain", async () => {
+    const paged = await seedRunAt("generating", "aa-truncated-pages");
+    const later = await seedRunAt("generating", "bb-after-truncated");
+    for (const attempt of [0, 1]) {
+      for (const artifactClass of [
+        "generator_request",
+        "generator_response",
+        "candidate_chunk",
+      ] as const) {
+        await putR2OnlyArtifact(paged, artifactClass, attempt);
+      }
+    }
+    const laterKey = await putR2OnlyArtifact(later, "candidate_chunk");
+    await failRunForRetention(paged);
+    await failRunForRetention(later);
+    const firstSweepAt = new Date(
+      PURGE_FAILED_AT.getTime() + 7 * 24 * 60 * 60_000 + 3 * 60_000,
+    );
+    const pagedPrefix = `pattern-ontology/pipeline/${paged.runId}/`;
+
+    await sweepExpiredOntologyPipelineArtifacts(env, firstSweepAt);
+    expect((await env.ARTIFACTS!.list({ prefix: pagedPrefix })).objects)
+      .toHaveLength(2);
+    expect(await env.ARTIFACTS!.head(laterKey)).not.toBeNull();
+
+    await sweepExpiredOntologyPipelineArtifacts(
+      env,
+      new Date(firstSweepAt.getTime() + 15 * 60_000),
+    );
+    expect((await env.ARTIFACTS!.list({ prefix: pagedPrefix })).objects)
+      .toHaveLength(2);
+    expect(await env.ARTIFACTS!.head(laterKey)).toBeNull();
+
+    await sweepExpiredOntologyPipelineArtifacts(
+      env,
+      new Date(firstSweepAt.getTime() + 30 * 60_000),
+    );
+    expect((await env.ARTIFACTS!.list({ prefix: pagedPrefix })).objects)
+      .toHaveLength(0);
+    expect(await purgeAttemptReceiptCount(paged.runId)).toBe(2);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM audit_events
+       WHERE action = 'ontology_pipeline.artifacts_purge_verified'
+         AND resource_id = ?`,
+    ).bind(paged.runId).first()).toEqual({ count: 1 });
   });
 
   it("recovers the D1 tombstone after R2 deletion succeeded", async () => {
