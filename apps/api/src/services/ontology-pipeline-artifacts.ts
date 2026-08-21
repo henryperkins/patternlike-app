@@ -1,6 +1,7 @@
 import { canonicalJson } from "@patternlike/shared";
 
 import type { Env } from "../env.js";
+import type { ClaimedOntologyPipelineRun } from "../db/ontology-pipeline.js";
 import {
   decodeOntologyArtifactBase64Url,
   decryptOntologyArtifact,
@@ -89,7 +90,10 @@ interface RunIdentityRow {
   candidate_ontology_version: string;
   stage: string;
   stage_generation: number;
+  stage_cursor: number;
   stage_attempt: number;
+  claim_token: string | null;
+  lease_expires_at: string | null;
 }
 
 interface ArtifactRow {
@@ -118,6 +122,8 @@ type ParsedEnvelope = SealedOntologyPipelineArtifact & {
 const MAX_PLAINTEXT_BYTES = 4 * 1024 * 1024;
 const MAX_EVALUATION_ENVELOPE_BYTES = 4 * 1024 * 1024;
 const MAX_ENVELOPE_BYTES = 6 * 1024 * 1024;
+export const ONTOLOGY_PIPELINE_ARTIFACT_CLEANUP_LIMIT = 4;
+const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 const ONTOLOGY_VERSION = /^.{1,200}$/;
@@ -260,7 +266,10 @@ function authenticatedIdentity(
     plaintext_hash: plaintextHash,
     run_id: identity.runId,
   };
-  if (identity.artifactClass === "evaluation_report") {
+  if (
+    identity.artifactClass === "evaluation_report" &&
+    identity.stageAttempt === 0
+  ) {
     return {
       ...common,
       schema_version: "ontology-evaluation-artifact/v1",
@@ -366,7 +375,8 @@ async function loadRunIdentity(
 ): Promise<OntologyPipelineArtifactEnvelopeCoordinate> {
   if (!coordinateIsValid(identity)) fail("ontology_pipeline_artifact_invalid");
   const row = await env.DB.prepare(
-    `SELECT candidate_ontology_version, stage, stage_generation, stage_attempt
+    `SELECT candidate_ontology_version, stage, stage_generation, stage_cursor,
+            stage_attempt, claim_token, lease_expires_at
      FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
   ).bind(identity.runId).first<RunIdentityRow>();
   if (
@@ -379,6 +389,42 @@ async function loadRunIdentity(
   ) {
     fail("ontology_pipeline_artifact_stale_owner");
   }
+  return { ...identity, ontologyVersion: row.candidate_ontology_version };
+}
+
+async function loadLiveClaimIdentity(
+  env: Pick<Env, "DB">,
+  identity: OntologyPipelineArtifactCoordinate,
+  claim: ClaimedOntologyPipelineRun,
+  now: Date,
+): Promise<OntologyPipelineArtifactEnvelopeCoordinate> {
+  if (
+    !coordinateIsValid(identity) ||
+    claim.runId !== identity.runId ||
+    claim.stage !== identity.stage ||
+    claim.stageGeneration !== identity.stageGeneration ||
+    claim.stageAttempt !== identity.stageAttempt
+  ) {
+    fail("ontology_pipeline_artifact_stale_owner");
+  }
+  const row = await env.DB.prepare(
+    `SELECT candidate_ontology_version, stage, stage_generation, stage_cursor,
+            stage_attempt, claim_token, lease_expires_at
+     FROM pattern_ontology_pipeline_runs
+     WHERE run_id = ? AND stage = ? AND stage_generation = ?
+       AND stage_cursor = ? AND stage_attempt = ? AND claim_token = ?
+       AND lease_expires_at IS NOT NULL
+       AND unixepoch(lease_expires_at) > unixepoch(?)`,
+  ).bind(
+    claim.runId,
+    claim.stage,
+    claim.stageGeneration,
+    claim.stageCursor,
+    claim.stageAttempt,
+    claim.claimToken,
+    now.toISOString(),
+  ).first<RunIdentityRow>();
+  if (!row) fail("ontology_pipeline_artifact_stale_owner");
   return { ...identity, ontologyVersion: row.candidate_ontology_version };
 }
 
@@ -403,15 +449,17 @@ function exactEnvelopeCoordinate(
   parsed: Record<string, unknown>,
   expected: OntologyPipelineArtifactEnvelopeCoordinate,
 ): boolean {
-  const isEvaluation = expected.artifactClass === "evaluation_report";
+  const isLegacyEvaluation =
+    expected.artifactClass === "evaluation_report" &&
+    expected.stageAttempt === 0;
   return (
-    parsed.schema_version === (isEvaluation
+    parsed.schema_version === (isLegacyEvaluation
       ? "ontology-evaluation-artifact/v1"
       : "ontology-pipeline-artifact/v1") &&
     parsed.artifact_class === expected.artifactClass &&
     parsed.run_id === expected.runId &&
     parsed.ontology_version === expected.ontologyVersion &&
-    (isEvaluation || (
+    (isLegacyEvaluation || (
       parsed.stage === expected.stage &&
       parsed.stage_generation === expected.stageGeneration &&
       parsed.stage_attempt === expected.stageAttempt
@@ -425,6 +473,12 @@ async function parseAndDecryptEnvelope(
   envelopeBytes: Uint8Array,
 ): Promise<ParsedEnvelope> {
   if (envelopeBytes.byteLength > maximumEnvelopeBytes(expected.artifactClass)) {
+    fail("ontology_pipeline_artifact_integrity_failed");
+  }
+  if (
+    envelopeBytes.byteLength >= UTF8_BOM.length &&
+    UTF8_BOM.every((byte, index) => envelopeBytes[index] === byte)
+  ) {
     fail("ontology_pipeline_artifact_integrity_failed");
   }
   let bytes: string;
@@ -442,7 +496,9 @@ async function parseAndDecryptEnvelope(
   } catch {
     fail("ontology_pipeline_artifact_integrity_failed");
   }
-  const fields = expected.artifactClass === "evaluation_report"
+  const fields =
+    expected.artifactClass === "evaluation_report" &&
+      expected.stageAttempt === 0
     ? EVALUATION_FIELDS
     : PIPELINE_FIELDS;
   if (
@@ -568,18 +624,25 @@ async function verifyStored(
 async function insertArtifactRow(
   env: Pick<Env, "DB">,
   identity: OntologyPipelineArtifactCoordinate,
+  claim: ClaimedOntologyPipelineRun,
   id: string,
   objectKey: string,
   sealed: SealedOntologyPipelineArtifact,
   createdAt: string,
 ): Promise<void> {
-  await env.DB.prepare(
+  const inserted = await env.DB.prepare(
     `INSERT INTO pattern_ontology_pipeline_artifacts (
        id, run_id, stage, stage_generation, stage_attempt, artifact_class,
        object_key, plaintext_sha256, envelope_sha256, ciphertext_sha256,
        envelope_key_id, envelope_nonce, byte_length, created_at,
        expires_at, deleted_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+     )
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL
+     FROM pattern_ontology_pipeline_runs run
+     WHERE run.run_id = ? AND run.stage = ? AND run.stage_generation = ?
+       AND run.stage_cursor = ? AND run.stage_attempt = ?
+       AND run.claim_token = ? AND run.lease_expires_at IS NOT NULL
+       AND unixepoch(run.lease_expires_at) > unixepoch(?)`,
   ).bind(
     id,
     identity.runId,
@@ -595,16 +658,27 @@ async function insertArtifactRow(
     sealed.envelopeNonce,
     sealed.byteLength,
     createdAt,
+    claim.runId,
+    claim.stage,
+    claim.stageGeneration,
+    claim.stageCursor,
+    claim.stageAttempt,
+    claim.claimToken,
+    createdAt,
   ).run();
+  if (inserted.meta.changes !== 1) {
+    fail("ontology_pipeline_artifact_stale_owner");
+  }
 }
 
 export async function putOntologyPipelineArtifact(
   env: Pick<Env, "DB" | "ARTIFACTS" | "ONTOLOGY_PIPELINE_ARTIFACT_KEYRING">,
   identity: OntologyPipelineArtifactCoordinate,
   plaintext: Uint8Array,
+  claim: ClaimedOntologyPipelineRun,
   createdAt = new Date(),
 ): Promise<PutOntologyPipelineArtifactResult> {
-  const expected = await loadRunIdentity(env, identity);
+  const expected = await loadLiveClaimIdentity(env, identity, claim, createdAt);
   if (!env.ARTIFACTS) fail("ontology_pipeline_artifact_unavailable");
   const id = await ontologyPipelineArtifactIdentity(identity);
   const objectKey = await ontologyPipelineArtifactObjectKey(identity);
@@ -615,6 +689,7 @@ export async function putOntologyPipelineArtifact(
       if (stored.plaintextSha256 !== await hashOntologyArtifactBytes(plaintext)) {
         fail("ontology_pipeline_artifact_conflict");
       }
+      await loadLiveClaimIdentity(env, identity, claim, createdAt);
       return { status: "adopted", artifact: rowToArtifact(existing) };
     } catch {
       fail("ontology_pipeline_artifact_conflict");
@@ -646,7 +721,7 @@ export async function putOntologyPipelineArtifact(
         null,
         id,
         objectKey,
-        identity.artifactClass === "evaluation_report",
+        true,
       );
       if (admitted.plaintextSha256 !== sealed.plaintextSha256) {
         fail("ontology_pipeline_artifact_conflict");
@@ -660,6 +735,7 @@ export async function putOntologyPipelineArtifact(
     await insertArtifactRow(
       env,
       identity,
+      claim,
       id,
       objectKey,
       admitted,
@@ -667,7 +743,10 @@ export async function putOntologyPipelineArtifact(
     );
   } catch {
     const raced = await loadArtifactRow(env, identity);
-    if (!raced) fail("ontology_pipeline_artifact_conflict");
+    if (!raced) {
+      await loadLiveClaimIdentity(env, identity, claim, createdAt);
+      fail("ontology_pipeline_artifact_conflict");
+    }
     try {
       const stored = await verifyStored(env, expected, raced, id, objectKey);
       if (stored.plaintextSha256 !== sealed.plaintextSha256) {
@@ -688,14 +767,120 @@ export async function putOntologyPipelineArtifact(
 export async function readOntologyPipelineArtifact(
   env: Pick<Env, "DB" | "ARTIFACTS" | "ONTOLOGY_PIPELINE_ARTIFACT_KEYRING">,
   identity: OntologyPipelineArtifactCoordinate,
+  options: {
+    claim?: ClaimedOntologyPipelineRun;
+    now?: Date;
+  } = {},
 ): Promise<ReadOntologyPipelineArtifactResult | null> {
-  const row = await loadArtifactRow(env, identity);
-  if (!row) return null;
+  const now = options.now ?? new Date();
+  let row = await loadArtifactRow(env, identity);
+  if (!row) {
+    if (!options.claim) return null;
+    const expected = await loadLiveClaimIdentity(
+      env,
+      identity,
+      options.claim,
+      now,
+    );
+    const id = await ontologyPipelineArtifactIdentity(identity);
+    const objectKey = await ontologyPipelineArtifactObjectKey(identity);
+    if (!env.ARTIFACTS) fail("ontology_pipeline_artifact_unavailable");
+    if (!await env.ARTIFACTS.head(objectKey)) return null;
+    let parsed: ParsedEnvelope;
+    try {
+      parsed = await verifyStored(env, expected, null, id, objectKey, true);
+    } catch (cause) {
+      if (
+        cause instanceof OntologyPipelineArtifactError &&
+        cause.code === "ontology_pipeline_artifact_integrity_failed"
+      ) {
+        throw cause;
+      }
+      return null;
+    }
+    try {
+      await insertArtifactRow(
+        env,
+        identity,
+        options.claim,
+        id,
+        objectKey,
+        parsed,
+        now.toISOString(),
+      );
+    } catch (cause) {
+      row = await loadArtifactRow(env, identity);
+      if (!row) throw cause;
+    }
+    row ??= await loadArtifactRow(env, identity);
+    if (!row || !rowMatchesSealed(row, id, objectKey, parsed)) {
+      fail("ontology_pipeline_artifact_integrity_failed");
+    }
+    return { artifact: rowToArtifact(row), plaintext: parsed.plaintext };
+  }
+  if (
+    row.deleted_at !== null ||
+    (row.expires_at !== null && Date.parse(row.expires_at) <= now.getTime())
+  ) {
+    fail("ontology_pipeline_artifact_unavailable");
+  }
+  if (options.claim) {
+    await loadLiveClaimIdentity(env, identity, options.claim, now);
+  }
   // Inventory rows are immutable evidence. A later stage must be able to read
   // prior-stage inputs, while only put/adoption requires the current owner.
   const expected = await loadRunIdentity(env, identity, false);
   const id = await ontologyPipelineArtifactIdentity(identity);
   const objectKey = await ontologyPipelineArtifactObjectKey(identity);
   const parsed = await verifyStored(env, expected, row, id, objectKey);
+  const current = await loadArtifactRow(env, identity);
+  if (
+    !current ||
+    current.deleted_at !== null ||
+    (current.expires_at !== null && Date.parse(current.expires_at) <= now.getTime())
+  ) {
+    fail("ontology_pipeline_artifact_unavailable");
+  }
   return { artifact: rowToArtifact(row), plaintext: parsed.plaintext };
+}
+
+export async function sweepExpiredOntologyPipelineArtifacts(
+  env: Pick<Env, "DB" | "ARTIFACTS">,
+  now = new Date(),
+  limit = ONTOLOGY_PIPELINE_ARTIFACT_CLEANUP_LIMIT,
+): Promise<{ deleted: number; failed: number }> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    return { deleted: 0, failed: 0 };
+  }
+  const at = now.toISOString();
+  const { results } = await env.DB.prepare(
+    `SELECT id, object_key
+     FROM pattern_ontology_pipeline_artifacts
+     WHERE expires_at IS NOT NULL AND deleted_at IS NULL
+       AND unixepoch(expires_at) <= unixepoch(?)
+     ORDER BY expires_at, id LIMIT ?`,
+  ).bind(at, limit).all<{ id: string; object_key: string }>();
+  if (results.length === 0) return { deleted: 0, failed: 0 };
+  if (!env.ARTIFACTS) return { deleted: 0, failed: results.length };
+
+  const deletedIds: string[] = [];
+  let failed = 0;
+  for (const row of results) {
+    try {
+      await env.ARTIFACTS.delete(row.object_key);
+      deletedIds.push(row.id);
+    } catch {
+      failed += 1;
+    }
+  }
+  if (deletedIds.length === 0) return { deleted: 0, failed };
+  const placeholders = deletedIds.map(() => "?").join(", ");
+  const tombstoned = await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_artifacts
+     SET deleted_at = ?
+     WHERE id IN (${placeholders}) AND deleted_at IS NULL
+       AND expires_at IS NOT NULL
+       AND unixepoch(expires_at) <= unixepoch(?)`,
+  ).bind(at, ...deletedIds, at).run();
+  return { deleted: tombstoned.meta.changes ?? 0, failed };
 }

@@ -1,4 +1,9 @@
 import { env } from "cloudflare:test";
+import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
+import {
+  canonicalJson,
+  type PatternOntologyRelease,
+} from "@patternlike/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -15,7 +20,9 @@ import {
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import {
   buildOntologyPipelineCommand,
+  loadOntologyPipelinePredecessor,
   ONTOLOGY_PIPELINE_COMMAND_VERSION,
+  type OntologyPipelineCommand,
 } from "./ontology-pipeline-command.js";
 import {
   dispatchUndispatchedOntologyPipelineRuns,
@@ -23,6 +30,7 @@ import {
   pauseOntologyPipelineDelivery,
 } from "./ontology-pipeline-enqueue.js";
 import { registerOntologyCorpus } from "./ontology-corpus.js";
+import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
 
 const NOW = new Date("2026-08-21T15:00:00.000Z");
 
@@ -106,6 +114,48 @@ async function reserve(
   );
 }
 
+async function seedActiveMachinePredecessor(): Promise<{
+  version: string;
+  bundleHash: string;
+  corpusHash: string;
+  objectKey: string;
+}> {
+  const version = `ontology-command-predecessor-${crypto.randomUUID()}`;
+  const release = syntheticOntologyRelease(version) as PatternOntologyRelease;
+  // Machine bundles are signed/stored as candidates; D1 is the activation
+  // authority and projects this row as active through the pointer.
+  release.status = "candidate";
+  release.provenance = { origin: "machine_pipeline" };
+  const bundleHash = await computeOntologyBundleHash(release);
+  release.bundle_hash = bundleHash;
+  const objectKey = `pattern-ontology/${version}.json`;
+  await env.ARTIFACTS!.put(objectKey, canonicalJson(release));
+  await env.DB.prepare(
+    `INSERT INTO pattern_ontology_releases (
+       version, bundle_hash, corpus_release_hash, locale, status, object_key,
+       evaluation_json, created_at, recalled_at
+     ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, NULL)`,
+  ).bind(
+    version,
+    bundleHash,
+    release.corpus_release_hash,
+    release.locale,
+    objectKey,
+    canonicalJson(release.evaluation),
+    NOW.toISOString(),
+  ).run();
+  await env.DB.prepare(
+    `UPDATE pattern_ontology_pointer SET active_version = ?, updated_at = ?
+     WHERE id = 1`,
+  ).bind(version, NOW.toISOString()).run();
+  return {
+    version,
+    bundleHash,
+    corpusHash: release.corpus_release_hash,
+    objectKey,
+  };
+}
+
 describe("ontology pipeline immutable command", () => {
   it("freezes the full reviewed identity and equal-model 100% threshold", async () => {
     const corpus = await registeredCorpus();
@@ -142,6 +192,25 @@ describe("ontology pipeline immutable command", () => {
         timeout_ms: 120000,
         max_output_tokens: 4000,
       },
+      generator_input: {
+        feature_vocabulary: [
+          "position",
+          "aspect",
+          "pattern",
+          "angle",
+          "house_cusp",
+          "uncertainty",
+        ],
+        coverage_targets: [
+          { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "aspect", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "angle", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "house_cusp", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "uncertainty", minimum_source_supported: 1, minimum_total: 1 },
+        ],
+        active_machine_predecessor: null,
+      },
       input_max_bytes: 98304,
       policy: {
         ontology_schema_version: "0.7.0",
@@ -173,6 +242,52 @@ describe("ontology pipeline immutable command", () => {
     expect(frozen).not.toContain(corpus.excerpt);
     expect(frozen).not.toContain("test-provider-key-never-frozen");
     expect(frozen).not.toContain("fragments");
+  });
+
+  it("freezes coverage and a content-addressed active predecessor before pointer mutation", async () => {
+    const predecessor = await seedActiveMachinePredecessor();
+    const corpus = await registeredCorpus();
+    const { queue } = fakeQueue();
+    const pipelineEnv = configuredEnv(queue);
+    const suffix = crypto.randomUUID();
+    const reserved = await reserve(pipelineEnv, corpus.releaseId, suffix);
+    const before = await env.DB.prepare(
+      `SELECT configuration_json, configuration_hash
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(reserved.runId).first<{
+      configuration_json: string;
+      configuration_hash: string;
+    }>();
+    const command = JSON.parse(before!.configuration_json) as OntologyPipelineCommand;
+    expect(command.generator_input.active_machine_predecessor).toEqual({
+      ontology_version: predecessor.version,
+      bundle_hash: predecessor.bundleHash,
+      corpus_release_hash: predecessor.corpusHash,
+      locale: "en-US",
+      object_key: predecessor.objectKey,
+    });
+    expect(command.generator_input.coverage_targets).toHaveLength(6);
+    expect(before!.configuration_json).not.toContain("records");
+
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pointer SET active_version = NULL, updated_at = ?
+       WHERE id = 1`,
+    ).bind(new Date(NOW.getTime() + 1_000).toISOString()).run();
+    await expect(loadOntologyPipelinePredecessor(
+      pipelineEnv,
+      command.generator_input.active_machine_predecessor,
+    )).resolves.toMatchObject({
+      version: predecessor.version,
+      bundleHash: predecessor.bundleHash,
+      objectKey: predecessor.objectKey,
+    });
+    pipelineEnv.ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT = "501";
+    await expect(reserve(pipelineEnv, corpus.releaseId, suffix))
+      .rejects.toMatchObject({ code: "ontology_pipeline_command_conflict" });
+    expect(await env.DB.prepare(
+      `SELECT configuration_json, configuration_hash
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(reserved.runId).first()).toEqual(before);
   });
 });
 
@@ -238,6 +353,79 @@ describe("ontology pipeline reservation and outbox", () => {
     ).bind(`ontology-enqueue-${suffix}`).first()).toEqual({ count: 1 });
   });
 
+  it("rethrows a non-identity reservation insert failure", async () => {
+    const corpus = await registeredCorpus();
+    const { queue } = fakeQueue();
+    const operationalFailure = new Error("d1 reservation unavailable");
+    const failingDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          if (query.includes("INSERT INTO pattern_ontology_pipeline_runs")) {
+            return {
+              bind: () => ({
+                run: async () => { throw operationalFailure; },
+              }),
+            } as unknown as D1PreparedStatement;
+          }
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
+    const pipelineEnv = new Proxy(configuredEnv(queue), {
+      get(target, property, receiver) {
+        if (property === "DB") return failingDb;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    await expect(reserve(pipelineEnv, corpus.releaseId))
+      .rejects.toBe(operationalFailure);
+  });
+
+  it("does not misclassify an operational insert failure as a matching race", async () => {
+    const corpus = await registeredCorpus();
+    const { queue } = fakeQueue();
+    const suffix = crypto.randomUUID();
+    await reserve(configuredEnv(queue), corpus.releaseId, suffix);
+
+    const operationalFailure = new Error("D1_ERROR: disk I/O error");
+    let occupiedLookupCount = 0;
+    const failingDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          if (query.includes("INSERT INTO pattern_ontology_pipeline_runs")) {
+            return {
+              bind: () => ({
+                run: async () => { throw operationalFailure; },
+              }),
+            } as unknown as D1PreparedStatement;
+          }
+          if (
+            query.includes("FROM pattern_ontology_pipeline_runs") &&
+            query.includes("WHERE idempotency_key = ? OR candidate_ontology_version = ?") &&
+            occupiedLookupCount++ === 0
+          ) {
+            return {
+              bind: () => ({ first: async () => null }),
+            } as unknown as D1PreparedStatement;
+          }
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
+    const pipelineEnv = new Proxy(configuredEnv(queue), {
+      get(target, property, receiver) {
+        if (property === "DB") return failingDb;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    await expect(reserve(pipelineEnv, corpus.releaseId, suffix))
+      .rejects.toBe(operationalFailure);
+  });
+
   it("leaves a failed send durable and the undispatched sweep repairs it", async () => {
     const corpus = await registeredCorpus();
     const { queue, send } = fakeQueue(1);
@@ -254,6 +442,41 @@ describe("ontology pipeline reservation and outbox", () => {
     expect(await env.DB.prepare(
       `SELECT dispatched_at FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
     ).bind(result.runId).first()).toEqual({ dispatched_at: NOW.toISOString() });
+  });
+
+  it("batches the bounded default outbox marks with D1 query headroom", async () => {
+    const corpus = await registeredCorpus();
+    const { queue, send } = fakeQueue(12);
+    const pipelineEnv = configuredEnv(queue);
+    for (let index = 0; index < 12; index += 1) {
+      await reserve(pipelineEnv, corpus.releaseId, `bounded-outbox-${crypto.randomUUID()}`);
+    }
+    let ontologyQueries = 0;
+    const countedDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          if (query.includes("pattern_ontology_pipeline_runs")) ontologyQueries += 1;
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
+
+    await expect(dispatchUndispatchedOntologyPipelineRuns(
+      new Proxy(pipelineEnv, {
+        get(target, property, receiver) {
+          if (property === "DB") return countedDb;
+          return Reflect.get(target, property, receiver);
+        },
+      }),
+      NOW,
+    )).resolves.toEqual({ dispatched: 4, failed: 0 });
+    expect(ontologyQueries).toBeLessThanOrEqual(2);
+    expect(send).toHaveBeenCalledTimes(16);
+    // Permanent Task 2 run identities intentionally survive the test; drain
+    // the remaining bounded pages so later outbox assertions stay isolated.
+    await dispatchUndispatchedOntologyPipelineRuns(pipelineEnv, NOW);
+    await dispatchUndispatchedOntologyPipelineRuns(pipelineEnv, NOW);
   });
 
   it("does not dispatch an exact replay before retry backoff expires", async () => {
@@ -478,6 +701,51 @@ describe("ontology pipeline generation and claim CAS", () => {
       stageGeneration: 0,
       stageAttempt: 0,
       claimToken: "claim-redelivery",
+    });
+    if (recovered.status === "claimed") {
+      await failOntologyPipelineRun(
+        env,
+        recovered,
+        "execution_error",
+        new Date(afterExpiry.getTime() + 1),
+      );
+    }
+  });
+
+  it("terminally bounds repeated expired-lease claims at the durable ceiling", async () => {
+    const corpus = await registeredCorpus();
+    const result = await reserve(configuredEnv(fakeQueue().queue), corpus.releaseId);
+    let claimAt = NOW;
+    for (let attempt = 1; attempt <= 16; attempt += 1) {
+      const claim = await claimOntologyPipelineRun(
+        env,
+        { run_id: result.runId, stage_generation: 0 },
+        claimAt,
+        `ontology-expiry-cycle-${attempt}`,
+      );
+      expect(claim.status).toBe("claimed");
+      const afterExpiry = new Date(claimAt.getTime() + 5 * 60_000 + 1);
+      const released = await releaseExpiredOntologyPipelineLeases(
+        env,
+        afterExpiry,
+        4,
+      );
+      expect(released).toBe(attempt === 16 ? 0 : 1);
+      claimAt = afterExpiry;
+    }
+
+    expect(await env.DB.prepare(
+      `SELECT stage, failure_class, claim_token, lease_expires_at,
+              failed_at, failed_artifact_expires_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(result.runId).first()).toEqual({
+      stage: "failed",
+      failure_class: "attempts_exhausted",
+      claim_token: null,
+      lease_expires_at: null,
+      failed_at: claimAt.toISOString(),
+      failed_artifact_expires_at:
+        new Date(claimAt.getTime() + 7 * 86400_000).toISOString(),
     });
   });
 });

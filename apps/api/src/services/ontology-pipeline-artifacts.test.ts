@@ -10,7 +10,9 @@ import {
   advanceOntologyPipelineStage,
   claimOntologyPipelineRun,
   failOntologyPipelineRun,
+  releaseExpiredOntologyPipelineLeases,
   succeedOntologyPipelineRun,
+  type ClaimedOntologyPipelineRun,
 } from "../db/ontology-pipeline.js";
 import {
   createOntologyPipelineArtifactEnvelope,
@@ -144,6 +146,22 @@ function coordinate(
   };
 }
 
+async function claimRun(
+  run: SeededRun,
+  claimToken = `ontology-artifact-claim-${crypto.randomUUID()}`,
+  now = CLAIMED_AT,
+): Promise<ClaimedOntologyPipelineRun> {
+  const claim = await claimOntologyPipelineRun(
+    env,
+    { run_id: run.runId, stage_generation: run.stageGeneration },
+    now,
+    claimToken,
+  );
+  expect(claim.status).toBe("claimed");
+  if (claim.status !== "claimed") throw new Error("artifact test claim failed");
+  return claim;
+}
+
 beforeEach(() => {
   env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
     testOntologyPipelineArtifactKeyring();
@@ -174,6 +192,7 @@ describe("ontology pipeline encrypted artifacts", () => {
   ] as const)("encrypts %s/%s and persists metadata only", async (stage, artifactClass) => {
     const run = await seedRunAt(stage);
     const identity = coordinate(run, artifactClass);
+    const claim = await claimRun(run);
     const secret = `PRIVATE-${artifactClass}-${crypto.randomUUID()}`;
     const plaintext = new TextEncoder().encode(canonicalJson({ secret }));
 
@@ -181,6 +200,7 @@ describe("ontology pipeline encrypted artifacts", () => {
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
     const object = await env.ARTIFACTS!.get(stored.artifact.objectKey);
@@ -205,6 +225,7 @@ describe("ontology pipeline encrypted artifacts", () => {
   it("keeps the existing evaluation-report envelope identity compatible", async () => {
     const run = await seedRunAt("evaluating");
     const identity = coordinate(run, "evaluation_report");
+    const claim = await claimRun(run, "ontology-evaluation-legacy-owner");
     const stored = await putOntologyPipelineArtifact(
       env,
       identity,
@@ -215,6 +236,7 @@ describe("ontology pipeline encrypted artifacts", () => {
         schema_version: "0.7.0",
         unevaluated_fixture_count: 0,
       })),
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
 
@@ -236,6 +258,27 @@ describe("ontology pipeline encrypted artifacts", () => {
     ]);
 
     await env.ARTIFACTS!.delete(stored.artifact.objectKey);
+  });
+
+  it("authenticates true-retry evaluation reports with their attempt coordinate", async () => {
+    const run = await seedRunAt("evaluating");
+    const identity = coordinate(run, "evaluation_report", 1);
+    const sealed = await createOntologyPipelineArtifactEnvelope(
+      env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING,
+      { ...identity, ontologyVersion: run.ontologyVersion },
+      new TextEncoder().encode(buildTestEvaluationReport(run.ontologyVersion)),
+    );
+
+    expect(await ontologyPipelineArtifactObjectKey(identity)).toMatch(
+      /\/opart_[a-f0-9]{40}\.enc$/,
+    );
+    expect(JSON.parse(new TextDecoder().decode(sealed.envelopeBytes)))
+      .toMatchObject({
+        schema_version: "ontology-pipeline-artifact/v1",
+        stage: "evaluating",
+        stage_generation: run.stageGeneration,
+        stage_attempt: 1,
+      });
   });
 
   it("keeps evaluation envelopes within the existing admission byte ceiling", async () => {
@@ -263,17 +306,20 @@ describe("ontology pipeline encrypted artifacts", () => {
   it("adopts an exact stored artifact before any budget reservation", async () => {
     const run = await seedRunAt("generating");
     const identity = coordinate(run, "generator_response");
+    const claim = await claimRun(run, "ontology-artifact-adoption-owner");
     const plaintext = new TextEncoder().encode("exact provider response bytes");
     const first = await putOntologyPipelineArtifact(
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
     const replay = await putOntologyPipelineArtifact(
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
 
@@ -301,6 +347,7 @@ describe("ontology pipeline encrypted artifacts", () => {
   it("repairs an R2-first torn write only after decrypting the full stored identity", async () => {
     const run = await seedRunAt("generating");
     const identity = coordinate(run, "candidate_chunk");
+    const claim = await claimRun(run, "ontology-artifact-torn-put-owner");
     const plaintext = new TextEncoder().encode(canonicalJson({ chunk: 1 }));
     const sealed = await createOntologyPipelineArtifactEnvelope(
       env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING,
@@ -311,12 +358,23 @@ describe("ontology pipeline encrypted artifacts", () => {
     const objectKey = await ontologyPipelineArtifactObjectKey(identity);
     await env.ARTIFACTS!.put(objectKey, sealed.envelopeBytes, {
       onlyIf: { etagDoesNotMatch: "*" },
+      customMetadata: {
+        artifact_id: await ontologyPipelineArtifactIdentity(identity),
+        coordinate_sha256: await contentHash(canonicalJson({
+          artifact_class: identity.artifactClass,
+          run_id: identity.runId,
+          stage: identity.stage,
+          stage_attempt: identity.stageAttempt,
+          stage_generation: identity.stageGeneration,
+        })),
+      },
     });
 
     const repaired = await putOntologyPipelineArtifact(
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
     expect(repaired.status).toBe("adopted");
@@ -327,8 +385,144 @@ describe("ontology pipeline encrypted artifacts", () => {
     await env.ARTIFACTS!.delete(objectKey);
   });
 
+  it("discovers and reconciles a crash-after-R2 response at the pre-provider read seam", async () => {
+    const run = await seedRunAt("generating");
+    const claim = await claimRun(run, "ontology-r2-first-read-owner");
+    const identity = coordinate(run, "generator_response");
+    const plaintext = new TextEncoder().encode("provider response stored before D1");
+    const sealed = await createOntologyPipelineArtifactEnvelope(
+      env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING,
+      { ...identity, ontologyVersion: run.ontologyVersion },
+      plaintext,
+      Uint8Array.from({ length: 12 }, (_, index) => 40 + index),
+    );
+    const id = await ontologyPipelineArtifactIdentity(identity);
+    const objectKey = await ontologyPipelineArtifactObjectKey(identity);
+    const coordinateHash = await contentHash(canonicalJson({
+      artifact_class: identity.artifactClass,
+      run_id: identity.runId,
+      stage: identity.stage,
+      stage_attempt: identity.stageAttempt,
+      stage_generation: identity.stageGeneration,
+    }));
+    await env.ARTIFACTS!.put(objectKey, sealed.envelopeBytes, {
+      customMetadata: {
+        artifact_id: id,
+        coordinate_sha256: coordinateHash,
+      },
+    });
+
+    const recovered = await readOntologyPipelineArtifact(env, identity, {
+      claim,
+      now: new Date(ARTIFACT_CREATED_AT),
+    });
+    expect(recovered).toMatchObject({
+      artifact: {
+        id,
+        objectKey,
+        plaintextSha256: sealed.plaintextSha256,
+      },
+      plaintext,
+    });
+    expect(await env.DB.prepare(
+      `SELECT plaintext_sha256 FROM pattern_ontology_pipeline_artifacts
+       WHERE id = ?`,
+    ).bind(id).first()).toEqual({ plaintext_sha256: sealed.plaintextSha256 });
+
+    await env.ARTIFACTS!.delete(objectKey);
+  });
+
+  it("requires the exact unexpired claim for create and R2-first adoption", async () => {
+    const run = await seedRunAt("generating");
+    const owner = await claimRun(run, "ontology-artifact-live-owner");
+    const stale = { ...owner, claimToken: "ontology-artifact-stale-owner" };
+
+    await expect(putOntologyPipelineArtifact(
+      env,
+      coordinate(run, "generator_request"),
+      new TextEncoder().encode("request"),
+      stale,
+      new Date(ARTIFACT_CREATED_AT),
+    )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_stale_owner" });
+
+    const afterExpiry = new Date("2026-08-21T14:05:31.000Z");
+    await expect(putOntologyPipelineArtifact(
+      env,
+      coordinate(run, "generator_response"),
+      new TextEncoder().encode("late response"),
+      owner,
+      afterExpiry,
+    )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_stale_owner" });
+
+    expect(await releaseExpiredOntologyPipelineLeases(env, afterExpiry, 100))
+      .toBeGreaterThan(0);
+    const successor = await claimRun(
+      run,
+      "ontology-artifact-successor-owner",
+      afterExpiry,
+    );
+    await expect(putOntologyPipelineArtifact(
+      env,
+      coordinate(run, "candidate_chunk"),
+      new TextEncoder().encode("successor chunk"),
+      owner,
+      new Date("2026-08-21T14:05:32.000Z"),
+    )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_stale_owner" });
+    const stored = await putOntologyPipelineArtifact(
+      env,
+      coordinate(run, "candidate_chunk"),
+      new TextEncoder().encode("successor chunk"),
+      successor,
+      new Date("2026-08-21T14:05:32.000Z"),
+    );
+    expect(stored.status).toBe("created");
+    await env.ARTIFACTS!.delete(stored.artifact.objectKey);
+  });
+
+  it("rejects BOM-prefixed canonical envelopes during R2 adoption", async () => {
+    const run = await seedRunAt("generating");
+    const claim = await claimRun(run, "ontology-artifact-bom-owner");
+    const identity = coordinate(run, "generator_response");
+    const plaintext = new TextEncoder().encode("provider response");
+    const sealed = await createOntologyPipelineArtifactEnvelope(
+      env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING,
+      { ...identity, ontologyVersion: run.ontologyVersion },
+      plaintext,
+    );
+    const id = await ontologyPipelineArtifactIdentity(identity);
+    const objectKey = await ontologyPipelineArtifactObjectKey(identity);
+    const prefixed = new Uint8Array(sealed.envelopeBytes.byteLength + 3);
+    prefixed.set([0xef, 0xbb, 0xbf]);
+    prefixed.set(sealed.envelopeBytes, 3);
+    await env.ARTIFACTS!.put(objectKey, prefixed, {
+      customMetadata: {
+        artifact_id: id,
+        coordinate_sha256: await contentHash(canonicalJson({
+          artifact_class: identity.artifactClass,
+          run_id: identity.runId,
+          stage: identity.stage,
+          stage_attempt: identity.stageAttempt,
+          stage_generation: identity.stageGeneration,
+        })),
+      },
+    });
+
+    await expect(putOntologyPipelineArtifact(
+      env,
+      identity,
+      plaintext,
+      claim,
+      new Date(ARTIFACT_CREATED_AT),
+    )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_conflict" });
+    expect(await env.DB.prepare(
+      `SELECT id FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
+    ).bind(id).first()).toBeNull();
+    await env.ARTIFACTS!.delete(objectKey);
+  });
+
   it("refuses an R2-only compatible evaluation envelope without attempt identity", async () => {
     const run = await seedRunAt("evaluating");
+    const claim = await claimRun(run, "ontology-evaluation-metadata-owner");
     const identity = coordinate(run, "evaluation_report");
     const plaintext = new TextEncoder().encode(buildTestEvaluationReport(
       run.ontologyVersion,
@@ -350,6 +544,7 @@ describe("ontology pipeline encrypted artifacts", () => {
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_conflict" });
     expect(await env.DB.prepare(
@@ -361,6 +556,7 @@ describe("ontology pipeline encrypted artifacts", () => {
 
   it("refuses a create-only object collision without overwriting it", async () => {
     const run = await seedRunAt("generating");
+    const claim = await claimRun(run, "ontology-artifact-collision-owner");
     const identity = coordinate(run, "generator_request");
     const objectKey = await ontologyPipelineArtifactObjectKey(identity);
     const occupied = "PRIVATE OCCUPIED OBJECT";
@@ -370,6 +566,7 @@ describe("ontology pipeline encrypted artifacts", () => {
       env,
       identity,
       new TextEncoder().encode("different request"),
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_conflict" });
     expect(await (await env.ARTIFACTS!.get(objectKey))!.text()).toBe(occupied);
@@ -383,11 +580,13 @@ describe("ontology pipeline encrypted artifacts", () => {
   it("refuses adoption when any stored ciphertext identity no longer matches", async () => {
     const run = await seedRunAt("generating");
     const identity = coordinate(run, "generator_response");
+    const claim = await claimRun(run, "ontology-artifact-tamper-owner");
     const plaintext = new TextEncoder().encode("provider response");
     const stored = await putOntologyPipelineArtifact(
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
     await env.ARTIFACTS!.put(stored.artifact.objectKey, "tampered-envelope");
@@ -396,6 +595,7 @@ describe("ontology pipeline encrypted artifacts", () => {
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     )).rejects.toMatchObject({ code: "ontology_pipeline_artifact_conflict" });
     await expect(readOntologyPipelineArtifact(env, identity))
@@ -407,24 +607,18 @@ describe("ontology pipeline encrypted artifacts", () => {
   it("assigns failed retention from the actual terminal instant and never at creation", async () => {
     const run = await seedRunAt("generating");
     const identity = coordinate(run, "candidate_chunk");
+    const claim = await claimRun(run, "ontology-artifact-retention-claim");
     const stored = await putOntologyPipelineArtifact(
       env,
       identity,
       new TextEncoder().encode("candidate chunk"),
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
     expect(await env.DB.prepare(
       `SELECT expires_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
     ).bind(stored.artifact.id).first()).toEqual({ expires_at: null });
 
-    const claim = await claimOntologyPipelineRun(
-      env,
-      { run_id: run.runId, stage_generation: run.stageGeneration },
-      CLAIMED_AT,
-      "ontology-artifact-retention-claim",
-    );
-    expect(claim.status).toBe("claimed");
-    if (claim.status !== "claimed") return;
     expect(await failOntologyPipelineRun(
       env,
       claim,
@@ -451,23 +645,47 @@ describe("ontology pipeline encrypted artifacts", () => {
     await env.ARTIFACTS!.delete(stored.artifact.objectKey);
   });
 
+  it("refuses failed-artifact reads at the exact seven-day boundary", async () => {
+    const run = await seedRunAt("generating");
+    const claim = await claimRun(run, "ontology-artifact-expiry-owner");
+    const identity = coordinate(run, "candidate_chunk");
+    const plaintext = new TextEncoder().encode("expiring candidate chunk");
+    const stored = await putOntologyPipelineArtifact(
+      env,
+      identity,
+      plaintext,
+      claim,
+      new Date(ARTIFACT_CREATED_AT),
+    );
+    expect(await failOntologyPipelineRun(
+      env,
+      claim,
+      "execution_error",
+      FAILED_AT,
+    )).toBe(true);
+    const expiresAt = new Date("2026-08-28T14:02:00.000Z");
+
+    await expect(readOntologyPipelineArtifact(env, identity, {
+      now: new Date(expiresAt.getTime() - 1),
+    })).resolves.toMatchObject({ plaintext });
+    await expect(readOntologyPipelineArtifact(env, identity, {
+      now: expiresAt,
+    })).rejects.toMatchObject({ code: "ontology_pipeline_artifact_unavailable" });
+
+    await env.ARTIFACTS!.delete(stored.artifact.objectKey);
+  });
+
   it("keeps successful evidence unexpired", async () => {
     const run = await seedRunAt("ingesting");
     const identity = coordinate(run, "ingestion_receipt");
+    const claim = await claimRun(run, "ontology-artifact-success-claim");
     const stored = await putOntologyPipelineArtifact(
       env,
       identity,
       new TextEncoder().encode("ingestion receipt"),
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
-    const claim = await claimOntologyPipelineRun(
-      env,
-      { run_id: run.runId, stage_generation: run.stageGeneration },
-      CLAIMED_AT,
-      "ontology-artifact-success-claim",
-    );
-    expect(claim.status).toBe("claimed");
-    if (claim.status !== "claimed") return;
     expect(await succeedOntologyPipelineRun(env, claim, FAILED_AT)).toBe(true);
     expect(await env.DB.prepare(
       `SELECT expires_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
@@ -480,20 +698,14 @@ describe("ontology pipeline encrypted artifacts", () => {
     const run = await seedRunAt("generating");
     const identity = coordinate(run, "candidate_chunk");
     const plaintext = new TextEncoder().encode("complete candidate chunk");
+    const claim = await claimRun(run, "ontology-prior-stage-read-claim");
     const stored = await putOntologyPipelineArtifact(
       env,
       identity,
       plaintext,
+      claim,
       new Date(ARTIFACT_CREATED_AT),
     );
-    const claim = await claimOntologyPipelineRun(
-      env,
-      { run_id: run.runId, stage_generation: run.stageGeneration },
-      CLAIMED_AT,
-      "ontology-prior-stage-read-claim",
-    );
-    expect(claim.status).toBe("claimed");
-    if (claim.status !== "claimed") return;
     expect(await advanceOntologyPipelineStage(
       env,
       claim,

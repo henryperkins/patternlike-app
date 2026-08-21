@@ -42,6 +42,8 @@ interface OutboxRow {
   available_at: string;
 }
 
+export const ONTOLOGY_PIPELINE_OUTBOX_LIMIT = 4;
+
 export class OntologyPipelineEnqueueError extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -51,6 +53,15 @@ export class OntologyPipelineEnqueueError extends Error {
 
 function fail(code: string): never {
   throw new OntologyPipelineEnqueueError(code);
+}
+
+function isReservationIdentityConflict(cause: unknown): boolean {
+  return cause instanceof Error && (
+    cause.message.includes("ontology pipeline command identity cannot be reused") ||
+    /UNIQUE constraint failed: pattern_ontology_pipeline_runs\.(?:run_id|idempotency_key|candidate_ontology_version)/.test(
+      cause.message,
+    )
+  );
 }
 
 function inputIsValid(input: EnqueueOntologyPipelineInput): boolean {
@@ -125,6 +136,40 @@ async function markOntologyPipelineDispatched(
     at,
   ).run();
   return result.meta.changes === 1;
+}
+
+async function markOntologyPipelineDispatchedBatch(
+  env: Pick<Env, "DB">,
+  rows: readonly OutboxRow[],
+  now: Date,
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const at = now.toISOString();
+  const coordinates = rows.map(() => (
+    `(run_id = ? AND stage = ? AND stage_generation = ?
+      AND stage_cursor = ? AND stage_attempt = ?)`
+  )).join(" OR ");
+  const bindings: unknown[] = [at, at];
+  for (const row of rows) {
+    bindings.push(
+      row.run_id,
+      row.stage,
+      row.stage_generation,
+      row.stage_cursor,
+      row.stage_attempt,
+    );
+  }
+  bindings.push(at);
+  const result = await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_runs
+     SET dispatched_at = ?, updated_at = ?
+     WHERE (${coordinates})
+       AND stage NOT IN ('succeeded', 'failed')
+       AND claim_token IS NULL AND lease_expires_at IS NULL
+       AND dispatched_at IS NULL
+       AND unixepoch(available_at) <= unixepoch(?)`,
+  ).bind(...bindings).run();
+  return result.meta.changes ?? 0;
 }
 
 async function dispatchOne(
@@ -218,9 +263,11 @@ export async function enqueueOntologyPipelineRun(
       ).run();
       status = "reserved";
       row = await loadOccupiedReservation(env, input);
-    } catch {
+    } catch (cause) {
+      if (!isReservationIdentityConflict(cause)) throw cause;
       row = await loadOccupiedReservation(env, input);
-      if (!row || !reservationMatches(
+      if (!row) throw cause;
+      if (!reservationMatches(
         row,
         input,
         command,
@@ -260,7 +307,7 @@ export async function enqueueOntologyPipelineRun(
 export async function dispatchUndispatchedOntologyPipelineRuns(
   env: Env,
   now = new Date(),
-  limit = 50,
+  limit = ONTOLOGY_PIPELINE_OUTBOX_LIMIT,
 ): Promise<{ dispatched: number; failed: number }> {
   const configuration = resolveOntologyPipelineConfiguration(env);
   if (!configuration.ok || configuration.rollout === "off") {
@@ -280,16 +327,27 @@ export async function dispatchUndispatchedOntologyPipelineRuns(
        AND unixepoch(available_at) <= unixepoch(?)
      ORDER BY available_at, run_id LIMIT ?`,
   ).bind(at, limit).all<OutboxRow>();
-  let dispatched = 0;
+  const sent: OutboxRow[] = [];
   let failed = 0;
   for (const row of results) {
     try {
-      if (await dispatchOne(env, row, now)) dispatched += 1;
+      await env.ONTOLOGY_PIPELINE_QUEUE.send({
+        run_id: row.run_id,
+        stage_generation: row.stage_generation,
+      });
+      sent.push(row);
     } catch {
       failed += 1;
     }
   }
-  return { dispatched, failed };
+  try {
+    return {
+      dispatched: await markOntologyPipelineDispatchedBatch(env, sent, now),
+      failed,
+    };
+  } catch {
+    return { dispatched: 0, failed: failed + sent.length };
+  }
 }
 
 /** Rollout-off acknowledgement puts this generation back in the outbox lane. */

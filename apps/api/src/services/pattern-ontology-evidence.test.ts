@@ -26,6 +26,15 @@ import {
   verifyPatternOntologyEvidence,
   type CommitOntologyPipelineEvidenceInput,
 } from "./pattern-ontology-evidence.js";
+import {
+  claimOntologyPipelineRun,
+  retryOntologyPipelineStage,
+} from "../db/ontology-pipeline.js";
+import { putOntologyPipelineArtifact } from "./ontology-pipeline-artifacts.js";
+import {
+  loadActiveOntology,
+  storeOntologyRelease,
+} from "../db/pattern-ontology.js";
 
 interface MachineRelease extends PatternOntologyRelease {
   provenance: { origin: "machine_pipeline" };
@@ -147,6 +156,120 @@ async function replaceArtifactEnvelope(
   fixture.input.evaluationArtifactEnvelopeHash = await contentHash(bytes);
 }
 
+async function replaceWithRetryEvaluationArtifact(
+  value: MachineRelease,
+  fixture: EvidenceFixture,
+): Promise<void> {
+  const now = new Date("2026-08-21T14:00:00.000Z");
+  const configuration = canonicalJson({ test: "retry-evidence" });
+  await env.DB.prepare(
+    `INSERT INTO pattern_source_corpus_releases (
+       corpus_release_id, corpus_hash, locale, object_key, fragment_count,
+       license_class, public_capable, created_at, registered_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    fixture.corpus.corpus_release_id,
+    fixture.corpus.corpus_hash,
+    fixture.corpus.locale,
+    fixture.corpusObjectKey,
+    fixture.corpus.fragments.length,
+    fixture.input.corpusLicenseClass,
+    fixture.input.corpusPublicCapable ? 1 : 0,
+    now.toISOString(),
+    now.toISOString(),
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO pattern_ontology_pipeline_runs (
+       run_id, idempotency_key, corpus_release_id, corpus_hash,
+       candidate_ontology_version, configuration_json, configuration_hash,
+       stage, stage_generation, stage_cursor, stage_attempt, claim_token,
+       lease_expires_at, available_at, dispatched_at, failure_class,
+       candidate_hash, compilation_report_hash, evaluation_report_hash,
+       regression_report_hash, bundle_hash, failed_artifact_expires_at,
+       created_at, updated_at, finished_at, succeeded_at, failed_at
+     ) VALUES (
+       ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0, NULL, NULL, ?, NULL, NULL,
+       NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL
+     )`,
+  ).bind(
+    fixture.input.runId,
+    `retry-evidence-${crypto.randomUUID()}`,
+    fixture.input.corpusReleaseId,
+    fixture.input.corpusReleaseHash,
+    fixture.input.ontologyVersion,
+    configuration,
+    await contentHash(configuration),
+    now.toISOString(),
+    now.toISOString(),
+    now.toISOString(),
+  ).run();
+  for (const [index, stage] of [
+    "corpus_reading",
+    "generating",
+    "compiling",
+    "evaluating",
+  ].entries()) {
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = ?, stage_generation = ?, stage_cursor = 0,
+           stage_attempt = 0, claim_token = NULL, lease_expires_at = NULL,
+           dispatched_at = NULL, updated_at = ?,
+           candidate_hash = CASE WHEN ? = 'compiling' THEN ? ELSE candidate_hash END,
+           compilation_report_hash = CASE WHEN ? = 'evaluating' THEN ? ELSE compilation_report_hash END
+       WHERE run_id = ?`,
+    ).bind(
+      stage,
+      index + 1,
+      now.toISOString(),
+      stage,
+      `sha256:${"1".repeat(64)}`,
+      stage,
+      `sha256:${"2".repeat(64)}`,
+      fixture.input.runId,
+    ).run();
+  }
+  const first = await claimOntologyPipelineRun(
+    env,
+    { run_id: fixture.input.runId, stage_generation: 4 },
+    now,
+    "retry-evidence-attempt-zero",
+  );
+  if (first.status !== "claimed") throw new Error("retry evidence claim failed");
+  expect(await retryOntologyPipelineStage(
+    env,
+    first,
+    new Date(now.getTime() + 1),
+  )).toBe(true);
+  const retry = await claimOntologyPipelineRun(
+    env,
+    { run_id: fixture.input.runId, stage_generation: 4 },
+    new Date(now.getTime() + 1),
+    "retry-evidence-attempt-one",
+  );
+  if (retry.status !== "claimed") throw new Error("retry evidence retry claim failed");
+  const stored = await putOntologyPipelineArtifact(
+    env,
+    {
+      runId: fixture.input.runId,
+      stage: "evaluating",
+      stageGeneration: 4,
+      stageAttempt: 1,
+      artifactClass: "evaluation_report",
+    },
+    new TextEncoder().encode(buildTestEvaluationReport(value.ontology_version)),
+    retry,
+    new Date(now.getTime() + 2),
+  );
+  await env.ARTIFACTS!.delete(fixture.input.evaluationArtifactObjectKey);
+  fixture.input.evaluationReportHash = stored.artifact.plaintextSha256;
+  fixture.input.evaluationArtifactObjectKey = stored.artifact.objectKey;
+  fixture.input.evaluationArtifactEnvelopeHash = stored.artifact.envelopeSha256;
+  fixture.input.evaluationArtifactCiphertextHash = stored.artifact.ciphertextSha256;
+  value.evaluation.evaluation_report_hash = stored.artifact.plaintextSha256;
+  value.bundle_hash = await computeOntologyBundleHash(value);
+  fixture.input.bundleHash = value.bundle_hash;
+}
+
 describe("machine ontology evidence", () => {
   beforeEach(async () => {
     await resetDb();
@@ -186,6 +309,38 @@ describe("machine ontology evidence", () => {
       evaluatorPassed: true,
       unevaluatedFixtureCount: 0,
       evidenceSummary: expect.any(String),
+    });
+  });
+
+  it("commits and re-verifies an attempt-one Task 5 evaluation report", async () => {
+    const value = await release("ontology-evidence-true-retry");
+    const fixture = await evidenceFixture(value);
+    await replaceWithRetryEvaluationArtifact(value, fixture);
+
+    expect(fixture.input.evaluationArtifactObjectKey).toMatch(
+      /\/opart_[a-f0-9]{40}\.enc$/,
+    );
+    await expect(commitOntologyPipelineEvidence(env, fixture.input))
+      .resolves.toBeUndefined();
+    const verified = await verifyPatternOntologyEvidence(
+      env,
+      value,
+      fixture.input.signingKeyId,
+    );
+    expect(verified).toMatchObject({
+      runId: fixture.input.runId,
+      evaluationArtifactObjectKey: fixture.input.evaluationArtifactObjectKey,
+    });
+    env.PATTERN_ONTOLOGY_KEYS = "";
+    await storeOntologyRelease(
+      env,
+      value,
+      `pattern-ontology/${value.ontology_version}.json`,
+      verified,
+    );
+    await expect(loadActiveOntology(env)).resolves.toMatchObject({
+      version: value.ontology_version,
+      activationScope: "public",
     });
   });
 

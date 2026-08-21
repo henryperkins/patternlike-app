@@ -9,6 +9,18 @@ import worker from "./index.js";
 import type { Env } from "./env.js";
 import { IDENTITY_A, USER_A, resetDb, rows, seedUser } from "../test/helpers.js";
 import { OPENAI_READING_MODEL } from "./services/reading-publisher.js";
+import {
+  buildTestCorpusManifest,
+  testOntologyPipelineArtifactKeyring,
+} from "../test/ontology-pipeline-fixtures.js";
+import { registerOntologyCorpus } from "./services/ontology-corpus.js";
+import {
+  advanceOntologyPipelineStage,
+  claimOntologyPipelineRun,
+  failOntologyPipelineRun,
+} from "./db/ontology-pipeline.js";
+import { enqueueOntologyPipelineRun } from "./services/ontology-pipeline-enqueue.js";
+import { putOntologyPipelineArtifact } from "./services/ontology-pipeline-artifacts.js";
 
 function hybridEnv(db: D1Database = env.DB): Env {
   return {
@@ -29,6 +41,55 @@ function hybridEnv(db: D1Database = env.DB): Env {
     READING_DAILY_PROVIDER_CALL_LIMIT: "250",
     OPENAI_API_KEY: "sk-test-key",
   };
+}
+
+function ontologyScheduledEnv(
+  queue: Queue,
+  overrides: Partial<Env> = {},
+): Env {
+  return Object.assign(Object.create(hybridEnv()), {
+    ONTOLOGY_PIPELINE_QUEUE: queue,
+    ONTOLOGY_PIPELINE_ROLLOUT: "internal",
+    ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
+    OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
+    OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.0",
+    OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
+    OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
+    OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
+    OPENAI_ONTOLOGY_EVALUATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION: "1.0.0-evaluator",
+    OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS: "120000",
+    OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS: "4000",
+    ONTOLOGY_PIPELINE_INPUT_MAX_BYTES: "98304",
+    ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT: "500",
+    ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS: "7",
+    ONTOLOGY_PIPELINE_ARTIFACT_KEYRING:
+      testOntologyPipelineArtifactKeyring(),
+    ...overrides,
+  }) as Env;
+}
+
+async function reserveOntologyRun(
+  pipelineEnv: Env,
+  now: Date,
+  suffix = crypto.randomUUID(),
+) {
+  const corpus = await buildTestCorpusManifest(
+    `corpus-scheduled-${suffix}`,
+    "en-US",
+    "internal_synthetic",
+  );
+  await registerOntologyCorpus(pipelineEnv, corpus);
+  return enqueueOntologyPipelineRun(
+    pipelineEnv,
+    {
+      idempotencyKey: `ontology-scheduled-${suffix}`,
+      corpusReleaseId: corpus.corpus_release_id,
+      candidateOntologyVersion: `ontology-scheduled-${suffix}`,
+    },
+    now,
+  );
 }
 
 beforeEach(resetDb);
@@ -163,5 +224,199 @@ describe("scheduled Worker entry point", () => {
       job_id: "job_scheduled_after_failure",
       job_type: "export_account",
     });
+  });
+
+  it("recovers an ontology send failure only after rollout is re-enabled", async () => {
+    let failures = 1;
+    const send = vi.fn(async () => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new Error("ontology queue unavailable");
+      }
+    });
+    const queue = { send } as unknown as Queue;
+    const now = new Date("2026-08-21T15:00:00.000Z");
+    const pipelineEnv = ontologyScheduledEnv(queue);
+    const run = await reserveOntologyRun(pipelineEnv, now);
+    expect(run.dispatched).toBe(false);
+
+    pipelineEnv.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+    await worker.scheduled(
+      createScheduledController({ scheduledTime: now.getTime(), cron: "*/15 * * * *" }),
+      pipelineEnv,
+      createExecutionContext(),
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+
+    pipelineEnv.ONTOLOGY_PIPELINE_ROLLOUT = "internal";
+    await worker.scheduled(
+      createScheduledController({ scheduledTime: now.getTime(), cron: "*/15 * * * *" }),
+      pipelineEnv,
+      createExecutionContext(),
+    );
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await env.DB.prepare(
+      `SELECT dispatched_at FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(run.runId).first()).toEqual({ dispatched_at: now.toISOString() });
+  });
+
+  it("recovers an expired ontology claim through the bounded scheduled path", async () => {
+    const send = vi.fn(async () => undefined);
+    const queue = { send } as unknown as Queue;
+    const claimedAt = new Date("2026-08-21T14:00:00.000Z");
+    const recoveredAt = new Date("2026-08-21T14:05:01.000Z");
+    const pipelineEnv = ontologyScheduledEnv(queue);
+    const run = await reserveOntologyRun(pipelineEnv, claimedAt);
+    const claim = await claimOntologyPipelineRun(
+      pipelineEnv,
+      { run_id: run.runId, stage_generation: 0 },
+      claimedAt,
+      "ontology-scheduled-expired-owner",
+    );
+    expect(claim.status).toBe("claimed");
+    let ontologyQueries = 0;
+    const countedDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          if (
+            query.includes("pattern_ontology_pipeline_runs") ||
+            query.includes("pattern_ontology_pipeline_artifacts")
+          ) ontologyQueries += 1;
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
+
+    await worker.scheduled(
+      createScheduledController({
+        scheduledTime: recoveredAt.getTime(),
+        cron: "*/15 * * * *",
+      }),
+      ontologyScheduledEnv(queue, { DB: countedDb }),
+      createExecutionContext(),
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await env.DB.prepare(
+      `SELECT claim_token, lease_expires_at, dispatched_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(run.runId).first()).toEqual({
+      claim_token: null,
+      lease_expires_at: null,
+      dispatched_at: recoveredAt.toISOString(),
+    });
+    expect(ontologyQueries).toBeLessThanOrEqual(6);
+  });
+
+  it("deletes and tombstones expired failed artifacts exactly, retrying R2 failures", async () => {
+    const send = vi.fn(async () => undefined);
+    const queue = { send } as unknown as Queue;
+    const startedAt = new Date("2026-08-14T11:58:00.000Z");
+    const artifactAt = new Date("2026-08-14T12:00:00.000Z");
+    const failedAt = new Date("2026-08-14T12:01:00.000Z");
+    const expiresAt = new Date("2026-08-21T12:01:00.000Z");
+    const pipelineEnv = ontologyScheduledEnv(queue);
+    const run = await reserveOntologyRun(pipelineEnv, startedAt);
+    const reserved = await claimOntologyPipelineRun(
+      pipelineEnv,
+      { run_id: run.runId, stage_generation: 0 },
+      startedAt,
+      "ontology-retention-reserved",
+    );
+    if (reserved.status !== "claimed") throw new Error("retention reserved claim failed");
+    expect(await advanceOntologyPipelineStage(
+      pipelineEnv,
+      reserved,
+      "corpus_reading",
+      {},
+      new Date(startedAt.getTime() + 1),
+    )).toBe(true);
+    const corpus = await claimOntologyPipelineRun(
+      pipelineEnv,
+      { run_id: run.runId, stage_generation: 1 },
+      new Date(startedAt.getTime() + 1),
+      "ontology-retention-corpus",
+    );
+    if (corpus.status !== "claimed") throw new Error("retention corpus claim failed");
+    expect(await advanceOntologyPipelineStage(
+      pipelineEnv,
+      corpus,
+      "generating",
+      {},
+      new Date(startedAt.getTime() + 2),
+    )).toBe(true);
+    const generating = await claimOntologyPipelineRun(
+      pipelineEnv,
+      { run_id: run.runId, stage_generation: 2 },
+      new Date(startedAt.getTime() + 2),
+      "ontology-retention-generating",
+    );
+    if (generating.status !== "claimed") throw new Error("retention generating claim failed");
+    const stored = await putOntologyPipelineArtifact(
+      pipelineEnv,
+      {
+        runId: run.runId,
+        stage: "generating",
+        stageGeneration: 2,
+        stageAttempt: 0,
+        artifactClass: "candidate_chunk",
+      },
+      new TextEncoder().encode("failed candidate"),
+      generating,
+      artifactAt,
+    );
+    expect(await failOntologyPipelineRun(
+      pipelineEnv,
+      generating,
+      "execution_error",
+      failedAt,
+    )).toBe(true);
+
+    const failingBucket = new Proxy(env.ARTIFACTS!, {
+      get(target, property, receiver) {
+        if (property === "delete") {
+          return async () => { throw new Error("R2 unavailable"); };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as R2Bucket;
+    await worker.scheduled(
+      createScheduledController({
+        scheduledTime: expiresAt.getTime(),
+        cron: "*/15 * * * *",
+      }),
+      ontologyScheduledEnv(queue, { ARTIFACTS: failingBucket }),
+      createExecutionContext(),
+    );
+    expect(await env.ARTIFACTS!.get(stored.artifact.objectKey)).not.toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
+    ).bind(stored.artifact.id).first()).toEqual({ deleted_at: null });
+
+    await worker.scheduled(
+      createScheduledController({
+        scheduledTime: expiresAt.getTime(),
+        cron: "*/15 * * * *",
+      }),
+      pipelineEnv,
+      createExecutionContext(),
+    );
+    expect(await env.ARTIFACTS!.get(stored.artifact.objectKey)).toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
+    ).bind(stored.artifact.id).first()).toEqual({
+      deleted_at: expiresAt.toISOString(),
+    });
+
+    await expect(worker.scheduled(
+      createScheduledController({
+        scheduledTime: expiresAt.getTime(),
+        cron: "*/15 * * * *",
+      }),
+      pipelineEnv,
+      createExecutionContext(),
+    )).resolves.toBeUndefined();
   });
 });

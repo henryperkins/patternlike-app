@@ -14,6 +14,11 @@ import {
   hashOntologyArtifactBytes,
   parseOntologyArtifactKeyring,
 } from "./ontology-artifact-crypto.js";
+import {
+  ontologyPipelineArtifactIdentity,
+  readOntologyPipelineArtifact,
+  type OntologyPipelineArtifactCoordinate,
+} from "./ontology-pipeline-artifacts.js";
 
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
@@ -128,14 +133,25 @@ function inputIsValid(input: CommitOntologyPipelineEvidenceInput): boolean {
     CONTENT_HASH.test(input.evaluationReportHash) &&
     CONTENT_HASH.test(input.evaluationArtifactEnvelopeHash) &&
     CONTENT_HASH.test(input.evaluationArtifactCiphertextHash) &&
-    input.evaluationArtifactObjectKey ===
-      `${EVALUATION_OBJECT_PREFIX}${input.runId}/evaluation-report.enc` &&
+    evaluationObjectKeyIsValid(
+      input.runId,
+      input.evaluationArtifactObjectKey,
+    ) &&
     KEY_ID.test(input.signingKeyId) &&
     input.compilerPassed === true &&
     input.evaluatorPassed === true &&
     input.unevaluatedFixtureCount === 0 &&
     publicCapabilityMatchesLicense
   );
+}
+
+function evaluationObjectKeyIsValid(runId: string, objectKey: string): boolean {
+  const prefix = `${EVALUATION_OBJECT_PREFIX}${runId}/`;
+  return objectKey === `${prefix}evaluation-report.enc` ||
+    (
+      objectKey.startsWith(prefix) &&
+      /^opart_[a-f0-9]{40}\.enc$/.test(objectKey.slice(prefix.length))
+    );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -280,6 +296,13 @@ async function verifyEvaluationArtifact(
   env: Env,
   expected: ExpectedEvaluationArtifact,
 ): Promise<void> {
+  if (
+    expected.objectKey !==
+      `${EVALUATION_OBJECT_PREFIX}${expected.runId}/evaluation-report.enc`
+  ) {
+    await verifyRetryEvaluationArtifact(env, expected);
+    return;
+  }
   if (!env.ARTIFACTS) fail("ontology_evaluation_artifact_missing");
   const object = await env.ARTIFACTS.get(expected.objectKey);
   if (!object) fail("ontology_evaluation_artifact_missing");
@@ -407,6 +430,79 @@ async function verifyEvaluationArtifact(
     fail("ontology_evaluation_artifact_plaintext_hash_mismatch");
   }
   verifyEvaluationReport(plaintext, expected.ontologyVersion);
+}
+
+interface RetryEvaluationArtifactRow {
+  id: string;
+  run_id: string;
+  stage: "evaluating";
+  stage_generation: number;
+  stage_attempt: number;
+  artifact_class: "evaluation_report";
+  object_key: string;
+  plaintext_sha256: string;
+  envelope_sha256: string;
+  ciphertext_sha256: string;
+  deleted_at: string | null;
+  expires_at: string | null;
+  candidate_ontology_version: string;
+}
+
+async function verifyRetryEvaluationArtifact(
+  env: Env,
+  expected: ExpectedEvaluationArtifact,
+): Promise<void> {
+  const row = await env.DB.prepare(
+    `SELECT artifact.id, artifact.run_id, artifact.stage,
+            artifact.stage_generation, artifact.stage_attempt,
+            artifact.artifact_class, artifact.object_key,
+            artifact.plaintext_sha256, artifact.envelope_sha256,
+            artifact.ciphertext_sha256, artifact.deleted_at,
+            artifact.expires_at, run.candidate_ontology_version
+     FROM pattern_ontology_pipeline_artifacts artifact
+     JOIN pattern_ontology_pipeline_runs run ON run.run_id = artifact.run_id
+     WHERE artifact.run_id = ? AND artifact.object_key = ?
+       AND artifact.stage = 'evaluating'
+       AND artifact.artifact_class = 'evaluation_report'
+       AND artifact.stage_attempt > 0`,
+  ).bind(expected.runId, expected.objectKey).first<RetryEvaluationArtifactRow>();
+  if (
+    !row ||
+    row.candidate_ontology_version !== expected.ontologyVersion ||
+    row.deleted_at !== null ||
+    row.expires_at !== null ||
+    !hashesEqual(row.plaintext_sha256, expected.plaintextHash) ||
+    !hashesEqual(row.envelope_sha256, expected.envelopeHash) ||
+    !hashesEqual(row.ciphertext_sha256, expected.ciphertextHash)
+  ) {
+    fail("ontology_evaluation_artifact_identity_mismatch");
+  }
+  const coordinate: OntologyPipelineArtifactCoordinate = {
+    runId: row.run_id,
+    stage: row.stage,
+    stageGeneration: row.stage_generation,
+    stageAttempt: row.stage_attempt,
+    artifactClass: row.artifact_class,
+  };
+  if (await ontologyPipelineArtifactIdentity(coordinate) !== row.id) {
+    fail("ontology_evaluation_artifact_identity_mismatch");
+  }
+  let artifact;
+  try {
+    artifact = await readOntologyPipelineArtifact(env, coordinate);
+  } catch {
+    fail("ontology_evaluation_artifact_invalid");
+  }
+  if (
+    !artifact ||
+    artifact.artifact.objectKey !== expected.objectKey ||
+    !hashesEqual(artifact.artifact.plaintextSha256, expected.plaintextHash) ||
+    !hashesEqual(artifact.artifact.envelopeSha256, expected.envelopeHash) ||
+    !hashesEqual(artifact.artifact.ciphertextSha256, expected.ciphertextHash)
+  ) {
+    fail("ontology_evaluation_artifact_identity_mismatch");
+  }
+  verifyEvaluationReport(artifact.plaintext, expected.ontologyVersion);
 }
 
 async function verifyCorpus(

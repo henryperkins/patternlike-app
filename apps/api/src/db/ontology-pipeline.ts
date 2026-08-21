@@ -64,6 +64,16 @@ export type ClaimOntologyPipelineRunResult =
   | { status: "duplicate" };
 
 const CLAIM_LEASE_MS = 5 * 60 * 1_000;
+export const MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS = 16;
+export const ONTOLOGY_PIPELINE_RECOVERY_LIMIT = 4;
+
+/** Stable, range-queryable receipt prefix expressed against a runs-table alias. */
+function claimReceiptPrefixSql(alias: string): string {
+  return `'ontology_pipeline_claim/' || length(${alias}.run_id) || ':' ||
+    ${alias}.run_id || '/' || ${alias}.stage || '/' ||
+    ${alias}.stage_generation || '/' || ${alias}.stage_cursor || '/' ||
+    ${alias}.stage_attempt || '/'`;
+}
 
 function toClaim(row: OntologyPipelineRunRow): ClaimedOntologyPipelineRun {
   if (
@@ -95,23 +105,71 @@ export async function claimOntologyPipelineRun(
 ): Promise<ClaimOntologyPipelineRunResult> {
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + CLAIM_LEASE_MS).toISOString();
-  const claimed = await env.DB.prepare(
-    `UPDATE pattern_ontology_pipeline_runs
-     SET claim_token = ?, lease_expires_at = ?,
-         dispatched_at = COALESCE(dispatched_at, ?), updated_at = ?
-     WHERE run_id = ? AND stage_generation = ?
-       AND stage NOT IN ('succeeded', 'failed')
-       AND claim_token IS NULL AND lease_expires_at IS NULL
-       AND unixepoch(available_at) <= unixepoch(?)`,
-  ).bind(
-    claimToken,
-    leaseExpiresAt,
-    nowIso,
-    nowIso,
-    message.run_id,
-    message.stage_generation,
-    nowIso,
-  ).run();
+  const receiptPrefixExpression = claimReceiptPrefixSql("run");
+  const [, claimed] = await env.DB.batch([
+    env.DB.prepare(
+      `WITH delivery AS (
+         SELECT run.*,
+                ${receiptPrefixExpression} AS receipt_prefix
+         FROM pattern_ontology_pipeline_runs run
+         WHERE run.run_id = ? AND run.stage_generation = ?
+           AND run.stage NOT IN ('succeeded', 'failed')
+           AND run.claim_token IS NULL AND run.lease_expires_at IS NULL
+           AND unixepoch(run.available_at) <= unixepoch(?)
+       ), counted AS (
+         SELECT delivery.*,
+                (SELECT COUNT(*) FROM audit_events receipt
+                 WHERE receipt.id >= delivery.receipt_prefix
+                   AND receipt.id < delivery.receipt_prefix || '~'
+                   AND receipt.action = 'ontology_pipeline.claim_acquired'
+                   AND receipt.resource_type = 'ontology_pipeline_delivery')
+                   AS claim_count
+         FROM delivery
+       )
+       INSERT INTO audit_events (
+         id, actor_type, actor_id, action, resource_type, resource_id,
+         result, detail_class, created_at
+       )
+       SELECT receipt_prefix || printf('%02d', claim_count + 1),
+              'service', ?, 'ontology_pipeline.claim_acquired',
+              'ontology_pipeline_delivery', run_id, 'success', stage, ?
+       FROM counted
+       WHERE claim_count < ?`,
+    ).bind(
+      message.run_id,
+      message.stage_generation,
+      nowIso,
+      claimToken,
+      nowIso,
+      MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs AS run
+       SET claim_token = ?, lease_expires_at = ?,
+           dispatched_at = COALESCE(dispatched_at, ?), updated_at = ?
+       WHERE run.run_id = ? AND run.stage_generation = ?
+         AND run.stage NOT IN ('succeeded', 'failed')
+         AND run.claim_token IS NULL AND run.lease_expires_at IS NULL
+         AND unixepoch(run.available_at) <= unixepoch(?)
+         AND EXISTS (
+           SELECT 1 FROM audit_events receipt
+           WHERE receipt.id >= ${receiptPrefixExpression}
+             AND receipt.id < ${receiptPrefixExpression} || '~'
+             AND receipt.actor_id = ?
+             AND receipt.action = 'ontology_pipeline.claim_acquired'
+             AND receipt.resource_type = 'ontology_pipeline_delivery'
+         )`,
+    ).bind(
+      claimToken,
+      leaseExpiresAt,
+      nowIso,
+      nowIso,
+      message.run_id,
+      message.stage_generation,
+      nowIso,
+      claimToken,
+    ),
+  ]);
   if (claimed.meta.changes !== 1) return { status: "duplicate" };
 
   const row = await env.DB.prepare(
@@ -294,56 +352,74 @@ export async function advanceOntologyPipelineStage(
   return result.meta.changes === 1;
 }
 
-interface ExpiredClaimRow {
-  run_id: string;
-  stage: Exclude<OntologyPipelineStage, "succeeded" | "failed">;
-  stage_generation: number;
-  stage_cursor: number;
-  stage_attempt: number;
-  claim_token: string;
-  lease_expires_at: string;
-}
-
 /** Returns expired owners to the same attempt's undispatched lane. */
 export async function releaseExpiredOntologyPipelineLeases(
   env: Pick<Env, "DB">,
   now = new Date(),
-  limit = 50,
+  limit = ONTOLOGY_PIPELINE_RECOVERY_LIMIT,
 ): Promise<number> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) return 0;
   const at = now.toISOString();
-  const { results } = await env.DB.prepare(
-    `SELECT run_id, stage, stage_generation, stage_cursor, stage_attempt,
-            claim_token, lease_expires_at
-     FROM pattern_ontology_pipeline_runs
-     WHERE stage NOT IN ('succeeded', 'failed') AND claim_token IS NOT NULL
-       AND lease_expires_at IS NOT NULL
-       AND unixepoch(lease_expires_at) <= unixepoch(?)
-     ORDER BY lease_expires_at, run_id LIMIT ?`,
-  ).bind(at, limit).all<ExpiredClaimRow>();
-  let released = 0;
-  for (const row of results) {
-    const result = await env.DB.prepare(
-      `UPDATE pattern_ontology_pipeline_runs
-       SET claim_token = NULL, lease_expires_at = NULL,
-           dispatched_at = NULL, available_at = ?, updated_at = ?
-       WHERE run_id = ? AND stage = ? AND stage_generation = ?
-         AND stage_cursor = ? AND stage_attempt = ? AND claim_token = ?
-         AND lease_expires_at = ?
-         AND unixepoch(lease_expires_at) <= unixepoch(?)`,
-    ).bind(
-      at,
-      at,
-      row.run_id,
-      row.stage,
-      row.stage_generation,
-      row.stage_cursor,
-      row.stage_attempt,
-      row.claim_token,
-      row.lease_expires_at,
-      at,
-    ).run();
-    if (result.meta.changes === 1) released += 1;
-  }
-  return released;
+  const expiresAt = new Date(
+    now.getTime() + 7 * 24 * 60 * 60 * 1_000,
+  ).toISOString();
+  const receiptPrefixExpression = claimReceiptPrefixSql("run");
+  await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_runs
+     SET stage = 'failed', stage_generation = stage_generation + 1,
+         claim_token = NULL, lease_expires_at = NULL,
+         failure_class = 'attempts_exhausted',
+         failed_artifact_expires_at = ?, updated_at = ?,
+         finished_at = ?, failed_at = ?
+     WHERE rowid IN (
+       SELECT run.rowid
+       FROM pattern_ontology_pipeline_runs run
+       WHERE run.stage NOT IN ('succeeded', 'failed')
+         AND run.claim_token IS NOT NULL
+         AND run.lease_expires_at IS NOT NULL
+         AND unixepoch(run.lease_expires_at) <= unixepoch(?)
+         AND (SELECT COUNT(*) FROM audit_events receipt
+              WHERE receipt.id >= ${receiptPrefixExpression}
+                AND receipt.id < ${receiptPrefixExpression} || '~'
+                AND receipt.action = 'ontology_pipeline.claim_acquired'
+                AND receipt.resource_type = 'ontology_pipeline_delivery') >= ?
+       ORDER BY run.lease_expires_at, run.run_id
+       LIMIT ?
+     )`,
+  ).bind(
+    expiresAt,
+    at,
+    at,
+    at,
+    at,
+    MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS,
+    limit,
+  ).run();
+  const released = await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_runs
+     SET claim_token = NULL, lease_expires_at = NULL,
+         dispatched_at = NULL, available_at = ?, updated_at = ?
+     WHERE rowid IN (
+       SELECT run.rowid
+       FROM pattern_ontology_pipeline_runs run
+       WHERE run.stage NOT IN ('succeeded', 'failed')
+         AND run.claim_token IS NOT NULL
+         AND run.lease_expires_at IS NOT NULL
+         AND unixepoch(run.lease_expires_at) <= unixepoch(?)
+         AND (SELECT COUNT(*) FROM audit_events receipt
+              WHERE receipt.id >= ${receiptPrefixExpression}
+                AND receipt.id < ${receiptPrefixExpression} || '~'
+                AND receipt.action = 'ontology_pipeline.claim_acquired'
+                AND receipt.resource_type = 'ontology_pipeline_delivery') < ?
+       ORDER BY run.lease_expires_at, run.run_id
+       LIMIT ?
+     )`,
+  ).bind(
+    at,
+    at,
+    at,
+    MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS,
+    limit,
+  ).run();
+  return released.meta.changes ?? 0;
 }

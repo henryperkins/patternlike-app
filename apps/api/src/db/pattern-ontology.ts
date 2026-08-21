@@ -40,9 +40,27 @@ const ONTOLOGY_ACTIVATION_SCOPE_SQL = `CASE
                ) = e.evaluation_report_hash
                AND length(e.evaluation_artifact_envelope_hash) = 71
                AND length(e.evaluation_artifact_ciphertext_hash) = 71
-               AND e.evaluation_artifact_object_key =
-                 'pattern-ontology/pipeline/' || e.run_id ||
-                 '/evaluation-report.enc'
+               AND (
+                 e.evaluation_artifact_object_key =
+                   'pattern-ontology/pipeline/' || e.run_id ||
+                   '/evaluation-report.enc'
+                 OR EXISTS (
+                   SELECT 1
+                   FROM pattern_ontology_pipeline_artifacts artifact
+                   WHERE artifact.run_id = e.run_id
+                     AND artifact.stage = 'evaluating'
+                     AND artifact.stage_attempt > 0
+                     AND artifact.artifact_class = 'evaluation_report'
+                     AND artifact.object_key = e.evaluation_artifact_object_key
+                     AND artifact.plaintext_sha256 = e.evaluation_report_hash
+                     AND artifact.envelope_sha256 =
+                       e.evaluation_artifact_envelope_hash
+                     AND artifact.ciphertext_sha256 =
+                       e.evaluation_artifact_ciphertext_hash
+                     AND artifact.expires_at IS NULL
+                     AND artifact.deleted_at IS NULL
+                 )
+               )
                AND EXISTS (
                  SELECT 1
                  FROM pattern_ontology_evaluation_runs receipt
@@ -123,6 +141,8 @@ export interface ActiveOntology {
   bundleHash: string;
   corpusReleaseHash: string;
   locale: string;
+  /** Immutable R2 pointer verified against bundleHash before release bytes are returned. */
+  objectKey: string;
   activationScope: "internal" | "public";
   release: PatternOntologyRelease;
 }
@@ -215,6 +235,7 @@ export async function loadActiveOntology(env: Env): Promise<ActiveOntology | nul
     bundleHash: pointer.bundle_hash,
     corpusReleaseHash: pointer.corpus_release_hash!,
     locale: pointer.locale!,
+    objectKey: pointer.object_key,
     activationScope: pointer.activation_scope,
     release,
   };
@@ -251,6 +272,7 @@ export async function loadOntologyByVersion(
     bundleHash: row.bundle_hash,
     corpusReleaseHash: row.corpus_release_hash,
     locale: row.locale,
+    objectKey: row.object_key,
     activationScope: row.activation_scope,
     release,
   };

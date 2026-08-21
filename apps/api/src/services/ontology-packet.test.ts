@@ -156,6 +156,7 @@ function activeMachinePredecessor(): ActiveOntology {
     bundleHash: release.bundle_hash,
     corpusReleaseHash: release.corpus_release_hash,
     locale: release.locale,
+    objectKey: "pattern-ontology/machine-1.json",
     activationScope: "internal",
     release,
   };

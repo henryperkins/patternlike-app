@@ -8,8 +8,15 @@ import {
   PATTERN_VALIDATION_POLICY_ID,
   PATTERN_VALIDATION_POLICY_VERSION,
 } from "@patternlike/pattern-engine";
+import m4CommonSchema from "../../../../contracts/m4/common.schema.json";
+import type { NatalFeatureClass } from "@patternlike/shared";
 
 import type { Env } from "../env.js";
+import {
+  loadActiveOntology,
+  loadOntologyByVersion,
+  type ActiveOntology,
+} from "../db/pattern-ontology.js";
 import {
   resolveOntologyPipelineConfiguration,
 } from "../middleware/config-guard.js";
@@ -17,6 +24,7 @@ import {
   readRegisteredOntologyCorpus,
   type OntologyCorpusLicenseClass,
 } from "./ontology-corpus.js";
+import type { OntologyCoverageTarget } from "./ontology-packet.js";
 
 export const ONTOLOGY_PIPELINE_COMMAND_VERSION =
   "OntologyPipelineCommandV1" as const;
@@ -29,6 +37,23 @@ export const ONTOLOGY_PROHIBITED_CLAIMS = [
   "fate",
   "biographical fact",
 ] as const;
+export const ONTOLOGY_PIPELINE_FEATURE_VOCABULARY = [
+  ...m4CommonSchema.$defs.featureClass.enum,
+] as readonly NatalFeatureClass[];
+export const ONTOLOGY_PIPELINE_COVERAGE_TARGETS =
+  ONTOLOGY_PIPELINE_FEATURE_VOCABULARY.map((featureClass) => ({
+    feature_class: featureClass,
+    minimum_source_supported: 1,
+    minimum_total: 1,
+  })) satisfies readonly OntologyCoverageTarget[];
+
+export interface OntologyPipelinePredecessorReference {
+  ontology_version: string;
+  bundle_hash: string;
+  corpus_release_hash: string;
+  locale: string;
+  object_key: string;
+}
 
 export interface OntologyPipelineCommand {
   command_version: typeof ONTOLOGY_PIPELINE_COMMAND_VERSION;
@@ -55,6 +80,11 @@ export interface OntologyPipelineCommand {
     prompt_version: string;
     timeout_ms: number;
     max_output_tokens: number;
+  };
+  generator_input: {
+    feature_vocabulary: readonly NatalFeatureClass[];
+    coverage_targets: readonly OntologyCoverageTarget[];
+    active_machine_predecessor: OntologyPipelinePredecessorReference | null;
   };
   input_max_bytes: number;
   policy: {
@@ -91,6 +121,51 @@ function fail(code: string): never {
   throw new OntologyPipelineCommandError(code);
 }
 
+function machinePredecessorReference(
+  ontology: ActiveOntology | null,
+): OntologyPipelinePredecessorReference | null {
+  if (
+    ontology === null ||
+    ontology.release.provenance?.origin !== "machine_pipeline"
+  ) {
+    return null;
+  }
+  return {
+    ontology_version: ontology.version,
+    bundle_hash: ontology.bundleHash,
+    corpus_release_hash: ontology.corpusReleaseHash,
+    locale: ontology.locale,
+    object_key: ontology.objectKey,
+  };
+}
+
+/** Reload exactly the content-addressed predecessor frozen at reservation. */
+export async function loadOntologyPipelinePredecessor(
+  env: Env,
+  reference: OntologyPipelinePredecessorReference | null,
+): Promise<ActiveOntology | null> {
+  if (reference === null) return null;
+  const ontology = await loadOntologyByVersion(env, reference.ontology_version);
+  if (
+    !ontology ||
+    ontology.version !== reference.ontology_version ||
+    ontology.bundleHash !== reference.bundle_hash ||
+    ontology.corpusReleaseHash !== reference.corpus_release_hash ||
+    ontology.locale !== reference.locale ||
+    ontology.objectKey !== reference.object_key ||
+    ontology.release.provenance?.origin !== "machine_pipeline"
+  ) {
+    fail("ontology_pipeline_predecessor_unavailable");
+  }
+  return {
+    ...ontology,
+    // Machine bundles are content-addressed while still candidates; the D1
+    // pointer proved this reference was active at reservation. Project that
+    // frozen eligibility without mutating the authenticated stored bytes.
+    release: { ...ontology.release, status: "active" },
+  };
+}
+
 /**
  * Resolve all executable pins and re-verify the registered corpus before a
  * reservation is allowed. Corpus bytes are used only for verification and are
@@ -112,6 +187,9 @@ export async function buildOntologyPipelineCommand(
     fail("ontology_pipeline_not_enabled");
   }
   const corpus = await readRegisteredOntologyCorpus(env, corpusReleaseId);
+  const activeMachinePredecessor = machinePredecessorReference(
+    await loadActiveOntology(env),
+  );
   const { pin } = outcome.config;
   return {
     command_version: ONTOLOGY_PIPELINE_COMMAND_VERSION,
@@ -138,6 +216,15 @@ export async function buildOntologyPipelineCommand(
       prompt_version: pin.evaluator_prompt_version,
       timeout_ms: outcome.config.evaluatorTimeoutMs,
       max_output_tokens: pin.evaluator_max_output_tokens,
+    },
+    generator_input: {
+      feature_vocabulary: [...ONTOLOGY_PIPELINE_FEATURE_VOCABULARY],
+      coverage_targets: ONTOLOGY_PIPELINE_COVERAGE_TARGETS.map((target) => ({
+        feature_class: target.feature_class,
+        minimum_source_supported: target.minimum_source_supported,
+        minimum_total: target.minimum_total,
+      })),
+      active_machine_predecessor: activeMachinePredecessor,
     },
     input_max_bytes: pin.input_max_bytes,
     policy: {
