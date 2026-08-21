@@ -24,6 +24,7 @@ import { stubRoutes } from "./routes/stubs.js";
 import { contentReleaseRoutes } from "./routes/content-releases.js";
 import { internalGenerationRoutes } from "./routes/internal-generation.js";
 import { internalPatternRoutes } from "./routes/internal-pattern.js";
+import { internalOntologyPipelineRoutes } from "./routes/internal-ontology-pipeline.js";
 import { adminPatternRoutes } from "./routes/admin-pattern.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
@@ -82,6 +83,7 @@ internal.use("*", serviceAuth);
 internal.route("/", contentReleaseRoutes);
 internal.route("/", internalGenerationRoutes);
 internal.route("/", internalPatternRoutes);
+internal.route("/", internalOntologyPipelineRoutes);
 
 const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 admin.use("*", configGuard);

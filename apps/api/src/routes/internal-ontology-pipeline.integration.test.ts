@@ -197,6 +197,94 @@ async function activePointer(): Promise<{
   ).first<{ active_version: string | null; bundle_hash: string | null }>())!;
 }
 
+async function postCorpus(manifest: unknown): Promise<{
+  status: number;
+  body: Record<string, unknown>;
+}> {
+  const response = await SELF.fetch(
+    "http://api.test/internal/ontology-corpora",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(manifest),
+    },
+  );
+  return {
+    status: response.status,
+    body: (await response.json()) as Record<string, unknown>,
+  };
+}
+
+describe("POST /internal/ontology-corpora", () => {
+  it("registers a canonical licensed corpus for the runtime reader", async () => {
+    const corpusReleaseId = `corpus-route-${crypto.randomUUID()}`;
+    const corpus = await buildTestCorpusManifest(
+      corpusReleaseId,
+      "en-US",
+      "licensed_excerpt",
+    );
+
+    const response = await postCorpus(corpus);
+
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    expect(response.body).toMatchObject({
+      status: "registered",
+      corpus_release_id: corpusReleaseId,
+      corpus_hash: corpus.corpus_hash,
+      license_class: "licensed_excerpt",
+      public_capable: true,
+    });
+    const row = await env.DB.prepare(
+      `SELECT corpus_hash, locale, object_key, fragment_count, license_class,
+              public_capable
+       FROM pattern_source_corpus_releases
+       WHERE corpus_release_id = ?`,
+    ).bind(corpusReleaseId).first<{
+      corpus_hash: string;
+      locale: string;
+      object_key: string;
+      fragment_count: number;
+      license_class: string;
+      public_capable: number;
+    }>();
+    expect(row).toEqual({
+      corpus_hash: corpus.corpus_hash,
+      locale: "en-US",
+      object_key: `pattern-ontology-corpora/${corpusReleaseId}.json`,
+      fragment_count: 1,
+      license_class: "licensed_excerpt",
+      public_capable: 1,
+    });
+  });
+
+  it("requires the internal service token when one is configured", async () => {
+    const corpus = await buildTestCorpusManifest(
+      `corpus-route-auth-${crypto.randomUUID()}`,
+      "en-US",
+      "licensed_excerpt",
+    );
+    env.SERVICE_AUTH_TOKEN = "task3-service-token";
+    try {
+      const denied = await postCorpus(corpus);
+      expect(denied.status).toBe(401);
+      const allowed = await SELF.fetch(
+        "http://api.test/internal/ontology-corpora",
+        {
+          method: "POST",
+          headers: {
+            "authorization": "Bearer task3-service-token",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(corpus),
+        },
+      );
+      expect(allowed.status).toBe(201);
+    } finally {
+      env.SERVICE_AUTH_TOKEN = "";
+    }
+  });
+});
+
 describe("machine ontology ingestion", () => {
   let key: ReleaseSigningKey;
 
