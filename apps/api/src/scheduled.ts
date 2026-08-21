@@ -8,6 +8,9 @@ import { releaseExpiredOntologyPipelineLeases } from "./db/ontology-pipeline.js"
 import { dispatchUndispatchedOntologyPipelineRuns } from "./services/ontology-pipeline-enqueue.js";
 import { sweepExpiredOntologyPipelineArtifacts } from "./services/ontology-pipeline-artifacts.js";
 
+export const ONTOLOGY_PIPELINE_MAINTENANCE_CRON =
+  "7,22,37,52 * * * *";
+
 /** Cron does not enter Hono, so it owns the same direct fail-closed gate as Queue. */
 export async function scheduled(
   controller: ScheduledController,
@@ -21,6 +24,17 @@ export async function scheduled(
   }
 
   const scheduledAt = new Date(controller.scheduledTime);
+  if (controller.cron === ONTOLOGY_PIPELINE_MAINTENANCE_CRON) {
+    await runOntologyPipelineMaintenance(env, scheduledAt);
+    return;
+  }
+  await runIncumbentMaintenance(env, scheduledAt);
+}
+
+async function runIncumbentMaintenance(
+  env: Env,
+  scheduledAt: Date,
+): Promise<void> {
   let laneFailure: unknown;
   try {
     const summary = await runReadingScheduler(env, scheduledAt);
@@ -40,6 +54,14 @@ export async function scheduled(
   } catch (error) {
     if (laneFailure === undefined) laneFailure = error;
   }
+  if (laneFailure !== undefined) throw laneFailure;
+}
+
+async function runOntologyPipelineMaintenance(
+  env: Env,
+  scheduledAt: Date,
+): Promise<void> {
+  let laneFailure: unknown;
   try {
     await releaseExpiredOntologyPipelineLeases(env, scheduledAt);
   } catch {

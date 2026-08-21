@@ -160,7 +160,7 @@ async function replaceWithRetryEvaluationArtifact(
   value: MachineRelease,
   fixture: EvidenceFixture,
 ): Promise<void> {
-  const now = new Date("2026-08-21T14:00:00.000Z");
+  const now = new Date(Date.now() - 1_000);
   const configuration = canonicalJson({ test: "retry-evidence" });
   await env.DB.prepare(
     `INSERT INTO pattern_source_corpus_releases (

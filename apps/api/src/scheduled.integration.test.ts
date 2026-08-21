@@ -20,7 +20,13 @@ import {
   failOntologyPipelineRun,
 } from "./db/ontology-pipeline.js";
 import { enqueueOntologyPipelineRun } from "./services/ontology-pipeline-enqueue.js";
-import { putOntologyPipelineArtifact } from "./services/ontology-pipeline-artifacts.js";
+import {
+  createOntologyPipelineArtifactEnvelope,
+  ontologyPipelineArtifactIdentity,
+  ontologyPipelineArtifactObjectKey,
+} from "./services/ontology-pipeline-artifacts.js";
+
+const ONTOLOGY_MAINTENANCE_CRON = "7,22,37,52 * * * *";
 
 function hybridEnv(db: D1Database = env.DB): Env {
   return {
@@ -242,7 +248,10 @@ describe("scheduled Worker entry point", () => {
 
     pipelineEnv.ONTOLOGY_PIPELINE_ROLLOUT = "off";
     await worker.scheduled(
-      createScheduledController({ scheduledTime: now.getTime(), cron: "*/15 * * * *" }),
+      createScheduledController({
+        scheduledTime: now.getTime(),
+        cron: ONTOLOGY_MAINTENANCE_CRON,
+      }),
       pipelineEnv,
       createExecutionContext(),
     );
@@ -250,7 +259,10 @@ describe("scheduled Worker entry point", () => {
 
     pipelineEnv.ONTOLOGY_PIPELINE_ROLLOUT = "internal";
     await worker.scheduled(
-      createScheduledController({ scheduledTime: now.getTime(), cron: "*/15 * * * *" }),
+      createScheduledController({
+        scheduledTime: now.getTime(),
+        cron: ONTOLOGY_MAINTENANCE_CRON,
+      }),
       pipelineEnv,
       createExecutionContext(),
     );
@@ -274,15 +286,12 @@ describe("scheduled Worker entry point", () => {
       "ontology-scheduled-expired-owner",
     );
     expect(claim.status).toBe("claimed");
-    let ontologyQueries = 0;
+    let totalD1Calls = 0;
     const countedDb = new Proxy(env.DB, {
       get(target, property, receiver) {
         if (property !== "prepare") return Reflect.get(target, property, receiver);
         return (query: string) => {
-          if (
-            query.includes("pattern_ontology_pipeline_runs") ||
-            query.includes("pattern_ontology_pipeline_artifacts")
-          ) ontologyQueries += 1;
+          totalD1Calls += 1;
           return target.prepare(query);
         };
       },
@@ -291,7 +300,7 @@ describe("scheduled Worker entry point", () => {
     await worker.scheduled(
       createScheduledController({
         scheduledTime: recoveredAt.getTime(),
-        cron: "*/15 * * * *",
+        cron: ONTOLOGY_MAINTENANCE_CRON,
       }),
       ontologyScheduledEnv(queue, { DB: countedDb }),
       createExecutionContext(),
@@ -306,7 +315,53 @@ describe("scheduled Worker entry point", () => {
       lease_expires_at: null,
       dispatched_at: recoveredAt.toISOString(),
     });
-    expect(ontologyQueries).toBeLessThanOrEqual(6);
+    expect(totalD1Calls).toBeLessThanOrEqual(12);
+  });
+
+  it("isolates ontology maintenance from incumbent scheduler failure", async () => {
+    let failures = 1;
+    const send = vi.fn(async () => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new Error("ontology queue unavailable");
+      }
+    });
+    const queue = { send } as unknown as Queue;
+    const now = new Date("2026-08-21T15:00:00.000Z");
+    const pipelineEnv = ontologyScheduledEnv(queue);
+    const run = await reserveOntologyRun(pipelineEnv, now);
+    expect(run.dispatched).toBe(false);
+    let incumbentQueryAttempted = false;
+    const isolatedDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          if (
+            query.includes("FROM users") ||
+            query.includes("FROM jobs") ||
+            query.includes("pattern_generation_jobs")
+          ) {
+            incumbentQueryAttempted = true;
+            throw new Error("incumbent D1 quota unavailable");
+          }
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
+
+    await expect(worker.scheduled(
+      createScheduledController({
+        scheduledTime: now.getTime(),
+        cron: ONTOLOGY_MAINTENANCE_CRON,
+      }),
+      ontologyScheduledEnv(queue, { DB: isolatedDb }),
+      createExecutionContext(),
+    )).resolves.toBeUndefined();
+    expect(incumbentQueryAttempted).toBe(false);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await env.DB.prepare(
+      `SELECT dispatched_at FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(run.runId).first()).toEqual({ dispatched_at: now.toISOString() });
   });
 
   it("deletes and tombstones expired failed artifacts exactly, retrying R2 failures", async () => {
@@ -353,25 +408,101 @@ describe("scheduled Worker entry point", () => {
       "ontology-retention-generating",
     );
     if (generating.status !== "claimed") throw new Error("retention generating claim failed");
-    const stored = await putOntologyPipelineArtifact(
-      pipelineEnv,
+    const coordinate = {
+      runId: run.runId,
+      stage: "generating" as const,
+      stageGeneration: 2,
+      stageAttempt: 0,
+      artifactClass: "candidate_chunk" as const,
+    };
+    const runIdentity = await env.DB.prepare(
+      `SELECT candidate_ontology_version FROM pattern_ontology_pipeline_runs
+       WHERE run_id = ?`,
+    ).bind(run.runId).first<{ candidate_ontology_version: string }>();
+    if (!runIdentity) throw new Error("retention run identity missing");
+    const sealed = await createOntologyPipelineArtifactEnvelope(
+      pipelineEnv.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING,
       {
-        runId: run.runId,
-        stage: "generating",
-        stageGeneration: 2,
-        stageAttempt: 0,
-        artifactClass: "candidate_chunk",
+        ...coordinate,
+        ontologyVersion: runIdentity.candidate_ontology_version,
       },
       new TextEncoder().encode("failed candidate"),
-      generating,
-      artifactAt,
     );
+    const artifactId = await ontologyPipelineArtifactIdentity(coordinate);
+    const objectKey = await ontologyPipelineArtifactObjectKey(coordinate);
+    await pipelineEnv.ARTIFACTS!.put(objectKey, sealed.envelopeBytes);
+    await env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_artifacts (
+         id, run_id, stage, stage_generation, stage_attempt, artifact_class,
+         object_key, plaintext_sha256, envelope_sha256, ciphertext_sha256,
+         envelope_key_id, envelope_nonce, byte_length, created_at,
+         expires_at, deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+    ).bind(
+      artifactId,
+      coordinate.runId,
+      coordinate.stage,
+      coordinate.stageGeneration,
+      coordinate.stageAttempt,
+      coordinate.artifactClass,
+      objectKey,
+      sealed.plaintextSha256,
+      sealed.envelopeSha256,
+      sealed.ciphertextSha256,
+      sealed.envelopeKeyId,
+      sealed.envelopeNonce,
+      sealed.byteLength,
+      artifactAt.toISOString(),
+    ).run();
     expect(await failOntologyPipelineRun(
       pipelineEnv,
       generating,
       "execution_error",
       failedAt,
     )).toBe(true);
+    const unmarkedOrphanKey =
+      `pattern-ontology/pipeline/${run.runId}/r2-only-unmarked.enc`;
+    await env.ARTIFACTS!.put(unmarkedOrphanKey, "orphan");
+
+    // Keep one previously completed failed run in the rescan lane. Together
+    // with the unmarked run above, this exercises both bounded prefix pages in
+    // the same real ontology-maintenance invocation.
+    const markedRun = await reserveOntologyRun(
+      pipelineEnv,
+      startedAt,
+      "retention-marked",
+    );
+    const markedClaim = await claimOntologyPipelineRun(
+      pipelineEnv,
+      { run_id: markedRun.runId, stage_generation: 0 },
+      startedAt,
+      "ontology-retention-marked-owner",
+    );
+    if (markedClaim.status !== "claimed") {
+      throw new Error("marked retention claim failed");
+    }
+    expect(await failOntologyPipelineRun(
+      pipelineEnv,
+      markedClaim,
+      "execution_error",
+      failedAt,
+    )).toBe(true);
+    await env.DB.prepare(
+      `INSERT INTO audit_events (
+         id, actor_type, actor_id, action, resource_type, resource_id,
+         result, detail_class, created_at
+       ) VALUES (?, 'service', 'ontology-pipeline-maintenance',
+                 'ontology_pipeline.artifacts_purge_verified',
+                 'ontology_pipeline_run', ?, 'success',
+                 'retention_complete', ?)`,
+    ).bind(
+      `ontology_pipeline_artifacts_purged:${markedRun.runId}`,
+      markedRun.runId,
+      expiresAt.toISOString(),
+    ).run();
+    const markedOrphanKey =
+      `pattern-ontology/pipeline/${markedRun.runId}/r2-only-marked.enc`;
+    await env.ARTIFACTS!.put(markedOrphanKey, "late orphan");
 
     const failingBucket = new Proxy(env.ARTIFACTS!, {
       get(target, property, receiver) {
@@ -385,35 +516,68 @@ describe("scheduled Worker entry point", () => {
     await worker.scheduled(
       createScheduledController({
         scheduledTime: expiresAt.getTime(),
-        cron: "*/15 * * * *",
+        cron: ONTOLOGY_MAINTENANCE_CRON,
       }),
       ontologyScheduledEnv(queue, { ARTIFACTS: failingBucket }),
       createExecutionContext(),
     );
-    expect(await env.ARTIFACTS!.get(stored.artifact.objectKey)).not.toBeNull();
+    expect(await env.ARTIFACTS!.get(objectKey)).not.toBeNull();
     expect(await env.DB.prepare(
       `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
-    ).bind(stored.artifact.id).first()).toEqual({ deleted_at: null });
+    ).bind(artifactId).first()).toEqual({ deleted_at: null });
 
+    // Add real lease and outbox work only after the failed R2 pass, so the
+    // measured retry covers the maximum work of every ontology lane together.
+    const expiredStartedAt = new Date(expiresAt.getTime() - 10 * 60_000);
+    const expiredClaimedAt = new Date(expiresAt.getTime() - 5 * 60_000 - 1_000);
+    const expiredRun = await reserveOntologyRun(
+      pipelineEnv,
+      expiredStartedAt,
+      "retention-expired-claim",
+    );
+    const expiredClaim = await claimOntologyPipelineRun(
+      pipelineEnv,
+      { run_id: expiredRun.runId, stage_generation: 0 },
+      expiredClaimedAt,
+      "ontology-retention-expired-owner",
+    );
+    if (expiredClaim.status !== "claimed") {
+      throw new Error("expired retention claim failed");
+    }
+
+    let totalD1Calls = 0;
+    const countedDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "prepare") return Reflect.get(target, property, receiver);
+        return (query: string) => {
+          totalD1Calls += 1;
+          return target.prepare(query);
+        };
+      },
+    }) as D1Database;
     await worker.scheduled(
       createScheduledController({
         scheduledTime: expiresAt.getTime(),
-        cron: "*/15 * * * *",
+        cron: ONTOLOGY_MAINTENANCE_CRON,
       }),
-      pipelineEnv,
+      ontologyScheduledEnv(queue, { DB: countedDb }),
       createExecutionContext(),
     );
-    expect(await env.ARTIFACTS!.get(stored.artifact.objectKey)).toBeNull();
+    expect(await env.ARTIFACTS!.get(objectKey)).toBeNull();
     expect(await env.DB.prepare(
       `SELECT deleted_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
-    ).bind(stored.artifact.id).first()).toEqual({
+    ).bind(artifactId).first()).toEqual({
       deleted_at: expiresAt.toISOString(),
     });
+    expect(await env.ARTIFACTS!.head(unmarkedOrphanKey)).toBeNull();
+    expect(await env.ARTIFACTS!.head(markedOrphanKey)).toBeNull();
+    expect(totalD1Calls).toBe(12);
+    expect(totalD1Calls).toBeLessThan(50);
 
     await expect(worker.scheduled(
       createScheduledController({
         scheduledTime: expiresAt.getTime(),
-        cron: "*/15 * * * *",
+        cron: ONTOLOGY_MAINTENANCE_CRON,
       }),
       pipelineEnv,
       createExecutionContext(),

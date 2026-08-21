@@ -125,11 +125,11 @@ max_concurrency = 1
 max_retries = 3
 dead_letter_queue = "patternlike-ontology-pipeline-dev-dlq"
 
-# Exercise the exported scheduled handler in local/default deployments. Triggers
-# are inheritable, so production explicitly overrides this with an empty list
-# until the separately approved production activation step replaces it.
+# Keep incumbent and ontology D1 maintenance in separate invocations in the
+# local/default environment. Production explicitly stays empty until its
+# separately approved activation step installs both intended schedules.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 
 # Default (development) vars. A bare `wrangler deploy` uses these, which is why
 # `npm run deploy` targets the production environment explicitly and the
@@ -255,10 +255,10 @@ ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS = "7"
 name = "patternlike-api-production"
 
 # An explicit empty override, not an omission. Top-level [triggers] declares the
-# 15-minute development cron, and a named environment INHERITS it when it does
-# not say otherwise — so deleting these two lines silently activates the
-# scheduler in production. Activating it is a separate configuration change with
-# its own gate; see docs/deploy/openai-daily-reading-rollout.md.
+# development crons, and a named environment INHERITS them when it does not say
+# otherwise — so deleting these two lines silently activates both schedulers in
+# production. Activating either is a separate configuration change with its own
+# gate; see docs/deploy/openai-daily-reading-rollout.md.
 [env.production.triggers]
 crons = []
 

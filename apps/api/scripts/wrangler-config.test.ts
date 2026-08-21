@@ -8,14 +8,17 @@ import { unstable_readConfig } from "wrangler";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.resolve(here, "../wrangler.toml");
 
-test("production effectively disables the inheritable development cron", () => {
+test("development isolates ontology maintenance and production disables every cron", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
     env: "production",
   });
 
-  assert.deepEqual(development.triggers.crons, ["*/15 * * * *"]);
+  assert.deepEqual(development.triggers.crons, [
+    "*/15 * * * *",
+    "7,22,37,52 * * * *",
+  ]);
   assert.deepEqual(production.triggers.crons, []);
 });
 
