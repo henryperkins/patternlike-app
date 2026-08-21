@@ -148,6 +148,7 @@ function generatorPacket(excerpt?: string) {
     ],
     policy: POLICY,
     activeMachinePredecessor: null,
+    continuation: null,
   }, pin());
   if (!result.ok) throw new Error(result.code);
   return result;

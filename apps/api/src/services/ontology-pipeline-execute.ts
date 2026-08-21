@@ -19,11 +19,15 @@ import {
   advanceOntologyPipelineCursor,
   advanceOntologyPipelineStage,
   claimOntologyPipelineRun,
+  classifyOntologyPipelineDeliveryBeforeClaim,
   failOntologyPipelineRun,
   retryOntologyPipelineStage,
   type ClaimedOntologyPipelineRun,
   type OntologyPipelineFailureClass,
 } from "../db/ontology-pipeline.js";
+import {
+  validateOntologyCandidateRelease,
+} from "./ontology-candidate-validation.js";
 import {
   createOntologyProviderCallReservation,
 } from "../db/ontology-provider-usage.js";
@@ -62,9 +66,11 @@ import {
   ONTOLOGY_PIPELINE_COMMAND_VERSION,
   ONTOLOGY_PIPELINE_COVERAGE_TARGETS,
   ONTOLOGY_PIPELINE_FEATURE_VOCABULARY,
+  ONTOLOGY_PIPELINE_LIMITS,
   ONTOLOGY_PROHIBITED_CLAIMS,
   ONTOLOGY_PROHIBITED_CLAIM_POLICY_VERSION,
   ONTOLOGY_REGRESSION_POLICY_VERSION,
+  OntologyPipelineCommandError,
   loadOntologyPipelinePredecessor,
   type OntologyPipelineCommand,
 } from "./ontology-pipeline-command.js";
@@ -104,6 +110,14 @@ interface OntologyPipelineExecutionRow {
 interface CandidateChunkArtifactRow {
   stage_generation: number;
   stage_attempt: number;
+  plaintext_sha256: string;
+}
+
+interface LoadedCandidateChunk {
+  chunk: OntologyGenerationChunk;
+  plaintextHash: string;
+  stageGeneration: number;
+  stageAttempt: number;
 }
 
 interface VerdictArtifactRow {
@@ -156,7 +170,7 @@ function arraysEqual(left: readonly unknown[], right: readonly unknown[]): boole
 }
 
 function hasExactKeys(
-  value: Record<string, unknown>,
+  value: object,
   expected: readonly string[],
 ): boolean {
   const actual = Object.keys(value).sort();
@@ -203,6 +217,7 @@ function commandIsExecutable(
   const generator = value.generator;
   const evaluator = value.evaluator;
   const generatorInput = value.generator_input;
+  const limits = value.limits;
   const policy = value.policy;
   const regression = value.regression;
   if (
@@ -217,6 +232,7 @@ function commandIsExecutable(
       "generator",
       "generator_input",
       "input_max_bytes",
+      "limits",
       "policy",
       "provider",
       "regression",
@@ -251,6 +267,13 @@ function commandIsExecutable(
       "active_machine_predecessor",
       "coverage_targets",
       "feature_vocabulary",
+    ]) ||
+    !isRecord(limits) ||
+    !hasExactKeys(limits, [
+      "maximum_candidate_bytes",
+      "maximum_candidate_records",
+      "maximum_evaluator_calls",
+      "maximum_generation_chunks",
     ]) ||
     !isRecord(policy) ||
     !hasExactKeys(policy, [
@@ -299,6 +322,14 @@ function commandIsExecutable(
     evaluator.max_output_tokens === pin.evaluator_max_output_tokens &&
     generator.prompt_version !== evaluator.prompt_version &&
     value.input_max_bytes === pin.input_max_bytes &&
+    limits.maximum_generation_chunks ===
+      ONTOLOGY_PIPELINE_LIMITS.maximum_generation_chunks &&
+    limits.maximum_candidate_records ===
+      ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_records &&
+    limits.maximum_evaluator_calls ===
+      ONTOLOGY_PIPELINE_LIMITS.maximum_evaluator_calls &&
+    limits.maximum_candidate_bytes ===
+      ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_bytes &&
     value.daily_provider_call_limit === configuration.dailyProviderCallLimit &&
     value.failed_artifact_retention_days === 7 &&
     value.configuration_equal === configuration.configurationEqual &&
@@ -644,28 +675,52 @@ async function handleProviderFailure(
   return { status: "rescheduled", retryAfterSeconds: delaySeconds };
 }
 
-async function loadCandidateChunks(
+async function rescheduleAmbiguousProviderRequest(
   env: Env,
   claim: ClaimedOntologyPipelineRun,
-): Promise<OntologyGenerationChunk[]> {
-  const expectedCount = claim.stage === "generating"
-    ? claim.stageCursor + 1
-    : claim.stageGeneration - 2;
-  const lastGeneration = claim.stage === "generating"
-    ? claim.stageGeneration
-    : claim.stageGeneration - 1;
-  const firstGeneration = lastGeneration - expectedCount + 1;
-  if (expectedCount < 1 || firstGeneration !== 2) terminal("candidate_invalid");
+  clock: () => Date,
+): Promise<OntologyPipelineExecuteOutcome> {
+  if (claim.stageAttempt + 1 >= MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS) {
+    terminal("attempts_exhausted");
+  }
+  const availableAt = new Date(
+    clock().getTime() + PROVIDER_RETRY_DELAY_SECONDS * 1_000,
+  );
+  if (!await retryOntologyPipelineStage(env, claim, availableAt)) {
+    return { status: "duplicate" };
+  }
+  return {
+    status: "rescheduled",
+    retryAfterSeconds: PROVIDER_RETRY_DELAY_SECONDS,
+  };
+}
+
+async function loadCandidateChunkRange(
+  env: Env,
+  runId: string,
+  expectedCount: number,
+  firstGeneration: number,
+  lastGeneration: number,
+): Promise<LoadedCandidateChunk[]> {
+  if (
+    expectedCount < 0 ||
+    firstGeneration !== 2 ||
+    lastGeneration !== firstGeneration + expectedCount - 1
+  ) {
+    terminal("candidate_invalid");
+  }
+  if (expectedCount === 0) return [];
   const { results } = await env.DB.prepare(
-    `SELECT stage_generation, stage_attempt
+    `SELECT stage_generation, stage_attempt, plaintext_sha256
      FROM pattern_ontology_pipeline_artifacts
      WHERE run_id = ? AND stage = 'generating'
        AND artifact_class = 'candidate_chunk' AND deleted_at IS NULL
+       AND stage_generation >= ? AND stage_generation <= ?
      ORDER BY stage_generation, stage_attempt`,
-  ).bind(claim.runId).all<CandidateChunkArtifactRow>();
+  ).bind(runId, firstGeneration, lastGeneration).all<CandidateChunkArtifactRow>();
   if (results.length !== expectedCount) terminal("candidate_invalid");
 
-  const chunks: OntologyGenerationChunk[] = [];
+  const chunks: LoadedCandidateChunk[] = [];
   for (let index = 0; index < results.length; index += 1) {
     const row = results[index]!;
     const generation = firstGeneration + index;
@@ -673,58 +728,161 @@ async function loadCandidateChunks(
     const stored = await readOntologyPipelineArtifact(
       env,
       historicalCoordinate(
-        claim.runId,
+        runId,
         "generating",
         row.stage_generation,
         row.stage_attempt,
         "candidate_chunk",
       ),
     );
-    if (!stored) terminal("candidate_invalid");
-    chunks.push(parseCanonicalChunk(stored.plaintext));
+    if (
+      !stored ||
+      stored.artifact.plaintextSha256 !== row.plaintext_sha256
+    ) {
+      terminal("artifact_integrity_failed");
+    }
+    chunks.push({
+      chunk: parseCanonicalChunk(stored.plaintext),
+      plaintextHash: row.plaintext_sha256,
+      stageGeneration: row.stage_generation,
+      stageAttempt: row.stage_attempt,
+    });
   }
   return chunks;
 }
 
-async function buildCompleteCandidate(
+async function loadCandidateChunks(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+): Promise<LoadedCandidateChunk[]> {
+  const expectedCount = claim.stage === "generating"
+    ? claim.stageCursor + 1
+    : claim.stageGeneration - 2;
+  const lastGeneration = claim.stage === "generating"
+    ? claim.stageGeneration
+    : claim.stageGeneration - 1;
+  return loadCandidateChunkRange(
+    env,
+    claim.runId,
+    expectedCount,
+    2,
+    lastGeneration,
+  );
+}
+
+interface AcceptedGenerationProgress {
+  chunks: LoadedCandidateChunk[];
+  records: PatternOntologyRecord[];
+  orderedRecordIds: string[];
+}
+
+async function loadAcceptedGenerationProgress(
   env: Env,
   claim: ClaimedOntologyPipelineRun,
   command: OntologyPipelineCommand,
-  corpus: RegisteredOntologyCorpus,
-): Promise<{ release: PatternOntologyRelease; canonicalBytes: string; candidateHash: string }> {
-  const chunks = await loadCandidateChunks(env, claim);
+): Promise<AcceptedGenerationProgress> {
   if (
-    chunks.some((chunk, index) =>
-      chunk.complete !== (index === chunks.length - 1))
+    claim.stage !== "generating" ||
+    claim.stageGeneration !== claim.stageCursor + 2 ||
+    claim.stageCursor >= command.limits.maximum_generation_chunks
   ) {
     terminal("candidate_invalid");
   }
-  const records = chunks.flatMap((chunk) => chunk.records);
-  if (records.length === 0) terminal("candidate_invalid");
-  const ids = new Set<string>();
-  for (const record of records) {
-    if (ids.has(record.id) || record.locale !== corpus.release.locale) {
-      terminal("candidate_invalid");
-    }
-    ids.add(record.id);
-    for (const fragmentId of record.source_fragment_ids) {
-      if (!corpus.fragmentIndex.has(fragmentId)) terminal("candidate_invalid");
-    }
+  const chunks = await loadCandidateChunkRange(
+    env,
+    claim.runId,
+    claim.stageCursor,
+    2,
+    claim.stageGeneration - 1,
+  );
+  if (chunks.some(({ chunk }) => chunk.complete)) {
+    terminal("candidate_invalid");
   }
-  for (const target of command.generator_input.coverage_targets) {
-    const matching = records.filter(
+  const records = chunks.flatMap(({ chunk }) => chunk.records);
+  if (records.length > command.limits.maximum_candidate_records) {
+    terminal("candidate_invalid");
+  }
+  const orderedRecordIds: string[] = [];
+  const seen = new Set<string>();
+  for (const record of records) {
+    if (seen.has(record.id)) terminal("candidate_invalid");
+    seen.add(record.id);
+    orderedRecordIds.push(record.id);
+  }
+  return { chunks, records, orderedRecordIds };
+}
+
+function remainingCoverageTargets(
+  command: OntologyPipelineCommand,
+  acceptedRecords: readonly PatternOntologyRecord[],
+) {
+  return command.generator_input.coverage_targets.flatMap((target) => {
+    const matching = acceptedRecords.filter(
       (record) => record.feature_predicate.type === target.feature_class,
     );
     const sourceSupported = matching.filter(
       (record) => record.meaning_class === "source_supported",
     );
-    if (
-      matching.length < target.minimum_total ||
-      sourceSupported.length < target.minimum_source_supported
-    ) {
-      terminal("candidate_invalid");
-    }
+    const minimumTotal = Math.max(0, target.minimum_total - matching.length);
+    const minimumSourceSupported = Math.max(
+      0,
+      target.minimum_source_supported - sourceSupported.length,
+    );
+    return minimumTotal === 0 && minimumSourceSupported === 0
+      ? []
+      : [{
+          feature_class: target.feature_class,
+          minimum_source_supported: minimumSourceSupported,
+          minimum_total: minimumTotal,
+        }];
+  });
+}
+
+function generatorContinuation(
+  command: OntologyPipelineCommand,
+  progress: AcceptedGenerationProgress,
+) {
+  if (progress.chunks.length === 0) return null;
+  return {
+    chunk_index: progress.chunks.length,
+    maximum_generation_chunks: command.limits.maximum_generation_chunks,
+    maximum_candidate_records: command.limits.maximum_candidate_records,
+    maximum_evaluator_calls: command.limits.maximum_evaluator_calls,
+    maximum_candidate_bytes: command.limits.maximum_candidate_bytes,
+    accepted_ordered_chunk_plaintext_hashes: progress.chunks.map(
+      (chunk) => chunk.plaintextHash,
+    ),
+    accepted_ordered_record_ids: progress.orderedRecordIds,
+    remaining_coverage_targets: remainingCoverageTargets(
+      command,
+      progress.records,
+    ),
+  };
+}
+
+function validateCurrentChunk(
+  chunk: OntologyGenerationChunk,
+  progress: AcceptedGenerationProgress,
+  command: OntologyPipelineCommand,
+): void {
+  if (
+    progress.records.length + chunk.records.length >
+      command.limits.maximum_candidate_records
+  ) {
+    terminal("candidate_invalid");
   }
+  const ids = new Set(progress.orderedRecordIds);
+  for (const record of chunk.records) {
+    if (ids.has(record.id)) terminal("candidate_invalid");
+    ids.add(record.id);
+  }
+}
+
+async function materializeCandidateRelease(
+  command: OntologyPipelineCommand,
+  corpus: RegisteredOntologyCorpus,
+  records: PatternOntologyRecord[],
+): Promise<{ release: PatternOntologyRelease; canonicalBytes: string }> {
   const release: PatternOntologyRelease = {
     schema_version: M7_SCHEMA_VERSION,
     ontology_version: command.candidate_ontology_version,
@@ -749,9 +907,41 @@ async function buildCompleteCandidate(
     provenance: { origin: "machine_pipeline" },
   };
   release.bundle_hash = await computeOntologyBundleHash(release);
-  const canonicalBytes = canonicalJson(release);
+  return { release, canonicalBytes: canonicalJson(release) };
+}
+
+async function buildCompleteCandidate(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  command: OntologyPipelineCommand,
+  corpus: RegisteredOntologyCorpus,
+): Promise<{ release: PatternOntologyRelease; canonicalBytes: string; candidateHash: string }> {
+  const loadedChunks = await loadCandidateChunks(env, claim);
+  const chunks = loadedChunks.map(({ chunk }) => chunk);
+  if (
+    chunks.some((chunk, index) =>
+      chunk.complete !== (index === chunks.length - 1))
+  ) {
+    terminal("candidate_invalid");
+  }
+  const records = chunks.flatMap((chunk) => chunk.records);
+  if (records.length === 0) terminal("candidate_invalid");
+  const { release, canonicalBytes } = await materializeCandidateRelease(
+    command,
+    corpus,
+    records,
+  );
+  const validation = validateOntologyCandidateRelease(release, {
+    canonicalBytes,
+    corpusLocale: corpus.release.locale,
+    permittedFragmentIds: new Set(corpus.fragmentIndex.keys()),
+    coverageTargets: command.generator_input.coverage_targets,
+    maximumCandidateRecords: command.limits.maximum_candidate_records,
+    maximumCandidateBytes: command.limits.maximum_candidate_bytes,
+  });
+  if (!validation.ok) terminal("candidate_invalid");
   return {
-    release,
+    release: validation.release,
     canonicalBytes,
     candidateHash: await contentHash(canonicalBytes),
   };
@@ -765,6 +955,11 @@ async function executeGenerating(
   clock: () => Date,
 ): Promise<OntologyPipelineExecuteOutcome> {
   const corpus = await readFrozenCorpus(env, context.command);
+  const progress = await loadAcceptedGenerationProgress(
+    env,
+    claim,
+    context.command,
+  );
   let chunk: OntologyGenerationChunk | null = null;
 
   // Parsed output is the cheapest exact adoption. A response-only torn write
@@ -788,6 +983,14 @@ async function executeGenerating(
   }
 
   if (!chunk) {
+    const ambiguousRequest = await readCurrentArtifact(
+      env,
+      claim,
+      "generator_request",
+    );
+    if (ambiguousRequest) {
+      return await rescheduleAmbiguousProviderRequest(env, claim, clock);
+    }
     const predecessor = await loadOntologyPipelinePredecessor(
       env,
       context.command.generator_input.active_machine_predecessor,
@@ -798,6 +1001,7 @@ async function executeGenerating(
       coverageTargets: context.command.generator_input.coverage_targets,
       policy: generationPolicy(context.command),
       activeMachinePredecessor: predecessor,
+      continuation: generatorContinuation(context.command, progress),
     }, pinFromCommand(context.command));
     if (!packet.ok) terminal("candidate_invalid");
     await putArtifact(env, claim, "generator_request", packet.serialized, clock);
@@ -828,6 +1032,18 @@ async function executeGenerating(
     chunk = storedValue;
   }
 
+  validateCurrentChunk(chunk, progress, context.command);
+  const prospectiveCandidate = await materializeCandidateRelease(
+    context.command,
+    corpus,
+    [...progress.records, ...chunk.records],
+  );
+  if (
+    textEncoder.encode(prospectiveCandidate.canonicalBytes).byteLength >
+      context.command.limits.maximum_candidate_bytes
+  ) {
+    terminal("candidate_invalid");
+  }
   const chunkArtifact = await putArtifact(
     env,
     claim,
@@ -835,7 +1051,15 @@ async function executeGenerating(
     canonicalJson(chunk),
     clock,
   );
-  if (!chunk.complete) return await advanceCursor(env, claim, clock);
+  if (!chunk.complete) {
+    if (
+      claim.stageCursor + 1 >=
+        context.command.limits.maximum_generation_chunks
+    ) {
+      terminal("candidate_invalid");
+    }
+    return await advanceCursor(env, claim, clock);
+  }
 
   const candidate = await buildCompleteCandidate(
     env,
@@ -951,7 +1175,11 @@ async function loadSingleCompilingArtifact(
   };
 }
 
-function parseCandidateRelease(bytes: Uint8Array): PatternOntologyRelease {
+async function parseCandidateRelease(
+  bytes: Uint8Array,
+  command: OntologyPipelineCommand,
+  corpus: RegisteredOntologyCorpus,
+): Promise<PatternOntologyRelease> {
   const text = decodeUtf8(bytes);
   let parsed: unknown;
   try {
@@ -959,24 +1187,27 @@ function parseCandidateRelease(bytes: Uint8Array): PatternOntologyRelease {
   } catch {
     terminal("candidate_invalid");
   }
-  if (!isRecord(parsed) || canonicalJson(parsed) !== text) {
-    terminal("candidate_invalid");
-  }
+  const validation = validateOntologyCandidateRelease(parsed, {
+    canonicalBytes: text,
+    corpusLocale: corpus.release.locale,
+    permittedFragmentIds: new Set(corpus.fragmentIndex.keys()),
+    coverageTargets: command.generator_input.coverage_targets,
+    maximumCandidateRecords: command.limits.maximum_candidate_records,
+    maximumCandidateBytes: command.limits.maximum_candidate_bytes,
+  });
+  if (!validation.ok) terminal("candidate_invalid");
+  const release = validation.release;
   if (
-    parsed.schema_version !== M7_SCHEMA_VERSION ||
-    typeof parsed.ontology_version !== "string" ||
-    typeof parsed.bundle_hash !== "string" ||
-    !CONTENT_HASH.test(parsed.bundle_hash) ||
-    typeof parsed.corpus_release_hash !== "string" ||
-    !CONTENT_HASH.test(parsed.corpus_release_hash) ||
-    typeof parsed.locale !== "string" ||
-    parsed.status !== "candidate"
+    release.schema_version !== M7_SCHEMA_VERSION ||
+    release.ontology_version !== command.candidate_ontology_version ||
+    release.corpus_release_hash !== command.corpus.corpus_hash ||
+    release.locale !== corpus.release.locale ||
+    release.status !== "candidate"
   ) {
     terminal("candidate_invalid");
   }
-  const evaluation = parsed.evaluation;
+  const evaluation = release.evaluation;
   if (
-    !isRecord(evaluation) ||
     !hasExactKeys(evaluation, [
       "compiler_passed",
       "evaluator_passed",
@@ -987,7 +1218,7 @@ function parseCandidateRelease(bytes: Uint8Array): PatternOntologyRelease {
       "verdict",
     ]) ||
     evaluation.schema_version !== M7_SCHEMA_VERSION ||
-    evaluation.ontology_version !== parsed.ontology_version ||
+    evaluation.ontology_version !== release.ontology_version ||
     evaluation.verdict !== "pass" ||
     evaluation.compiler_passed !== true ||
     evaluation.evaluator_passed !== true ||
@@ -996,42 +1227,17 @@ function parseCandidateRelease(bytes: Uint8Array): PatternOntologyRelease {
   ) {
     terminal("candidate_invalid");
   }
-  const provenance = parsed.provenance;
+  const provenance = release.provenance;
   if (
-    !isRecord(provenance) ||
+    !provenance ||
     !hasExactKeys(provenance, ["origin"]) ||
     provenance.origin !== "machine_pipeline"
   ) {
     terminal("candidate_invalid");
   }
-  const recordsEnvelope = {
-    schema_version: parsed.schema_version,
-    records: parsed.records,
-    complete: true,
-  };
-  if (!isOntologyGenerationChunk(recordsEnvelope)) {
+  if (release.bundle_hash !== await computeOntologyBundleHash(release)) {
     terminal("candidate_invalid");
   }
-  const release: PatternOntologyRelease = {
-    schema_version: parsed.schema_version,
-    ontology_version: parsed.ontology_version,
-    bundle_hash: parsed.bundle_hash,
-    corpus_release_hash: parsed.corpus_release_hash,
-    locale: parsed.locale,
-    status: parsed.status,
-    records: recordsEnvelope.records,
-    evaluation: {
-      schema_version: evaluation.schema_version,
-      ontology_version: evaluation.ontology_version,
-      verdict: evaluation.verdict,
-      compiler_passed: evaluation.compiler_passed,
-      evaluator_passed: evaluation.evaluator_passed,
-      regression_passed: evaluation.regression_passed,
-      unevaluated_fixture_count: evaluation.unevaluated_fixture_count,
-    },
-    provenance: { origin: provenance.origin },
-  };
-  if (canonicalJson(release) !== text) terminal("candidate_invalid");
   const compiled = compileOntologyRelease(release);
   if (!compiled.ok) terminal("candidate_invalid");
   return release;
@@ -1103,11 +1309,17 @@ async function executeEvaluating(
   ) {
     terminal("candidate_invalid");
   }
-  const candidate = parseCandidateRelease(candidateArtifact.plaintext);
+  const candidate = await parseCandidateRelease(
+    candidateArtifact.plaintext,
+    context.command,
+    corpus,
+  );
   const evaluationStartGeneration = claim.stageGeneration - claim.stageCursor;
   if (
     candidateArtifact.stageGeneration + 1 !== evaluationStartGeneration ||
-    claim.stageCursor >= candidate.records.length
+    claim.stageCursor >= candidate.records.length ||
+    candidate.records.length > context.command.limits.maximum_evaluator_calls ||
+    claim.stageCursor >= context.command.limits.maximum_evaluator_calls
   ) {
     terminal("candidate_invalid");
   }
@@ -1144,6 +1356,14 @@ async function executeEvaluating(
   }
 
   if (!verdict) {
+    const ambiguousRequest = await readCurrentArtifact(
+      env,
+      claim,
+      "evaluator_request",
+    );
+    if (ambiguousRequest) {
+      return await rescheduleAmbiguousProviderRequest(env, claim, clock);
+    }
     const packet = buildOntologyEvaluatorPacket({
       corpus,
       rule,
@@ -1236,6 +1456,16 @@ async function executeEvaluating(
       maxOutputTokens: context.command.evaluator.max_output_tokens,
     },
     inputMaxBytes: context.command.input_max_bytes,
+    limits: {
+      maximumGenerationChunks:
+        context.command.limits.maximum_generation_chunks,
+      maximumCandidateRecords:
+        context.command.limits.maximum_candidate_records,
+      maximumEvaluatorCalls:
+        context.command.limits.maximum_evaluator_calls,
+      maximumCandidateBytes:
+        context.command.limits.maximum_candidate_bytes,
+    },
     configurationEqual: context.command.configuration_equal,
     regression: {
       fixtureCount: context.command.regression.fixture_count,
@@ -1262,6 +1492,12 @@ async function executeEvaluating(
 
 function failureClassForCaught(cause: unknown): OntologyPipelineFailureClass | null {
   if (cause instanceof TerminalPipelineFailure) return cause.failureClass;
+  if (
+    cause instanceof OntologyPipelineCommandError &&
+    cause.code === "ontology_pipeline_predecessor_unavailable"
+  ) {
+    return "configuration_invalid";
+  }
   if (cause instanceof OntologyCorpusError) {
     if (cause.code.includes("hash_mismatch")) return "corpus_hash_mismatch";
     if (cause.code.includes("missing") || cause.code.includes("not_registered")) {
@@ -1303,6 +1539,16 @@ export async function executeOntologyPipelineDelivery(
   const clock = options.clock ?? (() => new Date());
   const resolved = resolveOntologyPipelineConfiguration(env);
   if (!resolved.ok || resolved.rollout !== "internal" || !resolved.config) {
+    return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
+  }
+  try {
+    if (
+      await classifyOntologyPipelineDeliveryBeforeClaim(env, message) ===
+        "task7"
+    ) {
+      return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
+    }
+  } catch {
     return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
   }
   const claim = await claimOntologyPipelineRun(env, message, clock());

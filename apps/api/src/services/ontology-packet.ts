@@ -24,6 +24,7 @@ import {
   findPrivateOpaqueIdPrefix,
   type PrivateOpaqueIdPrefix,
 } from "./private-opaque-identifiers.js";
+import { ONTOLOGY_PIPELINE_LIMITS } from "./ontology-pipeline-command.js";
 
 export interface OntologyCoverageTarget {
   feature_class: NatalFeatureClass;
@@ -41,6 +42,17 @@ export interface OntologyGenerationPolicy {
   prohibited_claims: readonly string[];
 }
 
+export interface OntologyGeneratorContinuation {
+  chunk_index: number;
+  maximum_generation_chunks: number;
+  maximum_candidate_records: number;
+  maximum_evaluator_calls: number;
+  maximum_candidate_bytes: number;
+  accepted_ordered_chunk_plaintext_hashes: readonly string[];
+  accepted_ordered_record_ids: readonly string[];
+  remaining_coverage_targets: readonly OntologyCoverageTarget[];
+}
+
 export interface OntologyCompilerSummary {
   rule_id: string;
   compiler_passed: boolean;
@@ -56,6 +68,7 @@ export interface OntologyGeneratorPacketInput {
   policy: OntologyGenerationPolicy;
   /** A release already loaded through the verified active-ontology seam. */
   activeMachinePredecessor: ActiveOntology | null;
+  continuation: OntologyGeneratorContinuation | null;
 }
 
 export interface OntologyEvaluatorPacketInput {
@@ -106,6 +119,16 @@ export interface OntologyGeneratorDocument {
     ontology_version: string;
     records: PatternOntologyRecord[];
   } | null;
+  continuation: {
+    chunk_index: number;
+    maximum_generation_chunks: number;
+    maximum_candidate_records: number;
+    maximum_evaluator_calls: number;
+    maximum_candidate_bytes: number;
+    accepted_ordered_chunk_plaintext_hashes: string[];
+    accepted_ordered_record_ids: string[];
+    remaining_coverage_targets: OntologyCoverageTarget[];
+  } | null;
 }
 
 export interface OntologyEvaluatorDocument {
@@ -150,6 +173,7 @@ export type OntologyPacketFailureCode =
   | "ontology_input_compiler_summary_mismatch"
   | "ontology_input_cited_meaning_missing"
   | "ontology_input_fragment_missing"
+  | "ontology_input_continuation_invalid"
   | "ontology_input_forbidden_key"
   | "ontology_input_unexpected_key"
   | "ontology_input_forbidden_identifier"
@@ -232,6 +256,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "coverage_targets",
   "policy",
   "active_machine_predecessor",
+  "continuation",
   "schema_version",
   "corpus_release_id",
   "corpus_hash",
@@ -260,6 +285,14 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "prohibited_claims",
   "ontology_version",
   "records",
+  "chunk_index",
+  "maximum_generation_chunks",
+  "maximum_candidate_records",
+  "maximum_evaluator_calls",
+  "maximum_candidate_bytes",
+  "accepted_ordered_chunk_plaintext_hashes",
+  "accepted_ordered_record_ids",
+  "remaining_coverage_targets",
   "rule",
   "cited_meanings",
   "permitted_fragments",
@@ -421,6 +454,90 @@ function validMachinePredecessor(predecessor: ActiveOntology): boolean {
     release.provenance?.origin === "machine_pipeline";
 }
 
+const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
+const ONTOLOGY_RULE_ID = /^ont_[a-f0-9]{32}$/;
+
+function validContinuation(
+  continuation: OntologyGeneratorContinuation | null,
+  coverageTargets: readonly OntologyCoverageTarget[],
+): boolean {
+  if (continuation === null) return true;
+  if (
+    !Number.isSafeInteger(continuation.chunk_index) ||
+    continuation.chunk_index < 1 ||
+    continuation.maximum_generation_chunks !==
+      ONTOLOGY_PIPELINE_LIMITS.maximum_generation_chunks ||
+    continuation.chunk_index >= continuation.maximum_generation_chunks ||
+    continuation.maximum_candidate_records !==
+      ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_records ||
+    continuation.maximum_evaluator_calls !==
+      ONTOLOGY_PIPELINE_LIMITS.maximum_evaluator_calls ||
+    continuation.maximum_candidate_bytes !==
+      ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_bytes ||
+    continuation.accepted_ordered_chunk_plaintext_hashes.length !==
+      continuation.chunk_index ||
+    continuation.accepted_ordered_chunk_plaintext_hashes.some(
+      (hash) => !CONTENT_HASH.test(hash),
+    ) ||
+    continuation.accepted_ordered_record_ids.some(
+      (id) => !ONTOLOGY_RULE_ID.test(id),
+    ) ||
+    continuation.accepted_ordered_record_ids.length >
+      continuation.maximum_candidate_records ||
+    new Set(continuation.accepted_ordered_record_ids).size !==
+      continuation.accepted_ordered_record_ids.length
+  ) {
+    return false;
+  }
+  let previousCoverageIndex = -1;
+  return continuation.remaining_coverage_targets.every((target) => {
+    const coverageIndex = coverageTargets.findIndex(
+      (frozen) => frozen.feature_class === target.feature_class,
+    );
+    const frozen = coverageTargets[coverageIndex];
+    if (
+      !isNatalFeatureClass(target.feature_class) ||
+      coverageIndex <= previousCoverageIndex ||
+      !frozen ||
+      !Number.isSafeInteger(target.minimum_source_supported) ||
+      target.minimum_source_supported < 0 ||
+      target.minimum_source_supported > frozen.minimum_source_supported ||
+      !Number.isSafeInteger(target.minimum_total) ||
+      target.minimum_total < 0 ||
+      target.minimum_total > frozen.minimum_total ||
+      (target.minimum_source_supported === 0 && target.minimum_total === 0)
+    ) {
+      return false;
+    }
+    previousCoverageIndex = coverageIndex;
+    return true;
+  });
+}
+
+function copyContinuation(
+  continuation: OntologyGeneratorContinuation | null,
+): OntologyGeneratorDocument["continuation"] {
+  if (continuation === null) return null;
+  return {
+    chunk_index: continuation.chunk_index,
+    maximum_generation_chunks: continuation.maximum_generation_chunks,
+    maximum_candidate_records: continuation.maximum_candidate_records,
+    maximum_evaluator_calls: continuation.maximum_evaluator_calls,
+    maximum_candidate_bytes: continuation.maximum_candidate_bytes,
+    accepted_ordered_chunk_plaintext_hashes:
+      copyStrings(continuation.accepted_ordered_chunk_plaintext_hashes),
+    accepted_ordered_record_ids:
+      copyStrings(continuation.accepted_ordered_record_ids),
+    remaining_coverage_targets: continuation.remaining_coverage_targets.map(
+      (target) => ({
+        feature_class: target.feature_class,
+        minimum_source_supported: target.minimum_source_supported,
+        minimum_total: target.minimum_total,
+      }),
+    ),
+  };
+}
+
 export function buildOntologyGeneratorPacket(
   input: OntologyGeneratorPacketInput,
   pin: OntologyPipelineConfigPin,
@@ -433,6 +550,9 @@ export function buildOntologyGeneratorPacket(
     !validMachinePredecessor(input.activeMachinePredecessor)
   ) {
     return { ok: false, code: "ontology_input_predecessor_invalid" };
+  }
+  if (!validContinuation(input.continuation, input.coverageTargets)) {
+    return { ok: false, code: "ontology_input_continuation_invalid" };
   }
 
   const release = input.corpus.release;
@@ -467,6 +587,7 @@ export function buildOntologyGeneratorPacket(
           ontology_version: predecessor.ontology_version,
           records: predecessor.records.map(copyRecord),
         },
+    continuation: copyContinuation(input.continuation),
   };
   return serialize("generator", document, pin);
 }

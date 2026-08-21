@@ -63,6 +63,8 @@ export type ClaimOntologyPipelineRunResult =
   | ClaimedOntologyPipelineRun
   | { status: "duplicate" };
 
+export type OntologyPipelinePreclaimDisposition = "claim" | "task7";
+
 const CLAIM_LEASE_MS = 5 * 60 * 1_000;
 export const MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS = 16;
 export const ONTOLOGY_PIPELINE_RECOVERY_LIMIT = 4;
@@ -183,9 +185,32 @@ export async function claimOntologyPipelineRun(
   return toClaim(row);
 }
 
+/**
+ * Read-only handoff gate for stages owned by Task 7. An exact stale generation
+ * deliberately falls through to the atomic claim CAS, which closes it as a
+ * duplicate without treating a loose stage read as authority.
+ */
+export async function classifyOntologyPipelineDeliveryBeforeClaim(
+  env: Pick<Env, "DB">,
+  message: OntologyPipelineMessage,
+): Promise<OntologyPipelinePreclaimDisposition> {
+  const row = await env.DB.prepare(
+    `/* ontology_pipeline_preclaim_stage */
+     SELECT stage FROM pattern_ontology_pipeline_runs
+     WHERE run_id = ? AND stage_generation = ?`,
+  ).bind(message.run_id, message.stage_generation).first<{
+    stage: OntologyPipelineStage;
+  }>();
+  return row && ["regressing", "signing", "ingesting"].includes(row.stage)
+    ? "task7"
+    : "claim";
+}
+
 function claimWhere(): string {
   return `run_id = ? AND stage = ? AND stage_generation = ?
-    AND stage_cursor = ? AND stage_attempt = ? AND claim_token = ?`;
+    AND stage_cursor = ? AND stage_attempt = ? AND claim_token = ?
+    AND lease_expires_at = ?
+    AND julianday('now') < julianday(lease_expires_at)`;
 }
 
 /** Terminal failure CAS. Migration triggers assign existing artifacts the exact TTL. */
@@ -218,6 +243,7 @@ export async function failOntologyPipelineRun(
     claim.stageCursor,
     claim.stageAttempt,
     claim.claimToken,
+    claim.leaseExpiresAt,
   ).run();
   // The migration's AFTER trigger updates every live artifact expiry, so D1's
   // change count may include more than the one CAS-owned run row.
@@ -247,6 +273,7 @@ export async function succeedOntologyPipelineRun(
     claim.stageCursor,
     claim.stageAttempt,
     claim.claimToken,
+    claim.leaseExpiresAt,
   ).run();
   return result.meta.changes === 1;
 }
@@ -281,6 +308,7 @@ export async function retryOntologyPipelineStage(
     claim.stageCursor,
     claim.stageAttempt,
     claim.claimToken,
+    claim.leaseExpiresAt,
   ).run();
   return result.meta.changes === 1;
 }
@@ -308,6 +336,7 @@ export async function advanceOntologyPipelineCursor(
     claim.stageCursor,
     claim.stageAttempt,
     claim.claimToken,
+    claim.leaseExpiresAt,
   ).run();
   return result.meta.changes === 1;
 }
@@ -348,6 +377,7 @@ export async function advanceOntologyPipelineStage(
     claim.stageCursor,
     claim.stageAttempt,
     claim.claimToken,
+    claim.leaseExpiresAt,
   ).run();
   return result.meta.changes === 1;
 }

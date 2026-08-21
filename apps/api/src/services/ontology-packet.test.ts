@@ -188,6 +188,7 @@ function generatorInput(corpus = registeredCorpus()) {
     ],
     policy: POLICY,
     activeMachinePredecessor: activeMachinePredecessor(),
+    continuation: null,
   };
 }
 
@@ -200,6 +201,7 @@ describe("ontology provider packet builders", () => {
       if (!result.ok) return;
       expect(Object.keys(result.document).sort()).toEqual([
         "active_machine_predecessor",
+        "continuation",
         "corpus",
         "coverage_targets",
         "feature_vocabulary",
@@ -224,9 +226,83 @@ describe("ontology provider packet builders", () => {
         ontology_version: "machine-1",
         records: [sourceRule()],
       });
+      expect(JSON.parse(result.serialized).continuation).toBeNull();
       expect(result.document).not.toHaveProperty("objectKey");
       expect(result.document).not.toHaveProperty("fragmentIndex");
       expect(result.document).not.toHaveProperty("publicCapable");
+    });
+
+    it("copies and authenticates the provider-visible continuation manifest deterministically", () => {
+      const continuation = {
+        chunk_index: 1,
+        maximum_generation_chunks: 16,
+        maximum_candidate_records: 64,
+        maximum_evaluator_calls: 64,
+        maximum_candidate_bytes: 262144,
+        accepted_ordered_chunk_plaintext_hashes: [`sha256:${"d".repeat(64)}`],
+        accepted_ordered_record_ids: [SOURCE_RULE_ID],
+        remaining_coverage_targets: [
+          { feature_class: "aspect" as const, minimum_source_supported: 1, minimum_total: 2 },
+        ],
+      };
+      const input = { ...generatorInput(), continuation };
+      const first = buildOntologyGeneratorPacket(input, PIN);
+      const replay = buildOntologyGeneratorPacket(input, PIN);
+      const next = buildOntologyGeneratorPacket({
+        ...input,
+        continuation: {
+          ...continuation,
+          chunk_index: 2,
+          accepted_ordered_chunk_plaintext_hashes: [
+            ...continuation.accepted_ordered_chunk_plaintext_hashes,
+            `sha256:${"e".repeat(64)}`,
+          ],
+          accepted_ordered_record_ids: [
+            ...continuation.accepted_ordered_record_ids,
+            OTHER_RULE_ID,
+          ],
+        },
+      }, PIN);
+
+      expect(first.ok).toBe(true);
+      expect(replay.ok).toBe(true);
+      expect(next.ok).toBe(true);
+      if (!first.ok || !replay.ok || !next.ok) return;
+      expect(first.document.continuation).toEqual(continuation);
+      expect(first.serialized).toBe(replay.serialized);
+      expect(next.serialized).not.toBe(first.serialized);
+      for (const forbidden of ["run_id", "stage_generation", "object_key", "oprun_"]) {
+        expect(first.serialized).not.toContain(forbidden);
+      }
+    });
+
+    it("refuses continuation manifests that alter the frozen V2 limits", () => {
+      const continuation = {
+        chunk_index: 1,
+        maximum_generation_chunks: 16,
+        maximum_candidate_records: 64,
+        maximum_evaluator_calls: 64,
+        maximum_candidate_bytes: 262144,
+        accepted_ordered_chunk_plaintext_hashes: [`sha256:${"d".repeat(64)}`],
+        accepted_ordered_record_ids: [SOURCE_RULE_ID],
+        remaining_coverage_targets: [
+          { feature_class: "aspect" as const, minimum_source_supported: 1, minimum_total: 2 },
+        ],
+      };
+      for (const changed of [
+        { ...continuation, maximum_generation_chunks: 17 },
+        { ...continuation, maximum_candidate_records: 65 },
+        { ...continuation, maximum_evaluator_calls: 65 },
+        { ...continuation, maximum_candidate_bytes: 262145 },
+      ]) {
+        expect(buildOntologyGeneratorPacket({
+          ...generatorInput(),
+          continuation: changed,
+        }, PIN)).toEqual({
+          ok: false,
+          code: "ontology_input_continuation_invalid",
+        });
+      }
     });
 
     it("does not spread wider corpus, release, policy, or predecessor objects", () => {

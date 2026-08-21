@@ -27,7 +27,7 @@ import {
 import type { OntologyCoverageTarget } from "./ontology-packet.js";
 
 export const ONTOLOGY_PIPELINE_COMMAND_VERSION =
-  "OntologyPipelineCommandV1" as const;
+  "OntologyPipelineCommandV2" as const;
 export const ONTOLOGY_COMPILER_POLICY_VERSION = "1.0.0" as const;
 export const ONTOLOGY_REGRESSION_POLICY_VERSION = "1.0.0" as const;
 export const ONTOLOGY_PROHIBITED_CLAIM_POLICY_VERSION = "1.0.0" as const;
@@ -37,6 +37,12 @@ export const ONTOLOGY_PROHIBITED_CLAIMS = [
   "fate",
   "biographical fact",
 ] as const;
+export const ONTOLOGY_PIPELINE_LIMITS = {
+  maximum_generation_chunks: 16,
+  maximum_candidate_records: 64,
+  maximum_evaluator_calls: 64,
+  maximum_candidate_bytes: 262_144,
+} as const;
 export const ONTOLOGY_PIPELINE_FEATURE_VOCABULARY = [
   ...m4CommonSchema.$defs.featureClass.enum,
 ] as readonly NatalFeatureClass[];
@@ -87,6 +93,16 @@ export interface OntologyPipelineCommand {
     active_machine_predecessor: OntologyPipelinePredecessorReference | null;
   };
   input_max_bytes: number;
+  limits: {
+    maximum_generation_chunks:
+      typeof ONTOLOGY_PIPELINE_LIMITS.maximum_generation_chunks;
+    maximum_candidate_records:
+      typeof ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_records;
+    maximum_evaluator_calls:
+      typeof ONTOLOGY_PIPELINE_LIMITS.maximum_evaluator_calls;
+    maximum_candidate_bytes:
+      typeof ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_bytes;
+  };
   policy: {
     ontology_schema_version: typeof M7_SCHEMA_VERSION;
     feature_policy_version: typeof NATAL_FEATURE_POLICY_VERSION;
@@ -227,6 +243,7 @@ export async function buildOntologyPipelineCommand(
       active_machine_predecessor: activeMachinePredecessor,
     },
     input_max_bytes: pin.input_max_bytes,
+    limits: { ...ONTOLOGY_PIPELINE_LIMITS },
     policy: {
       ontology_schema_version: M7_SCHEMA_VERSION,
       feature_policy_version: NATAL_FEATURE_POLICY_VERSION,

@@ -301,3 +301,318 @@ No blocking concern remains.
 ## Commit
 
 Exact subject prepared: `api: generate compile and evaluate ontology candidates`.
+
+---
+
+# Fix round 1 — close ontology execution safety gaps
+
+## Scope and interfaces
+
+This round starts from review HEAD
+`78ffce029a7e5ceefca36304e915cd2a243236aa` and changes no frozen contract,
+OpenAPI file, fixture, D1 migration, Queue binding, cron, environment variable,
+secret, or rollout value.
+
+Production interfaces changed:
+
+- `db/ontology-pipeline.ts` adds the read-only exact-generation Task 7
+  pre-claim classifier and hardens every shared owned-write CAS (`fail`,
+  `retry`, cursor advance, named-stage advance, and Task 7's `succeed`).
+- `ontology-pipeline-command.ts` freezes `OntologyPipelineCommandV2` with
+  generation-chunk, candidate-record, evaluator-call, and candidate-byte
+  ceilings.
+- `ontology-packet.ts` carries a provider-visible, deterministic continuation
+  manifest in the existing generator packet. The packet seam accepts only the
+  exact V2 ceilings and bounded ordered progress.
+- `ontology-prompt.ts` retains the stricter type-specific provider schema while
+  deriving missing ID, locale, house, priority, non-empty-string, and output
+  count bounds from the frozen schema authorities.
+- `ontology-candidate-validation.ts` is the whole-release runtime gate. Ajv
+  loads the exact frozen M0/M7 common, record, evaluation, and release schemas;
+  additive deterministic policy checks cover locale, fragment resolution,
+  coverage, source-supported obligations, synthesis source termination, and
+  expression-guidance non-assertion.
+- `ontology-pipeline-execute.ts` reuses the Task 5 claim/CAS/outbox/artifact and
+  shared daily-usage primitives. It parks downstream stages before claim,
+  treats request-without-response as ambiguous, enforces V2 continuation and
+  ceilings, validates the whole candidate, and includes the V2 limits in the
+  canonical evaluation report.
+- `ontology-evaluation.ts` binds the four frozen V2 limits into canonical
+  report bytes. The attempt-zero Task 9 envelope and attempt-scoped retry
+  envelope paths are both preserved.
+
+No second queue, claim, retry, transition, provider-accounting, encryption, or
+artifact implementation was introduced. Test-only changes add regressions and
+make scheduled-retention chronology compatible with a D1-clock-authoritative
+live lease.
+
+## Exact stage and cursor behavior
+
+| Owned delivery | Provider calls | Committed successor |
+| --- | ---: | --- |
+| `reserved(g,0,0)` | 0 | `corpus_reading(g+1,0,0)` |
+| `corpus_reading(g,0,0)` | 0 | `generating(g+1,0,0)` after exact registered-corpus verification |
+| `generating(g,c,a)`, valid incomplete chunk | at most 1 | `generating(g+1,c+1,0)` |
+| `generating(g,c,a)`, valid complete chunk | at most 1 | `compiling(g+1,0,0)` with the full candidate plaintext hash |
+| `compiling(g,0,a)` | 0 | `evaluating(g+1,0,0)` with the compilation-report plaintext hash |
+| `evaluating(g,c,a)`, non-final rule | at most 1 | `evaluating(g+1,c+1,0)` |
+| `evaluating(g,c,a)`, deterministic final rule | at most 1 | `regressing(g+1,0,0)` with the evaluation-report plaintext hash |
+| retryable provider result or ambiguous request | no same-attempt second call | same `(stage,g,c)`, `attempt=a+1`, available after the shared 60-second backoff |
+| closed deterministic/semantic failure | no semantic retry | `failed(g+1,...)`, with every live artifact assigned exactly `failed_at + 7 days` |
+| exact `regressing`, `signing`, or `ingesting` message | 0 | no claim, receipt, lease, attempt, hash, stage, or terminal mutation |
+| stale or duplicate message | 0 | duplicate, no mutation |
+
+Successful Task 6 execution still stops at `regressing`. It does not regress,
+sign, ingest, activate, write the immutable 0011 evidence receipt, or mark a run
+succeeded.
+
+## Artifact-first adoption and provider accounting
+
+The retained artifact classes are the Task 5 classes and identity scheme:
+
+- generation: `generator_request`, `generator_response`, `candidate_chunk`;
+- compilation: `candidate_release`, `compilation_report`;
+- evaluation: `evaluator_request`, `evaluator_response`,
+  `evaluator_verdict`, `evaluation_report`.
+
+For a generation chunk or evaluation rule, execution probes the exact
+attempt-scoped canonical artifact first, then the exact response artifact, and
+then the exact request artifact. A response found in R2 before its D1 inventory
+row is adopted and authenticated through the Task 5 service before any spend;
+the missing canonical chunk/verdict is derived without another call. A request
+with no response is an ambiguous-call receipt: that attempt performs no fetch
+or reservation on redelivery. The existing guarded retry CAS moves to a fresh
+attempt identity, and only that new attempt may reserve immediately before Task
+4's sole provider fetch. At attempt 15, ambiguity closes as
+`attempts_exhausted` without a second fetch.
+
+The hermetic tests prove both generator and evaluator ambiguity, R2-first
+response adoption, true retry identity, one call per delivery, and exact shared
+usage-ledger charges. Provider request/response bodies, candidate records, and
+evaluator content remain encrypted R2 artifacts; D1 retains only closed state,
+coordinates, pointers, counts, and hashes.
+
+## V2 continuation identity and hard limits
+
+Every request after chunk zero carries exactly:
+
+- `chunk_index`, equal to the count of validated accepted chunks;
+- frozen maxima `16`, `64`, `64`, and `262144`;
+- every accepted chunk plaintext hash in generation order;
+- every accepted record ID in candidate order; and
+- remaining coverage targets in frozen target order.
+
+The manifest contains no run ID, stage generation, object key, claim token, or
+other private identifier. It is authenticated inside the encrypted request
+artifact. Successive chunk requests differ because accepted hashes, record IDs,
+remaining coverage, and index change; an exact replay at one coordinate remains
+byte-identical. Gaps, duplicate IDs, corrupt hashes, alternate maxima, reordered
+or invented remaining targets, and one-over limits close before another cursor
+or provider call as applicable.
+
+The inclusive runtime ceilings are:
+
+```text
+maximum generation chunks   16
+maximum candidate records   64
+maximum evaluator calls     64
+maximum candidate bytes     262144
+```
+
+Both `complete:true` and `complete:false` prospective candidates are measured
+as the exact deterministic canonical candidate release. `262144` bytes is
+accepted; `262145` closes before compilation or cursor advance. The successful
+planned-call ceiling remains below the existing daily limit:
+
+```text
+16 generation + 64 evaluation + (30 fixtures * 11 regression) = 410 <= 500
+```
+
+## Frozen candidate validation and unchanged compiler
+
+The frozen M7 release schema is the structural authority; there is no copied
+release schema. The provider output schema remains an earlier, stricter
+type-specific boundary, but the exact assembled plaintext is then validated as
+one release against the frozen schema graph. Deterministic policy validation
+additionally proves:
+
+- exact registered corpus locale and resolution of every cited fragment;
+- exact frozen feature-class coverage;
+- non-empty source-supported fragment termination, tensions,
+  counter-expressions, and prohibited claims, with empty input meanings and a
+  null transformation;
+- derived syntheses have at least two inputs, a transformation, no cycle, no
+  missing input, and terminate exclusively in source-supported meanings; and
+- expression guidance adds no body, sign, house, aspect, life-event,
+  diagnosis, prediction, or psychological assertion. Non-claim-bearing
+  guidance is not incorrectly required to have synthesis inputs.
+
+Only after those checks does the deterministic compiling delivery invoke the
+existing `compileOntologyRelease` unchanged over the complete ordered release.
+No record is repaired, normalized, filtered, dropped, or partially accepted.
+House 13, priority 1001, malformed release shape, unresolved identity,
+incomplete coverage, invalid graph/policy, and compiler findings close the
+whole run.
+
+## Canonical evaluation report
+
+The canonical encrypted report binds:
+
+- the registered corpus release ID/hash, locale, license/public-capability
+  identity, and object pointer;
+- the full candidate plaintext hash;
+- compiler pass result, frozen compiler policy, and compilation-report
+  plaintext hash;
+- every rule ID and verdict plaintext hash in exact candidate order;
+- generator and evaluator model, reasoning, prompt, timeout, and output-token
+  pins;
+- input ceiling, all four V2 ceilings, configuration hash, and explicit
+  configuration equality; and
+- the frozen 30-fixture, 11-call, 100% regression threshold.
+
+All nine evaluator dimensions remain mandatory and verdict-only. A dimension
+failure or reject verdict terminally fails the release and cannot retry into an
+acceptance. Attempt-zero reports retain Task 9's
+`ontology-evaluation-artifact/v1` well-known object; a final-rule true retry
+uses the authenticated attempt-scoped generic pipeline envelope, and the Task 9
+reader accepts both exact paths.
+
+## Live-lease CAS and pre-claim handoff
+
+Every shared owned-write predicate now includes the exact stored timestamp and
+D1-clock authority:
+
+```sql
+AND lease_expires_at = ?
+AND julianday('now') < julianday(lease_expires_at)
+```
+
+The bound value is `claim.leaseExpiresAt`; no caller clock, sweep, token alone,
+or replaceable lease can authorize a write. Tests cover `fail`, `retry`, cursor
+advance, named-stage advance, and Task 7 `succeed` after expiry, plus an exact
+lease mismatch. They also cover expiry after final provider/canonical artifact
+persistence but before transition: the run cannot advance, fail, or retry under
+the dead owner.
+
+An exact-generation read-only classifier parks `regressing`, `signing`, and
+`ingesting` before claim. Seventeen repeated delivery/recovery cycles leave the
+stage, hashes, claim receipt count, lease, and attempt unchanged. A stale
+generation falls through to the atomic claim CAS and closes duplicate; a D1
+classification error fails closed with a delayed retry and no receipt. Rollout
+`off` remains earlier still, pausing durably before claim. The exact
+`OntologyPipelineCommandError('ontology_pipeline_predecessor_unavailable')`
+maps immediately to closed `configuration_invalid` rather than lease churn.
+
+## TDD evidence
+
+### Review-head RED
+
+The consolidated review regression suite was first run against unmodified
+`78ffce0`: 47 tests passed and 28 failed. Distinct failures demonstrated all
+review findings before their production edits:
+
+- downstream Task 7 deliveries acquired claims/receipts and could exhaust the
+  16-receipt ceiling;
+- request persisted + provider success + response-persistence crash could call
+  both generator and evaluator twice under one attempt;
+- the V1 command had no hard limits or authenticated continuation, successive
+  requests were not differentiated by accepted state, and one-over/unbounded
+  incomplete output could advance;
+- frozen-schema values such as house 13 and priority 1001, plus whole-release
+  policy violations, could pass the old partial guard;
+- all five shared CAS writes accepted an exact token after its stored lease had
+  expired; and
+- unavailable frozen predecessors produced uncertain lease retry rather than a
+  closed failure.
+
+### Finding GREEN
+
+- I1: the pre-claim Task 7 parking/stale-race/D1-error tests pass, including
+  more than 16 cycles with no claim receipt or lease.
+- I2: generator and evaluator pre-response-persistence crashes pass; same
+  attempt call count is one, true retry changes artifact identity, usage equals
+  actual calls, response-first R2 adoption is free, and ambiguity at the
+  attempt ceiling makes no second call.
+- I3: V2 command replay conflict, exact maxima, continuation authentication,
+  request differentiation/replay, chunk 16, record 64/65, evaluator ceiling,
+  and candidate byte 262144/262145 boundaries pass. A separately added
+  `complete:false` 262145-byte regression was RED (`advanced`) and GREEN after
+  prospective canonical-byte validation (`terminal`, cursor zero).
+- I4: frozen-schema authority, house/priority bounds, fragment/locale/coverage,
+  source obligations, derived graph termination, expression-guidance policy,
+  and unchanged compiler rejection pass. The normative guidance regression was
+  RED because valid empty-input guidance was rejected; it is GREEN after
+  restricting source termination to derived syntheses.
+- I5: expired and mismatched leases reject all five shared writes; final
+  artifact persistence cannot enable a late transition or terminal mutation.
+- Minor: the real frozen-predecessor disappearance path is terminal
+  `configuration_invalid` at attempt zero with no provider invocation.
+- The public packet seam's alternate-maxima test was separately RED (it
+  serialized 17/65/65/262145) and GREEN after exact V2 validation.
+
+### Discarded harness runs
+
+These are recorded separately and are not claimed as settled evidence:
+
+- The first combined Task 6 run reported 18 passes and 11 five-second timeouts
+  after a DB delay proxy leaked through Cloudflare's inherited binding
+  `[[Set]]`. The first timed-out case passed alone in 196 ms. Defining test env
+  overrides as own properties removed the contamination; no production timeout
+  or lease predicate changed.
+- The first adjacent compatibility run was 176/177: scheduled retention used a
+  seven-day-old fake claim, which the new D1-clock predicate correctly refused.
+  The fixture now keeps historical retention event timestamps while obtaining
+  a genuinely live setup lease. Its settled lane is 9/9.
+- An early attempt-ceiling fixture advanced its fake clock into the future and
+  hit the migration's artifact `created_at <= D1 now` guard at attempt 3. The
+  final test advances to attempt 15 through the public Task 5 claim/retry
+  primitives without synthetic provider artifacts, then proves one charged
+  ambiguous call and no second fetch.
+
+## Settled verification evidence
+
+- Required exact lane:
+  `npm exec -w @patternlike/api -- vitest run
+  src/services/ontology-evaluation.test.ts
+  src/services/ontology-pipeline-execute.test.ts` — 2 files, 31 tests passed.
+- Task 6 plus frozen candidate validator — 3 files, 37 tests passed.
+- Task 4/5 and queue/scheduled compatibility — 9 files, 175 tests passed.
+- Task 3 corpus and Task 9 evidence/integration/signing readers — 4 files,
+  103 tests passed.
+- `npm run typecheck -w @patternlike/api` — both TypeScript projects passed.
+- `npm run test:wrangler-config -w @patternlike/api` — 2/2 passed.
+- `npm run test:contracts` — all frozen contract/OpenAPI lanes passed; all 12
+  migrations fresh-applied into 46 tables with foreign-key and quick checks
+  clean.
+- `npm test -w @patternlike/api` — main Worker suite 90 files / 1,604 tests;
+  M3 compatibility 1/1; Wrangler resolution 2/2, all passed.
+- `npm run build -w @patternlike/api` — production Wrangler dry-run passed;
+  ontology rollout resolved to `off`; no deployment occurred.
+- `git diff --check` — passed.
+- `git diff --exit-code 78ffce029a7e5ceefca36304e915cd2a243236aa -- db/d1 contracts`
+  — passed with no output.
+
+## Workers, compatibility, and immutable audit
+
+The dedicated Queue body remains exactly `{run_id, stage_generation}`.
+Rollout-off still pauses before claim; malformed messages acknowledge closed;
+enabled uncertain/parked work retries with a closed delay; stale messages remain
+duplicates. There is no new fetch path and no live provider was called. The
+production dry-run shows the existing queue, D1, R2, and signer bindings and
+keeps ontology rollout off.
+
+The BASE-to-worktree diff contains no `db/d1/` or `contracts/` path. No frozen
+schema `$id`, enum, required field, fixture, OpenAPI projection, manifest, or
+migration changed. No remote migration, deployment, external resource, secret,
+push, or merge operation was performed.
+
+## Concerns and commit
+
+No blocking concern remains. The encrypted candidate still carries the frozen
+compiler's pre-evaluation structural scaffold noted in the original Task 6
+report; it cannot authorize signing, ingestion, activation, or success. Task 7
+must commit regression, accepted hashes, immutable evidence, and terminal
+success against the exact live run/claim transition.
+
+Exact commit subject prepared: `api: close ontology execution safety gaps`.
+The full resulting SHA is returned outside this self-referential report.

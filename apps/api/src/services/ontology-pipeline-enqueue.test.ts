@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
 import {
   canonicalJson,
+  contentHash,
   type PatternOntologyRelease,
 } from "@patternlike/shared";
 import { describe, expect, it, vi } from "vitest";
@@ -16,6 +17,7 @@ import {
   failOntologyPipelineRun,
   releaseExpiredOntologyPipelineLeases,
   retryOntologyPipelineStage,
+  succeedOntologyPipelineRun,
 } from "../db/ontology-pipeline.js";
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import {
@@ -32,7 +34,11 @@ import {
 import { registerOntologyCorpus } from "./ontology-corpus.js";
 import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
 
-const NOW = new Date("2026-08-21T15:00:00.000Z");
+const NOW = new Date(Date.now() - 60_000);
+
+function afterNow(milliseconds: number): Date {
+  return new Date(NOW.getTime() + milliseconds);
+}
 
 function fakeQueue(failures = 0): {
   queue: Queue<OntologyPipelineMessage>;
@@ -102,6 +108,7 @@ async function reserve(
   pipelineEnv: Env,
   corpusReleaseId: string,
   suffix = crypto.randomUUID(),
+  now = NOW,
 ) {
   return enqueueOntologyPipelineRun(
     pipelineEnv,
@@ -110,8 +117,48 @@ async function reserve(
       corpusReleaseId,
       candidateOntologyVersion: `1.0.0-pipeline-${suffix}`,
     },
-    NOW,
+    now,
   );
+}
+
+async function seedRunStageForCas(
+  runId: string,
+  target: "reserved" | "generating" | "ingesting",
+): Promise<void> {
+  if (target === "reserved") return;
+  const stages = [
+    "corpus_reading",
+    "generating",
+    "compiling",
+    "evaluating",
+    "regressing",
+    "signing",
+    "ingesting",
+  ] as const;
+  const finalIndex = stages.indexOf(target);
+  for (let index = 0; index <= finalIndex; index += 1) {
+    const stage = stages[index]!;
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = ?, stage_generation = ?, stage_cursor = 0, stage_attempt = 0,
+           claim_token = NULL, lease_expires_at = NULL, dispatched_at = NULL,
+           candidate_hash = COALESCE(candidate_hash, ?),
+           compilation_report_hash = COALESCE(compilation_report_hash, ?),
+           evaluation_report_hash = COALESCE(evaluation_report_hash, ?),
+           regression_report_hash = COALESCE(regression_report_hash, ?),
+           bundle_hash = COALESCE(bundle_hash, ?)
+       WHERE run_id = ?`,
+    ).bind(
+      stage,
+      index + 1,
+      stage === "compiling" ? `sha256:${"3".repeat(64)}` : null,
+      stage === "evaluating" ? `sha256:${"4".repeat(64)}` : null,
+      stage === "regressing" ? `sha256:${"5".repeat(64)}` : null,
+      stage === "signing" ? `sha256:${"6".repeat(64)}` : null,
+      stage === "ingesting" ? `sha256:${"7".repeat(64)}` : null,
+      runId,
+    ).run();
+  }
 }
 
 async function seedActiveMachinePredecessor(): Promise<{
@@ -166,6 +213,7 @@ describe("ontology pipeline immutable command", () => {
       "1.0.0-candidate",
     );
 
+    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV2");
     expect(command).toEqual({
       command_version: ONTOLOGY_PIPELINE_COMMAND_VERSION,
       schema_version: "0.7.0",
@@ -212,6 +260,12 @@ describe("ontology pipeline immutable command", () => {
         active_machine_predecessor: null,
       },
       input_max_bytes: 98304,
+      limits: {
+        maximum_generation_chunks: 16,
+        maximum_candidate_records: 64,
+        maximum_evaluator_calls: 64,
+        maximum_candidate_bytes: 262144,
+      },
       policy: {
         ontology_schema_version: "0.7.0",
         feature_policy_version: "1.0.0",
@@ -238,10 +292,80 @@ describe("ontology pipeline immutable command", () => {
       daily_provider_call_limit: 500,
       failed_artifact_retention_days: 7,
     });
+    expect(
+      command.limits.maximum_generation_chunks +
+      command.limits.maximum_evaluator_calls +
+      command.regression.fixture_count *
+        command.regression.maximum_provider_calls_per_fixture,
+    ).toBe(410);
     const frozen = JSON.stringify(command);
     expect(frozen).not.toContain(corpus.excerpt);
     expect(frozen).not.toContain("test-provider-key-never-frozen");
     expect(frozen).not.toContain("fragments");
+  });
+
+  it("rejects replaying a V1 command identity after the V2 limit freeze", async () => {
+    const corpus = await registeredCorpus();
+    const { queue } = fakeQueue();
+    const pipelineEnv = configuredEnv(queue);
+    const suffix = crypto.randomUUID();
+    const idempotencyKey = `ontology-v1-conflict-${suffix}`;
+    const candidateVersion = `1.0.0-v1-conflict-${suffix}`;
+    const current = await buildOntologyPipelineCommand(
+      pipelineEnv,
+      corpus.releaseId,
+      candidateVersion,
+    );
+    const oldShape = { ...current } as Record<string, unknown>;
+    oldShape.command_version = "OntologyPipelineCommandV1";
+    delete oldShape.limits;
+    const oldJson = canonicalJson(oldShape);
+    const oldHash = await contentHash(oldJson);
+    const runId = `oprun_v1_conflict_${suffix}`;
+    await env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_runs (
+         run_id, idempotency_key, corpus_release_id, corpus_hash,
+         candidate_ontology_version, configuration_json, configuration_hash,
+         stage, stage_generation, stage_cursor, stage_attempt,
+         claim_token, lease_expires_at, available_at, dispatched_at,
+         failure_class, candidate_hash, compilation_report_hash,
+         evaluation_report_hash, regression_report_hash, bundle_hash,
+         failed_artifact_expires_at, created_at, updated_at,
+         finished_at, succeeded_at, failed_at
+       ) VALUES (
+         ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0,
+         NULL, NULL, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+         ?, ?, NULL, NULL, NULL
+       )`,
+    ).bind(
+      runId,
+      idempotencyKey,
+      corpus.releaseId,
+      corpus.corpusHash,
+      candidateVersion,
+      oldJson,
+      oldHash,
+      NOW.toISOString(),
+      NOW.toISOString(),
+      NOW.toISOString(),
+    ).run();
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET dispatched_at = ? WHERE run_id = ?`,
+    ).bind(NOW.toISOString(), runId).run();
+
+    await expect(enqueueOntologyPipelineRun(
+      pipelineEnv,
+      { idempotencyKey, corpusReleaseId: corpus.releaseId, candidateOntologyVersion: candidateVersion },
+      NOW,
+    )).rejects.toMatchObject({ code: "ontology_pipeline_command_conflict" });
+    expect(await env.DB.prepare(
+      `SELECT configuration_json, configuration_hash
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(runId).first()).toEqual({
+      configuration_json: oldJson,
+      configuration_hash: oldHash,
+    });
   });
 
   it("freezes coverage and a content-addressed active predecessor before pointer mutation", async () => {
@@ -267,7 +391,7 @@ describe("ontology pipeline immutable command", () => {
       object_key: predecessor.objectKey,
     });
     expect(command.generator_input.coverage_targets).toHaveLength(6);
-    expect(before!.configuration_json).not.toContain("records");
+    expect(before!.configuration_json).not.toContain('"records":');
 
     await env.DB.prepare(
       `UPDATE pattern_ontology_pointer SET active_version = NULL, updated_at = ?
@@ -496,7 +620,7 @@ describe("ontology pipeline reservation and outbox", () => {
     expect(await retryOntologyPipelineStage(
       env,
       claim,
-      new Date("2026-08-21T15:20:00.000Z"),
+      afterNow(20 * 60_000),
     )).toBe(true);
 
     await expect(reserve(pipelineEnv, corpus.releaseId, suffix)).resolves
@@ -528,6 +652,111 @@ describe("ontology pipeline reservation and outbox", () => {
 });
 
 describe("ontology pipeline generation and claim CAS", () => {
+  it("rejects every owned write after the exact stored lease expires", async () => {
+    const corpus = await registeredCorpus();
+    const expiredClaimAt = new Date(Date.now() - 10 * 60_000);
+    const cases = [
+      {
+        name: "fail",
+        stage: "reserved" as const,
+        write: (claim: Extract<Awaited<ReturnType<typeof claimOntologyPipelineRun>>, { status: "claimed" }>) =>
+          failOntologyPipelineRun(env, claim, "execution_error", new Date()),
+      },
+      {
+        name: "retry",
+        stage: "reserved" as const,
+        write: (claim: Extract<Awaited<ReturnType<typeof claimOntologyPipelineRun>>, { status: "claimed" }>) =>
+          retryOntologyPipelineStage(env, claim, new Date()),
+      },
+      {
+        name: "named-stage",
+        stage: "reserved" as const,
+        write: (claim: Extract<Awaited<ReturnType<typeof claimOntologyPipelineRun>>, { status: "claimed" }>) =>
+          advanceOntologyPipelineStage(env, claim, "corpus_reading", {}, new Date()),
+      },
+      {
+        name: "cursor",
+        stage: "generating" as const,
+        write: (claim: Extract<Awaited<ReturnType<typeof claimOntologyPipelineRun>>, { status: "claimed" }>) =>
+          advanceOntologyPipelineCursor(env, claim, new Date()),
+      },
+      {
+        name: "succeed",
+        stage: "ingesting" as const,
+        write: (claim: Extract<Awaited<ReturnType<typeof claimOntologyPipelineRun>>, { status: "claimed" }>) =>
+          succeedOntologyPipelineRun(env, claim, new Date()),
+      },
+    ];
+
+    for (const item of cases) {
+      const result = await reserve(
+        configuredEnv(fakeQueue().queue),
+        corpus.releaseId,
+        `expired-${item.name}-${crypto.randomUUID()}`,
+        new Date(expiredClaimAt.getTime() - 60_000),
+      );
+      await seedRunStageForCas(result.runId, item.stage);
+      const claim = await claimOntologyPipelineRun(
+        env,
+        { run_id: result.runId, stage_generation: item.stage === "reserved" ? 0 : item.stage === "generating" ? 2 : 7 },
+        expiredClaimAt,
+        `expired-${item.name}`,
+      );
+      expect(claim.status).toBe("claimed");
+      if (claim.status !== "claimed") continue;
+      const before = await env.DB.prepare(
+        `SELECT stage, stage_generation, stage_cursor, stage_attempt,
+                claim_token, lease_expires_at, failure_class
+         FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+      ).bind(result.runId).first();
+      expect(await item.write(claim)).toBe(false);
+      expect(await env.DB.prepare(
+        `SELECT stage, stage_generation, stage_cursor, stage_attempt,
+                claim_token, lease_expires_at, failure_class
+         FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+      ).bind(result.runId).first()).toEqual(before);
+      await releaseExpiredOntologyPipelineLeases(env, new Date(), 100);
+      const cleanup = await claimOntologyPipelineRun(
+        env,
+        {
+          run_id: result.runId,
+          stage_generation: item.stage === "reserved" ? 0 : item.stage === "generating" ? 2 : 7,
+        },
+        new Date(),
+        `cleanup-${item.name}`,
+      );
+      if (cleanup.status === "claimed") {
+        await failOntologyPipelineRun(env, cleanup, "execution_error", new Date());
+      }
+    }
+  });
+
+  it("binds owned writes to the exact stored lease timestamp", async () => {
+    const corpus = await registeredCorpus();
+    const result = await reserve(configuredEnv(fakeQueue().queue), corpus.releaseId);
+    const claim = await claimOntologyPipelineRun(
+      env,
+      { run_id: result.runId, stage_generation: 0 },
+      new Date(),
+      "claim-exact-lease",
+    );
+    expect(claim.status).toBe("claimed");
+    if (claim.status !== "claimed") return;
+    expect(await retryOntologyPipelineStage(env, {
+      ...claim,
+      leaseExpiresAt: new Date(Date.parse(claim.leaseExpiresAt) + 1).toISOString(),
+    }, new Date())).toBe(false);
+    expect(await env.DB.prepare(
+      `SELECT stage_attempt, claim_token, lease_expires_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(result.runId).first()).toEqual({
+      stage_attempt: 0,
+      claim_token: claim.claimToken,
+      lease_expires_at: claim.leaseExpiresAt,
+    });
+    await failOntologyPipelineRun(env, claim, "execution_error", new Date());
+  });
+
   it("claims exactly five minutes and rejects claim theft", async () => {
     const corpus = await registeredCorpus();
     const result = await reserve(configuredEnv(fakeQueue().queue), corpus.releaseId);
@@ -536,7 +765,7 @@ describe("ontology pipeline generation and claim CAS", () => {
     expect(claim).toMatchObject({
       status: "claimed",
       claimToken: "claim-owner-a",
-      leaseExpiresAt: "2026-08-21T15:05:00.000Z",
+      leaseExpiresAt: afterNow(5 * 60_000).toISOString(),
     });
     await expect(claimOntologyPipelineRun(env, message, NOW, "claim-thief"))
       .resolves.toEqual({ status: "duplicate" });
@@ -545,7 +774,7 @@ describe("ontology pipeline generation and claim CAS", () => {
         env,
         claim,
         "execution_error",
-        new Date("2026-08-21T15:00:01.000Z"),
+        afterNow(1_000),
       );
     }
   });
@@ -564,12 +793,12 @@ describe("ontology pipeline generation and claim CAS", () => {
     expect(await retryOntologyPipelineStage(
       env,
       { ...claim, claimToken: "claim-stale" },
-      new Date("2026-08-21T15:00:10.000Z"),
+      afterNow(10_000),
     )).toBe(false);
     expect(await retryOntologyPipelineStage(
       env,
       claim,
-      new Date("2026-08-21T15:00:10.000Z"),
+      afterNow(10_000),
     )).toBe(true);
     expect(await env.DB.prepare(
       `SELECT stage_generation, stage_attempt, claim_token, dispatched_at
@@ -583,7 +812,7 @@ describe("ontology pipeline generation and claim CAS", () => {
     const cleanup = await claimOntologyPipelineRun(
       env,
       { run_id: result.runId, stage_generation: 0 },
-      new Date("2026-08-21T15:00:10.000Z"),
+      afterNow(10_000),
       "claim-retry-cleanup",
     );
     if (cleanup.status === "claimed") {
@@ -591,7 +820,7 @@ describe("ontology pipeline generation and claim CAS", () => {
         env,
         cleanup,
         "execution_error",
-        new Date("2026-08-21T15:00:11.000Z"),
+        afterNow(11_000),
       );
     }
   });
@@ -612,12 +841,12 @@ describe("ontology pipeline generation and claim CAS", () => {
       reserved,
       "corpus_reading",
       {},
-      new Date("2026-08-21T15:00:01.000Z"),
+      afterNow(1_000),
     )).toBe(true);
     const corpusClaim = await claimOntologyPipelineRun(
       env,
       { run_id: result.runId, stage_generation: 1 },
-      new Date("2026-08-21T15:00:01.000Z"),
+      afterNow(1_000),
       "claim-corpus",
     );
     expect(corpusClaim.status).toBe("claimed");
@@ -627,12 +856,12 @@ describe("ontology pipeline generation and claim CAS", () => {
       corpusClaim,
       "generating",
       {},
-      new Date("2026-08-21T15:00:02.000Z"),
+      afterNow(2_000),
     )).toBe(true);
     const generating = await claimOntologyPipelineRun(
       env,
       { run_id: result.runId, stage_generation: 2 },
-      new Date("2026-08-21T15:00:02.000Z"),
+      afterNow(2_000),
       "claim-generating",
     );
     expect(generating.status).toBe("claimed");
@@ -640,7 +869,7 @@ describe("ontology pipeline generation and claim CAS", () => {
     expect(await advanceOntologyPipelineCursor(
       env,
       generating,
-      new Date("2026-08-21T15:00:03.000Z"),
+      afterNow(3_000),
     )).toBe(true);
     expect(await env.DB.prepare(
       `SELECT stage, stage_generation, stage_cursor, stage_attempt,
@@ -657,7 +886,7 @@ describe("ontology pipeline generation and claim CAS", () => {
     const cleanup = await claimOntologyPipelineRun(
       env,
       { run_id: result.runId, stage_generation: 3 },
-      new Date("2026-08-21T15:00:03.000Z"),
+      afterNow(3_000),
       "claim-cursor-cleanup",
     );
     if (cleanup.status === "claimed") {
@@ -665,7 +894,7 @@ describe("ontology pipeline generation and claim CAS", () => {
         env,
         cleanup,
         "execution_error",
-        new Date("2026-08-21T15:00:04.000Z"),
+        afterNow(4_000),
       );
     }
   });
@@ -683,7 +912,7 @@ describe("ontology pipeline generation and claim CAS", () => {
     );
     expect(claim.status).toBe("claimed");
 
-    const afterExpiry = new Date("2026-08-21T15:05:01.000Z");
+    const afterExpiry = afterNow(5 * 60_000 + 1_000);
     expect(await releaseExpiredOntologyPipelineLeases(env, afterExpiry)).toBe(1);
     expect(await dispatchUndispatchedOntologyPipelineRuns(
       pipelineEnv,

@@ -1,7 +1,11 @@
 /** Separate generator/evaluator policies and strict OpenAI Responses schemas. */
 
 import Ajv2020 from "ajv/dist/2020.js";
+import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
+import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
+import ontologyRecordSchema from "../../../../contracts/m7/pattern-ontology-record.schema.json";
 import type { OntologyPipelineConfigPin } from "../middleware/config-guard.js";
+import { ONTOLOGY_PIPELINE_LIMITS } from "./ontology-pipeline-command.js";
 import type {
   OntologyGenerationChunk,
   OntologyRuleVerdict,
@@ -59,7 +63,23 @@ export const ONTOLOGY_OUTPUT_SCHEMA_NAME: Record<OntologyProviderPass, string> =
 
 const STRING_ARRAY_SCHEMA = {
   type: "array",
-  items: { type: "string" },
+  items: { type: "string", minLength: 1 },
+} as const;
+
+const NONEMPTY_STRING_SCHEMA = { type: "string", minLength: 1 } as const;
+const LOCALE_TAG_SCHEMA = {
+  type: "string",
+  minLength: m0CommonSchema.$defs.localeTag.minLength,
+  maxLength: m0CommonSchema.$defs.localeTag.maxLength,
+  pattern: m0CommonSchema.$defs.localeTag.pattern,
+} as const;
+const ONTOLOGY_RULE_ID_SCHEMA = {
+  type: "string",
+  pattern: m7CommonSchema.$defs.ontologyRuleId.pattern,
+} as const;
+const SOURCE_FRAGMENT_ID_SCHEMA = {
+  type: "string",
+  pattern: m7CommonSchema.$defs.sourceFragmentId.pattern,
 } as const;
 
 const FEATURE_PREDICATE_SCHEMA = {
@@ -70,7 +90,7 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "body"],
       properties: {
         type: { type: "string", enum: ["position"] },
-        body: { type: "string" },
+        body: NONEMPTY_STRING_SCHEMA,
       },
     },
     {
@@ -79,9 +99,9 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "body_a", "body_b", "aspect"],
       properties: {
         type: { type: "string", enum: ["aspect"] },
-        body_a: { type: "string" },
-        body_b: { type: "string" },
-        aspect: { type: "string" },
+        body_a: NONEMPTY_STRING_SCHEMA,
+        body_b: NONEMPTY_STRING_SCHEMA,
+        aspect: NONEMPTY_STRING_SCHEMA,
       },
     },
     {
@@ -90,7 +110,7 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "pattern"],
       properties: {
         type: { type: "string", enum: ["pattern"] },
-        pattern: { type: "string" },
+        pattern: NONEMPTY_STRING_SCHEMA,
       },
     },
     {
@@ -99,7 +119,7 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "angle"],
       properties: {
         type: { type: "string", enum: ["angle"] },
-        angle: { type: "string" },
+        angle: NONEMPTY_STRING_SCHEMA,
       },
     },
     {
@@ -108,7 +128,11 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "house"],
       properties: {
         type: { type: "string", enum: ["house_cusp"] },
-        house: { type: "integer" },
+        house: {
+          type: "integer",
+          minimum: ontologyRecordSchema.$defs.featurePredicate.properties.house.minimum,
+          maximum: ontologyRecordSchema.$defs.featurePredicate.properties.house.maximum,
+        },
       },
     },
     {
@@ -117,7 +141,7 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "accuracy"],
       properties: {
         type: { type: "string", enum: ["uncertainty"] },
-        accuracy: { type: "string" },
+        accuracy: NONEMPTY_STRING_SCHEMA,
       },
     },
   ],
@@ -143,16 +167,22 @@ const ONTOLOGY_RECORD_SCHEMA = {
     "cluster_tags",
   ],
   properties: {
-    id: { type: "string", pattern: "^ont_[0-9a-f]{32}$" },
+    id: ONTOLOGY_RULE_ID_SCHEMA,
     meaning_class: {
       type: "string",
       enum: ["source_supported", "derived_synthesis", "expression_guidance"],
     },
-    locale: { type: "string" },
+    locale: LOCALE_TAG_SCHEMA,
     feature_predicate: FEATURE_PREDICATE_SCHEMA,
-    normalized_proposition: { type: "string" },
-    source_fragment_ids: STRING_ARRAY_SCHEMA,
-    input_meaning_ids: STRING_ARRAY_SCHEMA,
+    normalized_proposition: NONEMPTY_STRING_SCHEMA,
+    source_fragment_ids: {
+      type: "array",
+      items: SOURCE_FRAGMENT_ID_SCHEMA,
+    },
+    input_meaning_ids: {
+      type: "array",
+      items: ONTOLOGY_RULE_ID_SCHEMA,
+    },
     transformation_class: {
       anyOf: [
         {
@@ -174,7 +204,13 @@ const ONTOLOGY_RECORD_SCHEMA = {
     counter_expressions: STRING_ARRAY_SCHEMA,
     prohibited_claims: STRING_ARRAY_SCHEMA,
     salience_band: { type: "string", enum: ["low", "medium", "high"] },
-    presentation_priority: { type: "integer" },
+    presentation_priority: {
+      type: "integer",
+      minimum: ontologyRecordSchema.$defs.patternOntologyRecord.properties
+        .presentation_priority.minimum,
+      maximum: ontologyRecordSchema.$defs.patternOntologyRecord.properties
+        .presentation_priority.maximum,
+    },
     cluster_tags: STRING_ARRAY_SCHEMA,
   },
 } as const;
@@ -185,7 +221,11 @@ const GENERATOR_SCHEMA = {
   required: ["schema_version", "records", "complete"],
   properties: {
     schema_version: { type: "string", enum: ["0.7.0"] },
-    records: { type: "array", items: ONTOLOGY_RECORD_SCHEMA },
+    records: {
+      type: "array",
+      maxItems: ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_records,
+      items: ONTOLOGY_RECORD_SCHEMA,
+    },
     complete: { type: "boolean" },
   },
 } as const;
@@ -203,7 +243,7 @@ const EVALUATOR_SCHEMA = {
   required: ["schema_version", "rule_id", "verdict", "dimensions"],
   properties: {
     schema_version: { type: "string", enum: ["0.7.0"] },
-    rule_id: { type: "string", pattern: "^ont_[0-9a-f]{32}$" },
+    rule_id: ONTOLOGY_RULE_ID_SCHEMA,
     verdict: { type: "string", enum: ["pass", "reject"] },
     dimensions: {
       type: "object",

@@ -114,6 +114,12 @@ export interface CanonicalOntologyEvaluationReportInput {
     maxOutputTokens: number;
   };
   inputMaxBytes: number;
+  limits: {
+    maximumGenerationChunks: number;
+    maximumCandidateRecords: number;
+    maximumEvaluatorCalls: number;
+    maximumCandidateBytes: number;
+  };
   configurationEqual: boolean;
   regression: {
     fixtureCount: number;
@@ -162,6 +168,12 @@ export interface CanonicalOntologyEvaluationReport {
     max_output_tokens: number;
   };
   input_max_bytes: number;
+  limits: {
+    maximum_generation_chunks: number;
+    maximum_candidate_records: number;
+    maximum_evaluator_calls: number;
+    maximum_candidate_bytes: number;
+  };
   configuration_equal: boolean;
   regression: {
     fixture_count: number;
@@ -216,6 +228,12 @@ export function createCanonicalOntologyEvaluationReport(
       max_output_tokens: input.evaluator.maxOutputTokens,
     },
     input_max_bytes: input.inputMaxBytes,
+    limits: {
+      maximum_generation_chunks: input.limits.maximumGenerationChunks,
+      maximum_candidate_records: input.limits.maximumCandidateRecords,
+      maximum_evaluator_calls: input.limits.maximumEvaluatorCalls,
+      maximum_candidate_bytes: input.limits.maximumCandidateBytes,
+    },
     configuration_equal: input.configurationEqual,
     regression: {
       fixture_count: input.regression.fixtureCount,

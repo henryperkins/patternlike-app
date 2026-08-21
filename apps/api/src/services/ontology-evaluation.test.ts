@@ -191,6 +191,12 @@ describe("ontology independent evaluation", () => {
         maxOutputTokens: 4000,
       },
       inputMaxBytes: 98304,
+      limits: {
+        maximumGenerationChunks: 16,
+        maximumCandidateRecords: 64,
+        maximumEvaluatorCalls: 64,
+        maximumCandidateBytes: 262144,
+      },
       configurationEqual: true,
       regression: {
         fixtureCount: 30,
@@ -232,6 +238,12 @@ describe("ontology independent evaluation", () => {
         timeout_ms: 120000,
       },
       input_max_bytes: 98304,
+      limits: {
+        maximum_candidate_bytes: 262144,
+        maximum_candidate_records: 64,
+        maximum_evaluator_calls: 64,
+        maximum_generation_chunks: 16,
+      },
       ontology_version: "ontology-task-6",
       ordered_rule_verdicts: [
         { rule_id: `ont_${"a".repeat(32)}`, verdict_hash: `sha256:${"5".repeat(64)}` },

@@ -8,6 +8,7 @@ import {
   ONTOLOGY_SYSTEM_POLICY,
   buildOntologyEvaluatorResponsesRequest,
   buildOntologyGeneratorResponsesRequest,
+  isOntologyGenerationChunk,
   isOntologyRuleVerdict,
 } from "./ontology-prompt.js";
 
@@ -150,6 +151,47 @@ describe("ontology provider prompts", () => {
         ).sort();
         expect([...(objectSchema.required ?? []) as string[]].sort()).toEqual(propertyNames);
       }
+    }
+  });
+
+  it("carries the frozen record bounds into the stricter generator schema", () => {
+    const base = {
+      id: `ont_${"1".repeat(32)}`,
+      meaning_class: "source_supported",
+      locale: "en-US",
+      feature_predicate: { type: "house_cusp", house: 1 },
+      normalized_proposition: "A bounded proposition.",
+      source_fragment_ids: [`srcf_${"2".repeat(32)}`],
+      input_meaning_ids: [],
+      transformation_class: null,
+      tensions: ["A tension."],
+      counter_expressions: ["A counter-expression."],
+      prohibited_claims: ["No diagnosis."],
+      salience_band: "medium",
+      presentation_priority: 0,
+      cluster_tags: ["house_cusp"],
+    };
+    const chunk = (record: unknown) => ({
+      schema_version: "0.7.0",
+      records: [record],
+      complete: true,
+    });
+
+    expect(isOntologyGenerationChunk(chunk(base))).toBe(true);
+    expect(isOntologyGenerationChunk(chunk({
+      ...base,
+      feature_predicate: { type: "house_cusp", house: 12 },
+      presentation_priority: 1000,
+    }))).toBe(true);
+    for (const malformed of [
+      { ...base, feature_predicate: { type: "house_cusp", house: 13 } },
+      { ...base, presentation_priority: 1001 },
+      { ...base, normalized_proposition: "" },
+      { ...base, locale: "not a locale" },
+      { ...base, source_fragment_ids: ["source-private"] },
+      { ...base, feature_predicate: { type: "position", body: "" } },
+    ]) {
+      expect(isOntologyGenerationChunk(chunk(malformed))).toBe(false);
     }
   });
 

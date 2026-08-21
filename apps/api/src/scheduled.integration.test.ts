@@ -367,16 +367,22 @@ describe("scheduled Worker entry point", () => {
   it("deletes and tombstones expired failed artifacts exactly, retrying R2 failures", async () => {
     const send = vi.fn(async () => undefined);
     const queue = { send } as unknown as Queue;
-    const startedAt = new Date("2026-08-14T11:58:00.000Z");
-    const artifactAt = new Date("2026-08-14T12:00:00.000Z");
-    const failedAt = new Date("2026-08-14T12:01:00.000Z");
-    const expiresAt = new Date("2026-08-21T12:01:00.000Z");
+    const recoveredAt = new Date(Date.now() - 1_000);
+    const expiresAt = new Date(recoveredAt.getTime() - 15 * 60_000);
+    const failedAt = new Date(
+      expiresAt.getTime() - 7 * 24 * 60 * 60 * 1_000,
+    );
+    const artifactAt = new Date(failedAt.getTime() - 60_000);
+    const startedAt = new Date(artifactAt.getTime() - 2 * 60_000);
+    // Event chronology stays historical so the retention deadline is expired,
+    // while each owned setup write holds a lease live against D1's real clock.
+    const liveClaimedAt = new Date(Date.now() - 30_000);
     const pipelineEnv = ontologyScheduledEnv(queue);
     const run = await reserveOntologyRun(pipelineEnv, startedAt);
     const reserved = await claimOntologyPipelineRun(
       pipelineEnv,
       { run_id: run.runId, stage_generation: 0 },
-      startedAt,
+      liveClaimedAt,
       "ontology-retention-reserved",
     );
     if (reserved.status !== "claimed") throw new Error("retention reserved claim failed");
@@ -390,7 +396,7 @@ describe("scheduled Worker entry point", () => {
     const corpus = await claimOntologyPipelineRun(
       pipelineEnv,
       { run_id: run.runId, stage_generation: 1 },
-      new Date(startedAt.getTime() + 1),
+      new Date(liveClaimedAt.getTime() + 1),
       "ontology-retention-corpus",
     );
     if (corpus.status !== "claimed") throw new Error("retention corpus claim failed");
@@ -404,7 +410,7 @@ describe("scheduled Worker entry point", () => {
     const generating = await claimOntologyPipelineRun(
       pipelineEnv,
       { run_id: run.runId, stage_generation: 2 },
-      new Date(startedAt.getTime() + 2),
+      new Date(liveClaimedAt.getTime() + 2),
       "ontology-retention-generating",
     );
     if (generating.status !== "claimed") throw new Error("retention generating claim failed");
@@ -475,7 +481,7 @@ describe("scheduled Worker entry point", () => {
     const markedClaim = await claimOntologyPipelineRun(
       pipelineEnv,
       { run_id: markedRun.runId, stage_generation: 0 },
-      startedAt,
+      new Date(liveClaimedAt.getTime() + 3),
       "ontology-retention-marked-owner",
     );
     if (markedClaim.status !== "claimed") {
@@ -563,7 +569,6 @@ describe("scheduled Worker entry point", () => {
 
     // Add real lease and outbox work only after the failed R2 pass, so the
     // measured retry covers the maximum work of every ontology lane together.
-    const recoveredAt = new Date(expiresAt.getTime() + 15 * 60_000);
     const expiredStartedAt = new Date(recoveredAt.getTime() - 10 * 60_000);
     const expiredClaimedAt = new Date(
       recoveredAt.getTime() - 5 * 60_000 - 1_000,
