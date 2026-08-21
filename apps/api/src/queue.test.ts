@@ -176,18 +176,21 @@ describe("ontology queue admission", () => {
     ).first()).toBeNull();
   });
 
-  it("routes enabled work to the later executor seam without claiming it", async () => {
+  it("routes enabled work through the ontology executor and acks committed progress", async () => {
     const reserved = await reserveRun();
     const result = await deliver(
       ONTOLOGY_QUEUE,
       [reserved.message],
       pipelineEnv("internal"),
     );
-    expect(result.retryMessages).toHaveLength(1);
+    expect(result.retryMessages).toEqual([]);
     expect(await env.DB.prepare(
-      `SELECT claim_token, stage_attempt FROM pattern_ontology_pipeline_runs
+      `SELECT stage, stage_generation, claim_token, stage_attempt
+       FROM pattern_ontology_pipeline_runs
        WHERE run_id = ?`,
     ).bind(reserved.runId).first()).toEqual({
+      stage: "corpus_reading",
+      stage_generation: 1,
       claim_token: null,
       stage_attempt: 0,
     });

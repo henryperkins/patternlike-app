@@ -36,6 +36,7 @@ import {
 } from "./services/account-deletion.js";
 import { executePatternJob } from "./services/pattern-execute.js";
 import { pauseOntologyPipelineDelivery } from "./services/ontology-pipeline-enqueue.js";
+import { executeOntologyPipelineDelivery } from "./services/ontology-pipeline-execute.js";
 
 /**
  * The daily-reading consumer.
@@ -191,9 +192,19 @@ export async function queue(
         }
         continue;
       }
-      // Task 6 replaces this retry-only executor seam. Taking a claim before
-      // an executor exists would strand the run behind a live lease.
-      message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
+      try {
+        const outcome = await executeOntologyPipelineDelivery(env, message.body);
+        if (outcome.status === "rescheduled" || outcome.status === "retry") {
+          message.retry({ delaySeconds: outcome.retryAfterSeconds });
+        } else {
+          // Advanced work already committed its successor outbox nudge;
+          // duplicate and terminal deliveries are also safe to acknowledge.
+          message.ack();
+        }
+      } catch {
+        safeLog({ event: "generation_threw", failure_class: "execution_error" });
+        message.retry({ delaySeconds: LEASE_RETRY_DELAY_SECONDS });
+      }
     }
     return;
   }
