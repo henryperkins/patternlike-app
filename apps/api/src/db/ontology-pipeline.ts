@@ -61,9 +61,10 @@ export interface ClaimedOntologyPipelineRun {
 
 export type ClaimOntologyPipelineRunResult =
   | ClaimedOntologyPipelineRun
+  | { status: "parked" }
   | { status: "duplicate" };
 
-export type OntologyPipelinePreclaimDisposition = "claim" | "task7";
+export type OntologyPipelineClaimOwnership = "all" | "task6";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1_000;
 export const MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS = 16;
@@ -104,11 +105,15 @@ export async function claimOntologyPipelineRun(
   message: OntologyPipelineMessage,
   now = new Date(),
   claimToken = `opclaim_${crypto.randomUUID()}`,
+  ownership: OntologyPipelineClaimOwnership = "all",
 ): Promise<ClaimOntologyPipelineRunResult> {
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + CLAIM_LEASE_MS).toISOString();
   const receiptPrefixExpression = claimReceiptPrefixSql("run");
-  const [, claimed] = await env.DB.batch([
+  const ownedStagePredicate = ownership === "task6"
+    ? "AND run.stage IN ('reserved', 'corpus_reading', 'generating', 'compiling', 'evaluating')"
+    : "";
+  const [, claimed, parked] = await env.DB.batch([
     env.DB.prepare(
       `WITH delivery AS (
          SELECT run.*,
@@ -116,6 +121,7 @@ export async function claimOntologyPipelineRun(
          FROM pattern_ontology_pipeline_runs run
          WHERE run.run_id = ? AND run.stage_generation = ?
            AND run.stage NOT IN ('succeeded', 'failed')
+           ${ownedStagePredicate}
            AND run.claim_token IS NULL AND run.lease_expires_at IS NULL
            AND unixepoch(run.available_at) <= unixepoch(?)
        ), counted AS (
@@ -151,6 +157,7 @@ export async function claimOntologyPipelineRun(
            dispatched_at = COALESCE(dispatched_at, ?), updated_at = ?
        WHERE run.run_id = ? AND run.stage_generation = ?
          AND run.stage NOT IN ('succeeded', 'failed')
+         ${ownedStagePredicate}
          AND run.claim_token IS NULL AND run.lease_expires_at IS NULL
          AND unixepoch(run.available_at) <= unixepoch(?)
          AND EXISTS (
@@ -171,8 +178,26 @@ export async function claimOntologyPipelineRun(
       nowIso,
       claimToken,
     ),
+    env.DB.prepare(
+      ownership === "task6"
+        ? `UPDATE pattern_ontology_pipeline_runs
+           SET dispatched_at = NULL, updated_at = ?
+           WHERE run_id = ? AND stage_generation = ?
+             AND stage IN ('regressing', 'signing', 'ingesting')
+             AND claim_token IS NULL AND lease_expires_at IS NULL`
+        : `UPDATE pattern_ontology_pipeline_runs SET updated_at = updated_at
+           WHERE 0 AND run_id = ? AND stage_generation = ? AND ? IS NOT NULL`,
+    ).bind(
+      ...(ownership === "task6"
+        ? [nowIso, message.run_id, message.stage_generation]
+        : [message.run_id, message.stage_generation, nowIso]),
+    ),
   ]);
-  if (claimed.meta.changes !== 1) return { status: "duplicate" };
+  if (claimed.meta.changes !== 1) {
+    return parked.meta.changes === 1
+      ? { status: "parked" }
+      : { status: "duplicate" };
+  }
 
   const row = await env.DB.prepare(
     `SELECT run_id, stage, stage_generation, stage_cursor, stage_attempt,
@@ -183,27 +208,6 @@ export async function claimOntologyPipelineRun(
     throw new Error("ontology_pipeline_claim_integrity_failed");
   }
   return toClaim(row);
-}
-
-/**
- * Read-only handoff gate for stages owned by Task 7. An exact stale generation
- * deliberately falls through to the atomic claim CAS, which closes it as a
- * duplicate without treating a loose stage read as authority.
- */
-export async function classifyOntologyPipelineDeliveryBeforeClaim(
-  env: Pick<Env, "DB">,
-  message: OntologyPipelineMessage,
-): Promise<OntologyPipelinePreclaimDisposition> {
-  const row = await env.DB.prepare(
-    `/* ontology_pipeline_preclaim_stage */
-     SELECT stage FROM pattern_ontology_pipeline_runs
-     WHERE run_id = ? AND stage_generation = ?`,
-  ).bind(message.run_id, message.stage_generation).first<{
-    stage: OntologyPipelineStage;
-  }>();
-  return row && ["regressing", "signing", "ingesting"].includes(row.stage)
-    ? "task7"
-    : "claim";
 }
 
 function claimWhere(): string {

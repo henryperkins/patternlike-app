@@ -15,9 +15,14 @@ import {
 } from "./ontology-packet.js";
 import type { RegisteredOntologyCorpus } from "./ontology-corpus.js";
 import { createOpenAiOntologyPublisher } from "./openai-ontology-publisher.js";
+import {
+  buildOntologyEvaluatorResponsesRequest,
+  buildOntologyGeneratorResponsesRequest,
+} from "./ontology-prompt.js";
 import type { AiGatewayRoute } from "./openai-responses-adapter.js";
 import type {
   OntologyGenerationChunk,
+  OntologyProviderReservationOutcome,
   OntologyRuleVerdict,
 } from "./ontology-publisher.js";
 import {
@@ -65,7 +70,7 @@ function sourceRule(): PatternOntologyRecord {
     id: SOURCE_RULE_ID,
     meaning_class: "source_supported",
     locale: "en-US",
-    feature_predicate: { type: "position", body: "sun" },
+    feature_predicate: { type: "position", body: "sun", house: 1 },
     normalized_proposition: "Direct expression is possible.",
     source_fragment_ids: [FRAGMENT_ID],
     input_meaning_ids: [],
@@ -236,6 +241,7 @@ interface Call {
   url: string;
   headers: Record<string, string>;
   body: Record<string, unknown>;
+  rawBody: string;
   signal: AbortSignal | null;
 }
 
@@ -256,6 +262,7 @@ function stubFetch(
         url: String(input),
         headers: normalized,
         body: JSON.parse(String(init.body)) as Record<string, unknown>,
+        rawBody: String(init.body),
         signal: init.signal ?? null,
       };
       calls.push(call);
@@ -274,15 +281,19 @@ function ok(payload: unknown, headers: Record<string, string> = {}): Response {
 function options(overrides: Partial<{
   timeoutMs: number;
   configuration: OntologyPipelineConfigPin;
-  reserve: (stage: "generator" | "evaluator") => Promise<{ ok: boolean }>;
+  reserve: (
+    stage: "generator" | "evaluator",
+  ) => Promise<OntologyProviderReservationOutcome>;
+  requestBody: string;
 }> = {}) {
   return {
     requestId: "internal-request-id-never-sent",
     timeoutMs: overrides.timeoutMs ?? 5_000,
     configuration: overrides.configuration ?? pin(),
+    requestBody: overrides.requestBody,
     reserve: overrides.reserve ?? (async () => {
       events.push("reserve");
-      return { ok: true };
+      return { ok: true, used: 1 };
     }),
   };
 }
@@ -322,7 +333,7 @@ describe("OpenAI ontology publisher", () => {
       const result = await publisher.generate(generatorPacket(), options({
         reserve: async (stage) => {
           events.push(`reserve:${stage}`);
-          return { ok: false };
+          return { ok: false, reason: "exhausted" };
         },
       }));
 
@@ -347,7 +358,7 @@ describe("OpenAI ontology publisher", () => {
       const result = await publisher.evaluate(evaluatorPacket(), options({
         reserve: async (stage) => {
           seen.push(stage);
-          return { ok: true };
+          return { ok: true, used: 1 };
         },
       }));
 
@@ -359,6 +370,55 @@ describe("OpenAI ontology publisher", () => {
   });
 
   describe("request and credential posture", () => {
+    it("sends the exact caller-frozen canonical request bytes for both passes", async () => {
+      stubFetch((call) => call.body.text &&
+          (call.body.text as { format?: { name?: string } }).format?.name ===
+            "patternlike_ontology_rule_verdict_v7"
+        ? ok(VERDICT)
+        : ok(GENERATION));
+      const publisher = createOpenAiOntologyPublisher(
+        { source: "worker", apiKey: "sk-test" },
+        null,
+      );
+      const generator = generatorPacket();
+      const evaluator = evaluatorPacket();
+      const generatorBody = canonicalJson(
+        buildOntologyGeneratorResponsesRequest(generator.serialized, pin()),
+      );
+      const evaluatorBody = canonicalJson(
+        buildOntologyEvaluatorResponsesRequest(evaluator.serialized, pin()),
+      );
+
+      await publisher.generate(generator, options({ requestBody: generatorBody }));
+      await publisher.evaluate(evaluator, options({ requestBody: evaluatorBody }));
+
+      expect(calls.map((call) => call.rawBody)).toEqual([
+        generatorBody,
+        evaluatorBody,
+      ]);
+    });
+
+    it("refuses request-body drift before reservation or fetch", async () => {
+      stubFetch(() => ok(GENERATION));
+      const publisher = createOpenAiOntologyPublisher(
+        { source: "worker", apiKey: "sk-test" },
+        null,
+      );
+
+      const result = await publisher.generate(
+        generatorPacket(),
+        options({ requestBody: canonicalJson({ model: "drifted" }) }),
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        code: "publisher_output_invalid",
+        safe_detail_code: "schema_mismatch",
+      });
+      expect(events).toEqual([]);
+      expect(calls).toEqual([]);
+    });
+
     it("sends exact direct generator request fields and no correlation id", async () => {
       stubFetch(() => ok(GENERATION));
       const publisher = createOpenAiOntologyPublisher(

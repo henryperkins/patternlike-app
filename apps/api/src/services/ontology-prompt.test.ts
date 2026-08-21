@@ -195,6 +195,65 @@ describe("ontology provider prompts", () => {
     }
   });
 
+  it("uses the frozen M0/M4 predicate vocabularies and type-specific combinations", () => {
+    const base = {
+      id: `ont_${"1".repeat(32)}`,
+      meaning_class: "source_supported",
+      locale: "en-US",
+      feature_predicate: { type: "position", body: "sun", house: 1 },
+      normalized_proposition: "A bounded proposition.",
+      source_fragment_ids: [`srcf_${"2".repeat(32)}`],
+      input_meaning_ids: [],
+      transformation_class: null,
+      tensions: ["A tension."],
+      counter_expressions: ["A counter-expression."],
+      prohibited_claims: ["No diagnosis."],
+      salience_band: "medium",
+      presentation_priority: 0,
+      cluster_tags: ["position"],
+    };
+    const chunk = (featurePredicate: unknown) => ({
+      schema_version: "0.7.0",
+      records: [{ ...base, feature_predicate: featurePredicate }],
+      complete: true,
+    });
+
+    for (const predicate of [
+      { type: "position", body: "sun", house: 1 },
+      {
+        type: "aspect",
+        body_a: "sun",
+        body_b: "moon",
+        aspect: "opposition",
+      },
+      { type: "pattern", pattern: "grand_trine" },
+      { type: "angle", angle: "midheaven" },
+      { type: "house_cusp", house: 12 },
+      { type: "uncertainty", accuracy: "approximate" },
+    ]) {
+      expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
+        .toBe(true);
+    }
+
+    for (const predicate of [
+      { type: "position", body: "ceres", house: 1 },
+      { type: "position", body: "sun" },
+      {
+        type: "aspect",
+        body_a: "sun",
+        body_b: "moon",
+        aspect: "quincunx",
+      },
+      { type: "aspect", aspect: "square" },
+      { type: "pattern", pattern: "invented_configuration" },
+      { type: "angle", angle: "descendant" },
+      { type: "uncertainty", accuracy: "precise-ish" },
+    ]) {
+      expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
+        .toBe(false);
+    }
+  });
+
   it("makes the evaluator verdict exactly the nine section 23.7 dimensions", () => {
     expect(ONTOLOGY_EVALUATOR_DIMENSIONS).toEqual([
       "source_support",

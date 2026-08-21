@@ -207,6 +207,8 @@ export interface OpenAiResponsesRunOptions {
   route: AiGatewayRoute | null;
   timeoutMs: number;
   body: unknown;
+  /** Exact credential-free JSON bytes prepared by the semantic publisher. */
+  serializedBody?: string;
   /** Awaited after all synchronous preparation and immediately before fetch. */
   reserve?: () => Promise<{ ok: boolean }>;
 }
@@ -393,7 +395,7 @@ export async function runOpenAiResponsesRequest(
 
   const url = responsesUrlFor(options.route);
   const headers = responsesHeaders(options.credential, options.route);
-  const requestBody = JSON.stringify(options.body);
+  const requestBody = options.serializedBody ?? JSON.stringify(options.body);
 
   if (options.reserve) {
     let reserved: { ok: boolean };

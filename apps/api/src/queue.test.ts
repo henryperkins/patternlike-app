@@ -1,6 +1,7 @@
 import {
   createExecutionContext,
   createMessageBatch,
+  createScheduledController,
   env,
   getQueueResult,
 } from "cloudflare:test";
@@ -14,6 +15,10 @@ import type {
   OntologyPipelineMessage,
 } from "./env.js";
 import { isOntologyPipelineMessage, queue } from "./queue.js";
+import {
+  ONTOLOGY_PIPELINE_MAINTENANCE_CRON,
+  scheduled,
+} from "./scheduled.js";
 import { enqueueOntologyPipelineRun } from "./services/ontology-pipeline-enqueue.js";
 import { registerOntologyCorpus } from "./services/ontology-corpus.js";
 
@@ -29,7 +34,7 @@ function pipelineEnv(
   rollout: "off" | "internal",
   overrides: Partial<Env> = {},
 ): Env {
-  return Object.assign(Object.create(env), {
+  const values = {
     ONTOLOGY_PIPELINE_QUEUE: fakeQueue(),
     ONTOLOGY_PIPELINE_ROLLOUT: rollout,
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
@@ -52,10 +57,11 @@ function pipelineEnv(
     AI_GATEWAY_ID: undefined,
     AI_GATEWAY_TOKEN: undefined,
     ...overrides,
-  }) as Env;
+  };
+  return Object.create(env, Object.getOwnPropertyDescriptors(values)) as Env;
 }
 
-async function reserveRun(): Promise<{
+async function reserveRun(reservationEnv = pipelineEnv("internal")): Promise<{
   runId: string;
   message: OntologyPipelineMessage;
 }> {
@@ -67,7 +73,7 @@ async function reserveRun(): Promise<{
   );
   await registerOntologyCorpus(env, manifest);
   const result = await enqueueOntologyPipelineRun(
-    pipelineEnv("internal"),
+    reservationEnv,
     {
       idempotencyKey: `queue-${crypto.randomUUID()}`,
       corpusReleaseId: releaseId,
@@ -85,19 +91,58 @@ async function deliver(
   queueName: string,
   bodies: unknown[],
   deliveryEnv: Env,
+  attempts = 1,
 ) {
   const batch = createMessageBatch<unknown>(
     queueName,
     bodies.map((body, index) => ({
       id: `ontology-message-${index}-${crypto.randomUUID()}`,
       timestamp: NOW,
-      attempts: 1,
+      attempts,
       body,
     })),
   );
   const context = createExecutionContext();
   await queue(batch, deliveryEnv);
   return getQueueResult(batch, context);
+}
+
+async function seedStage(
+  runId: string,
+  target: "evaluating" | "regressing",
+): Promise<void> {
+  const stages = [
+    "corpus_reading",
+    "generating",
+    "compiling",
+    "evaluating",
+    "regressing",
+  ] as const;
+  const targetIndex = stages.indexOf(target);
+  for (let index = 0; index <= targetIndex; index += 1) {
+    const stage = stages[index]!;
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = ?, stage_generation = ?, stage_cursor = 0, stage_attempt = 0,
+           claim_token = NULL, lease_expires_at = NULL, dispatched_at = NULL,
+           candidate_hash = COALESCE(candidate_hash, ?),
+           compilation_report_hash = COALESCE(compilation_report_hash, ?),
+           evaluation_report_hash = COALESCE(evaluation_report_hash, ?)
+       WHERE run_id = ?`,
+    ).bind(
+      stage,
+      index + 1,
+      stage === "compiling" ? `sha256:${"3".repeat(64)}` : null,
+      stage === "evaluating" ? `sha256:${"4".repeat(64)}` : null,
+      stage === "regressing" ? `sha256:${"5".repeat(64)}` : null,
+      runId,
+    ).run();
+  }
+  await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_runs
+     SET dispatched_at = ?, updated_at = ?
+     WHERE run_id = ?`,
+  ).bind(NOW.toISOString(), NOW.toISOString(), runId).run();
 }
 
 describe("ontology queue admission", () => {
@@ -194,5 +239,142 @@ describe("ontology queue admission", () => {
       claim_token: null,
       stage_attempt: 0,
     });
+  });
+
+  it("acks and durably parks exact Task 7 stages through the configured retry and DLQ horizon", async () => {
+    const send = vi.fn(async () => undefined);
+    const deliveryEnv = pipelineEnv("internal", {
+      ONTOLOGY_PIPELINE_QUEUE: { send } as unknown as Queue<OntologyPipelineMessage>,
+    });
+    const reserved = await reserveRun(deliveryEnv);
+    await seedStage(reserved.runId, "regressing");
+    const message = { run_id: reserved.runId, stage_generation: 5 };
+
+    for (let attempts = 1; attempts <= 4; attempts += 1) {
+      const result = await deliver(ONTOLOGY_QUEUE, [message], deliveryEnv, attempts);
+      expect(result.retryMessages, `delivery attempt ${attempts}`).toEqual([]);
+    }
+
+    expect(await env.DB.prepare(
+      `SELECT stage, stage_generation, stage_attempt, claim_token,
+              lease_expires_at, dispatched_at, failure_class
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(reserved.runId).first()).toEqual({
+      stage: "regressing",
+      stage_generation: 5,
+      stage_attempt: 0,
+      claim_token: null,
+      lease_expires_at: null,
+      dispatched_at: null,
+      failure_class: null,
+    });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM audit_events
+       WHERE resource_id = ? AND action = 'ontology_pipeline.claim_acquired'`,
+    ).bind(reserved.runId).first()).toEqual({ count: 0 });
+
+    await scheduled(
+      createScheduledController({
+        scheduledTime: NOW.getTime() + 60 * 60_000,
+        cron: ONTOLOGY_PIPELINE_MAINTENANCE_CRON,
+      }),
+      deliveryEnv,
+      createExecutionContext(),
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("atomically excludes a future-generation Task 7 handoff that races the claim", async () => {
+    const reserved = await reserveRun();
+    await seedStage(reserved.runId, "evaluating");
+    let raced = false;
+    const racingDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "batch") return Reflect.get(target, property, receiver);
+        return async (statements: D1PreparedStatement[]) => {
+          if (!raced) {
+            raced = true;
+            await env.DB.prepare(
+              `UPDATE pattern_ontology_pipeline_runs
+               SET stage = 'regressing', stage_generation = 5,
+                   stage_cursor = 0, stage_attempt = 0,
+                   claim_token = NULL, lease_expires_at = NULL,
+                   dispatched_at = NULL,
+                   evaluation_report_hash = ?
+               WHERE run_id = ?`,
+            ).bind(`sha256:${"5".repeat(64)}`, reserved.runId).run();
+          }
+          return target.batch(statements);
+        };
+      },
+    });
+    const deliveryEnv = pipelineEnv("internal", { DB: racingDb });
+
+    const result = await deliver(
+      ONTOLOGY_QUEUE,
+      [{ run_id: reserved.runId, stage_generation: 5 }],
+      deliveryEnv,
+    );
+
+    expect(result.retryMessages).toEqual([]);
+    expect(await env.DB.prepare(
+      `SELECT stage, stage_generation, claim_token, lease_expires_at, dispatched_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(reserved.runId).first()).toEqual({
+      stage: "regressing",
+      stage_generation: 5,
+      claim_token: null,
+      lease_expires_at: null,
+      dispatched_at: null,
+    });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM audit_events
+       WHERE resource_id = ? AND action = 'ontology_pipeline.claim_acquired'`,
+    ).bind(reserved.runId).first()).toEqual({ count: 0 });
+  });
+
+  it("recovers a preclaim D1 failure through scheduled stale-dispatch repair after main retries", async () => {
+    const send = vi.fn(async () => undefined);
+    const baseEnv = pipelineEnv("internal", {
+      ONTOLOGY_PIPELINE_QUEUE: { send } as unknown as Queue<OntologyPipelineMessage>,
+    });
+    const reserved = await reserveRun(baseEnv);
+    const failingDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property !== "batch") return Reflect.get(target, property, receiver);
+        return async () => { throw new Error("injected claim D1 outage"); };
+      },
+    });
+    const failingEnv = pipelineEnv("internal", { DB: failingDb });
+    for (let attempts = 1; attempts <= 3; attempts += 1) {
+      const result = await deliver(
+        ONTOLOGY_QUEUE,
+        [reserved.message],
+        failingEnv,
+        attempts,
+      );
+      expect(result.retryMessages).toHaveLength(1);
+    }
+
+    const recoveredAt = new Date(NOW.getTime() + 16 * 60_000);
+    await scheduled(
+      createScheduledController({
+        scheduledTime: recoveredAt.getTime(),
+        cron: ONTOLOGY_PIPELINE_MAINTENANCE_CRON,
+      }),
+      baseEnv,
+      createExecutionContext(),
+    );
+
+    expect(await env.DB.prepare(
+      `SELECT stage, stage_generation, claim_token, dispatched_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(reserved.runId).first()).toEqual({
+      stage: "reserved",
+      stage_generation: 0,
+      claim_token: null,
+      dispatched_at: recoveredAt.toISOString(),
+    });
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

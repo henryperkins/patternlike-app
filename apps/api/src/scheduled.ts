@@ -5,7 +5,10 @@ import { runPrivacyMaintenance } from "./services/privacy-maintenance.js";
 import { sweepPatternJobs } from "./services/pattern-sweep.js";
 import { safeLog } from "./services/safe-log.js";
 import { releaseExpiredOntologyPipelineLeases } from "./db/ontology-pipeline.js";
-import { dispatchUndispatchedOntologyPipelineRuns } from "./services/ontology-pipeline-enqueue.js";
+import {
+  dispatchUndispatchedOntologyPipelineRuns,
+  recoverStaleOntologyPipelineDispatches,
+} from "./services/ontology-pipeline-enqueue.js";
 import { sweepExpiredOntologyPipelineArtifacts } from "./services/ontology-pipeline-artifacts.js";
 
 export const ONTOLOGY_PIPELINE_MAINTENANCE_CRON =
@@ -67,6 +70,13 @@ async function runOntologyPipelineMaintenance(
   } catch {
     if (laneFailure === undefined) {
       laneFailure = new Error("ontology_pipeline_lease_recovery_failed");
+    }
+  }
+  try {
+    await recoverStaleOntologyPipelineDispatches(env, scheduledAt);
+  } catch {
+    if (laneFailure === undefined) {
+      laneFailure = new Error("ontology_pipeline_dispatch_recovery_failed");
     }
   }
   try {

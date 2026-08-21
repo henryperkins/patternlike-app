@@ -19,7 +19,6 @@ import {
   advanceOntologyPipelineCursor,
   advanceOntologyPipelineStage,
   claimOntologyPipelineRun,
-  classifyOntologyPipelineDeliveryBeforeClaim,
   failOntologyPipelineRun,
   retryOntologyPipelineStage,
   type ClaimedOntologyPipelineRun,
@@ -29,7 +28,7 @@ import {
   validateOntologyCandidateRelease,
 } from "./ontology-candidate-validation.js";
 import {
-  createOntologyProviderCallReservation,
+  createClaimedOntologyProviderCallReservation,
 } from "../db/ontology-provider-usage.js";
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import {
@@ -78,6 +77,8 @@ import {
   dispatchUndispatchedOntologyPipelineRuns,
 } from "./ontology-pipeline-enqueue.js";
 import {
+  buildOntologyEvaluatorResponsesRequest,
+  buildOntologyGeneratorResponsesRequest,
   isOntologyGenerationChunk,
   isOntologyRuleVerdict,
 } from "./ontology-prompt.js";
@@ -142,6 +143,7 @@ export type OntologyPipelineExecuteOutcome =
   | { status: "advanced" }
   | { status: "rescheduled"; retryAfterSeconds: number }
   | { status: "duplicate" }
+  | { status: "parked" }
   | { status: "terminal" }
   | { status: "retry"; retryAfterSeconds: number };
 
@@ -578,6 +580,29 @@ async function putArtifact(
   );
 }
 
+async function assertProviderRunCapacity(
+  env: Pick<Env, "DB">,
+  claim: ClaimedOntologyPipelineRun,
+  pass: "generator" | "evaluator",
+  limit: number,
+): Promise<void> {
+  const artifactClass = pass === "generator"
+    ? "generator_request"
+    : "evaluator_request";
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS request_count
+     FROM pattern_ontology_pipeline_artifacts
+     WHERE run_id = ? AND artifact_class = ?`,
+  ).bind(claim.runId, artifactClass).first<{ request_count: number }>();
+  if (
+    !row ||
+    !Number.isSafeInteger(row.request_count) ||
+    row.request_count >= limit
+  ) {
+    terminal("attempts_exhausted");
+  }
+}
+
 async function readCurrentArtifact(
   env: Env,
   claim: ClaimedOntologyPipelineRun,
@@ -632,6 +657,12 @@ function providerFailureClass(
 ): { failureClass: OntologyPipelineFailureClass; retryable: boolean } {
   if (outcome.code === "publisher_budget_exhausted") {
     return { failureClass: "provider_budget_exhausted", retryable: false };
+  }
+  if (outcome.code === "publisher_run_call_limit_exhausted") {
+    return { failureClass: "attempts_exhausted", retryable: false };
+  }
+  if (outcome.code === "publisher_claim_unavailable") {
+    return { failureClass: "provider_unavailable", retryable: true };
   }
   if (outcome.code === "publisher_refused") {
     return { failureClass: "provider_refusal", retryable: false };
@@ -935,6 +966,7 @@ async function buildCompleteCandidate(
     canonicalBytes,
     corpusLocale: corpus.release.locale,
     permittedFragmentIds: new Set(corpus.fragmentIndex.keys()),
+    fragments: corpus.fragmentIndex,
     coverageTargets: command.generator_input.coverage_targets,
     maximumCandidateRecords: command.limits.maximum_candidate_records,
     maximumCandidateBytes: command.limits.maximum_candidate_bytes,
@@ -991,6 +1023,12 @@ async function executeGenerating(
     if (ambiguousRequest) {
       return await rescheduleAmbiguousProviderRequest(env, claim, clock);
     }
+    await assertProviderRunCapacity(
+      env,
+      claim,
+      "generator",
+      context.command.limits.maximum_generation_chunks,
+    );
     const predecessor = await loadOntologyPipelinePredecessor(
       env,
       context.command.generator_input.active_machine_predecessor,
@@ -1004,15 +1042,26 @@ async function executeGenerating(
       continuation: generatorContinuation(context.command, progress),
     }, pinFromCommand(context.command));
     if (!packet.ok) terminal("candidate_invalid");
-    await putArtifact(env, claim, "generator_request", packet.serialized, clock);
+    const pin = pinFromCommand(context.command);
+    const requestBody = canonicalJson(
+      buildOntologyGeneratorResponsesRequest(packet.serialized, pin),
+    );
+    await putArtifact(env, claim, "generator_request", requestBody, clock);
     const outcome = await publisher.generate(packet, {
       requestId: `opreq_${crypto.randomUUID()}`,
       timeoutMs: context.command.generator.timeout_ms,
-      configuration: pinFromCommand(context.command),
-      reserve: createOntologyProviderCallReservation(
+      configuration: pin,
+      requestBody,
+      reserve: createClaimedOntologyProviderCallReservation(
         env,
-        context.command.daily_provider_call_limit,
-        clock,
+        claim,
+        {
+          expectedPass: "generator",
+          dailyLimit: context.command.daily_provider_call_limit,
+          runLimit: context.command.limits.maximum_generation_chunks,
+          timeoutMs: context.command.generator.timeout_ms,
+          now: clock,
+        },
       ),
     });
     if (!outcome.ok) {
@@ -1191,6 +1240,7 @@ async function parseCandidateRelease(
     canonicalBytes: text,
     corpusLocale: corpus.release.locale,
     permittedFragmentIds: new Set(corpus.fragmentIndex.keys()),
+    fragments: corpus.fragmentIndex,
     coverageTargets: command.generator_input.coverage_targets,
     maximumCandidateRecords: command.limits.maximum_candidate_records,
     maximumCandidateBytes: command.limits.maximum_candidate_bytes,
@@ -1364,6 +1414,12 @@ async function executeEvaluating(
     if (ambiguousRequest) {
       return await rescheduleAmbiguousProviderRequest(env, claim, clock);
     }
+    await assertProviderRunCapacity(
+      env,
+      claim,
+      "evaluator",
+      context.command.limits.maximum_evaluator_calls,
+    );
     const packet = buildOntologyEvaluatorPacket({
       corpus,
       rule,
@@ -1371,15 +1427,26 @@ async function executeEvaluating(
       compilerSummary,
     }, pinFromCommand(context.command));
     if (!packet.ok) terminal("candidate_invalid");
-    await putArtifact(env, claim, "evaluator_request", packet.serialized, clock);
+    const pin = pinFromCommand(context.command);
+    const requestBody = canonicalJson(
+      buildOntologyEvaluatorResponsesRequest(packet.serialized, pin),
+    );
+    await putArtifact(env, claim, "evaluator_request", requestBody, clock);
     const outcome = await publisher.evaluate(packet, {
       requestId: `opreq_${crypto.randomUUID()}`,
       timeoutMs: context.command.evaluator.timeout_ms,
-      configuration: pinFromCommand(context.command),
-      reserve: createOntologyProviderCallReservation(
+      configuration: pin,
+      requestBody,
+      reserve: createClaimedOntologyProviderCallReservation(
         env,
-        context.command.daily_provider_call_limit,
-        clock,
+        claim,
+        {
+          expectedPass: "evaluator",
+          dailyLimit: context.command.daily_provider_call_limit,
+          runLimit: context.command.limits.maximum_evaluator_calls,
+          timeoutMs: context.command.evaluator.timeout_ms,
+          now: clock,
+        },
       ),
     });
     if (!outcome.ok) {
@@ -1541,18 +1608,20 @@ export async function executeOntologyPipelineDelivery(
   if (!resolved.ok || resolved.rollout !== "internal" || !resolved.config) {
     return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
   }
+  let claim;
   try {
-    if (
-      await classifyOntologyPipelineDeliveryBeforeClaim(env, message) ===
-        "task7"
-    ) {
-      return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
-    }
+    claim = await claimOntologyPipelineRun(
+      env,
+      message,
+      clock(),
+      `opclaim_${crypto.randomUUID()}`,
+      "task6",
+    );
   } catch {
     return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
   }
-  const claim = await claimOntologyPipelineRun(env, message, clock());
   if (claim.status === "duplicate") return { status: "duplicate" };
+  if (claim.status === "parked") return { status: "parked" };
 
   try {
     const context = await loadExecutionContext(env, claim, resolved.config);

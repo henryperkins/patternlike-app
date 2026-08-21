@@ -1,4 +1,8 @@
-import { canonicalJson, type PatternOntologyRelease } from "@patternlike/shared";
+import {
+  canonicalJson,
+  type PatternOntologyRecord,
+  type PatternOntologyRelease,
+} from "@patternlike/shared";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +10,16 @@ import {
 } from "./ontology-candidate-validation.js";
 
 const FRAGMENT_ID = `srcf_${"a".repeat(32)}`;
+
+const FRAGMENT = {
+  id: FRAGMENT_ID,
+  corpus_release_id: "corpus-candidate-validation",
+  locale: "en-US",
+  normalized_proposition: "A bounded source proposition.",
+  excerpt: "A bounded source excerpt.",
+  license_class: "internal_synthetic" as const,
+  allowed_transformations: ["intersection" as const],
+};
 
 function release(): PatternOntologyRelease {
   return {
@@ -50,6 +64,7 @@ function validate(candidate: PatternOntologyRelease) {
     canonicalBytes,
     corpusLocale: "en-US",
     permittedFragmentIds: new Set([FRAGMENT_ID]),
+    fragments: new Map([[FRAGMENT_ID, FRAGMENT]]),
     coverageTargets: [{
       feature_class: "house_cusp",
       minimum_source_supported: 1,
@@ -106,6 +121,21 @@ describe("frozen ontology candidate validation", () => {
     }
   });
 
+  it("requires trimmed nonempty tension, counter-expression, and prohibited-claim entries", () => {
+    for (const field of [
+      "tensions",
+      "counter_expressions",
+      "prohibited_claims",
+    ] as const) {
+      const candidate = release();
+      candidate.records[0]![field] = [" \t\n "];
+      expect(validate(candidate), field).toEqual({
+        ok: false,
+        code: "candidate_policy_invalid",
+      });
+    }
+  });
+
   it("allows non-claim-bearing expression guidance without synthesis inputs", () => {
     const candidate = release();
     candidate.records.push({
@@ -149,6 +179,63 @@ describe("frozen ontology candidate validation", () => {
     });
   });
 
+  it("requires distinct synthesis inputs and a transformation allowed by every terminating source", () => {
+    const candidate = release();
+    const secondSource = {
+      ...candidate.records[0]!,
+      id: `ont_${"2".repeat(32)}`,
+      source_fragment_ids: [...candidate.records[0]!.source_fragment_ids],
+      input_meaning_ids: [],
+    };
+    const synthesis: PatternOntologyRecord = {
+      ...candidate.records[0]!,
+      id: `ont_${"3".repeat(32)}`,
+      meaning_class: "derived_synthesis" as const,
+      normalized_proposition: "A bounded synthesis of two source meanings.",
+      source_fragment_ids: [],
+      input_meaning_ids: [candidate.records[0]!.id, secondSource.id],
+      transformation_class: "contrast",
+    };
+    candidate.records.push(secondSource, synthesis);
+
+    expect(validate(candidate)).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+    });
+
+    synthesis.transformation_class = "intersection";
+    synthesis.input_meaning_ids = [candidate.records[0]!.id, candidate.records[0]!.id];
+    expect(validate(candidate)).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+    });
+  });
+
+  it("enforces source exclusions across the complete record text including prohibited claims", () => {
+    const candidate = release();
+    candidate.records[0]!.prohibited_claims = ["A forbidden extension."];
+    const canonicalBytes = canonicalJson(candidate);
+    expect(validateOntologyCandidateRelease(candidate, {
+      canonicalBytes,
+      corpusLocale: "en-US",
+      permittedFragmentIds: new Set([FRAGMENT_ID]),
+      fragments: new Map([[FRAGMENT_ID, {
+        ...FRAGMENT,
+        exclusions: ["forbidden extension"],
+      }]]),
+      coverageTargets: [{
+        feature_class: "house_cusp",
+        minimum_source_supported: 1,
+        minimum_total: 1,
+      }],
+      maximumCandidateRecords: 64,
+      maximumCandidateBytes: 262144,
+    })).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+    });
+  });
+
   it("rejects astrological assertions disguised as expression guidance", () => {
     const candidate = release();
     candidate.records.push({
@@ -165,6 +252,41 @@ describe("frozen ontology candidate validation", () => {
       ok: false,
       code: "candidate_policy_invalid",
     });
+  });
+
+  it("rejects sign and psychological assertions including hyphenated life-event variants without rejecting valid guidance", () => {
+    for (const proposition of [
+      "State that a sign determines a person’s temperament.",
+      "Describe a true-node placement as a guaranteed life-event.",
+      "Say that a grand-trine predicts psychological traits.",
+    ]) {
+      const candidate = release();
+      candidate.records.push({
+        ...candidate.records[0]!,
+        id: `ont_${"2".repeat(32)}`,
+        meaning_class: "expression_guidance",
+        normalized_proposition: proposition,
+        source_fragment_ids: [],
+        input_meaning_ids: [],
+        transformation_class: null,
+      });
+      expect(validate(candidate), proposition).toEqual({
+        ok: false,
+        code: "candidate_policy_invalid",
+      });
+    }
+
+    const valid = release();
+    valid.records.push({
+      ...valid.records[0]!,
+      id: `ont_${"2".repeat(32)}`,
+      meaning_class: "expression_guidance",
+      normalized_proposition: "Use a concise title with measured plain-language pacing.",
+      source_fragment_ids: [],
+      input_meaning_ids: [],
+      transformation_class: null,
+    });
+    expect(validate(valid)).toMatchObject({ ok: true });
   });
 
   it("enforces the exact 64-record and 262144-byte inclusive ceilings", () => {

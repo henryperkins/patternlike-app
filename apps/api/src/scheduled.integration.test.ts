@@ -358,7 +358,11 @@ describe("scheduled Worker entry point", () => {
       createExecutionContext(),
     )).resolves.toBeUndefined();
     expect(incumbentQueryAttempted).toBe(false);
-    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(send).toHaveBeenCalledWith({
+      run_id: run.runId,
+      stage_generation: 0,
+    });
     expect(await env.DB.prepare(
       `SELECT dispatched_at FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
     ).bind(run.runId).first()).toEqual({ dispatched_at: now.toISOString() });

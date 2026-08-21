@@ -134,12 +134,7 @@ export interface OntologyGeneratorDocument {
 export interface OntologyEvaluatorDocument {
   rule: PatternOntologyRecord;
   cited_meanings: PatternOntologyRecord[];
-  permitted_fragments: Array<{
-    id: string;
-    normalized_proposition: string;
-    excerpt: string;
-    allowed_transformations: string[];
-  }>;
+  permitted_fragments: ProviderCorpusFragment[];
   compiler_summary: {
     rule_id: string;
     compiler_passed: boolean;
@@ -595,12 +590,7 @@ export function buildOntologyGeneratorPacket(
 function permittedFragment(
   fragment: OntologyCorpusFragment,
 ): OntologyEvaluatorDocument["permitted_fragments"][number] {
-  return {
-    id: fragment.id,
-    normalized_proposition: fragment.normalized_proposition,
-    excerpt: fragment.excerpt,
-    allowed_transformations: copyStrings(fragment.allowed_transformations),
-  };
+  return copyCorpusFragment(fragment);
 }
 
 export function buildOntologyEvaluatorPacket(

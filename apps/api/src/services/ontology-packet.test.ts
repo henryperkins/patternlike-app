@@ -409,8 +409,16 @@ describe("ontology provider packet builders", () => {
       expect(result.document.permitted_fragments).toEqual([
         {
           id: FRAGMENT_ID,
+          corpus_release_id: "corpus-task-4",
+          locale: "en-US",
+          title: "Licensed test source",
+          author: "Test Author",
+          edition: "First",
+          location: "p. 12",
+          exclusions: ["Do not extend this proposition to a diagnosis."],
           normalized_proposition: "Direct expression is possible.",
           excerpt: "A short, licensed source excerpt.",
+          license_class: "licensed_excerpt",
           allowed_transformations: ["intersection", "tension"],
         },
       ]);

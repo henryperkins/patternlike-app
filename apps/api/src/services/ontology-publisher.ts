@@ -12,6 +12,14 @@ import type {
 } from "./ontology-packet.js";
 
 export type OntologyProviderPass = "generator" | "evaluator";
+export type OntologyProviderReservationFailureReason =
+  | "exhausted"
+  | "claim_unavailable"
+  | "run_exhausted";
+
+export type OntologyProviderReservationOutcome =
+  | { ok: true; used: number }
+  | { ok: false; reason: OntologyProviderReservationFailureReason };
 
 export interface OntologyGenerationChunk {
   schema_version: "0.7.0";
@@ -43,8 +51,12 @@ export interface OntologyPassOptions {
   requestId: string;
   timeoutMs: number;
   configuration: OntologyPipelineConfigPin;
+  /** Canonical credential-free body persisted before this provider pass. */
+  requestBody?: string;
   /** Awaited inside the adapter immediately before its one permitted fetch. */
-  reserve: (stageClass: OntologyProviderPass) => Promise<{ ok: boolean }>;
+  reserve: (
+    stageClass: OntologyProviderPass,
+  ) => Promise<OntologyProviderReservationOutcome>;
 }
 
 export interface OntologyPassMetadata {
@@ -60,7 +72,9 @@ export interface OntologyPassMetadata {
 
 export type OntologyPublisherFailureCode =
   | PublisherFailureCode
-  | "publisher_budget_exhausted";
+  | "publisher_budget_exhausted"
+  | "publisher_claim_unavailable"
+  | "publisher_run_call_limit_exhausted";
 
 export type OntologyPublisherSafeDetailCode =
   | PublisherSafeDetailCode
@@ -68,7 +82,9 @@ export type OntologyPublisherSafeDetailCode =
   | "gateway_dlp_match"
   | "provider_4xx"
   | "response_too_large"
-  | "daily_call_limit_reached";
+  | "daily_call_limit_reached"
+  | "claim_fence_refused"
+  | "run_call_limit_reached";
 
 export type OntologyPassOutcome<T> =
   | {

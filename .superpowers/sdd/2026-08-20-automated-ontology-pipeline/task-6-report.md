@@ -616,3 +616,117 @@ success against the exact live run/claim transition.
 
 Exact commit subject prepared: `api: close ontology execution safety gaps`.
 The full resulting SHA is returned outside this self-referential report.
+
+## Second rereview closure: handoff, request, and spend fences
+
+This section supersedes the first-rereview description of downstream parking
+and provider accounting. The second rereview found six additional Important
+gaps; all six are closed on top of
+`aca7690f35b6638d77588798f43770a56638626e`.
+
+### Atomic Task 6 ownership and durable handoff parking
+
+The former read-before-claim stage classifier is removed. Task 6 stage
+ownership is now part of the same D1 batch that inserts the claim receipt and
+takes the lease. If the exact generation has already advanced to `regressing`,
+`signing`, or `ingesting`, that batch instead clears its dispatch marker without
+creating a receipt or claim. The Queue acknowledges this durable `parked`
+outcome; repeated main-queue attempts therefore cannot consume the configured
+retry/DLQ horizon.
+
+Task 6 outbox queries hard-exclude all three Task 7 stages. A bounded scheduled
+repair clears dispatch markers older than 15 minutes for unclaimed Task 6
+stages, so a D1 outage across all Queue retries cannot strand a pre-Task-7 run.
+The claim CAS remains authoritative when an old Queue delivery races that
+repair. Tests cover attempts 1 through 4, a future-generation handoff race, and
+three consecutive claim-transaction failures followed by scheduled recovery.
+
+### Exact claimed reservation and physical call ceilings
+
+Generator/evaluator request artifacts are now the immutable physical-call
+identities. Before creating another request the executor counts the complete
+run inventory and closes at 16 generator or 64 evaluator identities. Retries,
+ambiguous requests, cursor advances, and UTC-day changes all consume the same
+run-scoped ceiling; the seventeenth/sixty-fifth request is never written or
+fetched.
+
+Immediately before the sole fetch, one atomic D1 statement increments the
+shared daily ledger only if all of these remain true:
+
+- the full run/stage/generation/cursor/attempt/token/lease tuple is still the
+  exact owner;
+- D1's current clock shows at least the frozen provider timeout plus a 30-second
+  response-persistence margin remaining;
+- the exact current request artifact exists and is live;
+- the complete request-artifact inventory is still within its run ceiling; and
+- the shared UTC-day total remains below 500.
+
+A lost or short claim is a true retry only while the exact retry CAS still
+owns the row; otherwise it closes duplicate. A run ceiling maps directly to
+`attempts_exhausted`, while daily exhaustion remains the existing terminal
+budget class. Once the atomic reservation succeeds, a timeout/failure still
+owns the unit. Tests prove stale ownership before reservation makes zero calls
+and charges, loss after reservation charges one but cannot persist or advance,
+short leases retry (or close at attempt 15), concurrent final delivery admits
+one call, and cross-day retry paths stop at exactly 16/64 physical calls.
+
+### Exact provider request artifact
+
+The stored request artifact is now the JCS-canonical, credential-free complete
+OpenAI Responses body—not the inner ontology packet. The semantic publisher
+reconstructs that body from the frozen packet and configuration, rejects any
+caller/body drift before reservation, and passes those exact serialized bytes
+to the shared transport. Generator and evaluator tests compare the decrypted
+artifact with the exact fetch body and prove that credentials, gateway headers,
+claim/run identities, and object pointers are absent.
+
+### Frozen predicate and deterministic source policy closure
+
+The provider schema and complete-candidate validator now enforce the frozen M0
+celestial-body/aspect/accuracy vocabulary, the M0 chart-pattern vocabulary, and
+the exact M4 type-specific predicate combinations. Because the frozen M7
+projection has no `sign` member, a `position` predicate must carry a valid
+house. Unknown bodies/aspects/patterns/angles/accuracy values and incomplete
+type combinations close before acceptance.
+
+Candidate policy now resolves complete source-fragment objects, not only IDs.
+It requires trimmed nonempty source obligations, distinct synthesis inputs,
+cycle-free source termination, a transformation allowed by every terminal
+source, and case-insensitive enforcement of every source exclusion across the
+complete record text. Evaluator packets retain the complete permitted fragment
+metadata. Expression guidance remains allowed only when it carries no source or
+synthesis edge and contains no astrological, diagnostic/predictive,
+psychological/personality/temperament/trait, or life-event assertion, including
+underscore/hyphen/space variants of frozen terms.
+
+### Second-rereview TDD evidence
+
+The consolidated six-suite RED run failed all six files: 42 failed and 76
+passed (118 total). A separate seam run recorded seven independent failures,
+and the physical generator-cap regression proved call 17 was admitted across
+UTC days. Production remained unchanged at that checkpoint.
+
+Settled GREEN evidence:
+
+- six Task 6 acceptance files: 6/6 files, 118/118 tests passed;
+- exact evaluation/executor lane: 2/2 files, 42/42 tests passed;
+- DB/outbox/artifact/scheduled/route compatibility: 6/6 files, 136/136 tests
+  passed;
+- `npm run typecheck -w @patternlike/api`: both TypeScript projects passed;
+- `npm test -w @patternlike/api`: main Worker suite 90 files / 1,625 tests,
+  M3 compatibility 1/1, and Wrangler config 2/2 all passed;
+- `npm run test:contracts`: all frozen schema/OpenAPI lanes passed and all 12
+  migrations fresh-applied into 46 tables with clean foreign-key/quick checks;
+- `npm run build -w @patternlike/api`: production dry-run passed with
+  `ONTOLOGY_PIPELINE_ROLLOUT=off` and no deployment;
+- `git diff --check`: passed; and
+- `git diff --exit-code aca7690f35b6638d77588798f43770a56638626e --
+  db/d1 contracts`: passed with no output.
+
+No live provider, deploy, remote migration, secret change, push, merge, or
+rollout action occurred. Production cron resolution remains empty. No blocking
+Task 6 concern remains; Task 7 still exclusively owns regression, signing,
+ingestion, activation, and terminal success.
+
+Exact second-rereview commit subject prepared:
+`api: fence ontology handoff requests and budgets`.

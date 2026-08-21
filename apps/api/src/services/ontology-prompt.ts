@@ -1,6 +1,7 @@
 /** Separate generator/evaluator policies and strict OpenAI Responses schemas. */
 
 import Ajv2020 from "ajv/dist/2020.js";
+import m0ChartContractSchema from "../../../../contracts/m0/chart-contract.schema.json";
 import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
 import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
 import ontologyRecordSchema from "../../../../contracts/m7/pattern-ontology-record.schema.json";
@@ -81,16 +82,32 @@ const SOURCE_FRAGMENT_ID_SCHEMA = {
   type: "string",
   pattern: m7CommonSchema.$defs.sourceFragmentId.pattern,
 } as const;
+const CELESTIAL_BODY_SCHEMA = {
+  type: "string",
+  enum: m0CommonSchema.$defs.celestialBody.enum,
+} as const;
+const ASPECT_TYPE_SCHEMA = {
+  type: "string",
+  enum: m0CommonSchema.$defs.aspectType.enum,
+} as const;
+const HOUSE_SCHEMA = {
+  type: "integer",
+  minimum: ontologyRecordSchema.$defs.featurePredicate.properties.house.minimum,
+  maximum: ontologyRecordSchema.$defs.featurePredicate.properties.house.maximum,
+} as const;
 
 const FEATURE_PREDICATE_SCHEMA = {
   anyOf: [
     {
       type: "object",
       additionalProperties: false,
-      required: ["type", "body"],
+      required: ["type", "body", "house"],
       properties: {
         type: { type: "string", enum: ["position"] },
-        body: NONEMPTY_STRING_SCHEMA,
+        body: CELESTIAL_BODY_SCHEMA,
+        // M7's projection has no `sign` member, so the frozen M4 position
+        // predicate can be represented only through its required house arm.
+        house: HOUSE_SCHEMA,
       },
     },
     {
@@ -99,9 +116,9 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "body_a", "body_b", "aspect"],
       properties: {
         type: { type: "string", enum: ["aspect"] },
-        body_a: NONEMPTY_STRING_SCHEMA,
-        body_b: NONEMPTY_STRING_SCHEMA,
-        aspect: NONEMPTY_STRING_SCHEMA,
+        body_a: CELESTIAL_BODY_SCHEMA,
+        body_b: CELESTIAL_BODY_SCHEMA,
+        aspect: ASPECT_TYPE_SCHEMA,
       },
     },
     {
@@ -110,7 +127,11 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "pattern"],
       properties: {
         type: { type: "string", enum: ["pattern"] },
-        pattern: NONEMPTY_STRING_SCHEMA,
+        pattern: {
+          type: "string",
+          enum: m0ChartContractSchema.$defs.chartSnapshot.properties.patterns
+            .items.properties.pattern_type.enum,
+        },
       },
     },
     {
@@ -119,7 +140,7 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "angle"],
       properties: {
         type: { type: "string", enum: ["angle"] },
-        angle: NONEMPTY_STRING_SCHEMA,
+        angle: { type: "string", enum: ["ascendant", "midheaven"] },
       },
     },
     {
@@ -128,11 +149,7 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "house"],
       properties: {
         type: { type: "string", enum: ["house_cusp"] },
-        house: {
-          type: "integer",
-          minimum: ontologyRecordSchema.$defs.featurePredicate.properties.house.minimum,
-          maximum: ontologyRecordSchema.$defs.featurePredicate.properties.house.maximum,
-        },
+        house: HOUSE_SCHEMA,
       },
     },
     {
@@ -141,7 +158,10 @@ const FEATURE_PREDICATE_SCHEMA = {
       required: ["type", "accuracy"],
       properties: {
         type: { type: "string", enum: ["uncertainty"] },
-        accuracy: NONEMPTY_STRING_SCHEMA,
+        accuracy: {
+          type: "string",
+          enum: m0CommonSchema.$defs.birthTimeAccuracy.enum,
+        },
       },
     },
   ],

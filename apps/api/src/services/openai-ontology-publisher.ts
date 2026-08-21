@@ -1,5 +1,7 @@
 /** Thin ontology projection over the shared reviewed Responses transport. */
 
+import { canonicalJson } from "@patternlike/shared";
+
 import {
   runOpenAiResponsesRequest,
   type AiGatewayRoute,
@@ -19,6 +21,7 @@ import type {
   OntologyGenerationChunk,
   OntologyPassOptions,
   OntologyPassOutcome,
+  OntologyProviderReservationFailureReason,
   OntologyPublisher,
   OntologyRuleVerdict,
 } from "./ontology-publisher.js";
@@ -31,6 +34,30 @@ function budgetExhausted<T>(): OntologyPassOutcome<T> {
     retry_after_seconds: null,
     origin_layer: "none",
   };
+}
+
+function reservationRefused<T>(
+  reason: OntologyProviderReservationFailureReason,
+): OntologyPassOutcome<T> {
+  if (reason === "claim_unavailable") {
+    return {
+      ok: false,
+      code: "publisher_claim_unavailable",
+      safe_detail_code: "claim_fence_refused",
+      retry_after_seconds: null,
+      origin_layer: "none",
+    };
+  }
+  if (reason === "run_exhausted") {
+    return {
+      ok: false,
+      code: "publisher_run_call_limit_exhausted",
+      safe_detail_code: "run_call_limit_reached",
+      retry_after_seconds: null,
+      origin_layer: "none",
+    };
+  }
+  return budgetExhausted<T>();
 }
 
 function schemaMismatch<T>(): OntologyPassOutcome<T> {
@@ -52,19 +79,30 @@ export function createOpenAiOntologyPublisher(
       packet: OntologyGeneratorPacket,
       options: OntologyPassOptions,
     ): Promise<OntologyPassOutcome<OntologyGenerationChunk>> {
+      const body = buildOntologyGeneratorResponsesRequest(
+        packet.serialized,
+        options.configuration,
+      );
+      const serializedBody = canonicalJson(body);
+      if (options.requestBody !== undefined && options.requestBody !== serializedBody) {
+        return schemaMismatch<OntologyGenerationChunk>();
+      }
+      let refusalReason: OntologyProviderReservationFailureReason = "exhausted";
       const result = await runOpenAiResponsesRequest({
         credential,
         route,
         timeoutMs: options.timeoutMs,
-        body: buildOntologyGeneratorResponsesRequest(
-          packet.serialized,
-          options.configuration,
-        ),
-        reserve: () => options.reserve("generator"),
+        body,
+        serializedBody,
+        reserve: async () => {
+          const reservation = await options.reserve("generator");
+          if (!reservation.ok) refusalReason = reservation.reason;
+          return reservation;
+        },
       });
       if (!result.ok) {
         if (result.kind === "reservation_refused") {
-          return budgetExhausted<OntologyGenerationChunk>();
+          return reservationRefused<OntologyGenerationChunk>(refusalReason);
         }
         return {
           ok: false,
@@ -98,19 +136,30 @@ export function createOpenAiOntologyPublisher(
       packet: OntologyEvaluatorPacket,
       options: OntologyPassOptions,
     ): Promise<OntologyPassOutcome<OntologyRuleVerdict>> {
+      const body = buildOntologyEvaluatorResponsesRequest(
+        packet.serialized,
+        options.configuration,
+      );
+      const serializedBody = canonicalJson(body);
+      if (options.requestBody !== undefined && options.requestBody !== serializedBody) {
+        return schemaMismatch<OntologyRuleVerdict>();
+      }
+      let refusalReason: OntologyProviderReservationFailureReason = "exhausted";
       const result = await runOpenAiResponsesRequest({
         credential,
         route,
         timeoutMs: options.timeoutMs,
-        body: buildOntologyEvaluatorResponsesRequest(
-          packet.serialized,
-          options.configuration,
-        ),
-        reserve: () => options.reserve("evaluator"),
+        body,
+        serializedBody,
+        reserve: async () => {
+          const reservation = await options.reserve("evaluator");
+          if (!reservation.ok) refusalReason = reservation.reason;
+          return reservation;
+        },
       });
       if (!result.ok) {
         if (result.kind === "reservation_refused") {
-          return budgetExhausted<OntologyRuleVerdict>();
+          return reservationRefused<OntologyRuleVerdict>(refusalReason);
         }
         return {
           ok: false,

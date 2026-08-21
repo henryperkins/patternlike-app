@@ -60,6 +60,11 @@ interface PublisherFailureFixture {
 
 type ProviderFixture<T> = T | PublisherFailureFixture;
 
+interface FakePublisherHooks {
+  beforeReserve?: (pass: "generator" | "evaluator") => Promise<void>;
+  afterReserve?: (pass: "generator" | "evaluator") => Promise<void>;
+}
+
 class FakeOntologyPublisher implements OntologyPublisher {
   readonly generateInvocations = vi.fn();
   readonly evaluateInvocations = vi.fn();
@@ -69,15 +74,18 @@ class FakeOntologyPublisher implements OntologyPublisher {
   constructor(
     readonly generation: ProviderFixture<OntologyGenerationChunk>[],
     readonly evaluation: ProviderFixture<OntologyRuleVerdict>[] = [],
+    readonly hooks: FakePublisherHooks = {},
   ) {}
 
   async generate(
     _packet: Parameters<OntologyPublisher["generate"]>[0],
     options: OntologyPassOptions,
   ): Promise<OntologyPassOutcome<OntologyGenerationChunk>> {
-    this.generateInvocations(_packet);
+    this.generateInvocations(_packet, options);
+    await this.hooks.beforeReserve?.("generator");
     const reserved = await options.reserve("generator");
-    if (!reserved.ok) return budgetExhausted();
+    if (!reserved.ok) return reservationRefused(reserved);
+    await this.hooks.afterReserve?.("generator");
     this.generatorProviderCalls += 1;
     const fixture = this.generation.shift();
     if (!fixture) throw new Error("missing generator fixture");
@@ -89,9 +97,11 @@ class FakeOntologyPublisher implements OntologyPublisher {
     _packet: Parameters<OntologyPublisher["evaluate"]>[0],
     options: OntologyPassOptions,
   ): Promise<OntologyPassOutcome<OntologyRuleVerdict>> {
-    this.evaluateInvocations(_packet);
+    this.evaluateInvocations(_packet, options);
+    await this.hooks.beforeReserve?.("evaluator");
     const reserved = await options.reserve("evaluator");
-    if (!reserved.ok) return budgetExhausted();
+    if (!reserved.ok) return reservationRefused(reserved);
+    await this.hooks.afterReserve?.("evaluator");
     this.evaluatorProviderCalls += 1;
     const fixture = this.evaluation.shift();
     if (!fixture) throw new Error("missing evaluator fixture");
@@ -120,6 +130,30 @@ function budgetExhausted<T>(): OntologyPassOutcome<T> {
     retry_after_seconds: null,
     origin_layer: "none",
   };
+}
+
+function reservationRefused<T>(
+  reserved: { ok: false } & Partial<{ reason: string }>,
+): OntologyPassOutcome<T> {
+  if (reserved.reason === "claim_unavailable") {
+    return {
+      ok: false,
+      code: "publisher_claim_unavailable",
+      safe_detail_code: "claim_fence_refused",
+      retry_after_seconds: null,
+      origin_layer: "none",
+    };
+  }
+  if (reserved.reason === "run_exhausted") {
+    return {
+      ok: false,
+      code: "publisher_run_call_limit_exhausted",
+      safe_detail_code: "run_call_limit_reached",
+      retry_after_seconds: null,
+      origin_layer: "none",
+    };
+  }
+  return budgetExhausted();
 }
 
 async function providerSuccess<T>(
@@ -180,7 +214,7 @@ function rejectingVerdict(ruleId: string): OntologyRuleVerdict {
 
 function pipelineRecords(sourceId: string): PatternOntologyRecord[] {
   const predicates: PatternOntologyRecord["feature_predicate"][] = [
-    { type: "position", body: "sun" },
+    { type: "position", body: "sun", house: 1 },
     { type: "aspect", body_a: "sun", body_b: "moon", aspect: "square" },
     { type: "pattern", pattern: "grand_trine" },
     { type: "angle", angle: "ascendant" },
@@ -279,7 +313,10 @@ interface ReservedFixture {
 }
 
 async function reserveFixture(
-  options: { dailyLimit?: number; clockStartMs?: number } = {},
+  options: {
+    dailyLimit?: number;
+    clockStartMs?: number;
+  } = {},
 ): Promise<ReservedFixture> {
   const suffix = crypto.randomUUID();
   const releaseId = `corpus-task-6-${suffix}`;
@@ -438,7 +475,10 @@ function failSecondArtifactPut(bucket: R2Bucket): R2Bucket {
   });
 }
 
-function delayNamedStageCas(db: D1Database, milliseconds: number): D1Database {
+function releaseClaimBeforeNamedStageCas(
+  db: D1Database,
+  runId: string,
+): D1Database {
   return new Proxy(db, {
     get(target, property, receiver) {
       if (property !== "prepare") return Reflect.get(target, property, receiver);
@@ -461,7 +501,12 @@ function delayNamedStageCas(db: D1Database, milliseconds: number): D1Database {
                 get(boundTarget, boundProperty, boundReceiver) {
                   if (boundProperty === "run") {
                     return async () => {
-                      await new Promise((resolve) => setTimeout(resolve, milliseconds));
+                      await db.prepare(
+                        `UPDATE pattern_ontology_pipeline_runs
+                         SET claim_token = NULL, lease_expires_at = NULL,
+                             dispatched_at = NULL
+                         WHERE run_id = ? AND claim_token IS NOT NULL`,
+                      ).bind(runId).run();
                       return boundTarget.run();
                     };
                   }
@@ -470,6 +515,37 @@ function delayNamedStageCas(db: D1Database, milliseconds: number): D1Database {
                 },
               });
             };
+          },
+        });
+      };
+    },
+  });
+}
+
+function shortenClaimLease(db: D1Database, remainingMs: number): D1Database {
+  return new Proxy(db, {
+    get(target, property, receiver) {
+      if (property !== "prepare") return Reflect.get(target, property, receiver);
+      return (query: string) => {
+        const statement = target.prepare(query);
+        if (!query.includes("SET claim_token = ?, lease_expires_at = ?")) {
+          return statement;
+        }
+        return new Proxy(statement, {
+          get(statementTarget, statementProperty, statementReceiver) {
+            if (statementProperty !== "bind") {
+              const value = Reflect.get(
+                statementTarget,
+                statementProperty,
+                statementReceiver,
+              );
+              return typeof value === "function" ? value.bind(statementTarget) : value;
+            }
+            return (...values: unknown[]) => statementTarget.bind(
+              values[0],
+              new Date(Date.now() + remainingMs).toISOString(),
+              ...values.slice(2),
+            );
           },
         });
       };
@@ -703,8 +779,14 @@ describe("ontology pipeline execution prefix", () => {
     );
     const firstText = new TextDecoder().decode(firstRequest!.plaintext);
     const secondText = new TextDecoder().decode(secondRequest!.plaintext);
-    const first = JSON.parse(firstText);
-    const second = JSON.parse(secondText);
+    const providerInput = (requestBytes: string) => {
+      const request = JSON.parse(requestBytes) as {
+        input: Array<{ content: Array<{ text: string }> }>;
+      };
+      return JSON.parse(request.input[0]!.content[0]!.text);
+    };
+    const first = providerInput(firstText);
+    const second = providerInput(secondText);
     expect(first.continuation).toBeNull();
     expect(second.continuation).toEqual({
       chunk_index: 1,
@@ -727,8 +809,12 @@ describe("ontology pipeline execution prefix", () => {
     for (const forbidden of [fixture.runId, "stage_generation", "object_key", "oprun_"]) {
       expect(secondText).not.toContain(forbidden);
     }
-    expect(publisher.generateInvocations.mock.calls[0]![0].serialized).toBe(firstText);
-    expect(publisher.generateInvocations.mock.calls[1]![0].serialized).toBe(secondText);
+    expect(publisher.generateInvocations.mock.calls[0]![1].requestBody).toBe(firstText);
+    expect(publisher.generateInvocations.mock.calls[1]![1].requestBody).toBe(secondText);
+    expect(publisher.generateInvocations.mock.calls[0]![0].serialized)
+      .toBe(canonicalJson(first));
+    expect(publisher.generateInvocations.mock.calls[1]![0].serialized)
+      .toBe(canonicalJson(second));
   });
 
   it("closes complete=false on chunk sixteen before a seventeenth call or cursor", async () => {
@@ -751,6 +837,84 @@ describe("ontology pipeline execution prefix", () => {
     });
     expect(publisher.generatorProviderCalls).toBe(16);
   });
+
+  it("counts retries and ambiguous requests toward the 16-call generator run ceiling across UTC days", async () => {
+    const fixture = await reserveFixture();
+    const records = expandedRecords(fixture.records, 16);
+    const publisher = new FakeOntologyPublisher([
+      { code: "publisher_unavailable", safe_detail_code: "network_error" },
+      ...records.map((record, index) => ({
+        schema_version: "0.7.0" as const,
+        records: [record],
+        complete: index === records.length - 1,
+      })),
+    ]);
+    await driveToGenerating(fixture, publisher);
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "rescheduled" });
+    const firstUsage = await env.DB.prepare(
+      `SELECT utc_date FROM pattern_ontology_provider_daily_usage`,
+    ).first<{ utc_date: string }>();
+    const priorUtcDate = new Date(
+      Date.parse(`${firstUsage!.utc_date}T00:00:00.000Z`) - 24 * 60 * 60_000,
+    ).toISOString().slice(0, 10);
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_provider_daily_usage SET utc_date = ?`,
+    ).bind(priorUtcDate).run();
+    fixture.clock.advance(60_000);
+    for (let index = 0; index < 15; index += 1) {
+      expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    }
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+    expect(publisher.generatorProviderCalls).toBe(16);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "attempts_exhausted",
+      stage_cursor: 15,
+    });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'generator_request'`,
+    ).bind(fixture.runId).first()).toEqual({ count: 16 });
+    expect(await env.DB.prepare(
+      `SELECT SUM(used_calls) AS used_calls, SUM(generator_calls) AS generator_calls
+       FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ used_calls: 16, generator_calls: 16 });
+    const usageRows = await env.DB.prepare(
+      `SELECT utc_date, generator_calls FROM pattern_ontology_provider_daily_usage
+       ORDER BY utc_date`,
+    ).all<{ utc_date: string; generator_calls: number }>();
+    expect(usageRows.results.map(({ generator_calls }) => generator_calls))
+      .toEqual([1, 15]);
+  }, 20_000);
+
+  it("serializes concurrent final generator reservations at the exact run boundary", async () => {
+    const fixture = await reserveFixture();
+    const records = expandedRecords(fixture.records, 16);
+    const publisher = new FakeOntologyPublisher(records.map((record, index) => ({
+      schema_version: "0.7.0" as const,
+      records: [record],
+      complete: index === records.length - 1,
+    })));
+    await driveToGenerating(fixture, publisher);
+    for (let index = 0; index < 15; index += 1) {
+      expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    }
+    const message = await currentMessage(fixture.runId);
+
+    const outcomes = await Promise.all([
+      deliver(fixture, publisher, message),
+      deliver(fixture, publisher, message),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === "advanced")).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome.status === "duplicate")).toHaveLength(1);
+    expect(publisher.generatorProviderCalls).toBe(16);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'generator_request'`,
+    ).bind(fixture.runId).first()).toEqual({ count: 16 });
+  }, 20_000);
 
   it("accepts exactly 64 candidate records and closes record 65 before cursor advance", async () => {
     const boundary = await reserveFixture();
@@ -858,10 +1022,39 @@ describe("ontology pipeline execution prefix", () => {
     }
   });
 
-  it("cannot transition after final artifact persistence when the lease expires", async () => {
-    const fixture = await reserveFixture({
-      clockStartMs: Date.now() - 5 * 60_000 + 2_000,
+  it("rejects an unknown frozen celestial body before accepting generator coverage", async () => {
+    const fixture = await reserveFixture();
+    fixture.records[0]!.feature_predicate = {
+      type: "position",
+      body: "ceres",
+      house: 1,
+    };
+    const publisher = new FakeOntologyPublisher([{
+      schema_version: "0.7.0",
+      records: fixture.records,
+      complete: true,
+    }]);
+    await driveToGenerating(fixture, publisher);
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "provider_response_invalid",
+      stage_cursor: 0,
     });
+    expect(await env.DB.prepare(
+      `SELECT artifact_class FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? ORDER BY artifact_class`,
+    ).bind(fixture.runId).all()).toMatchObject({
+      results: [
+        { artifact_class: "generator_request" },
+        { artifact_class: "generator_response" },
+      ],
+    });
+  });
+
+  it("cannot transition after final artifact persistence when the lease expires", async () => {
+    const fixture = await reserveFixture();
     const publisher = new FakeOntologyPublisher([{
       schema_version: "0.7.0",
       records: fixture.records,
@@ -869,7 +1062,7 @@ describe("ontology pipeline execution prefix", () => {
     }]);
     await driveToGenerating(fixture, publisher);
     const delayedEnv = configuredEnv(fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE, {
-      DB: delayNamedStageCas(env.DB, 2_200),
+      DB: releaseClaimBeforeNamedStageCas(env.DB, fixture.runId),
     });
 
     expect(await executeOntologyPipelineDelivery(
@@ -961,6 +1154,59 @@ describe("ontology pipeline execution prefix", () => {
     expect(await runRow(fixture.runId)).toMatchObject({ stage: "compiling" });
   });
 
+  it("stores the exact complete credential-free provider request bytes for generator and evaluator", async () => {
+    const fixture = await reserveFixture();
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      [passingVerdict(fixture.records[0]!.id)],
+    );
+    await driveToGenerating(fixture, publisher);
+    await deliver(fixture, publisher);
+
+    const generatorRequest = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(fixture.runId, "generating", 2, 0, "generator_request"),
+    );
+    const generatorOptions = publisher.generateInvocations.mock.calls[0]![1];
+    const generatorBytes = new TextDecoder().decode(generatorRequest!.plaintext);
+    expect(generatorBytes).toBe(generatorOptions.requestBody);
+    expect(JSON.parse(generatorBytes)).toMatchObject({
+      model: "gpt-5.6-sol",
+      instructions: expect.any(String),
+      max_output_tokens: 8000,
+      text: { format: { strict: true } },
+      input: expect.any(Array),
+    });
+
+    await deliver(fixture, publisher);
+    await deliver(fixture, publisher);
+    const evaluatorRequest = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(fixture.runId, "evaluating", 4, 0, "evaluator_request"),
+    );
+    const evaluatorOptions = publisher.evaluateInvocations.mock.calls[0]![1];
+    const evaluatorBytes = new TextDecoder().decode(evaluatorRequest!.plaintext);
+    expect(evaluatorBytes).toBe(evaluatorOptions.requestBody);
+    expect(JSON.parse(evaluatorBytes)).toMatchObject({
+      model: "gpt-5.6-sol",
+      instructions: expect.any(String),
+      max_output_tokens: 4000,
+      text: { format: { strict: true } },
+      input: expect.any(Array),
+    });
+    for (const privateValue of [
+      fixture.runId,
+      "task-6-hermetic-provider-key",
+      "authorization",
+      "cf-aig-authorization",
+      "object_key",
+      "claim_token",
+    ]) {
+      expect(generatorBytes).not.toContain(privateValue);
+      expect(evaluatorBytes).not.toContain(privateValue);
+    }
+  });
+
   it("never re-fetches an ambiguous generator request under the same attempt", async () => {
     const fixture = await reserveFixture();
     const successfulChunk = {
@@ -1005,6 +1251,91 @@ describe("ontology pipeline execution prefix", () => {
         { stage_attempt: 1, artifact_class: "generator_request" },
         { stage_attempt: 1, artifact_class: "generator_response" },
       ],
+    });
+  });
+
+  it("fences a generator owner lost between request persistence and reservation", async () => {
+    const fixture = await reserveFixture();
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      [],
+      {
+        beforeReserve: async (pass) => {
+          if (pass === "generator") {
+            await releaseCrashedClaim(fixture.runId, fixture.clock.now());
+          }
+        },
+      },
+    );
+    await driveToGenerating(fixture, publisher);
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "duplicate" });
+    expect(publisher.generatorProviderCalls).toBe(0);
+    expect(await env.DB.prepare(
+      `SELECT used_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT artifact_class FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND stage_generation = 2 ORDER BY artifact_class`,
+    ).bind(fixture.runId).all()).toMatchObject({
+      results: [{ artifact_class: "generator_request" }],
+    });
+  });
+
+  it("requires enough D1-current lease for generator timeout plus persistence and true-retries", async () => {
+    const fixture = await reserveFixture({
+      clockStartMs: Date.now() - 5 * 60_000 + 145_000,
+    });
+    const publisher = new FakeOntologyPublisher([{
+      schema_version: "0.7.0",
+      records: fixture.records,
+      complete: true,
+    }]);
+    await driveToGenerating(fixture, publisher);
+
+    expect(await deliver(fixture, publisher)).toEqual({
+      status: "rescheduled",
+      retryAfterSeconds: 60,
+    });
+    expect(publisher.generatorProviderCalls).toBe(0);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "generating",
+      stage_attempt: 1,
+    });
+    expect(await env.DB.prepare(
+      `SELECT used_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toBeNull();
+  });
+
+  it("closes attempt fifteen when the claim has insufficient provider-call lease", async () => {
+    const fixture = await reserveFixture({
+      clockStartMs: Date.now() - 5 * 60_000 + 145_000,
+    });
+    const publisher = new FakeOntologyPublisher([{
+      schema_version: "0.7.0",
+      records: fixture.records,
+      complete: true,
+    }]);
+    await driveToGenerating(fixture, publisher);
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      const claim = await claimOntologyPipelineRun(
+        fixture.pipelineEnv,
+        await currentMessage(fixture.runId),
+        fixture.clock.now(),
+      );
+      if (claim.status !== "claimed") throw new Error("expected live test claim");
+      expect(await retryOntologyPipelineStage(
+        fixture.pipelineEnv,
+        claim,
+        fixture.clock.now(),
+      )).toBe(true);
+    }
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+    expect(publisher.generatorProviderCalls).toBe(0);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "attempts_exhausted",
     });
   });
 
@@ -1170,6 +1501,98 @@ describe("ontology pipeline execution prefix", () => {
     ).first()).toEqual({ used_calls: 3, generator_calls: 1, evaluator_calls: 2 });
   });
 
+  it("fences an evaluator owner lost between request persistence and reservation", async () => {
+    const fixture = await reserveFixture();
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      [passingVerdict(fixture.records[0]!.id)],
+      {
+        beforeReserve: async (pass) => {
+          if (pass === "evaluator") {
+            await releaseCrashedClaim(fixture.runId, fixture.clock.now());
+          }
+        },
+      },
+    );
+    await driveToEvaluating(fixture, publisher);
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "duplicate" });
+    expect(publisher.evaluatorProviderCalls).toBe(0);
+    expect(await env.DB.prepare(
+      `SELECT used_calls, generator_calls, evaluator_calls
+       FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ used_calls: 1, generator_calls: 1, evaluator_calls: 0 });
+    expect(await env.DB.prepare(
+      `SELECT artifact_class FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND stage = 'evaluating' AND stage_generation = 4
+       ORDER BY artifact_class`,
+    ).bind(fixture.runId).all()).toMatchObject({
+      results: [{ artifact_class: "evaluator_request" }],
+    });
+  });
+
+  it("requires enough D1-current lease for evaluator timeout plus persistence", async () => {
+    const fixture = await reserveFixture();
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      [passingVerdict(fixture.records[0]!.id)],
+    );
+    await driveToEvaluating(fixture, publisher);
+    const shortLeaseEnv = configuredEnv(
+      fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE,
+      { DB: shortenClaimLease(env.DB, 145_000) },
+    );
+
+    expect(await executeOntologyPipelineDelivery(
+      shortLeaseEnv,
+      await currentMessage(fixture.runId),
+      { publisher, clock: fixture.clock.now },
+    )).toEqual({ status: "rescheduled", retryAfterSeconds: 60 });
+    expect(publisher.evaluatorProviderCalls).toBe(0);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "evaluating",
+      stage_attempt: 1,
+    });
+    expect(await env.DB.prepare(
+      `SELECT used_calls, generator_calls, evaluator_calls
+       FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ used_calls: 1, generator_calls: 1, evaluator_calls: 0 });
+  });
+
+  it("cannot persist or transition if ownership is lost after fenced reservation", async () => {
+    const fixture = await reserveFixture();
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      [],
+      {
+        afterReserve: async (pass) => {
+          if (pass === "generator") {
+            await releaseCrashedClaim(fixture.runId, fixture.clock.now());
+          }
+        },
+      },
+    );
+    await driveToGenerating(fixture, publisher);
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "duplicate" });
+    expect(publisher.generatorProviderCalls).toBe(1);
+    expect(await env.DB.prepare(
+      `SELECT used_calls, generator_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ used_calls: 1, generator_calls: 1 });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "generating",
+      stage_generation: 2,
+      stage_cursor: 0,
+      stage_attempt: 0,
+    });
+    expect(await env.DB.prepare(
+      `SELECT artifact_class FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND stage_generation = 2 ORDER BY artifact_class`,
+    ).bind(fixture.runId).all()).toMatchObject({
+      results: [{ artifact_class: "generator_request" }],
+    });
+  });
+
   it("fails closed on budget exhaustion without a second provider call or charge", async () => {
     const fixture = await reserveFixture({ dailyLimit: 1 });
     const publisher = new FakeOntologyPublisher([
@@ -1292,6 +1715,43 @@ describe("ontology pipeline execution prefix", () => {
     expect(publisher.evaluateInvocations).toHaveBeenCalledTimes(64);
   }, 20_000);
 
+  it("refuses evaluator call 65 after a retry of rule zero before fetch", async () => {
+    const fixture = await reserveFixture();
+    fixture.records = expandedRecords(fixture.records, 64);
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      [
+        { code: "publisher_unavailable", safe_detail_code: "network_error" },
+        passingVerdict(fixture.records[0]!.id),
+        ...fixture.records.slice(1).map((record) => passingVerdict(record.id)),
+      ],
+    );
+    await driveToEvaluating(fixture, publisher);
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "rescheduled" });
+    fixture.clock.advance(60_000);
+    while (
+      (await runRow(fixture.runId)).stage === "evaluating" &&
+      (await runRow(fixture.runId)).stage_cursor !== 63
+    ) {
+      expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    }
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+    expect(publisher.evaluatorProviderCalls).toBe(64);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "attempts_exhausted",
+      stage_cursor: 63,
+    });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'evaluator_request'`,
+    ).bind(fixture.runId).first()).toEqual({ count: 64 });
+    expect(await env.DB.prepare(
+      `SELECT evaluator_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ evaluator_calls: 64 });
+  }, 30_000);
+
   it("stores the canonical attempt-zero report and stops before regression or success", async () => {
     const fixture = await reserveFixture();
     const publisher = new FakeOntologyPublisher(
@@ -1372,10 +1832,7 @@ describe("ontology pipeline execution prefix", () => {
     ).bind(fixture.runId).first<{ count: number }>();
 
     for (let cycle = 0; cycle < 17; cycle += 1) {
-      expect(await deliver(fixture, publisher, message)).toEqual({
-        status: "retry",
-        retryAfterSeconds: 301,
-      });
+      expect(await deliver(fixture, publisher, message)).toEqual({ status: "parked" });
       expect(await env.DB.prepare(
         `SELECT claim_token, lease_expires_at FROM pattern_ontology_pipeline_runs
          WHERE run_id = ?`,
@@ -1397,21 +1854,24 @@ describe("ontology pipeline execution prefix", () => {
     })).toEqual({ status: "duplicate" });
   });
 
-  it("fails a pre-claim stage lookup closed without acquiring a receipt", async () => {
+  it("fails a claim transaction closed without acquiring a receipt", async () => {
     const fixture = await reserveFixture();
     const publisher = new FakeOntologyPublisher([]);
     const db = new Proxy(env.DB, {
       get(target, property, receiver) {
         if (property !== "prepare") return Reflect.get(target, property, receiver);
         return (query: string) => {
-          if (query.includes("ontology_pipeline_preclaim_stage")) {
-            throw new Error("injected preclaim D1 failure");
-          }
           return target.prepare(query);
         };
       },
     });
-    const failingEnv = configuredEnv(fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE, { DB: db });
+    const failingDb = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property !== "batch") return Reflect.get(target, property, receiver);
+        return async () => { throw new Error("injected claim D1 failure"); };
+      },
+    });
+    const failingEnv = configuredEnv(fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE, { DB: failingDb });
 
     expect(await deliver(fixture, publisher, undefined, failingEnv)).toEqual({
       status: "retry",

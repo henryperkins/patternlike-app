@@ -938,7 +938,7 @@ function ontologyPassDocument(
           id: `ont_${"4".repeat(32)}`,
           meaning_class: "source_supported",
           locale: document.corpus?.locale ?? "en-US",
-          feature_predicate: { type: "position", body: "sun" },
+          feature_predicate: { type: "position", body: "sun", house: 1 },
           normalized_proposition:
             fragment?.normalized_proposition ?? "A source-supported mock proposition.",
           source_fragment_ids: fragment?.id ? [fragment.id] : [],

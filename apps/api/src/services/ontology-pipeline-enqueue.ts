@@ -43,6 +43,9 @@ interface OutboxRow {
 }
 
 export const ONTOLOGY_PIPELINE_OUTBOX_LIMIT = 4;
+export const ONTOLOGY_PIPELINE_STALE_DISPATCH_MS = 15 * 60 * 1_000;
+const TASK6_OUTBOX_STAGE_SQL =
+  "('reserved', 'corpus_reading', 'generating', 'compiling', 'evaluating')";
 
 export class OntologyPipelineEnqueueError extends Error {
   constructor(readonly code: string) {
@@ -121,6 +124,7 @@ async function markOntologyPipelineDispatched(
     `UPDATE pattern_ontology_pipeline_runs
      SET dispatched_at = ?, updated_at = ?
      WHERE run_id = ? AND stage = ? AND stage_generation = ?
+       AND stage IN ${TASK6_OUTBOX_STAGE_SQL}
        AND stage_cursor = ? AND stage_attempt = ?
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
@@ -164,7 +168,7 @@ async function markOntologyPipelineDispatchedBatch(
     `UPDATE pattern_ontology_pipeline_runs
      SET dispatched_at = ?, updated_at = ?
      WHERE (${coordinates})
-       AND stage NOT IN ('succeeded', 'failed')
+       AND stage IN ${TASK6_OUTBOX_STAGE_SQL}
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
        AND unixepoch(available_at) <= unixepoch(?)`,
@@ -194,7 +198,7 @@ async function loadOutboxRow(
     `SELECT run_id, stage, stage_generation, stage_cursor, stage_attempt,
             available_at
      FROM pattern_ontology_pipeline_runs
-     WHERE run_id = ? AND stage NOT IN ('succeeded', 'failed')
+     WHERE run_id = ? AND stage IN ${TASK6_OUTBOX_STAGE_SQL}
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
        AND unixepoch(available_at) <= unixepoch(?)`,
@@ -321,7 +325,7 @@ export async function dispatchUndispatchedOntologyPipelineRuns(
     `SELECT run_id, stage, stage_generation, stage_cursor, stage_attempt,
             available_at
      FROM pattern_ontology_pipeline_runs
-     WHERE stage NOT IN ('succeeded', 'failed')
+     WHERE stage IN ${TASK6_OUTBOX_STAGE_SQL}
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
        AND unixepoch(available_at) <= unixepoch(?)
@@ -348,6 +352,46 @@ export async function dispatchUndispatchedOntologyPipelineRuns(
   } catch {
     return { dispatched: 0, failed: failed + sent.length };
   }
+}
+
+/**
+ * Returns old, unclaimed Task 6 dispatch markers to the existing outbox lane.
+ * This is the durable recovery path after Queue exhausts its bounded main
+ * retries and moves the opaque delivery to the configured DLQ. A duplicate
+ * still in flight is harmless because the claim CAS remains authoritative.
+ */
+export async function recoverStaleOntologyPipelineDispatches(
+  env: Pick<Env, "DB">,
+  now = new Date(),
+  limit = ONTOLOGY_PIPELINE_OUTBOX_LIMIT,
+  staleAfterMs = ONTOLOGY_PIPELINE_STALE_DISPATCH_MS,
+): Promise<number> {
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > 100 ||
+    !Number.isSafeInteger(staleAfterMs) ||
+    staleAfterMs < 1
+  ) {
+    return 0;
+  }
+  const at = now.toISOString();
+  const staleBefore = new Date(now.getTime() - staleAfterMs).toISOString();
+  const result = await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_runs
+     SET dispatched_at = NULL, updated_at = ?
+     WHERE rowid IN (
+       SELECT rowid FROM pattern_ontology_pipeline_runs
+       WHERE stage IN ${TASK6_OUTBOX_STAGE_SQL}
+         AND claim_token IS NULL AND lease_expires_at IS NULL
+         AND dispatched_at IS NOT NULL
+         AND unixepoch(dispatched_at) <= unixepoch(?)
+         AND unixepoch(available_at) <= unixepoch(?)
+       ORDER BY dispatched_at, run_id
+       LIMIT ?
+     )`,
+  ).bind(at, staleBefore, at, limit).run();
+  return result.meta.changes ?? 0;
 }
 
 /** Rollout-off acknowledgement puts this generation back in the outbox lane. */
