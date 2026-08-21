@@ -60,6 +60,20 @@ function envelope(payload: unknown, extra: Record<string, unknown> = {}): unknow
   };
 }
 
+function utf8Bom(text: string): Uint8Array {
+  const encoded = new TextEncoder().encode(text);
+  const bytes = new Uint8Array(encoded.byteLength + 3);
+  bytes.set([0xef, 0xbb, 0xbf]);
+  bytes.set(encoded, 3);
+  return bytes;
+}
+
+async function exactBytesHash(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
 interface Call {
   url: string;
   headers: Record<string, string>;
@@ -148,6 +162,21 @@ describe("OpenAI Pattern publisher", () => {
       expect(first.metadata.provider_response_hash).not.toBe(
         second.metadata.provider_response_hash,
       );
+    });
+
+    it("preserves a leading UTF-8 BOM in Pattern raw evidence and hashes its exact bytes", async () => {
+      const received = utf8Bom(JSON.stringify(envelope(PLAN)));
+      stubFetch(() => new Response(received, { status: 200 }));
+      const result = await createOpenAiPatternTransport(
+        { source: "worker", apiKey: "sk-test" },
+        null,
+      ).run("planner", {}, OPTIONS);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(new TextEncoder().encode(result.raw)).toEqual(received);
+      expect(result.metadata.provider_response_hash).toBe(await exactBytesHash(received));
+      expect(JSON.parse(result.raw.slice(1))).toEqual(envelope(PLAN));
     });
   });
 

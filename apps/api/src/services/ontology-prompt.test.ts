@@ -8,6 +8,7 @@ import {
   ONTOLOGY_SYSTEM_POLICY,
   buildOntologyEvaluatorResponsesRequest,
   buildOntologyGeneratorResponsesRequest,
+  isOntologyRuleVerdict,
 } from "./ontology-prompt.js";
 
 const PIN: OntologyPipelineConfigPin = {
@@ -174,6 +175,30 @@ describe("ontology provider prompts", () => {
     expect([...schema.properties.dimensions.required].sort()).toEqual(
       [...ONTOLOGY_EVALUATOR_DIMENSIONS].sort(),
     );
+  });
+
+  it("accepts a pass exactly when all dimensions pass and rejects both contradictions", () => {
+    const allPass = {
+      source_support: "pass",
+      entailment: "pass",
+      contradiction: "pass",
+      unsupported_expansion: "pass",
+      diagnostic_or_predictive_drift: "pass",
+      one_sided_or_essentialist_framing: "pass",
+      tension_counter_expression_balance: "pass",
+      uncertainty_compatibility: "pass",
+      cross_record_conflict: "pass",
+    } as const;
+    const oneReject = { ...allPass, unsupported_expansion: "reject" as const };
+    const base = {
+      schema_version: "0.7.0",
+      rule_id: `ont_${"1".repeat(32)}`,
+    } as const;
+
+    expect(isOntologyRuleVerdict({ ...base, verdict: "pass", dimensions: allPass })).toBe(true);
+    expect(isOntologyRuleVerdict({ ...base, verdict: "reject", dimensions: oneReject })).toBe(true);
+    expect(isOntologyRuleVerdict({ ...base, verdict: "pass", dimensions: oneReject })).toBe(false);
+    expect(isOntologyRuleVerdict({ ...base, verdict: "reject", dimensions: allPass })).toBe(false);
   });
 
   it("cannot carry edits, replacements, patches, corrections, or free rationale", () => {

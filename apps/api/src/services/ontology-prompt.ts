@@ -40,6 +40,7 @@ const EVALUATOR_POLICY = [
   "You independently judge exactly one candidate ontology rule.",
   "Use only that rule, its cited source-supported meanings, its permitted fragments, and its deterministic compiler summary.",
   "Judge all nine dimensions in the output schema. A dimension is pass only when the supplied evidence supports it.",
+  "The overall verdict is pass if and only if every dimension is pass; otherwise the overall verdict is reject.",
   "Do not edit the rule. Do not return replacement text, a replacement rule, a correction, a patch, rationale, notes, or advice to the generator.",
   "Do not infer strength from another candidate rule; no other candidate is authorized input.",
   INERTNESS,
@@ -220,14 +221,20 @@ export const ONTOLOGY_STRICT_SCHEMA: Record<OntologyProviderPass, unknown> = {
 
 const outputValidator = new Ajv2020({ strict: true });
 const validateGenerationChunk = outputValidator.compile(GENERATOR_SCHEMA);
-const validateRuleVerdict = outputValidator.compile(EVALUATOR_SCHEMA);
+const validateRuleVerdict = outputValidator.compile<OntologyRuleVerdict>(
+  EVALUATOR_SCHEMA,
+);
 
 export function isOntologyGenerationChunk(value: unknown): value is OntologyGenerationChunk {
   return validateGenerationChunk(value);
 }
 
 export function isOntologyRuleVerdict(value: unknown): value is OntologyRuleVerdict {
-  return validateRuleVerdict(value);
+  if (!validateRuleVerdict(value)) return false;
+  const everyDimensionPasses = ONTOLOGY_EVALUATOR_DIMENSIONS.every(
+    (dimension) => value.dimensions[dimension] === "pass",
+  );
+  return (value.verdict === "pass") === everyDimensionPasses;
 }
 
 interface OntologyResponsesInputMessage {

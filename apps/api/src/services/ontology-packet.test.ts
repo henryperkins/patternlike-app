@@ -506,5 +506,79 @@ describe("ontology provider packet builders", () => {
         identifier_class: "user",
       });
     });
+
+    it("rejects real check-in signal and life-event identifiers embedded in allowed prose", () => {
+      for (const value of [
+        `A check-in named sig_${"a".repeat(32)} must stay private.`,
+        `A life event named evt_${"b".repeat(32)} must stay private.`,
+      ]) {
+        expect(findOntologyPacketViolation({ excerpt: value })).toMatchObject({
+          code: "ontology_input_forbidden_identifier",
+        });
+      }
+    });
+
+    it("rejects the closed reviewed set of repository-private opaque identifier prefixes", () => {
+      const hex32 = "c".repeat(32);
+      const privateIds = [
+        `acc_${hex32}`,
+        `asp_${hex32}`,
+        `asm_${hex32}`,
+        `aud_${hex32}`,
+        `cht_${hex32}`,
+        `clm_${hex32}`,
+        `cns_${hex32}`,
+        `cs_${hex32}`,
+        `csr_${hex32}`,
+        "ctx_12",
+        `cyc_${hex32}`,
+        `cyp_${hex32}`,
+        `del_${hex32}`,
+        `dsf_${hex32}`,
+        `evt_${hex32}`,
+        `exp_${hex32}`,
+        `gen_${hex32}`,
+        `gin_sha256_${"d".repeat(64)}`,
+        `idn_${hex32}`,
+        `job_${hex32}`,
+        `nat_${hex32}`,
+        `nfs_${hex32}`,
+        `nft_${hex32}`,
+        `opart_${hex32}`,
+        `oprun_${hex32}`,
+        `paae_${hex32}`,
+        `par_${hex32}`,
+        `part_${hex32}`,
+        `pat_${hex32}`,
+        `pgc_${hex32}`,
+        `pgen_${hex32}`,
+        `poer_${hex32}`,
+        `pre_${hex32}`,
+        `prel_${hex32}`,
+        `rdg_${hex32}`,
+        `req_${hex32}`,
+        `rfb_${hex32}`,
+        `rsc_${hex32}`,
+        `ses_${hex32}`,
+        `sgn_${hex32}`,
+        `sig_${hex32}`,
+        `trc_${hex32}`,
+        `tts_${hex32}`,
+        `tzc_${hex32}`,
+        `usr_${hex32}`,
+      ];
+      for (const privateId of privateIds) {
+        expect(
+          findOntologyPacketViolation({ excerpt: `embedded ${privateId} in prose` }),
+          privateId,
+        ).toMatchObject({ code: "ontology_input_forbidden_identifier" });
+      }
+    });
+
+    it("does not confuse reviewed opaque-id prefixes with public vocabulary", () => {
+      expect(findOntologyPacketViolation({
+        excerpt: "part_of_fortune may coexist with pre_1970_zone_boundary.",
+      })).toBeNull();
+    });
   });
 });

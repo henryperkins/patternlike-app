@@ -217,6 +217,20 @@ function envelope(payload: unknown, extra: Record<string, unknown> = {}): unknow
   };
 }
 
+function utf8Bom(text: string): Uint8Array {
+  const encoded = new TextEncoder().encode(text);
+  const bytes = new Uint8Array(encoded.byteLength + 3);
+  bytes.set([0xef, 0xbb, 0xbf]);
+  bytes.set(encoded, 3);
+  return bytes;
+}
+
+async function exactBytesHash(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
 interface Call {
   url: string;
   headers: Record<string, string>;
@@ -480,6 +494,21 @@ describe("OpenAI ontology publisher", () => {
       expect(result.metadata.provider_response_hash).toBe(await contentHash(raw));
     });
 
+    it("preserves and hashes a BOM-prefixed ontology response as exact provider bytes", async () => {
+      const received = utf8Bom(JSON.stringify(envelope(GENERATION)));
+      stubFetch(() => new Response(received, { status: 200 }));
+      const result = await createOpenAiOntologyPublisher(
+        { source: "worker", apiKey: "sk-test" },
+        null,
+      ).generate(generatorPacket(), options());
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(new TextEncoder().encode(result.raw)).toEqual(received);
+      expect(result.metadata.provider_response_hash).toBe(await exactBytesHash(received));
+      expect(result.value).toEqual(GENERATION);
+    });
+
     it("returns the closed nine-dimensional evaluator verdict", async () => {
       stubFetch(() => ok(VERDICT));
       const publisher = createOpenAiOntologyPublisher(
@@ -509,6 +538,27 @@ describe("OpenAI ontology publisher", () => {
         expect(result.ok).toBe(false);
         if (!result.ok) expect(result.safe_detail_code).toBe("schema_mismatch");
         expect(JSON.stringify(result)).not.toContain("replacement_rule");
+      }
+    });
+
+    it("rejects either contradiction between the overall verdict and its dimensions", async () => {
+      for (const payload of [
+        {
+          ...VERDICT,
+          dimensions: { ...VERDICT.dimensions, contradiction: "reject" },
+        },
+        { ...VERDICT, verdict: "reject" },
+      ]) {
+        calls = [];
+        stubFetch(() => ok(payload));
+        const result = await createOpenAiOntologyPublisher(
+          { source: "worker", apiKey: "sk-test" },
+          null,
+        ).evaluate(evaluatorPacket(), options());
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.safe_detail_code).toBe("schema_mismatch");
+        expect(calls).toHaveLength(1);
       }
     });
 

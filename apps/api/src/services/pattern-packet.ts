@@ -27,6 +27,7 @@ import type {
   PatternPlan,
   PatternWriterOutput,
 } from "@patternlike/shared";
+import { findPrivateOpaqueIdPrefix } from "./private-opaque-identifiers.js";
 
 /**
  * Mirrors `FORBIDDEN_IN_PATTERN_PACKET_KEYS` in `contracts/validate_schemas.py`
@@ -63,61 +64,6 @@ const FORBIDDEN_KEYS: ReadonlySet<string> = new Set([
   "aliasMap",
   "alias_map",
 ]);
-
-/**
- * Every id prefix minted anywhere in the system.
- *
- * Enumerated from `newId(...)` call sites rather than from the handful that
- * looked reachable: a value carrying any of these has escaped the alias
- * indirection, which is the whole point of `aliasMap`, and "reachable today" is
- * not a property this list should depend on. `cht_` (chart) and `cns_` (consent)
- * were the two the module header already promised to exclude while the list
- * omitted them.
- *
- * Matched as a SUBSTRING, not a prefix. `contracts/validate_schemas.py:840`
- * scans `if prefix in encoded` over the serialized document, and an anchored
- * check misses every id embedded mid-sentence — which is exactly where one would
- * appear, since ontology prose, working titles, purposes, and section text all
- * travel verbatim. A single leading space defeated the anchored form.
- *
- * A false positive here is a terminal refusal an operator can see. That is the
- * correct direction to fail for a privacy boundary.
- */
-const FORBIDDEN_VALUE_PREFIXES: readonly string[] = [
-  "asp_",
-  "aud_",
-  "cht_",
-  "clm_",
-  "cns_",
-  "cs_",
-  "csr_",
-  "cyc_",
-  "cyp_",
-  "del_",
-  "dsf_",
-  "evt_",
-  "exp_",
-  "gen_",
-  "idn_",
-  "job_",
-  "nft_",
-  "paae_",
-  "par_",
-  "pat_",
-  "pgc_",
-  "pgen_",
-  "prel_",
-  "rdg_",
-  "req_",
-  "rfb_",
-  "rsc_",
-  "ses_",
-  "sig_",
-  "trc_",
-  "tts_",
-  "tzc_",
-  "usr_",
-];
 
 /**
  * Every key legal at any depth of any of the three documents.
@@ -664,14 +610,11 @@ function walk(
     return null;
   }
   if (typeof value === "string") {
-    for (const prefix of FORBIDDEN_VALUE_PREFIXES) {
-      // Substring, not prefix. An id embedded in prose is the likely case, and
-      // free text reaches here verbatim from ontology propositions, working
-      // titles, purposes, chapter titles, summaries, and section prose.
-      if (value.includes(prefix)) {
-        return { code: "pattern_input_forbidden_key", key: prefix };
-      }
-    }
+    // Substring, not prefix. An id embedded in prose is the likely case, and
+    // free text reaches here verbatim from ontology propositions, working
+    // titles, purposes, chapter titles, summaries, and section prose.
+    const prefix = findPrivateOpaqueIdPrefix(value);
+    if (prefix) return { code: "pattern_input_forbidden_key", key: prefix };
     return null;
   }
   if (!value || typeof value !== "object") return null;

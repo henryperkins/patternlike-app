@@ -11,7 +11,6 @@
  * No provider header, URL, message, or exception string crosses this boundary.
  */
 
-import { contentHash } from "@patternlike/shared";
 import {
   responsesUrlFor,
   type AiGatewayRoute,
@@ -234,7 +233,7 @@ function classifyOrigin(routed: boolean, body: string): OpenAiResponsesOriginLay
   if (!routed) return "provider";
   let parsed: unknown;
   try {
-    parsed = JSON.parse(body);
+    parsed = JSON.parse(jsonText(body));
   } catch {
     return "unknown";
   }
@@ -279,8 +278,22 @@ function responsesHeaders(
 }
 
 type BoundedBody =
-  | { ok: true; text: string }
+  | { ok: true; text: string; bytes: Uint8Array }
   | { ok: false; reason: "too_large" | "invalid_utf8" | "read_error"; aborted: boolean };
+
+/** Parse one optional UTF-8 BOM while leaving the evidence string untouched. */
+function jsonText(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+async function exactBytesHash(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hex = Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `sha256:${hex}`;
+}
 
 async function cancelResponseBody(
   response: Response,
@@ -309,7 +322,9 @@ async function readBoundedBody(
     }
   }
 
-  if (!response.body) return { ok: true, text: "" };
+  if (!response.body) {
+    return { ok: true, text: "", bytes: new Uint8Array(0) };
+  }
   const reader = response.body.getReader();
   // A fixed buffer bounds both byte storage and per-chunk bookkeeping. Keeping
   // every tiny chunk in an array would let a one-byte-chunk peer consume far
@@ -342,11 +357,16 @@ async function readBoundedBody(
   }
 
   try {
+    const received = bytes.subarray(0, total);
     return {
       ok: true,
-      text: new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(
-        bytes.subarray(0, total),
+      // `ignoreBOM: true` means the decoder treats the BOM as content. This
+      // keeps `raw` byte-for-byte re-encodable while `jsonText` explicitly
+      // accepts exactly one leading BOM for JSON parsing.
+      text: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+        received,
       ),
+      bytes: received,
     };
   } catch {
     return { ok: false, reason: "invalid_utf8", aborted: false };
@@ -495,10 +515,10 @@ export async function runOpenAiResponsesRequest(
   }
 
   const raw = bodyRead.text;
-  const provider_response_hash = await contentHash(raw);
+  const provider_response_hash = await exactBytesHash(bodyRead.bytes);
   let body: unknown;
   try {
-    body = JSON.parse(raw);
+    body = JSON.parse(jsonText(raw));
   } catch {
     return transportFailure("publisher_output_invalid", "invalid_json", "provider");
   }

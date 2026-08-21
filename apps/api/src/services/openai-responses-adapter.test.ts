@@ -1,11 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   extractOutputText,
   failure,
   responsesUrlFor,
   retryAfterSeconds,
+  runOpenAiResponsesRequest,
 } from "./openai-responses-adapter.js";
+
+function utf8Bom(text: string): Uint8Array {
+  const encoded = new TextEncoder().encode(text);
+  const bytes = new Uint8Array(encoded.byteLength + 3);
+  bytes.set([0xef, 0xbb, 0xbf]);
+  bytes.set(encoded, 3);
+  return bytes;
+}
+
+async function exactBytesHash(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")).join("")}`;
+}
 
 /** One `message` item wrapping the given content parts. */
 function envelope(content: unknown[]): unknown {
@@ -13,6 +28,38 @@ function envelope(content: unknown[]): unknown {
 }
 
 describe("OpenAI Responses boundary", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts one leading UTF-8 BOM while preserving and hashing the exact received bytes", async () => {
+    const body = JSON.stringify({
+      id: "resp_exact_bom",
+      status: "completed",
+      output: [{
+        type: "message",
+        content: [{ type: "output_text", text: JSON.stringify({ ok: true }) }],
+      }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+    });
+    const received = utf8Bom(body);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(received, { status: 200 })));
+
+    const result = await runOpenAiResponsesRequest({
+      credential: { source: "worker", apiKey: "sk-test" },
+      route: null,
+      timeoutMs: 5_000,
+      body: {},
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(new TextEncoder().encode(result.raw)).toEqual(received);
+    expect(result.raw.charCodeAt(0)).toBe(0xfeff);
+    expect(result.metadata.provider_response_hash).toBe(await exactBytesHash(received));
+    expect(result.parsed).toEqual({ ok: true });
+  });
+
   describe("extractOutputText", () => {
     it("resolves a refusal accompanied by text as a refusal, not as a candidate", () => {
       // The provider declined and then emitted prose anyway. Publishing that

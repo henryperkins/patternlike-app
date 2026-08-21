@@ -20,6 +20,10 @@ import type {
   OntologyCorpusFragment,
   RegisteredOntologyCorpus,
 } from "./ontology-corpus.js";
+import {
+  findPrivateOpaqueIdPrefix,
+  type PrivateOpaqueIdPrefix,
+} from "./private-opaque-identifiers.js";
 
 export interface OntologyCoverageTarget {
   feature_class: NatalFeatureClass;
@@ -136,7 +140,9 @@ type ForbiddenIdentifierClass =
   | "reading"
   | "session"
   | "consent"
-  | "run";
+  | "run"
+  | "private_context"
+  | "internal";
 
 export type OntologyPacketFailureCode =
   | "ontology_input_predecessor_invalid"
@@ -283,29 +289,33 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "accuracy",
 ]);
 
-const FORBIDDEN_IDENTIFIERS: ReadonlyArray<{
-  identifier_class: ForbiddenIdentifierClass;
-  pattern: RegExp;
-}> = [
-  { identifier_class: "user", pattern: /usr_[0-9a-f]{32}/i },
-  { identifier_class: "account", pattern: /acc_[0-9a-f]{32}/i },
-  { identifier_class: "chart", pattern: /cht_[0-9a-f]{32}/i },
-  { identifier_class: "reading", pattern: /rdg_[0-9a-f]{32}/i },
-  { identifier_class: "session", pattern: /ses_[0-9a-f]{32}/i },
-  { identifier_class: "consent", pattern: /cns_[0-9a-f]{32}/i },
-  { identifier_class: "run", pattern: /oprun_[A-Za-z0-9._:-]+/ },
-];
+function identifierClass(
+  prefix: PrivateOpaqueIdPrefix,
+): ForbiddenIdentifierClass {
+  if (prefix === "usr_") return "user";
+  if (prefix === "acc_") return "account";
+  if (["asp_", "asm_", "cht_", "nat_", "nfs_", "nft_"].includes(prefix)) {
+    return "chart";
+  }
+  if (["cyc_", "cyp_", "dsf_", "rdg_"].includes(prefix)) return "reading";
+  if (prefix === "ses_") return "session";
+  if (prefix === "cns_") return "consent";
+  if (["opart_", "oprun_", "poer_"].includes(prefix)) return "run";
+  if (["ctx_", "evt_", "sgn_", "sig_"].includes(prefix)) {
+    return "private_context";
+  }
+  return "internal";
+}
 
 export function findOntologyPacketViolation(value: unknown): OntologyPacketViolation | null {
   const visit = (node: unknown): OntologyPacketViolation | null => {
     if (typeof node === "string") {
-      for (const candidate of FORBIDDEN_IDENTIFIERS) {
-        if (candidate.pattern.test(node)) {
-          return {
-            code: "ontology_input_forbidden_identifier",
-            identifier_class: candidate.identifier_class,
-          };
-        }
+      const prefix = findPrivateOpaqueIdPrefix(node);
+      if (prefix) {
+        return {
+          code: "ontology_input_forbidden_identifier",
+          identifier_class: identifierClass(prefix),
+        };
       }
       return null;
     }
