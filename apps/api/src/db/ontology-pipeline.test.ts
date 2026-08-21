@@ -767,7 +767,7 @@ describe("ontology pipeline migration", () => {
     ).bind(artifact.id).run());
     await env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_artifacts SET deleted_at = ? WHERE id = ?`,
-    ).bind("2026-08-28T00:00:01.000Z", artifact.id).run();
+    ).bind(NOW, artifact.id).run();
     await expectRejected(() => env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_artifacts SET deleted_at = NULL WHERE id = ?`,
     ).bind(artifact.id).run());
@@ -799,7 +799,7 @@ describe("ontology pipeline migration", () => {
     await env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_artifacts SET deleted_at = ?
        WHERE id = ?`,
-    ).bind("2026-08-28T00:00:01.000Z", artifact.id).run();
+    ).bind(NOW, artifact.id).run();
 
     await expectRejected(() => env.DB.prepare(
       "DELETE FROM pattern_ontology_pipeline_artifacts WHERE id = ?",
@@ -921,6 +921,128 @@ describe("ontology pipeline migration", () => {
         expires_at: "2026-08-28T00:00:00.000Z",
       }),
     ));
+  });
+
+  it("rejects future artifact creation times before they can block failure", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      artifactForCurrentRun({
+        created_at: "2999-01-01T00:00:00.000Z",
+      }),
+    ));
+
+    const failedAt = "2026-08-21T02:00:00.000Z";
+    const expiresAt = "2026-08-28T02:00:00.000Z";
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 3,
+           failure_class = 'execution_error', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(NOW, expiresAt, failedAt, failedAt, RUN.run_id).run();
+
+    expect(await env.DB.prepare(
+      `SELECT stage, failed_at, failed_artifact_expires_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(RUN.run_id).first()).toEqual({
+      stage: "failed",
+      failed_at: failedAt,
+      failed_artifact_expires_at: expiresAt,
+    });
+  });
+
+  it("rejects artifacts created before their owning run", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      artifactForCurrentRun({
+        created_at: "2026-08-20T23:59:59.000Z",
+      }),
+    ));
+  });
+
+  it("rejects artifacts that enter already tombstoned", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      artifactForCurrentRun({
+        deleted_at: NOW,
+      }),
+    ));
+  });
+
+  it("rejects future artifact tombstone timestamps", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    const artifact = artifactForCurrentRun();
+    await execute("INSERT INTO pattern_ontology_pipeline_artifacts", artifact);
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_artifacts SET deleted_at = ?
+       WHERE id = ?`,
+    ).bind("2999-01-01T00:00:00.000Z", artifact.id).run());
+  });
+
+  it("rejects terminal timestamps that precede an owned artifact", async () => {
+    const runCreatedAt = "2026-08-01T00:00:00.000Z";
+    await insertCorpus({
+      created_at: runCreatedAt,
+      registered_at: runCreatedAt,
+    });
+    await insertRun({
+      available_at: runCreatedAt,
+      created_at: runCreatedAt,
+      updated_at: runCreatedAt,
+    });
+    await advanceRunTo("generating");
+    const artifact = artifactForCurrentRun();
+    await execute("INSERT INTO pattern_ontology_pipeline_artifacts", artifact);
+
+    const backdatedFailure = env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 3,
+           failure_class = 'execution_error', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(
+      runCreatedAt,
+      "2026-08-17T00:00:00.000Z",
+      "2026-08-10T00:00:00.000Z",
+      "2026-08-10T00:00:00.000Z",
+      RUN.run_id,
+    ).run();
+    await expect(backdatedFailure).rejects.toThrow(
+      "ontology pipeline terminal timestamp precedes owned artifact",
+    );
+
+    const failedAt = "2026-08-21T02:00:00.000Z";
+    const expiresAt = "2026-08-28T02:00:00.000Z";
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 3,
+           failure_class = 'execution_error', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(NOW, expiresAt, failedAt, failedAt, RUN.run_id).run();
+
+    expect(await env.DB.prepare(
+      `SELECT stage, failed_at, failed_artifact_expires_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(RUN.run_id).first()).toEqual({
+      stage: "failed",
+      failed_at: failedAt,
+      failed_artifact_expires_at: expiresAt,
+    });
   });
 
   it("assigns the exact failed-run deadline to every live artifact", async () => {

@@ -570,9 +570,11 @@ WHEN NOT EXISTS (
     AND run.stage = NEW.stage
     AND run.stage_generation = NEW.stage_generation
     AND run.stage_attempt = NEW.stage_attempt
+    AND unixepoch(NEW.created_at) >= unixepoch(run.created_at)
+    AND unixepoch(NEW.created_at) <= unixepoch('now')
 )
 BEGIN
-  SELECT RAISE(ABORT, 'ontology pipeline artifact stage owner is stale');
+  SELECT RAISE(ABORT, 'ontology pipeline artifact stage owner or creation time is stale');
 END;
 
 CREATE TRIGGER pattern_ontology_pipeline_artifacts_no_reuse
@@ -609,6 +611,14 @@ BEGIN
   SELECT RAISE(ABORT, 'ontology pipeline artifact expiry is terminally assigned');
 END;
 
+CREATE TRIGGER pattern_ontology_pipeline_artifacts_must_start_live
+BEFORE INSERT ON pattern_ontology_pipeline_artifacts
+FOR EACH ROW
+WHEN NEW.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline artifact must enter live');
+END;
+
 -- Inventory identity is create-only. The only lifecycle mutations are the
 -- first live-to-deleted tombstone and the failed-run deadline assignment.
 CREATE TRIGGER pattern_ontology_pipeline_artifacts_create_only
@@ -633,6 +643,7 @@ WHEN NOT (
     (
       OLD.deleted_at IS NULL
       AND NEW.deleted_at IS NOT NULL
+      AND unixepoch(NEW.deleted_at) <= unixepoch('now')
       AND OLD.expires_at IS NEW.expires_at
     )
     OR (
@@ -651,6 +662,25 @@ WHEN NOT (
 )
 BEGIN
   SELECT RAISE(ABORT, 'ontology pipeline artifact identity is create-only');
+END;
+
+-- A terminal timestamp cannot predate an artifact the run already owns. This
+-- keeps the exact failed-at-plus-seven-days assignment safe for every admitted
+-- artifact and closes the same chronology for successful evidence.
+CREATE TRIGGER pattern_ontology_pipeline_runs_terminal_after_artifacts
+BEFORE UPDATE OF stage, finished_at ON pattern_ontology_pipeline_runs
+FOR EACH ROW
+WHEN OLD.stage NOT IN ('succeeded', 'failed')
+  AND NEW.stage IN ('succeeded', 'failed')
+  AND unixepoch(NEW.finished_at) IS NOT NULL
+  AND EXISTS (
+    SELECT 1
+    FROM pattern_ontology_pipeline_artifacts artifact
+    WHERE artifact.run_id = NEW.run_id
+      AND unixepoch(artifact.created_at) > unixepoch(NEW.finished_at)
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline terminal timestamp precedes owned artifact');
 END;
 
 CREATE TRIGGER pattern_ontology_pipeline_runs_expire_failed_artifacts
