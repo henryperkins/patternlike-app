@@ -1,4 +1,10 @@
-import type { BirthTimeAccuracy } from "@patternlike/shared";
+import {
+  PATTERN_PUBLIC_STAGES,
+  type BirthTimeAccuracy,
+  type PatternPublicStage,
+} from "@patternlike/shared";
+import type { Env } from "../env.js";
+import { hasPatternProviderCallCapacity } from "../db/pattern-provider-usage.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 
 export const PATTERN_COMMAND_VERSION = "GeneratePatternCommandV1" as const;
@@ -94,6 +100,23 @@ export function publicStageFor(stage: PatternDomainStage): "organizing_evidence"
     return "checking_claims";
   }
   return null;
+}
+
+/** Read a stored terminal stage through the frozen public vocabulary. */
+export function publicFailureStageFor(value: string | null): PatternPublicStage | null {
+  return (PATTERN_PUBLIC_STAGES as readonly string[]).includes(value ?? "")
+    ? (value as PatternPublicStage)
+    : null;
+}
+
+/** Budget failures are retryable only when the current shared ledger has room. */
+export async function patternFailureIsRetryable(
+  env: Env,
+  failureClass: string | null,
+  now = new Date(),
+): Promise<boolean> {
+  if (failureClass !== "publisher_budget_exhausted") return true;
+  return hasPatternProviderCallCapacity(env, now);
 }
 
 /** Idempotent POST replay: in-progress public stage, or ready once accepted. */

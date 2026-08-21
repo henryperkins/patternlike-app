@@ -18,7 +18,12 @@ import {
 import { loadPatternGenerationGrant, patternConsentDocument } from "../db/pattern-consents.js";
 import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
 import { decryptUnderContentKey, unwrapContentKey } from "./pattern-crypto.js";
-import { publicStageFor, type PatternDomainStage } from "./pattern-command.js";
+import {
+  publicFailureStageFor,
+  patternFailureIsRetryable,
+  publicStageFor,
+  type PatternDomainStage,
+} from "./pattern-command.js";
 import {
   isInternalPatternAccount,
   readPatternAiRollout,
@@ -234,12 +239,21 @@ export async function buildPatternState(
 
   if (claim?.status === "available") {
     const failed = await env.DB.prepare(
-      `SELECT generation_id, stage, updated_at, created_at FROM pattern_generation_jobs
+      `SELECT generation_id, stage, updated_at, created_at,
+              public_failure_stage, failure_class
+       FROM pattern_generation_jobs
        WHERE user_id = ? AND chart_fingerprint_hash = ? AND stage = 'failed'
        ORDER BY updated_at DESC LIMIT 1`,
     )
       .bind(identity.userId, fingerprintHash)
-      .first<{ generation_id: string; stage: PatternDomainStage; updated_at: string; created_at: string }>();
+      .first<{
+        generation_id: string;
+        stage: PatternDomainStage;
+        updated_at: string;
+        created_at: string;
+        public_failure_stage: string | null;
+        failure_class: string | null;
+      }>();
     if (failed) {
       return {
         schema_version: M7_SCHEMA_VERSION,
@@ -248,10 +262,12 @@ export async function buildPatternState(
         consent,
         generation: {
           generation_id: failed.generation_id,
-          stage: publicStageFor(failed.stage) ?? "organizing_evidence",
+          stage: publicFailureStageFor(failed.public_failure_stage) ?? "organizing_evidence",
           status_updated_at: failed.updated_at,
           started_at: failed.created_at,
-          retryable: consent.status === "granted",
+          retryable:
+            consent.status === "granted" &&
+            await patternFailureIsRetryable(env, failed.failure_class, now),
           request_id: null,
         },
         pattern: null,

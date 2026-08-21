@@ -1,5 +1,37 @@
 import type { Env } from "../env.js";
 
+function positiveSafeInteger(value: string | undefined): number | null {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+/** Read current UTC-day capacity without reserving or charging a call. */
+export async function hasPatternProviderCallCapacity(
+  env: Env,
+  now = new Date(),
+): Promise<boolean> {
+  const limit = positiveSafeInteger(env.PATTERN_DAILY_PROVIDER_CALL_LIMIT);
+  if (limit === null) return false;
+  try {
+    const row = await env.DB.prepare(
+      `SELECT used_calls FROM pattern_provider_daily_usage
+       WHERE utc_date = ?`,
+    )
+      .bind(utcDateFor(now))
+      .first<{ used_calls: number }>();
+    if (!row) return true;
+    return (
+      Number.isInteger(row.used_calls) &&
+      row.used_calls >= 0 &&
+      row.used_calls < limit
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function consumePatternProviderCallBudget(
   env: Env,
   utcDate: string,

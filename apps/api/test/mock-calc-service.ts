@@ -489,6 +489,8 @@ export const OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY =
   "sk-test-pattern-candidate-invalid-once";
 export const OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY =
   "sk-test-pattern-full-rejection-loop";
+export const OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY =
+  "sk-test-pattern-injected-drift";
 export const PATTERN_CORRECTION_SMUGGLED_PROSE =
   "ZZPROSEZZ rejected candidate sentence";
 
@@ -563,6 +565,11 @@ interface PatternWriterRequestDocument {
     attempt: number;
     items: unknown[];
   };
+}
+
+interface PatternVerifierRequestDocument {
+  candidate: PatternWriterOutput;
+  plan: PatternPlan;
 }
 
 function fixedWords(count: number): string {
@@ -701,6 +708,38 @@ function invalidPatternWriter(document: PatternWriterRequestDocument): PatternWr
   };
 }
 
+/**
+ * Semantic, not structural, drift: the claim ledger stays inside chapter one,
+ * while its prose names an alias the frozen plan assigns to another chapter.
+ */
+function driftedPatternWriter(document: PatternWriterRequestDocument): PatternWriterOutput {
+  const writer = validPatternWriter(document);
+  const firstPlanChapter = document.plan.chapters[0];
+  const foreignAlias = document.plan.chapters
+    .slice(1)
+    .flatMap((chapter) => chapter.feature_aliases)
+    .find((alias) => !firstPlanChapter?.feature_aliases.includes(alias));
+  const firstChapter = writer.chapters[0];
+  const firstSection = firstChapter?.sections[0];
+  if (!firstPlanChapter || !foreignAlias || !firstChapter || !firstSection) return writer;
+  return {
+    ...writer,
+    chapters: [
+      {
+        ...firstChapter,
+        sections: [
+          {
+            ...firstSection,
+            text: `${fixedWords(102)} Assigned feature ${foreignAlias} contradicts the frozen chapter assignment`,
+          },
+          ...firstChapter.sections.slice(1),
+        ],
+      },
+      ...writer.chapters.slice(1),
+    ],
+  };
+}
+
 function isFullPlannerRequest(value: unknown): value is PatternPlannerRequestDocument {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const document = value as Partial<PatternPlannerRequestDocument>;
@@ -726,6 +765,52 @@ function isFullWriterRequest(value: unknown): value is PatternWriterRequestDocum
     !!document.uncertainty &&
     Array.isArray(document.uncertainty.required_language_rule_ids)
   );
+}
+
+function isFullVerifierRequest(value: unknown): value is PatternVerifierRequestDocument {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const document = value as Partial<PatternVerifierRequestDocument>;
+  return (
+    !!document.candidate &&
+    Array.isArray(document.candidate.chapters) &&
+    !!document.plan &&
+    Array.isArray(document.plan.chapters)
+  );
+}
+
+function injectedDriftVerdict(document: PatternVerifierRequestDocument): unknown {
+  const planByKey = new Map(
+    document.plan.chapters.map((chapter) => [chapter.chapter_key, chapter]),
+  );
+  for (const candidateChapter of document.candidate.chapters) {
+    const assigned = planByKey.get(candidateChapter.chapter_key);
+    if (!assigned) continue;
+    const foreignAliases = document.plan.chapters
+      .filter((chapter) => chapter.chapter_key !== assigned.chapter_key)
+      .flatMap((chapter) => chapter.feature_aliases)
+      .filter((alias) => !assigned.feature_aliases.includes(alias));
+    for (const section of candidateChapter.sections) {
+      const foreignAlias = foreignAliases.find((alias) =>
+        section.text.includes(`Assigned feature ${alias}`),
+      );
+      if (!foreignAlias) continue;
+      return {
+        schema_version: "0.7.0",
+        verdict: "reject",
+        findings: [
+          {
+            code: "claim_not_entailed",
+            severity: "error",
+            target_key: section.section_key,
+            feature_aliases: [],
+            ontology_rule_ids: [],
+            rationale: "Candidate prose contradicts the frozen chapter assignment.",
+          },
+        ],
+      };
+    }
+  }
+  return { schema_version: "0.7.0", verdict: "pass", findings: [] };
 }
 
 /** One Responses envelope, shaped as the real API shapes it. */
@@ -855,10 +940,28 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   const model = body.model;
   const authorization = request.headers.get("authorization") ?? "";
 
-  // Pattern passes route on the schema name. Failure sentinels below still key
-  // on `model`, so a Pattern test drives a failure exactly as a reading test
-  // does -- by pinning a sentinel model -- and the two never collide.
+  // Pattern passes route on the schema name. Pattern-specific faults key on
+  // the test credential, preserving the frozen production model pins; reading
+  // sentinels below remain keyed on model.
   const patternPass = PATTERN_SCHEMA_NAMES[body.text?.format?.name ?? ""];
+
+  if (
+    patternPass &&
+    authorization === `Bearer ${OPENAI_MOCK_TIMEOUT}`
+  ) {
+    const error = new Error("PRIVATE_PATTERN_TIMEOUT_PROVIDER_ERROR");
+    error.name = "AbortError";
+    throw error;
+  }
+
+  if (
+    patternPass &&
+    authorization === `Bearer ${OPENAI_MOCK_REFUSAL}`
+  ) {
+    return json(
+      responsesEnvelope(model, [{ type: "refusal", refusal: "I cannot help with that." }]),
+    );
+  }
 
   if (
     patternPass === "planner" &&
@@ -952,6 +1055,40 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
         ),
       );
     }
+  }
+
+  if (
+    patternPass === "writer" &&
+    authorization === `Bearer ${OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY}`
+  ) {
+    const input = JSON.parse(body.input[0]!.content[0]!.text) as unknown;
+    return json(
+      responsesEnvelope(
+        model,
+        outputText(
+          isFullWriterRequest(input)
+            ? driftedPatternWriter(input)
+            : patternPassDocument("writer", input),
+        ),
+      ),
+    );
+  }
+
+  if (
+    patternPass === "verifier" &&
+    authorization === `Bearer ${OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY}`
+  ) {
+    const input = JSON.parse(body.input[0]!.content[0]!.text) as unknown;
+    return json(
+      responsesEnvelope(
+        model,
+        outputText(
+          isFullVerifierRequest(input)
+            ? injectedDriftVerdict(input)
+            : patternPassDocument("verifier", input),
+        ),
+      ),
+    );
   }
 
   if (model === OPENAI_MOCK_NETWORK_ERROR) {

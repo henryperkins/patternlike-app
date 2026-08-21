@@ -21,7 +21,12 @@ import {
   deleteCurrentPattern,
   revokePatternGenerationConsent,
 } from "../services/pattern-lifecycle.js";
-import { publicStageFor, type PatternDomainStage } from "../services/pattern-command.js";
+import {
+  publicFailureStageFor,
+  patternFailureIsRetryable,
+  publicStageFor,
+  type PatternDomainStage,
+} from "../services/pattern-command.js";
 import { hashChartFingerprint, loadAnyClaim, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { loadPreferences } from "../db/preferences.js";
 import { isInternalPatternAccount } from "../services/pattern-rollout.js";
@@ -115,7 +120,8 @@ patternAiRoutes.get("/v1/pattern-generations/:generation_id", async (c) => {
   const requestId = c.get("requestId");
   const generationId = c.req.param("generation_id");
   const row = await c.env.DB.prepare(
-    `SELECT generation_id, stage, updated_at, created_at, finished_at
+    `SELECT generation_id, stage, updated_at, created_at, finished_at,
+            public_failure_stage, failure_class
      FROM pattern_generation_jobs WHERE generation_id = ? AND user_id = ?`,
   )
     .bind(generationId, c.get("userId"))
@@ -125,9 +131,13 @@ patternAiRoutes.get("/v1/pattern-generations/:generation_id", async (c) => {
       updated_at: string;
       created_at: string;
       finished_at: string | null;
+      public_failure_stage: string | null;
+      failure_class: string | null;
     }>();
   if (!row) return c.json(error(requestId, "not_found", "Generation not found"), 404);
-  const stage = publicStageFor(row.stage);
+  const stage = row.stage === "failed"
+    ? publicFailureStageFor(row.public_failure_stage)
+    : publicStageFor(row.stage);
   if (!stage) return c.json(error(requestId, "not_found", "Generation not found"), 404);
   return c.json(
     {
@@ -136,7 +146,9 @@ patternAiRoutes.get("/v1/pattern-generations/:generation_id", async (c) => {
       stage,
       status_updated_at: row.updated_at,
       started_at: row.created_at,
-      retryable: row.stage === "failed",
+      retryable:
+        row.stage === "failed" &&
+        await patternFailureIsRetryable(c.env, row.failure_class),
       finished_at: row.finished_at,
     },
     200,
@@ -214,18 +226,31 @@ export async function tryServeAiPattern(
   // you may try again" -- which is the difference between offering a retry and
   // offering nothing.
   const lastGeneration = await env.DB.prepare(
-    `SELECT stage, public_failure_stage FROM pattern_generation_jobs
+    `SELECT stage, public_failure_stage, failure_class
+     FROM pattern_generation_jobs
      WHERE user_id = ? AND chart_fingerprint_hash = ?
      ORDER BY created_at DESC, generation_id DESC
      LIMIT 1`,
   )
     .bind(userId, fingerprintHash)
-    .first<{ stage: string; public_failure_stage: string | null }>();
+    .first<{
+      stage: string;
+      public_failure_stage: string | null;
+      failure_class: string | null;
+    }>();
   if (lastGeneration?.stage === "failed") {
+    const publicFailureStage = publicFailureStageFor(
+      lastGeneration.public_failure_stage,
+    );
     return Response.json(
       error(requestId, "pattern_generation_failed", "The last Pattern generation did not finish", {
-        retryable: claim?.status === "available",
-        ...(lastGeneration.public_failure_stage ? { stage: lastGeneration.public_failure_stage } : {}),
+        retryable:
+          claim?.status === "available" &&
+          await patternFailureIsRetryable(
+            env,
+            lastGeneration.failure_class,
+          ),
+        ...(publicFailureStage ? { stage: publicFailureStage } : {}),
       }),
       { status: 409 },
     );
