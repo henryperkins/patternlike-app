@@ -1,24 +1,36 @@
 import { applyD1Migrations, env } from "cloudflare:test";
 
-// The migration setup is also the upgrade-path test. A fresh apply cannot prove
-// that a CHECK rebuild preserves live inventory, so stop immediately before
-// 0009, seed the exact pre-migration row shape, then apply the forward-only
-// remainder under the same live foreign-key enforcement D1 uses.
-const correctionMigrationIndex = env.TEST_MIGRATIONS.findIndex((migration) =>
-  migration.name.startsWith("0009_"),
-);
-if (correctionMigrationIndex < 0) {
-  throw new Error("0009 correction-artifact migration is missing");
-}
-const usageMigrationIndex = env.TEST_MIGRATIONS.findIndex((migration) =>
-  migration.name.startsWith("0010_"),
-);
-if (usageMigrationIndex <= correctionMigrationIndex) {
-  throw new Error("0010 stage-class usage migration is missing or out of order");
+const migrationNames = env.TEST_MIGRATIONS.map((migration) => migration.name);
+const expectedTail = [
+  "0009_pattern_correction_artifact.sql",
+  "0010_pattern_stage_class_usage.sql",
+  "0011_ontology_pipeline_evidence.sql",
+  "0012_ontology_pipeline.sql",
+];
+if (
+  JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
+  JSON.stringify(expectedTail)
+) {
+  throw new Error(
+    `ontology migration tail is missing or out of order: ${JSON.stringify(migrationNames.slice(-4))}`,
+  );
 }
 
+const correctionMigrationIndex = migrationNames.indexOf(expectedTail[0]);
+const usageMigrationIndex = migrationNames.indexOf(expectedTail[1]);
+const evidenceMigrationIndex = migrationNames.indexOf(expectedTail[2]);
+const pipelineMigrationIndex = migrationNames.indexOf(expectedTail[3]);
+
+// Main-test storage starts empty and receives the exact ordered migration set.
+// This is the fresh-database lane; individual tests then exercise the schema.
+await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+
+// The isolated upgrade binding stops before 0009, carries live rows through the
+// adapter rebuild/additive migrations and 0011, and only then applies 0012.
+// This proves forward compatibility separately from the clean-apply lane.
+const upgradeDb = env.MIGRATION_UPGRADE_DB;
 await applyD1Migrations(
-  env.DB,
+  upgradeDb,
   env.TEST_MIGRATIONS.slice(0, correctionMigrationIndex),
 );
 
@@ -36,7 +48,7 @@ const artifactBefore = {
   expires_at: "2026-09-19T00:00:00.000Z",
   deleted_at: null,
 };
-await env.DB.prepare(
+await upgradeDb.prepare(
   `INSERT INTO users (
      id, crypto_subject, status, locale, timezone, entitlement_tier, created_at, updated_at
    ) VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
@@ -48,7 +60,7 @@ await env.DB.prepare(
     artifactBefore.created_at,
   )
   .run();
-await env.DB.prepare(
+await upgradeDb.prepare(
   `INSERT INTO pattern_generation_artifacts (
      id, generation_id, user_id, artifact_class, object_key,
      ciphertext_sha256, plaintext_sha256, byte_length, created_at, expires_at, deleted_at
@@ -58,11 +70,11 @@ await env.DB.prepare(
   .run();
 
 await applyD1Migrations(
-  env.DB,
+  upgradeDb,
   env.TEST_MIGRATIONS.slice(correctionMigrationIndex, usageMigrationIndex),
 );
 
-const artifactAfter = await env.DB.prepare(
+const artifactAfter = await upgradeDb.prepare(
   `SELECT id, generation_id, user_id, artifact_class, object_key,
           ciphertext_sha256, plaintext_sha256, byte_length, created_at, expires_at, deleted_at
    FROM pattern_generation_artifacts WHERE id = ?`,
@@ -73,7 +85,7 @@ if (JSON.stringify(artifactAfter) !== JSON.stringify(artifactBefore)) {
   throw new Error("0009 did not preserve the populated artifact row byte-for-byte");
 }
 
-await env.DB.prepare(
+await upgradeDb.prepare(
   `INSERT INTO pattern_generation_artifacts (
      id, generation_id, user_id, artifact_class, object_key,
      ciphertext_sha256, plaintext_sha256, byte_length, created_at, expires_at, deleted_at
@@ -93,7 +105,7 @@ await env.DB.prepare(
 
 let unknownClassRejected = false;
 try {
-  await env.DB.prepare(
+  await upgradeDb.prepare(
     `INSERT INTO pattern_generation_artifacts (
        id, generation_id, user_id, artifact_class, object_key,
        ciphertext_sha256, plaintext_sha256, byte_length, created_at, expires_at, deleted_at
@@ -117,21 +129,20 @@ if (!unknownClassRejected) {
   throw new Error("0009 admitted an unknown correction artifact class");
 }
 
-const foreignKeyCheck = await env.DB.prepare("PRAGMA foreign_key_check").all();
+const foreignKeyCheck = await upgradeDb.prepare("PRAGMA foreign_key_check").all();
 if (foreignKeyCheck.results.length !== 0) {
   throw new Error("0009 left foreign-key violations after the CHECK rebuild");
 }
 
 // Both provider ledgers already exist in 0007. Seed their old two-counterless
-// row shapes so 0010 proves DEFAULT 0 is an upgrade property, not merely a fresh
-// schema declaration.
-await env.DB.prepare(
+// row shapes so 0010 proves DEFAULT 0 is an upgrade property.
+await upgradeDb.prepare(
   `INSERT INTO pattern_provider_daily_usage (utc_date, used_calls, created_at, updated_at)
    VALUES ('2026-08-18', 7, ?, ?)`,
 )
   .bind(artifactBefore.created_at, artifactBefore.created_at)
   .run();
-await env.DB.prepare(
+await upgradeDb.prepare(
   `INSERT INTO pattern_ontology_provider_daily_usage (
      utc_date, used_calls, created_at, updated_at
    ) VALUES ('2026-08-18', 9, ?, ?)`,
@@ -140,19 +151,14 @@ await env.DB.prepare(
   .run();
 
 await applyD1Migrations(
-  env.DB,
-  env.TEST_MIGRATIONS.slice(usageMigrationIndex),
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(usageMigrationIndex, evidenceMigrationIndex),
 );
 
-const patternUsage = await env.DB.prepare(
+const patternUsage = await upgradeDb.prepare(
   `SELECT used_calls, planner_calls, writer_calls, verifier_calls
    FROM pattern_provider_daily_usage WHERE utc_date = '2026-08-18'`,
-).first<{
-  used_calls: number;
-  planner_calls: number;
-  writer_calls: number;
-  verifier_calls: number;
-}>();
+).first();
 if (
   JSON.stringify(patternUsage) !==
   JSON.stringify({
@@ -165,15 +171,10 @@ if (
   throw new Error("0010 did not preserve Pattern total and zero stage-class counters");
 }
 
-const ontologyUsage = await env.DB.prepare(
+const ontologyUsage = await upgradeDb.prepare(
   `SELECT used_calls, generator_calls, evaluator_calls, regression_calls
    FROM pattern_ontology_provider_daily_usage WHERE utc_date = '2026-08-18'`,
-).first<{
-  used_calls: number;
-  generator_calls: number;
-  evaluator_calls: number;
-  regression_calls: number;
-}>();
+).first();
 if (
   JSON.stringify(ontologyUsage) !==
   JSON.stringify({
@@ -196,7 +197,7 @@ for (const [table, column] of [
 ] as const) {
   let negativeRejected = false;
   try {
-    await env.DB.prepare(
+    await upgradeDb.prepare(
       `UPDATE ${table} SET ${column} = -1 WHERE utc_date = '2026-08-18'`,
     ).run();
   } catch {
@@ -207,16 +208,79 @@ for (const [table, column] of [
   }
 }
 
-const finalForeignKeyCheck = await env.DB.prepare("PRAGMA foreign_key_check").all();
-if (finalForeignKeyCheck.results.length !== 0) {
-  throw new Error("0010 left foreign-key violations");
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(evidenceMigrationIndex, pipelineMigrationIndex),
+);
+
+const evidenceBefore = {
+  run_id: "oprun_populated_post_0011",
+  ontology_version: "ontology-populated-post-0011",
+  corpus_release_id: "corpus-populated-post-0011",
+  corpus_release_hash: `sha256:${"10".repeat(32)}`,
+  corpus_license_class: "internal_synthetic",
+  corpus_public_capable: 0,
+  activation_scope: "internal",
+  bundle_hash: `sha256:${"11".repeat(32)}`,
+  evaluation_report_hash: `sha256:${"12".repeat(32)}`,
+  evaluation_artifact_object_key: "migration-tests/evaluation-report.json.enc",
+  evaluation_artifact_envelope_hash: `sha256:${"13".repeat(32)}`,
+  evaluation_artifact_ciphertext_hash: `sha256:${"14".repeat(32)}`,
+  evaluation_artifact_status: "committed",
+  signing_key_id: "migration-test-signing-key",
+  run_status: "succeeded",
+  evidence_status: "committed",
+  compiler_passed: 1,
+  evaluator_passed: 1,
+  unevaluated_fixture_count: 0,
+  created_at: "2026-08-20T01:00:00.000Z",
+  committed_at: "2026-08-20T01:05:00.000Z",
+};
+await upgradeDb.prepare(
+  `INSERT INTO pattern_ontology_pipeline_evidence (
+     run_id, ontology_version, corpus_release_id, corpus_release_hash,
+     corpus_license_class, corpus_public_capable, activation_scope, bundle_hash,
+     evaluation_report_hash, evaluation_artifact_object_key,
+     evaluation_artifact_envelope_hash, evaluation_artifact_ciphertext_hash,
+     evaluation_artifact_status, signing_key_id, run_status, evidence_status,
+     compiler_passed, evaluator_passed, unevaluated_fixture_count,
+     created_at, committed_at
+   ) VALUES (${Object.keys(evidenceBefore).map(() => "?").join(", ")})`,
+)
+  .bind(...Object.values(evidenceBefore))
+  .run();
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(pipelineMigrationIndex),
+);
+
+const evidenceAfter = await upgradeDb.prepare(
+  `SELECT ${Object.keys(evidenceBefore).join(", ")}
+   FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
+)
+  .bind(evidenceBefore.run_id)
+  .first();
+if (JSON.stringify(evidenceAfter) !== JSON.stringify(evidenceBefore)) {
+  throw new Error("0012 did not preserve the populated 0011 evidence row byte-for-byte");
 }
 
-await env.DB.prepare(
-  "DELETE FROM pattern_generation_artifacts WHERE user_id = ?",
-)
-  .bind(migrationUserId)
-  .run();
-await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(migrationUserId).run();
-await env.DB.prepare("DELETE FROM pattern_provider_daily_usage").run();
-await env.DB.prepare("DELETE FROM pattern_ontology_provider_daily_usage").run();
+for (const table of [
+  "pattern_source_corpus_releases",
+  "pattern_ontology_pipeline_runs",
+  "pattern_ontology_pipeline_artifacts",
+]) {
+  const found = await upgradeDb.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+  ).bind(table).first();
+  if (!found) throw new Error(`0012 did not create ${table} on populated upgrade`);
+}
+
+const finalForeignKeyCheck = await upgradeDb.prepare("PRAGMA foreign_key_check").all();
+if (finalForeignKeyCheck.results.length !== 0) {
+  throw new Error("0012 left foreign-key violations on the populated upgrade");
+}
+const assertionRows = await upgradeDb.prepare("SELECT * FROM assertion_probe").all();
+if (assertionRows.results.length !== 0) {
+  throw new Error("0012 left an assertion probe armed");
+}

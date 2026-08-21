@@ -53,6 +53,12 @@ export default defineConfig({
       main: "src/index.ts",
       wrangler: { configPath: "./wrangler.toml" },
       miniflare: {
+        // The application DB proves a clean apply. The second binding is used
+        // only by apply-migrations.ts to exercise forward upgrades over live
+        // post-0011 rows without making every API test inherit those fixtures.
+        d1Databases: {
+          MIGRATION_UPGRADE_DB: "ontology-pipeline-migration-upgrade-test",
+        },
         bindings: {
           ...HERMETIC_TEST_BINDINGS,
           TEST_MIGRATIONS: migrations,

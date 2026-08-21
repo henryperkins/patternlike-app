@@ -10,6 +10,8 @@ declare global {
     interface Env extends AppEnv {
       /** Injected by vitest.config.ts via readD1Migrations(). */
       TEST_MIGRATIONS: D1Migration[];
+      /** Isolated D1 binding for populated forward-migration probes. */
+      MIGRATION_UPGRADE_DB: D1Database;
       /** Public half of the ephemeral auxiliary signer test key. */
       TEST_ONTOLOGY_SIGNER_KEY_ID: string;
       TEST_ONTOLOGY_SIGNER_PUBLIC_KEY: string;
