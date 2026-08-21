@@ -90,6 +90,7 @@ export type PatternPublisherSafeDetailCode =
   | "gateway_cache_hit"
   | "gateway_dlp_match"
   | "provider_4xx"
+  | "response_too_large"
   | "daily_call_limit_reached";
 
 export interface PatternPublisherPin {

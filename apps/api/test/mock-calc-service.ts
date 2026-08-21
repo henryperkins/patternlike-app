@@ -493,6 +493,13 @@ export const OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY =
   "sk-test-pattern-injected-drift";
 export const PATTERN_CORRECTION_SMUGGLED_PROSE =
   "ZZPROSEZZ rejected candidate sentence";
+/** Ontology faults use credentials so the reviewed model pins stay unchanged. */
+export const OPENAI_MOCK_ONTOLOGY_REFUSAL_KEY =
+  "sk-test-ontology-refusal";
+export const OPENAI_MOCK_ONTOLOGY_MALFORMED_KEY =
+  "sk-test-ontology-malformed";
+export const OPENAI_MOCK_ONTOLOGY_TIMEOUT_KEY =
+  "sk-test-ontology-timeout";
 
 type PatternScenarioState = Record<"planner" | "writer" | "verifier", number>;
 
@@ -898,6 +905,75 @@ const PATTERN_SCHEMA_NAMES: Record<string, "planner" | "writer" | "verifier"> = 
   patternlike_pattern_verdict_v7: "verifier",
 };
 
+const ONTOLOGY_SCHEMA_NAMES: Record<string, "generator" | "evaluator"> = {
+  patternlike_ontology_generation_chunk_v7: "generator",
+  patternlike_ontology_rule_verdict_v7: "evaluator",
+};
+
+interface OntologyGeneratorRequestDocument {
+  corpus?: {
+    locale?: string;
+    fragments?: Array<{
+      id?: string;
+      normalized_proposition?: string;
+    }>;
+  };
+}
+
+interface OntologyEvaluatorRequestDocument {
+  rule?: { id?: string };
+}
+
+function ontologyPassDocument(
+  pass: "generator" | "evaluator",
+  input: unknown,
+): unknown {
+  if (pass === "generator") {
+    const document = input as OntologyGeneratorRequestDocument;
+    const fragment = document.corpus?.fragments?.[0];
+    return {
+      schema_version: "0.7.0",
+      records: [
+        {
+          id: `ont_${"4".repeat(32)}`,
+          meaning_class: "source_supported",
+          locale: document.corpus?.locale ?? "en-US",
+          feature_predicate: { type: "position", body: "sun" },
+          normalized_proposition:
+            fragment?.normalized_proposition ?? "A source-supported mock proposition.",
+          source_fragment_ids: fragment?.id ? [fragment.id] : [],
+          input_meaning_ids: [],
+          transformation_class: null,
+          tensions: ["The tendency may become one-sided."],
+          counter_expressions: ["The same tendency may be expressed with restraint."],
+          prohibited_claims: ["No diagnosis, prediction, or fate claim."],
+          salience_band: "medium",
+          presentation_priority: 10,
+          cluster_tags: ["mock"],
+        },
+      ],
+      complete: true,
+    };
+  }
+  const document = input as OntologyEvaluatorRequestDocument;
+  return {
+    schema_version: "0.7.0",
+    rule_id: document.rule?.id ?? `ont_${"0".repeat(32)}`,
+    verdict: "pass",
+    dimensions: {
+      source_support: "pass",
+      entailment: "pass",
+      contradiction: "pass",
+      unsupported_expansion: "pass",
+      diagnostic_or_predictive_drift: "pass",
+      one_sided_or_essentialist_framing: "pass",
+      tension_counter_expression_balance: "pass",
+      uncertainty_compatibility: "pass",
+      cross_record_conflict: "pass",
+    },
+  };
+}
+
 /**
  * A valid answer for each Pattern pass, derived from the exact provider input.
  *
@@ -944,6 +1020,33 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
   // the test credential, preserving the frozen production model pins; reading
   // sentinels below remain keyed on model.
   const patternPass = PATTERN_SCHEMA_NAMES[body.text?.format?.name ?? ""];
+  const ontologyPass = ONTOLOGY_SCHEMA_NAMES[body.text?.format?.name ?? ""];
+
+  if (
+    ontologyPass &&
+    authorization === `Bearer ${OPENAI_MOCK_ONTOLOGY_TIMEOUT_KEY}`
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    return json(
+      responsesEnvelope(model, outputText("PRIVATE_ONTOLOGY_TIMEOUT_PROVIDER_ERROR")),
+    );
+  }
+
+  if (
+    ontologyPass &&
+    authorization === `Bearer ${OPENAI_MOCK_ONTOLOGY_REFUSAL_KEY}`
+  ) {
+    return json(
+      responsesEnvelope(model, [{ type: "refusal", refusal: "PRIVATE ontology refusal." }]),
+    );
+  }
+
+  if (
+    ontologyPass &&
+    authorization === `Bearer ${OPENAI_MOCK_ONTOLOGY_MALFORMED_KEY}`
+  ) {
+    return json(responsesEnvelope(model, outputText("{ PRIVATE ontology malformed")));
+  }
 
   if (
     patternPass &&
@@ -1185,6 +1288,13 @@ async function mockOpenAiResponses(request: Request): Promise<Response> {
     const input = JSON.parse(body.input[0]!.content[0]!.text) as unknown;
     return json(
       responsesEnvelope(model, outputText(patternPassDocument(patternPass, input))),
+    );
+  }
+
+  if (ontologyPass) {
+    const input = JSON.parse(body.input[0]!.content[0]!.text) as unknown;
+    return json(
+      responsesEnvelope(model, outputText(ontologyPassDocument(ontologyPass, input))),
     );
   }
 
