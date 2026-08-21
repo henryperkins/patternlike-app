@@ -46,52 +46,9 @@ interface RunRow {
   failed_at: string | null;
 }
 
-const CORPUS: CorpusRow = {
-  corpus_release_id: "corpus-schema-test-1",
-  corpus_hash: HASH("10"),
-  locale: "en-US",
-  object_key: "pattern-ontology-corpora/corpus-schema-test-1.json",
-  fragment_count: 40,
-  license_class: "internal_synthetic",
-  public_capable: 0,
-  created_at: NOW,
-  registered_at: NOW,
-};
-
-const RUN: RunRow = {
-  run_id: "oprun_schema_test_1",
-  idempotency_key: "ontology-pipeline-schema-test-1",
-  corpus_release_id: CORPUS.corpus_release_id,
-  corpus_hash: CORPUS.corpus_hash,
-  candidate_ontology_version: "1.0.0-machine-test",
-  configuration_json: JSON.stringify({
-    generator_model: "gpt-test-generator",
-    evaluator_model: "gpt-test-evaluator",
-    regression_threshold_percent: 90,
-    failed_artifact_retention_days: 7,
-  }),
-  configuration_hash: HASH("20"),
-  stage: "reserved",
-  stage_generation: 0,
-  stage_cursor: 0,
-  stage_attempt: 0,
-  claim_token: null,
-  lease_expires_at: null,
-  available_at: NOW,
-  dispatched_at: null,
-  failure_class: null,
-  candidate_hash: null,
-  compilation_report_hash: null,
-  evaluation_report_hash: null,
-  regression_report_hash: null,
-  bundle_hash: null,
-  failed_artifact_expires_at: null,
-  created_at: NOW,
-  updated_at: NOW,
-  finished_at: null,
-  succeeded_at: null,
-  failed_at: null,
-};
+let testSequence = 0;
+let CORPUS: CorpusRow;
+let RUN: RunRow;
 
 async function execute(
   sql: string,
@@ -117,16 +74,156 @@ async function insertRun(overrides: Partial<RunRow> = {}): Promise<void> {
   );
 }
 
+const FORWARD_STAGES = [
+  "corpus_reading",
+  "generating",
+  "compiling",
+  "evaluating",
+  "regressing",
+  "signing",
+  "ingesting",
+] as const;
+
+type ForwardStage = (typeof FORWARD_STAGES)[number];
+
+async function advanceRunTo(
+  target: ForwardStage,
+  runId = RUN.run_id,
+): Promise<void> {
+  const targetIndex = FORWARD_STAGES.indexOf(target);
+  const current = await env.DB.prepare(
+    "SELECT stage FROM pattern_ontology_pipeline_runs WHERE run_id = ?",
+  ).bind(runId).first<{ stage: string }>();
+  if (!current) throw new Error("ontology pipeline test run missing");
+  const currentIndex = current.stage === "reserved"
+    ? -1
+    : FORWARD_STAGES.indexOf(current.stage as ForwardStage);
+  if (
+    (current.stage !== "reserved" && currentIndex === -1)
+    || currentIndex >= targetIndex
+  ) {
+    throw new Error(`cannot advance ${current.stage} to ${target}`);
+  }
+  for (let index = currentIndex + 1; index <= targetIndex; index += 1) {
+    const stage = FORWARD_STAGES[index];
+    const evidence = {
+      ...(stage === "compiling" ? { candidate_hash: HASH("30") } : {}),
+      ...(stage === "evaluating" ? {
+        compilation_report_hash: HASH("31"),
+      } : {}),
+      ...(stage === "regressing" ? {
+        evaluation_report_hash: HASH("32"),
+      } : {}),
+      ...(stage === "signing" ? {
+        regression_report_hash: HASH("33"),
+      } : {}),
+      ...(stage === "ingesting" ? { bundle_hash: HASH("34") } : {}),
+    };
+    const assignments = [
+      "stage = ?",
+      "stage_generation = ?",
+      "stage_cursor = 0",
+      "stage_attempt = 0",
+      "claim_token = NULL",
+      "lease_expires_at = NULL",
+      "dispatched_at = NULL",
+      ...Object.keys(evidence).map((column) => `${column} = ?`),
+    ];
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs SET ${assignments.join(", ")}
+       WHERE run_id = ?`,
+    ).bind(stage, index + 1, ...Object.values(evidence), runId).run();
+  }
+}
+
+async function claimCurrentRun(
+  token = "claim-owner",
+  leaseExpiresAt = "2026-08-21T00:05:00.000Z",
+): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE pattern_ontology_pipeline_runs
+     SET claim_token = ?, lease_expires_at = ?,
+         dispatched_at = COALESCE(dispatched_at, ?)
+     WHERE run_id = ?`,
+  ).bind(token, leaseExpiresAt, NOW, RUN.run_id).run();
+}
+
+function artifactForCurrentRun(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: `opart_retention_${testSequence}`,
+    run_id: RUN.run_id,
+    stage: "generating",
+    stage_generation: 2,
+    stage_attempt: 0,
+    artifact_class: "generator_response",
+    object_key: `pattern-ontology/runs/${RUN.run_id}/retention.enc`,
+    plaintext_sha256: HASH("70"),
+    envelope_sha256: HASH("71"),
+    ciphertext_sha256: HASH("72"),
+    envelope_key_id: "ontology-artifact-key-retention",
+    envelope_nonce: `retention-nonce-${testSequence}`,
+    byte_length: 512,
+    created_at: NOW,
+    expires_at: null,
+    deleted_at: null,
+    ...overrides,
+  };
+}
+
 async function expectRejected(work: () => Promise<unknown>): Promise<void> {
   await expect(work()).rejects.toThrow();
 }
 
-beforeEach(async () => {
-  await env.DB.batch([
-    env.DB.prepare("DELETE FROM pattern_ontology_pipeline_artifacts"),
-    env.DB.prepare("DELETE FROM pattern_ontology_pipeline_runs"),
-    env.DB.prepare("DELETE FROM pattern_source_corpus_releases"),
-  ]);
+beforeEach(() => {
+  testSequence += 1;
+  const suffix = testSequence.toString(16).padStart(2, "0");
+  CORPUS = {
+    corpus_release_id: `corpus-schema-test-${suffix}`,
+    corpus_hash: HASH(suffix),
+    locale: "en-US",
+    object_key: `pattern-ontology-corpora/corpus-schema-test-${suffix}.json`,
+    fragment_count: 40,
+    license_class: "internal_synthetic",
+    public_capable: 0,
+    created_at: NOW,
+    registered_at: NOW,
+  };
+  RUN = {
+    run_id: `oprun_schema_test_${suffix}`,
+    idempotency_key: `ontology-pipeline-schema-test-${suffix}`,
+    corpus_release_id: CORPUS.corpus_release_id,
+    corpus_hash: CORPUS.corpus_hash,
+    candidate_ontology_version: `1.0.0-machine-test-${suffix}`,
+    configuration_json: JSON.stringify({
+      generator_model: "gpt-test-generator",
+      evaluator_model: "gpt-test-evaluator",
+      regression_threshold_percent: 90,
+      failed_artifact_retention_days: 7,
+    }),
+    configuration_hash: HASH("20"),
+    stage: "reserved",
+    stage_generation: 0,
+    stage_cursor: 0,
+    stage_attempt: 0,
+    claim_token: null,
+    lease_expires_at: null,
+    available_at: NOW,
+    dispatched_at: null,
+    failure_class: null,
+    candidate_hash: null,
+    compilation_report_hash: null,
+    evaluation_report_hash: null,
+    regression_report_hash: null,
+    bundle_hash: null,
+    failed_artifact_expires_at: null,
+    created_at: NOW,
+    updated_at: NOW,
+    finished_at: null,
+    succeeded_at: null,
+    failed_at: null,
+  };
 });
 
 describe("ontology pipeline migration", () => {
@@ -183,6 +280,26 @@ describe("ontology pipeline migration", () => {
     }));
   });
 
+  it("physically preserves corpus identities so they cannot be reused", async () => {
+    await insertCorpus();
+
+    await expectRejected(() => env.DB.prepare(
+      "DELETE FROM pattern_source_corpus_releases WHERE corpus_release_id = ?",
+    ).bind(CORPUS.corpus_release_id).run());
+    await expectRejected(() => execute(
+      "INSERT OR REPLACE INTO pattern_source_corpus_releases",
+      {
+        ...CORPUS,
+        corpus_hash: HASH("aa"),
+        object_key: `${CORPUS.object_key}.replace`,
+      },
+    ));
+    await expectRejected(() => insertCorpus({
+      corpus_hash: HASH("aa"),
+      object_key: `${CORPUS.object_key}.replacement`,
+    }));
+  });
+
   it("pins one immutable command to the exact corpus identity", async () => {
     await insertCorpus();
     await insertRun();
@@ -214,6 +331,62 @@ describe("ontology pipeline migration", () => {
         `UPDATE pattern_ontology_pipeline_runs SET ${column} = ? WHERE run_id = ?`,
       ).bind(changed, RUN.run_id).run());
     }
+  });
+
+  it("physically preserves run identities so commands cannot be reused", async () => {
+    await insertCorpus();
+    await insertRun();
+
+    await expectRejected(() => env.DB.prepare(
+      "DELETE FROM pattern_ontology_pipeline_runs WHERE run_id = ?",
+    ).bind(RUN.run_id).run());
+    await expectRejected(() => execute(
+      "INSERT OR REPLACE INTO pattern_ontology_pipeline_runs",
+      {
+        ...RUN,
+        idempotency_key: `${RUN.idempotency_key}-replace`,
+        candidate_ontology_version: `${RUN.candidate_ontology_version}-replace`,
+        configuration_json: JSON.stringify({ replacement: true }),
+        configuration_hash: HASH("ab"),
+      },
+    ));
+    await expectRejected(() => insertRun({
+      idempotency_key: `${RUN.idempotency_key}-replacement`,
+      candidate_ontology_version: `${RUN.candidate_ontology_version}-replacement`,
+      configuration_json: JSON.stringify({ replacement: true }),
+      configuration_hash: HASH("ab"),
+    }));
+  });
+
+  it("requires every new run to start in coherent reserved state", async () => {
+    await insertCorpus();
+
+    await expectRejected(() => insertRun({
+      stage: "generating",
+      stage_generation: 2,
+      dispatched_at: NOW,
+    }));
+    await expectRejected(() => insertRun({
+      stage: "failed",
+      stage_generation: 1,
+      failure_class: "execution_error",
+      dispatched_at: NOW,
+      failed_artifact_expires_at: "2026-08-28T02:00:00.000Z",
+      finished_at: "2026-08-21T02:00:00.000Z",
+      failed_at: "2026-08-21T02:00:00.000Z",
+    }));
+    await expectRejected(() => insertRun({
+      stage: "succeeded",
+      stage_generation: 9,
+      dispatched_at: NOW,
+      candidate_hash: HASH("30"),
+      compilation_report_hash: HASH("31"),
+      evaluation_report_hash: HASH("32"),
+      regression_report_hash: HASH("33"),
+      bundle_hash: HASH("34"),
+      finished_at: "2026-08-21T02:00:00.000Z",
+      succeeded_at: "2026-08-21T02:00:00.000Z",
+    }));
   });
 
   it("admits only the full forward stage sequence and coherent claims", async () => {
@@ -280,81 +453,147 @@ describe("ontology pipeline migration", () => {
        WHERE run_id = ?`,
     ).bind(RUN.run_id).run());
 
-    await env.DB.prepare(
-      `UPDATE pattern_ontology_pipeline_runs
-       SET claim_token = 'claim-1', lease_expires_at = ?, dispatched_at = ?
-       WHERE run_id = ?`,
-    ).bind("2026-08-21T00:05:00.000Z", NOW, RUN.run_id).run();
+    await claimCurrentRun("claim-1");
     await expectRejected(() => env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_runs SET lease_expires_at = NULL
        WHERE run_id = ?`,
     ).bind(RUN.run_id).run());
   });
 
+  it("rejects replacing a live stage claim", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    await claimCurrentRun();
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET claim_token = 'claim-thief', lease_expires_at = ?
+       WHERE run_id = ?`,
+    ).bind("2026-08-21T00:10:00.000Z", RUN.run_id).run());
+  });
+
+  it("rejects extending a live stage lease", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    await claimCurrentRun();
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs SET lease_expires_at = ?
+       WHERE run_id = ?`,
+    ).bind("2026-08-21T00:10:00.000Z", RUN.run_id).run());
+  });
+
+  it("rejects advancing an attempt while its claim remains live", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    await claimCurrentRun();
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs SET stage_attempt = stage_attempt + 1
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run());
+  });
+
   it("requires stage evidence before downstream work", async () => {
     await insertCorpus();
-    await expectRejected(() => insertRun({
-      stage: "compiling",
-      stage_generation: 3,
-      dispatched_at: NOW,
-    }));
-    await expectRejected(() => insertRun({
-      stage: "regressing",
-      stage_generation: 5,
-      candidate_hash: HASH("30"),
-      compilation_report_hash: HASH("31"),
-      dispatched_at: NOW,
-    }));
-    await expectRejected(() => insertRun({
-      stage: "ingesting",
-      stage_generation: 8,
-      candidate_hash: HASH("30"),
-      compilation_report_hash: HASH("31"),
-      evaluation_report_hash: HASH("32"),
-      regression_report_hash: HASH("33"),
-      dispatched_at: NOW,
-    }));
+    await insertRun();
+    await advanceRunTo("generating");
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'compiling', stage_generation = 3
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run());
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'compiling', stage_generation = 3, candidate_hash = ?
+       WHERE run_id = ?`,
+    ).bind(HASH("30"), RUN.run_id).run();
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'evaluating', stage_generation = 4
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run());
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'evaluating', stage_generation = 4,
+           compilation_report_hash = ?
+       WHERE run_id = ?`,
+    ).bind(HASH("31"), RUN.run_id).run();
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'regressing', stage_generation = 5
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run());
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'regressing', stage_generation = 5,
+           evaluation_report_hash = ?
+       WHERE run_id = ?`,
+    ).bind(HASH("32"), RUN.run_id).run();
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'signing', stage_generation = 6,
+           regression_report_hash = ?
+       WHERE run_id = ?`,
+    ).bind(HASH("33"), RUN.run_id).run();
+
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'ingesting', stage_generation = 7
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run());
   });
 
   it("never rewrites acquired evidence or moves same-stage counters backward", async () => {
     await insertCorpus();
-    await insertRun({
-      stage: "compiling",
-      stage_generation: 3,
-      stage_cursor: 2,
-      stage_attempt: 2,
-      candidate_hash: HASH("30"),
-      dispatched_at: NOW,
-    });
+    await insertRun();
+    await advanceRunTo("generating");
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage_generation = 3, stage_cursor = 1
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run();
 
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs SET candidate_hash = ?
+       WHERE run_id = ?`,
+    ).bind(HASH("30"), RUN.run_id).run();
     await expectRejected(() => env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_runs SET candidate_hash = ?
        WHERE run_id = ?`,
     ).bind(HASH("39"), RUN.run_id).run());
     await expectRejected(() => env.DB.prepare(
-      `UPDATE pattern_ontology_pipeline_runs SET stage_cursor = 1
+      `UPDATE pattern_ontology_pipeline_runs SET stage_cursor = 0
        WHERE run_id = ?`,
     ).bind(RUN.run_id).run());
     await expectRejected(() => env.DB.prepare(
-      `UPDATE pattern_ontology_pipeline_runs SET stage_attempt = 1
+      `UPDATE pattern_ontology_pipeline_runs SET stage_attempt = -1
        WHERE run_id = ?`,
     ).bind(RUN.run_id).run());
   });
 
   it("distinguishes same-generation retries from successor deliveries", async () => {
     await insertCorpus();
-    await insertRun({
-      stage: "generating",
-      stage_generation: 2,
-      stage_cursor: 0,
-      stage_attempt: 0,
-      dispatched_at: NOW,
-    });
+    await insertRun();
+    await advanceRunTo("generating");
 
-    // A retry owns the same cursor and generation, but advances its attempt.
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs SET stage_attempt = 1
+       WHERE run_id = ?`,
+    ).bind(RUN.run_id).run());
+    await claimCurrentRun("claim-retry");
+
+    // An owned retry releases the delivery and advances its durable attempt.
     await env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_runs
-       SET stage_attempt = 1, dispatched_at = NULL
+       SET stage_attempt = 1, claim_token = NULL, lease_expires_at = NULL,
+           dispatched_at = NULL
        WHERE run_id = ?`,
     ).bind(RUN.run_id).run();
 
@@ -381,13 +620,9 @@ describe("ontology pipeline migration", () => {
 
   it("clears claim ownership when advancing to a new named stage", async () => {
     await insertCorpus();
-    await insertRun({
-      stage: "corpus_reading",
-      stage_generation: 1,
-      claim_token: "claim-corpus-reader",
-      lease_expires_at: "2026-08-21T00:05:00.000Z",
-      dispatched_at: NOW,
-    });
+    await insertRun();
+    await advanceRunTo("corpus_reading");
+    await claimCurrentRun("claim-corpus-reader");
 
     await expectRejected(() => env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_runs
@@ -406,78 +641,89 @@ describe("ontology pipeline migration", () => {
 
   it("closes terminal state and fixes failed retention at exactly seven days", async () => {
     await insertCorpus();
+    await insertRun();
     const failedAt = "2026-08-21T02:00:00.000Z";
-    await insertRun({
-      stage: "failed",
-      failure_class: "evaluation_rejected",
-      dispatched_at: NOW,
-      failed_artifact_expires_at: "2026-08-28T02:00:00.000Z",
-      finished_at: failedAt,
-      failed_at: failedAt,
-    });
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 1,
+           failure_class = 'evaluation_rejected', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(
+      NOW,
+      "2026-08-29T02:00:00.000Z",
+      failedAt,
+      failedAt,
+      RUN.run_id,
+    ).run());
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 1,
+           failure_class = 'provider said secret prose', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(
+      NOW,
+      "2026-08-28T02:00:00.000Z",
+      failedAt,
+      failedAt,
+      RUN.run_id,
+    ).run());
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 1,
+           failure_class = 'evaluation_rejected', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(
+      NOW,
+      "2026-08-28T02:00:00.000Z",
+      "2026-08-21T02:00:01.000Z",
+      failedAt,
+      RUN.run_id,
+    ).run());
+    await expectRejected(() => env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 1,
+           claim_token = 'claim-terminal', lease_expires_at = ?,
+           failure_class = 'evaluation_rejected', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(
+      "2026-08-21T02:05:00.000Z",
+      NOW,
+      "2026-08-28T02:00:00.000Z",
+      failedAt,
+      failedAt,
+      RUN.run_id,
+    ).run());
 
-    await expectRejected(() => insertRun({
-      run_id: "oprun_bad_failure_expiry",
-      idempotency_key: "bad-failure-expiry",
-      candidate_ontology_version: "1.0.1-machine-test",
-      stage: "failed",
-      failure_class: "evaluation_rejected",
-      dispatched_at: NOW,
-      failed_artifact_expires_at: "2026-08-29T02:00:00.000Z",
-      finished_at: failedAt,
-      failed_at: failedAt,
-    }));
-    await expectRejected(() => insertRun({
-      run_id: "oprun_bad_failure_class",
-      idempotency_key: "bad-failure-class",
-      candidate_ontology_version: "1.0.2-machine-test",
-      stage: "failed",
-      failure_class: "provider said secret prose",
-      dispatched_at: NOW,
-      failed_artifact_expires_at: "2026-08-28T02:00:00.000Z",
-      finished_at: failedAt,
-      failed_at: failedAt,
-    }));
-    await expectRejected(() => insertRun({
-      run_id: "oprun_mismatched_failure_time",
-      idempotency_key: "mismatched-failure-time",
-      candidate_ontology_version: "1.0.25-machine-test",
-      stage: "failed",
-      failure_class: "evaluation_rejected",
-      dispatched_at: NOW,
-      failed_artifact_expires_at: "2026-08-28T02:00:00.000Z",
-      finished_at: "2026-08-21T02:00:01.000Z",
-      failed_at: failedAt,
-    }));
-    await expectRejected(() => insertRun({
-      run_id: "oprun_terminal_claim",
-      idempotency_key: "terminal-claim",
-      candidate_ontology_version: "1.0.3-machine-test",
-      stage: "failed",
-      claim_token: "claim-terminal",
-      lease_expires_at: "2026-08-21T02:05:00.000Z",
-      failure_class: "evaluation_rejected",
-      dispatched_at: NOW,
-      failed_artifact_expires_at: "2026-08-28T02:00:00.000Z",
-      finished_at: failedAt,
-      failed_at: failedAt,
-    }));
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 1,
+           failure_class = 'evaluation_rejected', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(
+      NOW,
+      "2026-08-28T02:00:00.000Z",
+      failedAt,
+      failedAt,
+      RUN.run_id,
+    ).run();
 
     await insertRun({
       run_id: "oprun_success",
       idempotency_key: "successful-run",
       candidate_ontology_version: "1.0.4-machine-test",
-      stage: "succeeded",
-      stage_generation: 9,
-      dispatched_at: NOW,
-      candidate_hash: HASH("30"),
-      compilation_report_hash: HASH("31"),
-      evaluation_report_hash: HASH("32"),
-      regression_report_hash: HASH("33"),
-      bundle_hash: HASH("34"),
-      finished_at: failedAt,
-      succeeded_at: failedAt,
     });
+    await advanceRunTo("ingesting", "oprun_success");
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'succeeded', stage_generation = 8, dispatched_at = ?,
+           finished_at = ?, succeeded_at = ?
+       WHERE run_id = ?`,
+    ).bind(NOW, failedAt, failedAt, "oprun_success").run();
     await expectRejected(() => env.DB.prepare(
       `UPDATE pattern_ontology_pipeline_runs SET updated_at = ? WHERE run_id = ?`,
     ).bind("2026-08-21T03:00:00.000Z", "oprun_success").run());
@@ -485,19 +731,14 @@ describe("ontology pipeline migration", () => {
 
   it("uses attempt-scoped create-only artifact identities", async () => {
     await insertCorpus();
-    await insertRun({
-      stage: "generating",
-      stage_generation: 2,
-      stage_cursor: 1,
-      stage_attempt: 1,
-      dispatched_at: NOW,
-    });
+    await insertRun();
+    await advanceRunTo("generating");
     const artifact = {
       id: "opart_schema_test_1",
       run_id: RUN.run_id,
       stage: "generating",
       stage_generation: 2,
-      stage_attempt: 1,
+      stage_attempt: 0,
       artifact_class: "generator_response",
       object_key: "pattern-ontology/runs/oprun_schema_test_1/2/1/response.json.enc",
       plaintext_sha256: HASH("40"),
@@ -507,7 +748,7 @@ describe("ontology pipeline migration", () => {
       envelope_nonce: "bWlncmF0aW9uLXRlc3Q",
       byte_length: 512,
       created_at: NOW,
-      expires_at: "2026-08-28T00:00:00.000Z",
+      expires_at: null,
       deleted_at: null,
     };
     await execute("INSERT INTO pattern_ontology_pipeline_artifacts", artifact);
@@ -532,15 +773,93 @@ describe("ontology pipeline migration", () => {
     ).bind(artifact.id).run());
   });
 
-  it("accepts artifacts only from the run's current stage owner", async () => {
+  it("physically preserves artifact tombstones and every create-only identity", async () => {
     await insertCorpus();
-    await insertRun({
+    await insertRun();
+    await advanceRunTo("generating");
+    const artifact = {
+      id: `opart_delete_guard_${testSequence}`,
+      run_id: RUN.run_id,
       stage: "generating",
       stage_generation: 2,
-      stage_cursor: 1,
-      stage_attempt: 1,
-      dispatched_at: NOW,
-    });
+      stage_attempt: 0,
+      artifact_class: "generator_response",
+      object_key: `pattern-ontology/runs/${RUN.run_id}/delete-guard.enc`,
+      plaintext_sha256: HASH("60"),
+      envelope_sha256: HASH("61"),
+      ciphertext_sha256: HASH("62"),
+      envelope_key_id: "ontology-artifact-key-delete-guard",
+      envelope_nonce: `delete-guard-nonce-${testSequence}`,
+      byte_length: 512,
+      created_at: NOW,
+      expires_at: null,
+      deleted_at: null,
+    };
+    await execute("INSERT INTO pattern_ontology_pipeline_artifacts", artifact);
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_artifacts SET deleted_at = ?
+       WHERE id = ?`,
+    ).bind("2026-08-28T00:00:01.000Z", artifact.id).run();
+
+    await expectRejected(() => env.DB.prepare(
+      "DELETE FROM pattern_ontology_pipeline_artifacts WHERE id = ?",
+    ).bind(artifact.id).run());
+    await expectRejected(() => execute(
+      "INSERT OR REPLACE INTO pattern_ontology_pipeline_artifacts",
+      {
+        ...artifact,
+        artifact_class: "candidate_chunk",
+        object_key: `${artifact.object_key}.replace`,
+        envelope_nonce: `${artifact.envelope_nonce}-replace`,
+        deleted_at: null,
+      },
+    ));
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      {
+        ...artifact,
+        artifact_class: "candidate_chunk",
+        object_key: `${artifact.object_key}.id-reuse`,
+        envelope_nonce: `${artifact.envelope_nonce}-id`,
+        deleted_at: null,
+      },
+    ));
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      {
+        ...artifact,
+        id: `${artifact.id}_coordinate`,
+        object_key: `${artifact.object_key}.coordinate-reuse`,
+        envelope_nonce: `${artifact.envelope_nonce}-coordinate`,
+        deleted_at: null,
+      },
+    ));
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      {
+        ...artifact,
+        id: `${artifact.id}_object_key`,
+        artifact_class: "candidate_chunk",
+        envelope_nonce: `${artifact.envelope_nonce}-object`,
+        deleted_at: null,
+      },
+    ));
+    await expectRejected(() => execute(
+      "INSERT INTO pattern_ontology_pipeline_artifacts",
+      {
+        ...artifact,
+        id: `${artifact.id}_nonce`,
+        artifact_class: "generator_request",
+        object_key: `${artifact.object_key}.nonce-reuse`,
+        deleted_at: null,
+      },
+    ));
+  });
+
+  it("accepts artifacts only from the run's current stage owner", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
     await expectRejected(() => execute(
       "INSERT INTO pattern_ontology_pipeline_artifacts",
       {
@@ -548,7 +867,7 @@ describe("ontology pipeline migration", () => {
         run_id: RUN.run_id,
         stage: "generating",
         stage_generation: 2,
-        stage_attempt: 0,
+        stage_attempt: 1,
         artifact_class: "generator_response",
         object_key: "pattern-ontology/runs/oprun_schema_test_1/stale-owner.json.enc",
         plaintext_sha256: HASH("43"),
@@ -558,7 +877,7 @@ describe("ontology pipeline migration", () => {
         envelope_nonce: "c3RhbGUtb3duZXItbm9uY2U",
         byte_length: 512,
         created_at: NOW,
-        expires_at: "2026-08-28T00:00:00.000Z",
+        expires_at: null,
         deleted_at: null,
       },
     ));
@@ -566,11 +885,8 @@ describe("ontology pipeline migration", () => {
 
   it("rejects artifact classes owned by another stage", async () => {
     await insertCorpus();
-    await insertRun({
-      stage: "generating",
-      stage_generation: 2,
-      dispatched_at: NOW,
-    });
+    await insertRun();
+    await advanceRunTo("generating");
     const artifact = {
       id: "opart_bad_stage",
       run_id: RUN.run_id,
@@ -586,7 +902,7 @@ describe("ontology pipeline migration", () => {
       envelope_nonce: "bWlncmF0aW9uLXRlc3Q",
       byte_length: 1,
       created_at: NOW,
-      expires_at: "2026-08-28T00:00:00.000Z",
+      expires_at: null,
       deleted_at: null,
     };
     await expectRejected(() => execute(
@@ -595,34 +911,59 @@ describe("ontology pipeline migration", () => {
     ));
   });
 
-  it("rejects artifact expiry before creation", async () => {
+  it("rejects caller-assigned artifact expiry before terminal failure", async () => {
     await insertCorpus();
-    await insertRun({
-      stage: "generating",
-      stage_generation: 2,
-      dispatched_at: NOW,
-    });
+    await insertRun();
+    await advanceRunTo("generating");
     await expectRejected(() => execute(
       "INSERT INTO pattern_ontology_pipeline_artifacts",
-      {
-        id: "opart_bad_expiry",
-        run_id: RUN.run_id,
-        stage: "generating",
-        stage_generation: 2,
-        stage_attempt: 0,
-        artifact_class: "generator_response",
-        object_key: "pattern-ontology/runs/oprun_schema_test_1/bad-expiry.json.enc",
-        plaintext_sha256: HASH("53"),
-        envelope_sha256: HASH("54"),
-        ciphertext_sha256: HASH("55"),
-        envelope_key_id: "ontology-artifact-key-1",
-        envelope_nonce: "ZXhwaXJ5LXRlc3Qtbm9uY2U",
-        byte_length: 1,
-        created_at: NOW,
-        expires_at: "2026-08-20T00:00:00.000Z",
-        deleted_at: null,
-      },
+      artifactForCurrentRun({
+        expires_at: "2026-08-28T00:00:00.000Z",
+      }),
     ));
+  });
+
+  it("assigns the exact failed-run deadline to every live artifact", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    const artifact = artifactForCurrentRun();
+    await execute("INSERT INTO pattern_ontology_pipeline_artifacts", artifact);
+
+    const failedAt = "2026-08-21T02:00:00.000Z";
+    const expiresAt = "2026-08-28T02:00:00.000Z";
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'failed', stage_generation = 3,
+           failure_class = 'execution_error', dispatched_at = ?,
+           failed_artifact_expires_at = ?, finished_at = ?, failed_at = ?
+       WHERE run_id = ?`,
+    ).bind(NOW, expiresAt, failedAt, failedAt, RUN.run_id).run();
+
+    expect(await env.DB.prepare(
+      `SELECT expires_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
+    ).bind(artifact.id).first()).toEqual({ expires_at: expiresAt });
+  });
+
+  it("keeps successful evidence artifacts without a cleanup deadline", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    const artifact = artifactForCurrentRun();
+    await execute("INSERT INTO pattern_ontology_pipeline_artifacts", artifact);
+    await advanceRunTo("ingesting");
+
+    const succeededAt = "2026-08-21T02:00:00.000Z";
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'succeeded', stage_generation = 8, dispatched_at = ?,
+           finished_at = ?, succeeded_at = ?
+       WHERE run_id = ?`,
+    ).bind(NOW, succeededAt, succeededAt, RUN.run_id).run();
+
+    expect(await env.DB.prepare(
+      `SELECT expires_at FROM pattern_ontology_pipeline_artifacts WHERE id = ?`,
+    ).bind(artifact.id).first()).toEqual({ expires_at: null });
   });
 
   it("serves all maintenance lanes from their required partial indexes", async () => {
@@ -647,7 +988,8 @@ describe("ontology pipeline migration", () => {
       {
         query: `EXPLAIN QUERY PLAN
           SELECT id FROM pattern_ontology_pipeline_artifacts
-          WHERE deleted_at IS NULL AND expires_at <= ?
+          WHERE expires_at IS NOT NULL AND deleted_at IS NULL
+            AND expires_at <= ?
           ORDER BY expires_at, id LIMIT 100`,
         expected: "idx_pattern_ontology_artifacts_expiry",
       },

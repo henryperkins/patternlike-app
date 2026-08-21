@@ -50,6 +50,29 @@ BEGIN
   SELECT RAISE(ABORT, 'registered ontology source corpus is immutable');
 END;
 
+-- SQLite REPLACE may remove a conflicting row without invoking DELETE
+-- triggers, so reject every occupied corpus identity before conflict handling.
+CREATE TRIGGER pattern_source_corpus_releases_no_reuse
+BEFORE INSERT ON pattern_source_corpus_releases
+FOR EACH ROW
+WHEN EXISTS (
+  SELECT 1
+  FROM pattern_source_corpus_releases corpus
+  WHERE corpus.corpus_release_id = NEW.corpus_release_id
+    OR corpus.corpus_hash = NEW.corpus_hash
+    OR corpus.object_key = NEW.object_key
+)
+BEGIN
+  SELECT RAISE(ABORT, 'registered ontology source corpus identity cannot be reused');
+END;
+
+CREATE TRIGGER pattern_source_corpus_releases_no_delete
+BEFORE DELETE ON pattern_source_corpus_releases
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'registered ontology source corpus cannot be deleted');
+END;
+
 -- ---------------------------------------------------------------------------
 -- Durable stage machine, CAS lease, and Queue outbox
 -- ---------------------------------------------------------------------------
@@ -247,6 +270,48 @@ CREATE INDEX idx_pattern_ontology_runs_expired_lease
   WHERE stage NOT IN ('succeeded', 'failed')
     AND claim_token IS NOT NULL;
 
+-- Reservation is the only creation boundary. Every later state must be reached
+-- through the guarded transition machine below, including terminal states.
+CREATE TRIGGER pattern_ontology_pipeline_runs_initial_state
+BEFORE INSERT ON pattern_ontology_pipeline_runs
+FOR EACH ROW
+WHEN NOT (
+  NEW.stage = 'reserved'
+  AND NEW.stage_generation = 0
+  AND NEW.stage_cursor = 0
+  AND NEW.stage_attempt = 0
+  AND NEW.claim_token IS NULL
+  AND NEW.lease_expires_at IS NULL
+  AND NEW.dispatched_at IS NULL
+  AND NEW.failure_class IS NULL
+  AND NEW.candidate_hash IS NULL
+  AND NEW.compilation_report_hash IS NULL
+  AND NEW.evaluation_report_hash IS NULL
+  AND NEW.regression_report_hash IS NULL
+  AND NEW.bundle_hash IS NULL
+  AND NEW.failed_artifact_expires_at IS NULL
+  AND NEW.finished_at IS NULL
+  AND NEW.succeeded_at IS NULL
+  AND NEW.failed_at IS NULL
+)
+BEGIN
+  SELECT RAISE(ABORT, 'new ontology pipeline run must start reserved');
+END;
+
+CREATE TRIGGER pattern_ontology_pipeline_runs_no_reuse
+BEFORE INSERT ON pattern_ontology_pipeline_runs
+FOR EACH ROW
+WHEN EXISTS (
+  SELECT 1
+  FROM pattern_ontology_pipeline_runs run
+  WHERE run.run_id = NEW.run_id
+    OR run.idempotency_key = NEW.idempotency_key
+    OR run.candidate_ontology_version = NEW.candidate_ontology_version
+)
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline command identity cannot be reused');
+END;
+
 -- Frozen reservation inputs never change once inserted. Operational fields are
 -- updated by the stage CAS, so immutability is enforced on the exact pin set.
 CREATE TRIGGER pattern_ontology_pipeline_runs_command_immutable
@@ -299,7 +364,50 @@ WHEN NOT (
     OLD.stage = NEW.stage
     AND OLD.stage_generation = NEW.stage_generation
     AND NEW.stage_cursor = OLD.stage_cursor
-    AND NEW.stage_attempt IN (OLD.stage_attempt, OLD.stage_attempt + 1)
+    AND (
+      -- Outbox scheduling or metadata work while nobody owns the delivery.
+      (
+        OLD.claim_token IS NULL
+        AND OLD.lease_expires_at IS NULL
+        AND NEW.claim_token IS NULL
+        AND NEW.lease_expires_at IS NULL
+        AND NEW.stage_attempt = OLD.stage_attempt
+      )
+      -- A delivery may acquire one unowned row. It preserves an existing
+      -- dispatch receipt or atomically fills a still-null outbox receipt.
+      OR (
+        OLD.claim_token IS NULL
+        AND OLD.lease_expires_at IS NULL
+        AND NEW.claim_token IS NOT NULL
+        AND NEW.lease_expires_at IS NOT NULL
+        AND NEW.stage_attempt = OLD.stage_attempt
+        AND NEW.dispatched_at IS NOT NULL
+        AND (
+          OLD.dispatched_at IS NULL
+          OR NEW.dispatched_at IS OLD.dispatched_at
+        )
+        AND NEW.available_at IS OLD.available_at
+      )
+      -- Work under a live claim cannot replace or renew its ownership tuple.
+      OR (
+        OLD.claim_token IS NOT NULL
+        AND NEW.claim_token IS OLD.claim_token
+        AND NEW.lease_expires_at IS OLD.lease_expires_at
+        AND NEW.stage_attempt = OLD.stage_attempt
+        AND NEW.dispatched_at IS OLD.dispatched_at
+        AND NEW.available_at IS OLD.available_at
+      )
+      -- Owned retry (k+1) and expired-lease recovery (same k) both return the
+      -- row to the undispatched lane before another delivery can claim it.
+      OR (
+        OLD.claim_token IS NOT NULL
+        AND OLD.lease_expires_at IS NOT NULL
+        AND NEW.claim_token IS NULL
+        AND NEW.lease_expires_at IS NULL
+        AND NEW.stage_attempt IN (OLD.stage_attempt, OLD.stage_attempt + 1)
+        AND NEW.dispatched_at IS NULL
+      )
+    )
   )
   OR (
     OLD.stage = NEW.stage
@@ -350,6 +458,13 @@ BEGIN
   SELECT RAISE(ABORT, 'terminal ontology pipeline run is immutable');
 END;
 
+CREATE TRIGGER pattern_ontology_pipeline_runs_no_delete
+BEFORE DELETE ON pattern_ontology_pipeline_runs
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline run cannot be deleted');
+END;
+
 -- ---------------------------------------------------------------------------
 -- Attempt-scoped create-only encrypted R2 artifact inventory
 -- ---------------------------------------------------------------------------
@@ -383,7 +498,8 @@ CREATE TABLE pattern_ontology_pipeline_artifacts (
     CHECK (length(envelope_nonce) BETWEEN 16 AND 128),
   byte_length INTEGER NOT NULL CHECK (byte_length >= 0),
   created_at TEXT NOT NULL CHECK (unixepoch(created_at) IS NOT NULL),
-  expires_at TEXT NOT NULL CHECK (unixepoch(expires_at) IS NOT NULL),
+  expires_at TEXT
+    CHECK (expires_at IS NULL OR unixepoch(expires_at) IS NOT NULL),
   deleted_at TEXT,
   UNIQUE (run_id, stage, stage_generation, stage_attempt, artifact_class),
   UNIQUE (envelope_key_id, envelope_nonce),
@@ -402,7 +518,10 @@ CREATE TABLE pattern_ontology_pipeline_artifacts (
     AND substr(ciphertext_sha256, 1, 7) = 'sha256:'
     AND substr(ciphertext_sha256, 8) NOT GLOB '*[^0-9a-f]*'
   ),
-  CHECK (unixepoch(expires_at) > unixepoch(created_at)),
+  CHECK (
+    expires_at IS NULL
+    OR unixepoch(expires_at) > unixepoch(created_at)
+  ),
   CHECK (
     deleted_at IS NULL
     OR (
@@ -439,7 +558,7 @@ CREATE INDEX idx_pattern_ontology_artifacts_run
 
 CREATE INDEX idx_pattern_ontology_artifacts_expiry
   ON pattern_ontology_pipeline_artifacts(expires_at, id)
-  WHERE deleted_at IS NULL;
+  WHERE expires_at IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TRIGGER pattern_ontology_pipeline_artifacts_stage_owner
 BEFORE INSERT ON pattern_ontology_pipeline_artifacts
@@ -456,16 +575,47 @@ BEGIN
   SELECT RAISE(ABORT, 'ontology pipeline artifact stage owner is stale');
 END;
 
--- Inventory identity is create-only. The single permitted mutation is the
--- first transition from live to deleted; coordinates, keys, hashes and expiry
--- can never be rewritten or a deleted object adopted again.
+CREATE TRIGGER pattern_ontology_pipeline_artifacts_no_reuse
+BEFORE INSERT ON pattern_ontology_pipeline_artifacts
+FOR EACH ROW
+WHEN EXISTS (
+  SELECT 1
+  FROM pattern_ontology_pipeline_artifacts artifact
+  WHERE artifact.id = NEW.id
+    OR artifact.object_key = NEW.object_key
+    OR (
+      artifact.run_id = NEW.run_id
+      AND artifact.stage = NEW.stage
+      AND artifact.stage_generation = NEW.stage_generation
+      AND artifact.stage_attempt = NEW.stage_attempt
+      AND artifact.artifact_class = NEW.artifact_class
+    )
+    OR (
+      artifact.envelope_key_id = NEW.envelope_key_id
+      AND artifact.envelope_nonce = NEW.envelope_nonce
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline artifact identity cannot be reused');
+END;
+
+-- Failure time is unknown at artifact creation. Only the terminal transition
+-- below may assign the exact seven-day deadline; successful evidence has none.
+CREATE TRIGGER pattern_ontology_pipeline_artifacts_no_early_expiry
+BEFORE INSERT ON pattern_ontology_pipeline_artifacts
+FOR EACH ROW
+WHEN NEW.expires_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline artifact expiry is terminally assigned');
+END;
+
+-- Inventory identity is create-only. The only lifecycle mutations are the
+-- first live-to-deleted tombstone and the failed-run deadline assignment.
 CREATE TRIGGER pattern_ontology_pipeline_artifacts_create_only
 BEFORE UPDATE ON pattern_ontology_pipeline_artifacts
 FOR EACH ROW
 WHEN NOT (
-  OLD.deleted_at IS NULL
-  AND NEW.deleted_at IS NOT NULL
-  AND OLD.id IS NEW.id
+  OLD.id IS NEW.id
   AND OLD.run_id IS NEW.run_id
   AND OLD.stage IS NEW.stage
   AND OLD.stage_generation IS NEW.stage_generation
@@ -479,8 +629,46 @@ WHEN NOT (
   AND OLD.envelope_nonce IS NEW.envelope_nonce
   AND OLD.byte_length IS NEW.byte_length
   AND OLD.created_at IS NEW.created_at
-  AND OLD.expires_at IS NEW.expires_at
+  AND (
+    (
+      OLD.deleted_at IS NULL
+      AND NEW.deleted_at IS NOT NULL
+      AND OLD.expires_at IS NEW.expires_at
+    )
+    OR (
+      OLD.expires_at IS NULL
+      AND NEW.expires_at IS NOT NULL
+      AND OLD.deleted_at IS NEW.deleted_at
+      AND EXISTS (
+        SELECT 1
+        FROM pattern_ontology_pipeline_runs run
+        WHERE run.run_id = OLD.run_id
+          AND run.stage = 'failed'
+          AND run.failed_artifact_expires_at IS NEW.expires_at
+      )
+    )
+  )
 )
 BEGIN
   SELECT RAISE(ABORT, 'ontology pipeline artifact identity is create-only');
+END;
+
+CREATE TRIGGER pattern_ontology_pipeline_runs_expire_failed_artifacts
+AFTER UPDATE OF stage, failed_artifact_expires_at
+ON pattern_ontology_pipeline_runs
+FOR EACH ROW
+WHEN OLD.stage IS NOT NEW.stage AND NEW.stage = 'failed'
+BEGIN
+  UPDATE pattern_ontology_pipeline_artifacts
+  SET expires_at = NEW.failed_artifact_expires_at
+  WHERE run_id = NEW.run_id
+    AND expires_at IS NULL
+    AND deleted_at IS NULL;
+END;
+
+CREATE TRIGGER pattern_ontology_pipeline_artifacts_no_delete
+BEFORE DELETE ON pattern_ontology_pipeline_artifacts
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'ontology pipeline artifact tombstone cannot be deleted');
 END;
