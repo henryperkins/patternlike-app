@@ -9,15 +9,17 @@ import {
   readVerifiedPatternOntologyCorpus,
   type VerifiedCorpusLicenseClass,
 } from "./pattern-ontology-corpus.js";
+import {
+  decodeOntologyArtifactBase64Url,
+  hashOntologyArtifactBytes,
+  parseOntologyArtifactKeyring,
+} from "./ontology-artifact-crypto.js";
 
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const EVALUATION_OBJECT_PREFIX = "pattern-ontology/pipeline/";
 const MAX_EVALUATION_ARTIFACT_BYTES = 4 * 1024 * 1024;
-const MAX_ARTIFACT_KEYRING_BYTES = 8 * 1024;
-const MAX_ARTIFACT_KEYS = 8;
 const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
 const EVALUATION_ENVELOPE_FIELDS = new Set([
   "schema_version",
@@ -30,7 +32,6 @@ const EVALUATION_ENVELOPE_FIELDS = new Set([
   "ciphertext",
 ]);
 const ENCRYPTION_FIELDS = new Set(["alg", "key_id", "nonce"]);
-const ARTIFACT_KEYRING_FIELDS = new Set(["version", "keys"]);
 
 export type OntologyActivationScope = "internal" | "public";
 export type OntologyCorpusLicenseClass =
@@ -149,34 +150,6 @@ function hasExactFields(
   return keys.length === fields.size && keys.every((key) => fields.has(key));
 }
 
-function decodeBase64Url(value: string): Uint8Array | null {
-  if (!BASE64URL.test(value)) return null;
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/") +
-    "=".repeat((4 - (value.length % 4)) % 4);
-  try {
-    const binary = atob(padded);
-    const bytes = Uint8Array.from(
-      binary,
-      (character) => character.charCodeAt(0),
-    );
-    let canonical = "";
-    for (const byte of bytes) canonical += String.fromCharCode(byte);
-    const encoded = btoa(canonical)
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-    return encoded === value ? bytes : null;
-  } catch {
-    return null;
-  }
-}
-
-async function sha256(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return `sha256:${Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
 function hasUtf8Bom(bytes: Uint8Array): boolean {
   return (
     bytes.byteLength >= UTF8_BOM.length &&
@@ -188,38 +161,8 @@ function parseArtifactKeyring(
   raw: string | undefined,
 ): Map<string, Uint8Array> {
   if (!raw) fail("ontology_evaluation_artifact_keyring_missing");
-  if (raw.length > MAX_ARTIFACT_KEYRING_BYTES) {
-    fail("ontology_evaluation_artifact_keyring_invalid");
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    fail("ontology_evaluation_artifact_keyring_invalid");
-  }
-  if (
-    !isRecord(parsed) ||
-    !hasExactFields(parsed, ARTIFACT_KEYRING_FIELDS) ||
-    parsed.version !== 1 ||
-    !isRecord(parsed.keys)
-  ) {
-    fail("ontology_evaluation_artifact_keyring_invalid");
-  }
-  const entries = Object.entries(parsed.keys);
-  if (entries.length === 0 || entries.length > MAX_ARTIFACT_KEYS) {
-    fail("ontology_evaluation_artifact_keyring_invalid");
-  }
-  const keys = new Map<string, Uint8Array>();
-  for (const [keyId, encoded] of entries) {
-    if (!KEY_ID.test(keyId) || typeof encoded !== "string") {
-      fail("ontology_evaluation_artifact_keyring_invalid");
-    }
-    const key = decodeBase64Url(encoded);
-    if (!key || key.byteLength !== 32) {
-      fail("ontology_evaluation_artifact_keyring_invalid");
-    }
-    keys.set(keyId, key);
-  }
+  const keys = parseOntologyArtifactKeyring(raw);
+  if (!keys) fail("ontology_evaluation_artifact_keyring_invalid");
   return keys;
 }
 
@@ -344,7 +287,7 @@ async function verifyEvaluationArtifact(
     fail("ontology_evaluation_artifact_too_large");
   }
   const rawBytes = new Uint8Array(await object.arrayBuffer());
-  const envelopeHash = await sha256(rawBytes);
+  const envelopeHash = await hashOntologyArtifactBytes(rawBytes);
   if (!hashesEqual(envelopeHash, expected.envelopeHash)) {
     fail("ontology_evaluation_artifact_envelope_hash_mismatch");
   }
@@ -403,12 +346,12 @@ async function verifyEvaluationArtifact(
   if (!hashesEqual(parsed.plaintext_hash, expected.plaintextHash)) {
     fail("ontology_evaluation_artifact_plaintext_mismatch");
   }
-  const nonce = decodeBase64Url(parsed.encryption.nonce);
-  const ciphertext = decodeBase64Url(parsed.ciphertext);
+  const nonce = decodeOntologyArtifactBase64Url(parsed.encryption.nonce);
+  const ciphertext = decodeOntologyArtifactBase64Url(parsed.ciphertext);
   if (!nonce || nonce.byteLength !== 12 || !ciphertext || ciphertext.byteLength < 16) {
     fail("ontology_evaluation_artifact_invalid");
   }
-  const ciphertextHash = await sha256(ciphertext);
+  const ciphertextHash = await hashOntologyArtifactBytes(ciphertext);
   if (
     !hashesEqual(ciphertextHash, parsed.ciphertext_hash) ||
     !hashesEqual(ciphertextHash, expected.ciphertextHash)
@@ -456,7 +399,7 @@ async function verifyEvaluationArtifact(
   } catch {
     fail("ontology_evaluation_artifact_authentication_failed");
   }
-  const plaintextHash = await sha256(plaintext);
+  const plaintextHash = await hashOntologyArtifactBytes(plaintext);
   if (
     !hashesEqual(plaintextHash, parsed.plaintext_hash) ||
     !hashesEqual(plaintextHash, expected.plaintextHash)

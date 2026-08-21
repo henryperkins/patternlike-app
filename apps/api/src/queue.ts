@@ -1,5 +1,13 @@
-import type { Env, GenerationMessage, PatternGenerationMessage, WorkerMessage } from "./env.js";
-import { checkSecureConfig } from "./middleware/config-guard.js";
+import type {
+  Env,
+  GenerationMessage,
+  OntologyPipelineMessage,
+  PatternGenerationMessage,
+} from "./env.js";
+import {
+  checkSecureConfig,
+  resolveOntologyPipelineConfiguration,
+} from "./middleware/config-guard.js";
 import {
   ClaimLoadError,
   claimJob,
@@ -27,6 +35,7 @@ import {
   processDeletionMessage,
 } from "./services/account-deletion.js";
 import { executePatternJob } from "./services/pattern-execute.js";
+import { pauseOntologyPipelineDelivery } from "./services/ontology-pipeline-enqueue.js";
 
 /**
  * The daily-reading consumer.
@@ -46,7 +55,7 @@ interface ClaimReference {
 }
 
 async function retryOrFail(
-  message: Message<GenerationMessage>,
+  message: Message<unknown>,
   env: Env,
   claim: ClaimReference,
   resultClass: string,
@@ -83,16 +92,70 @@ async function retryOrFail(
   message.retry({ delaySeconds: LEASE_RETRY_DELAY_SECONDS });
 }
 
-function isPatternMessage(body: WorkerMessage): body is PatternGenerationMessage {
-  return "kind" in body && body.kind === "pattern_generation";
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPatternMessage(body: unknown): body is PatternGenerationMessage {
+  return isRecord(body) &&
+    Object.keys(body).length === 4 &&
+    body.kind === "pattern_generation" &&
+    typeof body.job_id === "string" &&
+    body.job_id.length > 0 &&
+    typeof body.generation_id === "string" &&
+    body.generation_id.length > 0 &&
+    typeof body.stage_generation === "number" &&
+    Number.isSafeInteger(body.stage_generation) &&
+    body.stage_generation >= 0;
+}
+
+function isGenerationMessage(body: unknown): body is GenerationMessage {
+  return isRecord(body) &&
+    Object.keys(body).length === 2 &&
+    typeof body.job_id === "string" &&
+    body.job_id.length > 0 &&
+    typeof body.reading_id === "string" &&
+    body.reading_id.length > 0;
+}
+
+function isGenerationPauseOnlyMessage(
+  body: unknown,
+): body is Pick<GenerationMessage, "job_id"> {
+  return isRecord(body) &&
+    Object.keys(body).length === 1 &&
+    typeof body.job_id === "string" &&
+    body.job_id.length > 0;
 }
 
 function isPatternQueueName(name: string): boolean {
   return name.includes("pattern-generation");
 }
 
+function isOntologyPipelineQueueName(name: string): boolean {
+  return name === "patternlike-ontology-pipeline-dev" ||
+    name === "patternlike-ontology-pipeline";
+}
+
+/** Closed admission for the dedicated structured-clone queue body. */
+export function isOntologyPipelineMessage(
+  value: unknown,
+): value is OntologyPipelineMessage {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  return (
+    keys.length === 2 &&
+    keys.includes("run_id") &&
+    keys.includes("stage_generation") &&
+    typeof value.run_id === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(value.run_id) &&
+    typeof value.stage_generation === "number" &&
+    Number.isSafeInteger(value.stage_generation) &&
+    value.stage_generation >= 0
+  );
+}
+
 export async function queue(
-  batch: MessageBatch<WorkerMessage>,
+  batch: MessageBatch<unknown>,
   env: Env,
 ): Promise<void> {
   const failure = checkSecureConfig(env);
@@ -103,8 +166,51 @@ export async function queue(
     return;
   }
 
-  const generationMessages: Message<GenerationMessage>[] = [];
-  const patternMessages: Message<PatternGenerationMessage>[] = [];
+  // This queue has a deliberately untagged two-field body, so routing is by
+  // its dedicated binding name before any daily-reading shape is considered.
+  if (isOntologyPipelineQueueName(batch.queue)) {
+    const configuration = resolveOntologyPipelineConfiguration(env);
+    if (!configuration.ok) {
+      batch.retryAll({ delaySeconds: RETRY_DELAY_SECONDS });
+      return;
+    }
+    for (const message of batch.messages) {
+      if (!isOntologyPipelineMessage(message.body)) {
+        safeLog({ event: "generation_message_malformed" });
+        message.ack();
+        continue;
+      }
+      if (configuration.rollout === "off") {
+        try {
+          // The durable pause happens before a claim, R2/keyring access,
+          // decryption, or provider-budget reservation.
+          await pauseOntologyPipelineDelivery(env, message.body);
+          message.ack();
+        } catch {
+          message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
+        }
+        continue;
+      }
+      // Task 6 replaces this retry-only executor seam. Taking a claim before
+      // an executor exists would strand the run behind a live lease.
+      message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
+    }
+    return;
+  }
+
+  const rollout = readReadingV5Rollout(env);
+  const generationMessages: Array<{
+    message: Message<unknown>;
+    body: GenerationMessage;
+  }> = [];
+  const generationPauseOnlyMessages: Array<{
+    message: Message<unknown>;
+    jobId: string;
+  }> = [];
+  const patternMessages: Array<{
+    message: Message<unknown>;
+    body: PatternGenerationMessage;
+  }> = [];
   for (const message of batch.messages) {
     if (isPrivacyMessage(message.body)) {
       if (message.body.job_type === "delete_account") {
@@ -128,22 +234,30 @@ export async function queue(
         message.ack();
         continue;
       }
-      patternMessages.push(message as Message<PatternGenerationMessage>);
+      patternMessages.push({ message, body: message.body });
     } else if (isPatternQueueName(batch.queue)) {
       safeLog({ event: "generation_message_malformed" });
       message.ack();
+    } else if (isGenerationMessage(message.body)) {
+      generationMessages.push({ message, body: message.body });
+    } else if (
+      rollout === "off" &&
+      isGenerationPauseOnlyMessage(message.body)
+    ) {
+      // Existing V2 pause semantics deliberately trust only the durable job
+      // id. A missing untrusted reading id must not prevent the kill switch,
+      // and this shape is never admitted to enabled execution below.
+      generationPauseOnlyMessages.push({
+        message,
+        jobId: message.body.job_id,
+      });
     } else {
-      generationMessages.push(message as Message<GenerationMessage>);
+      safeLog({ event: "generation_message_malformed" });
+      message.ack();
     }
   }
 
-  for (const message of patternMessages) {
-    const body = message.body;
-    if (!body.job_id || !body.generation_id) {
-      safeLog({ event: "generation_message_malformed" });
-      message.ack();
-      continue;
-    }
+  for (const { message, body } of patternMessages) {
     try {
       const outcome = await executePatternJob(env, body);
       if (outcome.ok || outcome.reason === "duplicate" || outcome.reason === "terminal") {
@@ -157,32 +271,28 @@ export async function queue(
     }
   }
 
-  const rollout = readReadingV5Rollout(env);
   const rolloutPaused = new Set<string>();
   if (rollout === "off") {
     for (const message of generationMessages) {
-      const { job_id: jobId } = message.body ?? {};
-      if (!jobId) continue;
+      const { job_id: jobId } = message.body;
       const paused = await pauseQueuedV2ForRolloutOff(env, jobId);
       if (paused !== "not_v2") {
         // D1 committed the pause (or a duplicate delivery observed it) before
         // the Queue nudge is acknowledged. No command decryption or claim.
-        message.ack();
-        rolloutPaused.add(message.id);
+        message.message.ack();
+        rolloutPaused.add(message.message.id);
       }
+    }
+    for (const { message, jobId } of generationPauseOnlyMessages) {
+      await pauseQueuedV2ForRolloutOff(env, jobId);
+      message.ack();
     }
   }
 
-  for (const message of generationMessages) {
+  for (const queued of generationMessages) {
+    const { message, body } = queued;
     if (rolloutPaused.has(message.id)) continue;
-    const { job_id: jobId, reading_id: readingId } = message.body ?? {};
-    if (!jobId || !readingId) {
-      // Nothing to claim and nothing to retry into. Acking stops an unparseable
-      // message from cycling until it reaches the dead-letter queue.
-      safeLog({ event: "generation_message_malformed" });
-      message.ack();
-      continue;
-    }
+    const { job_id: jobId } = body;
 
     let claimed: ClaimReference | null = null;
     try {

@@ -20,7 +20,17 @@ export interface PrivacyMessage {
   job_type: "export_account" | "delete_account";
 }
 
-export type WorkerMessage = GenerationMessage | PrivacyMessage | PatternGenerationMessage;
+/** Opaque ontology-pipeline nudge; the complete immutable command stays in D1. */
+export interface OntologyPipelineMessage {
+  run_id: string;
+  stage_generation: number;
+}
+
+export type WorkerMessage =
+  | GenerationMessage
+  | PrivacyMessage
+  | PatternGenerationMessage
+  | OntologyPipelineMessage;
 
 /** Opaque Pattern-generation nudge. The encrypted command remains in D1. */
 export interface PatternGenerationMessage {
@@ -69,13 +79,15 @@ export interface Env {
    * jobs.payload_enc.
    */
   PATTERN_QUEUE: Queue<PatternGenerationMessage>;
+  /** Dedicated provider-protecting ontology pipeline queue. */
+  ONTOLOGY_PIPELINE_QUEUE: Queue<OntologyPipelineMessage>;
   /**
    * Service-binding-only ontology signer. The private signing key is absent
    * from this Env by construction and exists only in the signer Worker.
    */
   ONTOLOGY_SIGNER: OntologySignerBinding;
   /**
-   * Secret v1 JSON keyring for decrypting ontology evaluation artifacts:
+   * Secret v1 JSON keyring for all ontology pipeline artifact envelopes:
    * `{"version":1,"keys":{"<key_id>":"<base64url 32-byte AES key>"}}`.
    * Configure only with `wrangler secret put`; never add it to wrangler vars.
    */

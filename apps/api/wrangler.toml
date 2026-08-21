@@ -108,6 +108,23 @@ max_concurrency = 2
 max_retries = 3
 dead_letter_queue = "patternlike-pattern-generation-dev-dlq"
 
+# Automated ontology generation has its own one-message control-plane queue.
+# The body is only {run_id, stage_generation}; D1 owns the command and outbox.
+# Concurrency one is intentional while generator/evaluator/regression calls
+# share one daily ceiling. Create this queue and its DLQ only as a separately
+# approved operational prerequisite; this change performs no remote action.
+[[queues.producers]]
+binding = "ONTOLOGY_PIPELINE_QUEUE"
+queue = "patternlike-ontology-pipeline-dev"
+
+[[queues.consumers]]
+queue = "patternlike-ontology-pipeline-dev"
+max_batch_size = 1
+max_batch_timeout = 5
+max_concurrency = 1
+max_retries = 3
+dead_letter_queue = "patternlike-ontology-pipeline-dev-dlq"
+
 # Exercise the exported scheduled handler in local/default deployments. Triggers
 # are inheritable, so production explicitly overrides this with an empty list
 # until the separately approved production activation step replaces it.
@@ -497,6 +514,20 @@ max_batch_timeout = 5
 max_concurrency = 2
 max_retries = 3
 dead_letter_queue = "patternlike-pattern-generation-dlq"
+
+# Named environments do not inherit queues. Keep production entirely distinct
+# from the development control plane and preserve the same one-delivery lease.
+[[env.production.queues.producers]]
+binding = "ONTOLOGY_PIPELINE_QUEUE"
+queue = "patternlike-ontology-pipeline"
+
+[[env.production.queues.consumers]]
+queue = "patternlike-ontology-pipeline"
+max_batch_size = 1
+max_batch_timeout = 5
+max_concurrency = 1
+max_retries = 3
+dead_letter_queue = "patternlike-ontology-pipeline-dlq"
 
 # Workers Logs / Traces. Declared here so a deploy cannot silently reset what
 # the dashboard currently has: observability is part of the uploaded metadata,
