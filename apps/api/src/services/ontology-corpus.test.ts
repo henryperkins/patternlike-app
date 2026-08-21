@@ -16,6 +16,7 @@ import {
 } from "./ontology-corpus.js";
 
 const DUPLICATE_CORPUS_ID = "corpus-duplicate-fragments";
+const MAX_CORPUS_MANIFEST_BYTES = 4 * 1024 * 1024;
 let corpusSequence = 0;
 
 function nextCorpusId(label: string): string {
@@ -29,6 +30,31 @@ async function withRecomputedHash<T extends {
   const { corpus_hash: _corpusHash, ...payload } = manifest;
   manifest.corpus_hash = await contentHash(canonicalJson(payload));
   return manifest;
+}
+
+async function corpusAtCanonicalByteLength(
+  label: string,
+  byteLength: number,
+) {
+  const corpus = await buildTestCorpusManifest(
+    nextCorpusId(label),
+    "en-US",
+    "licensed_excerpt",
+  );
+  corpus.fragments[0]!.normalized_proposition = "";
+  await withRecomputedHash(corpus);
+  const baseByteLength = new TextEncoder().encode(canonicalJson(corpus)).byteLength;
+  const fillerByteLength = byteLength - baseByteLength;
+  if (fillerByteLength < 1) {
+    throw new Error("Requested corpus byte length is below the valid manifest base");
+  }
+  // Canonical JSON writes this character literally, so this exercises UTF-8
+  // byte length rather than JavaScript UTF-16 code-unit length.
+  corpus.fragments[0]!.normalized_proposition =
+    "é".repeat(Math.floor(fillerByteLength / 2)) +
+    "x".repeat(fillerByteLength % 2);
+  await withRecomputedHash(corpus);
+  return corpus;
 }
 
 function expectCorpusError(action: () => unknown, code: string): void {
@@ -101,6 +127,45 @@ describe("ontology corpus validation", () => {
        WHERE corpus_release_id = ?`,
     ).bind(corpus.corpus_release_id).first();
     expect(row).toBeNull();
+  });
+
+  it("rejects an over-limit UTF-8 canonical corpus before creating R2 or D1 identity", async () => {
+    const corpus = await corpusAtCanonicalByteLength(
+      "over-limit",
+      MAX_CORPUS_MANIFEST_BYTES + 1,
+    );
+    const canonicalBytes = new TextEncoder().encode(canonicalJson(corpus));
+    expect(canonicalBytes.byteLength).toBe(MAX_CORPUS_MANIFEST_BYTES + 1);
+    expect(corpus.fragments[0]!.normalized_proposition.length)
+      .toBeLessThan(canonicalBytes.byteLength);
+
+    await expect(registerOntologyCorpus(env, corpus)).rejects.toMatchObject({
+      code: "ontology_corpus_manifest_invalid",
+    });
+    expect(await env.ARTIFACTS!.get(
+      ontologyCorpusObjectKey(corpus.corpus_release_id),
+    )).toBeNull();
+    const row = await env.DB.prepare(
+      `SELECT corpus_release_id FROM pattern_source_corpus_releases
+       WHERE corpus_release_id = ?`,
+    ).bind(corpus.corpus_release_id).first();
+    expect(row).toBeNull();
+  });
+
+  it("accepts a canonical corpus at the exact UTF-8 byte limit", async () => {
+    const corpus = await corpusAtCanonicalByteLength(
+      "at-limit",
+      MAX_CORPUS_MANIFEST_BYTES,
+    );
+    expect(new TextEncoder().encode(canonicalJson(corpus)).byteLength)
+      .toBe(MAX_CORPUS_MANIFEST_BYTES);
+
+    const registered = await registerOntologyCorpus(env, corpus);
+
+    expect(registered.status).toBe("registered");
+    await expect(
+      readRegisteredOntologyCorpus(env, corpus.corpus_release_id),
+    ).resolves.toMatchObject({ release: { corpus_hash: corpus.corpus_hash } });
   });
 
   it("recovers a prior R2-only write only when its canonical bytes match", async () => {

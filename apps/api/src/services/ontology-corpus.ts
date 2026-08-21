@@ -182,10 +182,14 @@ export async function canonicalizeOntologyCorpusRelease(
   if (computedHash !== declaredHash) {
     fail("ontology_corpus_manifest_hash_mismatch");
   }
+  const canonicalBytes = canonicalJson(release);
+  if (new TextEncoder().encode(canonicalBytes).byteLength > MAX_CORPUS_MANIFEST_BYTES) {
+    fail("ontology_corpus_manifest_invalid");
+  }
   const licenseClass = release.fragments[0]!.license_class;
   return {
     release,
-    canonicalBytes: canonicalJson(release),
+    canonicalBytes,
     objectKey: ontologyCorpusObjectKey(release.corpus_release_id),
     licenseClass,
     // This is derived from a validated all-fragment class, never caller input.
