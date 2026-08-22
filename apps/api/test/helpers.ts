@@ -46,7 +46,12 @@ const TABLES = [
   "pattern_generation_claims",
   "pattern_admin_access_events",
   "pattern_erasure_replay_events",
+  // 0012 control plane, children first. Its production no-delete triggers are
+  // suspended only around the test reset batch and restored immediately.
+  "pattern_ontology_pipeline_artifacts",
   "pattern_ontology_pipeline_evidence",
+  "pattern_ontology_pipeline_runs",
+  "pattern_source_corpus_releases",
   "pattern_ontology_evaluation_runs",
   "pattern_ontology_recall_events",
   "pattern_ontology_pointer",
@@ -74,6 +79,36 @@ const TABLES = [
   "users",
 ];
 
+const ONTOLOGY_PIPELINE_NO_DELETE_TRIGGERS = [
+  {
+    name: "pattern_ontology_pipeline_artifacts_no_delete",
+    create: `CREATE TRIGGER pattern_ontology_pipeline_artifacts_no_delete
+      BEFORE DELETE ON pattern_ontology_pipeline_artifacts
+      FOR EACH ROW
+      BEGIN
+        SELECT RAISE(ABORT, 'ontology pipeline artifact tombstone cannot be deleted');
+      END`,
+  },
+  {
+    name: "pattern_ontology_pipeline_runs_no_delete",
+    create: `CREATE TRIGGER pattern_ontology_pipeline_runs_no_delete
+      BEFORE DELETE ON pattern_ontology_pipeline_runs
+      FOR EACH ROW
+      BEGIN
+        SELECT RAISE(ABORT, 'ontology pipeline run cannot be deleted');
+      END`,
+  },
+  {
+    name: "pattern_source_corpus_releases_no_delete",
+    create: `CREATE TRIGGER pattern_source_corpus_releases_no_delete
+      BEFORE DELETE ON pattern_source_corpus_releases
+      FOR EACH ROW
+      BEGIN
+        SELECT RAISE(ABORT, 'registered ontology source corpus cannot be deleted');
+      END`,
+  },
+] as const;
+
 export async function resetDb(): Promise<void> {
   await env.DB.prepare("DROP TRIGGER IF EXISTS fail_pattern_correction_reconcile").run();
   await env.DB.prepare("DROP TRIGGER IF EXISTS fail_machine_ontology_evaluation_receipt").run();
@@ -99,12 +134,25 @@ export async function resetDb(): Promise<void> {
     if (!meta.changes) break;
   }
 
-  await env.DB.batch([
-    // A reading points at the job that generated it, so the link is broken
-    // before jobs are deleted. Ordinarily a no-op by now.
-    env.DB.prepare("UPDATE daily_readings SET active_generation_job_id = NULL"),
-    ...TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
-  ]);
+  await env.DB.batch(
+    ONTOLOGY_PIPELINE_NO_DELETE_TRIGGERS.map(({ name }) =>
+      env.DB.prepare(`DROP TRIGGER IF EXISTS ${name}`)
+    ),
+  );
+  try {
+    await env.DB.batch([
+      // A reading points at the job that generated it, so the link is broken
+      // before jobs are deleted. Ordinarily a no-op by now.
+      env.DB.prepare("UPDATE daily_readings SET active_generation_job_id = NULL"),
+      ...TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
+    ]);
+  } finally {
+    await env.DB.batch(
+      ONTOLOGY_PIPELINE_NO_DELETE_TRIGGERS.map(({ create }) =>
+        env.DB.prepare(create)
+      ),
+    );
+  }
 
   // Export artifacts share ARTIFACTS with immutable editorial releases. Keep
   // cleanup prefix-scoped and paginate so a suite can never erase the release
@@ -127,6 +175,16 @@ export async function resetDb(): Promise<void> {
     cursor = undefined;
     do {
       const page = await env.ARTIFACTS.list({ prefix: "pattern-ontology/", cursor });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+    cursor = undefined;
+    do {
+      const page = await env.ARTIFACTS.list({
+        prefix: "pattern-ontology-corpora/",
+        cursor,
+      });
       const keys = page.objects.map((object) => object.key);
       if (keys.length > 0) await env.ARTIFACTS.delete(keys);
       cursor = page.truncated ? page.cursor : undefined;

@@ -285,6 +285,309 @@ describe("POST /internal/ontology-corpora", () => {
   });
 });
 
+describe("POST /internal/ontology-pipeline-runs", () => {
+  beforeEach(async () => {
+    await resetDb();
+    env.ONTOLOGY_PIPELINE_ROLLOUT = "internal";
+    env.ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1";
+    env.OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol";
+    env.OPENAI_ONTOLOGY_GENERATOR_REASONING = "high";
+    env.OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.0";
+    env.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "120000";
+    env.OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = "8000";
+    env.OPENAI_ONTOLOGY_EVALUATOR_MODEL = "gpt-5.6-sol";
+    env.OPENAI_ONTOLOGY_EVALUATOR_REASONING = "high";
+    env.OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION = "1.0.0-evaluator";
+    env.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = "120000";
+    env.OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS = "4000";
+    env.ONTOLOGY_PIPELINE_INPUT_MAX_BYTES = "98304";
+    env.ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT = "500";
+    env.ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS = "7";
+    env.OPENAI_CREDENTIAL_SOURCE = "worker";
+    env.OPENAI_API_KEY = "route-hermetic-provider-key";
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
+      testOntologyPipelineArtifactKeyring();
+  });
+
+  afterEach(() => {
+    env.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+    env.ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "";
+    env.OPENAI_ONTOLOGY_GENERATOR_MODEL = "";
+    env.OPENAI_ONTOLOGY_GENERATOR_REASONING = "";
+    env.OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "";
+    env.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "";
+    env.OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = "";
+    env.OPENAI_ONTOLOGY_EVALUATOR_MODEL = "";
+    env.OPENAI_ONTOLOGY_EVALUATOR_REASONING = "";
+    env.OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION = "";
+    env.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = "";
+    env.OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS = "";
+    env.ONTOLOGY_PIPELINE_INPUT_MAX_BYTES = "";
+    env.ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT = "";
+    env.ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS = "";
+    env.OPENAI_CREDENTIAL_SOURCE = "";
+    env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING = "";
+    env.OPENAI_API_KEY = "";
+  });
+
+  it("reserves and dispatches a registered corpus through the service-authenticated route", async () => {
+    const corpusReleaseId = `corpus-run-${crypto.randomUUID()}`;
+    const corpus = await buildTestCorpusManifest(
+      corpusReleaseId,
+      "en-US",
+      "licensed_excerpt",
+    );
+    expect((await postCorpus(corpus)).status).toBe(201);
+
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: "rollout-pilot-2026-08-22",
+          corpus_release_id: corpusReleaseId,
+          candidate_ontology_version: "ontology-rollout-pilot-2026-08-22",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(202);
+    const body = await response.json<{
+      status: string;
+      run_id: string;
+      stage_generation: number;
+      configuration_hash: string;
+      dispatched: boolean;
+    }>();
+    expect(body).toMatchObject({
+      status: "reserved",
+      stage_generation: 0,
+      dispatched: true,
+    });
+    expect(body.run_id).toMatch(/^oprun_/);
+    expect(body.configuration_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const row = await env.DB.prepare(
+      `SELECT idempotency_key, corpus_release_id, candidate_ontology_version,
+              stage, stage_generation, dispatched_at
+       FROM pattern_ontology_pipeline_runs
+       WHERE run_id = ?`,
+    ).bind(body.run_id).first<{
+      idempotency_key: string;
+      corpus_release_id: string;
+      candidate_ontology_version: string;
+      stage: string;
+      stage_generation: number;
+      dispatched_at: string | null;
+    }>();
+    expect(row).toEqual({
+      idempotency_key: "rollout-pilot-2026-08-22",
+      corpus_release_id: corpusReleaseId,
+      candidate_ontology_version: "ontology-rollout-pilot-2026-08-22",
+      stage: "reserved",
+      stage_generation: 0,
+      dispatched_at: expect.any(String),
+    });
+  });
+
+  it("returns the original run for an identical idempotent replay", async () => {
+    const corpusReleaseId = `corpus-run-replay-${crypto.randomUUID()}`;
+    const corpus = await buildTestCorpusManifest(
+      corpusReleaseId,
+      "en-US",
+      "licensed_excerpt",
+    );
+    expect((await postCorpus(corpus)).status).toBe(201);
+    const init = {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        idempotency_key: "rollout-pilot-replay-2026-08-22",
+        corpus_release_id: corpusReleaseId,
+        candidate_ontology_version:
+          "ontology-rollout-pilot-replay-2026-08-22",
+      }),
+    };
+
+    const first = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      init,
+    );
+    const replay = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      init,
+    );
+
+    expect(first.status).toBe(202);
+    expect(replay.status).toBe(200);
+    const firstBody = await first.json<{ run_id: string; status: string }>();
+    const replayBody = await replay.json<{ run_id: string; status: string }>();
+    expect(firstBody.status).toBe("reserved");
+    expect(replayBody).toEqual(
+      expect.objectContaining({ status: "replay", run_id: firstBody.run_id }),
+    );
+    const count = await env.DB.prepare(
+      `SELECT COUNT(*) AS count
+       FROM pattern_ontology_pipeline_runs
+       WHERE idempotency_key = ?`,
+    ).bind("rollout-pilot-replay-2026-08-22").first<{ count: number }>();
+    expect(count?.count).toBe(1);
+  });
+
+  it("refuses malformed JSON without reserving a run", async () => {
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "invalid_json",
+        message: "Request body must be valid JSON",
+        request_id: expect.any(String),
+      },
+    });
+    const count = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_runs",
+    ).first<{ count: number }>();
+    expect(count?.count).toBe(0);
+  });
+
+  it.each([
+    null,
+    [],
+    {},
+    {
+      idempotency_key: "rollout-invalid",
+      corpus_release_id: "corpus-invalid",
+      candidate_ontology_version: "ontology-invalid",
+      unexpected: true,
+    },
+  ])("refuses a non-closed pipeline command %#", async (body) => {
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code,
+    ).toBe("ontology_pipeline_command_invalid");
+  });
+
+  it("maps an invalid command identity to a closed 400 response", async () => {
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: "",
+          corpus_release_id: "corpus-invalid-command",
+          candidate_ontology_version: "ontology-invalid-command",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "ontology_pipeline_command_invalid",
+        message: "Pipeline run command is invalid",
+        request_id: expect.any(String),
+      },
+    });
+  });
+
+  it("refuses a run whose corpus was not registered", async () => {
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: "rollout-unregistered-corpus",
+          corpus_release_id: "corpus-not-registered",
+          candidate_ontology_version: "ontology-unregistered-corpus",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code,
+    ).toBe("ontology_corpus_not_registered");
+  });
+
+  it("refuses to reserve while the ontology pipeline rollout is off", async () => {
+    const corpusReleaseId = `corpus-run-off-${crypto.randomUUID()}`;
+    const corpus = await buildTestCorpusManifest(
+      corpusReleaseId,
+      "en-US",
+      "licensed_excerpt",
+    );
+    expect((await postCorpus(corpus)).status).toBe(201);
+    env.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: "rollout-off",
+          corpus_release_id: corpusReleaseId,
+          candidate_ontology_version: "ontology-rollout-off",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code,
+    ).toBe("ontology_pipeline_not_enabled");
+  });
+
+  it("rejects reuse of an occupied idempotency key with changed command bytes", async () => {
+    const corpusReleaseId = `corpus-run-conflict-${crypto.randomUUID()}`;
+    const corpus = await buildTestCorpusManifest(
+      corpusReleaseId,
+      "en-US",
+      "licensed_excerpt",
+    );
+    expect((await postCorpus(corpus)).status).toBe(201);
+    const post = (version: string) => SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: "rollout-conflict",
+          corpus_release_id: corpusReleaseId,
+          candidate_ontology_version: version,
+        }),
+      },
+    );
+    expect((await post("ontology-rollout-conflict-a")).status).toBe(202);
+
+    const response = await post("ontology-rollout-conflict-b");
+
+    expect(response.status).toBe(409);
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code,
+    ).toBe("ontology_pipeline_command_conflict");
+  });
+});
+
 describe("machine ontology ingestion", () => {
   let key: ReleaseSigningKey;
 
