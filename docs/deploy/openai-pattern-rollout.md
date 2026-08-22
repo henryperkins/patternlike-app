@@ -342,6 +342,13 @@ log entry, or unrecorded upstream-retention posture.
 
 **Current state:** open. The committed value `100` is configuration, not approval.
 
+The 2026-08-22 production preflight pins a conservative `110,000` input-token
+planning bound for every Pattern and ontology-pipeline pass. The bound covers
+the `98,304`-byte serialized input-document cap, the largest fixed compiled
+request envelope in this candidate, framing allowance, and rounding headroom.
+It is an approval input, not a new runtime variable. Re-measure it whenever a
+prompt policy, strict output schema, or request envelope changes.
+
 The inclusive worst case is exactly:
 
 ```text
@@ -374,15 +381,53 @@ artifacts consume none.
 
 Record prices, timestamp/source, arithmetic, approved Pattern/day count, call
 limit, worst-case cost, and approver. Re-cost on any model, price, input cap,
-output cap, attempt maximum, or cohort-size change.
+output cap, prompt/schema envelope, attempt maximum, or cohort-size change.
+
+The current shared ledger limits calls, not stage mix or new Pattern count.
+Therefore the approval must cover both the complete-Pattern arithmetic and the
+hard call-ledger ceiling. Carry-over work can make a UTC day writer-heavy, so
+`maximum_new_patterns_per_utc_day * pattern_max_cost` alone is not the hard
+daily spend cap.
+
+### 2026-08-22 proposed ceiling (not approved)
+
+The exact model is `gpt-5.6-sol`. The
+[official model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+fetched on 2026-08-22 reports promotional standard pricing of $4.00 per
+million input tokens and $20.00 per million output tokens through at least
+2026-11-21. The `110,000` input-token planning bound is below the page's
+greater-than-272,000 long-context price boundary.
+
+| Pass | Input bound | Output bound | Maximum call cost |
+| --- | ---: | ---: | ---: |
+| planner | 110,000 | 4,000 | $0.520000 |
+| writer | 110,000 | 8,000 | $0.600000 |
+| verifier | 110,000 | 4,000 | $0.520000 |
+
+The inclusive maximum is therefore `$5.960000` per Pattern. A proposed maximum
+of nine new Patterns per UTC day is 99 calls and `$53.640000`; it fits the
+configured 100-call ledger. Because stage mix is not constrained, the hard
+100-call daily ceiling is `$60.000000` (100 writer-priced calls). Approver and
+written acceptance remain absent, so Gate 6 stays open.
+
+Gate 7B's separate production-shaped pipeline run is at most 16 generator + 64
+evaluator + 330 regression calls. At the same bounds, one complete candidate is
+at most 410 calls and `$221.680000`; the configured 500-call ledger has an
+absolute writer/generator-priced ceiling of `$300.000000`. That pipeline spend
+also remains unapproved.
 
 **Stop:** missing input bound, stale price, arithmetic not based on 11, or no
 written ceiling approval.
 
 ## Gate 7 — activate an ontology on the selected path
 
-**Current state:** no release artifact or current live-pointer evidence is
-recorded here.
+**Current state:** the 2026-08-22 production inventory found zero registered
+corpora, pipeline runs/artifacts/evidence receipts, ontology releases, or active
+pointer. The API has neither `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING` nor
+`PATTERN_ONTOLOGY_KEYS`; the isolated signer has no
+`PATTERN_ONTOLOGY_SIGNING_KEY`. The full candidate gate passes, but neither
+activation path may start without its corpus, signing identity, verification
+key, artifact keyring, and written pipeline-spend approval.
 
 ### Gate 7A — shortest internal path
 
@@ -413,8 +458,12 @@ attempt to make Slice A public.
 
 ## Gate 8 — enable and certify the first internal Pattern
 
-**Current state:** not started. This is the first point a generated Pattern may
-exist outside hermetic tests.
+**Current state:** blocked before reservation. Production has four active
+accounts, four active charts, and four confirmed `en-US` locales, but zero
+current Pattern-generation grants and therefore zero currently eligible canary
+accounts. No internal account has been designated and no reusable authenticated
+session is available. This is the first point a generated Pattern may exist
+outside hermetic tests.
 
 Deploy one exact `PATTERN_INTERNAL_ACCOUNT_IDS` entry and set
 `PATTERN_AI_ROLLOUT=internal`. The account must have:
@@ -443,7 +492,12 @@ internal account. Gates 9–10 govern external readers.
 
 ## Gate 9 — public-readiness certification
 
-**Current state:** not started.
+**Current state:** implementation prerequisites are open. The admin route still
+accepts the shared static `PATTERN_ADMIN_TOKEN`; the dedicated
+`pattern_generation_auditor` identity path is undecided; and `0008` plus the
+event contract exist without a runtime writer, replayer, replica receipt, or
+restore drill. The administrator-authorization and replay-ledger designs remain
+drafts requiring operator approval before implementation.
 
 Before `first_open`, record all of the following against the same candidate:
 
@@ -466,7 +520,8 @@ restore resurrection, plaintext exposure, or exception waived by a person.
 
 ## Gate 10 — advance to `first_open`
 
-**Current state:** not started.
+**Current state:** not attempted. Gates 6, 7B, 8, and 9 are open, and there is no
+active machine release or sustained internal observation interval.
 
 Prerequisites: Gate 7B's active machine release, Gate 9 complete, no active
 Slice A release, and sustained internal observations within the approved bounds
@@ -512,8 +567,8 @@ until its evidence exists.
 | 2026-08-22 | 3 | `611884e`; signer `9533269b`; API `c20fa0da` | `0012`, compatible | none | health 200; rollout off; Pattern queue/DLQ batch 1/concurrency 2; zero Pattern usage/claims/artifacts; scheduler stays off; authenticated read replay unavailable; signer key absent and fail-closed | deployed; gate open on authenticated replay |
 | 2026-08-22 | 4 | `611884e`; API `c20fa0da` | `0012` | none | live `gpt-5.6-sol` lookup and strict `pattern` schema passed; response id/hash/time recorded without prose | complete |
 | 2026-08-22 | 5 | `611884e`; API `c20fa0da` | `0012` | none | direct Worker mode is internally consistent; OpenAI secret present and gateway fields/token absent; upstream organization/project retention could not be read with project key (403) | route verified; gate open on retention evidence |
-|  | 6 |  |  |  |  | pending |
-|  | 7A or 7B |  |  |  |  | pending |
-|  | 8 |  |  |  |  | pending |
-|  | 9 |  |  |  |  | pending |
+| 2026-08-22 | 6 preflight | `24804ee` | `0012` | none | official promotional rate fetched; 110,000 input-token planning bound proposed; $5.96/Pattern, $53.64 for nine/99 calls, $60 hard 100-call day; pipeline candidate $221.68/410 calls and $300 hard 500-call day | open: written numeric approval absent |
+| 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
+| 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |
+| 2026-08-22 | 9 preflight | `24804ee` | `0012` | none | static admin bearer remains; replay table has zero rows and no runtime writer/replayer/drill implementation; identity path and both draft designs await operator decision/approval | blocked before certification |
 |  | 10 |  |  |  |  | pending |
