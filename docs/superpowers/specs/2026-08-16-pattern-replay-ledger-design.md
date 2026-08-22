@@ -2,9 +2,11 @@
 
 **Date:** 2026-08-16
 
-**Status:** Draft for approval. No restore drill may be scheduled until this
-is approved and the migration is applied. This is the blocking dependency of
-Slice D criterion 23, not the drill itself.
+**Status:** Approved and implemented. Migration `0008`, the signed R2-first
+runtime writer, D1 receipt, service-authenticated replayer/sweeper, and lifecycle
+integration are present. The production restore exercise remains the existing
+Gate 9 drill criterion; this design does not satisfy that operational evidence
+by itself.
 
 **Scope:** Specify the signed, non-content lifecycle ledger that a disaster-
 recovery restore replays before the Worker receives traffic, so a
@@ -57,9 +59,9 @@ the replica and prove:
    for that fingerprint;
 4. no provider call is made.
 
-Explicit non-goals. This slice does not run the drill (Slice D). It does
-not change `PATTERN_AI_ROLLOUT`. It does not store content. It does not
-replace `pattern_admin_access_events`.
+Explicit non-goals. This design does not run the Gate 9 drill. It does not
+change `PATTERN_AI_ROLLOUT`. It does not store content. It does not replace
+`pattern_admin_access_events`.
 
 ## Events
 

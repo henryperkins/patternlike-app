@@ -2,10 +2,11 @@
 
 **Created:** 2026-08-20
 
-**Status:** Core adapter and automated-ontology engineering are present;
-operational rollout and public-readiness work are not complete. This file is the
-operational source of truth; updating it does not authorize a deployment,
-secret change, ontology activation, provider call, or rollout advance.
+**Status:** Core adapter, automated-ontology, and erasure-replay engineering are
+present. Gate 6 is approved; Gates 7B–10 still require the operational evidence
+described below. This file is the operational source of truth; updating it does
+not itself authorize a deployment, secret change, ontology activation,
+provider call, or rollout advance.
 
 **Companion artifacts:**
 
@@ -50,11 +51,11 @@ This table describes repository evidence, not unqueried live state.
 | `0009` / `0010` / `0011` / `0012` | Applied to production in order | Gate 2 evidence below; integrity and shape checks clean |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
-| Public-capable machine ontology pipeline | Engineering complete through Task 10; rollout evidence open | Automated ontology plan Task 11 and Gates 2–10 remain operational work |
+| Public-capable machine ontology pipeline | Engineering complete; production candidate evidence in progress | Authorized corpus registered; two candidates failed closed; corrected bounded continuation awaits a fresh run |
 | Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
 | Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
-| Numeric call-limit value | `100` in committed production config | A value is not spend approval; Gate 6 remains open |
-| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 5 | No Pattern claims/artifacts/provider-ledger rows; OpenAI Worker secret present; ontology signer/keyring secrets remain unprovisioned; no active ontology evidence recorded |
+| Numeric call-limit value | `100` in committed production config | Gate 6 approved the nine-Pattern/99-call operating ceiling and 100-call hard ceiling |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 7B | Corpus and ontology signing identities are provisioned; no active machine ontology yet; Pattern rollout remains `off` |
 
 ## What remains before the first generated Pattern
 
@@ -340,7 +341,10 @@ log entry, or unrecorded upstream-retention posture.
 
 ## Gate 6 — approve the numeric spend ceiling
 
-**Current state:** open. The committed value `100` is configuration, not approval.
+**Current state:** complete. On 2026-08-22 the operator gave written approval in
+this deployment session for the numeric Pattern and ontology-pipeline ceilings
+recorded below. The committed value `100` remains only the enforcement value;
+the approval is the evidence that authorizes its stated operating envelope.
 
 The 2026-08-22 production preflight pins a conservative `110,000` input-token
 planning bound for every Pattern and ontology-pipeline pass. The bound covers
@@ -389,7 +393,7 @@ hard call-ledger ceiling. Carry-over work can make a UTC day writer-heavy, so
 `maximum_new_patterns_per_utc_day * pattern_max_cost` alone is not the hard
 daily spend cap.
 
-### 2026-08-22 proposed ceiling (not approved)
+### 2026-08-22 approved ceiling
 
 The exact model is `gpt-5.6-sol`. The
 [official model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
@@ -404,30 +408,36 @@ greater-than-272,000 long-context price boundary.
 | writer | 110,000 | 8,000 | $0.600000 |
 | verifier | 110,000 | 4,000 | $0.520000 |
 
-The inclusive maximum is therefore `$5.960000` per Pattern. A proposed maximum
-of nine new Patterns per UTC day is 99 calls and `$53.640000`; it fits the
-configured 100-call ledger. Because stage mix is not constrained, the hard
-100-call daily ceiling is `$60.000000` (100 writer-priced calls). Approver and
-written acceptance remain absent, so Gate 6 stays open.
+The inclusive maximum is therefore `$5.960000` per Pattern. The approved
+maximum of nine new Patterns per UTC day is 99 calls and `$53.640000`; it fits
+the configured 100-call ledger. Because stage mix is not constrained, the hard
+100-call daily ceiling is `$60.000000` (100 writer-priced calls). The operator
+approved these values in writing in the 2026-08-22 deployment session.
 
 Gate 7B's separate production-shaped pipeline run is at most 16 generator + 64
 evaluator + 330 regression calls. At the same bounds, one complete candidate is
 at most 410 calls and `$221.680000`; the configured 500-call ledger has an
-absolute writer/generator-priced ceiling of `$300.000000`. That pipeline spend
-also remains unapproved.
+absolute writer/generator-priced ceiling of `$300.000000`. The operator also
+approved that candidate-run ceiling in the same written approval.
 
 **Stop:** missing input bound, stale price, arithmetic not based on 11, or no
 written ceiling approval.
 
 ## Gate 7 — activate an ontology on the selected path
 
-**Current state:** the 2026-08-22 production inventory found zero registered
-corpora, pipeline runs/artifacts/evidence receipts, ontology releases, or active
-pointer. The API has neither `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING` nor
-`PATTERN_ONTOLOGY_KEYS`; the isolated signer has no
-`PATTERN_ONTOLOGY_SIGNING_KEY`. The full candidate gate passes, but neither
-activation path may start without its corpus, signing identity, verification
-key, artifact keyring, and written pipeline-spend approval.
+**Current state:** Gate 7B is in progress. The authorized 60-fragment
+`licensed_excerpt` corpus release
+`pattern-ontology-source-manual-en-us-0.1.0` is registered with corpus hash
+`sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`.
+The isolated signing identity, API verification keyring, and pipeline artifact
+keyring are provisioned. Two fresh production candidates failed closed before
+evaluation or activation: `pattern-ontology-en-us-0.1.0` was rejected for an
+ambiguous completion/exclusion response, and `pattern-ontology-en-us-0.1.1`
+was rejected as `coverage_incomplete`. The latter exposed that provider
+`complete=true` must be advisory while frozen coverage remains; the corrected
+bounded-continuation behavior and regression test are committed. No machine
+release is active. A fresh production run must pass every existing 7B
+criterion before activation.
 
 ### Gate 7A — shortest internal path
 
@@ -492,12 +502,14 @@ internal account. Gates 9–10 govern external readers.
 
 ## Gate 9 — public-readiness certification
 
-**Current state:** implementation prerequisites are open. The admin route still
-accepts the shared static `PATTERN_ADMIN_TOKEN`; the dedicated
-`pattern_generation_auditor` identity path is undecided; and `0008` plus the
-event contract exist without a runtime writer, replayer, replica receipt, or
-restore drill. The administrator-authorization and replay-ledger designs remain
-drafts requiring operator approval before implementation.
+**Current state:** replay engineering is complete, while operational
+certification remains open. Migration `0008`, the signed create-only R2-first
+writer, atomic D1 receipts, lifecycle integrations, service-authenticated
+replayer/sweeper, and replay bucket binding are present. Production replay
+signing material and the restore drill in
+`docs/deploy/pattern-erasure-replay-drill.md` remain to be exercised. The admin
+route still accepts the shared static `PATTERN_ADMIN_TOKEN`; the existing
+dedicated `pattern_generation_auditor` identity criterion also remains open.
 
 Before `first_open`, record all of the following against the same candidate:
 
@@ -520,8 +532,9 @@ restore resurrection, plaintext exposure, or exception waived by a person.
 
 ## Gate 10 — advance to `first_open`
 
-**Current state:** not attempted. Gates 6, 7B, 8, and 9 are open, and there is no
-active machine release or sustained internal observation interval.
+**Current state:** not attempted. Gate 6 is complete; Gates 7B, 8, and 9 are
+open, and there is no active machine release or sustained internal observation
+interval.
 
 Prerequisites: Gate 7B's active machine release, Gate 9 complete, no active
 Slice A release, and sustained internal observations within the approved bounds
@@ -567,7 +580,10 @@ until its evidence exists.
 | 2026-08-22 | 3 | `611884e`; signer `9533269b`; API `c20fa0da` | `0012`, compatible | none | health 200; rollout off; Pattern queue/DLQ batch 1/concurrency 2; zero Pattern usage/claims/artifacts; scheduler stays off; authenticated read replay unavailable; signer key absent and fail-closed | deployed; gate open on authenticated replay |
 | 2026-08-22 | 4 | `611884e`; API `c20fa0da` | `0012` | none | live `gpt-5.6-sol` lookup and strict `pattern` schema passed; response id/hash/time recorded without prose | complete |
 | 2026-08-22 | 5 | `611884e`; API `c20fa0da` | `0012` | none | direct Worker mode is internally consistent; OpenAI secret present and gateway fields/token absent; upstream organization/project retention could not be read with project key (403) | route verified; gate open on retention evidence |
-| 2026-08-22 | 6 preflight | `24804ee` | `0012` | none | official promotional rate fetched; 110,000 input-token planning bound proposed; $5.96/Pattern, $53.64 for nine/99 calls, $60 hard 100-call day; pipeline candidate $221.68/410 calls and $300 hard 500-call day | open: written numeric approval absent |
+| 2026-08-22 | 6 | `24804ee` | `0012` | none | official promotional rate and 110,000 input-token planning bound; operator approved $5.96/Pattern, nine/99 calls and $53.64 operating day, $60 hard 100-call day, plus $221.68/410-call pipeline candidate and $300 hard 500-call day | complete |
+| 2026-08-22 | 7B attempt 1 | API `af2b6cea` | `0012` | candidate `pattern-ontology-en-us-0.1.0`; none active | authorized 60-fragment corpus and signing identities registered; run `oprun_32783057-32b8-4341-b8c9-a0134d104f8a` failed closed as `candidate_invalid` on completion/exclusion ambiguity; no evaluation, signing, or activation | failed closed; prompt corrected |
+| 2026-08-22 | 7B attempt 2 | API `af2b6cea` | `0012` | candidate `pattern-ontology-en-us-0.1.1`; none active | run `oprun_26101c6b-1960-4328-bd8a-9f0a20d8e3a7` failed closed as `coverage_incomplete`; provider completion was found advisory while frozen coverage remained; bounded continuation fix and regression coverage committed | failed closed; fresh run required |
+| 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, and focused regression suites implemented; restore procedure recorded without claiming execution | implementation complete; signing material, drill, and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |
 | 2026-08-22 | 9 preflight | `24804ee` | `0012` | none | static admin bearer remains; replay table has zero rows and no runtime writer/replayer/drill implementation; identity path and both draft designs await operator decision/approval | blocked before certification |
