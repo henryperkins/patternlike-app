@@ -32,12 +32,12 @@
     "@patternlike/shared": "0.2.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "hono": "^4.12.32",
+    "hono": "^4.12.34",
     "moment-timezone": "^0.6.3",
     "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.19.1",
+    "@cloudflare/vitest-pool-workers": "^0.21.0",
     "@cloudflare/workers-types": "^4.20250525.0",
     "@types/node": "^22.15.21",
     "@types/tz-lookup": "^6.1.2",
@@ -45,6 +45,6 @@
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vitest": "^4.1.10",
-    "wrangler": "^4.16.1"
+    "wrangler": "^4.120.1"
   }
 }
