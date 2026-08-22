@@ -176,11 +176,13 @@ Worker candidate was ready.
 ## Gate 3 — deploy the compatible Worker with rollout off
 
 **Current state:** API version
-`c20fa0da-273b-4d63-8fdd-7fc53d972c05` (version 133) is deployed at 100% from
-candidate `611884e`. Deployment and unauthenticated operational checks passed,
-but no reusable production ID token was available for the required
-authenticated before/after Pattern read. Leave this gate open until that replay
-is recorded.
+`d784b0ea-625d-4c8c-84ce-4e27f71ec9d0` (version 135) is deployed at 100%.
+The compatible Gate 3 deployment and unauthenticated operational checks passed.
+A reusable production Auth0 canary now exists, and its deployed React SDK login
+created a live Worker session. The CLI loopback namespace was unavailable, so
+this preflight did not capture the required authenticated `/v1/pattern`
+before/after pair. Leave this gate open until that replay is recorded around an
+authorized deployment.
 
 Recorded evidence:
 
@@ -197,7 +199,10 @@ Recorded evidence:
   size 1, three retries, five-second wait, and bounded concurrency 2; and
 - after health/auth smoke, `pattern_provider_daily_usage` still contained zero
   rows and zero planner/writer/verifier calls; there were no Pattern claims or
-  artifacts.
+  artifacts; and
+- the Auth0 SPA callback, logout, and web-origin lists were restored exactly
+  after the interrupted CLI loopback attempt; the subsequent deployed SDK login
+  created a live Worker session without exporting its bearer.
 
 Deploy the exact Gate 1 commit:
 
@@ -475,9 +480,14 @@ attempt to make Slice A public.
 **Current state:** blocked before reservation. Production has four active
 accounts, four active charts, and four confirmed `en-US` locales, but zero
 current Pattern-generation grants and therefore zero currently eligible canary
-accounts. No internal account has been designated and no reusable authenticated
-session is available. This is the first point a generated Pattern may exist
-outside hermetic tests.
+accounts. Canary `usr_3ca4f7c2f2498c4eab97511fc3c6ff97` is active with one
+active chart, confirmed `en-US` from `user_confirmed`, and a live Worker
+session. It has zero Pattern claims, generation jobs, documents, and grants; no
+claim was reserved. The account is prepared but not designated. Gate 8 remains
+blocked on an eligible active ontology, the scheduler decision, separate
+authorization and deployment of the exact internal allowlist/rollout change,
+and first-use Pattern consent. This is the first point a generated Pattern may
+exist outside hermetic tests.
 
 Deploy one exact `PATTERN_INTERNAL_ACCOUNT_IDS` entry and set
 `PATTERN_AI_ROLLOUT=internal`. The account must have:
@@ -594,5 +604,6 @@ until its evidence exists.
 | 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb`, `3a47565` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, replay bucket, and production `pattern-replay-2026-08` signing key/keyring are deployed; restore procedure recorded without claiming execution | implementation/signing complete; drill and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |
+| 2026-08-22 | Auth0 canary preflight | `01049cc`, `b4e1770`; API `d784b0ea` (135) | `0012` | none active | existing identity reused through deployed Universal Login; SPA URL lists restored exactly after the unusable CLI loopback; Worker session accepted; canary `usr_3ca4f7c2f2498c4eab97511fc3c6ff97` is active with one chart and confirmed en-US; zero Pattern claims, jobs, documents, or grants; no reservation | canary prepared; Gate 8 remains blocked |
 | 2026-08-22 | 9 preflight | `24804ee` | `0012` | none | static admin bearer remains; replay table has zero rows and no runtime writer/replayer/drill implementation; identity path and both draft designs await operator decision/approval | blocked before certification |
 | 2026-08-22 | 10 | `56f49fe`; API `70de1b79` | `0012` | none active | Gate 7B has no accepted machine release; Gate 8 has no designated/consented canary; Gate 9 drill and auditor identity remain open; rollout verified `off` | blocked by existing prerequisites; not attempted |
