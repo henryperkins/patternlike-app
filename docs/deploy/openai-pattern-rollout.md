@@ -94,9 +94,9 @@ release recalls it and triggers withdrawal for documents based on it.
 
 ## Gate 1 — complete and freeze the code candidate
 
-**Current state:** Task 10 implementation is present. This gate stays open until
-the full command set has passed against the final candidate revision and that
-revision is recorded below.
+**Current state:** complete for local candidate `92aa24d` on 2026-08-22. The
+full command set passed against the exact tree committed there. This records no
+provider call or remote change; Gates 2–10 remain open.
 
 Run from the repository root:
 
@@ -448,7 +448,7 @@ until its evidence exists.
 | Date UTC | Gate | Commit / Worker version | Migration state | Ontology version / origin | Evidence summary | Result |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-08-20 | Foundation only | `8558e82`…`d2975e0`, `31d3621` | unchanged | none | Tasks 1–5a complete; focused seven-file lane passed 222 tests | complete, not a rollout gate |
-|  | 1 |  |  |  |  | pending |
+| 2026-08-22 | 1 | `92aa24d` | repository migrations through `0011`; remote unqueried and unchanged | none | typecheck, root tests (including 1,650 API, 207 web, and 8 verifier tests), build/dry-run, frozen-contract validation, and D1 smoke passed; both Pattern rollouts remained `off`; no live call or remote action | complete, local candidate only |
 |  | 2 |  |  |  |  | pending |
 |  | 3 |  |  |  |  | pending |
 |  | 4 |  |  |  |  | pending |
