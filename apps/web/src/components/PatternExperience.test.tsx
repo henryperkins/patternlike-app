@@ -127,6 +127,8 @@ describe("PatternExperience", () => {
     render(<PatternExperience onUnauthorized={noop} />);
     expect(await screen.findByRole("button", { name: /Generate my Pattern/i })).toBeInTheDocument();
     expect(screen.getByText(/Birth date, time, place, and coordinates are not sent/i)).toBeInTheDocument();
+    expect(screen.getByText("A successful Pattern cannot be rerolled for this chart.")).toBeInTheDocument();
+    expect(screen.getByText("Deleting your Pattern is permanent.")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Generate my Pattern/i }));
     const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
