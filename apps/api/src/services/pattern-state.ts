@@ -33,6 +33,7 @@ import type { PatternDocumentInternal } from "@patternlike/shared";
 
 interface DocumentRow {
   id: string;
+  claim_id: string;
   generation_id: string;
   locale: string;
   effective_accuracy: "exact" | "approximate" | "unknown";
@@ -65,7 +66,7 @@ export async function loadAnyPatternDocument(
   userId: string,
 ): Promise<DocumentRow | null> {
   return env.DB.prepare(
-    `SELECT id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
+    `SELECT id, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
             wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
             generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version
      FROM pattern_documents WHERE user_id = ?`,
@@ -80,7 +81,7 @@ export async function loadActivePatternDocument(
   fingerprintHash: string,
 ): Promise<DocumentRow | null> {
   return env.DB.prepare(
-    `SELECT id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
+    `SELECT id, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
             wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
             generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version
      FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash = ?`,

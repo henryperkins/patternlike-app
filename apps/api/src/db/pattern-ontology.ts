@@ -5,6 +5,7 @@ import {
 } from "@patternlike/shared";
 import { compileOntologyRelease } from "@patternlike/pattern-engine";
 import type { Env } from "../env.js";
+import { writePatternReplayIntent } from "../services/pattern-replay-ledger.js";
 import { isDevEnvironment } from "../crypto.js";
 import { hashesEqual } from "../services/content-release.js";
 import {
@@ -623,24 +624,47 @@ export async function isOntologyRecalled(env: Env, version: string): Promise<boo
 }
 
 export async function recallOntologyVersion(env: Env, version: string, reasonClass: string): Promise<boolean> {
-  const now = new Date().toISOString();
-  const updated = await env.DB.prepare(
-    `UPDATE pattern_ontology_releases
-     SET status = 'recalled', recalled_at = ?
-     WHERE version = ? AND status IN ('active', 'superseded', 'candidate')`,
-  )
-    .bind(now, version)
-    .run();
-  if (!updated.meta.changes) return false;
+  const existing = await env.DB.prepare(
+    `SELECT status FROM pattern_ontology_releases WHERE version = ?`,
+  ).bind(version).first<{ status: string }>();
+  if (!existing) return false;
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
+  const replay = await writePatternReplayIntent(env, {
+    eventClass: "ontology_recalled",
+    semanticOperationKey: version,
+    targetUserId: null,
+    chartFingerprintHash: null,
+    claimId: null,
+    generationId: null,
+    patternId: null,
+    ontologyVersion: version,
+    priorClaimStatus: null,
+    nextClaimStatus: null,
+  }, nowDate);
   await env.DB.batch([
+    ...replay.receiptStatements(env),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_releases
+       SET status = 'recalled', recalled_at = COALESCE(recalled_at, ?)
+       WHERE version = ? AND status IN ('active', 'superseded', 'candidate', 'recalled')`,
+    ).bind(now, version),
     env.DB.prepare(
       `UPDATE pattern_ontology_pointer SET active_version = NULL, updated_at = ?
        WHERE id = 1 AND active_version = ?`,
     ).bind(now, version),
     env.DB.prepare(
-      `INSERT INTO pattern_ontology_recall_events (id, ontology_version, reason_class, created_at)
+      `INSERT OR IGNORE INTO pattern_ontology_recall_events (id, ontology_version, reason_class, created_at)
        VALUES (?, ?, ?, ?)`,
-    ).bind(`pre_${crypto.randomUUID().replaceAll("-", "").slice(0, 32)}`, version, reasonClass, now),
+    ).bind(`pre_${replay.event.event_id.slice(5)}`, version, reasonClass, now),
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'ontology recall did not converge'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM pattern_ontology_releases
+         WHERE version = ? AND status = 'recalled'
+       )`,
+    ).bind(version),
   ]);
-  return true;
+  return existing.status !== "recalled";
 }

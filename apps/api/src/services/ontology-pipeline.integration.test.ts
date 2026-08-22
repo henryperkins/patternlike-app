@@ -33,6 +33,11 @@ import {
   type TestCorpusLicenseClass,
   type TestCorpusManifest,
 } from "../../test/ontology-pipeline-fixtures.js";
+import {
+  clearPatternReplayObjects,
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+} from "../../test/pattern-replay-fixtures.js";
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import { loadActiveOntology } from "../db/pattern-ontology.js";
 import {
@@ -757,6 +762,8 @@ async function publishReaderPattern(): Promise<{
 describe("automated ontology pipeline end to end", () => {
   beforeEach(async () => {
     await resetDb();
+    await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
   });
 

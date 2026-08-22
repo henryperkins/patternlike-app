@@ -8,6 +8,10 @@ import { enqueuePatternGeneration } from "./pattern-enqueue.js";
 import { PATTERN_JOB_TYPE } from "./pattern-command.js";
 import { isOntologyRecalled, recallOntologyVersion } from "../db/pattern-ontology.js";
 import { safeLog } from "./safe-log.js";
+import {
+  patternReplayEventId,
+  writePatternReplayIntent,
+} from "./pattern-replay-ledger.js";
 
 async function deleteGenerationObjects(env: Env, generationId: string): Promise<void> {
   if (!env.ARTIFACTS) return;
@@ -65,6 +69,7 @@ export async function revokePatternGenerationConsent(
 export async function deleteCurrentPattern(
   env: Env,
   identity: UserIdentity,
+  idempotencyKey: string,
   now = new Date(),
 ): Promise<"gone" | "accepted"> {
   const chart = await loadActiveChart(env, identity.userId);
@@ -84,8 +89,21 @@ export async function deleteCurrentPattern(
   )
     .bind(identity.userId)
     .all<{ generation_id: string }>();
+  const replay = await writePatternReplayIntent(env, {
+    eventClass: "pattern_deleted",
+    semanticOperationKey: `${identity.userId}:${idempotencyKey}`,
+    targetUserId: identity.userId,
+    chartFingerprintHash: document.chart_fingerprint_hash,
+    claimId: document.claim_id,
+    generationId: document.generation_id,
+    patternId: document.id,
+    ontologyVersion: document.ontology_version,
+    priorClaimStatus: "accepted",
+    nextClaimStatus: "deleted",
+  }, now);
 
   await env.DB.batch([
+    ...replay.receiptStatements(env),
     env.DB.prepare(`DELETE FROM pattern_documents WHERE user_id = ? AND id = ?`).bind(identity.userId, document.id),
     env.DB.prepare(
       `UPDATE pattern_generation_artifact_keys
@@ -119,6 +137,7 @@ export async function deleteCurrentPattern(
 export async function reconcilePatternAfterChartCorrection(
   env: Env,
   identity: UserIdentity,
+  newlyActiveChartId: string,
   now = new Date(),
 ): Promise<void> {
   const nowIso = now.toISOString();
@@ -128,8 +147,23 @@ export async function reconcilePatternAfterChartCorrection(
   )
     .bind(identity.userId)
     .all<{ generation_id: string }>();
+  const replay = document
+    ? await writePatternReplayIntent(env, {
+        eventClass: "chart_correction_erased",
+        semanticOperationKey: newlyActiveChartId,
+        targetUserId: identity.userId,
+        chartFingerprintHash: document.chart_fingerprint_hash,
+        claimId: document.claim_id,
+        generationId: document.generation_id,
+        patternId: document.id,
+        ontologyVersion: document.ontology_version,
+        priorClaimStatus: "accepted",
+        nextClaimStatus: "superseded",
+      }, now)
+    : null;
 
   await env.DB.batch([
+    ...(replay?.receiptStatements(env) ?? []),
     env.DB.prepare(`DELETE FROM pattern_documents WHERE user_id = ?`).bind(identity.userId),
     env.DB.prepare(
       `UPDATE pattern_generation_jobs
@@ -220,7 +254,13 @@ export async function retryPatternReconcileIfStale(
   now = new Date(),
 ): Promise<void> {
   if (await patternHasStaleCorrectionLeftover(env, identity.userId)) {
-    await reconcilePatternAfterChartCorrection(env, identity, now);
+    const chart = await loadActiveChart(env, identity.userId);
+    await reconcilePatternAfterChartCorrection(
+      env,
+      identity,
+      chart?.id ?? `chart_absent:${identity.userId}`,
+      now,
+    );
   }
 }
 
@@ -235,32 +275,51 @@ export async function recallOntologyAndWithdraw(
     .bind(version)
     .first<{ status: string }>();
   if (!existing) return 0;
-  if (existing.status !== "recalled") {
-    const flipped = await recallOntologyVersion(env, version, reasonClass);
-    if (!flipped && !(await isOntologyRecalled(env, version))) return 0;
-  }
+  const flipped = await recallOntologyVersion(env, version, reasonClass);
+  if (!flipped && !(await isOntologyRecalled(env, version))) return 0;
   const now = new Date().toISOString();
   const { results: jobs } = await env.DB.prepare(
-    `SELECT generation_id, user_id FROM pattern_generation_jobs WHERE ontology_version = ?`,
+    `SELECT generation.generation_id, generation.user_id,
+            generation.claim_id, generation.chart_fingerprint_hash,
+            claim.status AS claim_status, document.id AS pattern_id
+     FROM pattern_generation_jobs generation
+     JOIN pattern_generation_claims claim ON claim.id = generation.claim_id
+     LEFT JOIN pattern_documents document
+       ON document.generation_id = generation.generation_id
+     WHERE generation.ontology_version = ?
+     ORDER BY generation.generation_id`,
   )
     .bind(version)
-    .all<{ generation_id: string; user_id: string }>();
-  const { results: documents } = await env.DB.prepare(
-    `SELECT id, user_id, generation_id FROM pattern_documents WHERE ontology_version = ?`,
-  )
-    .bind(version)
-    .all<{ id: string; user_id: string; generation_id: string }>();
-
-  const seen = new Set<string>();
-  const generations: Array<{ generation_id: string; user_id: string }> = [];
-  for (const row of [...jobs, ...documents]) {
-    if (seen.has(row.generation_id)) continue;
-    seen.add(row.generation_id);
-    generations.push({ generation_id: row.generation_id, user_id: row.user_id });
-  }
-
-  for (const row of generations) {
+    .all<{
+      generation_id: string;
+      user_id: string;
+      claim_id: string;
+      chart_fingerprint_hash: string;
+      claim_status: string;
+      pattern_id: string | null;
+    }>();
+  const recallEventId = await patternReplayEventId(
+    "ontology_recalled",
+    version,
+  );
+  let withdrawnDocuments = 0;
+  for (const row of jobs) {
+    const withdrawal = row.pattern_id && row.claim_status === "accepted"
+      ? await writePatternReplayIntent(env, {
+          eventClass: "pattern_withdrawn",
+          semanticOperationKey: `${recallEventId}:${row.claim_id}`,
+          targetUserId: row.user_id,
+          chartFingerprintHash: row.chart_fingerprint_hash,
+          claimId: row.claim_id,
+          generationId: row.generation_id,
+          patternId: row.pattern_id,
+          ontologyVersion: version,
+          priorClaimStatus: "accepted",
+          nextClaimStatus: "withdrawn",
+        }, new Date(now))
+      : null;
     await env.DB.batch([
+      ...(withdrawal?.receiptStatements(env) ?? []),
       env.DB.prepare(`DELETE FROM pattern_documents WHERE generation_id = ?`).bind(row.generation_id),
       env.DB.prepare(
         `UPDATE pattern_generation_jobs
@@ -278,30 +337,29 @@ export async function recallOntologyAndWithdraw(
         `UPDATE jobs SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
          WHERE id = (SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?)`,
       ).bind(row.generation_id),
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'withdrawn', consumed_at = COALESCE(consumed_at, ?), withdrawn_at = ?,
-             active_generation_id = NULL, updated_at = ?
-         WHERE user_id = ? AND id = (
-           SELECT claim_id FROM pattern_generation_jobs WHERE generation_id = ?
-         ) AND status = 'accepted'`,
-      ).bind(now, now, now, row.user_id, row.generation_id),
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'available', active_generation_id = NULL, updated_at = ?
-         WHERE user_id = ? AND id = (
-           SELECT claim_id FROM pattern_generation_jobs WHERE generation_id = ?
-         ) AND status = 'reserved' AND consumed_at IS NULL`,
-      ).bind(now, row.user_id, row.generation_id),
+      withdrawal
+        ? env.DB.prepare(
+            `UPDATE pattern_generation_claims
+             SET status = 'withdrawn', consumed_at = COALESCE(consumed_at, ?), withdrawn_at = ?,
+                 active_generation_id = NULL, updated_at = ?
+             WHERE user_id = ? AND id = ? AND status = 'accepted'`,
+          ).bind(now, now, now, row.user_id, row.claim_id)
+        : env.DB.prepare(
+            `UPDATE pattern_generation_claims
+             SET status = 'available', active_generation_id = NULL, updated_at = ?
+             WHERE user_id = ? AND id = ? AND status = 'reserved'
+               AND consumed_at IS NULL AND active_generation_id = ?`,
+          ).bind(now, row.user_id, row.claim_id, row.generation_id),
       env.DB.prepare(
         `UPDATE pattern_generation_artifact_keys
          SET wrapped_key_enc = NULL, wrapped_key_version = NULL, wrapped_key_nonce = NULL, erased_at = ?
          WHERE generation_id = ? AND user_id = ?`,
       ).bind(now, row.generation_id, row.user_id),
     ]);
+    if (row.pattern_id) withdrawnDocuments += 1;
     await deleteGenerationObjects(env, row.generation_id);
   }
-  return documents.length;
+  return withdrawnDocuments;
 }
 
 /**

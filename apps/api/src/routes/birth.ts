@@ -504,7 +504,12 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   }
 
   try {
-    await reconcilePatternAfterChartCorrection(c.env, identity, new Date(now));
+    await reconcilePatternAfterChartCorrection(
+      c.env,
+      identity,
+      chart.id,
+      new Date(now),
+    );
   } catch {
     safeLog({ event: "pattern_stage_failed" });
     return c.json(
@@ -545,4 +550,3 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     202,
   );
 });
-

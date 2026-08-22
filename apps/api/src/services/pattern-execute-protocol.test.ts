@@ -14,6 +14,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env, SELF } from "cloudflare:test";
 import { contentHash } from "@patternlike/shared";
+import type { Env } from "../env.js";
 
 import {
   IDENTITY_A,
@@ -27,6 +28,12 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
+import {
+  clearPatternReplayObjects,
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+  patternReplayTestEnv,
+} from "../../test/pattern-replay-fixtures.js";
 import {
   OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY,
   OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY,
@@ -77,10 +84,10 @@ async function reserve(key: string): Promise<string> {
 }
 
 /** Deliver the message the durable row currently names. */
-async function deliver(generationId: string) {
-  const job = await loadPatternJob(env, generationId);
+async function deliver(generationId: string, executionEnv: Env = env) {
+  const job = await loadPatternJob(executionEnv, generationId);
   if (!job) throw new Error("pattern job missing");
-  return executePatternJob(env, {
+  return executePatternJob(executionEnv, {
     kind: "pattern_generation",
     job_id: job.job_id,
     generation_id: generationId,
@@ -115,6 +122,8 @@ async function stageOf(generationId: string): Promise<string> {
 describe("Pattern stage protocol", () => {
   beforeEach(async () => {
     await resetDb();
+    await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A);
@@ -222,6 +231,116 @@ describe("Pattern stage protocol", () => {
     expect(await stageOf(generationId)).toBe("writing");
     // The ledger counts provider calls, and a stand-in is not a provider.
     expect(await providerCalls()).toBe(0);
+  });
+
+  it("keeps publication reserved when the replay replica is unavailable", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-replay-unavailable");
+
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    expect(await stageOf(generationId)).toBe("semantic_verifying");
+
+    const unavailableBucket = new Proxy(env.PATTERN_REPLAY_LEDGER!, {
+      get(target, property, receiver) {
+        if (property === "get") return async () => null;
+        if (property === "put") {
+          return async () => {
+            throw new Error("injected replay outage");
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as R2Bucket;
+    const outcome = await deliver(
+      generationId,
+      patternReplayTestEnv(env, { PATTERN_REPLAY_LEDGER: unavailableBucket }),
+    );
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: "retry",
+      failureClass: "replay_replica_unavailable",
+    });
+    expect(await env.DB.prepare(
+      `SELECT status FROM pattern_generation_claims WHERE active_generation_id = ?`,
+    ).bind(generationId).first<{ status: string }>()).toEqual({ status: "reserved" });
+    expect(await env.DB.prepare(
+      `SELECT status FROM jobs WHERE id = (
+         SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?
+       )`,
+    ).bind(generationId).first<{ status: string }>()).toEqual({ status: "queued" });
+    expect(await stageOf(generationId)).toBe("publishing");
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM pattern_documents WHERE generation_id = ?`,
+    ).bind(generationId).first<{ n: number }>()).toEqual({ n: 0 });
+  });
+
+  it("adopts the write-ahead publication intent after a D1 failure", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-replay-d1-retry");
+
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+
+    let failPublicationBatch = true;
+    let publicationPrepared = false;
+    const failingDb = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property === "prepare") {
+          return (query: string) => {
+            if (query.includes("INSERT INTO pattern_documents")) {
+              publicationPrepared = true;
+            }
+            return target.prepare(query);
+          };
+        }
+        if (property === "batch") {
+          return async (statements: D1PreparedStatement[]) => {
+            if (failPublicationBatch && publicationPrepared) {
+              failPublicationBatch = false;
+              publicationPrepared = false;
+              throw new Error("injected publication transaction failure");
+            }
+            publicationPrepared = false;
+            return target.batch(statements);
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as D1Database;
+    const retryEnv = patternReplayTestEnv(env, { DB: failingDb });
+
+    expect(await deliver(generationId, retryEnv)).toEqual({
+      ok: false,
+      reason: "retry",
+      failureClass: "publication_commit_failed",
+    });
+    expect((await env.PATTERN_REPLAY_LEDGER!.list({
+      prefix: "pattern-erasure-replay/",
+    })).objects).toHaveLength(1);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM pattern_erasure_replay_events WHERE generation_id = ?`,
+    ).bind(generationId).first<{ n: number }>()).toEqual({ n: 0 });
+    expect(await env.DB.prepare(
+      `SELECT status FROM pattern_generation_claims WHERE active_generation_id = ?`,
+    ).bind(generationId).first<{ status: string }>()).toEqual({ status: "reserved" });
+
+    await clearBackoff(generationId);
+    expect(await deliver(generationId, retryEnv)).toEqual({ ok: true, terminal: true });
+    expect((await env.PATTERN_REPLAY_LEDGER!.list({
+      prefix: "pattern-erasure-replay/",
+    })).objects).toHaveLength(1);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM pattern_erasure_replay_events WHERE generation_id = ?`,
+    ).bind(generationId).first<{ n: number }>()).toEqual({ n: 1 });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM pattern_documents WHERE generation_id = ?`,
+    ).bind(generationId).first<{ n: number }>()).toEqual({ n: 1 });
   });
 
   it("keeps the frozen synthetic author and stores honest provenance after a live pin change", async () => {

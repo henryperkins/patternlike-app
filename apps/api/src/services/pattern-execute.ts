@@ -65,6 +65,10 @@ import {
   randomKey,
 } from "./pattern-crypto.js";
 import { safeLog } from "./safe-log.js";
+import {
+  PatternReplayLedgerError,
+  writePatternReplayIntent,
+} from "./pattern-replay-ledger.js";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
@@ -1049,6 +1053,42 @@ export async function cancelJob(env: Env, job: PatternJobRow, token: string, rea
   }
 }
 
+/**
+ * Release only the queue lease after publication could not finish.
+ *
+ * Once a `claim_consumed` intent exists, no failure path may return its claim
+ * to `available`. Keeping the same stage generation also lets the redelivery
+ * adopt the already committed verifier artifacts and the exact replay event.
+ */
+async function releasePublicationRetry(
+  env: Env,
+  job: PatternJobRow,
+  token: string,
+  now: Date,
+): Promise<boolean> {
+  const updatedAt = now.toISOString();
+  const availableAt = new Date(now.getTime() + 60_000).toISOString();
+  try {
+    await env.DB.batch([
+      ...ownershipProbes(env, job, token),
+      env.DB.prepare(
+        `UPDATE jobs SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
+                dispatched_at = NULL, available_at = ?
+         WHERE id = ? AND claim_token = ? AND status = 'running'`,
+      ).bind(availableAt, job.job_id, token),
+      env.DB.prepare(
+        `UPDATE pattern_generation_jobs
+         SET stage = 'publishing', updated_at = ?
+         WHERE generation_id = ? AND stage_generation = ?
+           AND stage IN ('semantic_verifying', 'publishing')`,
+      ).bind(updatedAt, job.generation_id, job.stage_generation),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function eligibility(
   env: Env,
   identity: UserIdentity,
@@ -1670,7 +1710,7 @@ export async function executePatternJob(
         await failJob(env, claimed.job, claimed.token, "semantic_verification_failed", "checking_claims");
         return { ok: false, reason: "terminal", failureClass: "semantic_verification_failed" };
       }
-      const published = await publishPattern(
+      const publication = await publishPattern(
         env,
         identity,
         command,
@@ -1682,9 +1722,13 @@ export async function executePatternJob(
         verdictHash,
         now,
       );
-      if (!published) {
-        await cancelJob(env, claimed.job, claimed.token, "stale_publication");
-        return { ok: true, terminal: true };
+      if (publication.status === "retry") {
+        await releasePublicationRetry(env, claimed.job, claimed.token, now);
+        return {
+          ok: false,
+          reason: "retry",
+          failureClass: publication.failureClass,
+        };
       }
       return { ok: true, terminal: true };
     }
@@ -1709,8 +1753,13 @@ async function publishPattern(
   candidateHash: string,
   verdictHash: string,
   now: Date,
-): Promise<boolean> {
-  const patternId = newId("pat");
+): Promise<
+  | { status: "published" }
+  | { status: "retry"; failureClass: string }
+> {
+  const patternId = `pat_${(await sha256Hex(
+    `pattern-document-v1:${command.generation_id}`,
+  )).slice(0, 32)}`;
   const generatedAt = now.toISOString();
   const documentKey = randomKey();
   const nonce = randomNonce();
@@ -1752,6 +1801,28 @@ async function publishPattern(
   );
   const content = await contentHash(JSON.stringify(internal));
   const accuracy = internal.effective_accuracy;
+  let replay;
+  try {
+    replay = await writePatternReplayIntent(env, {
+      eventClass: "claim_consumed",
+      semanticOperationKey: command.generation_id,
+      targetUserId: identity.userId,
+      chartFingerprintHash: command.chart_fingerprint_hash,
+      claimId: command.claim_id,
+      generationId: command.generation_id,
+      patternId,
+      ontologyVersion: command.ontology_version,
+      priorClaimStatus: "reserved",
+      nextClaimStatus: "accepted",
+    }, now);
+  } catch (error) {
+    return {
+      status: "retry",
+      failureClass: error instanceof PatternReplayLedgerError
+        ? error.code
+        : "replay_replica_unavailable",
+    };
+  }
   try {
     await env.DB.batch([
       env.DB.prepare(
@@ -1763,6 +1834,7 @@ async function publishPattern(
          )`,
       ).bind(command.claim_id, command.generation_id),
       ...ownershipProbes(env, claimed.job, claimed.token),
+      ...replay.receiptStatements(env),
       env.DB.prepare(
         `DELETE FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash != ?`,
       ).bind(identity.userId, command.chart_fingerprint_hash),
@@ -1815,9 +1887,9 @@ async function publishPattern(
          VALUES (?, 'system', ?, 'pattern_generation.published', 'pattern', ?, 'success', 'accepted', ?)`,
       ).bind(newId("aud"), identity.userId, patternId, generatedAt),
     ]);
-    return true;
+    return { status: "published" };
   } catch {
-    return false;
+    return { status: "retry", failureClass: "publication_commit_failed" };
   }
 }
 

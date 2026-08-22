@@ -44,6 +44,11 @@ import {
   ontologySigningPayload,
 } from "../services/pattern-ontology-verify.js";
 import { generateSigningKey, releaseKeysVar, toBase64Url } from "../../test/content-release-fixtures.js";
+import {
+  clearPatternReplayObjects,
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+} from "../../test/pattern-replay-fixtures.js";
 
 const POLICY = "1.0.0";
 
@@ -91,6 +96,8 @@ async function drain(generationId: string): Promise<string> {
 describe("M7 AI-generated Pattern", () => {
   beforeEach(async () => {
     await resetDb();
+    await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A);
@@ -784,7 +791,11 @@ describe("M7 AI-generated Pattern", () => {
     });
     const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
     expect(await drain(generationId)).toBe("succeeded");
-    await reconcilePatternAfterChartCorrection(env, IDENTITY_A);
+    await reconcilePatternAfterChartCorrection(
+      env,
+      IDENTITY_A,
+      "cht_correction_payload_test",
+    );
     const payload = await env.DB.prepare(
       `SELECT payload_enc FROM jobs WHERE id = (SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?)`,
     )

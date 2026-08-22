@@ -172,7 +172,7 @@ patternAiRoutes.delete("/v1/pattern", async (c) => {
   }
   const identity = await identityFrom(c);
   if (!identity) return c.json(error(requestId, "unauthorized", "Authentication required"), 401);
-  const result = await deleteCurrentPattern(c.env, identity);
+  const result = await deleteCurrentPattern(c.env, identity, key);
   return result === "gone" ? c.body(null, 204) : c.body(null, 202);
 });
 

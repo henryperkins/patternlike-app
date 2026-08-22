@@ -1,9 +1,9 @@
-import { sha256Hex } from "@patternlike/shared";
+import { contentHash } from "@patternlike/shared";
 import type { Env } from "../env.js";
 
 /** Domain-separated hash. The raw chart fingerprint never lands in this column. */
 export async function hashChartFingerprint(fingerprint: string): Promise<string> {
-  return sha256Hex(`patternlike.pattern-claim.v1|${fingerprint}`);
+  return contentHash(`patternlike.pattern-claim.v1|${fingerprint}`);
 }
 
 export type PatternClaimStatus =
