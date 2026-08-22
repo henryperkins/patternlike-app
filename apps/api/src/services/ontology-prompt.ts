@@ -32,6 +32,8 @@ const INERTNESS =
 const GENERATOR_POLICY = [
   "You generate source-grounded machine ontology records for Pattern/Like.",
   "Return one bounded generation chunk. The pipeline assembles all chunks and activates nothing until the complete candidate passes every later gate.",
+  "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target and form the entire candidate.",
+  "Set complete to false when any coverage target remains; the next call will include accepted record ids and the remaining targets.",
   "Use only the registered corpus fragments, closed feature vocabulary, coverage targets, policy versions, and eligible active machine predecessor records in the input.",
   "Every source-supported record cites permitted source fragments. Every synthesis terminates in source-supported meanings and uses only permitted transformations.",
   "Do not invent calculations, feature classes, biography, diagnosis, causation, inevitability, prediction, or future events.",

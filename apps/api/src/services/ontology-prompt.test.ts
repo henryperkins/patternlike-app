@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { OntologyPipelineConfigPin } from "../middleware/config-guard.js";
 import {
+  OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION,
+} from "../middleware/config-guard.js";
+import {
   ONTOLOGY_EVALUATOR_DIMENSIONS,
   ONTOLOGY_OUTPUT_SCHEMA_NAME,
   ONTOLOGY_STRICT_SCHEMA,
@@ -15,7 +18,7 @@ import {
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
   generator_reasoning: "high",
-  generator_prompt_version: "1.0.0",
+  generator_prompt_version: "1.0.1",
   generator_max_output_tokens: 8000,
   evaluator_model: "gpt-5.6-sol",
   evaluator_reasoning: "high",
@@ -58,6 +61,16 @@ function deepKeys(value: unknown): string[] {
 }
 
 describe("ontology provider prompts", () => {
+  it("pins the multi-chunk completion rule to the revised generator prompt", () => {
+    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.1");
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Set complete to false when any coverage target remains",
+    );
+  });
+
   it("keeps generator and evaluator policies, schema names, and prompt pins distinct", () => {
     expect(ONTOLOGY_SYSTEM_POLICY.generator).not.toBe(ONTOLOGY_SYSTEM_POLICY.evaluator);
     expect(ONTOLOGY_OUTPUT_SCHEMA_NAME.generator).not.toBe(

@@ -64,7 +64,7 @@ function configuredEnv(queue: Queue<OntologyPipelineMessage>): Env {
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
     OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
-    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.0",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.1",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
@@ -229,7 +229,7 @@ describe("ontology pipeline immutable command", () => {
       generator: {
         model: "gpt-5.6-sol",
         reasoning: "high",
-        prompt_version: "1.0.0",
+        prompt_version: "1.0.1",
         timeout_ms: 120000,
         max_output_tokens: 8000,
       },
