@@ -84,10 +84,22 @@ export type ReserveExportOutcome =
   | { kind: "duplicate"; response: WorkflowAccepted }
   | { kind: "conflict" };
 
+// `include_patterns` joined `ExportOptions` in M7, so a command frozen before that
+// carries no such field. `parseExportRequest` defaults an omitted flag to `true`, and
+// reading a missing stored flag the same way keeps a pre-M7 reservation replaying as a
+// duplicate instead of turning into a spurious `idempotency_conflict`.
+function includePatterns(options: ExportOptions): boolean {
+  return (options as Partial<ExportOptions>).include_patterns ?? true;
+}
+
+// Every member of the frozen request participates. A member that does not is a member a
+// caller can change under the same key without being refused — the replay would hand back
+// the first workflow's ids and the artifact would carry a section the caller asked to omit.
 function sameRequest(a: ExportOptions, b: ExportOptions): boolean {
   return (
     a.include_readings === b.include_readings &&
-    a.include_journal === b.include_journal
+    a.include_journal === b.include_journal &&
+    includePatterns(a) === includePatterns(b)
   );
 }
 

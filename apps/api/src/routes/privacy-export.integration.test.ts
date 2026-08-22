@@ -264,6 +264,17 @@ describe("account export", () => {
     });
     expect(conflict.response.status).toBe(409);
     expect(conflict.body.error?.code).toBe("idempotency_conflict");
+
+    // include_patterns is the M7 member of the frozen request. Omitting it from the
+    // comparison replayed the first workflow and shipped the caller a patterns section
+    // they asked to drop, so it has to conflict like any other changed member.
+    const patternsConflict = await postExport(USER_A, "idem-export-account-1", {
+      include_readings: true,
+      include_journal: true,
+      include_patterns: false,
+    });
+    expect(patternsConflict.response.status).toBe(409);
+    expect(patternsConflict.body.error?.code).toBe("idempotency_conflict");
   });
 
   it("validates the frozen request without reserving work", async () => {
