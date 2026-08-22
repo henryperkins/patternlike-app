@@ -1102,10 +1102,10 @@ describe("the Today surface", () => {
       );
       await screen.findByRole("heading", { name: /Your reading needs your say-so/i });
 
+      expect(await screen.findByText("Unavailable")).toHaveAttribute("role", "status");
       expect(
         screen.queryByRole("button", { name: /Agree and generate/i }),
       ).not.toBeInTheDocument();
-      expect(await screen.findByRole("status")).toHaveTextContent("Unavailable");
     });
 
     it("reports a refused grant without claiming it succeeded", async () => {
