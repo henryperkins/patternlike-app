@@ -872,6 +872,12 @@ interface AcceptedGenerationProgress {
   orderedRecordIds: string[];
 }
 
+interface CoverageDeficit {
+  feature_class: OntologyPipelineCommand["generator_input"]["coverage_targets"][number]["feature_class"];
+  minimum_source_supported: number;
+  minimum_total: number;
+}
+
 async function loadAcceptedGenerationProgress(
   env: Env,
   claim: ClaimedOntologyPipelineRun,
@@ -908,11 +914,11 @@ async function loadAcceptedGenerationProgress(
   return { chunks, records, orderedRecordIds };
 }
 
-function remainingCoverageTargets(
+function coverageDeficits(
   command: OntologyPipelineCommand,
   acceptedRecords: readonly PatternOntologyRecord[],
-) {
-  return command.generator_input.coverage_targets.flatMap((target) => {
+): CoverageDeficit[] {
+  return command.generator_input.coverage_targets.map((target) => {
     const matching = acceptedRecords.filter(
       (record) => record.feature_predicate.type === target.feature_class,
     );
@@ -924,14 +930,48 @@ function remainingCoverageTargets(
       0,
       target.minimum_source_supported - sourceSupported.length,
     );
-    return minimumTotal === 0 && minimumSourceSupported === 0
-      ? []
-      : [{
-          feature_class: target.feature_class,
-          minimum_source_supported: minimumSourceSupported,
-          minimum_total: minimumTotal,
-        }];
+    return {
+      feature_class: target.feature_class,
+      minimum_source_supported: minimumSourceSupported,
+      minimum_total: minimumTotal,
+    };
   });
+}
+
+function remainingCoverageTargets(
+  command: OntologyPipelineCommand,
+  acceptedRecords: readonly PatternOntologyRecord[],
+): CoverageDeficit[] {
+  return coverageDeficits(command, acceptedRecords).filter(
+    (deficit) =>
+      deficit.minimum_total > 0 || deficit.minimum_source_supported > 0,
+  );
+}
+
+function coverageStrictlyDecreases(
+  before: readonly CoverageDeficit[],
+  after: readonly CoverageDeficit[],
+): boolean {
+  if (before.length !== after.length) return false;
+  let decreased = false;
+  for (let index = 0; index < before.length; index += 1) {
+    const prior = before[index]!;
+    const next = after[index]!;
+    if (prior.feature_class !== next.feature_class) return false;
+    if (
+      next.minimum_total > prior.minimum_total ||
+      next.minimum_source_supported > prior.minimum_source_supported
+    ) {
+      return false;
+    }
+    if (
+      next.minimum_total < prior.minimum_total ||
+      next.minimum_source_supported < prior.minimum_source_supported
+    ) {
+      decreased = true;
+    }
+  }
+  return decreased;
 }
 
 function generatorContinuation(
@@ -1153,6 +1193,18 @@ async function executeGenerating(
   }
 
   validateCurrentChunk(chunk, progress, context.command);
+  const preChunkCoverageDeficits = coverageDeficits(
+    context.command,
+    progress.records,
+  );
+  const postChunkCoverageDeficits = coverageDeficits(
+    context.command,
+    [...progress.records, ...chunk.records],
+  );
+  const remainingFeatureClasses = postChunkCoverageDeficits
+    .filter((deficit) =>
+      deficit.minimum_total > 0 || deficit.minimum_source_supported > 0)
+    .map((deficit) => deficit.feature_class);
   // `complete` is a provider declaration, not an authority boundary. If the
   // immutable coverage targets prove work remains, persist this otherwise
   // valid chunk as an incomplete predecessor and continue within the frozen
@@ -1187,9 +1239,29 @@ async function executeGenerating(
   );
   if (!chunk.complete) {
     if (
+      preChunkCoverageDeficits.some((deficit) =>
+        deficit.minimum_total > 0 || deficit.minimum_source_supported > 0) &&
+      !coverageStrictlyDecreases(
+        preChunkCoverageDeficits,
+        postChunkCoverageDeficits,
+      )
+    ) {
+      safeLog({
+        event: "ontology_generation_stalled",
+        safe_detail_code: "coverage_no_progress",
+        remaining_feature_classes: remainingFeatureClasses,
+      });
+      terminal("candidate_invalid");
+    }
+    if (
       claim.stageCursor + 1 >=
         context.command.limits.maximum_generation_chunks
     ) {
+      safeLog({
+        event: "ontology_generation_stalled",
+        safe_detail_code: "generation_chunk_limit_exhausted",
+        remaining_feature_classes: remainingFeatureClasses,
+      });
       terminal("candidate_invalid");
     }
     return await advanceCursor(env, claim, clock);

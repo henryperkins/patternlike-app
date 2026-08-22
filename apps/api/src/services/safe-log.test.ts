@@ -9,6 +9,35 @@ afterEach(() => {
 });
 
 describe("safe logging", () => {
+  it("projects only the closed stalled-generation diagnostic", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "ontology_generation_stalled",
+      safe_detail_code: "coverage_no_progress",
+      remaining_feature_classes: ["position"],
+      candidate: SENTINEL,
+      corpus: SENTINEL,
+      run: SENTINEL,
+      response_prose: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    const payload = warn.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      safe_detail_code: "coverage_no_progress",
+      remaining_feature_classes: ["position"],
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+    });
+    expect(Object.keys(payload).sort()).toEqual([
+      "remaining_feature_classes",
+      "safe_detail_code",
+      "trace_id",
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
+
   it("projects only a closed ontology candidate rejection reason", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const hostile = {

@@ -1001,6 +1001,59 @@ describe("ontology pipeline execution", () => {
     expect(publisher.generatorProviderCalls).toBe(2);
   });
 
+  it("stores a valid non-covering chunk then closes stalled generation without another request", async () => {
+    const fixture = await reserveFixture();
+    const secondNonPositionRecord = expandedRecords(
+      [fixture.records[1]!],
+      2,
+    )[1]!;
+    const publisher = new FakeOntologyPublisher([
+      {
+        schema_version: "0.7.0",
+        records: fixture.records.slice(1),
+        complete: true,
+      },
+      {
+        schema_version: "0.7.0",
+        records: [secondNonPositionRecord],
+        complete: true,
+      },
+    ]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await driveToGenerating(fixture, publisher);
+    expect(await deliver(fixture, publisher)).toEqual({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "generating",
+      stage_generation: 3,
+      stage_cursor: 1,
+    });
+    const firstChunk = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(fixture.runId, "generating", 2, 0, "candidate_chunk"),
+    );
+    expect(JSON.parse(new TextDecoder().decode(firstChunk!.plaintext)))
+      .toMatchObject({ complete: false });
+
+    expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "candidate_invalid",
+      stage_cursor: 1,
+    });
+    const secondChunk = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(fixture.runId, "generating", 3, 0, "candidate_chunk"),
+    );
+    expect(secondChunk).not.toBeNull();
+    expect(publisher.generatorProviderCalls).toBe(2);
+    expect(warn).toHaveBeenCalledWith("ontology_generation_stalled", {
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+      safe_detail_code: "coverage_no_progress",
+      remaining_feature_classes: ["position"],
+    });
+  });
+
   it("assembles exact ordered chunks and compiles the unchanged whole candidate", async () => {
     const fixture = await reserveFixture();
     const publisher = new FakeOntologyPublisher([
@@ -1111,6 +1164,7 @@ describe("ontology pipeline execution", () => {
       records: [record],
       complete: false,
     })));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await driveToGenerating(fixture, publisher);
     for (let index = 0; index < 15; index += 1) {
       expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
@@ -1122,6 +1176,11 @@ describe("ontology pipeline execution", () => {
       stage_cursor: 15,
     });
     expect(publisher.generatorProviderCalls).toBe(16);
+    expect(warn).toHaveBeenCalledWith("ontology_generation_stalled", {
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+      safe_detail_code: "generation_chunk_limit_exhausted",
+      remaining_feature_classes: [],
+    });
   });
 
   it("counts retries and ambiguous requests toward the 16-call generator run ceiling across UTC days", async () => {

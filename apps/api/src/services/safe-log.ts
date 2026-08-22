@@ -1,4 +1,4 @@
-import { newId } from "@patternlike/shared";
+import { newId, type NatalFeatureClass } from "@patternlike/shared";
 import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { PublisherSafeDetailCode } from "./reading-publisher.js";
@@ -96,6 +96,13 @@ export type SafeLogEvent =
   | {
       event: "ontology_candidate_rejected";
       reason: OntologyCandidateSafeDetailCode;
+    }
+  | {
+      event: "ontology_generation_stalled";
+      safe_detail_code:
+        | "coverage_no_progress"
+        | "generation_chunk_limit_exhausted";
+      remaining_feature_classes: NatalFeatureClass[];
     }
   /** A stage exhausted its claim ceiling and the sweep failed the job. */
   | { event: "pattern_stage_terminal_failure" }
@@ -268,6 +275,13 @@ export function safeLog(input: SafeLogEvent): string {
       break;
     case "ontology_candidate_rejected":
       console.warn(input.event, { trace_id, reason: input.reason });
+      break;
+    case "ontology_generation_stalled":
+      console.warn(input.event, {
+        trace_id,
+        safe_detail_code: input.safe_detail_code,
+        remaining_feature_classes: input.remaining_feature_classes,
+      });
       break;
     case "unhandled_error":
     case "generation_claim_release_failed":
