@@ -4,11 +4,22 @@ import {
   jcsCanonicalize,
   sha256Hex,
 } from "@patternlike/shared";
+import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Env } from "../env.js";
+import { storeOntologyRelease } from "../db/pattern-ontology.js";
+import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
 import {
+  IDENTITY_A,
+  USER_A,
+  resetDb,
+  seedUser,
+} from "../../test/helpers.js";
+import {
+  applyPatternReplayEvent,
+  applyPatternReplayReplica,
   parsePatternReplayKeyring,
   parsePatternReplaySigningKey,
   patternReplayEventId,
@@ -435,5 +446,463 @@ describe("Pattern replay create-only replica", () => {
       replayEnv(writerSecret(key), publicKeyring(key), failingBucket),
       intent(),
     )).rejects.toMatchObject({ code: "replay_replica_unavailable" });
+  });
+});
+
+describe("Pattern replay D1 receipts", () => {
+  beforeEach(resetDb);
+
+  it("inserts every signed field and adopts an exact D1 replay", async () => {
+    const key = await testSigningKey();
+    const prepared = await writePatternReplayIntent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      intent(),
+      new Date("2026-08-22T14:40:00.000Z"),
+    );
+
+    await env.DB.batch(prepared.receiptStatements(env));
+    await env.DB.batch(prepared.receiptStatements(env));
+
+    const row = await env.DB.prepare(
+      "SELECT * FROM pattern_erasure_replay_events WHERE event_id = ?",
+    ).bind(prepared.event.event_id).first<Record<string, unknown>>();
+    expect(row).toEqual({
+      event_id: prepared.event.event_id,
+      event_class: prepared.event.event_class,
+      occurred_at: prepared.event.occurred_at,
+      target_user_id: prepared.event.target_user_id,
+      chart_fingerprint_hash: prepared.event.chart_fingerprint_hash,
+      claim_id: prepared.event.claim_id,
+      generation_id: prepared.event.generation_id,
+      pattern_id: prepared.event.pattern_id,
+      ontology_version: prepared.event.ontology_version,
+      prior_claim_status: prepared.event.prior_claim_status,
+      next_claim_status: prepared.event.next_claim_status,
+      content_hash: prepared.event.content_hash,
+      signing_key_id: prepared.event.signing_key_id,
+      signature: prepared.event.signature,
+      replica_put_at: prepared.replicaPutAt,
+      created_at: prepared.replicaPutAt,
+    });
+  });
+
+  it("arms assertion_probe and rolls back a lifecycle batch on receipt mismatch", async () => {
+    const key = await testSigningKey();
+    const prepared = await writePatternReplayIntent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      intent(),
+      new Date("2026-08-22T14:41:00.000Z"),
+    );
+    await env.DB.batch(prepared.receiptStatements(env));
+    await env.DB.prepare(
+      `UPDATE pattern_erasure_replay_events
+       SET target_user_id = ? WHERE event_id = ?`,
+    ).bind(
+      "usr_99999999999999999999999999999999",
+      prepared.event.event_id,
+    ).run();
+
+    await expect(env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO pattern_provider_daily_usage
+           (utc_date, used_calls, created_at, updated_at,
+            planner_calls, writer_calls, verifier_calls)
+         VALUES ('2026-08-22', 0, ?, ?, 0, 0, 0)`,
+      ).bind(prepared.replicaPutAt, prepared.replicaPutAt),
+      ...prepared.receiptStatements(env),
+    ])).rejects.toThrow();
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_provider_daily_usage",
+    ).first<{ count: number }>()).toEqual({ count: 0 });
+  });
+});
+
+describe("Pattern replay claim application", () => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+  });
+
+  async function claimEvent(
+    key: TestSigningKey,
+    priorClaimStatus: "available" | "reserved" = "reserved",
+  ) {
+    return writePatternReplayIntent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      intent({ targetUserId: USER_A, priorClaimStatus }),
+      new Date("2026-08-22T14:42:00.000Z"),
+    );
+  }
+
+  async function insertClaim(
+    status: "available" | "reserved" | "accepted" | "deleted",
+  ): Promise<void> {
+    const input = intent({ targetUserId: USER_A });
+    const consumedAt = status === "accepted" || status === "deleted"
+      ? "2026-08-22T14:00:00.000Z"
+      : null;
+    const activeGenerationId = status === "reserved" ? input.generationId : null;
+    await env.DB.prepare(
+      `INSERT INTO pattern_generation_claims (
+         id, user_id, chart_fingerprint_hash, last_chart_id, status,
+         active_generation_id, consumed_at, accepted_at, deleted_at,
+         created_at, updated_at
+       ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.claimId,
+      USER_A,
+      input.chartFingerprintHash,
+      status,
+      activeGenerationId,
+      consumedAt,
+      status === "accepted" ? consumedAt : null,
+      status === "deleted" ? consumedAt : null,
+      "2026-08-22T13:00:00.000Z",
+      "2026-08-22T14:00:00.000Z",
+    ).run();
+  }
+
+  it.each(["available", "reserved"] as const)(
+    "moves a restored %s claim only forward and adopts an exact replay",
+    async (status) => {
+      const key = await testSigningKey();
+      await insertClaim(status);
+      const prepared = await claimEvent(key, status);
+      const configured = replayEnv(writerSecret(key), publicKeyring(key));
+
+      await expect(applyPatternReplayEvent(
+        configured,
+        prepared.event,
+        new Date(prepared.replicaPutAt),
+      )).resolves.toBe("applied");
+      await expect(applyPatternReplayEvent(
+        configured,
+        prepared.event,
+        new Date(prepared.replicaPutAt),
+      )).resolves.toBe("replay");
+
+      expect(await env.DB.prepare(
+        `SELECT status, active_generation_id, consumed_at, accepted_at
+         FROM pattern_generation_claims WHERE id = ?`,
+      ).bind(prepared.event.claim_id).first()).toEqual({
+        status: "accepted",
+        active_generation_id: null,
+        consumed_at: prepared.event.occurred_at,
+        accepted_at: prepared.event.occurred_at,
+      });
+    },
+  );
+
+  it("leaves an already-terminal claim terminal", async () => {
+    const key = await testSigningKey();
+    await insertClaim("deleted");
+    const prepared = await claimEvent(key);
+
+    await applyPatternReplayEvent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    );
+
+    expect(await env.DB.prepare(
+      "SELECT status, deleted_at FROM pattern_generation_claims WHERE id = ?",
+    ).bind(prepared.event.claim_id).first()).toEqual({
+      status: "deleted",
+      deleted_at: "2026-08-22T14:00:00.000Z",
+    });
+  });
+
+  it("inserts a pinned terminal tombstone for an absent claim when the user exists", async () => {
+    const key = await testSigningKey();
+    const prepared = await claimEvent(key, "available");
+
+    await applyPatternReplayEvent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    );
+
+    expect(await env.DB.prepare(
+      `SELECT user_id, chart_fingerprint_hash, status, consumed_at,
+              active_generation_id
+       FROM pattern_generation_claims WHERE id = ?`,
+    ).bind(prepared.event.claim_id).first()).toEqual({
+      user_id: USER_A,
+      chart_fingerprint_hash: prepared.event.chart_fingerprint_hash,
+      status: "accepted",
+      consumed_at: prepared.event.occurred_at,
+      active_generation_id: null,
+    });
+  });
+});
+
+describe("Pattern replay erasure application", () => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+  });
+
+  async function seedAcceptedPattern(): Promise<void> {
+    const input = intent({ targetUserId: USER_A });
+    const at = "2026-08-22T14:00:00.000Z";
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO pattern_generation_claims (
+           id, user_id, chart_fingerprint_hash, status, active_generation_id,
+           consumed_at, accepted_at, created_at, updated_at
+         ) VALUES (?, ?, ?, 'accepted', NULL, ?, ?, ?, ?)`,
+      ).bind(input.claimId, USER_A, input.chartFingerprintHash, at, at, at, at),
+      env.DB.prepare(
+        `INSERT INTO jobs (
+           id, job_type, user_id, idempotency_key, status, created_at
+         ) VALUES ('job_replay_pattern', 'generate_pattern', ?,
+                   'replay-pattern-fixture', 'succeeded', ?)`,
+      ).bind(USER_A, at),
+      env.DB.prepare(
+        `INSERT INTO pattern_generation_jobs (
+           generation_id, job_id, user_id, claim_id, chart_id,
+           chart_fingerprint_hash, feature_set_id, feature_set_hash,
+           feature_policy_version, selection_policy_version, locale,
+           locale_revision, consent_id, consent_policy_version,
+           ontology_version, ontology_bundle_hash, corpus_release_hash,
+           reservation_reason, stage, stage_generation, created_at, updated_at,
+           finished_at
+         ) VALUES (?, 'job_replay_pattern', ?, ?, 'cht_replay_pattern', ?,
+                   'nfs_replay_pattern', ?, '1.0.0', '1.0.0', 'en-US', 1,
+                   'cns_replay_pattern', '1.0.0', ?, ?, ?, 'first_open',
+                   'succeeded', 1, ?, ?, ?)`,
+      ).bind(
+        input.generationId,
+        USER_A,
+        input.claimId,
+        input.chartFingerprintHash,
+        `sha256:${"5".repeat(64)}`,
+        input.ontologyVersion,
+        `sha256:${"6".repeat(64)}`,
+        `sha256:${"7".repeat(64)}`,
+        at,
+        at,
+        at,
+      ),
+      env.DB.prepare(
+        `INSERT INTO pattern_generation_artifact_keys (
+           generation_id, user_id, wrapped_key_enc, wrapped_key_version,
+           wrapped_key_nonce, created_at, erased_at
+         ) VALUES (?, ?, ?, 1, 'nonce', ?, NULL)`,
+      ).bind(input.generationId, USER_A, new Uint8Array([1, 2, 3]), at),
+      env.DB.prepare(
+        `INSERT INTO pattern_documents (
+           id, user_id, claim_id, generation_id, chart_fingerprint_hash,
+           ontology_version, ontology_bundle_hash, locale, effective_accuracy,
+           document_enc, document_nonce, wrapped_document_key_enc,
+           wrapped_document_key_version, wrapped_document_key_nonce,
+           content_hash, compact_provenance_json, generated_at, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'en-US', 'exact', ?, 'document-nonce',
+                   ?, 1, 'wrapped-nonce', ?, '{}', ?, ?)`,
+      ).bind(
+        input.patternId,
+        USER_A,
+        input.claimId,
+        input.generationId,
+        input.chartFingerprintHash,
+        input.ontologyVersion,
+        `sha256:${"6".repeat(64)}`,
+        new Uint8Array([4, 5, 6]),
+        new Uint8Array([7, 8, 9]),
+        `sha256:${"8".repeat(64)}`,
+        at,
+        at,
+      ),
+    ]);
+  }
+
+  it.each([
+    ["pattern_deleted", "deleted"],
+    ["chart_correction_erased", "superseded"],
+    ["pattern_withdrawn", "withdrawn"],
+  ] as const)(
+    "%s erases the restored document and key and pins the claim %s",
+    async (eventClass, nextClaimStatus) => {
+      await seedAcceptedPattern();
+      const key = await testSigningKey();
+      const prepared = await writePatternReplayIntent(
+        replayEnv(writerSecret(key), publicKeyring(key)),
+        intent({
+          eventClass,
+          semanticOperationKey: `replay-erasure:${eventClass}`,
+          targetUserId: USER_A,
+          priorClaimStatus: "accepted",
+          nextClaimStatus,
+        }),
+        new Date("2026-08-22T14:43:00.000Z"),
+      );
+
+      await applyPatternReplayEvent(
+        replayEnv(writerSecret(key), publicKeyring(key)),
+        prepared.event,
+        new Date(prepared.replicaPutAt),
+      );
+
+      expect(await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM pattern_documents",
+      ).first()).toEqual({ count: 0 });
+      expect(await env.DB.prepare(
+        `SELECT wrapped_key_enc, wrapped_key_version, wrapped_key_nonce, erased_at
+         FROM pattern_generation_artifact_keys WHERE generation_id = ?`,
+      ).bind(prepared.event.generation_id).first()).toEqual({
+        wrapped_key_enc: null,
+        wrapped_key_version: null,
+        wrapped_key_nonce: null,
+        erased_at: prepared.event.occurred_at,
+      });
+      expect(await env.DB.prepare(
+        "SELECT status, active_generation_id FROM pattern_generation_claims WHERE id = ?",
+      ).bind(prepared.event.claim_id).first()).toEqual({
+        status: nextClaimStatus,
+        active_generation_id: null,
+      });
+    },
+  );
+});
+
+describe("Pattern replay ontology recall application", () => {
+  beforeEach(resetDb);
+
+  async function recallEvent(key: TestSigningKey, version: string) {
+    return writePatternReplayIntent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      intent({
+        eventClass: "ontology_recalled",
+        semanticOperationKey: version,
+        targetUserId: null,
+        chartFingerprintHash: null,
+        claimId: null,
+        generationId: null,
+        patternId: null,
+        ontologyVersion: version,
+        priorClaimStatus: null,
+        nextClaimStatus: null,
+      }),
+      new Date("2026-08-22T14:44:00.000Z"),
+    );
+  }
+
+  it("recalls an existing release and clears its active pointer", async () => {
+    const version = "ontology-replay-existing";
+    const at = "2026-08-22T14:00:00.000Z";
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO pattern_ontology_releases (
+           version, bundle_hash, corpus_release_hash, locale, status,
+           object_key, evaluation_json, created_at, recalled_at
+         ) VALUES (?, ?, ?, 'en-US', 'active', ?, '{}', ?, NULL)`,
+      ).bind(
+        version,
+        `sha256:${"a".repeat(64)}`,
+        `sha256:${"b".repeat(64)}`,
+        `pattern-ontology/${version}.json`,
+        at,
+      ),
+      env.DB.prepare(
+        "UPDATE pattern_ontology_pointer SET active_version = ?, updated_at = ? WHERE id = 1",
+      ).bind(version, at),
+    ]);
+    const key = await testSigningKey();
+    const prepared = await recallEvent(key, version);
+
+    await applyPatternReplayEvent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    );
+
+    expect(await env.DB.prepare(
+      "SELECT status, recalled_at FROM pattern_ontology_releases WHERE version = ?",
+    ).bind(version).first()).toEqual({
+      status: "recalled",
+      recalled_at: prepared.event.occurred_at,
+    });
+    expect(await env.DB.prepare(
+      "SELECT active_version FROM pattern_ontology_pointer WHERE id = 1",
+    ).first()).toEqual({ active_version: null });
+  });
+
+  it("retains an absent-release tombstone and refuses later ingestion", async () => {
+    const version = "ontology-replay-pre-release";
+    const key = await testSigningKey();
+    const prepared = await recallEvent(key, version);
+    const configured = replayEnv(writerSecret(key), publicKeyring(key));
+    await applyPatternReplayEvent(
+      configured,
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    );
+
+    expect(await env.DB.prepare(
+      `SELECT event_class, ontology_version
+       FROM pattern_erasure_replay_events WHERE event_id = ?`,
+    ).bind(prepared.event.event_id).first()).toEqual({
+      event_class: "ontology_recalled",
+      ontology_version: version,
+    });
+    const release = syntheticOntologyRelease(version);
+    const bundleHash = await computeOntologyBundleHash(release);
+    await expect(storeOntologyRelease(
+      configured,
+      { ...release, bundle_hash: bundleHash },
+      `pattern-ontology/${version}.json`,
+    )).rejects.toThrow("ontology_version_recalled");
+  });
+});
+
+describe("Pattern replay replica sweep", () => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+  });
+
+  it("verifies, applies, and then idempotently replays the complete replica", async () => {
+    const key = await testSigningKey();
+    const configured = replayEnv(writerSecret(key), publicKeyring(key));
+    const prepared = await writePatternReplayIntent(
+      configured,
+      intent({ targetUserId: USER_A, priorClaimStatus: "available" }),
+      new Date("2026-08-22T14:45:00.000Z"),
+    );
+
+    await expect(applyPatternReplayReplica(
+      configured,
+      new Date("2026-08-22T14:46:00.000Z"),
+    )).resolves.toEqual({ listed: 1, applied: 1, replayed: 0 });
+    await expect(applyPatternReplayReplica(
+      configured,
+      new Date("2026-08-22T14:47:00.000Z"),
+    )).resolves.toEqual({ listed: 1, applied: 0, replayed: 1 });
+    expect(await env.DB.prepare(
+      "SELECT status FROM pattern_generation_claims WHERE id = ?",
+    ).bind(prepared.event.claim_id).first()).toEqual({ status: "accepted" });
+  });
+
+  it("verifies every listed object before making any D1 change", async () => {
+    const key = await testSigningKey();
+    const configured = replayEnv(writerSecret(key), publicKeyring(key));
+    const prepared = await writePatternReplayIntent(
+      configured,
+      intent({ targetUserId: USER_A, priorClaimStatus: "available" }),
+      new Date("2026-08-22T14:48:00.000Z"),
+    );
+    await env.PATTERN_REPLAY_LEDGER!.put(
+      `pattern-erasure-replay/prel_${"f".repeat(32)}.json`,
+      "{}",
+    );
+
+    await expect(applyPatternReplayReplica(configured))
+      .rejects.toMatchObject({ code: "replay_replica_integrity" });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_generation_claims WHERE id = ?",
+    ).bind(prepared.event.claim_id).first()).toEqual({ count: 0 });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_erasure_replay_events",
+    ).first()).toEqual({ count: 0 });
   });
 });

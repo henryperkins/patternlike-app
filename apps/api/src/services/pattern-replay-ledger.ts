@@ -74,11 +74,70 @@ export interface PatternReplayIntentInput {
   > | null;
 }
 
-export interface PreparedPatternReplayEvent {
-  event: PatternErasureReplayEvent;
-  objectKey: string;
-  canonicalBytes: string;
-  replicaPutAt: string;
+export class PreparedPatternReplayEvent {
+  constructor(
+    readonly event: PatternErasureReplayEvent,
+    readonly objectKey: string,
+    readonly canonicalBytes: string,
+    readonly replicaPutAt: string,
+  ) {}
+
+  receiptStatements(
+    env: Pick<Env, "DB">,
+  ): D1PreparedStatement[] {
+    const event = this.event;
+    const values = [
+      event.event_id,
+      event.event_class,
+      event.occurred_at,
+      event.target_user_id,
+      event.chart_fingerprint_hash,
+      event.claim_id,
+      event.generation_id,
+      event.pattern_id,
+      event.ontology_version,
+      event.prior_claim_status,
+      event.next_claim_status,
+      event.content_hash,
+      event.signing_key_id,
+      event.signature,
+      this.replicaPutAt,
+      this.replicaPutAt,
+    ] as const;
+    return [
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO pattern_erasure_replay_events (
+           event_id, event_class, occurred_at, target_user_id,
+           chart_fingerprint_hash, claim_id, generation_id, pattern_id,
+           ontology_version, prior_claim_status, next_claim_status,
+           content_hash, signing_key_id, signature, replica_put_at, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(...values),
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'Pattern replay receipt did not converge'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM pattern_erasure_replay_events
+           WHERE event_id IS ?
+             AND event_class IS ?
+             AND occurred_at IS ?
+             AND target_user_id IS ?
+             AND chart_fingerprint_hash IS ?
+             AND claim_id IS ?
+             AND generation_id IS ?
+             AND pattern_id IS ?
+             AND ontology_version IS ?
+             AND prior_claim_status IS ?
+             AND next_claim_status IS ?
+             AND content_hash IS ?
+             AND signing_key_id IS ?
+             AND signature IS ?
+             AND replica_put_at IS ?
+             AND created_at IS ?
+         )`,
+      ).bind(...values),
+    ];
+  }
 }
 
 export class PatternReplayLedgerError extends Error {
@@ -408,12 +467,12 @@ async function readReplicaEvent(
     fail("replay_replica_integrity");
   }
   if (jcsCanonicalize(event) !== bytes) fail("replay_replica_integrity");
-  return {
+  return new PreparedPatternReplayEvent(
     event,
     objectKey,
-    canonicalBytes: bytes,
-    replicaPutAt: object.uploaded.toISOString(),
-  };
+    bytes,
+    object.uploaded.toISOString(),
+  );
 }
 
 async function adoptReplicaEvent(
@@ -507,4 +566,390 @@ export async function writePatternReplayIntent(
   );
   if (!stored) fail("replay_replica_unavailable");
   return stored;
+}
+
+function terminalClaimTimestamp(
+  status: PatternErasureReplayEvent["next_claim_status"],
+  expected: Exclude<PatternReplayClaimStatus, "available" | "reserved">,
+  occurredAt: string,
+): string | null {
+  return status === expected ? occurredAt : null;
+}
+
+async function existingReplicaPutAt(
+  env: Pick<Env, "DB">,
+  eventId: string,
+): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT replica_put_at FROM pattern_erasure_replay_events
+     WHERE event_id = ?`,
+  ).bind(eventId).first<{ replica_put_at: string }>();
+  return row?.replica_put_at ?? null;
+}
+
+function claimReplayStatements(
+  env: Pick<Env, "DB">,
+  event: PatternErasureReplayEvent,
+  includeAccepted: boolean,
+): D1PreparedStatement[] {
+  const acceptedAt = terminalClaimTimestamp(
+    event.next_claim_status,
+    "accepted",
+    event.occurred_at,
+  );
+  const deletedAt = terminalClaimTimestamp(
+    event.next_claim_status,
+    "deleted",
+    event.occurred_at,
+  );
+  const supersededAt = terminalClaimTimestamp(
+    event.next_claim_status,
+    "superseded",
+    event.occurred_at,
+  );
+  const withdrawnAt = terminalClaimTimestamp(
+    event.next_claim_status,
+    "withdrawn",
+    event.occurred_at,
+  );
+  return [
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO pattern_generation_claims (
+         id, user_id, chart_fingerprint_hash, last_chart_id, status,
+         active_generation_id, consumed_at, accepted_at, deleted_at,
+         superseded_at, withdrawn_at, created_at, updated_at
+       )
+       SELECT ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)`,
+    ).bind(
+      event.claim_id,
+      event.target_user_id,
+      event.chart_fingerprint_hash,
+      event.next_claim_status,
+      event.occurred_at,
+      acceptedAt,
+      deletedAt,
+      supersededAt,
+      withdrawnAt,
+      event.occurred_at,
+      event.occurred_at,
+      event.target_user_id,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_generation_claims
+       SET status = ?, active_generation_id = NULL,
+           consumed_at = COALESCE(consumed_at, ?),
+           accepted_at = COALESCE(accepted_at, ?),
+           deleted_at = COALESCE(deleted_at, ?),
+           superseded_at = COALESCE(superseded_at, ?),
+           withdrawn_at = COALESCE(withdrawn_at, ?),
+           updated_at = ?
+       WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
+         AND status IN (${includeAccepted
+    ? "'available', 'reserved', 'accepted'"
+    : "'available', 'reserved'"})`,
+    ).bind(
+      event.next_claim_status,
+      event.occurred_at,
+      acceptedAt,
+      deletedAt,
+      supersededAt,
+      withdrawnAt,
+      event.occurred_at,
+      event.claim_id,
+      event.target_user_id,
+      event.chart_fingerprint_hash,
+    ),
+  ];
+}
+
+function erasureReplayStatements(
+  env: Pick<Env, "DB">,
+  event: PatternErasureReplayEvent,
+): D1PreparedStatement[] {
+  return [
+    env.DB.prepare(
+      `DELETE FROM pattern_documents
+       WHERE user_id = ? AND claim_id = ?
+         AND (? IS NULL OR generation_id = ?)
+         AND (? IS NULL OR id = ?)`,
+    ).bind(
+      event.target_user_id,
+      event.claim_id,
+      event.generation_id,
+      event.generation_id,
+      event.pattern_id,
+      event.pattern_id,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_generation_artifact_keys
+       SET wrapped_key_enc = NULL, wrapped_key_version = NULL,
+           wrapped_key_nonce = NULL, erased_at = COALESCE(erased_at, ?)
+       WHERE user_id = ? AND erased_at IS NULL
+         AND (
+           (? IS NOT NULL AND generation_id = ?)
+           OR (
+             ? IS NULL
+             AND generation_id IN (
+               SELECT generation_id FROM pattern_generation_jobs
+               WHERE claim_id = ? AND user_id = ?
+             )
+           )
+         )`,
+    ).bind(
+      event.occurred_at,
+      event.target_user_id,
+      event.generation_id,
+      event.generation_id,
+      event.generation_id,
+      event.claim_id,
+      event.target_user_id,
+    ),
+  ];
+}
+
+function claimReplayConvergenceStatement(
+  env: Pick<Env, "DB">,
+  event: PatternErasureReplayEvent,
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO assertion_probe (id, reason)
+     SELECT 1, 'Pattern claim replay did not converge'
+     WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)
+       AND NOT EXISTS (
+         SELECT 1 FROM pattern_generation_claims
+         WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
+           AND status IN ('accepted', 'deleted', 'superseded', 'withdrawn')
+           AND consumed_at IS NOT NULL
+           AND active_generation_id IS NULL
+       )`,
+  ).bind(
+    event.target_user_id,
+    event.claim_id,
+    event.target_user_id,
+    event.chart_fingerprint_hash,
+  );
+}
+
+function erasureReplayConvergenceStatement(
+  env: Pick<Env, "DB">,
+  event: PatternErasureReplayEvent,
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO assertion_probe (id, reason)
+     SELECT 1, 'Pattern erasure replay did not converge'
+     WHERE EXISTS (
+       SELECT 1 FROM pattern_documents
+       WHERE user_id = ? AND claim_id = ?
+         AND (? IS NULL OR generation_id = ?)
+         AND (? IS NULL OR id = ?)
+     ) OR EXISTS (
+       SELECT 1 FROM pattern_generation_artifact_keys
+       WHERE user_id = ? AND erased_at IS NULL
+         AND (
+           (? IS NOT NULL AND generation_id = ?)
+           OR (
+             ? IS NULL
+             AND generation_id IN (
+               SELECT generation_id FROM pattern_generation_jobs
+               WHERE claim_id = ? AND user_id = ?
+             )
+           )
+         )
+     )`,
+  ).bind(
+    event.target_user_id,
+    event.claim_id,
+    event.generation_id,
+    event.generation_id,
+    event.pattern_id,
+    event.pattern_id,
+    event.target_user_id,
+    event.generation_id,
+    event.generation_id,
+    event.generation_id,
+    event.claim_id,
+    event.target_user_id,
+  );
+}
+
+function ontologyRecallReplayStatements(
+  env: Pick<Env, "DB">,
+  event: PatternErasureReplayEvent,
+): D1PreparedStatement[] {
+  return [
+    env.DB.prepare(
+      `UPDATE pattern_ontology_releases
+       SET status = 'recalled', recalled_at = COALESCE(recalled_at, ?)
+       WHERE version = ? AND status IN ('candidate', 'active', 'superseded')`,
+    ).bind(event.occurred_at, event.ontology_version),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pointer
+       SET active_version = NULL, updated_at = ?
+       WHERE id = 1 AND active_version = ?`,
+    ).bind(event.occurred_at, event.ontology_version),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO pattern_ontology_recall_events (
+         id, ontology_version, reason_class, created_at
+       )
+       SELECT ?, ?, 'replay_ledger', ?
+       WHERE EXISTS (
+         SELECT 1 FROM pattern_ontology_releases WHERE version = ?
+       )`,
+    ).bind(
+      event.event_id,
+      event.ontology_version,
+      event.occurred_at,
+      event.ontology_version,
+    ),
+  ];
+}
+
+function ontologyRecallConvergenceStatement(
+  env: Pick<Env, "DB">,
+  event: PatternErasureReplayEvent,
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO assertion_probe (id, reason)
+     SELECT 1, 'Pattern ontology recall replay did not converge'
+     WHERE EXISTS (
+       SELECT 1 FROM pattern_ontology_pointer
+       WHERE id = 1 AND active_version = ?
+     ) OR EXISTS (
+       SELECT 1 FROM pattern_ontology_releases
+       WHERE version = ? AND status != 'recalled'
+     )`,
+  ).bind(event.ontology_version, event.ontology_version);
+}
+
+/** Apply one already-signed event without ever assigning an available claim. */
+export async function applyPatternReplayEvent(
+  env: Env,
+  event: PatternErasureReplayEvent,
+  appliedAt = new Date(),
+): Promise<"applied" | "replay"> {
+  if (!Number.isFinite(appliedAt.getTime())) fail("replay_event_apply_invalid");
+  const verified = await verifyPatternReplayEvent(
+    event,
+    env.PATTERN_REPLAY_LEDGER_KEYS,
+  );
+  const erasure = verified.event_class === "pattern_deleted" ||
+    verified.event_class === "chart_correction_erased" ||
+    verified.event_class === "pattern_withdrawn";
+  const ontologyRecall = verified.event_class === "ontology_recalled";
+  if (verified.event_class !== "claim_consumed" && !erasure && !ontologyRecall) {
+    fail("replay_event_apply_unsupported");
+  }
+  const priorReplicaPutAt = await existingReplicaPutAt(env, verified.event_id);
+  const receipt = new PreparedPatternReplayEvent(
+    verified,
+    patternReplayObjectKey(verified.event_id),
+    jcsCanonicalize(verified),
+    priorReplicaPutAt ?? appliedAt.toISOString(),
+  );
+  if (ontologyRecall) {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'Pattern ontology recall replay precondition failed'
+         WHERE ? != 'ontology_recalled' OR ? IS NULL OR ? IS NOT NULL`,
+      ).bind(
+        verified.event_class,
+        verified.ontology_version,
+        verified.next_claim_status,
+      ),
+      ...ontologyRecallReplayStatements(env, verified),
+      ...receipt.receiptStatements(env),
+      ontologyRecallConvergenceStatement(env, verified),
+    ]);
+    return priorReplicaPutAt === null ? "applied" : "replay";
+  }
+  const finalAssertions = [claimReplayConvergenceStatement(env, verified)];
+  if (erasure) {
+    finalAssertions.push(erasureReplayConvergenceStatement(env, verified));
+  }
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'Pattern replay precondition failed'
+       WHERE ? NOT IN (
+         'claim_consumed', 'pattern_deleted',
+         'chart_correction_erased', 'pattern_withdrawn'
+       )
+          OR ? IS NULL OR ? IS NULL OR ? IS NULL OR ? IS NULL`,
+    ).bind(
+      verified.event_class,
+      verified.target_user_id,
+      verified.chart_fingerprint_hash,
+      verified.claim_id,
+      verified.next_claim_status,
+    ),
+    ...(erasure ? erasureReplayStatements(env, verified) : []),
+    ...claimReplayStatements(env, verified, erasure),
+    ...receipt.receiptStatements(env),
+    ...finalAssertions,
+  ]);
+  return priorReplicaPutAt === null ? "applied" : "replay";
+}
+
+/** Verify the whole external replica before applying any ordered event. */
+export async function applyPatternReplayReplica(
+  env: Env,
+  now = new Date(),
+): Promise<{ listed: number; applied: number; replayed: number }> {
+  if (!env.PATTERN_REPLAY_LEDGER || !Number.isFinite(now.getTime())) {
+    fail("replay_replica_unavailable");
+  }
+  const prepared: PreparedPatternReplayEvent[] = [];
+  const eventIds = new Set<string>();
+  let cursor: string | undefined;
+  do {
+    let page: R2Objects;
+    try {
+      page = await env.PATTERN_REPLAY_LEDGER.list({
+        prefix: REPLAY_OBJECT_PREFIX,
+        cursor,
+      });
+    } catch {
+      fail("replay_replica_unavailable");
+    }
+    for (const object of page.objects) {
+      const stored = await readReplicaEvent(
+        env.PATTERN_REPLAY_LEDGER,
+        object.key,
+        env.PATTERN_REPLAY_LEDGER_KEYS,
+      );
+      if (
+        !stored ||
+        stored.objectKey !== patternReplayObjectKey(stored.event.event_id) ||
+        eventIds.has(stored.event.event_id)
+      ) {
+        fail("replay_replica_integrity");
+      }
+      eventIds.add(stored.event.event_id);
+      prepared.push(stored);
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+
+  prepared.sort((left, right) => {
+    const leftAccount = left.event.event_class === "account_deleted" ? 1 : 0;
+    const rightAccount = right.event.event_class === "account_deleted" ? 1 : 0;
+    if (leftAccount !== rightAccount) return leftAccount - rightAccount;
+    return left.event.occurred_at.localeCompare(right.event.occurred_at) ||
+      left.event.event_id.localeCompare(right.event.event_id);
+  });
+
+  let applied = 0;
+  let replayed = 0;
+  for (const item of prepared) {
+    const outcome = await applyPatternReplayEvent(
+      env,
+      item.event,
+      new Date(item.replicaPutAt),
+    );
+    if (outcome === "applied") applied += 1;
+    else replayed += 1;
+  }
+  return { listed: prepared.length, applied, replayed };
 }

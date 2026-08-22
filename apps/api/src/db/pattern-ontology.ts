@@ -332,6 +332,10 @@ export async function storeOntologyRelease(
       `INSERT INTO assertion_probe (id, reason)
        SELECT 1, 'ontology version recalled or immutable'
        WHERE EXISTS (
+         SELECT 1 FROM pattern_erasure_replay_events
+         WHERE event_class = 'ontology_recalled'
+           AND ontology_version = ?
+       ) OR EXISTS (
          SELECT 1
          FROM pattern_ontology_releases
          WHERE version = ?
@@ -344,6 +348,7 @@ export async function storeOntologyRelease(
            )
        )`,
     ).bind(
+      release.ontology_version,
       release.ontology_version,
       computed,
       release.corpus_release_hash,
@@ -572,6 +577,11 @@ export async function storeOntologyRelease(
   try {
     await env.DB.batch(statements);
   } catch (cause) {
+    const recallTombstone = await env.DB.prepare(
+      `SELECT 1 AS present FROM pattern_erasure_replay_events
+       WHERE event_class = 'ontology_recalled' AND ontology_version = ?
+       LIMIT 1`,
+    ).bind(release.ontology_version).first<{ present: number }>();
     const raced = await env.DB.prepare(
       `SELECT bundle_hash, corpus_release_hash, locale, object_key, status
        FROM pattern_ontology_releases WHERE version = ?`,
@@ -584,7 +594,7 @@ export async function storeOntologyRelease(
         object_key: string;
         status: string;
       }>();
-    if (raced?.status === "recalled") {
+    if (recallTombstone || raced?.status === "recalled") {
       throw new Error("ontology_version_recalled");
     }
     if (
