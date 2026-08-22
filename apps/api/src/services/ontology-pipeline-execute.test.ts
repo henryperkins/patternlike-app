@@ -2,10 +2,20 @@ import { env } from "cloudflare:test";
 import {
   canonicalJson,
   contentHash,
+  type PatternFactPacket,
   type PatternOntologyRecord,
   type PatternOntologyRelease,
+  type PatternPlan,
+  type PatternSemanticVerdict,
+  type PatternTransformationClass,
+  type PatternWriterOutput,
 } from "@patternlike/shared";
-import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
+import {
+  buildDeterministicPlan,
+  buildDeterministicWriterOutput,
+  ontologyRecordMatchesFeature,
+  syntheticOntologyRelease,
+} from "@patternlike/pattern-engine";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -38,7 +48,19 @@ import {
   executeOntologyPipelineDelivery,
   type OntologyPipelineExecuteOutcome,
 } from "./ontology-pipeline-execute.js";
-import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
+import {
+  loadOntologyRegressionCorpus,
+} from "./ontology-regression.js";
+import type {
+  PatternPassOptions as RuntimePatternPassOptions,
+  PatternPassOutcome as RuntimePatternPassOutcome,
+  PatternPublisher,
+} from "./pattern-publisher.js";
+import { evaluateSemanticVerdict } from "./pattern-semantic.js";
+import {
+  computeOntologyBundleHash,
+  type SignedOntologyRelease,
+} from "./pattern-ontology-verify.js";
 
 interface PublisherFailureFixture {
   code:
@@ -107,6 +129,118 @@ class FakeOntologyPublisher implements OntologyPublisher {
     if (!fixture) throw new Error("missing evaluator fixture");
     if ("code" in fixture) return providerFailure(fixture);
     return providerSuccess("evaluator", fixture, this.evaluatorProviderCalls);
+  }
+}
+
+class FakeRegressionPatternPublisher implements PatternPublisher {
+  readonly planInvocations = vi.fn();
+  readonly writeInvocations = vi.fn();
+  readonly verifyInvocations = vi.fn();
+  providerCalls = 0;
+  private packet: PatternFactPacket | null = null;
+
+  constructor(
+    private readonly mutateWriter?: (writer: PatternWriterOutput) => void,
+    private readonly mismatchedRawPass?: "planner" | "writer" | "verifier",
+  ) {}
+
+  private async success<T>(
+    pass: "planner" | "writer" | "verifier",
+    value: T,
+    options: RuntimePatternPassOptions,
+  ): Promise<RuntimePatternPassOutcome<T>> {
+    const reserved = await options.reserve(pass);
+    if (!reserved.ok) {
+      return {
+        ok: false,
+        code: "publisher_budget_exhausted",
+        safe_detail_code: "daily_call_limit_reached",
+        retry_after_seconds: null,
+        origin_layer: "none",
+      };
+    }
+    this.providerCalls += 1;
+    const rawValue = pass === this.mismatchedRawPass ? {} : value;
+    const raw = JSON.stringify({
+      id: `resp_regression_${this.providerCalls}`,
+      output: [{
+        type: "message",
+        content: [{ type: "output_text", text: JSON.stringify(rawValue) }],
+      }],
+      usage: { input_tokens: 13, output_tokens: 8 },
+    });
+    return {
+      ok: true,
+      value,
+      raw,
+      metadata: {
+        provider: "openai",
+        pass,
+        model: options.pin[`${pass}_model`],
+        prompt_version: options.pin[`${pass}_prompt_version`],
+        provider_request_id: `resp_regression_${this.providerCalls}`,
+        input_tokens: 13,
+        output_tokens: 8,
+        provider_response_hash: await contentHash(raw),
+      },
+    };
+  }
+
+  async plan(
+    input: unknown,
+    options: RuntimePatternPassOptions,
+  ): Promise<RuntimePatternPassOutcome<PatternPlan>> {
+    this.planInvocations(input, options);
+    const document = input as {
+      packet: PatternFactPacket;
+      ontology_records: PatternOntologyRecord[];
+    };
+    this.packet = document.packet;
+    const planner = buildDeterministicPlan(
+      document.packet,
+      document.ontology_records,
+    );
+    return this.success(
+      "planner",
+      {
+        ...planner,
+        plan_hash: await contentHash(JSON.stringify(planner)),
+        sparse_pattern: document.packet.selection_constraints.sparse_pattern,
+      },
+      options,
+    );
+  }
+
+  async write(
+    input: unknown,
+    options: RuntimePatternPassOptions,
+  ): Promise<RuntimePatternPassOutcome<PatternWriterOutput>> {
+    this.writeInvocations(input, options);
+    const document = input as {
+      plan: PatternPlan;
+      ontology_records: PatternOntologyRecord[];
+    };
+    if (!this.packet) throw new Error("planner packet missing");
+    const writer = buildDeterministicWriterOutput(
+      document.plan,
+      this.packet,
+      document.ontology_records,
+    );
+    this.mutateWriter?.(writer);
+    return this.success("writer", writer, options);
+  }
+
+  async verify(
+    input: unknown,
+    options: RuntimePatternPassOptions,
+  ): Promise<RuntimePatternPassOutcome<PatternSemanticVerdict>> {
+    this.verifyInvocations(input, options);
+    const document = input as { candidate: PatternWriterOutput };
+    return this.success(
+      "verifier",
+      evaluateSemanticVerdict(document.candidate, { forceReject: false }),
+      options,
+    );
   }
 }
 
@@ -316,6 +450,7 @@ async function reserveFixture(
   options: {
     dailyLimit?: number;
     clockStartMs?: number;
+    allowedTransformations?: PatternTransformationClass[];
   } = {},
 ): Promise<ReservedFixture> {
   const suffix = crypto.randomUUID();
@@ -325,6 +460,13 @@ async function reserveFixture(
     "en-US",
     "internal_synthetic",
   );
+  if (options.allowedTransformations) {
+    manifest.fragments[0]!.allowed_transformations = [
+      ...options.allowedTransformations,
+    ];
+    const { corpus_hash: _corpusHash, ...body } = manifest;
+    manifest.corpus_hash = await contentHash(canonicalJson(body));
+  }
   await registerOntologyCorpus(env, manifest);
   const { queue } = fakeQueue();
   const pipelineEnv = configuredEnv(queue, {
@@ -352,11 +494,95 @@ async function reserveFixture(
   };
 }
 
+async function reserveActivationFixture(): Promise<ReservedFixture> {
+  const fixture = await reserveFixture({
+    allowedTransformations: [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range",
+      "shared_motif",
+    ],
+  });
+  const regression = loadOntologyRegressionCorpus();
+  const sourceId = fixture.manifest.fragments[0]!.id;
+  const sourceTemplates = regression.manifest.reference_ontology_records.filter(
+    (record) => record.meaning_class === "source_supported",
+  );
+  const sourceRecords: PatternOntologyRecord[] = [];
+  const sourceIdByTemplate = new Map<string, string>();
+  const seenPredicates = new Set<string>();
+  for (const activationFixture of regression.fixtures) {
+    for (const feature of activationFixture.features) {
+      const template = sourceTemplates.find((record) =>
+        ontologyRecordMatchesFeature(record, feature));
+      // `aspect_chain` is the corpus's deliberate unsupported ontology gap.
+      if (!template) continue;
+      const predicate = feature.feature_class === "position"
+        ? { type: "position" as const, body: feature.body, house: 1 }
+        : feature.feature_class === "aspect"
+          ? {
+              type: "aspect" as const,
+              body_a: feature.body_a,
+              body_b: feature.body_b,
+              aspect: feature.aspect,
+            }
+          : feature.feature_class === "pattern"
+            ? { type: "pattern" as const, pattern: feature.pattern }
+            : feature.feature_class === "angle"
+              ? { type: "angle" as const, angle: feature.angle }
+              : feature.feature_class === "house_cusp"
+                ? { type: "house_cusp" as const, house: feature.house }
+                : {
+                    type: "uncertainty" as const,
+                    accuracy: feature.accuracy,
+                  };
+      const identity = canonicalJson(predicate);
+      if (seenPredicates.has(identity)) continue;
+      seenPredicates.add(identity);
+      const id = `ont_${(sourceRecords.length + 1).toString(16).padStart(32, "0")}`;
+      sourceRecords.push({
+        ...structuredClone(template),
+        id,
+        feature_predicate: predicate,
+        source_fragment_ids: [sourceId],
+      });
+      if (!sourceIdByTemplate.has(template.id)) {
+        sourceIdByTemplate.set(template.id, id);
+      }
+    }
+  }
+  const derived = regression.manifest.reference_ontology_records
+    .filter((record) => record.meaning_class === "derived_synthesis")
+    .map((record) => ({
+      ...structuredClone(record),
+      feature_predicate: { type: "position" as const, body: "sun" as const, house: 1 },
+      input_meaning_ids: record.input_meaning_ids.map((id) =>
+        sourceIdByTemplate.get(id) ?? id),
+    }));
+  fixture.records = [...sourceRecords, ...derived];
+  fixture.pipelineEnv = configuredEnv(
+    fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE,
+    {
+      PATTERN_ONTOLOGY_KEYS: JSON.stringify({
+        [env.TEST_ONTOLOGY_SIGNER_KEY_ID]: {
+          alg: "Ed25519",
+          public_key: env.TEST_ONTOLOGY_SIGNER_PUBLIC_KEY,
+        },
+      }),
+    },
+  );
+  return fixture;
+}
+
 async function runRow(runId: string): Promise<Record<string, unknown>> {
   return (await env.DB.prepare(
     `SELECT stage, stage_generation, stage_cursor, stage_attempt,
             failure_class, candidate_hash, compilation_report_hash,
-            evaluation_report_hash, failed_at, failed_artifact_expires_at,
+            evaluation_report_hash, regression_report_hash, bundle_hash,
+            failed_at, failed_artifact_expires_at,
             succeeded_at
      FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
   ).bind(runId).first<Record<string, unknown>>())!;
@@ -375,11 +601,12 @@ async function deliver(
   publisher: OntologyPublisher,
   message?: OntologyPipelineMessage,
   envOverride: Env = fixture.pipelineEnv,
+  patternPublisher?: PatternPublisher,
 ): Promise<OntologyPipelineExecuteOutcome> {
   return executeOntologyPipelineDelivery(
     envOverride,
     message ?? await currentMessage(fixture.runId),
-    { publisher, clock: fixture.clock.now },
+    { publisher, patternPublisher, clock: fixture.clock.now },
   );
 }
 
@@ -406,12 +633,17 @@ async function driveToEvaluating(
   publisher: OntologyPublisher,
 ): Promise<void> {
   await driveToGenerating(fixture, publisher);
-  expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
-  expect(await runRow(fixture.runId)).toMatchObject({
-    stage: "compiling",
-    stage_generation: 3,
-    stage_cursor: 0,
-    candidate_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+  const generated = await deliver(fixture, publisher);
+  const generatedRow = await runRow(fixture.runId);
+  expect(generatedRow.failure_class).toBeNull();
+  expect({ outcome: generated, row: generatedRow }).toMatchObject({
+    outcome: { status: "advanced" },
+    row: {
+      stage: "compiling",
+      stage_generation: 3,
+      stage_cursor: 0,
+      candidate_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+    },
   });
   expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
   expect(await runRow(fixture.runId)).toMatchObject({
@@ -420,6 +652,23 @@ async function driveToEvaluating(
     stage_cursor: 0,
     compilation_report_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
   });
+}
+
+async function driveActivationToRegression(): Promise<{
+  fixture: ReservedFixture;
+  publisher: FakeOntologyPublisher;
+}> {
+  const fixture = await reserveActivationFixture();
+  const publisher = new FakeOntologyPublisher(
+    [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+    fixture.records.map((record) => passingVerdict(record.id)),
+  );
+  await driveToEvaluating(fixture, publisher);
+  while ((await runRow(fixture.runId)).stage === "evaluating") {
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+  }
+  expect(await runRow(fixture.runId)).toMatchObject({ stage: "regressing" });
+  return { fixture, publisher };
 }
 
 function coordinate(
@@ -644,7 +893,7 @@ async function seedUnavailableMachinePredecessor(): Promise<string> {
   return objectKey;
 }
 
-describe("ontology pipeline execution prefix", () => {
+describe("ontology pipeline execution", () => {
   beforeEach(async () => {
     await env.DB.prepare("DELETE FROM pattern_ontology_provider_daily_usage").run();
   });
@@ -1814,45 +2063,309 @@ describe("ontology pipeline execution prefix", () => {
     ).bind(fixture.runId).first()).toEqual({ count: 0 });
   });
 
-  it("parks Task 7 stages before claim through more than sixteen recovery cycles", async () => {
-    const fixture = await reserveFixture();
-    const publisher = new FakeOntologyPublisher(
-      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
-      fixture.records.map((record) => passingVerdict(record.id)),
+  it("adopts a persisted regression response after a result-write crash without another call", async () => {
+    const { fixture, publisher } = await driveActivationToRegression();
+    const patternPublisher = new FakeRegressionPatternPublisher();
+    const coordinateRow = await runRow(fixture.runId);
+    const stageGeneration = coordinateRow.stage_generation as number;
+    const crashingEnv = configuredEnv(
+      fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE,
+      {
+        ARTIFACTS: failThirdArtifactPut(env.ARTIFACTS!),
+        PATTERN_ONTOLOGY_KEYS: fixture.pipelineEnv.PATTERN_ONTOLOGY_KEYS,
+      },
     );
-    await driveToEvaluating(fixture, publisher);
-    while ((await runRow(fixture.runId)).stage === "evaluating") {
-      await deliver(fixture, publisher);
-    }
-    const message = await currentMessage(fixture.runId);
-    const before = await runRow(fixture.runId);
-    const receiptsBefore = await env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM audit_events
-       WHERE resource_id = ? AND action = 'ontology_pipeline.claim_acquired'`,
-    ).bind(fixture.runId).first<{ count: number }>();
 
-    for (let cycle = 0; cycle < 17; cycle += 1) {
-      expect(await deliver(fixture, publisher, message)).toEqual({ status: "parked" });
-      expect(await env.DB.prepare(
-        `SELECT claim_token, lease_expires_at FROM pattern_ontology_pipeline_runs
-         WHERE run_id = ?`,
-      ).bind(fixture.runId).first()).toEqual({
-        claim_token: null,
-        lease_expires_at: null,
-      });
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      crashingEnv,
+      patternPublisher,
+    )).toEqual({ status: "retry", retryAfterSeconds: 301 });
+    expect(patternPublisher.providerCalls).toBe(1);
+    expect(await env.DB.prepare(
+      `SELECT artifact_class FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND stage_generation = ? ORDER BY artifact_class`,
+    ).bind(fixture.runId, stageGeneration).all()).toMatchObject({
+      results: [
+        { artifact_class: "regression_request" },
+        { artifact_class: "regression_response" },
+      ],
+    });
+
+    await releaseCrashedClaim(fixture.runId, fixture.clock.now());
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toMatchObject({ status: "advanced" });
+    expect(patternPublisher.providerCalls).toBe(1);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "regressing",
+      stage_cursor: 1,
+      stage_attempt: 0,
+    });
+    const state = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(
+        fixture.runId,
+        "regressing",
+        stageGeneration,
+        0,
+        "regression_result",
+      ),
+    );
+    expect(JSON.parse(new TextDecoder().decode(state!.plaintext))).toMatchObject({
+      phase: "writer",
+      provider_calls: 1,
+      planner_calls: 1,
+    });
+  }, 60_000);
+
+  it("refuses a regression value that does not match the exact provider response", async () => {
+    const { fixture, publisher } = await driveActivationToRegression();
+    const patternPublisher = new FakeRegressionPatternPublisher(
+      undefined,
+      "planner",
+    );
+
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "terminal" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "provider_response_invalid",
+      regression_report_hash: null,
+    });
+    expect(patternPublisher.providerCalls).toBe(1);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'regression_result'`,
+    ).bind(fixture.runId).first()).toEqual({ count: 0 });
+  }, 60_000);
+
+  it("treats a request-only regression crash as one ambiguous call and retries once", async () => {
+    const { fixture, publisher } = await driveActivationToRegression();
+    const patternPublisher = new FakeRegressionPatternPublisher();
+    const coordinateRow = await runRow(fixture.runId);
+    const stageGeneration = coordinateRow.stage_generation as number;
+    const crashingEnv = configuredEnv(
+      fixture.pipelineEnv.ONTOLOGY_PIPELINE_QUEUE,
+      {
+        ARTIFACTS: failSecondArtifactPut(env.ARTIFACTS!),
+        PATTERN_ONTOLOGY_KEYS: fixture.pipelineEnv.PATTERN_ONTOLOGY_KEYS,
+      },
+    );
+
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      crashingEnv,
+      patternPublisher,
+    )).toEqual({ status: "retry", retryAfterSeconds: 301 });
+    expect(patternPublisher.providerCalls).toBe(1);
+    await releaseCrashedClaim(fixture.runId, fixture.clock.now());
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "rescheduled", retryAfterSeconds: 60 });
+    expect(patternPublisher.providerCalls).toBe(1);
+    fixture.clock.advance(60_000);
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toMatchObject({ status: "advanced" });
+    expect(patternPublisher.providerCalls).toBe(2);
+    const state = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(
+        fixture.runId,
+        "regressing",
+        stageGeneration,
+        1,
+        "regression_result",
+      ),
+    );
+    expect(JSON.parse(new TextDecoder().decode(state!.plaintext))).toMatchObject({
+      phase: "writer",
+      provider_calls: 2,
+      planner_calls: 2,
+    });
+    expect(await env.DB.prepare(
+      `SELECT regression_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ regression_calls: 2 });
+  }, 60_000);
+
+  it("makes a prohibited claim hard-gate failure terminal before signing", async () => {
+    const { fixture, publisher } = await driveActivationToRegression();
+    const patternPublisher = new FakeRegressionPatternPublisher((writer) => {
+      writer.chapters[0]!.sections[0]!.text =
+        "This placement guarantees a future medical diagnosis.";
+    });
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toMatchObject({ status: "advanced" });
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toMatchObject({ status: "advanced" });
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "terminal" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "regression_failed",
+      regression_report_hash: null,
+      bundle_hash: null,
+    });
+    expect(patternPublisher.providerCalls).toBe(3);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class IN ('unsigned_bundle', 'signed_bundle')`,
+    ).bind(fixture.runId).first()).toEqual({ count: 0 });
+    const resultRow = await env.DB.prepare(
+      `SELECT stage_generation, stage_attempt FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'regression_result'
+       ORDER BY stage_generation DESC LIMIT 1`,
+    ).bind(fixture.runId).first<{
+      stage_generation: number;
+      stage_attempt: number;
+    }>();
+    const result = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(
+        fixture.runId,
+        "regressing",
+        resultRow!.stage_generation,
+        resultRow!.stage_attempt,
+        "regression_result",
+      ),
+    );
+    expect(JSON.parse(new TextDecoder().decode(result!.plaintext))).toMatchObject({
+      result: {
+        accepted: false,
+        hard_gate_failures: ["prohibited_claim"],
+      },
+    });
+  }, 60_000);
+
+  it("runs all 30 fixtures one provider pass per delivery, signs, and activates", async () => {
+    const { fixture, publisher } = await driveActivationToRegression();
+
+    const patternPublisher = new FakeRegressionPatternPublisher();
+    let regressionDeliveries = 0;
+    while ((await runRow(fixture.runId)).stage === "regressing") {
+      const before = patternPublisher.providerCalls;
+      const outcome = await deliver(
+        fixture,
+        publisher,
+        undefined,
+        fixture.pipelineEnv,
+        patternPublisher,
+      );
+      const afterDelivery = await runRow(fixture.runId);
+      expect(
+        afterDelivery.failure_class,
+        `regression delivery ${regressionDeliveries}`,
+      ).toBeNull();
+      expect({
+        outcome,
+        row: afterDelivery,
+        regressionDeliveries,
+      }).toMatchObject({ outcome: { status: "advanced" } });
+      expect(patternPublisher.providerCalls - before).toBe(1);
+      regressionDeliveries += 1;
     }
-    const after = await runRow(fixture.runId);
-    const receiptsAfter = await env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM audit_events
-       WHERE resource_id = ? AND action = 'ontology_pipeline.claim_acquired'`,
-    ).bind(fixture.runId).first<{ count: number }>();
-    expect(after).toEqual(before);
-    expect(receiptsAfter).toEqual(receiptsBefore);
-    expect(await deliver(fixture, publisher, {
-      run_id: fixture.runId,
-      stage_generation: message.stage_generation - 1,
-    })).toEqual({ status: "duplicate" });
-  });
+    expect(regressionDeliveries).toBe(90);
+    expect(patternPublisher.providerCalls).toBe(90);
+    expect(patternPublisher.planInvocations).toHaveBeenCalledTimes(30);
+    expect(patternPublisher.writeInvocations).toHaveBeenCalledTimes(30);
+    expect(patternPublisher.verifyInvocations).toHaveBeenCalledTimes(30);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "signing",
+      regression_report_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+    });
+
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "ingesting",
+      bundle_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+    });
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    const succeeded = await runRow(fixture.runId);
+    expect(succeeded).toMatchObject({
+      stage: "succeeded",
+      failure_class: null,
+      succeeded_at: expect.any(String),
+    });
+
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'regression_request'`,
+    ).bind(fixture.runId).first()).toEqual({ count: 90 });
+    expect(await env.DB.prepare(
+      `SELECT used_calls, generator_calls, evaluator_calls, regression_calls
+       FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({
+      used_calls: 1 + fixture.records.length + 90,
+      generator_calls: 1,
+      evaluator_calls: fixture.records.length,
+      regression_calls: 90,
+    });
+    const active = await env.DB.prepare(
+      `SELECT r.status, r.object_key, r.evaluation_json
+       FROM pattern_ontology_pointer p
+       JOIN pattern_ontology_releases r ON r.version = p.active_version
+       WHERE p.id = 1`,
+    ).first<{
+      status: string;
+      object_key: string;
+      evaluation_json: string;
+    }>();
+    expect(active?.status).toBe("active");
+    const stored = JSON.parse(
+      await (await env.ARTIFACTS!.get(active!.object_key))!.text(),
+    ) as SignedOntologyRelease;
+    expect(stored).toMatchObject({
+      status: "candidate",
+      bundle_hash: succeeded.bundle_hash,
+      evaluation: {
+        regression_passed: true,
+        evaluation_report_hash: succeeded.evaluation_report_hash,
+        regression_report_hash: succeeded.regression_report_hash,
+      },
+      signature: { key_id: env.TEST_ONTOLOGY_SIGNER_KEY_ID },
+    });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_evidence
+       WHERE run_id = ? AND bundle_hash = ?`,
+    ).bind(fixture.runId, succeeded.bundle_hash).first()).toEqual({ count: 1 });
+  }, 60_000);
 
   it("fails a claim transaction closed without acquiring a receipt", async () => {
     const fixture = await reserveFixture();

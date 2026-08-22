@@ -1095,7 +1095,7 @@ async function eligibility(
  * packet the selector produced. A publisher-supplied `plan_hash` would be a hash
  * of something nobody stored.
  */
-function narrowPlannerOutput(value: PatternPlan | PatternPlannerOutput): PatternPlannerOutput {
+export function narrowPlannerOutput(value: PatternPlan | PatternPlannerOutput): PatternPlannerOutput {
   return {
     schema_version: value.schema_version,
     chapters: value.chapters,

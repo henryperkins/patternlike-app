@@ -317,13 +317,20 @@ export function selectPatternEvidence(input: SelectionInput): PatternSelectionRe
   const uncertaintyRules = packetFeatures
     .filter((feature) => feature.feature_class === "uncertainty")
     .flatMap((feature) => feature.ontology_rule_ids);
+  const suppressedClasses = [...new Set(
+    kept.flatMap(({ feature }) =>
+      feature.feature_class === "uncertainty"
+        ? feature.suppressed_features
+        : [],
+    ),
+  )].sort();
 
   const packet: PatternFactPacket = {
     schema_version: M7_SCHEMA_VERSION,
     locale: input.locale,
     effective_accuracy: input.effectiveAccuracy,
     uncertainty: {
-      suppressed_classes: [],
+      suppressed_classes: suppressedClasses,
       required_language_rule_ids: uncertaintyRules,
     },
     features: packetFeatures,
@@ -353,7 +360,13 @@ export function selectPatternEvidence(input: SelectionInput): PatternSelectionRe
     schema_version: M7_SCHEMA_VERSION,
     policy_id: PATTERN_SELECTION_POLICY_ID,
     policy_version: PATTERN_SELECTION_POLICY_VERSION,
-    feature_set_hash: input.featureSetHash,
+    // M4 froze feature_set_hash as a bare SHA-256 hex digest, while M7's
+    // selection-manifest contract deliberately uses the content-hash form.
+    // Normalize at this version boundary without changing the persisted M4
+    // identity or double-prefixing authored M7 callers.
+    feature_set_hash: input.featureSetHash.startsWith("sha256:")
+      ? input.featureSetHash
+      : `sha256:${input.featureSetHash}`,
     sparse_pattern: sparsePattern,
     accounting,
   };

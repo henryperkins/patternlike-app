@@ -21,6 +21,7 @@ import {
   claimOntologyPipelineRun,
   failOntologyPipelineRun,
   retryOntologyPipelineStage,
+  succeedOntologyPipelineRun,
   type ClaimedOntologyPipelineRun,
   type OntologyPipelineFailureClass,
 } from "../db/ontology-pipeline.js";
@@ -29,7 +30,12 @@ import {
 } from "./ontology-candidate-validation.js";
 import {
   createClaimedOntologyProviderCallReservation,
+  reserveClaimedOntologyRegressionProviderCall,
 } from "../db/ontology-provider-usage.js";
+import {
+  ONTOLOGY_OBJECT_PREFIX,
+  storeOntologyRelease,
+} from "../db/pattern-ontology.js";
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import {
   resolveOntologyPipelineConfiguration,
@@ -89,7 +95,47 @@ import type {
   OntologyRuleVerdict,
 } from "./ontology-publisher.js";
 import { createOpenAiOntologyPublisher } from "./openai-ontology-publisher.js";
-import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
+import {
+  ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL,
+  ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
+  ONTOLOGY_REGRESSION_PATTERN_PIN,
+  OntologyRegressionError,
+  applyOntologyRegressionPass,
+  createCanonicalOntologyRegressionReport,
+  createOntologyRegressionFixtureState,
+  loadOntologyRegressionCorpus,
+  ontologyRegressionPassCanAttempt,
+  ontologyRegressionPassMaximumOutputTokens,
+  ontologyRegressionPassTimeoutMs,
+  prepareOntologyRegressionPass,
+  type OntologyRegressionFixtureResult,
+  type OntologyRegressionFixtureState,
+} from "./ontology-regression.js";
+import {
+  createOpenAiPatternPublisher,
+} from "./pattern-publisher-factory.js";
+import type {
+  PatternPassOutcome,
+  PatternPassProvenance,
+  PatternPublisher,
+  PatternStageClass,
+} from "./pattern-publisher.js";
+import {
+  commitOntologyPipelineEvidence,
+  PatternOntologyEvidenceError,
+  verifyPatternOntologyEvidence,
+} from "./pattern-ontology-evidence.js";
+import {
+  OntologySigningClientError,
+  signOntologyCandidate,
+} from "./ontology-signing-client.js";
+import {
+  computeOntologyBundleHash,
+  parseOntologyKeys,
+  stripOntologySignature,
+  verifyOntologySignature,
+  type SignedOntologyRelease,
+} from "./pattern-ontology-verify.js";
 
 const textEncoder = new TextEncoder();
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
@@ -106,6 +152,8 @@ interface OntologyPipelineExecutionRow {
   candidate_hash: string | null;
   compilation_report_hash: string | null;
   evaluation_report_hash: string | null;
+  regression_report_hash: string | null;
+  bundle_hash: string | null;
 }
 
 interface CandidateChunkArtifactRow {
@@ -127,9 +175,16 @@ interface VerdictArtifactRow {
 }
 
 interface SingleArtifactRow {
-  stage: "compiling";
+  stage: "compiling" | "evaluating" | "regressing" | "signing" | "ingesting";
   stage_generation: number;
   stage_attempt: number;
+  plaintext_sha256: string;
+}
+
+interface RegressionArtifactRow {
+  stage_generation: number;
+  stage_attempt: number;
+  artifact_class: "regression_request" | "regression_response" | "regression_result";
   plaintext_sha256: string;
 }
 
@@ -149,6 +204,7 @@ export type OntologyPipelineExecuteOutcome =
 
 export interface OntologyPipelineExecuteOptions {
   publisher?: OntologyPublisher;
+  patternPublisher?: PatternPublisher;
   clock?: () => Date;
 }
 
@@ -371,7 +427,7 @@ async function loadExecutionContext(
     `SELECT run_id, corpus_release_id, corpus_hash,
             candidate_ontology_version, configuration_json,
             configuration_hash, candidate_hash, compilation_report_hash,
-            evaluation_report_hash
+            evaluation_report_hash, regression_report_hash, bundle_hash
      FROM pattern_ontology_pipeline_runs
      WHERE run_id = ? AND stage = ? AND stage_generation = ?
        AND stage_cursor = ? AND stage_attempt = ? AND claim_token = ?`,
@@ -461,7 +517,7 @@ function artifactCoordinate(
 
 function historicalCoordinate(
   runId: string,
-  stage: "generating" | "compiling" | "evaluating",
+  stage: "generating" | "compiling" | "evaluating" | "regressing" | "signing" | "ingesting",
   stageGeneration: number,
   stageAttempt: number,
   artifactClass: OntologyPipelineArtifactClass,
@@ -627,7 +683,14 @@ async function nudgeOutbox(env: Env, now: Date): Promise<void> {
 async function advanceStage(
   env: Env,
   claim: ClaimedOntologyPipelineRun,
-  nextStage: "corpus_reading" | "generating" | "compiling" | "evaluating" | "regressing",
+  nextStage:
+    | "corpus_reading"
+    | "generating"
+    | "compiling"
+    | "evaluating"
+    | "regressing"
+    | "signing"
+    | "ingesting",
   evidence: Parameters<typeof advanceOntologyPipelineStage>[3],
   clock: () => Date,
 ): Promise<OntologyPipelineExecuteOutcome> {
@@ -1557,6 +1620,1035 @@ async function executeEvaluating(
   );
 }
 
+interface RegressionRequestDocument {
+  schema_version: "ontology-regression-request/v1";
+  fixture_index: number;
+  fixture_id: string;
+  pass: PatternStageClass;
+  document: unknown;
+}
+
+interface RegressionResponseDocument {
+  schema_version: "ontology-regression-response/v1";
+  fixture_index: number;
+  fixture_id: string;
+  pass: PatternStageClass;
+  raw: string;
+  metadata: PatternPassProvenance;
+  value: unknown;
+}
+
+function parseCanonicalObject(bytes: Uint8Array): Record<string, unknown> {
+  const text = decodeUtf8(bytes);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    terminal("artifact_integrity_failed");
+  }
+  if (!isRecord(parsed) || canonicalJson(parsed) !== text) {
+    terminal("artifact_integrity_failed");
+  }
+  return parsed;
+}
+
+function parseCanonicalRegressionState(
+  bytes: Uint8Array,
+): OntologyRegressionFixtureState {
+  const parsed = parseCanonicalObject(bytes);
+  const phase = parsed.phase;
+  const result = parsed.result;
+  if (
+    !hasExactKeys(parsed, [
+      "accuracy",
+      "candidate",
+      "complete",
+      "correction",
+      "fixture_id",
+      "fixture_index",
+      "input_tokens",
+      "output_tokens",
+      "phase",
+      "plan",
+      "planner_calls",
+      "provider_calls",
+      "result",
+      "schema_version",
+      "verifier_calls_for_candidate",
+      "writer_calls",
+    ]) ||
+    parsed.schema_version !== "ontology-regression-state/v1" ||
+    !Number.isSafeInteger(parsed.fixture_index) ||
+    (parsed.fixture_index as number) < 0 ||
+    (parsed.fixture_index as number) >= 30 ||
+    typeof parsed.fixture_id !== "string" ||
+    !["exact", "approximate", "unknown"].includes(String(parsed.accuracy)) ||
+    !["planner", "writer", "verifier", "complete"].includes(String(phase)) ||
+    typeof parsed.complete !== "boolean" ||
+    !["planner_calls", "writer_calls", "verifier_calls_for_candidate", "provider_calls", "input_tokens", "output_tokens"]
+      .every((key) => Number.isSafeInteger(parsed[key]) && (parsed[key] as number) >= 0) ||
+    (parsed.planner_calls as number) > 2 ||
+    (parsed.writer_calls as number) > 3 ||
+    (parsed.verifier_calls_for_candidate as number) > 2 ||
+    (parsed.provider_calls as number) > 11 ||
+    (parsed.complete !== (phase === "complete")) ||
+    (parsed.complete !== (result !== null)) ||
+    (phase === "writer" && !isRecord(parsed.plan)) ||
+    (phase === "verifier" &&
+      (!isRecord(parsed.plan) || !isRecord(parsed.candidate)))
+  ) {
+    terminal("artifact_integrity_failed");
+  }
+  if (result !== null) {
+    if (
+      !isRecord(result) ||
+      typeof result.fixture_id !== "string" ||
+      result.fixture_id !== parsed.fixture_id ||
+      result.accuracy !== parsed.accuracy ||
+      typeof result.accepted !== "boolean" ||
+      !["accepted", "refused"].includes(String(result.declared_outcome)) ||
+      result.provider_calls !== parsed.provider_calls ||
+      result.input_tokens !== parsed.input_tokens ||
+      result.output_tokens !== parsed.output_tokens ||
+      !Array.isArray(result.hard_gate_failures)
+    ) {
+      terminal("artifact_integrity_failed");
+    }
+  }
+  return parsed as unknown as OntologyRegressionFixtureState;
+}
+
+function regressionMetadataMatches(
+  metadata: PatternPassProvenance,
+  pass: PatternStageClass,
+): boolean {
+  return metadata.provider === "openai" &&
+    metadata.pass === pass &&
+    metadata.model === ONTOLOGY_REGRESSION_PATTERN_PIN[`${pass}_model`] &&
+    metadata.prompt_version ===
+      ONTOLOGY_REGRESSION_PATTERN_PIN[`${pass}_prompt_version`] &&
+    typeof metadata.provider_request_id === "string" &&
+    metadata.provider_request_id.length > 0 &&
+    Number.isSafeInteger(metadata.input_tokens) &&
+    metadata.input_tokens !== null &&
+    metadata.input_tokens >= 0 &&
+    metadata.input_tokens <=
+      ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL &&
+    Number.isSafeInteger(metadata.output_tokens) &&
+    metadata.output_tokens !== null &&
+    metadata.output_tokens >= 0 &&
+    metadata.output_tokens <= ontologyRegressionPassMaximumOutputTokens(pass) &&
+    typeof metadata.provider_response_hash === "string" &&
+    CONTENT_HASH.test(metadata.provider_response_hash);
+}
+
+async function parseRegressionResponse(
+  bytes: Uint8Array,
+  fixtureIndex: number,
+  fixtureId: string,
+  pass: PatternStageClass,
+): Promise<RegressionResponseDocument> {
+  const parsed = parseCanonicalObject(bytes);
+  if (
+    !hasExactKeys(parsed, [
+      "document",
+      "fixture_id",
+      "fixture_index",
+      "metadata",
+      "pass",
+      "raw",
+      "schema_version",
+    ]) ||
+    parsed.schema_version !== "ontology-regression-response/v1" ||
+    parsed.fixture_index !== fixtureIndex ||
+    parsed.fixture_id !== fixtureId ||
+    parsed.pass !== pass ||
+    typeof parsed.raw !== "string" ||
+    !isRecord(parsed.metadata)
+  ) {
+    terminal("artifact_integrity_failed");
+  }
+  const metadata = parsed.metadata as unknown as PatternPassProvenance;
+  if (
+    !regressionMetadataMatches(metadata, pass) ||
+    await contentHash(parsed.raw) !== metadata.provider_response_hash
+  ) {
+    terminal("artifact_integrity_failed");
+  }
+  const providerValue = parseRawProviderValue(
+    textEncoder.encode(parsed.raw),
+    isRecord,
+  );
+  if (canonicalJson(providerValue) !== canonicalJson(parsed.document)) {
+    terminal("provider_response_invalid");
+  }
+  return {
+    schema_version: "ontology-regression-response/v1",
+    fixture_index: fixtureIndex,
+    fixture_id: fixtureId,
+    pass,
+    raw: parsed.raw,
+    metadata,
+    value: providerValue,
+  };
+}
+
+function regressionRequestDocument(
+  fixtureIndex: number,
+  fixtureId: string,
+  pass: PatternStageClass,
+  document: unknown,
+): RegressionRequestDocument {
+  return {
+    schema_version: "ontology-regression-request/v1",
+    fixture_index: fixtureIndex,
+    fixture_id: fixtureId,
+    pass,
+    document,
+  };
+}
+
+function parseRegressionRequest(
+  bytes: Uint8Array,
+): RegressionRequestDocument {
+  const parsed = parseCanonicalObject(bytes);
+  if (
+    !hasExactKeys(parsed, [
+      "document",
+      "fixture_id",
+      "fixture_index",
+      "pass",
+      "schema_version",
+    ]) ||
+    parsed.schema_version !== "ontology-regression-request/v1" ||
+    !Number.isSafeInteger(parsed.fixture_index) ||
+    typeof parsed.fixture_id !== "string" ||
+    !["planner", "writer", "verifier"].includes(String(parsed.pass))
+  ) {
+    terminal("artifact_integrity_failed");
+  }
+  return parsed as unknown as RegressionRequestDocument;
+}
+
+async function loadPriorRegressionState(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+): Promise<OntologyRegressionFixtureState | null> {
+  const { results } = await env.DB.prepare(
+    `SELECT stage_generation, stage_attempt, artifact_class, plaintext_sha256
+     FROM pattern_ontology_pipeline_artifacts
+     WHERE run_id = ? AND stage = 'regressing'
+       AND artifact_class = 'regression_result' AND deleted_at IS NULL
+       AND stage_generation < ?
+     ORDER BY stage_generation, stage_attempt`,
+  ).bind(claim.runId, claim.stageGeneration).all<RegressionArtifactRow>();
+  if (results.length !== claim.stageCursor) terminal("regression_failed");
+  const latest = results.at(-1);
+  if (!latest) return null;
+  const stored = await readOntologyPipelineArtifact(
+    env,
+    historicalCoordinate(
+      claim.runId,
+      "regressing",
+      latest.stage_generation,
+      latest.stage_attempt,
+      "regression_result",
+    ),
+  );
+  if (!stored || stored.artifact.plaintextSha256 !== latest.plaintext_sha256) {
+    terminal("artifact_integrity_failed");
+  }
+  return parseCanonicalRegressionState(stored.plaintext);
+}
+
+async function assertRegressionProviderRunCapacity(
+  env: Pick<Env, "DB">,
+  runId: string,
+): Promise<void> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS request_count
+     FROM pattern_ontology_pipeline_artifacts
+     WHERE run_id = ? AND artifact_class = 'regression_request'`,
+  ).bind(runId).first<{ request_count: number }>();
+  if (
+    !row ||
+    !Number.isSafeInteger(row.request_count) ||
+    row.request_count >= ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS
+  ) {
+    terminal("regression_budget_exceeded");
+  }
+}
+
+async function runRegressionPublisherPass(
+  publisher: PatternPublisher,
+  pass: PatternStageClass,
+  document: unknown,
+  options: Parameters<PatternPublisher["plan"]>[1],
+): Promise<PatternPassOutcome<unknown>> {
+  if (pass === "planner") return publisher.plan(document, options);
+  if (pass === "writer") return publisher.write(document, options);
+  return publisher.verify(document, options);
+}
+
+async function retryRegressionProviderPass(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  state: OntologyRegressionFixtureState,
+  retryAfterSeconds: number,
+  clock: () => Date,
+): Promise<OntologyPipelineExecuteOutcome> {
+  if (!ontologyRegressionPassCanAttempt(state, claim.stageAttempt + 1)) {
+    terminal("regression_failed");
+  }
+  const delaySeconds = Math.max(
+    PROVIDER_RETRY_DELAY_SECONDS,
+    retryAfterSeconds,
+  );
+  const availableAt = new Date(clock().getTime() + delaySeconds * 1_000);
+  if (!await retryOntologyPipelineStage(env, claim, availableAt)) {
+    return { status: "duplicate" };
+  }
+  return { status: "rescheduled", retryAfterSeconds: delaySeconds };
+}
+
+async function handleRegressionProviderFailure(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  state: OntologyRegressionFixtureState,
+  outcome: Extract<PatternPassOutcome<unknown>, { ok: false }>,
+  reservationFailure:
+    | "exhausted"
+    | "claim_unavailable"
+    | "run_exhausted"
+    | null,
+  clock: () => Date,
+): Promise<OntologyPipelineExecuteOutcome> {
+  if (reservationFailure === "run_exhausted") terminal("attempts_exhausted");
+  if (reservationFailure === "exhausted") {
+    terminal("provider_budget_exhausted");
+  }
+  if (outcome.code === "publisher_budget_exhausted") {
+    return retryRegressionProviderPass(env, claim, state, 0, clock);
+  }
+  if (outcome.code === "publisher_refused") terminal("provider_refusal");
+  if (
+    outcome.code === "publisher_auth_failed" ||
+    outcome.code === "publisher_model_unavailable"
+  ) {
+    terminal("provider_not_configured");
+  }
+  return retryRegressionProviderPass(
+    env,
+    claim,
+    state,
+    outcome.retry_after_seconds ?? 0,
+    clock,
+  );
+}
+
+async function loadRegressionArtifactRows(
+  env: Pick<Env, "DB">,
+  runId: string,
+): Promise<RegressionArtifactRow[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT stage_generation, stage_attempt, artifact_class, plaintext_sha256
+     FROM pattern_ontology_pipeline_artifacts
+     WHERE run_id = ? AND stage = 'regressing'
+       AND artifact_class IN (
+         'regression_request', 'regression_response', 'regression_result'
+       )
+       AND deleted_at IS NULL
+     ORDER BY stage_generation, stage_attempt, artifact_class`,
+  ).bind(runId).all<RegressionArtifactRow>();
+  return results;
+}
+
+function regressionCoordinateKey(row: {
+  stage_generation: number;
+  stage_attempt: number;
+}): string {
+  return `${row.stage_generation}:${row.stage_attempt}`;
+}
+
+async function createCompletedRegressionReport(input: {
+  env: Env;
+  claim: ClaimedOntologyPipelineRun;
+  context: LoadedExecutionContext;
+  candidateHash: string;
+  corpusManifestHash: string;
+}): Promise<{
+  canonicalBytes: string;
+  plaintextHash: string;
+}> {
+  const rows = await loadRegressionArtifactRows(input.env, input.claim.runId);
+  const requests = rows.filter((row) => row.artifact_class === "regression_request");
+  const responses = rows.filter((row) => row.artifact_class === "regression_response");
+  const states = rows.filter((row) => row.artifact_class === "regression_result");
+  if (
+    requests.length > ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS ||
+    responses.length !== states.length ||
+    states.length !== input.claim.stageCursor + 1
+  ) {
+    terminal("regression_budget_exceeded");
+  }
+
+  const responseCoordinates = new Set(responses.map(regressionCoordinateKey));
+  const requestCoordinates = new Set(requests.map(regressionCoordinateKey));
+  const stateCoordinates = new Set(states.map(regressionCoordinateKey));
+  if (
+    responseCoordinates.size !== responses.length ||
+    requestCoordinates.size !== requests.length ||
+    stateCoordinates.size !== states.length ||
+    responses.some((row) => !requestCoordinates.has(regressionCoordinateKey(row))) ||
+    states.some((row) => !responseCoordinates.has(regressionCoordinateKey(row)))
+  ) {
+    terminal("artifact_integrity_failed");
+  }
+
+  let successfulInputTokens = 0;
+  let successfulOutputTokens = 0;
+  for (const row of responses) {
+    const stored = await readOntologyPipelineArtifact(
+      input.env,
+      historicalCoordinate(
+        input.claim.runId,
+        "regressing",
+        row.stage_generation,
+        row.stage_attempt,
+        "regression_response",
+      ),
+    );
+    if (!stored || stored.artifact.plaintextSha256 !== row.plaintext_sha256) {
+      terminal("artifact_integrity_failed");
+    }
+    const parsed = parseCanonicalObject(stored.plaintext);
+    if (
+      !Number.isSafeInteger(parsed.fixture_index) ||
+      typeof parsed.fixture_id !== "string" ||
+      !["planner", "writer", "verifier"].includes(String(parsed.pass))
+    ) {
+      terminal("artifact_integrity_failed");
+    }
+    const response = await parseRegressionResponse(
+      stored.plaintext,
+      parsed.fixture_index as number,
+      parsed.fixture_id,
+      parsed.pass as PatternStageClass,
+    );
+    successfulInputTokens += response.metadata.input_tokens!;
+    successfulOutputTokens += response.metadata.output_tokens!;
+  }
+
+  let missingInputTokens = 0;
+  let missingOutputTokens = 0;
+  for (const row of requests) {
+    if (responseCoordinates.has(regressionCoordinateKey(row))) continue;
+    const stored = await readOntologyPipelineArtifact(
+      input.env,
+      historicalCoordinate(
+        input.claim.runId,
+        "regressing",
+        row.stage_generation,
+        row.stage_attempt,
+        "regression_request",
+      ),
+    );
+    if (!stored || stored.artifact.plaintextSha256 !== row.plaintext_sha256) {
+      terminal("artifact_integrity_failed");
+    }
+    const request = parseRegressionRequest(stored.plaintext);
+    missingInputTokens += ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL;
+    missingOutputTokens += ontologyRegressionPassMaximumOutputTokens(request.pass);
+  }
+
+  const complete = new Map<number, OntologyRegressionFixtureResult>();
+  let accountedProviderCalls = 0;
+  let accountedInputTokens = 0;
+  let accountedOutputTokens = 0;
+  for (const row of states) {
+    const stored = await readOntologyPipelineArtifact(
+      input.env,
+      historicalCoordinate(
+        input.claim.runId,
+        "regressing",
+        row.stage_generation,
+        row.stage_attempt,
+        "regression_result",
+      ),
+    );
+    if (!stored || stored.artifact.plaintextSha256 !== row.plaintext_sha256) {
+      terminal("artifact_integrity_failed");
+    }
+    const state = parseCanonicalRegressionState(stored.plaintext);
+    if (!state.complete || !state.result) continue;
+    if (complete.has(state.fixture_index)) terminal("regression_failed");
+    const result: OntologyRegressionFixtureResult = {
+      fixture_id: state.result.fixture_id,
+      accuracy: state.result.accuracy,
+      accepted: state.result.accepted,
+      declared_outcome: state.result.declared_outcome,
+      result_hash: row.plaintext_sha256,
+      provider_calls: state.result.provider_calls,
+      input_tokens: state.result.input_tokens,
+      output_tokens: state.result.output_tokens,
+      hard_gate_failures: state.result.hard_gate_failures,
+    };
+    complete.set(state.fixture_index, result);
+    accountedProviderCalls += result.provider_calls;
+    accountedInputTokens += result.input_tokens;
+    accountedOutputTokens += result.output_tokens;
+  }
+  const orderedResults = Array.from({ length: 30 }, (_, fixtureIndex) =>
+    complete.get(fixtureIndex));
+  if (
+    orderedResults.some((result) => result === undefined) ||
+    accountedProviderCalls !== requests.length ||
+    accountedInputTokens !== successfulInputTokens ||
+    accountedOutputTokens !== successfulOutputTokens
+  ) {
+    terminal("regression_failed");
+  }
+  const configurationHash = await contentHash(
+    canonicalJson(ONTOLOGY_REGRESSION_PATTERN_PIN),
+  );
+  return createCanonicalOntologyRegressionReport({
+    ontologyVersion: input.context.command.candidate_ontology_version,
+    commandHash: input.context.row.configuration_hash,
+    configurationHash,
+    corpusReleaseId: input.context.command.corpus.corpus_release_id,
+    corpusHash: input.context.command.corpus.corpus_hash,
+    corpusManifestHash: input.corpusManifestHash,
+    candidateHash: input.candidateHash,
+    evaluationReportHash: input.context.row.evaluation_report_hash!,
+    configurationEqual: input.context.command.configuration_equal,
+    results: orderedResults as OntologyRegressionFixtureResult[],
+    requestArtifactCount: requests.length,
+    responseArtifactCount: responses.length,
+    inputTokens: successfulInputTokens + missingInputTokens,
+    outputTokens: successfulOutputTokens + missingOutputTokens,
+  });
+}
+
+async function executeRegressing(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  context: LoadedExecutionContext,
+  publisher: PatternPublisher,
+  clock: () => Date,
+): Promise<OntologyPipelineExecuteOutcome> {
+  if (!context.row.evaluation_report_hash || !context.row.candidate_hash) {
+    terminal("regression_failed");
+  }
+  const sourceCorpus = await readFrozenCorpus(env, context.command);
+  const candidateArtifact = await loadSingleCompilingArtifact(
+    env,
+    claim.runId,
+    "candidate_release",
+  );
+  if (candidateArtifact.plaintextHash !== context.row.candidate_hash) {
+    terminal("candidate_invalid");
+  }
+  const candidate = await parseCandidateRelease(
+    candidateArtifact.plaintext,
+    context.command,
+    sourceCorpus,
+  );
+  const regressionCorpus = loadOntologyRegressionCorpus();
+  const prior = await loadPriorRegressionState(env, claim);
+  const fixtureIndex = prior?.complete
+    ? prior.fixture_index + 1
+    : prior?.fixture_index ?? 0;
+  const fixture = regressionCorpus.fixtures[fixtureIndex];
+  if (!fixture) terminal("regression_failed");
+  const baseState = prior?.complete
+    ? createOntologyRegressionFixtureState(fixtureIndex, fixture)
+    : prior ?? createOntologyRegressionFixtureState(fixtureIndex, fixture);
+  if (
+    baseState.fixture_index !== fixtureIndex ||
+    baseState.fixture_id !== fixture.fixture_id ||
+    baseState.accuracy !== fixture.effective_accuracy
+  ) {
+    terminal("regression_failed");
+  }
+  const prepared = prepareOntologyRegressionPass({
+    state: baseState,
+    fixture,
+    ontology: candidate.records,
+    inputMaxBytes: ONTOLOGY_REGRESSION_PATTERN_PIN.input_max_bytes,
+  });
+  if (JSON.stringify(prepared.document) !== prepared.serialized) {
+    terminal("regression_failed");
+  }
+  const request = regressionRequestDocument(
+    fixtureIndex,
+    fixture.fixture_id,
+    prepared.pass,
+    prepared.document,
+  );
+  const requestBytes = canonicalJson(request);
+
+  let response: RegressionResponseDocument | null = null;
+  const adoptedResponse = await readCurrentArtifact(
+    env,
+    claim,
+    "regression_response",
+  );
+  if (adoptedResponse) {
+    response = await parseRegressionResponse(
+      adoptedResponse.plaintext,
+      fixtureIndex,
+      fixture.fixture_id,
+      prepared.pass,
+    );
+  }
+
+  let nextState: OntologyRegressionFixtureState | null = null;
+  const adoptedResult = await readCurrentArtifact(
+    env,
+    claim,
+    "regression_result",
+  );
+  if (adoptedResult) {
+    if (!response) terminal("artifact_integrity_failed");
+    const recomputed = await applyOntologyRegressionPass({
+      state: baseState,
+      fixture,
+      ontology: candidate.records,
+      sourceFragmentIds: new Set(sourceCorpus.fragmentIndex.keys()),
+      pass: prepared.pass,
+      value: response.value,
+      deliveryAttempt: claim.stageAttempt,
+      metadata: response.metadata,
+      ontologyVersion: candidate.ontology_version,
+    });
+    nextState = parseCanonicalRegressionState(adoptedResult.plaintext);
+    if (canonicalJson(nextState) !== canonicalJson(recomputed)) {
+      terminal("artifact_integrity_failed");
+    }
+  }
+
+  if (!response) {
+    const ambiguousRequest = await readCurrentArtifact(
+      env,
+      claim,
+      "regression_request",
+    );
+    if (ambiguousRequest) {
+      if (decodeUtf8(ambiguousRequest.plaintext) !== requestBytes) {
+        terminal("artifact_integrity_failed");
+      }
+      return retryRegressionProviderPass(env, claim, baseState, 0, clock);
+    }
+    if (!ontologyRegressionPassCanAttempt(baseState, claim.stageAttempt)) {
+      terminal("regression_failed");
+    }
+    await assertRegressionProviderRunCapacity(env, claim.runId);
+    await putArtifact(env, claim, "regression_request", requestBytes, clock);
+    let reservationFailure:
+      | "exhausted"
+      | "claim_unavailable"
+      | "run_exhausted"
+      | null = null;
+    const timeoutMs = ontologyRegressionPassTimeoutMs(prepared.pass);
+    const outcome = await runRegressionPublisherPass(
+      publisher,
+      prepared.pass,
+      prepared.document,
+      {
+        requestId: `opreq_${crypto.randomUUID()}`,
+        timeoutMs,
+        pin: ONTOLOGY_REGRESSION_PATTERN_PIN,
+        reserve: async (stageClass) => {
+          if (stageClass !== prepared.pass) {
+            reservationFailure = "claim_unavailable";
+            return { ok: false };
+          }
+          const reserved = await reserveClaimedOntologyRegressionProviderCall(
+            env,
+            claim,
+            {
+              dailyLimit: context.command.daily_provider_call_limit,
+              runLimit: ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
+              timeoutMs,
+              now: clock,
+            },
+          );
+          if (!reserved.ok) reservationFailure = reserved.reason;
+          return reserved;
+        },
+      },
+    );
+    if (!outcome.ok) {
+      return handleRegressionProviderFailure(
+        env,
+        claim,
+        baseState,
+        outcome,
+        reservationFailure,
+        clock,
+      );
+    }
+    if (
+      !regressionMetadataMatches(outcome.metadata, prepared.pass) ||
+      outcome.raw === null ||
+      await contentHash(outcome.raw) !== outcome.metadata.provider_response_hash
+    ) {
+      terminal("provider_response_invalid");
+    }
+    const responseBytes = canonicalJson({
+      schema_version: "ontology-regression-response/v1",
+      fixture_index: fixtureIndex,
+      fixture_id: fixture.fixture_id,
+      pass: prepared.pass,
+      raw: outcome.raw,
+      metadata: outcome.metadata,
+      document: outcome.value,
+    });
+    await putArtifact(env, claim, "regression_response", responseBytes, clock);
+    response = await parseRegressionResponse(
+      textEncoder.encode(responseBytes),
+      fixtureIndex,
+      fixture.fixture_id,
+      prepared.pass,
+    );
+  }
+
+  if (!nextState) {
+    nextState = await applyOntologyRegressionPass({
+      state: baseState,
+      fixture,
+      ontology: candidate.records,
+      sourceFragmentIds: new Set(sourceCorpus.fragmentIndex.keys()),
+      pass: prepared.pass,
+      value: response.value,
+      deliveryAttempt: claim.stageAttempt,
+      metadata: response.metadata,
+      ontologyVersion: candidate.ontology_version,
+    });
+    await putArtifact(
+      env,
+      claim,
+      "regression_result",
+      canonicalJson(nextState),
+      clock,
+    );
+  }
+
+  if (nextState.result?.hard_gate_failures.length) {
+    terminal("regression_failed");
+  }
+  if (!nextState.complete || fixtureIndex < regressionCorpus.fixtures.length - 1) {
+    return advanceCursor(env, claim, clock);
+  }
+  const report = await createCompletedRegressionReport({
+    env,
+    claim,
+    context,
+    candidateHash: candidateArtifact.plaintextHash,
+    corpusManifestHash: regressionCorpus.manifest_hash,
+  });
+  const storedReport = await putArtifact(
+    env,
+    claim,
+    "regression_report",
+    report.canonicalBytes,
+    clock,
+  );
+  if (storedReport.artifact.plaintextSha256 !== report.plaintextHash) {
+    terminal("artifact_integrity_failed");
+  }
+  return advanceStage(
+    env,
+    claim,
+    "signing",
+    { regressionReportHash: report.plaintextHash },
+    clock,
+  );
+}
+
+async function loadUniquePipelineArtifact(
+  env: Env,
+  runId: string,
+  stage: "evaluating" | "regressing" | "signing",
+  artifactClass:
+    | "evaluation_report"
+    | "regression_report"
+    | "unsigned_bundle"
+    | "signed_bundle",
+) {
+  const { results } = await env.DB.prepare(
+    `SELECT stage, stage_generation, stage_attempt, plaintext_sha256
+     FROM pattern_ontology_pipeline_artifacts
+     WHERE run_id = ? AND stage = ? AND artifact_class = ?
+       AND deleted_at IS NULL
+     ORDER BY stage_generation, stage_attempt`,
+  ).bind(runId, stage, artifactClass).all<SingleArtifactRow>();
+  if (results.length !== 1) terminal("artifact_unavailable");
+  const row = results[0]!;
+  const stored = await readOntologyPipelineArtifact(
+    env,
+    historicalCoordinate(
+      runId,
+      stage,
+      row.stage_generation,
+      row.stage_attempt,
+      artifactClass,
+    ),
+  );
+  if (!stored || stored.artifact.plaintextSha256 !== row.plaintext_sha256) {
+    terminal("artifact_integrity_failed");
+  }
+  return stored;
+}
+
+async function buildPassedOntologyRelease(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  context: LoadedExecutionContext,
+): Promise<PatternOntologyRelease> {
+  if (
+    !context.row.candidate_hash ||
+    !context.row.evaluation_report_hash ||
+    !context.row.regression_report_hash
+  ) {
+    terminal("signing_failed");
+  }
+  const corpus = await readFrozenCorpus(env, context.command);
+  const candidateArtifact = await loadSingleCompilingArtifact(
+    env,
+    claim.runId,
+    "candidate_release",
+  );
+  if (candidateArtifact.plaintextHash !== context.row.candidate_hash) {
+    terminal("candidate_invalid");
+  }
+  const candidate = await parseCandidateRelease(
+    candidateArtifact.plaintext,
+    context.command,
+    corpus,
+  );
+  const evaluationArtifact = await loadUniquePipelineArtifact(
+    env,
+    claim.runId,
+    "evaluating",
+    "evaluation_report",
+  );
+  const regressionArtifact = await loadUniquePipelineArtifact(
+    env,
+    claim.runId,
+    "regressing",
+    "regression_report",
+  );
+  if (
+    evaluationArtifact.artifact.plaintextSha256 !==
+      context.row.evaluation_report_hash ||
+    regressionArtifact.artifact.plaintextSha256 !==
+      context.row.regression_report_hash
+  ) {
+    terminal("artifact_integrity_failed");
+  }
+  const regressionReport = parseCanonicalObject(regressionArtifact.plaintext);
+  if (
+    regressionReport.schema_version !== "ontology-regression-report/v1" ||
+    regressionReport.ontology_version !== candidate.ontology_version ||
+    regressionReport.command_hash !== context.row.configuration_hash ||
+    regressionReport.candidate_hash !== context.row.candidate_hash ||
+    regressionReport.evaluation_report_hash !==
+      context.row.evaluation_report_hash ||
+    regressionReport.passed !== true
+  ) {
+    terminal("regression_failed");
+  }
+  const release: PatternOntologyRelease = {
+    ...candidate,
+    evaluation: {
+      ...candidate.evaluation,
+      verdict: "pass",
+      compiler_passed: true,
+      evaluator_passed: true,
+      regression_passed: true,
+      unevaluated_fixture_count: 0,
+      evaluation_report_hash: context.row.evaluation_report_hash,
+      regression_report_hash: context.row.regression_report_hash,
+    },
+  };
+  release.bundle_hash = await computeOntologyBundleHash(release);
+  const compiled = compileOntologyRelease(release);
+  if (!compiled.ok) terminal("candidate_invalid");
+  return release;
+}
+
+function ontologyPipelineSigningKeyId(env: Env): string {
+  const keys = [...parseOntologyKeys(env.PATTERN_ONTOLOGY_KEYS).keys()].sort();
+  // A rotation with two verification keys needs an explicit operator cutover;
+  // choosing one silently could ask the isolated signer for the wrong key.
+  if (keys.length !== 1) terminal("signing_failed");
+  return keys[0]!;
+}
+
+async function parseSignedOntologyBundle(
+  bytes: Uint8Array,
+  expected: PatternOntologyRelease,
+  env: Env,
+): Promise<SignedOntologyRelease> {
+  const text = decodeUtf8(bytes);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    terminal("artifact_integrity_failed");
+  }
+  if (!isRecord(parsed) || canonicalJson(parsed) !== text) {
+    terminal("artifact_integrity_failed");
+  }
+  const signed = parsed as unknown as SignedOntologyRelease;
+  if (
+    !signed.signature ||
+    canonicalJson(stripOntologySignature(signed)) !== canonicalJson(expected) ||
+    await verifyOntologySignature(
+      signed,
+      parseOntologyKeys(env.PATTERN_ONTOLOGY_KEYS),
+    ) !== null
+  ) {
+    terminal("signing_failed");
+  }
+  return signed;
+}
+
+async function executeSigning(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  context: LoadedExecutionContext,
+  clock: () => Date,
+): Promise<OntologyPipelineExecuteOutcome> {
+  const release = await buildPassedOntologyRelease(env, claim, context);
+  const unsignedBytes = canonicalJson(release);
+  await putArtifact(env, claim, "unsigned_bundle", unsignedBytes, clock);
+  let signed: SignedOntologyRelease;
+  const adopted = await readCurrentArtifact(env, claim, "signed_bundle");
+  if (adopted) {
+    signed = await parseSignedOntologyBundle(adopted.plaintext, release, env);
+  } else {
+    const keyId = ontologyPipelineSigningKeyId(env);
+    let signature;
+    try {
+      signature = await signOntologyCandidate(env.ONTOLOGY_SIGNER, release, keyId);
+    } catch {
+      terminal("signing_failed");
+    }
+    signed = { ...release, signature };
+    if (
+      await verifyOntologySignature(
+        signed,
+        parseOntologyKeys(env.PATTERN_ONTOLOGY_KEYS),
+      ) !== null
+    ) {
+      terminal("signing_failed");
+    }
+    await putArtifact(
+      env,
+      claim,
+      "signed_bundle",
+      canonicalJson(signed),
+      clock,
+    );
+  }
+  if (release.bundle_hash !== context.row.bundle_hash && context.row.bundle_hash) {
+    terminal("signing_failed");
+  }
+  return advanceStage(
+    env,
+    claim,
+    "ingesting",
+    { bundleHash: release.bundle_hash },
+    clock,
+  );
+}
+
+async function executeIngesting(
+  env: Env,
+  claim: ClaimedOntologyPipelineRun,
+  context: LoadedExecutionContext,
+  clock: () => Date,
+): Promise<OntologyPipelineExecuteOutcome> {
+  if (
+    !context.row.bundle_hash ||
+    !context.row.evaluation_report_hash ||
+    !context.row.regression_report_hash
+  ) {
+    terminal("ingestion_failed");
+  }
+  const release = await buildPassedOntologyRelease(env, claim, context);
+  if (release.bundle_hash !== context.row.bundle_hash) {
+    terminal("ingestion_failed");
+  }
+  const signedArtifact = await loadUniquePipelineArtifact(
+    env,
+    claim.runId,
+    "signing",
+    "signed_bundle",
+  );
+  const signed = await parseSignedOntologyBundle(
+    signedArtifact.plaintext,
+    release,
+    env,
+  );
+  const evaluationArtifact = await loadUniquePipelineArtifact(
+    env,
+    claim.runId,
+    "evaluating",
+    "evaluation_report",
+  );
+  const signature = signed.signature;
+  if (!signature) terminal("ingestion_failed");
+  await commitOntologyPipelineEvidence(env, {
+    runId: claim.runId,
+    ontologyVersion: release.ontology_version,
+    corpusReleaseId: context.command.corpus.corpus_release_id,
+    corpusReleaseHash: context.command.corpus.corpus_hash,
+    corpusLicenseClass: context.command.corpus.license_class,
+    corpusPublicCapable: context.command.corpus.public_capable,
+    activationScope: context.command.corpus.public_capable ? "public" : "internal",
+    bundleHash: release.bundle_hash,
+    evaluationReportHash: context.row.evaluation_report_hash,
+    evaluationArtifactObjectKey: evaluationArtifact.artifact.objectKey,
+    evaluationArtifactEnvelopeHash: evaluationArtifact.artifact.envelopeSha256,
+    evaluationArtifactCiphertextHash: evaluationArtifact.artifact.ciphertextSha256,
+    signingKeyId: signature.key_id,
+    compilerPassed: true,
+    evaluatorPassed: true,
+    unevaluatedFixtureCount: 0,
+  });
+  const evidence = await verifyPatternOntologyEvidence(
+    env,
+    release,
+    signature.key_id,
+  );
+  const objectKey = `${ONTOLOGY_OBJECT_PREFIX}${release.ontology_version}.json`;
+  await storeOntologyRelease(env, signed, objectKey, evidence);
+  await putArtifact(
+    env,
+    claim,
+    "ingestion_receipt",
+    canonicalJson({
+      schema_version: "ontology-ingestion-receipt/v1",
+      run_id: claim.runId,
+      ontology_version: release.ontology_version,
+      bundle_hash: release.bundle_hash,
+      evaluation_report_hash: context.row.evaluation_report_hash,
+      regression_report_hash: context.row.regression_report_hash,
+      signing_key_id: signature.key_id,
+      object_key: objectKey,
+      status: "activated",
+    }),
+    clock,
+  );
+  if (!await succeedOntologyPipelineRun(env, claim, clock())) {
+    return { status: "duplicate" };
+  }
+  return { status: "advanced" };
+}
+
 function failureClassForCaught(cause: unknown): OntologyPipelineFailureClass | null {
   if (cause instanceof TerminalPipelineFailure) return cause.failureClass;
   if (
@@ -1589,15 +2681,13 @@ function failureClassForCaught(cause: unknown): OntologyPipelineFailureClass | n
       return "candidate_invalid";
     }
   }
+  if (cause instanceof OntologyRegressionError) return cause.code;
+  if (cause instanceof OntologySigningClientError) return "signing_failed";
+  if (cause instanceof PatternOntologyEvidenceError) return "ingestion_failed";
   return null;
 }
 
-/**
- * Execute one opaque Queue delivery through the successful evaluating prefix.
- * The function owns no retry, accounting, transition, encryption, or Queue
- * implementation: it composes the Task 4 publisher with Task 5's reviewed
- * primitives and stops after committing `regressing`.
- */
+/** Execute one opaque Queue delivery through the complete durable stage graph. */
 export async function executeOntologyPipelineDelivery(
   env: Env,
   message: OntologyPipelineMessage,
@@ -1615,7 +2705,7 @@ export async function executeOntologyPipelineDelivery(
       message,
       clock(),
       `opclaim_${crypto.randomUUID()}`,
-      "task6",
+      "all",
     );
   } catch {
     return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
@@ -1642,11 +2732,20 @@ export async function executeOntologyPipelineDelivery(
       case "evaluating":
         return await executeEvaluating(env, claim, context, publisher, clock);
       case "regressing":
+        return await executeRegressing(
+          env,
+          claim,
+          context,
+          options.patternPublisher ?? createOpenAiPatternPublisher(
+            resolved.config.credential,
+            resolved.config.gatewayRoute,
+          ),
+          clock,
+        );
       case "signing":
+        return await executeSigning(env, claim, context, clock);
       case "ingesting":
-        // Task 7 owns every downstream transition. A Task 6 consumer must not
-        // acknowledge or mutate a stage it cannot execute.
-        return { status: "retry", retryAfterSeconds: LEASE_RETRY_DELAY_SECONDS };
+        return await executeIngesting(env, claim, context, clock);
     }
   } catch (cause) {
     if (

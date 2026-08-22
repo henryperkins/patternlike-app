@@ -1763,6 +1763,354 @@ def check_m6_manifest() -> list[str]:
 
 M7_SCHEMA_VERSION = "0.7.0"
 
+M7_REGRESSION_FIXTURE_VERSION = "ontology-regression-fixture/v1"
+M7_REGRESSION_AXES = frozenset(
+    {
+        "exact-birth-time",
+        "approximate-birth-time",
+        "unknown-birth-time",
+        "sparse-feature-set",
+        "dense-feature-set",
+        "houses-and-angles-present",
+        "houses-and-angles-absent",
+        "repeated-body-aspect-network",
+        "calculation-produced-multi-body-pattern",
+        "conflicting-source-meanings",
+        "unsupported-ontology-gap",
+        "every-suppression-class",
+        "adversarial-instruction-fragment",
+        "maximum-depth-derived-synthesis",
+        "supported-locale",
+    }
+)
+
+
+def _m7_regression_fixture_paths() -> list[str]:
+    return [
+        f"en-US/{cohort}-{index:02d}.json"
+        for cohort in ("exact", "approximate", "unknown")
+        for index in range(1, 11)
+    ]
+
+
+def _m7_feature_matches_chart(feature: dict, chart: dict) -> bool:
+    """Prove the checked-in M4 feature is traceable to its M0 chart fact."""
+    feature_class = feature.get("feature_class")
+    if feature_class == "position":
+        return any(
+            position.get("body") == feature.get("body")
+            and position.get("longitude_deg") == feature.get("longitude")
+            and position.get("house") == feature.get("house")
+            for position in chart.get("positions") or []
+        )
+    if feature_class == "aspect":
+        return any(
+            aspect.get("body_a") == feature.get("body_a")
+            and aspect.get("body_b") == feature.get("body_b")
+            and aspect.get("aspect") == feature.get("aspect")
+            and aspect.get("orb_deg") == feature.get("orb")
+            for aspect in chart.get("aspects") or []
+        )
+    if feature_class == "pattern":
+        return any(
+            pattern.get("pattern_type") == feature.get("pattern")
+            and pattern.get("members") == feature.get("member_bodies")
+            for pattern in chart.get("patterns") or []
+        )
+    if feature_class == "angle":
+        angles = chart.get("angles") or {}
+        key = (
+            "ascendant_deg"
+            if feature.get("angle") == "ascendant"
+            else "midheaven_deg"
+        )
+        return angles.get(key) == feature.get("longitude")
+    if feature_class == "house_cusp":
+        houses = chart.get("houses") or {}
+        cusps = houses.get("cusps_deg") or []
+        house = feature.get("house")
+        return (
+            isinstance(house, int)
+            and 1 <= house <= len(cusps)
+            and cusps[house - 1] == feature.get("longitude")
+        )
+    if feature_class == "uncertainty":
+        uncertainty = chart.get("uncertainty") or {}
+        suppressed = [
+            item.get("feature_class")
+            for item in uncertainty.get("suppressed_features") or []
+        ]
+        return (
+            uncertainty.get("accuracy") == feature.get("accuracy")
+            and suppressed == feature.get("suppressed_features")
+        )
+    return False
+
+
+def check_m7_regression_corpus(registry: Registry) -> list[str]:
+    """Validate the exact 30-file §23.8 activation corpus and its coverage."""
+    errors: list[str] = []
+    corpus = M7 / "fixtures" / "corpus"
+    manifest_path = corpus / "manifest.json"
+    if not manifest_path.exists():
+        return ["contracts/m7/fixtures/corpus/manifest.json is missing"]
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"M7 regression corpus manifest is unreadable: {exc}"]
+
+    expected_paths = _m7_regression_fixture_paths()
+    if manifest.get("schema_version") != M7_SCHEMA_VERSION:
+        errors.append("M7 regression corpus schema_version is not 0.7.0")
+    if manifest.get("status") != "authored":
+        errors.append("M7 regression corpus status is not authored")
+    if manifest.get("locale") != "en-US":
+        errors.append("M7 regression corpus locale is not en-US")
+
+    required_axes = manifest.get("required_axes")
+    if (
+        not isinstance(required_axes, list)
+        or len(required_axes) != len(set(required_axes))
+        or set(required_axes) != M7_REGRESSION_AXES
+    ):
+        errors.append("M7 regression corpus required_axes is not the exact §23.8 axis set")
+
+    authored = manifest.get("authored_chains")
+    if not isinstance(authored, list):
+        authored = []
+        errors.append("M7 regression corpus authored_chains must be an array")
+    paths = [entry.get("path") for entry in authored if isinstance(entry, dict)]
+    ids = [entry.get("fixture_id") for entry in authored if isinstance(entry, dict)]
+    if paths != expected_paths:
+        errors.append("M7 regression corpus does not list the exact ordered 30 fixture paths")
+    if len(paths) != len(set(paths)):
+        errors.append("M7 regression corpus contains a duplicate fixture path")
+    if len(ids) != len(set(ids)):
+        errors.append("M7 regression corpus contains a duplicate fixture id")
+
+    corpus_identity = {
+        key: manifest.get(key)
+        for key in (
+            "authored_chains",
+            "axis_assignments",
+            "corpus_version",
+            "locale",
+            "required_axes",
+            "schema_version",
+        )
+    }
+    canonical_identity = json.dumps(
+        corpus_identity,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    expected_identity_hash = "sha256:" + sha256(canonical_identity).hexdigest()
+    if manifest.get("corpus_identity_hash") != expected_identity_hash:
+        errors.append(
+            "M7 regression corpus identity hash does not bind its authored chains, "
+            "axis assignments, version, locale, axes, and schema"
+        )
+
+    assignments = manifest.get("axis_assignments")
+    if not isinstance(assignments, dict) or set(assignments) != M7_REGRESSION_AXES:
+        errors.append("M7 regression corpus axis_assignments is missing or has unknown axes")
+        assignments = {}
+    assigned_axes_by_path: dict[str, set[str]] = {
+        path: set() for path in expected_paths
+    }
+    for axis in sorted(M7_REGRESSION_AXES):
+        assigned = assignments.get(axis)
+        if not isinstance(assigned, list) or not assigned:
+            errors.append(f"M7 regression axis {axis!r} has no fixture assignment")
+            continue
+        if len(assigned) != len(set(assigned)):
+            errors.append(f"M7 regression axis {axis!r} contains a duplicate assignment")
+        for path in assigned:
+            if path not in assigned_axes_by_path:
+                errors.append(
+                    f"M7 regression axis {axis!r} assigns unknown fixture {path!r}"
+                )
+                continue
+            assigned_axes_by_path[path].add(axis)
+    for path, axes in assigned_axes_by_path.items():
+        if not axes:
+            errors.append(f"M7 regression fixture {path!r} is unassigned")
+
+    record_validator = resolve_validator(
+        M7_BASE + "pattern-ontology-record.schema.json#/$defs/patternOntologyRecord",
+        registry,
+    )
+    fragment_validator = resolve_validator(
+        M7_BASE + "pattern-source-fragment.schema.json#/$defs/patternSourceFragment",
+        registry,
+    )
+    reference_records = manifest.get("reference_ontology_records")
+    if not isinstance(reference_records, list) or not reference_records:
+        errors.append("M7 regression corpus has no reference ontology records")
+    else:
+        for index, record in enumerate(reference_records):
+            try:
+                record_validator.validate(record)
+            except ValidationError as exc:
+                errors.append(
+                    f"M7 regression reference ontology record {index} failed: {exc.message}"
+                )
+    reference_fragments = manifest.get("reference_source_fragments")
+    if not isinstance(reference_fragments, list) or not reference_fragments:
+        errors.append("M7 regression corpus has no reference source fragments")
+    else:
+        for index, fragment in enumerate(reference_fragments):
+            try:
+                fragment_validator.validate(fragment)
+            except ValidationError as exc:
+                errors.append(
+                    f"M7 regression reference source fragment {index} failed: {exc.message}"
+                )
+
+    nested_validators = {
+        "chart_snapshot": resolve_validator(
+            "https://patternlike.app/contracts/m0/chart-contract.schema.json#/$defs/chartSnapshot",
+            registry,
+        ),
+        "feature": resolve_validator(
+            M4_BASE + "natal-feature.schema.json#/$defs/natalFeature",
+            registry,
+        ),
+        "selection_manifest": resolve_validator(
+            M7_BASE + "pattern-selection-manifest.schema.json#/$defs/patternSelectionManifest",
+            registry,
+        ),
+        "fact_packet": resolve_validator(
+            M7_BASE + "pattern-fact-packet.schema.json#/$defs/patternFactPacket",
+            registry,
+        ),
+        "plan": resolve_validator(
+            M7_BASE + "pattern-plan.schema.json#/$defs/patternPlan",
+            registry,
+        ),
+        "writer": resolve_validator(
+            M7_BASE + "pattern-writer-output.schema.json",
+            registry,
+        ),
+        "verdict": resolve_validator(
+            M7_BASE + "pattern-semantic-verdict.schema.json",
+            registry,
+        ),
+        "public_projection": resolve_validator(
+            M7_BASE + "pattern-response.schema.json#/$defs/patternResponse",
+            registry,
+        ),
+    }
+
+    entry_by_path = {
+        entry.get("path"): entry for entry in authored if isinstance(entry, dict)
+    }
+    shipped_paths = sorted(
+        path.relative_to(corpus).as_posix()
+        for path in corpus.glob("en-US/*.json")
+    )
+    if shipped_paths != sorted(expected_paths):
+        errors.append("M7 regression corpus directory does not contain exactly 30 named fixtures")
+
+    for path in expected_paths:
+        absolute = corpus / path
+        if not absolute.exists():
+            errors.append(f"M7 regression fixture {path!r} is missing")
+            continue
+        try:
+            fixture = json.loads(absolute.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"M7 regression fixture {path!r} is unreadable: {exc}")
+            continue
+        entry = entry_by_path.get(path)
+        if not isinstance(entry, dict):
+            errors.append(f"M7 regression fixture {path!r} has no manifest entry")
+            continue
+        expected_digest = "sha256:" + sha256(absolute.read_bytes()).hexdigest()
+        if entry.get("sha256") != expected_digest:
+            errors.append(f"M7 regression fixture {path!r} hash does not match its bytes")
+        cohort = path.split("/")[1].split("-")[0]
+        if (
+            fixture.get("schema_version") != M7_REGRESSION_FIXTURE_VERSION
+            or fixture.get("fixture_id") != entry.get("fixture_id")
+            or fixture.get("locale") != "en-US"
+            or fixture.get("effective_accuracy") != cohort
+            or fixture.get("effective_accuracy") != entry.get("accuracy")
+            or fixture.get("declared_outcome") != "accepted"
+        ):
+            errors.append(f"M7 regression fixture {path!r} has inconsistent identity")
+        axes = fixture.get("axes")
+        if (
+            not isinstance(axes, list)
+            or len(axes) != len(set(axes))
+            or set(axes) != assigned_axes_by_path[path]
+            or axes != entry.get("axes")
+        ):
+            errors.append(f"M7 regression fixture {path!r} axis inventory disagrees")
+
+        chart = fixture.get("chart_snapshot")
+        features = fixture.get("features")
+        chain = fixture.get("chain")
+        try:
+            nested_validators["chart_snapshot"].validate(chart)
+        except ValidationError as exc:
+            errors.append(f"M7 regression fixture {path!r} chart failed: {exc.message}")
+            continue
+        if chart.get("birth", {}).get("accuracy") != cohort:
+            errors.append(f"M7 regression fixture {path!r} chart accuracy disagrees")
+        if not isinstance(features, list) or not features:
+            errors.append(f"M7 regression fixture {path!r} has no feature chain")
+            continue
+        feature_ids: list[str] = []
+        for index, feature in enumerate(features):
+            try:
+                nested_validators["feature"].validate(feature)
+            except ValidationError as exc:
+                errors.append(
+                    f"M7 regression fixture {path!r} feature {index} failed: {exc.message}"
+                )
+                continue
+            feature_ids.append(feature.get("feature_id"))
+            if not _m7_feature_matches_chart(feature, chart):
+                errors.append(
+                    f"M7 regression fixture {path!r} feature {index} is not traceable to its chart"
+                )
+        if len(feature_ids) != len(set(feature_ids)):
+            errors.append(f"M7 regression fixture {path!r} duplicates a feature id")
+        if not isinstance(chain, dict):
+            errors.append(f"M7 regression fixture {path!r} has no complete chain")
+            continue
+        for field, validator in nested_validators.items():
+            if field in ("chart_snapshot", "feature"):
+                continue
+            try:
+                validator.validate(chain.get(field))
+            except ValidationError as exc:
+                errors.append(
+                    f"M7 regression fixture {path!r} {field} failed: {exc.message}"
+                )
+        if chain.get("selection_manifest", {}).get("feature_set_hash") != fixture.get(
+            "feature_set_hash"
+        ):
+            errors.append(f"M7 regression fixture {path!r} feature-set hash disagrees")
+        for field in ("fact_packet", "public_projection"):
+            document = chain.get(field) or {}
+            if (
+                document.get("locale") != "en-US"
+                or document.get("effective_accuracy") != cohort
+            ):
+                errors.append(
+                    f"M7 regression fixture {path!r} {field} identity disagrees"
+                )
+
+    if not errors:
+        print(
+            "OK  corpus        contracts/m7 has 30 hashed chart-to-public chains "
+            "and exact §23.8 coverage"
+        )
+    return errors
+
 
 def check_m7_manifest() -> list[str]:
     errors: list[str] = []
@@ -2037,6 +2385,7 @@ def main() -> int:
     errors += check_openapi(M7, registry)
     errors += check_m7_manifest()
     errors += check_m7_openapi_projection()
+    errors += check_m7_regression_corpus(registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")

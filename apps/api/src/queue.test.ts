@@ -241,7 +241,7 @@ describe("ontology queue admission", () => {
     });
   });
 
-  it("acks and durably parks exact Task 7 stages through the configured retry and DLQ horizon", async () => {
+  it("claims Task 7 stages and acks a closed terminal refusal without DLQ churn", async () => {
     const send = vi.fn(async () => undefined);
     const deliveryEnv = pipelineEnv("internal", {
       ONTOLOGY_PIPELINE_QUEUE: { send } as unknown as Queue<OntologyPipelineMessage>,
@@ -260,18 +260,18 @@ describe("ontology queue admission", () => {
               lease_expires_at, dispatched_at, failure_class
        FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
     ).bind(reserved.runId).first()).toEqual({
-      stage: "regressing",
-      stage_generation: 5,
+      stage: "failed",
+      stage_generation: 6,
       stage_attempt: 0,
       claim_token: null,
       lease_expires_at: null,
-      dispatched_at: null,
-      failure_class: null,
+      dispatched_at: NOW.toISOString(),
+      failure_class: "candidate_invalid",
     });
     expect(await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM audit_events
        WHERE resource_id = ? AND action = 'ontology_pipeline.claim_acquired'`,
-    ).bind(reserved.runId).first()).toEqual({ count: 0 });
+    ).bind(reserved.runId).first()).toEqual({ count: 1 });
 
     await scheduled(
       createScheduledController({
@@ -284,7 +284,7 @@ describe("ontology queue admission", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("atomically excludes a future-generation Task 7 handoff that races the claim", async () => {
+  it("atomically claims a future-generation Task 7 handoff that races admission", async () => {
     const reserved = await reserveRun();
     await seedStage(reserved.runId, "evaluating");
     let raced = false;
@@ -321,16 +321,16 @@ describe("ontology queue admission", () => {
       `SELECT stage, stage_generation, claim_token, lease_expires_at, dispatched_at
        FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
     ).bind(reserved.runId).first()).toEqual({
-      stage: "regressing",
-      stage_generation: 5,
+      stage: "failed",
+      stage_generation: 6,
       claim_token: null,
       lease_expires_at: null,
-      dispatched_at: null,
+      dispatched_at: expect.any(String),
     });
     expect(await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM audit_events
        WHERE resource_id = ? AND action = 'ontology_pipeline.claim_acquired'`,
-    ).bind(reserved.runId).first()).toEqual({ count: 0 });
+    ).bind(reserved.runId).first()).toEqual({ count: 1 });
   });
 
   it("recovers a preclaim D1 failure through scheduled stale-dispatch repair after main retries", async () => {

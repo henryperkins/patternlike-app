@@ -95,6 +95,30 @@ describe("deriveNatalFeatureSet", () => {
     expect(result.featureSetHash).toBe(original.featureSetHash);
   });
 
+  it("derives a multi-body feature from the frozen M0 chart pattern fields", async () => {
+    const source = snapshot();
+    (source as { patterns: unknown[] }).patterns = [{
+      id: "patcalc_contract_shape",
+      pattern_type: "grand_trine",
+      members: ["sun", "moon", "jupiter"],
+      rule_set_version: "1.0.0",
+    }];
+    const result = await deriveNatalFeatureSet({
+      chartId: "cht_alpha",
+      userId: "usr_alpha",
+      chartFingerprint: fingerprint,
+      effectiveAccuracy: "exact",
+      snapshot: source,
+      uncertainty: { accuracy: "exact", suppressed_features: [] },
+    });
+
+    expect(result.features.find((feature) => feature.feature_class === "pattern"))
+      .toMatchObject({
+        pattern: "grand_trine",
+        member_bodies: ["jupiter", "moon", "sun"],
+      });
+  });
+
   it("omits houses and angles when the effective chart says they are suppressed", async () => {
     const result = await deriveNatalFeatureSet({
       chartId: "cht_alpha",

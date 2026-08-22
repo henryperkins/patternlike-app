@@ -1,0 +1,1431 @@
+{
+  "schema_version": "ontology-regression-fixture/v1",
+  "fixture_id": "m7-unknown-06",
+  "locale": "en-US",
+  "effective_accuracy": "unknown",
+  "declared_outcome": "accepted",
+  "axes": [
+    "unknown-birth-time",
+    "dense-feature-set",
+    "houses-and-angles-absent",
+    "unsupported-ontology-gap",
+    "supported-locale"
+  ],
+  "chart_snapshot": {
+    "schema_version": "0.2.0",
+    "id": "cht_9bb3df3d03e40e11e4952bd329323e53",
+    "user_id": "usr_a4f0682deebee8a0355fa6918095219b",
+    "profile_version": 1,
+    "fingerprint": "sha256:eb3c583c84aaa6bdc0ed5581599ff983bc57bd42efedfc0470eb3500101e7bb7",
+    "contract_id": "calc-contract-launch",
+    "contract_version": "0.2.0",
+    "container_digest": "sha256:3f305235d5bdbcacb9d3493aa7dab0f84ff7f7bfe1c1b9ad23fae314ac59b4bb",
+    "tzdb_version": "2026a",
+    "birth": {
+      "accuracy": "unknown",
+      "utc_instant": null,
+      "timezone": "Etc/UTC"
+    },
+    "positions": [
+      {
+        "body": "sun",
+        "longitude_deg": 32,
+        "sign": "taurus",
+        "house": null
+      },
+      {
+        "body": "moon",
+        "longitude_deg": 75,
+        "sign": "gemini",
+        "house": null
+      },
+      {
+        "body": "mercury",
+        "longitude_deg": 118,
+        "sign": "cancer",
+        "house": null
+      },
+      {
+        "body": "venus",
+        "longitude_deg": 161,
+        "sign": "virgo",
+        "house": null
+      },
+      {
+        "body": "mars",
+        "longitude_deg": 204,
+        "sign": "libra",
+        "house": null
+      },
+      {
+        "body": "jupiter",
+        "longitude_deg": 247,
+        "sign": "sagittarius",
+        "house": null
+      },
+      {
+        "body": "saturn",
+        "longitude_deg": 290,
+        "sign": "capricorn",
+        "house": null
+      }
+    ],
+    "houses": null,
+    "angles": null,
+    "aspects": [
+      {
+        "id": "asp_1fd5de1b9a5a22beea1ead10cf4f9119",
+        "body_a": "sun",
+        "body_b": "moon",
+        "aspect": "square",
+        "orb_deg": 2.1,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_2c2fa6c3997015d25ca465d8569ed582",
+        "body_a": "sun",
+        "body_b": "mercury",
+        "aspect": "conjunction",
+        "orb_deg": 1.4,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_cec4a593ce485074a4e959a212f9f980",
+        "body_a": "moon",
+        "body_b": "venus",
+        "aspect": "trine",
+        "orb_deg": 3.2,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_f5c5f7084db63cca2d1b07c85bf933cc",
+        "body_a": "mars",
+        "body_b": "jupiter",
+        "aspect": "opposition",
+        "orb_deg": 4.1,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_51a0c7e7edd6f5d298783d997309a3ae",
+        "body_a": "jupiter",
+        "body_b": "saturn",
+        "aspect": "sextile",
+        "orb_deg": 2.7,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      }
+    ],
+    "patterns": [
+      {
+        "id": "cpat_88e7d2258a2d91ca206a2c6914431bb5",
+        "pattern_type": "grand_trine",
+        "members": [
+          "jupiter",
+          "moon",
+          "sun"
+        ],
+        "rule_set_version": "1.0.0"
+      },
+      {
+        "id": "cpat_d6bb089eafd704ca8c962c0e2f99e029",
+        "pattern_type": "aspect_chain",
+        "members": [
+          "mars",
+          "mercury",
+          "moon",
+          "sun"
+        ],
+        "rule_set_version": "1.0.0"
+      }
+    ],
+    "uncertainty": {
+      "accuracy": "unknown",
+      "window": null,
+      "suppressed_features": [
+        {
+          "feature_class": "angle_transits",
+          "reason": "unknown_birth_time"
+        },
+        {
+          "feature_class": "angles",
+          "reason": "unknown_birth_time"
+        },
+        {
+          "feature_class": "houses",
+          "reason": "unknown_birth_time"
+        },
+        {
+          "feature_class": "moon_time_sensitive",
+          "reason": "unknown_birth_time"
+        }
+      ],
+      "qualified_features": [
+        {
+          "feature_id": "moon",
+          "qualification": "low_confidence_moon"
+        }
+      ],
+      "user_facing_summary": "The synthetic uncertainty boundary is explicit in this activation fixture."
+    },
+    "calculated_at": "2026-08-22T00:00:00.000Z",
+    "status": "active"
+  },
+  "feature_set_hash": "sha256:a979f4ee4631fafae2da6224336421efabe22e8f2aca1055195e77ec5ae610a3",
+  "features": [
+    {
+      "feature_id": "nft_00d7444d1ae912d52623f534d9715fc8",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "venus",
+      "longitude": 161,
+      "sign": 6,
+      "house": null
+    },
+    {
+      "feature_id": "nft_288f8f4b881a41998194744486223ad7",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "mercury",
+      "longitude": 118,
+      "sign": 4,
+      "house": null
+    },
+    {
+      "feature_id": "nft_2dd0f6549424c4db8b27d131a3cc2818",
+      "feature_class": "pattern",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "pattern": "grand_trine",
+      "member_bodies": [
+        "jupiter",
+        "moon",
+        "sun"
+      ]
+    },
+    {
+      "feature_id": "nft_373585aff2e3316c2ee3ae8463464120",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "mars",
+      "body_b": "jupiter",
+      "aspect": "opposition",
+      "orb": 4.1
+    },
+    {
+      "feature_id": "nft_4eb5eced19726fbb00d8a7245294339d",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "jupiter",
+      "longitude": 247,
+      "sign": 9,
+      "house": null
+    },
+    {
+      "feature_id": "nft_52fca559a0ea691d67d4f0aaf151f8ef",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "sun",
+      "body_b": "moon",
+      "aspect": "square",
+      "orb": 2.1
+    },
+    {
+      "feature_id": "nft_5bb2555823b5993525867dbca7d8c077",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "sun",
+      "longitude": 32,
+      "sign": 2,
+      "house": null
+    },
+    {
+      "feature_id": "nft_60a6e02e0b8f4dda66f956b865a70bda",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "mars",
+      "longitude": 204,
+      "sign": 7,
+      "house": null
+    },
+    {
+      "feature_id": "nft_69fa0368af1551ca843bbd9031e480ec",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "moon",
+      "body_b": "venus",
+      "aspect": "trine",
+      "orb": 3.2
+    },
+    {
+      "feature_id": "nft_79d49fe2e869630bf5d8a162e05dbc82",
+      "feature_class": "pattern",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "pattern": "aspect_chain",
+      "member_bodies": [
+        "mars",
+        "mercury",
+        "moon",
+        "sun"
+      ]
+    },
+    {
+      "feature_id": "nft_ca6525426d2591a08ec74001826f49cb",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "moon",
+      "longitude": 75,
+      "sign": 3,
+      "house": null
+    },
+    {
+      "feature_id": "nft_d903d7ea82753e676bb3bed15987626a",
+      "feature_class": "uncertainty",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "accuracy": "unknown",
+      "suppressed_features": [
+        "angle_transits",
+        "angles",
+        "houses",
+        "moon_time_sensitive"
+      ]
+    },
+    {
+      "feature_id": "nft_ed42cb15de84be4c81036e0dfd186e96",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "saturn",
+      "longitude": 290,
+      "sign": 10,
+      "house": null
+    },
+    {
+      "feature_id": "nft_f69375d92bbd8b51702e07f82d55ec45",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "sun",
+      "body_b": "mercury",
+      "aspect": "conjunction",
+      "orb": 1.4
+    },
+    {
+      "feature_id": "nft_f7b6e71ce661633b73ac8db5afc14d2e",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "jupiter",
+      "body_b": "saturn",
+      "aspect": "sextile",
+      "orb": 2.7
+    }
+  ],
+  "chain": {
+    "selection_manifest": {
+      "schema_version": "0.7.0",
+      "policy_id": "pattern-selection-policy",
+      "policy_version": "1.0.0",
+      "feature_set_hash": "sha256:a979f4ee4631fafae2da6224336421efabe22e8f2aca1055195e77ec5ae610a3",
+      "sparse_pattern": false,
+      "accounting": [
+        {
+          "feature_id": "nft_00d7444d1ae912d52623f534d9715fc8",
+          "alias": "f001",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_288f8f4b881a41998194744486223ad7",
+          "alias": "f002",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_2dd0f6549424c4db8b27d131a3cc2818",
+          "alias": "f003",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_373585aff2e3316c2ee3ae8463464120",
+          "alias": "f004",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_4eb5eced19726fbb00d8a7245294339d",
+          "alias": "f005",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_52fca559a0ea691d67d4f0aaf151f8ef",
+          "alias": "f006",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_5bb2555823b5993525867dbca7d8c077",
+          "alias": "f007",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_60a6e02e0b8f4dda66f956b865a70bda",
+          "alias": "f008",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_69fa0368af1551ca843bbd9031e480ec",
+          "alias": "f009",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_79d49fe2e869630bf5d8a162e05dbc82",
+          "alias": null,
+          "coverage": "ontology_unsupported",
+          "reason": "no_activated_ontology_record"
+        },
+        {
+          "feature_id": "nft_ca6525426d2591a08ec74001826f49cb",
+          "alias": "f010",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_d903d7ea82753e676bb3bed15987626a",
+          "alias": "f011",
+          "coverage": "mandatory_any",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_ed42cb15de84be4c81036e0dfd186e96",
+          "alias": "f012",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_f69375d92bbd8b51702e07f82d55ec45",
+          "alias": "f013",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_f7b6e71ce661633b73ac8db5afc14d2e",
+          "alias": "f014",
+          "coverage": "eligible",
+          "reason": null
+        }
+      ]
+    },
+    "fact_packet": {
+      "schema_version": "0.7.0",
+      "locale": "en-US",
+      "effective_accuracy": "unknown",
+      "uncertainty": {
+        "suppressed_classes": [
+          "angle_transits",
+          "angles",
+          "houses",
+          "moon_time_sensitive"
+        ],
+        "required_language_rule_ids": [
+          "ont_756e6365727461696e74790000000000"
+        ]
+      },
+      "features": [
+        {
+          "alias": "f001",
+          "feature_class": "position",
+          "fact": {
+            "body": "venus",
+            "longitude": 161,
+            "sign": 6,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d76656e757300000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f002",
+          "feature_class": "position",
+          "fact": {
+            "body": "mercury",
+            "longitude": 118,
+            "sign": 4,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d6d6572637572790000000000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f003",
+          "feature_class": "pattern",
+          "fact": {
+            "pattern": "grand_trine",
+            "member_bodies": [
+              "jupiter",
+              "moon",
+              "sun"
+            ]
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_7061747465726e000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f004",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "mars",
+            "body_b": "jupiter",
+            "aspect": "opposition",
+            "orb": 4.1
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_6173702d6f70706f736974696f6e0000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f005",
+          "feature_class": "position",
+          "fact": {
+            "body": "jupiter",
+            "longitude": 247,
+            "sign": 9,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d6a7570697465720000000000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f006",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "square",
+            "orb": 2.1
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_6173702d737175617265000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f007",
+          "feature_class": "position",
+          "fact": {
+            "body": "sun",
+            "longitude": 32,
+            "sign": 2,
+            "house": null
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_706f732d73756e000000000000000000",
+            "ont_0b397e84e8241333a49d5e6ef481a227",
+            "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+            "ont_7d270a613581574ad23f94a01589222d",
+            "ont_f97d4681eee458bedca9b2c3f99dc391",
+            "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f008",
+          "feature_class": "position",
+          "fact": {
+            "body": "mars",
+            "longitude": 204,
+            "sign": 7,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d6d6172730000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2a8b2feb"
+          ]
+        },
+        {
+          "alias": "f009",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "moon",
+            "body_b": "venus",
+            "aspect": "trine",
+            "orb": 3.2
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_6173702d7472696e6500000000000000"
+          ],
+          "cluster_ids": [
+            "clu_87fd3ac9"
+          ]
+        },
+        {
+          "alias": "f010",
+          "feature_class": "position",
+          "fact": {
+            "body": "moon",
+            "longitude": 75,
+            "sign": 3,
+            "house": null
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_706f732d6d6f6f6e0000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_87fd3ac9"
+          ]
+        },
+        {
+          "alias": "f011",
+          "feature_class": "uncertainty",
+          "fact": {
+            "accuracy": "unknown",
+            "suppressed_features": [
+              "angle_transits",
+              "angles",
+              "houses",
+              "moon_time_sensitive"
+            ]
+          },
+          "coverage": "mandatory_any",
+          "ontology_rule_ids": [
+            "ont_756e6365727461696e74790000000000"
+          ],
+          "cluster_ids": [
+            "clu_bf958fed"
+          ]
+        },
+        {
+          "alias": "f012",
+          "feature_class": "position",
+          "fact": {
+            "body": "saturn",
+            "longitude": 290,
+            "sign": 10,
+            "house": null
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d73617475726e000000000000"
+          ],
+          "cluster_ids": [
+            "clu_87fd3ac9"
+          ]
+        },
+        {
+          "alias": "f013",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "sun",
+            "body_b": "mercury",
+            "aspect": "conjunction",
+            "orb": 1.4
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00"
+          ],
+          "cluster_ids": [
+            "clu_87fd3ac9"
+          ]
+        },
+        {
+          "alias": "f014",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "jupiter",
+            "body_b": "saturn",
+            "aspect": "sextile",
+            "orb": 2.7
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_6173702d73657874696c650000000000"
+          ],
+          "cluster_ids": [
+            "clu_87fd3ac9"
+          ]
+        }
+      ],
+      "clusters": [
+        {
+          "cluster_id": "clu_2a8b2feb",
+          "feature_aliases": [
+            "f001",
+            "f002",
+            "f003",
+            "f004",
+            "f005",
+            "f006",
+            "f007",
+            "f008"
+          ],
+          "compatible_with": [
+            "clu_87fd3ac9",
+            "clu_bf958fed"
+          ]
+        },
+        {
+          "cluster_id": "clu_87fd3ac9",
+          "feature_aliases": [
+            "f009",
+            "f010",
+            "f012",
+            "f013",
+            "f014"
+          ],
+          "compatible_with": [
+            "clu_2a8b2feb",
+            "clu_bf958fed"
+          ]
+        },
+        {
+          "cluster_id": "clu_bf958fed",
+          "feature_aliases": [
+            "f011"
+          ],
+          "compatible_with": [
+            "clu_2a8b2feb",
+            "clu_87fd3ac9"
+          ]
+        }
+      ],
+      "selection_constraints": {
+        "core_chapters_min": 4,
+        "core_chapters_max": 6,
+        "additional_signatures_max": 8,
+        "sparse_pattern": false
+      }
+    },
+    "plan": {
+      "schema_version": "0.7.0",
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "working_title": "A standing position theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f001",
+            "f002",
+            "f003",
+            "f004",
+            "f011"
+          ],
+          "ontology_rule_ids": [
+            "ont_706f732d76656e757300000000000000",
+            "ont_706f732d6d6572637572790000000000",
+            "ont_7061747465726e000000000000000000",
+            "ont_6173702d6f70706f736974696f6e0000",
+            "ont_756e6365727461696e74790000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_706f732d76656e757300000000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_706f732d76656e757300000000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_706f732d76656e757300000000000000#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_02",
+          "working_title": "A standing aspect theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f009",
+            "f010",
+            "f012"
+          ],
+          "ontology_rule_ids": [
+            "ont_6173702d7472696e6500000000000000",
+            "ont_706f732d6d6f6f6e0000000000000000",
+            "ont_706f732d73617475726e000000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_6173702d7472696e6500000000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_6173702d7472696e6500000000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_6173702d7472696e6500000000000000#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_03",
+          "working_title": "A standing position theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f005",
+            "f006",
+            "f007",
+            "f008"
+          ],
+          "ontology_rule_ids": [
+            "ont_706f732d6a7570697465720000000000",
+            "ont_6173702d737175617265000000000000",
+            "ont_706f732d73756e000000000000000000",
+            "ont_0b397e84e8241333a49d5e6ef481a227",
+            "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+            "ont_7d270a613581574ad23f94a01589222d",
+            "ont_f97d4681eee458bedca9b2c3f99dc391",
+            "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+            "ont_706f732d6d6172730000000000000000"
+          ],
+          "derived_synthesis_ids": [
+            "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+            "ont_7d270a613581574ad23f94a01589222d",
+            "ont_f97d4681eee458bedca9b2c3f99dc391",
+            "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+          ],
+          "required_tension_ids": [
+            "ont_706f732d6a7570697465720000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_706f732d6a7570697465720000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_706f732d6a7570697465720000000000#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_04",
+          "working_title": "A standing aspect theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f013",
+            "f014"
+          ],
+          "ontology_rule_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00",
+            "ont_6173702d73657874696c650000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00#tension"
+          ],
+          "required_resource_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00#counter"
+          ]
+        }
+      ],
+      "additional_signatures": [],
+      "omissions": [],
+      "plan_hash": "sha256:9ab0b82229f07fba62475d27bda2ae57cb2403ec82ae391358aeaafd98afdb11",
+      "sparse_pattern": false
+    },
+    "writer": {
+      "schema_version": "0.7.0",
+      "title": "Your Pattern",
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "title": "A standing position theme",
+          "summary": "This chapter holds The venus position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_01_section_01",
+              "text": "The calculated evidence points to The venus position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f001",
+                "f002",
+                "f003",
+                "f004",
+                "f011"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d76656e757300000000000000",
+                "ont_706f732d6d6572637572790000000000",
+                "ont_7061747465726e000000000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_01_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f001",
+                "f002",
+                "f003",
+                "f004",
+                "f011"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d76656e757300000000000000",
+                "ont_706f732d6d6572637572790000000000",
+                "ont_7061747465726e000000000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "pos-venus can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f001",
+                "f002",
+                "f003",
+                "f004",
+                "f011"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d76656e757300000000000000",
+                "ont_706f732d6d6572637572790000000000",
+                "ont_7061747465726e000000000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "The venus position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f001",
+                "f002",
+                "f003",
+                "f004",
+                "f011"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d76656e757300000000000000",
+                "ont_706f732d6d6572637572790000000000",
+                "ont_7061747465726e000000000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "pos-venus can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f001",
+              "f002",
+              "f003",
+              "f004",
+              "f011"
+            ],
+            "ontology_rule_ids": [
+              "ont_706f732d76656e757300000000000000",
+              "ont_706f732d6d6572637572790000000000",
+              "ont_7061747465726e000000000000000000",
+              "ont_6173702d6f70706f736974696f6e0000",
+              "ont_756e6365727461696e74790000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_02",
+          "title": "A standing aspect theme",
+          "summary": "This chapter holds A trine describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_02_section_01",
+              "text": "The calculated evidence points to A trine describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f009",
+                "f010",
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d7472696e6500000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73617475726e000000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_02_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f009",
+                "f010",
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d7472696e6500000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73617475726e000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "asp-trine can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f009",
+                "f010",
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d7472696e6500000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73617475726e000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "A trine describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f009",
+                "f010",
+                "f012"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d7472696e6500000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73617475726e000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "asp-trine can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f009",
+              "f010",
+              "f012"
+            ],
+            "ontology_rule_ids": [
+              "ont_6173702d7472696e6500000000000000",
+              "ont_706f732d6d6f6f6e0000000000000000",
+              "ont_706f732d73617475726e000000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_03",
+          "title": "A standing position theme",
+          "summary": "This chapter holds The jupiter position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_03_section_01",
+              "text": "The calculated evidence points to The jupiter position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f005",
+                "f006",
+                "f007",
+                "f008"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6d6172730000000000000000"
+              ],
+              "derived_synthesis_ids": [
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+              ]
+            },
+            {
+              "section_key": "chapter_03_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f005",
+                "f006",
+                "f007",
+                "f008"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6d6172730000000000000000"
+              ],
+              "derived_synthesis_ids": [
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+              ]
+            }
+          ],
+          "tensions": [
+            {
+              "text": "pos-jupiter can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f005",
+                "f006",
+                "f007",
+                "f008"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6d6172730000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "The jupiter position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f005",
+                "f006",
+                "f007",
+                "f008"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6d6172730000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "pos-jupiter can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f005",
+              "f006",
+              "f007",
+              "f008"
+            ],
+            "ontology_rule_ids": [
+              "ont_706f732d6a7570697465720000000000",
+              "ont_6173702d737175617265000000000000",
+              "ont_706f732d73756e000000000000000000",
+              "ont_0b397e84e8241333a49d5e6ef481a227",
+              "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+              "ont_7d270a613581574ad23f94a01589222d",
+              "ont_f97d4681eee458bedca9b2c3f99dc391",
+              "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+              "ont_706f732d6d6172730000000000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_04",
+          "title": "A standing aspect theme",
+          "summary": "This chapter holds A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_04_section_01",
+              "text": "The calculated evidence points to A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f013",
+                "f014"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_6173702d73657874696c650000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_04_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f013",
+                "f014"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_6173702d73657874696c650000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "asp-conjunction can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f013",
+                "f014"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_6173702d73657874696c650000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f013",
+                "f014"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_6173702d73657874696c650000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "asp-conjunction can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f013",
+              "f014"
+            ],
+            "ontology_rule_ids": [
+              "ont_6173702d636f6e6a756e6374696f6e00",
+              "ont_6173702d73657874696c650000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        }
+      ],
+      "additional_signatures": [],
+      "uncertainty_note": {
+        "text": "Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+        "claim_class": "uncertainty",
+        "feature_aliases": [
+          "f011"
+        ],
+        "ontology_rule_ids": [
+          "ont_756e6365727461696e74790000000000"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    "verdict": {
+      "schema_version": "0.7.0",
+      "verdict": "pass",
+      "findings": []
+    },
+    "public_projection": {
+      "schema_version": "0.7.0",
+      "pattern_id": "pat_d069fb6dff2867947d5f75d25f5c5ef1",
+      "generated_at": "2026-08-22T00:00:00.000Z",
+      "locale": "en-US",
+      "effective_accuracy": "unknown",
+      "provenance": {
+        "assembly_mode": "constrained_model",
+        "provider": "Hermetic",
+        "model_family": "m7-corpus-deterministic-v1",
+        "raw_birth_details_sent": false
+      },
+      "core_chapters": [
+        {
+          "title": "A standing position theme",
+          "summary": "This chapter holds The venus position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to The venus position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "pos-venus can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "The venus position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "pos-venus can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing aspect theme",
+          "summary": "This chapter holds A trine describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to A trine describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "asp-trine can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "A trine describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "asp-trine can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing position theme",
+          "summary": "This chapter holds The jupiter position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to The jupiter position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "pos-jupiter can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "The jupiter position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "pos-jupiter can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing aspect theme",
+          "summary": "This chapter holds A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "asp-conjunction can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "asp-conjunction can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        }
+      ],
+      "additional_signatures": [],
+      "uncertainty": {
+        "text": "Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+      }
+    }
+  }
+}

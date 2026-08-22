@@ -44,8 +44,8 @@ interface OutboxRow {
 
 export const ONTOLOGY_PIPELINE_OUTBOX_LIMIT = 4;
 export const ONTOLOGY_PIPELINE_STALE_DISPATCH_MS = 15 * 60 * 1_000;
-const TASK6_OUTBOX_STAGE_SQL =
-  "('reserved', 'corpus_reading', 'generating', 'compiling', 'evaluating')";
+const EXECUTABLE_OUTBOX_STAGE_SQL =
+  "('reserved', 'corpus_reading', 'generating', 'compiling', 'evaluating', 'regressing', 'signing', 'ingesting')";
 
 export class OntologyPipelineEnqueueError extends Error {
   constructor(readonly code: string) {
@@ -124,7 +124,7 @@ async function markOntologyPipelineDispatched(
     `UPDATE pattern_ontology_pipeline_runs
      SET dispatched_at = ?, updated_at = ?
      WHERE run_id = ? AND stage = ? AND stage_generation = ?
-       AND stage IN ${TASK6_OUTBOX_STAGE_SQL}
+       AND stage IN ${EXECUTABLE_OUTBOX_STAGE_SQL}
        AND stage_cursor = ? AND stage_attempt = ?
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
@@ -168,7 +168,7 @@ async function markOntologyPipelineDispatchedBatch(
     `UPDATE pattern_ontology_pipeline_runs
      SET dispatched_at = ?, updated_at = ?
      WHERE (${coordinates})
-       AND stage IN ${TASK6_OUTBOX_STAGE_SQL}
+       AND stage IN ${EXECUTABLE_OUTBOX_STAGE_SQL}
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
        AND unixepoch(available_at) <= unixepoch(?)`,
@@ -198,7 +198,7 @@ async function loadOutboxRow(
     `SELECT run_id, stage, stage_generation, stage_cursor, stage_attempt,
             available_at
      FROM pattern_ontology_pipeline_runs
-     WHERE run_id = ? AND stage IN ${TASK6_OUTBOX_STAGE_SQL}
+     WHERE run_id = ? AND stage IN ${EXECUTABLE_OUTBOX_STAGE_SQL}
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
        AND unixepoch(available_at) <= unixepoch(?)`,
@@ -325,7 +325,7 @@ export async function dispatchUndispatchedOntologyPipelineRuns(
     `SELECT run_id, stage, stage_generation, stage_cursor, stage_attempt,
             available_at
      FROM pattern_ontology_pipeline_runs
-     WHERE stage IN ${TASK6_OUTBOX_STAGE_SQL}
+     WHERE stage IN ${EXECUTABLE_OUTBOX_STAGE_SQL}
        AND claim_token IS NULL AND lease_expires_at IS NULL
        AND dispatched_at IS NULL
        AND unixepoch(available_at) <= unixepoch(?)
@@ -355,7 +355,7 @@ export async function dispatchUndispatchedOntologyPipelineRuns(
 }
 
 /**
- * Returns old, unclaimed Task 6 dispatch markers to the existing outbox lane.
+ * Returns old, unclaimed pipeline dispatch markers to the existing outbox lane.
  * This is the durable recovery path after Queue exhausts its bounded main
  * retries and moves the opaque delivery to the configured DLQ. A duplicate
  * still in flight is harmless because the claim CAS remains authoritative.
@@ -382,7 +382,7 @@ export async function recoverStaleOntologyPipelineDispatches(
      SET dispatched_at = NULL, updated_at = ?
      WHERE rowid IN (
        SELECT rowid FROM pattern_ontology_pipeline_runs
-       WHERE stage IN ${TASK6_OUTBOX_STAGE_SQL}
+       WHERE stage IN ${EXECUTABLE_OUTBOX_STAGE_SQL}
          AND claim_token IS NULL AND lease_expires_at IS NULL
          AND dispatched_at IS NOT NULL
          AND unixepoch(dispatched_at) <= unixepoch(?)

@@ -1,0 +1,2025 @@
+{
+  "schema_version": "ontology-regression-fixture/v1",
+  "fixture_id": "m7-exact-10",
+  "locale": "en-US",
+  "effective_accuracy": "exact",
+  "declared_outcome": "accepted",
+  "axes": [
+    "exact-birth-time",
+    "dense-feature-set",
+    "houses-and-angles-present",
+    "supported-locale"
+  ],
+  "chart_snapshot": {
+    "schema_version": "0.2.0",
+    "id": "cht_21e5ccf0d16f96fc45ca99da62e5a9d5",
+    "user_id": "usr_9466cc7b70a1ebe6c1ade0850d18acaa",
+    "profile_version": 1,
+    "fingerprint": "sha256:813dac907458104dd62099594330fa1bef32b8632e36501cdaa9d574883a867a",
+    "contract_id": "calc-contract-launch",
+    "contract_version": "0.2.0",
+    "container_digest": "sha256:3f305235d5bdbcacb9d3493aa7dab0f84ff7f7bfe1c1b9ad23fae314ac59b4bb",
+    "tzdb_version": "2026a",
+    "birth": {
+      "accuracy": "exact",
+      "utc_instant": "1990-05-10T12:00:00Z",
+      "timezone": "Etc/UTC"
+    },
+    "positions": [
+      {
+        "body": "sun",
+        "longitude_deg": 42,
+        "sign": "taurus",
+        "house": 1
+      },
+      {
+        "body": "moon",
+        "longitude_deg": 85,
+        "sign": "gemini",
+        "house": 2
+      },
+      {
+        "body": "mercury",
+        "longitude_deg": 128,
+        "sign": "leo",
+        "house": 3
+      },
+      {
+        "body": "venus",
+        "longitude_deg": 171,
+        "sign": "virgo",
+        "house": 4
+      },
+      {
+        "body": "mars",
+        "longitude_deg": 214,
+        "sign": "scorpio",
+        "house": 5
+      },
+      {
+        "body": "jupiter",
+        "longitude_deg": 257,
+        "sign": "sagittarius",
+        "house": 6
+      },
+      {
+        "body": "saturn",
+        "longitude_deg": 300,
+        "sign": "aquarius",
+        "house": 7
+      }
+    ],
+    "houses": {
+      "system_used": "placidus",
+      "fallback_applied": false,
+      "cusps_deg": [
+        5,
+        35,
+        65,
+        95,
+        125,
+        155,
+        185,
+        215,
+        245,
+        275,
+        305,
+        335
+      ]
+    },
+    "angles": {
+      "ascendant_deg": 5,
+      "midheaven_deg": 275
+    },
+    "aspects": [
+      {
+        "id": "asp_eaf227c87e152b06dec424fda4916bf4",
+        "body_a": "sun",
+        "body_b": "moon",
+        "aspect": "square",
+        "orb_deg": 2.1,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_6b7a66e633842027772d288d33eb613b",
+        "body_a": "sun",
+        "body_b": "mercury",
+        "aspect": "conjunction",
+        "orb_deg": 1.4,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_b2e33d4102966a7bc7685940a3a6033b",
+        "body_a": "moon",
+        "body_b": "venus",
+        "aspect": "trine",
+        "orb_deg": 3.2,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_7dca88d218fde9820bafb2c32078ada4",
+        "body_a": "mars",
+        "body_b": "jupiter",
+        "aspect": "opposition",
+        "orb_deg": 4.1,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      },
+      {
+        "id": "asp_1a27dcf8433f4182c3b77be134fc962a",
+        "body_a": "jupiter",
+        "body_b": "saturn",
+        "aspect": "sextile",
+        "orb_deg": 2.7,
+        "applying": false,
+        "orb_policy_id": "orb-launch-default",
+        "orb_policy_version": "0.2.0"
+      }
+    ],
+    "patterns": [],
+    "uncertainty": {
+      "accuracy": "exact",
+      "window": null,
+      "suppressed_features": [],
+      "qualified_features": [],
+      "user_facing_summary": "Exact birth time supports the calculated houses and angles when present."
+    },
+    "calculated_at": "2026-08-22T00:00:00.000Z",
+    "status": "active"
+  },
+  "feature_set_hash": "sha256:5f8442b67029448c26ee1e91a2a966964031f06426cb4d613fe9d5eed63a039c",
+  "features": [
+    {
+      "feature_id": "nft_02e9bde446864d406e7c015b996de112",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "mars",
+      "longitude": 214,
+      "sign": 8,
+      "house": 5
+    },
+    {
+      "feature_id": "nft_03e71fa2d8d15eec6d7d8044240c516f",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 6,
+      "longitude": 155,
+      "sign": 6
+    },
+    {
+      "feature_id": "nft_10bc3d3bc20d7c98124f99f9ac6dc451",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "moon",
+      "longitude": 85,
+      "sign": 3,
+      "house": 2
+    },
+    {
+      "feature_id": "nft_328fa8bd5d9e5d7530a749703987476e",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "sun",
+      "longitude": 42,
+      "sign": 2,
+      "house": 1
+    },
+    {
+      "feature_id": "nft_4152d730ea8d9debc48706cd4c8101ca",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 1,
+      "longitude": 5,
+      "sign": 1
+    },
+    {
+      "feature_id": "nft_49607e085c9423825554e7871502522a",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 12,
+      "longitude": 335,
+      "sign": 12
+    },
+    {
+      "feature_id": "nft_560fd97e03c86f319f83518720ce9d5c",
+      "feature_class": "angle",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "angle": "midheaven",
+      "longitude": 275,
+      "sign": 10
+    },
+    {
+      "feature_id": "nft_5b532e8aee5aa4bba779c327e281b170",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 7,
+      "longitude": 185,
+      "sign": 7
+    },
+    {
+      "feature_id": "nft_5e01051aae9cc286ce24a7ea21b8a861",
+      "feature_class": "angle",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "angle": "ascendant",
+      "longitude": 5,
+      "sign": 1
+    },
+    {
+      "feature_id": "nft_6dd5b475e733f04207b2b2d3d2ba306c",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 9,
+      "longitude": 245,
+      "sign": 9
+    },
+    {
+      "feature_id": "nft_6eed245458d2bb6eb4a6f9fcc040f011",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "jupiter",
+      "longitude": 257,
+      "sign": 9,
+      "house": 6
+    },
+    {
+      "feature_id": "nft_7654183041cbf4a44386512acf35e727",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 8,
+      "longitude": 215,
+      "sign": 8
+    },
+    {
+      "feature_id": "nft_7cbf686348c0cb0cb1cd206a6271c4e4",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "jupiter",
+      "body_b": "saturn",
+      "aspect": "sextile",
+      "orb": 2.7
+    },
+    {
+      "feature_id": "nft_83178f6d8a0e25d09af8d1afb8c9d977",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "saturn",
+      "longitude": 300,
+      "sign": 11,
+      "house": 7
+    },
+    {
+      "feature_id": "nft_858a77b1db62109daa0d796ebd7da901",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "mars",
+      "body_b": "jupiter",
+      "aspect": "opposition",
+      "orb": 4.1
+    },
+    {
+      "feature_id": "nft_8816abd49a1d49e76ef8570115d85fea",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 2,
+      "longitude": 35,
+      "sign": 2
+    },
+    {
+      "feature_id": "nft_90e648f572fb9e77111382f34872d9ff",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "moon",
+      "body_b": "venus",
+      "aspect": "trine",
+      "orb": 3.2
+    },
+    {
+      "feature_id": "nft_9672eda23f5353ed04a0255b0acd3972",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 3,
+      "longitude": 65,
+      "sign": 3
+    },
+    {
+      "feature_id": "nft_9c3c03afae3abbfe5ea4b721149dd240",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 4,
+      "longitude": 95,
+      "sign": 4
+    },
+    {
+      "feature_id": "nft_a42a6719910ff322262d76fbbaebcde6",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 10,
+      "longitude": 275,
+      "sign": 10
+    },
+    {
+      "feature_id": "nft_adaa33098dc32e4f8107feed6ace5c86",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "sun",
+      "body_b": "mercury",
+      "aspect": "conjunction",
+      "orb": 1.4
+    },
+    {
+      "feature_id": "nft_b0a544139af8c8d39ce36fad46460d5f",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "venus",
+      "longitude": 171,
+      "sign": 6,
+      "house": 4
+    },
+    {
+      "feature_id": "nft_cb0416019191fcfc105caf8239ed5902",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 5,
+      "longitude": 125,
+      "sign": 5
+    },
+    {
+      "feature_id": "nft_cba622337446d5e86ae07b07efe82442",
+      "feature_class": "uncertainty",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "accuracy": "exact",
+      "suppressed_features": []
+    },
+    {
+      "feature_id": "nft_e3f329bb96b46fcc4d407b18c64c4d2e",
+      "feature_class": "aspect",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body_a": "sun",
+      "body_b": "moon",
+      "aspect": "square",
+      "orb": 2.1
+    },
+    {
+      "feature_id": "nft_ee4221587dd691f3c972ca03a1e3f357",
+      "feature_class": "position",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "body": "mercury",
+      "longitude": 128,
+      "sign": 5,
+      "house": 3
+    },
+    {
+      "feature_id": "nft_faefcbe70d5489507f20f879ceab54fb",
+      "feature_class": "house_cusp",
+      "policy_id": "natal-feature-policy",
+      "policy_version": "1.0.0",
+      "house": 11,
+      "longitude": 305,
+      "sign": 11
+    }
+  ],
+  "chain": {
+    "selection_manifest": {
+      "schema_version": "0.7.0",
+      "policy_id": "pattern-selection-policy",
+      "policy_version": "1.0.0",
+      "feature_set_hash": "sha256:5f8442b67029448c26ee1e91a2a966964031f06426cb4d613fe9d5eed63a039c",
+      "sparse_pattern": false,
+      "accounting": [
+        {
+          "feature_id": "nft_02e9bde446864d406e7c015b996de112",
+          "alias": "f001",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_03e71fa2d8d15eec6d7d8044240c516f",
+          "alias": "f002",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_10bc3d3bc20d7c98124f99f9ac6dc451",
+          "alias": "f003",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_328fa8bd5d9e5d7530a749703987476e",
+          "alias": "f004",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_4152d730ea8d9debc48706cd4c8101ca",
+          "alias": "f005",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_49607e085c9423825554e7871502522a",
+          "alias": "f006",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_560fd97e03c86f319f83518720ce9d5c",
+          "alias": "f007",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_5b532e8aee5aa4bba779c327e281b170",
+          "alias": "f008",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_5e01051aae9cc286ce24a7ea21b8a861",
+          "alias": "f009",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_6dd5b475e733f04207b2b2d3d2ba306c",
+          "alias": "f010",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_6eed245458d2bb6eb4a6f9fcc040f011",
+          "alias": "f011",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_7654183041cbf4a44386512acf35e727",
+          "alias": "f012",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_7cbf686348c0cb0cb1cd206a6271c4e4",
+          "alias": "f013",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_83178f6d8a0e25d09af8d1afb8c9d977",
+          "alias": "f014",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_858a77b1db62109daa0d796ebd7da901",
+          "alias": "f015",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_8816abd49a1d49e76ef8570115d85fea",
+          "alias": "f016",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_90e648f572fb9e77111382f34872d9ff",
+          "alias": "f017",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_9672eda23f5353ed04a0255b0acd3972",
+          "alias": "f018",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_9c3c03afae3abbfe5ea4b721149dd240",
+          "alias": "f019",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_a42a6719910ff322262d76fbbaebcde6",
+          "alias": "f020",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_adaa33098dc32e4f8107feed6ace5c86",
+          "alias": "f021",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_b0a544139af8c8d39ce36fad46460d5f",
+          "alias": "f022",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_cb0416019191fcfc105caf8239ed5902",
+          "alias": "f023",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_cba622337446d5e86ae07b07efe82442",
+          "alias": "f024",
+          "coverage": "mandatory_any",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_e3f329bb96b46fcc4d407b18c64c4d2e",
+          "alias": "f025",
+          "coverage": "mandatory_core",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_ee4221587dd691f3c972ca03a1e3f357",
+          "alias": "f026",
+          "coverage": "eligible",
+          "reason": null
+        },
+        {
+          "feature_id": "nft_faefcbe70d5489507f20f879ceab54fb",
+          "alias": "f027",
+          "coverage": "eligible",
+          "reason": null
+        }
+      ]
+    },
+    "fact_packet": {
+      "schema_version": "0.7.0",
+      "locale": "en-US",
+      "effective_accuracy": "exact",
+      "uncertainty": {
+        "suppressed_classes": [],
+        "required_language_rule_ids": [
+          "ont_756e6365727461696e74790000000000"
+        ]
+      },
+      "features": [
+        {
+          "alias": "f001",
+          "feature_class": "position",
+          "fact": {
+            "body": "mars",
+            "longitude": 214,
+            "sign": 8,
+            "house": 5
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d6d6172730000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f002",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 6,
+            "longitude": 155,
+            "sign": 6
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f003",
+          "feature_class": "position",
+          "fact": {
+            "body": "moon",
+            "longitude": 85,
+            "sign": 3,
+            "house": 2
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_706f732d6d6f6f6e0000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f004",
+          "feature_class": "position",
+          "fact": {
+            "body": "sun",
+            "longitude": 42,
+            "sign": 2,
+            "house": 1
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_706f732d73756e000000000000000000",
+            "ont_0b397e84e8241333a49d5e6ef481a227",
+            "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+            "ont_7d270a613581574ad23f94a01589222d",
+            "ont_f97d4681eee458bedca9b2c3f99dc391",
+            "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f005",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 1,
+            "longitude": 5,
+            "sign": 1
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f006",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 12,
+            "longitude": 335,
+            "sign": 12
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f007",
+          "feature_class": "angle",
+          "fact": {
+            "angle": "midheaven",
+            "longitude": 275,
+            "sign": 10
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_616e676c652d6d630000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_a5ca3a47"
+          ]
+        },
+        {
+          "alias": "f008",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 7,
+            "longitude": 185,
+            "sign": 7
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f009",
+          "feature_class": "angle",
+          "fact": {
+            "angle": "ascendant",
+            "longitude": 5,
+            "sign": 1
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_616e676c652d61736300000000000000"
+          ],
+          "cluster_ids": [
+            "clu_a5ca3a47"
+          ]
+        },
+        {
+          "alias": "f010",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 9,
+            "longitude": 245,
+            "sign": 9
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f011",
+          "feature_class": "position",
+          "fact": {
+            "body": "jupiter",
+            "longitude": 257,
+            "sign": 9,
+            "house": 6
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d6a7570697465720000000000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f012",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 8,
+            "longitude": 215,
+            "sign": 8
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f013",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "jupiter",
+            "body_b": "saturn",
+            "aspect": "sextile",
+            "orb": 2.7
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_6173702d73657874696c650000000000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f014",
+          "feature_class": "position",
+          "fact": {
+            "body": "saturn",
+            "longitude": 300,
+            "sign": 11,
+            "house": 7
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d73617475726e000000000000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f015",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "mars",
+            "body_b": "jupiter",
+            "aspect": "opposition",
+            "orb": 4.1
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_6173702d6f70706f736974696f6e0000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f016",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 2,
+            "longitude": 35,
+            "sign": 2
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f017",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "moon",
+            "body_b": "venus",
+            "aspect": "trine",
+            "orb": 3.2
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_6173702d7472696e6500000000000000"
+          ],
+          "cluster_ids": [
+            "clu_3e7afe6e"
+          ]
+        },
+        {
+          "alias": "f018",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 3,
+            "longitude": 65,
+            "sign": 3
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "alias": "f019",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 4,
+            "longitude": 95,
+            "sign": 4
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2ab16f79"
+          ]
+        },
+        {
+          "alias": "f020",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 10,
+            "longitude": 275,
+            "sign": 10
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2ab16f79"
+          ]
+        },
+        {
+          "alias": "f021",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "sun",
+            "body_b": "mercury",
+            "aspect": "conjunction",
+            "orb": 1.4
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00"
+          ],
+          "cluster_ids": [
+            "clu_58a180d7"
+          ]
+        },
+        {
+          "alias": "f022",
+          "feature_class": "position",
+          "fact": {
+            "body": "venus",
+            "longitude": 171,
+            "sign": 6,
+            "house": 4
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d76656e757300000000000000"
+          ],
+          "cluster_ids": [
+            "clu_58a180d7"
+          ]
+        },
+        {
+          "alias": "f023",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 5,
+            "longitude": 125,
+            "sign": 5
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2ab16f79"
+          ]
+        },
+        {
+          "alias": "f024",
+          "feature_class": "uncertainty",
+          "fact": {
+            "accuracy": "exact",
+            "suppressed_features": []
+          },
+          "coverage": "mandatory_any",
+          "ontology_rule_ids": [
+            "ont_756e6365727461696e74790000000000"
+          ],
+          "cluster_ids": [
+            "clu_3c92831d"
+          ]
+        },
+        {
+          "alias": "f025",
+          "feature_class": "aspect",
+          "fact": {
+            "body_a": "sun",
+            "body_b": "moon",
+            "aspect": "square",
+            "orb": 2.1
+          },
+          "coverage": "mandatory_core",
+          "ontology_rule_ids": [
+            "ont_6173702d737175617265000000000000"
+          ],
+          "cluster_ids": [
+            "clu_58a180d7"
+          ]
+        },
+        {
+          "alias": "f026",
+          "feature_class": "position",
+          "fact": {
+            "body": "mercury",
+            "longitude": 128,
+            "sign": 5,
+            "house": 3
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_706f732d6d6572637572790000000000"
+          ],
+          "cluster_ids": [
+            "clu_58a180d7"
+          ]
+        },
+        {
+          "alias": "f027",
+          "feature_class": "house_cusp",
+          "fact": {
+            "house": 11,
+            "longitude": 305,
+            "sign": 11
+          },
+          "coverage": "eligible",
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "cluster_ids": [
+            "clu_2ab16f79"
+          ]
+        }
+      ],
+      "clusters": [
+        {
+          "cluster_id": "clu_3e7afe6e",
+          "feature_aliases": [
+            "f001",
+            "f003",
+            "f004",
+            "f011",
+            "f013",
+            "f014",
+            "f015",
+            "f017"
+          ],
+          "compatible_with": [
+            "clu_2ab16f79",
+            "clu_3c92831d",
+            "clu_58a180d7",
+            "clu_a5ca3a47",
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "cluster_id": "clu_58a180d7",
+          "feature_aliases": [
+            "f021",
+            "f022",
+            "f025",
+            "f026"
+          ],
+          "compatible_with": [
+            "clu_2ab16f79",
+            "clu_3c92831d",
+            "clu_3e7afe6e",
+            "clu_a5ca3a47",
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "cluster_id": "clu_b86907f0",
+          "feature_aliases": [
+            "f002",
+            "f005",
+            "f006",
+            "f008",
+            "f010",
+            "f012",
+            "f016",
+            "f018"
+          ],
+          "compatible_with": [
+            "clu_2ab16f79",
+            "clu_3c92831d",
+            "clu_3e7afe6e",
+            "clu_58a180d7",
+            "clu_a5ca3a47"
+          ]
+        },
+        {
+          "cluster_id": "clu_2ab16f79",
+          "feature_aliases": [
+            "f019",
+            "f020",
+            "f023",
+            "f027"
+          ],
+          "compatible_with": [
+            "clu_3c92831d",
+            "clu_3e7afe6e",
+            "clu_58a180d7",
+            "clu_a5ca3a47",
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "cluster_id": "clu_a5ca3a47",
+          "feature_aliases": [
+            "f007",
+            "f009"
+          ],
+          "compatible_with": [
+            "clu_2ab16f79",
+            "clu_3c92831d",
+            "clu_3e7afe6e",
+            "clu_58a180d7",
+            "clu_b86907f0"
+          ]
+        },
+        {
+          "cluster_id": "clu_3c92831d",
+          "feature_aliases": [
+            "f024"
+          ],
+          "compatible_with": [
+            "clu_2ab16f79",
+            "clu_3e7afe6e",
+            "clu_58a180d7",
+            "clu_a5ca3a47",
+            "clu_b86907f0"
+          ]
+        }
+      ],
+      "selection_constraints": {
+        "core_chapters_min": 4,
+        "core_chapters_max": 6,
+        "additional_signatures_max": 8,
+        "sparse_pattern": false
+      }
+    },
+    "plan": {
+      "schema_version": "0.7.0",
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "working_title": "A standing position theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f001",
+            "f003",
+            "f004",
+            "f011",
+            "f013",
+            "f014",
+            "f015",
+            "f017",
+            "f024"
+          ],
+          "ontology_rule_ids": [
+            "ont_706f732d6d6172730000000000000000",
+            "ont_706f732d6d6f6f6e0000000000000000",
+            "ont_706f732d73756e000000000000000000",
+            "ont_0b397e84e8241333a49d5e6ef481a227",
+            "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+            "ont_7d270a613581574ad23f94a01589222d",
+            "ont_f97d4681eee458bedca9b2c3f99dc391",
+            "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+            "ont_706f732d6a7570697465720000000000",
+            "ont_6173702d73657874696c650000000000",
+            "ont_706f732d73617475726e000000000000",
+            "ont_6173702d6f70706f736974696f6e0000",
+            "ont_6173702d7472696e6500000000000000",
+            "ont_756e6365727461696e74790000000000"
+          ],
+          "derived_synthesis_ids": [
+            "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+            "ont_7d270a613581574ad23f94a01589222d",
+            "ont_f97d4681eee458bedca9b2c3f99dc391",
+            "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+          ],
+          "required_tension_ids": [
+            "ont_706f732d6d6172730000000000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_706f732d6d6172730000000000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_706f732d6d6172730000000000000000#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_02",
+          "working_title": "A standing aspect theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f021",
+            "f022",
+            "f025",
+            "f026"
+          ],
+          "ontology_rule_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00",
+            "ont_706f732d76656e757300000000000000",
+            "ont_6173702d737175617265000000000000",
+            "ont_706f732d6d6572637572790000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00#tension"
+          ],
+          "required_resource_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_6173702d636f6e6a756e6374696f6e00#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_03",
+          "working_title": "A standing house_cusp theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f002",
+            "f005",
+            "f006",
+            "f008",
+            "f010",
+            "f012",
+            "f016",
+            "f018"
+          ],
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_686f7573650000000000000000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_686f7573650000000000000000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_686f7573650000000000000000000000#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_04",
+          "working_title": "A standing house_cusp theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f019",
+            "f020",
+            "f023",
+            "f027"
+          ],
+          "ontology_rule_ids": [
+            "ont_686f7573650000000000000000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_686f7573650000000000000000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_686f7573650000000000000000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_686f7573650000000000000000000000#counter"
+          ]
+        },
+        {
+          "chapter_key": "chapter_05",
+          "working_title": "A standing angle theme",
+          "purpose": "Integrate the selected calculated evidence without inventing facts or personal context.",
+          "feature_aliases": [
+            "f007",
+            "f009"
+          ],
+          "ontology_rule_ids": [
+            "ont_616e676c652d6d630000000000000000",
+            "ont_616e676c652d61736300000000000000"
+          ],
+          "derived_synthesis_ids": [],
+          "required_tension_ids": [
+            "ont_616e676c652d6d630000000000000000#tension"
+          ],
+          "required_resource_ids": [
+            "ont_616e676c652d6d630000000000000000#resource"
+          ],
+          "required_counter_expression_ids": [
+            "ont_616e676c652d6d630000000000000000#counter"
+          ]
+        }
+      ],
+      "additional_signatures": [],
+      "omissions": [],
+      "plan_hash": "sha256:7c7c2e25ef12e6cf94d2b879b2db2fd2ae3e30e17c5386eb4c309a324a303d19",
+      "sparse_pattern": false
+    },
+    "writer": {
+      "schema_version": "0.7.0",
+      "title": "Your Pattern",
+      "chapters": [
+        {
+          "chapter_key": "chapter_01",
+          "title": "A standing position theme",
+          "summary": "This chapter holds The mars position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_01_section_01",
+              "text": "The calculated evidence points to The mars position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f001",
+                "f003",
+                "f004",
+                "f011",
+                "f013",
+                "f014",
+                "f015",
+                "f017",
+                "f024"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6d6172730000000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d73657874696c650000000000",
+                "ont_706f732d73617475726e000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_6173702d7472696e6500000000000000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": [
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+              ]
+            },
+            {
+              "section_key": "chapter_01_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f001",
+                "f003",
+                "f004",
+                "f011",
+                "f013",
+                "f014",
+                "f015",
+                "f017",
+                "f024"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6d6172730000000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d73657874696c650000000000",
+                "ont_706f732d73617475726e000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_6173702d7472696e6500000000000000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": [
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50"
+              ]
+            }
+          ],
+          "tensions": [
+            {
+              "text": "pos-mars can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f001",
+                "f003",
+                "f004",
+                "f011",
+                "f013",
+                "f014",
+                "f015",
+                "f017",
+                "f024"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6d6172730000000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d73657874696c650000000000",
+                "ont_706f732d73617475726e000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_6173702d7472696e6500000000000000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "The mars position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f001",
+                "f003",
+                "f004",
+                "f011",
+                "f013",
+                "f014",
+                "f015",
+                "f017",
+                "f024"
+              ],
+              "ontology_rule_ids": [
+                "ont_706f732d6d6172730000000000000000",
+                "ont_706f732d6d6f6f6e0000000000000000",
+                "ont_706f732d73756e000000000000000000",
+                "ont_0b397e84e8241333a49d5e6ef481a227",
+                "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+                "ont_7d270a613581574ad23f94a01589222d",
+                "ont_f97d4681eee458bedca9b2c3f99dc391",
+                "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+                "ont_706f732d6a7570697465720000000000",
+                "ont_6173702d73657874696c650000000000",
+                "ont_706f732d73617475726e000000000000",
+                "ont_6173702d6f70706f736974696f6e0000",
+                "ont_6173702d7472696e6500000000000000",
+                "ont_756e6365727461696e74790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "pos-mars can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f001",
+              "f003",
+              "f004",
+              "f011",
+              "f013",
+              "f014",
+              "f015",
+              "f017",
+              "f024"
+            ],
+            "ontology_rule_ids": [
+              "ont_706f732d6d6172730000000000000000",
+              "ont_706f732d6d6f6f6e0000000000000000",
+              "ont_706f732d73756e000000000000000000",
+              "ont_0b397e84e8241333a49d5e6ef481a227",
+              "ont_2a9c6f5f78c174e1f5bf08e4981cc8a1",
+              "ont_7d270a613581574ad23f94a01589222d",
+              "ont_f97d4681eee458bedca9b2c3f99dc391",
+              "ont_71944b440ecf582fa5c5f3bc0cd9ec50",
+              "ont_706f732d6a7570697465720000000000",
+              "ont_6173702d73657874696c650000000000",
+              "ont_706f732d73617475726e000000000000",
+              "ont_6173702d6f70706f736974696f6e0000",
+              "ont_6173702d7472696e6500000000000000",
+              "ont_756e6365727461696e74790000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_02",
+          "title": "A standing aspect theme",
+          "summary": "This chapter holds A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_02_section_01",
+              "text": "The calculated evidence points to A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f021",
+                "f022",
+                "f025",
+                "f026"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_706f732d76656e757300000000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d6d6572637572790000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_02_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f021",
+                "f022",
+                "f025",
+                "f026"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_706f732d76656e757300000000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d6d6572637572790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "asp-conjunction can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f021",
+                "f022",
+                "f025",
+                "f026"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_706f732d76656e757300000000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d6d6572637572790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f021",
+                "f022",
+                "f025",
+                "f026"
+              ],
+              "ontology_rule_ids": [
+                "ont_6173702d636f6e6a756e6374696f6e00",
+                "ont_706f732d76656e757300000000000000",
+                "ont_6173702d737175617265000000000000",
+                "ont_706f732d6d6572637572790000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "asp-conjunction can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f021",
+              "f022",
+              "f025",
+              "f026"
+            ],
+            "ontology_rule_ids": [
+              "ont_6173702d636f6e6a756e6374696f6e00",
+              "ont_706f732d76656e757300000000000000",
+              "ont_6173702d737175617265000000000000",
+              "ont_706f732d6d6572637572790000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_03",
+          "title": "A standing house_cusp theme",
+          "summary": "This chapter holds House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_03_section_01",
+              "text": "The calculated evidence points to House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f002",
+                "f005",
+                "f006",
+                "f008",
+                "f010",
+                "f012",
+                "f016",
+                "f018"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_03_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f002",
+                "f005",
+                "f006",
+                "f008",
+                "f010",
+                "f012",
+                "f016",
+                "f018"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "house can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f002",
+                "f005",
+                "f006",
+                "f008",
+                "f010",
+                "f012",
+                "f016",
+                "f018"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f002",
+                "f005",
+                "f006",
+                "f008",
+                "f010",
+                "f012",
+                "f016",
+                "f018"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "house can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f002",
+              "f005",
+              "f006",
+              "f008",
+              "f010",
+              "f012",
+              "f016",
+              "f018"
+            ],
+            "ontology_rule_ids": [
+              "ont_686f7573650000000000000000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_04",
+          "title": "A standing house_cusp theme",
+          "summary": "This chapter holds House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_04_section_01",
+              "text": "The calculated evidence points to House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f019",
+                "f020",
+                "f023",
+                "f027"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_04_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f019",
+                "f020",
+                "f023",
+                "f027"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "house can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f019",
+                "f020",
+                "f023",
+                "f027"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f019",
+                "f020",
+                "f023",
+                "f027"
+              ],
+              "ontology_rule_ids": [
+                "ont_686f7573650000000000000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "house can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f019",
+              "f020",
+              "f023",
+              "f027"
+            ],
+            "ontology_rule_ids": [
+              "ont_686f7573650000000000000000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        },
+        {
+          "chapter_key": "chapter_05",
+          "title": "A standing angle theme",
+          "summary": "This chapter holds The midheaven describes public direction when birth time supports it. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "section_key": "chapter_05_section_01",
+              "text": "The calculated evidence points to The midheaven describes public direction when birth time supports it. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f007",
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_616e676c652d6d630000000000000000",
+                "ont_616e676c652d61736300000000000000"
+              ],
+              "derived_synthesis_ids": []
+            },
+            {
+              "section_key": "chapter_05_section_02",
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "reflective_interpretation",
+              "feature_aliases": [
+                "f007",
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_616e676c652d6d630000000000000000",
+                "ont_616e676c652d61736300000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "tensions": [
+            {
+              "text": "angle-mc can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "tension",
+              "feature_aliases": [
+                "f007",
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_616e676c652d6d630000000000000000",
+                "ont_616e676c652d61736300000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "resources": [
+            {
+              "text": "The midheaven describes public direction when birth time supports it. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+              "claim_class": "resource",
+              "feature_aliases": [
+                "f007",
+                "f009"
+              ],
+              "ontology_rule_ids": [
+                "ont_616e676c652d6d630000000000000000",
+                "ont_616e676c652d61736300000000000000"
+              ],
+              "derived_synthesis_ids": []
+            }
+          ],
+          "counter_expression": {
+            "text": "angle-mc can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+            "claim_class": "counter_expression",
+            "feature_aliases": [
+              "f007",
+              "f009"
+            ],
+            "ontology_rule_ids": [
+              "ont_616e676c652d6d630000000000000000",
+              "ont_616e676c652d61736300000000000000"
+            ],
+            "derived_synthesis_ids": []
+          }
+        }
+      ],
+      "additional_signatures": [],
+      "uncertainty_note": {
+        "text": "Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+        "claim_class": "uncertainty",
+        "feature_aliases": [
+          "f024"
+        ],
+        "ontology_rule_ids": [
+          "ont_756e6365727461696e74790000000000"
+        ],
+        "derived_synthesis_ids": []
+      }
+    },
+    "verdict": {
+      "schema_version": "0.7.0",
+      "verdict": "pass",
+      "findings": []
+    },
+    "public_projection": {
+      "schema_version": "0.7.0",
+      "pattern_id": "pat_5b979a686f676c63bdaf22c201572fa8",
+      "generated_at": "2026-08-22T00:00:00.000Z",
+      "locale": "en-US",
+      "effective_accuracy": "exact",
+      "provenance": {
+        "assembly_mode": "constrained_model",
+        "provider": "Hermetic",
+        "model_family": "m7-corpus-deterministic-v1",
+        "raw_birth_details_sent": false
+      },
+      "core_chapters": [
+        {
+          "title": "A standing position theme",
+          "summary": "This chapter holds The mars position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to The mars position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "pos-mars can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "The mars position describes a standing emphasis. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "pos-mars can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing aspect theme",
+          "summary": "This chapter holds A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "asp-conjunction can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "A conjunction describes a repeating negotiation between two bodies. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "asp-conjunction can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing house_cusp theme",
+          "summary": "This chapter holds House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "house can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "house can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing house_cusp theme",
+          "summary": "This chapter holds House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "house can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "House cusps locate topics when birth time is known. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "house can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        },
+        {
+          "title": "A standing angle theme",
+          "summary": "This chapter holds The midheaven describes public direction when birth time supports it. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.",
+          "sections": [
+            {
+              "text": "The calculated evidence points to The midheaven describes public direction when birth time supports it. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            },
+            {
+              "text": "How that tendency is used remains a matter of attention, not fate. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "tensions": [
+            {
+              "text": "angle-mc can harden into overuse. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "resources": [
+            {
+              "text": "The midheaven describes public direction when birth time supports it. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+            }
+          ],
+          "counter_expression": {
+            "text": "angle-mc can also read as a quieter strength. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+          }
+        }
+      ],
+      "additional_signatures": [],
+      "uncertainty": {
+        "text": "Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains. This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains."
+      }
+    }
+  }
+}

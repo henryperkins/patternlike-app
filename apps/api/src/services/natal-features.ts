@@ -157,8 +157,8 @@ export async function deriveNatalFeatureSet(
   const rawPatterns = Array.isArray(snap.patterns) ? snap.patterns : [];
   for (const raw of rawPatterns) {
     const item = record(raw);
-    const name = item?.pattern ?? item?.type ?? item?.name;
-    const members = item?.member_bodies ?? item?.bodies;
+    const name = item?.pattern_type ?? item?.pattern ?? item?.type ?? item?.name;
+    const members = item?.members ?? item?.member_bodies ?? item?.bodies;
     if (typeof name !== "string" || !Array.isArray(members)) continue;
     const normalizedMembers = [...new Set(members.map(body).filter((v): v is CelestialBody => v !== null))].sort();
     if (normalizedMembers.length < 2) continue;

@@ -97,6 +97,51 @@ test("selection assigns luminary facts as mandatory_core and never sends nft_ id
   assert.ok(selected.packet.features.every((row) => row.ontology_rule_ids.length >= 1));
 });
 
+test("selection carries every calculated suppression class into the closed uncertainty block", () => {
+  const release = syntheticOntologyRelease();
+  const features = FEATURES.map((item) =>
+    item.feature_class === "uncertainty"
+      ? {
+          ...item,
+          accuracy: "unknown" as const,
+          suppressed_features: [
+            "houses",
+            "angles",
+            "angle_transits",
+            "moon_time_sensitive",
+          ],
+        }
+      : item,
+  );
+  const selected = selectPatternEvidence({
+    locale: "en-US",
+    effectiveAccuracy: "unknown",
+    featureSetHash: `sha256:${"33".repeat(32)}`,
+    features,
+    ontology: release.records,
+  });
+
+  assert.deepEqual(selected.packet.uncertainty.suppressed_classes, [
+    "angle_transits",
+    "angles",
+    "houses",
+    "moon_time_sensitive",
+  ]);
+});
+
+test("selection normalizes the persisted M4 digest to the M7 content-hash form", () => {
+  const release = syntheticOntologyRelease();
+  const selected = selectPatternEvidence({
+    locale: "en-US",
+    effectiveAccuracy: "exact",
+    featureSetHash: "44".repeat(32),
+    features: FEATURES,
+    ontology: release.records,
+  });
+
+  assert.equal(selected.manifest.feature_set_hash, `sha256:${"44".repeat(32)}`);
+});
+
 test("deterministic plan and writer pass validators and strip private ledgers", () => {
   const release = syntheticOntologyRelease();
   const selected = selectPatternEvidence({
