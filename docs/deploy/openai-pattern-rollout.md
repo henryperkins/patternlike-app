@@ -44,17 +44,17 @@ This table describes repository evidence, not unqueried live state.
 | Area | State at 2026-08-22 | Evidence / next owner |
 | --- | --- | --- |
 | Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a |
-| Executor/provider path and queue-level integration | Complete in repository; not live | `pattern-execute.ts`, `pattern-execute-openai.test.ts`; rollout `off` prevents provider work |
+| Executor/provider path and queue-level integration | Deployed with rollout off | Worker `c20fa0da-273b-4d63-8fdd-7fc53d972c05`; `pattern-execute.ts`, `pattern-execute-openai.test.ts` |
 | Artifact-first idempotency, attempts, writer↔verifier correction, 11-call loop | Complete | `pattern-execute.ts`; exact ceiling in `pattern-execute-protocol.test.ts` |
 | Executed-pin provenance and per-stage usage | Complete | `pattern-execute.ts`; migration `0010_pattern_stage_class_usage.sql` |
-| `0009` / `0010` | Present in repository; remote state unqueried | Apply only through Gate 2 |
-| Pattern model/strict-schema verification command | Present; no fresh live run recorded | `npm run publisher:pattern:model:verify -w @patternlike/api`; Gate 4 remains open |
+| `0009` / `0010` / `0011` / `0012` | Applied to production in order | Gate 2 evidence below; integrity and shape checks clean |
+| Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
 | Public-capable machine ontology pipeline | Engineering complete through Task 10; rollout evidence open | Automated ontology plan Task 11 and Gates 2–10 remain operational work |
 | Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
 | Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
 | Numeric call-limit value | `100` in committed production config | A value is not spend approval; Gate 6 remains open |
-| Production DB, secrets, active ontology pointer, deployed Worker version | **Not re-queried by this documentation change** | Gates 2–5 must record live evidence |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 5 | No Pattern claims/artifacts/provider-ledger rows; OpenAI Worker secret present; ontology signer/keyring secrets remain unprovisioned; no active ontology evidence recorded |
 
 ## What remains before the first generated Pattern
 
@@ -94,9 +94,11 @@ release recalls it and triggers withdrawal for documents based on it.
 
 ## Gate 1 — complete and freeze the code candidate
 
-**Current state:** complete for local candidate `92aa24d` on 2026-08-22. The
-full command set passed against the exact tree committed there. This records no
-provider call or remote change; Gates 2–10 remain open.
+**Current state:** requalified and complete for candidate `611884e` on
+2026-08-22 after the first signer upload exposed a missing platform-required
+handler. A regression test first reproduced that upload shape, the signer added
+an empty-404 `fetch`, and the full command set passed against the corrected
+tree. The local verification itself made no provider call or remote change.
 
 Run from the repository root:
 
@@ -126,8 +128,27 @@ drift, or non-`off` committed rollout.
 
 ## Gate 2 — inventory production and apply forward-only migrations
 
-**Current state:** not started. Do not infer migration state from files in the
-repository.
+**Current state:** complete on 2026-08-22. The initial production ledger ended
+at `0008`. The operator explicitly approved including the unexpected but
+additive `0012_ontology_pipeline.sql`; `0009` through `0012` were then applied
+in numeric order.
+
+Recorded evidence:
+
+- pre-apply Time Travel bookmark:
+  `00000081-00000000-000050cf-14b34dd939ee6e24552c9757f1f197b1`;
+- full export outside the repository at
+  `~/patternlike-backups/patternlike-ops-pre0009-20260822T1216Z.sql`, mode 0600,
+  759,696 bytes, SHA-256
+  `01a93877510c89731d1bb2bfed8828f626e802937936ded28950a3e09b609948`;
+- post-apply Time Travel bookmark:
+  `00000081-0000000a-000050cf-9123939a04ef16532cb26441a249ea2a`;
+- no migration remains pending; `foreign_key_check` returned zero rows,
+  `quick_check` returned `ok`, and `assertion_probe` remained empty;
+- all pre-existing target tables preserved their zero row counts; all four
+  `0012` pipeline tables were also empty; and
+- the correction artifact class, six stage counters, four pipeline tables, and
+  eight required indexes were present after apply.
 
 Before applying anything, record a D1 export path, time-travel bookmark, current
 migration list, row counts for every table rebuilt by pending migrations, and:
@@ -140,8 +161,9 @@ wrangler d1 execute patternlike-ops --config apps/api/wrangler.toml --env produc
 
 Apply pending migrations in numeric order with the same explicit config and
 environment. For adapter rollout, `0009` widens the artifact-class CHECK and
-`0010` adds stage-class usage counters. Preserve populated artifact rows
-byte-for-byte through the `0009` rebuild.
+`0010` adds stage-class usage counters. `0011` adds the terminal pipeline
+evidence receipt and `0012` adds the automated pipeline control-plane tables.
+Preserve populated artifact rows byte-for-byte through the `0009` rebuild.
 
 Afterward, record the migration list, `foreign_key_check` (zero rows),
 `quick_check` (`ok`), empty `assertion_probe`, table SQL, and pre/post row counts.
@@ -152,7 +174,29 @@ Worker candidate was ready.
 
 ## Gate 3 — deploy the compatible Worker with rollout off
 
-**Current state:** not started.
+**Current state:** API version
+`c20fa0da-273b-4d63-8fdd-7fc53d972c05` (version 133) is deployed at 100% from
+candidate `611884e`. Deployment and unauthenticated operational checks passed,
+but no reusable production ID token was available for the required
+authenticated before/after Pattern read. Leave this gate open until that replay
+is recorded.
+
+Recorded evidence:
+
+- prior deployed version `99847321-0679-480c-ab31-5299d0c37444` was recorded
+  before the change;
+- signer version `9533269b-08e8-4ece-9418-928405a16449` was deployed first as
+  the private service-binding target; it has only the empty-404 `fetch` and
+  `signOntology` handlers, and its signing secret is deliberately still absent;
+- `/health` returned 200 with `environment=production`; unauthenticated
+  `/v1/pattern` and `/v1/pattern-state` remained 401;
+- the deployed binding reports `PATTERN_AI_ROLLOUT=off`, publisher `openai`,
+  queue `patternlike-pattern-generation`, and the expected signer service;
+- the Pattern consumer reports DLQ `patternlike-pattern-generation-dlq`, batch
+  size 1, three retries, five-second wait, and bounded concurrency 2; and
+- after health/auth smoke, `pattern_provider_daily_usage` still contained zero
+  rows and zero planner/writer/verifier calls; there were no Pattern claims or
+  artifacts.
 
 Deploy the exact Gate 1 commit:
 
@@ -181,6 +225,10 @@ immediate nudge is *deliberately* refused by `claimStage`'s
 what re-sends it. With no cron, a backed-off Pattern job waits forever, holding
 the reader's one claim.
 
+**Scheduler decision for this run:** keep production `crons = []` through Gates
+2–5. Therefore a backed-off Pattern provider retry cannot recover until the
+scheduler is enabled. It must be enabled or separately resolved before Gate 8.
+
 Enabling the production cron is its own configuration change with its own gate
 (see `docs/deploy/openai-daily-reading-rollout.md`), because the same schedule
 drives the daily-reading scheduler. Either enable it before Gate 8, or record
@@ -191,9 +239,12 @@ traffic. Roll back the Worker version; do not roll back the forward migration.
 
 ## Gate 4 — fresh model and strict-schema preflight
 
-**Current state:** the reproducible command is implemented and hermetically
-tested. Repository evidence exists from 2026-08-19, but no fresh live run is
-recorded for this candidate.
+**Current state:** complete for candidate `611884e` on 2026-08-22. A fresh live
+run passed model lookup for `gpt-5.6-sol` and the minimal strict `pattern`
+schema. It recorded response id
+`resp_0c0e06d21cb2a7f3016a8996efc86887d09b15a9fbe285e27c`, response SHA-256
+`sha256:047754291268ee488b96fe19fc26087af468a30748e35a0af707e358ac7ce517`,
+and completion time `2026-08-22T12:32:49.920Z`; no provider prose was printed.
 
 Run from the repository root only when the provider call is authorized:
 
@@ -218,10 +269,18 @@ any output containing provider prose.
 
 ## Gate 5 — configure one credential route and verify AI Gateway state
 
-**Current state:** committed mode is `worker`; gateway ids and alias are empty.
-The operator has already chosen the existing AI Gateway whose literal id and
-stored-key alias are both `default`, with BYOK and no custom domain or Access.
-No cutover is performed by this document.
+**Current state:** the operator chose to reuse the direct Worker credential
+route. Deployed version `c20fa0da-273b-4d63-8fdd-7fc53d972c05` consistently
+declares `OPENAI_CREDENTIAL_SOURCE=worker`, has the `OPENAI_API_KEY` secret, and
+has empty gateway account/id/alias values with no `AI_GATEWAY_TOKEN`. The Gate 4
+live call proves the reusable local credential can reach the pinned model and
+schema. No gateway cutover was performed.
+
+The route configuration is verified, but this gate remains open on upstream
+retention posture. The project credential received 403 from OpenAI's
+organization-retention admin endpoint, no `OPENAI_ADMIN_KEY` or authenticated
+dashboard session is available, and a project credential cannot prove the
+organization setting or a project override. Record both before Gate 5 closes.
 
 Allowed final states are exact:
 
@@ -230,7 +289,7 @@ Allowed final states are exact:
 | `worker` | `OPENAI_API_KEY`; either both gateway ids or neither | BYOK alias without stored mode; half-configured gateway |
 | `gateway_stored` | both gateway ids, `AI_GATEWAY_TOKEN`, pinned `OPENAI_GATEWAY_KEY_ALIAS` | `OPENAI_API_KEY`, missing alias, missing token |
 
-For the intended stored-key cutover, prepare and verify one Worker version in
+For any later stored-key cutover, prepare and verify one Worker version in
 which `AI_GATEWAY_ACCOUNT_ID`, `AI_GATEWAY_ID="default"`, alias `default`, and
 `AI_GATEWAY_TOKEN` are present while `OPENAI_API_KEY` is absent. Do not expose
 traffic to an intermediate combination. Record secret names and version ids,
@@ -247,19 +306,19 @@ not permanent evidence.
 
 | Setting | Required / accepted state | Evidence |
 | --- | --- | --- |
-| Gateway identity | existing reviewed id `default`; prove it already exists before sending | pending |
-| Authenticated Gateway | on | pending |
-| Stored provider key | OpenAI, alias `default` | pending |
-| Guardrails | absent/off | pending |
-| DLP | absent/off | pending |
-| Dynamic Routes / fallbacks | none | pending |
-| Retry default | record it; every request overrides to `1` | pending |
-| Cache default | record it; every request sets skip-cache | pending |
-| Spend-limit action | `Block` if configured; never fallback | pending |
-| Gateway logging / Logpush | record actual state | pending |
-| Automatic Log Deletion | record actual state | pending |
-| Zero Data Retention | record actual state; it does not protect BYOK traffic | pending |
-| OpenAI upstream retention | record the authorized account/project posture separately | pending |
+| Gateway identity | existing reviewed id `default`; prove it already exists before sending | N/A — direct Worker route selected |
+| Authenticated Gateway | on | N/A — direct Worker route selected |
+| Stored provider key | OpenAI, alias `default` | N/A — direct Worker route selected |
+| Guardrails | absent/off | N/A — direct Worker route selected |
+| DLP | absent/off | N/A — direct Worker route selected |
+| Dynamic Routes / fallbacks | none | N/A — direct Worker route selected |
+| Retry default | record it; every request overrides to `1` | N/A — direct Worker route selected |
+| Cache default | record it; every request sets skip-cache | N/A — direct Worker route selected |
+| Spend-limit action | `Block` if configured; never fallback | N/A — direct Worker route selected |
+| Gateway logging / Logpush | record actual state | N/A — direct Worker route selected |
+| Automatic Log Deletion | record actual state | N/A — direct Worker route selected |
+| Zero Data Retention | record actual state; it does not protect BYOK traffic | N/A — direct Worker route selected |
+| OpenAI upstream retention | record the authorized organization and project posture separately | pending — admin key or authenticated dashboard required |
 
 Every routed request must send exact values
 `cf-aig-collect-log:false`, `cf-aig-max-attempts:1`, and
@@ -448,11 +507,11 @@ until its evidence exists.
 | Date UTC | Gate | Commit / Worker version | Migration state | Ontology version / origin | Evidence summary | Result |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-08-20 | Foundation only | `8558e82`…`d2975e0`, `31d3621` | unchanged | none | Tasks 1–5a complete; focused seven-file lane passed 222 tests | complete, not a rollout gate |
-| 2026-08-22 | 1 | `92aa24d` | repository migrations through `0011`; remote unqueried and unchanged | none | typecheck, root tests (including 1,650 API, 207 web, and 8 verifier tests), build/dry-run, frozen-contract validation, and D1 smoke passed; both Pattern rollouts remained `off`; no live call or remote action | complete, local candidate only |
-|  | 2 |  |  |  |  | pending |
-|  | 3 |  |  |  |  | pending |
-|  | 4 |  |  |  |  | pending |
-|  | 5 |  |  |  |  | pending |
+| 2026-08-22 | 1 | `611884e` | repository migrations through `0012`; remote unchanged during candidate verification | none | corrected signer handler reproduced red then green; typecheck, root tests (including 1,650 API, 207 web, 19 signer, and 8 verifier tests), build/dry-run, frozen contracts, and D1 smoke passed; Pattern rollout remained `off` | complete, corrected candidate |
+| 2026-08-22 | 2 | `611884e` | production advanced `0008` → `0012`; nothing pending | none | external 0600 export plus pre/post bookmarks; `0009`–`0012` applied in order; FK/integrity/assertion/shape/count checks clean | complete |
+| 2026-08-22 | 3 | `611884e`; signer `9533269b`; API `c20fa0da` | `0012`, compatible | none | health 200; rollout off; Pattern queue/DLQ batch 1/concurrency 2; zero Pattern usage/claims/artifacts; scheduler stays off; authenticated read replay unavailable; signer key absent and fail-closed | deployed; gate open on authenticated replay |
+| 2026-08-22 | 4 | `611884e`; API `c20fa0da` | `0012` | none | live `gpt-5.6-sol` lookup and strict `pattern` schema passed; response id/hash/time recorded without prose | complete |
+| 2026-08-22 | 5 | `611884e`; API `c20fa0da` | `0012` | none | direct Worker mode is internally consistent; OpenAI secret present and gateway fields/token absent; upstream organization/project retention could not be read with project key (403) | route verified; gate open on retention evidence |
 |  | 6 |  |  |  |  | pending |
 |  | 7A or 7B |  |  |  |  | pending |
 |  | 8 |  |  |  |  | pending |
