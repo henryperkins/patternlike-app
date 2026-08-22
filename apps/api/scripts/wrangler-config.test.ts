@@ -77,3 +77,28 @@ test("ontology pipeline queues are distinct and fully redeclared", () => {
       producer.binding === "ONTOLOGY_PIPELINE_QUEUE")?.queue,
   );
 });
+
+test("Pattern replay ledger has dedicated development and production buckets", () => {
+  const development = unstable_readConfig({ config: configPath });
+  const production = unstable_readConfig({
+    config: configPath,
+    env: "production",
+  });
+
+  assert.deepEqual(
+    development.r2_buckets.find((bucket: { binding?: string }) =>
+      bucket.binding === "PATTERN_REPLAY_LEDGER"),
+    {
+      binding: "PATTERN_REPLAY_LEDGER",
+      bucket_name: "pattern-erasure-replay-dev",
+    },
+  );
+  assert.deepEqual(
+    production.r2_buckets.find((bucket: { binding?: string }) =>
+      bucket.binding === "PATTERN_REPLAY_LEDGER"),
+    {
+      binding: "PATTERN_REPLAY_LEDGER",
+      bucket_name: "pattern-erasure-replay",
+    },
+  );
+});

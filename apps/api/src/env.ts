@@ -229,6 +229,12 @@ export interface Env {
    * CONTENT_RELEASE_KEYS. Ingestion fails closed while unset.
    */
   PATTERN_ONTOLOGY_KEYS?: string;
+  /** Dedicated create-only R2 authority for Pattern erasure/claim replay. */
+  PATTERN_REPLAY_LEDGER?: R2Bucket;
+  /** Active Ed25519 writer secret; never place this private material in vars. */
+  PATTERN_REPLAY_LEDGER_SIGNING_KEY?: string;
+  /** Public Ed25519 verification allowlist retained across key rotations. */
+  PATTERN_REPLAY_LEDGER_KEYS?: string;
   /** Separate from SERVICE_AUTH_TOKEN and from consumer sessions. */
   PATTERN_ADMIN_TOKEN?: string;
 }

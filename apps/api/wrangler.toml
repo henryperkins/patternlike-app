@@ -25,6 +25,12 @@ migrations_dir = "../../db/d1"
 binding = "ARTIFACTS"
 bucket_name = "pattern-artifacts-dev"
 
+# Signed, content-free Pattern lifecycle intents live outside D1 Time Travel
+# and outside the general artifact bucket by construction.
+[[r2_buckets]]
+binding = "PATTERN_REPLAY_LEDGER"
+bucket_name = "pattern-erasure-replay-dev"
+
 # Private ontology-signing identity. The target has no route and owns the
 # PATTERN_ONTOLOGY_SIGNING_KEY secret; this Worker never receives that secret.
 [[services]]
@@ -475,6 +481,10 @@ migrations_dir = "../../db/d1"
 [[env.production.r2_buckets]]
 binding = "ARTIFACTS"
 bucket_name = "pattern-artifacts"
+
+[[env.production.r2_buckets]]
+binding = "PATTERN_REPLAY_LEDGER"
+bucket_name = "pattern-erasure-replay"
 
 [[env.production.services]]
 binding = "ONTOLOGY_SIGNER"

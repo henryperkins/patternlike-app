@@ -191,6 +191,19 @@ export async function resetDb(): Promise<void> {
     } while (cursor);
   }
 
+  if (env.PATTERN_REPLAY_LEDGER) {
+    let cursor: string | undefined;
+    do {
+      const page = await env.PATTERN_REPLAY_LEDGER.list({
+        prefix: "pattern-erasure-replay/",
+        cursor,
+      });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.PATTERN_REPLAY_LEDGER.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
+
   await env.DB.prepare(
     `INSERT INTO pattern_ontology_pointer (id, active_version, updated_at)
      VALUES (1, NULL, '1970-01-01T00:00:00Z')`,
