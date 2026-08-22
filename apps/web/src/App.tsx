@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BirthProfileRequest } from "@patternlike/shared";
 import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
@@ -18,7 +19,11 @@ import {
   type BirthWorkflowResponse,
   type ChartResponse,
 } from "./lib/api-client.js";
-import { beginSignIn, completeSignIn, isRedirectCallback, signOut } from "./lib/auth.js";
+import {
+  clearAuth0CallbackParams,
+  completeSignIn,
+  signOut,
+} from "./lib/auth.js";
 
 type ChartState =
   | { status: "loading" }
@@ -52,13 +57,25 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
-export default function App() {
+interface AppProps {
+  isAuth0Redirect?: boolean;
+}
+
+export default function App({ isAuth0Redirect = false }: AppProps) {
+  const {
+    error: auth0Error,
+    getIdTokenClaims,
+    isLoading: isAuth0Loading,
+    loginWithRedirect,
+    logout: auth0Logout,
+  } = useAuth0();
+  const callbackSession = useRef<Promise<void> | null>(null);
   const [view, setView] = useState<AppRoute>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
   const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
   const [correctingBirth, setCorrectingBirth] = useState(false);
 
-  const load = async (signal?: AbortSignal) => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const chart = await getChart(signal);
       setAuthState({ status: "signed-in" });
@@ -83,7 +100,7 @@ export default function App() {
         requestId: error instanceof ApiError ? error.requestId : null,
       });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const onHashChange = () => setView(currentView());
@@ -98,35 +115,57 @@ export default function App() {
   }, [view]);
 
   useEffect(() => {
+    if (isAuth0Redirect || currentView() === "deletion-status") return;
     const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [isAuth0Redirect, load]);
 
+  useEffect(() => {
+    if (
+      !isAuth0Redirect ||
+      isAuth0Loading ||
+      currentView() === "deletion-status"
+    ) {
+      return;
+    }
+
+    const controller = new AbortController();
     const start = async () => {
-      // Deletion status is deliberately independent of the chart bootstrap.
-      // A pending-deletion account is frozen, so probing a normal account route
-      // first would strand a direct reload on the generic error screen.
-      if (currentView() === "deletion-status") return;
+      if (auth0Error) {
+        clearAuth0CallbackParams();
+        setAuthState({
+          status: "signed-out",
+          error: auth0Error.message || "Sign-in failed.",
+        });
+        return;
+      }
 
-      // Finish an Auth0 redirect before asking the API anything: the session
-      // cookie is set by that exchange, so probing /v1/chart first would 401 on
-      // every single sign-in and flash the signed-out page at a user who just
-      // authenticated successfully.
-      if (isRedirectCallback()) {
-        try {
-          await completeSignIn();
-        } catch (error) {
+      callbackSession.current ??= completeSignIn(getIdTokenClaims);
+      try {
+        await callbackSession.current;
+      } catch (error) {
+        if (!controller.signal.aborted) {
           setAuthState({
             status: "signed-out",
             error: error instanceof Error ? error.message : "Sign-in failed.",
           });
-          return;
         }
+        return;
       }
-      await load(controller.signal);
+
+      if (!controller.signal.aborted) await load(controller.signal);
     };
 
     void start();
     return () => controller.abort();
-  }, []);
+  }, [
+    auth0Error,
+    getIdTokenClaims,
+    isAuth0Loading,
+    isAuth0Redirect,
+    load,
+  ]);
 
   /**
    * A 401 from a view, rather than from the mount probe.
@@ -158,7 +197,7 @@ export default function App() {
         // leave. Auth0's logout still runs (signOut calls it from `finally`),
         // and the cookie is cleared server-side on the next resolve attempt.
       }
-    });
+    }, auth0Logout);
   };
 
   const submitBirthProfile = async (
@@ -222,7 +261,12 @@ export default function App() {
   // to a view that requires a session, so showing the chrome to a signed-out
   // caller would offer five routes that all bounce straight back here.
   if (authState.status === "signed-out") {
-    return <SignedOut onSignIn={beginSignIn} error={authState.error} />;
+    return (
+      <SignedOut
+        onSignIn={() => loginWithRedirect()}
+        error={authState.error}
+      />
+    );
   }
 
   const shellStatus = chartState.status;

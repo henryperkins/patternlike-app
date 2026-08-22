@@ -1,10 +1,14 @@
 import axe from "axe-core";
-import { render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Auth0Client } from "@auth0/auth0-spa-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  initialContext,
+  type Auth0ContextInterface,
+  type IdToken,
+} from "@auth0/auth0-react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.js";
-import { __setAuthClientForTests } from "./lib/auth.js";
 import {
   capturedFor,
   deferred,
@@ -19,6 +23,40 @@ import {
   evidenceGraph,
   todayResponse,
 } from "./test/reading-fixture.js";
+
+const auth0Harness = vi.hoisted(() => ({
+  current: null as Auth0ContextInterface | null,
+}));
+
+vi.mock("@auth0/auth0-react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@auth0/auth0-react")>();
+  return {
+    ...actual,
+    useAuth0: () => {
+      if (!auth0Harness.current) throw new Error("Auth0 test context missing");
+      return auth0Harness.current;
+    },
+  };
+});
+
+function setAuth0(
+  overrides: Partial<Auth0ContextInterface> = {},
+): Auth0ContextInterface {
+  const current = {
+    ...initialContext,
+    isLoading: false,
+    error: undefined,
+    getIdTokenClaims: vi.fn().mockResolvedValue({
+      __raw: "header.payload.signature",
+      sub: "auth0|test-only",
+    } as IdToken),
+    loginWithRedirect: vi.fn().mockResolvedValue(undefined),
+    logout: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  } as Auth0ContextInterface;
+  auth0Harness.current = current;
+  return current;
+}
 
 const emptyTopics: MockResponse = {
   status: 200,
@@ -119,9 +157,14 @@ const chart = {
   status: "active",
 };
 
+beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+  setAuth0();
+  mockApiResponses({});
+});
+
 afterEach(() => {
-  // Leaks across files otherwise: the auth client is module-level state.
-  __setAuthClientForTests(null);
+  auth0Harness.current = null;
 });
 
 describe("web application shell", () => {
@@ -767,6 +810,114 @@ describe("web application shell", () => {
     expect(screen.queryByText(/API unavailable/)).not.toBeInTheDocument();
   });
 
+  it("loads a valid Worker session without waiting for Auth0 initialization", async () => {
+    const auth0 = setAuth0({ isLoading: true });
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /architecture of your chart/i }),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/sessions")).toHaveLength(0);
+    expect(auth0.getIdTokenClaims).not.toHaveBeenCalled();
+  });
+
+  it("ignores an ordinary Auth0 initialization error when the Worker session is valid", async () => {
+    setAuth0({ error: new Error("issuer unavailable") });
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /architecture of your chart/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sign in/i })).not.toBeInTheDocument();
+  });
+
+  it("waits for the SDK callback and exchanges one session before probing the chart", async () => {
+    const sessionGate = deferred();
+    setAuth0({ isLoading: true });
+    mockApiResponses({
+      "/v1/sessions": {
+        status: 201,
+        gate: sessionGate.promise,
+        body: {
+          token: "sess_test_only",
+          expires_at: "2026-09-07T00:00:00Z",
+        },
+      },
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    const { rerender } = render(
+      <StrictMode>
+        <App isAuth0Redirect />
+      </StrictMode>,
+    );
+
+    expect(capturedFor("/v1/sessions")).toHaveLength(0);
+    expect(capturedFor("/v1/chart")).toHaveLength(0);
+
+    setAuth0({ isLoading: false });
+    rerender(
+      <StrictMode>
+        <App isAuth0Redirect />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(capturedFor("/v1/sessions")).toHaveLength(1));
+    expect(capturedFor("/v1/sessions")[0].body).toEqual({
+      id_token: "header.payload.signature",
+    });
+    expect(capturedFor("/v1/chart")).toHaveLength(0);
+
+    sessionGate.release();
+    expect(
+      await screen.findByRole("heading", { name: /architecture of your chart/i }),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/sessions")).toHaveLength(1);
+    expect(capturedFor("/v1/chart")).toHaveLength(1);
+  });
+
+  it("cleans a refused callback and shows its SDK error on the existing signed-out surface", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/?error=access_denied&error_description=User%20declined&state=xyz#pattern",
+    );
+    setAuth0({ error: new Error("User declined") });
+
+    render(<App isAuth0Redirect />);
+
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(screen.getByText(/User declined/i)).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+    expect(window.location.hash).toBe("#pattern");
+    expect(capturedFor("/v1/chart")).toHaveLength(0);
+  });
+
+  it("starts Universal Login from the existing Sign in button", async () => {
+    const auth0 = setAuth0();
+    mockApiResponses({
+      "/v1/chart": {
+        status: 401,
+        body: { error: { code: "unauthorized", message: "Authentication required" } },
+      },
+    });
+    const user = userEvent.setup();
+
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: /Sign in/i }));
+
+    expect(auth0.loginWithRedirect).toHaveBeenCalledTimes(1);
+    expect(auth0.loginWithRedirect).toHaveBeenCalledWith();
+  });
+
   it("keeps the signed-out surface free of detectable structural accessibility violations", async () => {
     mockApiResponses({
       "/v1/chart": {
@@ -787,12 +938,11 @@ describe("web application shell", () => {
 
   it("revokes the Worker session before handing off to the issuer's logout", async () => {
     const user = userEvent.setup();
-    const logout = vi.fn().mockResolvedValue(undefined);
-    __setAuthClientForTests({ logout } as unknown as Auth0Client);
-
+    const revokeGate = deferred();
+    const auth0 = setAuth0();
     mockApiResponses({
       "/v1/chart": { status: 200, body: chart },
-      "/v1/sessions/current": { status: 204, body: null },
+      "/v1/sessions/current": { status: 204, gate: revokeGate.promise, body: null },
       "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
       "GET /v1/preferences/topic-exclusions": emptyTopics,
     });
@@ -800,12 +950,36 @@ describe("web application shell", () => {
     render(<App />);
     await screen.findByRole("heading", { name: /architecture of your chart/i });
     await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
-
     await user.click(screen.getByRole("button", { name: /Sign out/i }));
 
-    const [request] = capturedFor("/v1/sessions/current");
-    expect(request.method).toBe("DELETE");
-    expect(logout).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(capturedFor("/v1/sessions/current")).toHaveLength(1);
+    });
+    expect(auth0.logout).not.toHaveBeenCalled();
+
+    revokeGate.release();
+    await waitFor(() => expect(auth0.logout).toHaveBeenCalledTimes(1));
+    expect(auth0.logout).toHaveBeenCalledWith({
+      logoutParams: { returnTo: window.location.origin },
+    });
+  });
+
+  it("still hands off to Auth0 when Worker revocation is unreachable", async () => {
+    const user = userEvent.setup();
+    const auth0 = setAuth0();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/sessions/current": { status: 0, body: null, unreachable: true },
+      "GET /v1/consents/ai-synthesis": { status: 200, body: consentGranted },
+      "GET /v1/preferences/topic-exclusions": emptyTopics,
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Sign out/i }));
+
+    await waitFor(() => expect(auth0.logout).toHaveBeenCalledTimes(1));
   });
 
   it("keeps the Time Travel surface free of detectable structural accessibility violations", async () => {
