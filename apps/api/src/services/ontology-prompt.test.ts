@@ -18,7 +18,7 @@ import {
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
   generator_reasoning: "high",
-  generator_prompt_version: "1.0.1",
+  generator_prompt_version: "1.0.2",
   generator_max_output_tokens: 8000,
   evaluator_model: "gpt-5.6-sol",
   evaluator_reasoning: "high",
@@ -61,8 +61,8 @@ function deepKeys(value: unknown): string[] {
 }
 
 describe("ontology provider prompts", () => {
-  it("pins the multi-chunk completion rule to the revised generator prompt", () => {
-    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.1");
+  it("pins completion and deterministic record policy to the revised generator prompt", () => {
+    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.2");
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target",
     );
@@ -74,6 +74,15 @@ describe("ontology provider prompts", () => {
     );
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Source-supported records use one or more unique source_fragment_ids, no input_meaning_ids, and a null transformation_class",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Use the corpus locale exactly for every record and never repeat a record id",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Do not emit expression_guidance records",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "even as a negation",
     );
   });
 
