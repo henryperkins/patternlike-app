@@ -107,13 +107,23 @@ Machine ingestions (`provenance.origin === "machine_pipeline"`) compile, verify 
 
 ### Sign-in
 
-Auth0 authenticates; the Worker authorises. `apps/web/src/lib/auth.ts` runs an authorization-code + PKCE redirect, then trades the one-shot `id_token` for a `pl_session` cookie via `POST /v1/sessions`. Auth0 is never consulted again — **the cookie is the only source of truth for "am I signed in", answered by calling the API and watching for a 401**, never by asking the issuer. Nothing from Auth0 is persisted: `cacheLocation` stays in-memory and refresh tokens are off.
+Auth0 authenticates; the Worker authorises. `apps/web/src/main.tsx` mounts the
+official `@auth0/auth0-react` provider, and `App` uses `useAuth0()` for Universal
+Login, callback completion, raw ID-token claims, and Auth0 logout. After a
+successful callback, `apps/web/src/lib/auth.ts` trades the one-shot encoded
+`id_token` for a `pl_session` cookie via `POST /v1/sessions`.
+
+The provider may check the Auth0 session when it initializes, but Auth0 state
+never grants access to product data. The Worker cookie remains the source of
+truth for “am I signed in”, answered by calling the API and watching for a 401.
+Auth0 caching remains in memory and refresh tokens remain disabled; the browser
+does not persist issuer tokens.
+
+The `VITE_AUTH0_DOMAIN`/`VITE_AUTH0_CLIENT_ID` defaults in `auth.ts` must stay in
+step with `OIDC_ISSUER`/`OIDC_AUDIENCE` in `apps/api/wrangler.toml`. A mismatch
+is a flat browser 401; detailed token-verification reasons remain server-only.
 
 `identities.provider` stores the **issuer string itself**, and lookups are `WHERE provider = ? AND provider_subject = ?`. Changing `OIDC_ISSUER` therefore orphans every existing account — new user id, new crypto subject, old ciphertext unreadable. The tenant is currently a `dev-` one; migrating to production must happen before the first real user.
-
-The three `OIDC_*` vars in `wrangler.toml` must stay in step with `AUTH0_DOMAIN`/`AUTH0_CLIENT_ID` in `auth.ts`. A mismatch is a silent 401: the rejection reason is logged server-side and deliberately never returned.
-
-The SDK is a dynamic `import()`, worth ~57 KB gzipped — a third of the bundle. Making it static puts it on the critical path for returning users who never touch it.
 
 ### Fail-closed configuration
 
