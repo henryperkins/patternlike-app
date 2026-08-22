@@ -166,6 +166,8 @@ Editorial bundles are **M3-only**: `POST /internal/content-releases` accepts `sc
 
 The repo is **not** under a single license — see `LICENSING.md`. Only `apps/calc-stub` is AGPL-3.0-or-later; it must keep its `LICENSE`, `COPYRIGHT`, `NOTICE`, and source-offer documentation intact. `packages/shared` is imported by the AGPL service, and that boundary is the open legal question.
 
+For M7 ontology corpora, `license_class` is a publication-rights flag, not an authorship field: authorized first-party model output may be `licensed_excerpt`, while `internal_synthetic` is deliberately withheld from external readers. An ontology produced by the automated generator/evaluator/signer path still carries `provenance.origin: "machine_pipeline"`; corpus authorship is recorded separately in the immutable corpus and its decision/review evidence. See `pattern-corpus/ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md`.
+
 ## Deployment
 
 - **API + PWA are one Worker.** `[env.production.assets]` in `apps/api/wrangler.toml` ships `apps/web/dist` alongside the API, so both live on one origin (`patternlike-api-production.lfd.workers.dev`). Deploy with `npm run deploy:api` from the root — it builds the web app first, which the upload requires. **Live** since 2026-08-08; see `docs/deploy/api-production.md`.

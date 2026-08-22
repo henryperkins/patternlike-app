@@ -140,6 +140,13 @@ constant `true`. So a corpus of internally written propositions is a
 under a `licensed_excerpt` claim. This matters for Slice A too, and is carried
 into the reconciliation section below.
 
+`license_class` records publication authority rather than authorship provenance.
+Authorized first-party model output may therefore be `licensed_excerpt`; an
+experiment or unreviewed draft intentionally withheld from external readers is
+`internal_synthetic`. This does not change release provenance: output of this
+automated pipeline remains `provenance.origin: "machine_pipeline"`, while corpus
+authorship is retained in the immutable corpus and its decision/review evidence.
+
 **The compiler is already §23.6.** `compileOntologyRelease`
 (`packages/pattern-engine/src/ontology.ts:205`) enforces schema and id grammar,
 locale, release status, duplicate ids, canonical aspect ordering, source

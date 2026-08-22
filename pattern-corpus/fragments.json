@@ -1,0 +1,1388 @@
+[
+  {
+    "ref": "mars-body-initiation",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.5 Mars",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Mars is associated with initiating action and with the friction of moving before everyone else is ready.",
+    "excerpt": "Mars is usually described in terms of starting rather than sustaining. The common report is of a low threshold for beginning things and a shorter patience for the interval before something is underway. People describe this as decisiveness when it lands well and as impatience when it does not, and the two descriptions frequently come from the same person about the same week. The counterweight is that a low threshold for starting is also a low threshold for repair. Where Mars is prominent, an argument tends to be entered quickly and also left quickly, and grudges are often reported as short. Reading only the friction misses that the same speed applies to getting over things. Neither the speed nor the friction is a setting the person chose, and neither is a problem to be corrected.",
+    "exclusions": [
+      "anger management",
+      "a violent temper",
+      "a guaranteed outcome"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "virgo-sign-improvement",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.6 Virgo",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Virgo is associated with working by improvement, noticing the gap between a thing and its better version.",
+    "excerpt": "Virgo is best read as a working method rather than a personality. The method is improvement: attention goes to the difference between how something is and how it could be, and that difference is what gets acted on. Used well this reads as craft. The gap is noticed, the correction is small and specific, and the work gets better without anyone announcing it. Used poorly the same attention lands on people who did not ask to be edited, or turns inward and finds a gap that will not close. Both readings come from one habit of attention rather than from two different kinds of person. Someone working in this mode on a good week and a difficult week is doing the same thing, applied to a different object. The method also improves with use, which is worth saying because the difficult version is more often early than permanent.",
+    "exclusions": [
+      "obsessive compulsive",
+      "a perfectionist personality",
+      "an anxiety disorder"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "tenth-house-visibility",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.10 Tenth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The tenth house is associated with the part of a life that is visible to people who do not know the person.",
+    "excerpt": "The tenth house is about visibility rather than achievement. It describes the part of a life that strangers can see and form an opinion about, which is the role, the title, the thing said at introductions. The tension is that visible and important are different measurements and they come apart. Work that reads as significant from outside can be the least interesting part of a week from inside, and the reverse happens just as often. The counter-expression is that visibility is also usable. Being legible to strangers is what lets help arrive unasked, and a role that is easy to describe is a role other people can refer work into. Treating the visible part as merely a surface misses what it does. Nothing here requires ambition, and the house says nothing about whether the visible thing is any good.",
+    "exclusions": [
+      "your career will",
+      "professional advice",
+      "a guaranteed promotion"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "square-aspect-structural-friction",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§4.3 Square",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A square is associated with two active tendencies that work on the same material without a shared method.",
+    "excerpt": "A square describes two tendencies that both want to act on the same material and do not agree on how. Neither one is the problem. The friction is structural, and it stays. The usual report is of effort that feels disproportionate: a decision that ought to be simple keeps being reopened, and each reopening is reasonable on its own terms. What is being described is two working methods with equal standing, not one method and one obstacle. The counter-expression is that squares are where work gets done. A tendency with nothing pushing against it tends to run unexamined. One that meets resistance every time gets tested, and the tested version is usually the more durable. People frequently report that the area they found hardest is the area they became most competent in, and those two facts are not unrelated.",
+    "exclusions": [
+      "a source of suffering",
+      "a psychological conflict",
+      "will go wrong"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "ascendant-angle-approach",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§5.1 Ascendant",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The ascendant is associated with the approach a person leads with, which is not the same as what they are like.",
+    "excerpt": "The ascendant describes an approach rather than an interior. It is the manner that arrives first: the way a room is entered, the register of a first sentence, the default setting before anything has been decided. The tension is that the approach is frequently mistaken for the whole, by other people and sometimes by the person using it. An approach that works gets used more, and a manner used often enough starts to be reported back as a personality. The counter-expression is that a reliable approach is a real asset rather than a mask. Having a working default means less is spent on deciding how to begin, and the saving is available for whatever the situation actually needs. This is also the factor most sensitive to birth time. Where the time is unknown it is not calculated, and nothing here should be asserted.",
+    "exclusions": [
+      "a false self",
+      "a personality disorder",
+      "how you really are"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "pattern-concentration-weight",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§6.2 Concentration",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A concentration of several bodies in one area is associated with disproportionate attention going to that area.",
+    "excerpt": "When several bodies gather in one area of a chart, the usual description is of weight rather than talent. A large share of available attention goes to one department of life, and other departments get what is left. The tension is proportion. The concentrated area tends to be where effort, worry, and interest all land, which makes it hard to judge from inside whether the attention is warranted. People often report that the crowded area felt like the only real thing for years at a stretch. The counter-expression is depth. Attention that keeps returning to one place accumulates, and what accumulates is competence that thinner attention does not produce. The same concentration that narrows a decade can be the reason there is something worth showing at the end of it. Neither reading requires the area to matter to anyone else.",
+    "exclusions": [
+      "an obsession",
+      "a special talent",
+      "you are destined"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range",
+      "shared_motif"
+    ]
+  },
+  {
+    "ref": "uncertainty-unknown-birth-time",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§7.1 Unknown birth time",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "When the birth time is unknown, houses and angles are not calculated, and their absence is not a defect in the reading.",
+    "excerpt": "A chart without a birth time is a smaller chart rather than a worse one. The positions of the slower bodies and the aspects between them are unaffected by a few hours. Houses, the angles, and anything depending on the Moon's exact degree are not, and are therefore left out. What remains is genuinely there. A reading built only on what is calculable is shorter and says less about arenas, meaning where something plays out, while saying the same amount about tendencies. The failure mode is filling the gap. A reading that quietly supplies house material it does not have is worse than one that is visibly shorter, because the reader cannot tell which parts to trust. Where a factor is missing, the honest form is to name what is absent and stop, rather than to substitute a general statement that would be true of anyone.",
+    "exclusions": [
+      "approximately noon",
+      "we can assume your birth time",
+      "your rising sign is likely"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-two-tempos",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.3 Tempo",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Factors in a chart run on different timescales, and much of what reads as inconsistency is two tempos at once.",
+    "excerpt": "Charts contain fast material and slow material, and they are not in competition. The Moon changes register within a day. The outer bodies describe conditions that hold for years. A person is running both at the same time. Much of what gets reported as inconsistency is this. A slow tendency toward caution and a fast tendency toward appetite are both accurate, and the day decides which is visible. Asking which one is the real one is asking the wrong question. The counter-expression is that the two tempos check each other. Fast material supplies information a slow tendency would never gather. Slow material supplies a reason not to act on every piece of it. A chart with only one tempo would be easier to describe and worse to live in. This is the main reason a reading should not resolve into a single verdict about a person.",
+    "exclusions": [
+      "your true nature",
+      "the dominant side of you",
+      "a split personality"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range",
+      "shared_motif"
+    ]
+  },
+  {
+    "ref": "sun-body-organizing-motive",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.1 Sun",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The Sun is associated with what a person organizes effort around, which is not the same as what they are best at.",
+    "excerpt": "The Sun describes what effort gets organized around when nothing external is asking for anything in particular. It is the thing returned to in an unclaimed hour. The tension is that this is frequently not the thing a person is most skilled at, and almost never the thing they are most rewarded for. People often report a long stretch of treating it as a hobby while something else paid, and report the arrangement as sensible and also as slightly wrong. The counter-expression is that it is the most reliable supply of energy available. Work aligned with it costs less to sustain, which matters more over years than over weeks, and a person spending down some other reserve usually notices eventually. None of this makes the solar material important to anyone else, and it carries no claim about talent.",
+    "exclusions": [
+      "your true purpose",
+      "what you were meant to do",
+      "a guaranteed outcome"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "moon-body-settling",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.2 Moon",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The Moon is associated with how a person settles, and with what gets reached for when steadiness is needed.",
+    "excerpt": "The Moon describes the return route rather than the outward manner. It is what gets reached for at the end of a long day, and what has to be in place before anything else works properly. The tension is that this material is rarely chosen and is often slightly embarrassing to state plainly. What actually settles a person is frequently smaller and more particular than the account they would give of themselves, and there is a gap between the two that most people leave alone. The counter-expression is that knowing the route is practical. A settling condition that is named can be arranged for deliberately instead of stumbled into, and the arranging is cheap once the condition is known. This says nothing about mood, and nothing here should be read as a description of how a person is doing.",
+    "exclusions": [
+      "emotional instability",
+      "a mood disorder",
+      "how you are feeling"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "mercury-body-handling-information",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.3 Mercury",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Mercury is associated with how information is taken in and passed on, rather than with how much is known.",
+    "excerpt": "Mercury describes handling rather than capacity. It is about the shape a thought arrives in and the shape it leaves in, which is a question of method rather than of intelligence. The tension is that a method that suits one setting reads as a deficiency in another. Someone who thinks by talking is slow on paper. Someone who needs the whole structure before the first sentence looks unprepared in a meeting that rewards speaking early. The same handling gets described as sharp or scattered depending entirely on who is doing the describing. The counter-expression is that method is adjustable in a way that capacity is not. Knowing that a thought needs to be written before it is reliable is usable information, and most people arrive at it late by trial. Nothing here is a measure of how well anyone thinks.",
+    "exclusions": [
+      "a learning disability",
+      "a high intelligence",
+      "an attention deficit"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "venus-body-worth-and-terms",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.4 Venus",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Venus is associated with what registers as worth having, and with the terms on which a person meets other people.",
+    "excerpt": "Venus describes a standard rather than a preference. It is what registers as worth the trouble, and the terms on which company is comfortable. Both parts tend to be held quietly and treated as obvious. The tension is that a standard nobody has said out loud still gets applied, and the application looks arbitrary from outside. People frequently report being unable to explain why one arrangement felt fine and a similar one did not, and the failure to explain gets read as fussiness by others and as instinct by themselves. The counter-expression is that a clear standard is efficient. Someone who knows what registers wastes less time in arrangements that were never going to hold, and the clarity is usually more generous than it looks, since it also names what is genuinely enough. This is not a description of taste, and carries no claim about anyone's relationships.",
+    "exclusions": [
+      "your ideal partner",
+      "a romantic outcome",
+      "will meet someone"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "jupiter-body-scale-and-enough",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.6 Jupiter",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Jupiter is associated with the area where more seems reasonable, and with the judgment about how much is enough.",
+    "excerpt": "Jupiter marks where the estimate runs large. In that area an increase seems obviously sensible, and the question of whether it is enough gets asked later than elsewhere. The tension is that generosity of estimate and poor judgment of scale are the same instrument. The willingness to take on more is what produces range, and it is also what produces the commitment that turns out to be two commitments. People often describe the overreach and the reach as a single decision they would make again. The counter-expression is that the area is genuinely where growth is cheapest. Effort put in there returns more than the same effort elsewhere, which is why the estimate runs large in the first place, and the estimate is not simply wrong. Nothing here concerns luck, money, or how much anyone will have.",
+    "exclusions": [
+      "financial gain",
+      "a period of luck",
+      "will expand your"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "saturn-body-testing-before-accepting",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.7 Saturn",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Saturn is associated with slowing down and testing a commitment before accepting it.",
+    "excerpt": "Where Saturn sits, the reported experience is usually one of weight and delay. Work in that area tends to feel effortful out of proportion to its size, and easy agreement tends to feel suspect. People describe holding back until something has been checked, and describe the check as reassuring rather than reluctant. The tension is that the checking is indistinguishable from avoidance while it is happening, both to the person and to anyone waiting on them. The counter-expression is durability. What is accepted slowly is frequently what is still being maintained years later, and the area that felt heaviest early is often the one described as solid in retrospect. The order matters here: the weight is at the front. Nothing in this requires hardship, and difficulty is not evidence that anything is working.",
+    "exclusions": [
+      "a period of hardship",
+      "a karmic lesson",
+      "a guaranteed outcome"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "uranus-body-arrangement-stops-fitting",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.8 Uranus",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Uranus is associated with the point at which an established arrangement stops being acceptable to continue.",
+    "excerpt": "Uranus marks where a settled arrangement stops being tolerable. The area has a low ceiling for arrangements that work adequately and mean nothing, and the reaction when the ceiling is reached tends to be abrupt rather than gradual. The tension is that abruptness reads as instability from outside and as overdue from inside. Both readings are describing the same event. What looks like a sudden reversal is usually the visible end of a long private accumulation nobody else was shown. The counter-expression is that the low ceiling prevents a specific and expensive failure, which is staying in something workable for a decade past the point of interest. A person with a high ceiling everywhere avoids disruption and pays for it elsewhere. This says nothing about what will change or when, and the timing of anything is outside what a chart describes.",
+    "exclusions": [
+      "a sudden upheaval",
+      "an unexpected event will",
+      "your life will change"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "neptune-body-indistinct-edges",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.9 Neptune",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Neptune is associated with the area where edges are least distinct, which serves imagination and complicates accounting.",
+    "excerpt": "Neptune marks where the edges are softest. In that area the boundary between what is there and what is being supplied by the person looking is the hardest to locate, and locating it requires deliberate effort that the rest of the chart does not require. The tension is bookkeeping. Where edges are indistinct, it is difficult to say what was agreed, what was assumed, and where one person's responsibility ended. Confusion here is ordinary rather than a failing, but it does not resolve on its own and tends to be discovered late. The counter-expression is that indistinct edges are the working condition for imagination and for sympathy. The same softness that makes accounting hard is what allows a person to occupy a situation that is not theirs, which is not a small capability. Nothing here concerns deception, substances, or anyone's grip on what is real.",
+    "exclusions": [
+      "substance use",
+      "a tendency to deceive",
+      "losing touch with reality"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "pluto-body-refuses-casual",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.10 Pluto",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Pluto is associated with the area that refuses to stay casual, whatever level of involvement was intended.",
+    "excerpt": "Pluto marks the area that will not stay light. Whatever level of involvement was intended at the start, the actual involvement arrives at a different depth, and the adjustment is not usually a decision anyone remembers making. The tension is proportion again, from a different direction. Full involvement in one area means the ordinary version of that area is not available, and people frequently report envying others their casual relationship to the thing they cannot be casual about. The counter-expression is that depth of this kind is not distributed evenly and is not purchasable. Someone who cannot be superficial about a subject will know it in a way that a hundred interested people will not, and that is the same trait producing both results. This describes involvement and nothing else. It carries no claim about crisis, loss, or anything that has happened to a person.",
+    "exclusions": [
+      "a traumatic experience",
+      "a destructive pattern",
+      "a crisis will"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "true-node-body-unfamiliar-direction",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§1.11 Lunar node",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The lunar node is associated with a direction that stays slightly unfamiliar however often it is approached.",
+    "excerpt": "The node marks a direction that does not become second nature. It can be approached repeatedly and still require attention on each approach, which is unlike the rest of the chart, where repetition usually produces ease. The tension is that permanent unfamiliarity is easy to read as unsuitability. The absence of fluency is taken as evidence that the direction was wrong, and the ordinary response is to return to material that runs without supervision. The counter-expression is that attention is the point. A direction that never becomes automatic never stops being noticed, and things that are noticed continue to be done deliberately rather than by habit. The cost is that it stays effortful. Nothing here is owed, and the node describes a direction rather than an obligation or a destination anyone is required to reach.",
+    "exclusions": [
+      "your soul purpose",
+      "a past life",
+      "you are meant to"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "aries-sign-from-scratch",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.1 Aries",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Aries is associated with working from scratch, treating the absence of an established method as an opening.",
+    "excerpt": "Aries is a method rather than a temperament, and the method is to start without the preamble. Where other approaches survey first, this one begins and treats the beginning as the survey. The tension is that a great deal of what gets started this way is discarded, and the discarding is visible to everyone. Someone working in this mode accumulates abandoned openings the way a slower method accumulates unopened plans, and only the first kind is easy to count. The counter-expression is that the method is the only reliable answer to a situation with no precedent. When there is nothing to survey, starting is the only way to generate information, and a person who cannot start until conditions are legible will simply not act at all. Neither version is braver than the other. They are the same instrument in different conditions.",
+    "exclusions": [
+      "an aggressive personality",
+      "a short temper",
+      "a natural leader"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "taurus-sign-rate-of-change",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.2 Taurus",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Taurus is associated with working at a chosen rate and keeping what has already been established.",
+    "excerpt": "The method here is rate. Something is adopted slowly, and once adopted it is kept, and the keeping is not revisited on a schedule. This applies to arrangements, materials, and opinions equally. The tension is that a rate suited to building is unsuited to correcting. The same reluctance to churn that lets a thing become solid also keeps a thing that stopped working, and the interval between those two states is not announced. People frequently describe realizing late that an arrangement had been finished for a while. The counter-expression is that most things fail from being abandoned early rather than from being kept too long. A method that defaults to keeping produces a smaller number of deeper commitments, and depth of that kind is not available at a faster rate. This is about pace and not about materialism, comfort, or anyone's relationship to money.",
+    "exclusions": [
+      "a stubborn personality",
+      "material possessions",
+      "financial security"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "gemini-sign-holding-several",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.3 Gemini",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Gemini is associated with holding several live options at once rather than closing to one.",
+    "excerpt": "The method is multiplication. Where one account of a situation would do, several are generated and held open, and the holding open is the work rather than a delay before the work. The tension is that this looks like indecision from any position that needs a single answer. It also genuinely postpones depth, since attention spread across four versions is not available for the fourth level of any of them. Someone working this way often reports arriving at real fluency later than people who committed early. The counter-expression is that a situation described only one way has been reduced before it was understood, and most reductions are wrong in ways that only show up later. Holding several accounts is what makes the wrong one survivable. Nothing here concerns being talkative, restless, or superficial, which are descriptions of behaviour rather than of method.",
+    "exclusions": [
+      "a scattered mind",
+      "an inability to commit",
+      "says one thing and means another"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "cancer-sign-tending",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.4 Cancer",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Cancer is associated with tending what already exists so that it continues, rather than with starting or expanding it.",
+    "excerpt": "The method is tending. Attention goes to whether a thing is holding up, and effort goes toward the conditions that let it keep going. This is directed at arrangements and projects as readily as at people. The tension is that tending is invisible when it works and only becomes legible when it stops. Someone working this way is frequently described as doing less than they are doing, and the misreading is structural rather than anyone's fault. There is also a real risk of tending something past the point where it should have been let go, since the method has no natural stopping rule. The counter-expression is that nothing survives without it. Every arrangement that lasted was maintained by someone, and the maintenance was almost never the part anyone recorded. This describes a working method and makes no claim about family, sensitivity, or how anyone was raised.",
+    "exclusions": [
+      "your family situation",
+      "overly sensitive",
+      "childhood experiences"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "leo-sign-taking-the-part",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.5 Leo",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Leo is associated with committing visibly to a position and accepting the exposure that follows.",
+    "excerpt": "The method is to take the part rather than hedge it. A position is occupied fully and in view, which means the work carries a name and the name is available to be praised or blamed. The tension is that full commitment removes the retreat. A hedged position can be quietly revised. An occupied one has to be revised in public, and the revision costs more, so there is a real pull toward defending a position past its usefulness. The counter-expression is that most things worth doing require someone to be identifiably responsible for them. Work with no name attached tends to be work nobody finishes, and the willingness to be the name is a service rather than a vanity, whatever it looks like from outside. Neither generosity nor its opposite is implied here. This is about visibility of commitment and nothing more.",
+    "exclusions": [
+      "a need for attention",
+      "an inflated ego",
+      "loves the spotlight"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "libra-sign-weighing-against",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.7 Libra",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Libra is associated with reaching a position by weighing it against another position rather than in isolation.",
+    "excerpt": "The method requires a second term. A judgment is arrived at by setting it beside something else, and a position formed with nothing to weigh it against does not feel finished. This is a procedure rather than a need for approval. The tension is that the procedure is slow and can be captured. If the second term is supplied by whoever is in the room, the conclusion moves with the room, and the person reaches a settled view only once the room is quiet. The delay reads as evasion to anyone waiting. The counter-expression is that a position never weighed against anything is untested, and most confident positions are simply unexamined ones. The procedure produces conclusions that survive contact with an argument. Nothing here concerns charm, indecisiveness, or a preference for peace, which are behaviours rather than the method producing them.",
+    "exclusions": [
+      "conflict avoidant",
+      "a people pleaser",
+      "chronically indecisive"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "scorpio-sign-to-the-bottom",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.8 Scorpio",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Scorpio is associated with going to the bottom of a matter rather than accepting the account offered at the surface.",
+    "excerpt": "The method is not to accept the first account. Whatever explanation is offered is treated as provisional until the structure underneath it has been checked, and the checking continues past the point where most methods stop. The tension is that this is expensive and is not always warranted. Applied to a situation where the surface account was accurate, the method finds nothing and costs a great deal, and applied to people it can read as suspicion when it was only thoroughness. The counter-expression is that the surface account is wrong often enough for the method to pay for itself. Someone who habitually checks underneath will know things that a hundred people taking the account at face value will not, and the knowledge is not obtainable any other way. This is a description of method. It says nothing about secrecy, intensity of feeling, or anyone's private conduct.",
+    "exclusions": [
+      "a controlling nature",
+      "sexual behaviour",
+      "a secretive personality"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "sagittarius-sign-widening-the-frame",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.9 Sagittarius",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Sagittarius is associated with widening the frame around a question until it connects to something larger.",
+    "excerpt": "The method is to widen. A particular question is answered by placing it in a bigger frame, on the working assumption that the specific case is an instance of something general and the general version is the more useful one. The tension is that the widening skips detail, and some questions are entirely detail. A frame large enough to be interesting is frequently too large to act on, and the specific thing that was actually being asked can go unanswered while a better question is being discussed. The counter-expression is that a question answered only at its own scale teaches nothing transferable. Someone who widens habitually arrives at a working model rather than a collection of unrelated resolved cases, and the model is what makes the next case cheap. Nothing here concerns travel, optimism, or belief, which are places the method sometimes goes rather than the method itself.",
+    "exclusions": [
+      "religious belief",
+      "a foreign country",
+      "blind optimism"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "capricorn-sign-sequencing",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.10 Capricorn",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Capricorn is associated with putting things in a sequence and doing them in that order.",
+    "excerpt": "The method is sequence. A situation is resolved into an order of operations, and the operations are performed in that order, including the parts that are dull and the parts whose value is not yet visible. The tension is that a sequence assumes the situation holds still. When the ground moves, a well-built order becomes a well-built order for a problem that no longer exists, and the sunk effort makes abandoning it harder than it should be. There is also a tendency to keep executing well past the point where the point has been forgotten. The counter-expression is that almost nothing substantial is completed without this. Most abandoned work was abandoned in the unrewarding middle, and a method that runs on order rather than on interest is the one that gets through that stretch. This concerns method, not ambition, seniority, or anyone's relationship to authority.",
+    "exclusions": [
+      "a cold personality",
+      "obsessed with status",
+      "a workaholic"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "aquarius-sign-standing-outside",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.11 Aquarius",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Aquarius is associated with standing slightly outside a group in order to see the arrangement the group is inside.",
+    "excerpt": "The method is to step back far enough to see the arrangement rather than the contents. Attention goes to the rule everyone is following, including the rules nobody has stated, and the question asked is whether the arrangement is the one anyone would choose. The tension is that the position outside is a real position, not a pose, and it costs the ordinary comforts of being inside. Someone who is always slightly outside sees the arrangement clearly and participates in it less, and the clarity does not compensate for the distance in any straightforward way. The counter-expression is that arrangements are invisible from inside them. A group with nobody standing back will keep a rule for thirty years past its reason, and the person who names it is doing something the group cannot do for itself. This describes a vantage point and implies nothing about eccentricity or politics.",
+    "exclusions": [
+      "emotionally detached",
+      "a rebellious streak",
+      "political views"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "pisces-sign-permeability",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§2.12 Pisces",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Pisces is associated with taking on the character of the surrounding situation rather than holding a fixed shape against it.",
+    "excerpt": "The method is permeability. The surrounding situation is admitted rather than held off, and the resulting position takes some of its shape from what is around it. This is how the method gathers information that a fixed position would exclude. The tension is that admitted material is hard to sort afterward. What came from the situation and what was already there become difficult to separate, and a person working this way can end up carrying a position they never adopted and cannot locate the origin of. The counter-expression is that a shape held rigidly against every situation learns nothing from any of them. Permeability is what makes accurate reading of a room possible, and rooms are mostly what there is. Nothing here concerns escapism, weakness of will, or anyone's ability to look after themselves.",
+    "exclusions": [
+      "a lack of boundaries",
+      "an escapist tendency",
+      "emotionally fragile"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "first-house-immediate-arena",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.1 First house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The first house is associated with the immediate arena a person acts from, before anything has been negotiated.",
+    "excerpt": "The first house is the arena closest in. It describes the conditions a person is operating under before any negotiation with anyone else has taken place, which makes it the least examined part of a chart, because it is what everything else is looked at through. The tension is exactly that. Conditions this close are not experienced as conditions. They are experienced as how things are, and a person will defend them without ever having chosen them, since there is no vantage point from which to see them as optional. The counter-expression is that these conditions are also the most available. They require no one else's cooperation to alter, unlike most of the chart, and a small deliberate change here propagates through everything downstream. Nothing about this concerns appearance, physical build, or how anyone looks. This house requires a birth time and is not calculated without one.",
+    "exclusions": [
+      "physical appearance",
+      "your body type",
+      "how you look"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "second-house-own-terms",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.2 Second house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The second house is associated with what a person holds on their own terms, without needing anyone else's agreement.",
+    "excerpt": "The second house describes holdings that do not require a counterparty. Skills, materials, and settled convictions all sit here, and what they share is that nobody has to agree for them to remain. The tension is that anything held this way tends to be undervalued by the person holding it. Something that has been available continuously is difficult to price, and people frequently discover the worth of a second-house holding only when a situation removes it or when someone outside offers to pay for it. The counter-expression is that these holdings are the ones that survive a bad year. Anything requiring agreement can be withdrawn by whoever is doing the agreeing. What sits here cannot. This concerns holding rather than earning, and nothing here is advice about money, saving, or how anyone should manage what they have. This house requires a birth time.",
+    "exclusions": [
+      "financial advice",
+      "your income will",
+      "a wealthy period"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "third-house-near-circuit",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.3 Third house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The third house is associated with the near circuit of routine exchange, the contacts and errands repeated without ceremony.",
+    "excerpt": "The third house covers the near circuit: the people spoken to weekly without it being an occasion, the short trips, the exchanges too ordinary to be planned. It is the traffic of a life rather than its events. The tension is that this traffic is beneath notice while it is working, so it is almost never attended to deliberately. A person can describe their close relationships and their long-term aims in detail and have no account at all of the circuit that occupies most of their actual hours. The counter-expression is that the near circuit is where most information enters. Almost nothing useful arrives by formal channel first, and someone with a rich circuit knows things that better-connected people with thinner traffic will not hear for a year. This describes exchange, not siblings, and makes no claim about anyone's family. This house requires a birth time.",
+    "exclusions": [
+      "your siblings",
+      "a short journey will",
+      "communication problems"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "fourth-house-the-base",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.4 Fourth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The fourth house is associated with the base a person operates from and returns to, rather than with what is done in view.",
+    "excerpt": "The fourth house describes the base. It is the arrangement a person operates out of and comes back to, and its defining property is that it does not have to be explained to anyone. The tension is that a base is judged only by whether it holds, which means it gets attention only when it does not. Effort spent on it looks like effort spent on nothing, and it is the first thing sacrificed when something visible is demanding attention. The bill for that arrives later and is not itemised. The counter-expression is that the base sets the ceiling on everything else. Range in the visible parts of a life is limited by what there is to return to, and people who appear to have unusual capacity for exposure usually have an unusually solid base rather than unusual nerve. This concerns the base itself and makes no claim about anyone's family, upbringing, or home. This house requires a birth time.",
+    "exclusions": [
+      "your childhood",
+      "your parents",
+      "a family conflict"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "fifth-house-made-for-its-own-sake",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.5 Fifth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The fifth house is associated with what is made or done for its own sake, without a justification outside itself.",
+    "excerpt": "The fifth house covers what gets made or done without needing a reason beyond the doing. The defining feature is the absence of a justification: it does not need to develop into anything, and it stops being fifth-house material at the point where it does. The tension is that adults are poorly equipped to protect activity with no external warrant. It is the first thing cut when time is short, and it is difficult to defend in a conversation, because any defence offered turns it into something with a purpose and quietly destroys it. The counter-expression is that this is where things get tried before there is a reason to try them. A great deal of substantial work started as something done for no reason, and the unjustified stage is not skippable. This makes no claim about children, romance, or anyone's creative ability. This house requires a birth time.",
+    "exclusions": [
+      "whether you will have children",
+      "a romantic encounter",
+      "artistic talent"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "sixth-house-repeated-work",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.6 Sixth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The sixth house is associated with work that is repeated rather than completed, and with the method used to get through it.",
+    "excerpt": "The sixth house covers work that recurs. Its defining feature is that it is never finished, only done again, which makes it a different kind of task from anything that can be completed and set down. The tension is that recurring work is measured by nobody and noticed only in its absence. There is no natural moment of credit, and a person can carry an enormous amount of it while appearing, on any summary of achievements, to have done very little. The counter-expression is that method here compounds more than anywhere else in a chart. A small improvement to something done weekly returns for years, while the same improvement to a one-off returns once, and people who seem to have more hours than others have usually just arranged this layer well. Nothing here concerns health, the body, or anyone's physical condition. This house requires a birth time.",
+    "exclusions": [
+      "a health condition",
+      "your physical health",
+      "an illness"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "seventh-house-the-counterpart",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.7 Seventh house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The seventh house is associated with what happens in one-to-one arrangements, where the other party has equal standing.",
+    "excerpt": "The seventh house describes the one-to-one arrangement, where a second party has standing equal to the first and the outcome is genuinely not one person's to determine. This covers any such arrangement, not only the intimate ones. The tension is that everything in this house is negotiated, and negotiation exposes what a person will and will not concede. People frequently report learning more about their own limits from a difficult arrangement than from any amount of solitude, and report it as unwelcome information arriving in an unwelcome way. The counter-expression is that a counterpart supplies what cannot be self-supplied. A position never met by an equal is a position never tested, and the testing is the value rather than the cost. This describes the structure of paired arrangements and says nothing about anyone's relationships. This house requires a birth time.",
+    "exclusions": [
+      "your future spouse",
+      "a marriage will",
+      "relationship compatibility"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "eighth-house-held-jointly",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.8 Eighth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The eighth house is associated with what is held jointly, where nothing can be settled without the other party.",
+    "excerpt": "The eighth house covers holdings that are not separable. Where the second house describes what a person holds alone, this describes what has been merged, and the defining feature is that unwinding it requires the other party's participation. The tension is that merged holdings are entered for good reasons and are difficult to reverse. The terms are usually set early, when goodwill is high and precision seems unnecessary, and they are examined later, when precision matters and goodwill is doing less work. Almost nobody sets these terms well the first time. The counter-expression is that merging is what makes things possible at a scale no one reaches alone. The irreversibility that makes it risky is the same property that makes it worth anything. This describes joint holdings only, and makes no claim about death, inheritance, or anyone's private conduct. This house requires a birth time.",
+    "exclusions": [
+      "an inheritance",
+      "a death in the family",
+      "your sex life"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "ninth-house-beyond-direct-experience",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.9 Ninth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The ninth house is associated with the models a person holds about territory they have not directly experienced.",
+    "excerpt": "The ninth house covers what a person holds about places, periods, and situations they have not been in. Everyone carries a large stock of these, mostly unexamined, and they do a great deal of work in deciding what is attempted. The tension is that a model of unvisited territory is unfalsifiable while it stays unvisited. It can be held with total confidence for decades at no cost, and it shapes decisions the whole time. The most consequential of these models are usually the ones a person would not think to state. The counter-expression is that models of this kind are how anyone acts beyond their own direct experience, which is where most of the interesting territory is. Refusing to hold them does not produce neutrality. It produces a much smaller range. Nothing here concerns religion, higher education, or foreign travel as such. This house requires a birth time.",
+    "exclusions": [
+      "your religious beliefs",
+      "will travel abroad",
+      "a university degree"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "eleventh-house-the-wider-network",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.11 Eleventh house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The eleventh house is associated with the wider network of loose ties, where belonging is partial and revocable.",
+    "excerpt": "The eleventh house describes the wider network: the group memberships and loose ties where a person is one of many and belonging is partial. The relationships here are weaker than the ones in the seventh house and there are far more of them. The tension is that loose ties are held loosely by both sides. A network that felt solid can turn out to have been a shared context rather than a set of commitments, and the discovery usually arrives when the context ends and the ties do not survive it. The counter-expression is that loose ties carry information and opportunity that close ones structurally cannot, because close contacts mostly know what a person already knows. Almost every unexpected opening arrives through someone at a distance. This describes network structure and makes no claim about anyone's friendships or how many people they know. This house requires a birth time.",
+    "exclusions": [
+      "your true friends",
+      "a social circle will",
+      "a wish will be granted"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "twelfth-house-unwitnessed",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§3.12 Twelfth house",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The twelfth house is associated with what is done or worked out unwitnessed, where no account is given to anyone.",
+    "excerpt": "The twelfth house covers the unwitnessed portion. It is where things are worked out without an audience and without a record, and its defining feature is that no account of it is given to anyone, including sometimes to the person themselves. The tension is that unwitnessed work is unverifiable. There is no way to tell from inside whether a long private process is doing something or simply continuing, and no one is positioned to say. Time can be spent here at a rate that would be obvious to an observer, if there were one. The counter-expression is that some work only proceeds unobserved. Anything that would be distorted by being watched has to happen here or not at all, and the absence of an audience is the working condition rather than a deficiency. This describes privacy of process. It makes no claim about isolation, hidden difficulty, or anyone's state of mind. This house requires a birth time.",
+    "exclusions": [
+      "hidden enemies",
+      "a mental health",
+      "a pattern of self-sabotage"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "conjunction-aspect-single-instrument",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§4.1 Conjunction",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A conjunction is associated with two tendencies that operate as a single instrument and are not experienced separately.",
+    "excerpt": "A conjunction describes two tendencies fused into one operation. They are not experienced as two things cooperating; they arrive together and are reported as a single trait. The tension is that fused material cannot be applied selectively. Where a separated pair can be used one at a time as the situation warrants, this pair arrives whole, which means the less useful half turns up in every situation the more useful half is needed for. There is no setting that admits one and excludes the other. The counter-expression is concentration. Two tendencies acting as one produce more force in that direction than the same two acting independently, and the areas where a person is unusually effective are frequently built this way. What cannot be separated also cannot be diluted. Neither reading here makes the combination good or bad, and the same fusion produces both accounts.",
+    "exclusions": [
+      "an intensified problem",
+      "a powerful gift",
+      "a guaranteed outcome"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "sextile-aspect-available-not-automatic",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§4.2 Sextile",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A sextile is associated with a combination that is available on request but does not engage on its own.",
+    "excerpt": "A sextile describes a combination that works when it is asked for and stays quiet otherwise. Unlike material that arrives whether or not it is wanted, this pair requires a deliberate move to bring together, and the move is small. The tension is that anything requiring initiation is frequently never initiated. A capability that would engage readily can go a whole decade unused simply because nothing forced the question, and the person has no sense of a missing capacity, since nothing is being obstructed. The counter-expression is that optional is a genuine advantage once the option is known. A combination that engages only when called can be applied to precisely the situations that warrant it, which is not true of anything fused. The value here depends entirely on someone noticing it is available. This describes availability and carries no claim about talent or ease.",
+    "exclusions": [
+      "an easy opportunity",
+      "a natural gift",
+      "will come easily"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "trine-aspect-runs-unattended",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§4.4 Trine",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A trine is associated with a combination that runs without supervision, which makes it both reliable and unexamined.",
+    "excerpt": "A trine describes a combination that runs on its own. It requires no maintenance and produces no friction, which is why it is usually reported as a strength when it is reported at all. The tension is that unsupervised material is unexamined material. What never resists is never inspected, so a trine can run for years in a direction nobody chose, and the absence of difficulty removes every occasion that would have prompted a look. People frequently describe discovering late that a reliable capability had been pointed at something they did not especially want. The counter-expression is that reliability is not a small thing. Effort that would otherwise go to maintaining a combination is available for something else, and a person with a functioning trine has capacity that a person managing friction in the same area does not. The ease is real. It is simply not self-directing.",
+    "exclusions": [
+      "a stroke of luck",
+      "an effortless success",
+      "a blessing"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "opposition-aspect-across-a-gap",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§4.5 Opposition",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "An opposition is associated with two tendencies that see each other clearly across a distance and are difficult to hold at once.",
+    "excerpt": "An opposition describes two tendencies at maximum separation, each fully visible from the other. Unlike a square, where the friction is about method, here the two are legible to each other and the difficulty is holding both at the same time. The usual report is of alternation. One end is occupied for a stretch, then the other, and the swing gets described as inconsistency by anyone watching from a fixed position. There is a strong pull to resolve it by declaring one end the real one, which produces a simpler account and a worse one. The counter-expression is that separation this wide is what makes both ends visible in the first place. Material that is fused cannot be seen from outside itself. An opposition supplies a vantage point on each end that no other configuration provides, and people working with one tend to describe both ends more accurately than people who only have one.",
+    "exclusions": [
+      "an internal conflict",
+      "a divided self",
+      "will be forced to choose"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "midheaven-angle-what-is-recorded",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§5.2 Midheaven",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The midheaven is associated with the version of a person that gets recorded and repeated by people who are not present.",
+    "excerpt": "The midheaven describes the recorded version. It is what gets said about a person when they are not in the room, and it is necessarily compressed, because a summary that travels has to be short enough to repeat. The tension is that the compression is done by other people and is not open to correction. A person has considerable influence over what they do and very little over which part of it becomes the portable version, and the two frequently do not match. The counter-expression is that a portable version does work no amount of presence can do. It travels to rooms nobody could attend and arrives before any introduction, and a legible one saves an enormous amount of explaining. Someone whose summary is accurate is spared a great deal. This is the most birth-time-sensitive point in a chart along with the ascendant, and where the time is unknown it is not calculated and nothing here applies.",
+    "exclusions": [
+      "your career path",
+      "professional success",
+      "your reputation will"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "descendant-angle-what-arrives-as-other",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§5.3 Descendant",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The descendant is associated with the qualities a person reliably meets in others rather than supplies themselves.",
+    "excerpt": "The descendant sits opposite the approach and describes what shows up from the other side. It marks the qualities that a person tends to encounter in counterparts rather than produce themselves, which is why the same type of situation keeps arriving from apparently unrelated directions. The tension is that anything met repeatedly gets attributed to the people supplying it. The common report is of bad luck with a particular kind of person, and the report is sincere, and it locates the finding entirely outside the person making it. The counter-expression is that reliably meeting a quality is a form of access to it. What arrives from outside can be worked with, and material a person cannot supply for themselves is genuinely obtainable this way. Nothing here says a person attracts anything or is responsible for how others behave. This requires a birth time and is not calculated without one.",
+    "exclusions": [
+      "you attract people who",
+      "the kind of partner you",
+      "relationship problems"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "imum-coeli-angle-the-private-floor",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§5.4 Imum coeli",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "The imum coeli is associated with the private floor a person stands on, which is not shown and not explained.",
+    "excerpt": "The imum coeli sits opposite the recorded version and describes the floor underneath it. It is the private footing a person operates from, and its defining feature is that no account of it is offered to anyone, not from secrecy but because it is prior to the kind of thing that gets explained. The tension is that an unexamined floor is still a floor. It carries the whole structure and is consulted constantly, and because it is never stated it is never checked against anything. A person can operate for decades on a footing that was assembled early and never revisited. The counter-expression is that the footing is what makes exposure survivable. Anyone who takes public positions is standing on something, and those who appear unusually steady in view are almost always standing on something solid rather than feeling less. This requires a birth time and is not calculated without one.",
+    "exclusions": [
+      "your early home",
+      "your parents",
+      "a buried memory"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "pattern-axis-across-the-chart",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§6.3 Axis",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "An axis spanning the chart is associated with a single question that keeps reappearing in unrelated areas.",
+    "excerpt": "When a configuration spans the chart rather than sitting in one region, the usual description is of a question that keeps reappearing. The same choice presents itself in areas with nothing else in common, and each appearance looks local until enough of them have accumulated to show the shape. The tension is that a question arriving in unrelated places is difficult to recognise as one question. Each instance gets solved on its own terms, the solutions do not transfer, and a person can resolve the same matter six times without noticing they have done it more than once. The counter-expression is that once the shape is visible it is unusually useful. A single question showing up across a whole chart means one piece of understanding pays out in every area it touches, which is not true of anything local. Recognising it is the whole of the work. Nothing here concerns difficulty or how anything resolves.",
+    "exclusions": [
+      "a recurring crisis",
+      "a difficult year",
+      "will keep happening"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "developmental_arc",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "pattern-reinforcing-loop",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§6.4 Reinforcing loop",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A closed loop of mutually supporting factors is associated with a self-sustaining mode that is easy to enter and hard to leave.",
+    "excerpt": "When several factors support each other in a closed loop, the result is a mode that sustains itself. Once entered it requires no external input to continue, and it continues whether or not the situation still warrants it. The tension is that self-sustaining modes have no natural exit. Everything inside the loop confirms everything else, so there is no internal signal that the mode has stopped being appropriate, and the interruption usually has to arrive from outside. People frequently report a long stretch in one register that felt entirely coherent from within. The counter-expression is that coherence of this kind is productive. A mode that holds together without maintenance can be occupied for a long time at low cost, and sustained work of any depth generally requires exactly that. The loop is not a trap. It is simply a mode with no alarm on it.",
+    "exclusions": [
+      "a vicious cycle",
+      "a rare configuration",
+      "a special ability"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "pattern-isolated-factor",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§6.5 Isolated factor",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A factor with no connections to the rest of the chart is associated with material that operates without moderation from anything else.",
+    "excerpt": "A factor standing without connections operates on its own terms. Nothing else in the chart moderates it, and it does not participate in the trades and adjustments that connected material is constantly making. The tension is that unmoderated material runs at full strength or not at all. It tends to be reported as arriving in episodes rather than as a steady presence, and because it is not integrated it can seem to belong to someone else, or to be out of character in a way the person cannot account for. The counter-expression is that unmoderated is also uncompromised. Connected material is always partly shaped by what it is connected to. This is not, and the areas where a person is least like anyone else are frequently built from exactly this. Isolation is a structural fact here and is not a deficiency, an absence, or something missing from a chart.",
+    "exclusions": [
+      "an unaspected weakness",
+      "something missing from your",
+      "out of control"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "tension",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "uncertainty-approximate-birth-time",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§7.2 Approximate birth time",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "An approximate birth time supports some house and angle material but not the parts that move within the stated range.",
+    "excerpt": "An approximate time is not a worse exact time. It is a range, and the useful question is which findings hold across the whole of it. Some do: a factor sitting well inside a house at every point in the range is as solid as anything calculated from an exact time. Others do not, and the ones that do not are precisely the ones a reading is most tempted to state, since they are the specific-sounding ones. The tension is that a range invites rounding to its middle. Treating the midpoint as the time produces a chart that looks exact and is not, and nothing downstream carries any marker that a choice was made. The counter-expression is that a range honestly worked is more informative than a false point. Saying which findings survive the whole range and which do not tells a reader something true about their own chart, including where to look if they ever locate the time.",
+    "exclusions": [
+      "we have used noon",
+      "the most likely time",
+      "close enough for"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "uncertainty-sparse-feature-set",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§7.3 Sparse feature set",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A chart with few strong features supports a shorter reading, and the shortness is a property of the chart rather than a shortfall.",
+    "excerpt": "Some charts have few strong features. There is no interpretive rule that makes this a defect, and no reason a person with a quiet chart should receive the same length of reading as a person with a crowded one. The tension is that length reads as value. A short reading is received as less care taken, which creates pressure to pad, and padding is done with the only material always available, which is material general enough to be true of anyone. This is the specific way a sparse chart becomes a bad reading. The counter-expression is that a quiet chart is easier to say something accurate about. Fewer strong features means less competition between them and less hedging, and the few findings that are present can be stated plainly rather than qualified against a dozen others. Shorter and more definite is a better trade than longer and more general.",
+    "exclusions": [
+      "a boring chart",
+      "an ordinary person",
+      "not much to say"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "uncertainty-qualified-location",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§7.4 Qualified location",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A birthplace that resolves imprecisely to a time zone qualifies every finding that depends on the exact moment.",
+    "excerpt": "Where a birthplace sits near a zone boundary, or falls before the period when zone rules were reliably recorded, or lands in a local time that a clock change skipped or repeated, the resolution to an actual moment is qualified rather than certain. The consequence runs downstream: everything depending on the exact instant inherits that qualification, whether or not it is restated. The tension is that a qualification stated once at the top is forgotten by the second paragraph. A reading that opens with a note about zone confidence and then speaks with full certainty for two thousand words has technically disclosed and practically not. The counter-expression is that qualification attached to individual findings is usable. A reader told which specific claims rest on the uncertain moment can weigh those claims differently, which is a real capability rather than a disclaimer.",
+    "exclusions": [
+      "we assumed the nearest",
+      "the standard offset",
+      "an approximate location will"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-collective-material",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.1 Collective material",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Slow-moving factors are shared by everyone born in the same period and describe a cohort rather than an individual.",
+    "excerpt": "The slowest-moving bodies stay in one sign for years at a time, which means everyone born across that stretch shares the placement. Material of this kind describes a cohort. It is real, and it is not personal, and stating it as though it were personal is the single most common way a reading becomes flattery. The tension is that shared material still shows up in an individual life. A person genuinely does experience it, so a reading that names it lands as accurate, and the accuracy is what makes the misattribution effective rather than harmless. The counter-expression is that cohort material becomes specific when it connects to something fast. A slow placement joined to a personal factor is describing this person and not their whole year group, and that junction is where anything worth saying about slow material lives. Shared material stated alone is true of millions and should be labelled that way.",
+    "exclusions": [
+      "unique to you",
+      "your generation will",
+      "sets you apart"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-absence-is-not-deficit",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.2 Absence",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "An area of a chart with nothing in it describes an absence of emphasis, not an absence of capacity.",
+    "excerpt": "Most areas of most charts are empty. An empty area means no particular emphasis was placed there, which is different in kind from a capacity being missing, and the difference matters because emphasis and ability are not the same measurement. The tension is that absence invites narration. An empty area is a blank space a reading can fill with almost anything, and the filling is unfalsifiable, since nothing in the chart contradicts it. This is where readings quietly stop being grounded. The counter-expression is that unemphasised areas are frequently where people operate most easily. Without a strong signal pulling in a particular direction, the area is handled by ordinary judgment, and ordinary judgment is often the better instrument. A person with nothing marked in an area of life may simply be getting on with it. Nothing should be asserted about an empty area beyond the fact that it is empty.",
+    "exclusions": [
+      "a weakness in this area",
+      "something you lack",
+      "will struggle with"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-convergence",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.4 Convergence",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A finding supported by several independent factors carries more weight than one resting on a single placement.",
+    "excerpt": "When the same finding is reached from several unrelated directions in a chart, it is on firmer ground than one resting on a single factor. This is the closest thing to a weighting rule available, and it is worth applying explicitly rather than leaving to intuition. The tension is that convergence is easy to fabricate. Any two factors can be made to seem to agree if the description of each is loose enough, and a reading that wants to sound confident will reach for a second supporting factor and find one. Manufactured convergence is indistinguishable from the real thing in the finished prose. The counter-expression is that genuine convergence is the main reason to trust anything in a chart. A finding arrived at three ways from material that has nothing else in common is not an accident of interpretation. The discipline is describing each factor tightly enough that agreement between them means something.",
+    "exclusions": [
+      "everything points to",
+      "the chart clearly shows",
+      "beyond any doubt"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-contradiction-is-ordinary",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.5 Contradiction",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A chart routinely contains findings that contradict each other, and both members of a contradicting pair can be accurate.",
+    "excerpt": "Charts contain contradictory material as a matter of course. A factor describing caution and a factor describing appetite can both be strongly marked, and neither one is a mistake or a modifier of the other. People contain contradictions, and a description that did not would be describing something simpler than a person. The tension is that contradiction is uncomfortable to write and to read. There is strong pressure to resolve it, either by ranking one side as dominant or by blending both into a moderate average that matches neither. Both moves produce a cleaner account of somebody who does not exist. The counter-expression is that stating a contradiction plainly is usually the most recognisable thing a reading can do. Readers identify a genuine contradiction faster than they identify a smooth summary, because they have been living inside it. Contradiction should be named as contradiction and left standing.",
+    "exclusions": [
+      "the dominant influence",
+      "on balance you are",
+      "your overall type"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "tension",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-description-not-instruction",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.6 Description and instruction",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "A chart describes tendencies and supplies no instruction about what anyone should do with them.",
+    "excerpt": "A description of a tendency is not a recommendation to follow it. The two get conflated constantly, and the conflation is what turns an account of how someone tends to operate into an argument for continuing to operate that way. Nothing in a chart carries authority over a decision. The tension is that description drifts toward instruction without anyone deciding it should. A sentence naming a tendency, followed by a sentence about where the tendency works well, reads as advice by adjacency even when no advice was offered. The drift is a property of prose rather than of intent. The counter-expression is that accurate description is the more useful thing anyway. A person who knows they default to a particular move can choose to make it or not, and that choice is only available once the default has been named neutrally. Naming is the service. What follows belongs to the reader.",
+    "exclusions": [
+      "you should",
+      "the best approach for you",
+      "we recommend that you"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-strength-is-not-frequency",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.7 Strength and frequency",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "How strongly a factor is marked is a separate measurement from how often it is visible in an ordinary week.",
+    "excerpt": "A strongly marked factor is not the same as a frequently visible one. Some material is prominent in a chart and surfaces rarely, arriving with force in a narrow set of situations and staying absent the rest of the time. Other material is modestly marked and present in almost every hour. The tension is that readings default to treating prominence as frequency. The strongest factor gets described as the person's general character, which produces an account that will not match an ordinary Tuesday, and the mismatch teaches the reader to discount the whole reading. The counter-expression is that separating the two makes both more accurate. Naming a factor as strong but rare tells a reader something checkable, and naming a modest factor as constant explains something they have noticed and never had a word for. The two measurements answer different questions and are worth stating separately.",
+    "exclusions": [
+      "your defining trait",
+      "the most important thing about",
+      "will always"
+    ],
+    "allowed_transformations": [
+      "intersection",
+      "contrast",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  },
+  {
+    "ref": "crosscutting-no-ranking-between-charts",
+    "title": "Pattern Ontology Source Manual",
+    "author": "Pattern editorial (model-generated)",
+    "edition": "0.1 (2026)",
+    "location": "§8.8 No ranking",
+    "locale": "en-US",
+    "license_class": "licensed_excerpt",
+    "normalized_proposition": "Charts differ in arrangement and not in quality, and no configuration is better to have than another.",
+    "excerpt": "Charts are not comparable on a scale. One arrangement is not a better arrangement than another, and there is no configuration that constitutes an advantage over a different one. Every arrangement carries what it carries, and the trades are internal to it rather than measurable against someone else's. The tension is that ranking language is available and comfortable. Words like strong, difficult, favourable, and challenging all imply a scale, and once a scale is implied a reader will place themselves on it, usually unkindly. The vocabulary does this whether or not the reading intended it. The counter-expression is that describing an arrangement on its own terms is more informative than grading it. What a person can do with what they have is a real question. Where they sit relative to a stranger is not, and it has no answer. Comparative framing should be absent rather than balanced.",
+    "exclusions": [
+      "a difficult chart",
+      "a well-aspected chart",
+      "more gifted than"
+    ],
+    "allowed_transformations": [
+      "contrast",
+      "counterbalance",
+      "shared_motif",
+      "expression_range"
+    ]
+  }
+]

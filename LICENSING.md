@@ -16,6 +16,7 @@ This repository is **not** under a single license. Terms differ by directory.
 | `apps/calc-stub/data/ephe/` | Swiss Ephemeris data, distributed under Swiss Ephemeris / AGPL terms. Not vendored — downloaded and verified against [`apps/calc-stub/ephemeris.lock.json`](apps/calc-stub/ephemeris.lock.json). |
 | `apps/api/` | **All rights reserved.** Not relicensed under AGPL. |
 | `packages/shared/` | **All rights reserved.** Not relicensed under AGPL. |
+| [`pattern-corpus/`](pattern-corpus/) | **First-party model-generated corpus; publication authorized conditionally.** `license_class: licensed_excerpt` records publication rights, not human authorship. Public activation remains subject to the conditions in [`ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md`](pattern-corpus/ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md). |
 | `contracts/`, `db/`, `docs/`, `spec-bundle/` | **All rights reserved.** |
 | Third-party dependencies | Their own licenses. See [`NOTICE`](NOTICE). |
 
