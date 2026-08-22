@@ -2,8 +2,9 @@
 
 **Gate:** Existing Gate 9 restore-drill criterion
 
-**Status:** Procedure ready; execution awaits the accepted Gate 8 canary whose
-deletion and consumed claim must be restored and replayed.
+**Status:** Production replay signing identity/keyring and bucket are ready;
+execution awaits the accepted Gate 8 canary whose deletion and consumed claim
+must be restored and replayed.
 
 This drill proves that restoring D1 to a point before a Pattern lifecycle
 erasure cannot resurrect readable Pattern content or make its fingerprint
