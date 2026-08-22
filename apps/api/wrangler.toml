@@ -254,13 +254,12 @@ ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS = "7"
 [env.production]
 name = "patternlike-api-production"
 
-# An explicit empty override, not an omission. Top-level [triggers] declares the
-# development crons, and a named environment INHERITS them when it does not say
-# otherwise — so deleting these two lines silently activates both schedulers in
-# production. Activating either is a separate configuration change with its own
-# gate; see docs/deploy/openai-daily-reading-rollout.md.
+# An explicit override, not an omission. Top-level [triggers] declares both
+# development crons, and a named environment inherits them when it does not say
+# otherwise. Production enables only the separately approved ontology-pipeline
+# maintenance lane; the incumbent reading/privacy/Pattern scheduler remains off.
 [env.production.triggers]
-crons = []
+crons = ["7,22,37,52 * * * *"]
 
 [env.production.vars]
 ENVIRONMENT = "production"

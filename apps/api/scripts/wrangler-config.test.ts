@@ -8,7 +8,7 @@ import { unstable_readConfig } from "wrangler";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.resolve(here, "../wrangler.toml");
 
-test("development isolates ontology maintenance and production disables every cron", () => {
+test("production enables only ontology maintenance and not the incumbent scheduler", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
@@ -19,7 +19,11 @@ test("development isolates ontology maintenance and production disables every cr
     "*/15 * * * *",
     "7,22,37,52 * * * *",
   ]);
-  assert.deepEqual(production.triggers.crons, []);
+  assert.deepEqual(production.triggers.crons, [
+    "7,22,37,52 * * * *",
+  ]);
+  assert.equal(production.vars.ONTOLOGY_PIPELINE_ROLLOUT, "internal");
+  assert.equal(production.vars.PATTERN_AI_ROLLOUT, "off");
 });
 
 test("ontology pipeline queues are distinct and fully redeclared", () => {
