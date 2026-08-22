@@ -1153,6 +1153,20 @@ async function executeGenerating(
   }
 
   validateCurrentChunk(chunk, progress, context.command);
+  // `complete` is a provider declaration, not an authority boundary. If the
+  // immutable coverage targets prove work remains, persist this otherwise
+  // valid chunk as an incomplete predecessor and continue within the frozen
+  // chunk/call ceilings. The exact provider response remains preserved in its
+  // response artifact; only the pipeline's accepted chunk state is narrowed.
+  if (
+    chunk.complete &&
+    remainingCoverageTargets(
+      context.command,
+      [...progress.records, ...chunk.records],
+    ).length > 0
+  ) {
+    chunk = { ...chunk, complete: false };
+  }
   const prospectiveCandidate = await materializeCandidateRelease(
     context.command,
     corpus,

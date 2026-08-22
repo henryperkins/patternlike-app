@@ -23,6 +23,11 @@ import {
   testOntologyPipelineArtifactKeyring,
   type TestCorpusManifest,
 } from "../../test/ontology-pipeline-fixtures.js";
+import {
+  clearPatternReplayObjects,
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+} from "../../test/pattern-replay-fixtures.js";
 import { seedActiveOntology } from "../../test/helpers.js";
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import {
@@ -897,6 +902,8 @@ async function seedUnavailableMachinePredecessor(): Promise<string> {
 describe("ontology pipeline execution", () => {
   beforeEach(async () => {
     await env.DB.prepare("DELETE FROM pattern_ontology_provider_daily_usage").run();
+    await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
   });
 
   it("uses deterministic zero-provider deliveries for reservation and corpus reading", async () => {
@@ -948,21 +955,50 @@ describe("ontology pipeline execution", () => {
     expect(publisher.generateInvocations).not.toHaveBeenCalled();
   });
 
-  it("does not trust complete=true until frozen coverage is complete", async () => {
+  it("continues bounded generation when complete=true precedes frozen coverage", async () => {
     const fixture = await reserveFixture();
-    const publisher = new FakeOntologyPublisher([{
-      schema_version: "0.7.0",
-      records: fixture.records.slice(0, 5),
-      complete: true,
-    }]);
+    const publisher = new FakeOntologyPublisher([
+      {
+        schema_version: "0.7.0",
+        records: fixture.records.slice(0, 5),
+        complete: true,
+      },
+      {
+        schema_version: "0.7.0",
+        records: fixture.records.slice(5),
+        complete: true,
+      },
+    ]);
 
     await driveToGenerating(fixture, publisher);
-    expect(await deliver(fixture, publisher)).toMatchObject({ status: "terminal" });
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
     expect(await runRow(fixture.runId)).toMatchObject({
-      stage: "failed",
-      failure_class: "candidate_invalid",
+      stage: "generating",
+      stage_cursor: 1,
+      stage_generation: 3,
     });
-    expect(publisher.generatorProviderCalls).toBe(1);
+    const acceptedChunk = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(fixture.runId, "generating", 2, 0, "candidate_chunk"),
+    );
+    const exactResponse = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(fixture.runId, "generating", 2, 0, "generator_response"),
+    );
+    expect(JSON.parse(new TextDecoder().decode(acceptedChunk!.plaintext)))
+      .toMatchObject({ complete: false });
+    const envelope = JSON.parse(new TextDecoder().decode(exactResponse!.plaintext)) as {
+      output: Array<{ content: Array<{ text: string }> }>;
+    };
+    expect(JSON.parse(envelope.output[0]!.content[0]!.text))
+      .toMatchObject({ complete: true });
+    expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "compiling",
+      stage_cursor: 0,
+      stage_generation: 4,
+    });
+    expect(publisher.generatorProviderCalls).toBe(2);
   });
 
   it("assembles exact ordered chunks and compiles the unchanged whole candidate", async () => {
