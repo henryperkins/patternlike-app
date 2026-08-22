@@ -31,6 +31,10 @@ import {
   testOntologyPipelineArtifactKeyring,
 } from "../../test/ontology-pipeline-fixtures.js";
 import {
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+} from "../../test/pattern-replay-fixtures.js";
+import {
   commitOntologyPipelineEvidence,
   type CommitOntologyPipelineEvidenceInput,
 } from "../services/pattern-ontology-evidence.js";
@@ -593,6 +597,7 @@ describe("machine ontology ingestion", () => {
 
   beforeEach(async () => {
     await resetDb();
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
     env.PATTERN_ONTOLOGY_KEYS = "";
     await seedActiveOntology("ontology-prior-active");

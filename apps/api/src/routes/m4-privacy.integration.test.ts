@@ -28,6 +28,10 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
+import {
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+} from "../../test/pattern-replay-fixtures.js";
 
 const EVENT: LifeEventRequest = {
   schema_version: "0.4.0",
@@ -170,6 +174,7 @@ async function deleteAccount(userId: string, key: string) {
 describe("M4 export, retention, and deletion boundary", () => {
   beforeEach(async () => {
     await resetDb();
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A, "America/Chicago");
   });

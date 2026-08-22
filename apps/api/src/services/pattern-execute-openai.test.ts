@@ -26,6 +26,10 @@ import {
   OPENAI_MOCK_REFUSAL,
   OPENAI_MOCK_TIMEOUT,
 } from "../../test/mock-calc-service.js";
+import {
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+} from "../../test/pattern-replay-fixtures.js";
 import { getArtifactAt, loadPatternJob } from "./pattern-execute.js";
 
 const POLICY = "1.0.0";
@@ -209,6 +213,7 @@ describe("OpenAI Pattern queue integration", () => {
   beforeEach(async () => {
     await env.DB.prepare(`DROP TRIGGER IF EXISTS ${ADVANCE_FAILURE_TRIGGER}`).run();
     await resetDb();
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
     messageSequence = 0;
     await seedUser(IDENTITY_A);
