@@ -99,7 +99,7 @@ The M7 Pattern path is planner → deterministic plan validation → writer → 
 
 ### Isolated ontology signing
 
-`apps/ontology-signer` holds `PATTERN_ONTOLOGY_SIGNING_KEY`. The API Worker `Env` has no such field; it only has the `ONTOLOGY_SIGNER` service binding. The signer has no `fetch` handler, no route, and no D1/R2/provider/corpus binding. Deploy it *before* any API deploy that declares the binding, or the API upload fails on an unknown Worker.
+`apps/ontology-signer` holds `PATTERN_ONTOLOGY_SIGNING_KEY`. The API Worker `Env` has no such field; it only has the `ONTOLOGY_SIGNER` service binding. The signer has no public route and no D1/R2/provider/corpus binding. Its default `WorkerEntrypoint` includes only the platform-required `fetch` handler, which always returns an empty 404, plus the `signOntology` RPC method. Deploy it *before* any API deploy that declares the binding, or the API upload fails on an unknown Worker.
 
 Machine ingestions (`provenance.origin === "machine_pipeline"`) compile, verify the signature over the original **candidate** bytes, decrypt the evaluation artifact with `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING`, and only then write. R2 stores those candidate bytes byte-identical; activation is the D1 status/pointer flip in one guarded batch. `regression_passed` / `regression_report_hash` may ride the frozen contract and even be signed — they do not admit or block a release. Missing or malformed artifact-keyring configuration is `503`, not a 409 about the release.
 

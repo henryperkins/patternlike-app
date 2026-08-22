@@ -1,9 +1,10 @@
 # Ontology signer
 
-This Worker has no route. The API reaches its single `signOntology` RPC method
-through the `ONTOLOGY_SIGNER` service binding. `workers_dev` and preview URLs
-are disabled, and the Worker declares no provider, corpus, D1, R2, queue, or
-other data binding.
+This Worker has no public route. The API reaches its single `signOntology` RPC
+method through the `ONTOLOGY_SIGNER` service binding. Cloudflare requires a
+registered handler on the default entrypoint, so its `fetch` method always
+returns an empty 404. `workers_dev` and preview URLs are disabled, and the
+Worker declares no provider, corpus, D1, R2, queue, or other data binding.
 
 `PATTERN_ONTOLOGY_SIGNING_KEY` is the Worker's only secret. Set it with
 `wrangler secret put PATTERN_ONTOLOGY_SIGNING_KEY --env production`. Its value

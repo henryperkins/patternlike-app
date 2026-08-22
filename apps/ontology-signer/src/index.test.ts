@@ -7,7 +7,6 @@ import {
   type ReleasePublicKey,
   type SignatureAlgorithm,
 } from "../../api/src/services/content-release.js";
-import OntologySigner from "./index.js";
 import * as signerWorkerModule from "./index.js";
 import {
   type OntologySigningRequest,
@@ -108,8 +107,11 @@ describe("ontology signing Worker", () => {
     expect(Object.keys(signerWorkerModule)).toEqual(["default"]);
   });
 
-  it("has no fetch route", () => {
-    expect(Object.prototype.hasOwnProperty.call(OntologySigner.prototype, "fetch")).toBe(false);
+  it("registers a fail-closed fetch handler for deployment", async () => {
+    const response = await exports.default.fetch(new Request("https://signer.invalid/"));
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("");
   });
 
   it.each(["Ed25519", "ES256"] as const)(

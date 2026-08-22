@@ -274,6 +274,10 @@ async function signOntologyPayload(
 }
 
 export default class OntologySigner extends WorkerEntrypoint<SignerEnv> {
+  fetch(): Response {
+    return new Response(null, { status: 404 });
+  }
+
   async signOntology(request: unknown): Promise<OntologySigningResult> {
     return signOntologyPayload(request, this.env.PATTERN_ONTOLOGY_SIGNING_KEY);
   }
