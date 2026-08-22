@@ -81,11 +81,19 @@ describe("frozen ontology candidate validation", () => {
 
     const badHouse = release();
     badHouse.records[0]!.feature_predicate = { type: "house_cusp", house: 13 };
-    expect(validate(badHouse)).toEqual({ ok: false, code: "candidate_schema_invalid" });
+    expect(validate(badHouse)).toEqual({
+      ok: false,
+      code: "candidate_schema_invalid",
+      safe_detail_code: "schema_invalid",
+    });
 
     const badPriority = release();
     badPriority.records[0]!.presentation_priority = 1001;
-    expect(validate(badPriority)).toEqual({ ok: false, code: "candidate_schema_invalid" });
+    expect(validate(badPriority)).toEqual({
+      ok: false,
+      code: "candidate_schema_invalid",
+      safe_detail_code: "schema_invalid",
+    });
   });
 
   it("closes locale, fragment, coverage, and source-supported policy failures", () => {
@@ -132,6 +140,7 @@ describe("frozen ontology candidate validation", () => {
       expect(validate(candidate), field).toEqual({
         ok: false,
         code: "candidate_policy_invalid",
+        safe_detail_code: "record_policy_invalid",
       });
     }
   });
@@ -176,6 +185,7 @@ describe("frozen ontology candidate validation", () => {
     expect(validate(candidate)).toEqual({
       ok: false,
       code: "candidate_policy_invalid",
+      safe_detail_code: "record_policy_invalid",
     });
   });
 
@@ -201,6 +211,7 @@ describe("frozen ontology candidate validation", () => {
     expect(validate(candidate)).toEqual({
       ok: false,
       code: "candidate_policy_invalid",
+      safe_detail_code: "record_policy_invalid",
     });
 
     synthesis.transformation_class = "intersection";
@@ -208,6 +219,7 @@ describe("frozen ontology candidate validation", () => {
     expect(validate(candidate)).toEqual({
       ok: false,
       code: "candidate_policy_invalid",
+      safe_detail_code: "record_policy_invalid",
     });
   });
 
@@ -233,6 +245,29 @@ describe("frozen ontology candidate validation", () => {
     })).toEqual({
       ok: false,
       code: "candidate_policy_invalid",
+      safe_detail_code: "record_policy_invalid",
+    });
+  });
+
+  it("distinguishes incomplete coverage without logging candidate content", () => {
+    const candidate = release();
+    const canonicalBytes = canonicalJson(candidate);
+    expect(validateOntologyCandidateRelease(candidate, {
+      canonicalBytes,
+      corpusLocale: "en-US",
+      permittedFragmentIds: new Set([FRAGMENT_ID]),
+      fragments: new Map([[FRAGMENT_ID, FRAGMENT]]),
+      coverageTargets: [{
+        feature_class: "angle",
+        minimum_source_supported: 1,
+        minimum_total: 1,
+      }],
+      maximumCandidateRecords: 64,
+      maximumCandidateBytes: 262144,
+    })).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_incomplete",
     });
   });
 
@@ -251,6 +286,7 @@ describe("frozen ontology candidate validation", () => {
     expect(validate(candidate)).toEqual({
       ok: false,
       code: "candidate_policy_invalid",
+      safe_detail_code: "record_policy_invalid",
     });
   });
 
@@ -273,6 +309,7 @@ describe("frozen ontology candidate validation", () => {
       expect(validate(candidate), proposition).toEqual({
         ok: false,
         code: "candidate_policy_invalid",
+        safe_detail_code: "record_policy_invalid",
       });
     }
 
@@ -295,12 +332,20 @@ describe("frozen ontology candidate validation", () => {
       ...release().records[0]!,
       id: `ont_${(index + 1).toString(16).padStart(32, "0")}`,
     }));
-    expect(validate(tooMany)).toEqual({ ok: false, code: "candidate_limit_exceeded" });
+    expect(validate(tooMany)).toEqual({
+      ok: false,
+      code: "candidate_limit_exceeded",
+      safe_detail_code: "limit_exceeded",
+    });
 
     const tooLarge = release();
     const original = canonicalJson(tooLarge).length;
     tooLarge.records[0]!.normalized_proposition += "x".repeat(262145 - original);
     expect(new TextEncoder().encode(canonicalJson(tooLarge)).byteLength).toBe(262145);
-    expect(validate(tooLarge)).toEqual({ ok: false, code: "candidate_limit_exceeded" });
+    expect(validate(tooLarge)).toEqual({
+      ok: false,
+      code: "candidate_limit_exceeded",
+      safe_detail_code: "limit_exceeded",
+    });
   });
 });

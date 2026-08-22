@@ -69,6 +69,12 @@ describe("ontology provider prompts", () => {
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Set complete to false when any coverage target remains",
     );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Do not copy or paraphrase a cited fragment's exclusions into prohibited_claims",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Source-supported records use one or more unique source_fragment_ids, no input_meaning_ids, and a null transformation_class",
+    );
   });
 
   it("keeps generator and evaluator policies, schema names, and prompt pins distinct", () => {

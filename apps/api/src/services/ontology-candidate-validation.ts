@@ -18,6 +18,14 @@ import ontologyReleaseSchema from "../../../../contracts/m7/pattern-ontology-rel
 import type { OntologyCorpusFragment } from "./ontology-corpus.js";
 import type { OntologyCoverageTarget } from "./ontology-packet.js";
 
+export type OntologyCandidateSafeDetailCode =
+  | "schema_invalid"
+  | "limit_exceeded"
+  | "locale_invalid"
+  | "predicate_invalid"
+  | "record_policy_invalid"
+  | "coverage_incomplete";
+
 export type OntologyCandidateValidationResult =
   | { ok: true; release: PatternOntologyRelease }
   | {
@@ -26,6 +34,7 @@ export type OntologyCandidateValidationResult =
         | "candidate_schema_invalid"
         | "candidate_limit_exceeded"
         | "candidate_policy_invalid";
+      safe_detail_code: OntologyCandidateSafeDetailCode;
     };
 
 export interface OntologyCandidateValidationOptions {
@@ -298,27 +307,57 @@ export function validateOntologyCandidateRelease(
     !validateFrozenRelease(value) ||
     canonicalJson(value) !== options.canonicalBytes
   ) {
-    return { ok: false, code: "candidate_schema_invalid" };
+    return {
+      ok: false,
+      code: "candidate_schema_invalid",
+      safe_detail_code: "schema_invalid",
+    };
   }
   if (
     value.records.length > options.maximumCandidateRecords ||
     textEncoder.encode(options.canonicalBytes).byteLength >
       options.maximumCandidateBytes
   ) {
-    return { ok: false, code: "candidate_limit_exceeded" };
+    return {
+      ok: false,
+      code: "candidate_limit_exceeded",
+      safe_detail_code: "limit_exceeded",
+    };
+  }
+  if (value.locale !== options.corpusLocale) {
+    return {
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "locale_invalid",
+    };
   }
   if (
-    value.locale !== options.corpusLocale ||
     !value.records.every((record) => {
       if (!validateFrozenPredicate(record.feature_predicate)) return false;
       return record.feature_predicate.type !== "pattern" ||
         (typeof record.feature_predicate.pattern === "string" &&
           FROZEN_PATTERN_TYPES.has(record.feature_predicate.pattern));
-    }) ||
-    !candidatePolicyIsValid(value.records, options) ||
-    !coverageIsComplete(value.records, options.coverageTargets)
+    })
   ) {
-    return { ok: false, code: "candidate_policy_invalid" };
+    return {
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "predicate_invalid",
+    };
+  }
+  if (!candidatePolicyIsValid(value.records, options)) {
+    return {
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "record_policy_invalid",
+    };
+  }
+  if (!coverageIsComplete(value.records, options.coverageTargets)) {
+    return {
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_incomplete",
+    };
   }
   return { ok: true, release: value };
 }

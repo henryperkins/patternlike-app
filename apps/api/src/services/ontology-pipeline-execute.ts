@@ -28,6 +28,7 @@ import {
 import {
   validateOntologyCandidateRelease,
 } from "./ontology-candidate-validation.js";
+import { safeLog } from "./safe-log.js";
 import {
   createClaimedOntologyProviderCallReservation,
   reserveClaimedOntologyRegressionProviderCall,
@@ -1035,7 +1036,13 @@ async function buildCompleteCandidate(
     maximumCandidateRecords: command.limits.maximum_candidate_records,
     maximumCandidateBytes: command.limits.maximum_candidate_bytes,
   });
-  if (!validation.ok) terminal("candidate_invalid");
+  if (!validation.ok) {
+    safeLog({
+      event: "ontology_candidate_rejected",
+      reason: validation.safe_detail_code,
+    });
+    terminal("candidate_invalid");
+  }
   return {
     release: validation.release,
     canonicalBytes,

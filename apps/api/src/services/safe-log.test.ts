@@ -9,6 +9,30 @@ afterEach(() => {
 });
 
 describe("safe logging", () => {
+  it("projects only a closed ontology candidate rejection reason", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "ontology_candidate_rejected",
+      reason: "record_policy_invalid",
+      candidate: SENTINEL,
+      corpus: SENTINEL,
+      run_id: "private-run-id",
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]![1]).toMatchObject({
+      reason: "record_policy_invalid",
+    });
+    expect(Object.keys(warn.mock.calls[0]![1] as object).sort()).toEqual([
+      "reason",
+      "trace_id",
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("private-run-id");
+  });
+
   it("projects a closed event and generates its own internal trace id", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 

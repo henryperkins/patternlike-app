@@ -7,6 +7,9 @@ import type {
   PatternPublisherSafeDetailCode,
   PatternStageClass,
 } from "./pattern-publisher.js";
+import type {
+  OntologyCandidateSafeDetailCode,
+} from "./ontology-candidate-validation.js";
 
 export type ConfigurationCode =
   | "reading_rollout_invalid"
@@ -90,6 +93,10 @@ export type SafeLogEvent =
   | { event: "natal_feature_cache_write_failed" }
   | { event: "pattern_dispatch_failed" }
   | { event: "pattern_stage_failed" }
+  | {
+      event: "ontology_candidate_rejected";
+      reason: OntologyCandidateSafeDetailCode;
+    }
   /** A stage exhausted its claim ceiling and the sweep failed the job. */
   | { event: "pattern_stage_terminal_failure" }
   /** Retention prune or expired-artifact cleanup could not complete. */
@@ -258,6 +265,9 @@ export function safeLog(input: SafeLogEvent): string {
         failure_class: input.failure_class,
         safe_detail_code: input.safe_detail_code,
       });
+      break;
+    case "ontology_candidate_rejected":
+      console.warn(input.event, { trace_id, reason: input.reason });
       break;
     case "unhandled_error":
     case "generation_claim_release_failed":
