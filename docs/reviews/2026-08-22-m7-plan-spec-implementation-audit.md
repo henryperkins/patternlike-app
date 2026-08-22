@@ -43,4 +43,4 @@ python3 contracts/validate_schemas.py
 
 All exited 0, including 1,650 API tests.
 
-One scope warning: local `main` is 22 commits ahead of the currently fetched `origin/main`, so remote main does not yet contain all this work. The handoff archive rename and ledger edit are also currently uncommitted.
+One scope note: this audit was written against local `main` at `26990c1`, which was then 22 commits ahead of `origin/main`, with the handoff archive rename and ledger edit still uncommitted. That work was pushed on 2026-08-22 (`cd599f2..d0aee9d`); the archive move and its index landed in `3849308`. The verdicts above are unaffected — none of those commits closes an open item named here.
