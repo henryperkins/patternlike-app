@@ -11,6 +11,11 @@ import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
 import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
 import replayEventSchema from "../../../../contracts/m7/pattern-erasure-replay-event.schema.json";
 import type { Env } from "../env.js";
+import {
+  collectDeletionArtifactKeys,
+  DELETED_USER_TABLES,
+  deleteUserRows,
+} from "./deletion-manifest.js";
 
 export const PATTERN_REPLAY_EVENT_CLASSES = [
   "claim_consumed",
@@ -822,6 +827,143 @@ function ontologyRecallConvergenceStatement(
   ).bind(event.ontology_version, event.ontology_version);
 }
 
+async function applyAccountDeletionReplay(
+  env: Env,
+  event: PatternErasureReplayEvent,
+  receipt: PreparedPatternReplayEvent,
+): Promise<void> {
+  if (
+    !env.ARTIFACTS ||
+    !event.target_user_id ||
+    event.chart_fingerprint_hash !== null ||
+    event.claim_id !== null ||
+    event.generation_id !== null ||
+    event.pattern_id !== null ||
+    event.ontology_version !== null ||
+    event.prior_claim_status !== null ||
+    event.next_claim_status !== "deleted"
+  ) {
+    fail("replay_event_apply_invalid");
+  }
+  const userId = event.target_user_id;
+  const existingProof = await env.DB.prepare(
+    `SELECT id, idempotency_key, created_at
+     FROM deletion_requests WHERE user_id = ?
+     ORDER BY created_at, id LIMIT 1`,
+  ).bind(userId).first<{
+    id: string;
+    idempotency_key: string;
+    created_at: string;
+  }>();
+  const proofId = existingProof?.id ?? event.event_id;
+  const proofKey = existingProof?.idempotency_key ?? event.event_id;
+  const proofCreatedAt = existingProof?.created_at ?? event.occurred_at;
+
+  let objectKeys: string[];
+  try {
+    objectKeys = await collectDeletionArtifactKeys(env, userId);
+    for (let offset = 0; offset < objectKeys.length; offset += 1000) {
+      await env.ARTIFACTS.delete(objectKeys.slice(offset, offset + 1000));
+    }
+  } catch {
+    fail("replay_event_apply_unavailable");
+  }
+
+  // This manifest is intentionally idempotent and dependency ordered. A
+  // restore route runs before traffic, so a crash between statements is
+  // repaired by applying the same signed event again.
+  await deleteUserRows(env, userId, event.event_id);
+
+  const deletedSubject = `cs_deleted_${event.event_id.slice(5, 29)}`;
+  const auditId = `aud_${event.event_id.slice(5)}`;
+  const convergence = DELETED_USER_TABLES.map((table) =>
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'account deletion replay retained a user row'
+       WHERE EXISTS (SELECT 1 FROM ${table} WHERE user_id = ?)`,
+    ).bind(userId)
+  );
+  await env.DB.batch([
+    env.DB.prepare(
+      `DELETE FROM deletion_requests WHERE user_id = ? AND id != ?`,
+    ).bind(userId, proofId),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO deletion_requests (
+         id, user_id, status, dek_destroyed, idempotency_key, created_at,
+         completed_at, job_id, receipt_hash, receipt_expires_at, checkpoint,
+         status_updated_at, error_class, artifact_manifest_json,
+         artifact_cleanup_until
+       ) VALUES (?, ?, 'completed', 1, ?, ?, ?, NULL, NULL, NULL,
+                 'completed', ?, NULL, '[]', NULL)`,
+    ).bind(
+      proofId,
+      userId,
+      proofKey,
+      proofCreatedAt,
+      event.occurred_at,
+      event.occurred_at,
+    ),
+    env.DB.prepare(
+      `UPDATE deletion_requests
+       SET status = 'completed', dek_destroyed = 1, completed_at = ?,
+           job_id = NULL, receipt_hash = NULL, receipt_expires_at = NULL,
+           checkpoint = 'completed', status_updated_at = ?, error_class = NULL,
+           artifact_manifest_json = '[]', artifact_cleanup_until = NULL
+       WHERE id = ? AND user_id = ?`,
+    ).bind(event.occurred_at, event.occurred_at, proofId, userId),
+    env.DB.prepare(
+      `UPDATE user_keys
+       SET wrapped_dek = NULL,
+           destroyed_at = COALESCE(destroyed_at, ?),
+           erased_at = COALESCE(erased_at, ?)
+       WHERE user_id = ?`,
+    ).bind(event.occurred_at, event.occurred_at, userId),
+    env.DB.prepare(
+      `UPDATE users
+       SET crypto_subject = ?, status = 'deleted', locale = 'und',
+           timezone = 'UTC', entitlement_tier = 'none', next_due_at = NULL,
+           timezone_source = 'default_unconfirmed', timezone_revision = 0,
+           timezone_updated_at = NULL, locale_source = 'default_unconfirmed',
+           locale_updated_at = NULL, updated_at = ?,
+           deleted_at = COALESCE(deleted_at, ?)
+       WHERE id = ?`,
+    ).bind(
+      deletedSubject,
+      event.occurred_at,
+      event.occurred_at,
+      userId,
+    ),
+    ...receipt.receiptStatements(env),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO audit_events (
+         id, actor_type, actor_id, action, resource_type, resource_id,
+         result, detail_class, created_at
+       ) VALUES (?, 'system', ?, 'account_deleted', 'deletion_request', ?,
+                 'success', 'replay_ledger', ?)`,
+    ).bind(auditId, userId, proofId, event.occurred_at),
+    ...convergence,
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'account deletion replay did not converge'
+       WHERE EXISTS (SELECT 1 FROM jobs WHERE user_id = ?)
+          OR NOT EXISTS (
+            SELECT 1 FROM users
+            WHERE id = ? AND status = 'deleted' AND deleted_at IS NOT NULL
+          )
+          OR NOT EXISTS (
+            SELECT 1 FROM user_keys
+            WHERE user_id = ? AND wrapped_dek IS NULL
+              AND destroyed_at IS NOT NULL AND erased_at IS NOT NULL
+          )
+          OR NOT EXISTS (
+            SELECT 1 FROM deletion_requests
+            WHERE id = ? AND user_id = ? AND status = 'completed'
+              AND checkpoint = 'completed' AND dek_destroyed = 1
+          )`,
+    ).bind(userId, userId, userId, proofId, userId),
+  ]);
+}
+
 /** Apply one already-signed event without ever assigning an available claim. */
 export async function applyPatternReplayEvent(
   env: Env,
@@ -837,7 +979,13 @@ export async function applyPatternReplayEvent(
     verified.event_class === "chart_correction_erased" ||
     verified.event_class === "pattern_withdrawn";
   const ontologyRecall = verified.event_class === "ontology_recalled";
-  if (verified.event_class !== "claim_consumed" && !erasure && !ontologyRecall) {
+  const accountDeletion = verified.event_class === "account_deleted";
+  if (
+    verified.event_class !== "claim_consumed" &&
+    !erasure &&
+    !ontologyRecall &&
+    !accountDeletion
+  ) {
     fail("replay_event_apply_unsupported");
   }
   const priorReplicaPutAt = await existingReplicaPutAt(env, verified.event_id);
@@ -847,6 +995,10 @@ export async function applyPatternReplayEvent(
     jcsCanonicalize(verified),
     priorReplicaPutAt ?? appliedAt.toISOString(),
   );
+  if (accountDeletion) {
+    await applyAccountDeletionReplay(env, verified, receipt);
+    return priorReplicaPutAt === null ? "applied" : "replay";
+  }
   if (ontologyRecall) {
     await env.DB.batch([
       env.DB.prepare(

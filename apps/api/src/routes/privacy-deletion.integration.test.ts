@@ -32,6 +32,12 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
+import {
+  clearPatternReplayObjects,
+  generatePatternReplayTestKeys,
+  installPatternReplayTestKeys,
+  patternReplayTestEnv,
+} from "../../test/pattern-replay-fixtures.js";
 
 interface WorkflowAccepted {
   schema_version: "0.2.0";
@@ -85,11 +91,60 @@ async function deliver(jobId: string) {
 
 beforeEach(async () => {
   await resetDb();
+  await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+  installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
   await seedUser(IDENTITY_A);
   await seedUser(IDENTITY_B);
 });
 
 describe("account deletion", () => {
+  it("leaves account rows and keys intact when its replay intent cannot replicate", async () => {
+    await seedChart(IDENTITY_A);
+    const accepted = await requestDeletion("idem-delete-account-replay-outage");
+    const unavailableBucket = new Proxy(env.PATTERN_REPLAY_LEDGER!, {
+      get(target, property, receiver) {
+        if (property === "get") return async () => null;
+        if (property === "put") {
+          return async () => {
+            throw new Error("injected replay outage");
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as R2Bucket;
+
+    expect(await processDeletionMessage(
+      patternReplayTestEnv(env, { PATTERN_REPLAY_LEDGER: unavailableBucket }),
+      {
+        kind: "privacy",
+        job_id: accepted.body.job_id,
+        job_type: "delete_account",
+      },
+      new Date("2026-08-22T15:10:00.000Z"),
+    )).toEqual({ retryAfterSeconds: 60 });
+    expect(await rows(
+      `SELECT checkpoint FROM deletion_requests WHERE id = ?`,
+      accepted.body.resource_id,
+    )).toEqual([{ checkpoint: "accepted" }]);
+    expect(await rows(
+      `SELECT COUNT(*) AS count FROM chart_snapshots WHERE user_id = ?`,
+      USER_A,
+    )).toEqual([{ count: 1 }]);
+    expect(await rows(
+      `SELECT wrapped_dek, destroyed_at FROM user_keys WHERE user_id = ?`,
+      USER_A,
+    )).toEqual([{
+      wrapped_dek: expect.anything(),
+      destroyed_at: null,
+    }]);
+    expect(await rows(
+      `SELECT COUNT(*) AS count FROM pattern_erasure_replay_events
+       WHERE event_class = 'account_deleted' AND target_user_id = ?`,
+      USER_A,
+    )).toEqual([{ count: 0 }]);
+  });
+
   it("atomically locks the account and returns a narrowly scoped receipt", async () => {
     const now = new Date().toISOString();
     await env.DB.batch([
@@ -227,6 +282,15 @@ describe("account deletion", () => {
 
     const delivery = await deliver(accepted.body.job_id);
     expect(delivery.retryMessages).toEqual([]);
+    expect(await rows(
+      `SELECT event_class, next_claim_status
+       FROM pattern_erasure_replay_events
+       WHERE target_user_id = ? AND event_class = 'account_deleted'`,
+      USER_A,
+    )).toEqual([{
+      event_class: "account_deleted",
+      next_claim_status: "deleted",
+    }]);
 
     const user = await rows<Record<string, unknown>>(
       `SELECT status, locale, timezone, entitlement_tier, next_due_at, deleted_at

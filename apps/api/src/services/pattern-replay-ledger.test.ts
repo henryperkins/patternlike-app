@@ -15,6 +15,7 @@ import {
   IDENTITY_A,
   USER_A,
   resetDb,
+  seedChart,
   seedUser,
 } from "../../test/helpers.js";
 import {
@@ -852,6 +853,94 @@ describe("Pattern replay ontology recall application", () => {
       { ...release, bundle_hash: bundleHash },
       `pattern-ontology/${version}.json`,
     )).rejects.toThrow("ontology_version_recalled");
+  });
+});
+
+describe("Pattern replay account deletion application", () => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    await seedChart(IDENTITY_A);
+  });
+
+  it("deletes a pre-request restore and retains only proof tombstones", async () => {
+    const exportId = `exp_${"a".repeat(32)}`;
+    const objectKey = `exports/${exportId}.json.enc`;
+    const createdAt = "2026-08-22T14:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO export_requests (
+         id, user_id, status, idempotency_key, created_at, status_updated_at
+       ) VALUES (?, ?, 'queued', 'replay-account-export', ?, ?)`,
+    ).bind(exportId, USER_A, createdAt, createdAt).run();
+    await env.ARTIFACTS!.put(objectKey, "encrypted export fixture");
+
+    const key = await testSigningKey();
+    const configured = replayEnv(writerSecret(key), publicKeyring(key));
+    const prepared = await writePatternReplayIntent(
+      configured,
+      intent({
+        eventClass: "account_deleted",
+        semanticOperationKey: "del_restore_predates_request",
+        targetUserId: USER_A,
+        chartFingerprintHash: null,
+        claimId: null,
+        generationId: null,
+        patternId: null,
+        ontologyVersion: null,
+        priorClaimStatus: null,
+        nextClaimStatus: "deleted",
+      }),
+      new Date("2026-08-22T14:45:00.000Z"),
+    );
+
+    await expect(applyPatternReplayEvent(
+      configured,
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    )).resolves.toBe("applied");
+    await expect(applyPatternReplayEvent(
+      configured,
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    )).resolves.toBe("replay");
+
+    expect(await env.ARTIFACTS!.head(objectKey)).toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT status, locale, timezone, entitlement_tier, deleted_at
+       FROM users WHERE id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      status: "deleted",
+      locale: "und",
+      timezone: "UTC",
+      entitlement_tier: "none",
+      deleted_at: prepared.event.occurred_at,
+    });
+    expect(await env.DB.prepare(
+      `SELECT wrapped_dek, destroyed_at, erased_at
+       FROM user_keys WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      wrapped_dek: null,
+      destroyed_at: prepared.event.occurred_at,
+      erased_at: prepared.event.occurred_at,
+    });
+    expect(await env.DB.prepare(
+      `SELECT id, status, checkpoint, dek_destroyed, completed_at
+       FROM deletion_requests WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      id: prepared.event.event_id,
+      status: "completed",
+      checkpoint: "completed",
+      dek_destroyed: 1,
+      completed_at: prepared.event.occurred_at,
+    });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM chart_snapshots WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({ count: 0 });
+    expect(await env.DB.prepare(
+      `SELECT event_class FROM pattern_erasure_replay_events WHERE event_id = ?`,
+    ).bind(prepared.event.event_id).first()).toEqual({
+      event_class: "account_deleted",
+    });
   });
 });
 

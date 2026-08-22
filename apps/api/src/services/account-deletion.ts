@@ -2,10 +2,10 @@ import { sha256Hex } from "@patternlike/shared";
 import type { Env, PrivacyMessage } from "../env.js";
 import {
   DELETE_JOB_TYPE,
+  DELETION_ARTIFACT_FENCE_TTL_SECONDS,
   type DeletionClaim,
   advanceDeletionCheckpoint,
   claimDeletionJob,
-  recordDeletionArtifactManifest,
   releaseDeletionClaim,
 } from "../db/deletion-jobs.js";
 import { EXPORT_JOB_TYPE } from "../db/privacy-jobs.js";
@@ -14,6 +14,10 @@ import {
   deleteUserRows,
 } from "./deletion-manifest.js";
 import { safeLog, type DeletionFailureCheckpoint } from "./safe-log.js";
+import {
+  PreparedPatternReplayEvent,
+  writePatternReplayIntent,
+} from "./pattern-replay-ledger.js";
 
 export const DELETION_RETRY_DELAY_SECONDS = 60;
 export const DELETION_MAX_RETRY_DELAY_SECONDS = 60 * 60;
@@ -29,6 +33,7 @@ export function deletionRetryDelaySeconds(attempts: number): number {
 async function fenceExports(
   env: Env,
   claim: DeletionClaim,
+  replay: PreparedPatternReplayEvent,
   now: Date,
 ): Promise<"ready" | "wait"> {
   const live = await env.DB.prepare(
@@ -40,19 +45,91 @@ async function fenceExports(
     .first<{ present: number }>();
   if (live) return "wait";
 
-  await env.DB.prepare(
-    `UPDATE jobs
-     SET status = 'cancelled', result_class = 'account_pending_deletion',
-         finished_at = ?, claim_token = NULL, lease_expires_at = NULL
-     WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')`,
-  )
-    .bind(now.toISOString(), claim.request.user_id, EXPORT_JOB_TYPE)
-    .run();
+  if (!claim.claimToken) throw new Error("deletion claim has no token");
   const keys = await collectDeletionArtifactKeys(env, claim.request.user_id);
-  if (!(await recordDeletionArtifactManifest(env, claim, keys, now))) {
-    throw new Error("deletion artifact manifest lost its claim");
-  }
+  const nowIso = now.toISOString();
+  const cleanupUntil = keys.length > 0
+    ? new Date(
+        now.getTime() + DELETION_ARTIFACT_FENCE_TTL_SECONDS * 1000,
+      ).toISOString()
+    : null;
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'deletion artifact fence lost claim'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM deletion_requests request
+         JOIN jobs job ON job.id = request.job_id
+         WHERE request.id = ? AND request.user_id = ?
+           AND request.job_id = ? AND request.status = 'running'
+           AND job.status = 'running' AND job.claim_token = ?
+       )`,
+    ).bind(
+      claim.request.id,
+      claim.request.user_id,
+      claim.jobId,
+      claim.claimToken,
+    ),
+    ...replay.receiptStatements(env),
+    env.DB.prepare(
+      `UPDATE jobs
+       SET status = 'cancelled', result_class = 'account_pending_deletion',
+           finished_at = ?, claim_token = NULL, lease_expires_at = NULL
+       WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')`,
+    ).bind(nowIso, claim.request.user_id, EXPORT_JOB_TYPE),
+    env.DB.prepare(
+      `UPDATE deletion_requests
+       SET checkpoint = 'exports_fenced', status_updated_at = ?,
+           artifact_manifest_json = ?, artifact_cleanup_until = ?
+       WHERE id = ? AND user_id = ? AND job_id = ? AND status = 'running'
+         AND EXISTS (
+           SELECT 1 FROM jobs j WHERE j.id = deletion_requests.job_id
+             AND j.status = 'running' AND j.claim_token = ?
+         )`,
+    ).bind(
+      nowIso,
+      JSON.stringify(keys),
+      cleanupUntil,
+      claim.request.id,
+      claim.request.user_id,
+      claim.jobId,
+      claim.claimToken,
+    ),
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'deletion artifact fence did not converge'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM deletion_requests
+         WHERE id = ? AND checkpoint = 'exports_fenced'
+           AND artifact_manifest_json = ?
+           AND artifact_cleanup_until IS ?
+       )`,
+    ).bind(claim.request.id, JSON.stringify(keys), cleanupUntil),
+  ]);
+  claim.request.checkpoint = "exports_fenced";
+  claim.request.artifact_manifest_json = JSON.stringify(keys);
+  claim.request.artifact_cleanup_until = cleanupUntil;
   return "ready";
+}
+
+async function ensureAccountReplayReceipt(
+  env: Env,
+  claim: DeletionClaim,
+  replay: PreparedPatternReplayEvent,
+): Promise<void> {
+  if (!claim.claimToken) throw new Error("deletion claim has no token");
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'deletion replay receipt lost claim'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM jobs
+         WHERE id = ? AND job_type = ? AND status = 'running'
+           AND claim_token = ?
+       )`,
+    ).bind(claim.jobId, DELETE_JOB_TYPE, claim.claimToken),
+    ...replay.receiptStatements(env),
+  ]);
 }
 
 async function deleteRegisteredObjects(env: Env, userId: string): Promise<void> {
@@ -191,8 +268,20 @@ export async function processDeletionMessage(
   }
 
   try {
+    const replay = await writePatternReplayIntent(env, {
+      eventClass: "account_deleted",
+      semanticOperationKey: claim.request.id,
+      targetUserId: claim.request.user_id,
+      chartFingerprintHash: null,
+      claimId: null,
+      generationId: null,
+      patternId: null,
+      ontologyVersion: null,
+      priorClaimStatus: null,
+      nextClaimStatus: "deleted",
+    }, now);
     if (claim.request.checkpoint === "accepted") {
-      if ((await fenceExports(env, claim, now)) === "wait") {
+      if ((await fenceExports(env, claim, replay, now)) === "wait") {
         const retryAfterSeconds = deletionRetryDelaySeconds(claim.attempts);
         await releaseDeletionClaim(
           env,
@@ -201,6 +290,8 @@ export async function processDeletionMessage(
         );
         return { retryAfterSeconds };
       }
+    } else {
+      await ensureAccountReplayReceipt(env, claim, replay);
     }
     if (claim.request.checkpoint === "exports_fenced") {
       await deleteRegisteredObjects(env, claim.request.user_id);
