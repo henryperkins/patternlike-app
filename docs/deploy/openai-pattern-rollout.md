@@ -2,9 +2,10 @@
 
 **Created:** 2026-08-20
 
-**Status:** Engineering and rollout not complete. This file is the operational
-source of truth; creating it does not authorize a deployment, secret change,
-ontology activation, provider call, or rollout advance.
+**Status:** Core adapter and automated-ontology engineering are present;
+operational rollout and public-readiness work are not complete. This file is the
+operational source of truth; updating it does not authorize a deployment,
+secret change, ontology activation, provider call, or rollout advance.
 
 **Companion artifacts:**
 
@@ -40,17 +41,18 @@ override a failed machine gate.
 
 This table describes repository evidence, not unqueried live state.
 
-| Area | State at 2026-08-20 | Evidence / next owner |
+| Area | State at 2026-08-22 | Evidence / next owner |
 | --- | --- | --- |
-| Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a; focused lane: 222 tests passed on 2026-08-20 |
-| Live executor calls OpenAI | **No** | Adapter Task 6; current executor refuses a non-synthetic publisher |
-| Artifact-first idempotency, attempts, 11-call loop | **No** | Adapter Tasks 6, 8b, and 9 |
-| Executed-pin provenance and per-stage usage | **No** | Adapter Tasks 7 and 8a |
-| `0009` / `0010` | **Absent** | Adapter Tasks 8 and 8a |
-| Internal ontology containment and release | **Absent** | Internal ontology plan |
-| Public-capable machine ontology pipeline | **Absent** | Automated ontology plan |
+| Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a |
+| Executor/provider path and queue-level integration | Complete in repository; not live | `pattern-execute.ts`, `pattern-execute-openai.test.ts`; rollout `off` prevents provider work |
+| Artifact-first idempotency, attempts, writer↔verifier correction, 11-call loop | Complete | `pattern-execute.ts`; exact ceiling in `pattern-execute-protocol.test.ts` |
+| Executed-pin provenance and per-stage usage | Complete | `pattern-execute.ts`; migration `0010_pattern_stage_class_usage.sql` |
+| `0009` / `0010` | Present in repository; remote state unqueried | Apply only through Gate 2 |
+| Pattern model/strict-schema verification command | Present; no fresh live run recorded | `npm run publisher:pattern:model:verify -w @patternlike/api`; Gate 4 remains open |
+| Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
+| Public-capable machine ontology pipeline | Engineering complete through Task 10; rollout evidence open | Automated ontology plan Task 11 and Gates 2–10 remain operational work |
 | Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
-| Publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed config |
+| Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
 | Numeric call-limit value | `100` in committed production config | A value is not spend approval; Gate 6 remains open |
 | Production DB, secrets, active ontology pointer, deployed Worker version | **Not re-queried by this documentation change** | Gates 2–5 must record live evidence |
 
@@ -58,12 +60,12 @@ This table describes repository evidence, not unqueried live state.
 
 The shortest supported route is the internal path. In order:
 
-1. finish adapter Tasks 6–9 so the executor can call the implemented publisher
-   safely and pass the queue-level integration suite;
-2. implement the internal ontology plan, or implement the automated pipeline
+1. pass Gate 1 on the final adapter candidate;
+2. execute the internal ontology plan, or run the implemented automated pipeline
    instead, and activate a signed release;
-3. pass Gate 1, apply required migrations, and deploy with rollout still `off`;
-4. prove the model/schema, configure one valid credential mode, and approve the
+3. inventory production, apply required migrations, and deploy with rollout
+   still `off`;
+4. freshly prove the model/schema, configure one valid credential mode, and approve the
    worst-case spend ceiling;
 5. set exactly the canary account in `PATTERN_INTERNAL_ACCOUNT_IDS`, move only to
    `internal`, and use an account with an active chart, confirmed `en-US` locale,
@@ -71,17 +73,18 @@ The shortest supported route is the internal path. In order:
 6. reserve once and let the machine pipeline reach `ready` or an honest terminal
    failure.
 
-Tasks 1–5a, including Task 5a's credential model, are complete and are no longer
-gates. Administrator OIDC, the replay restore drill, and the automated ontology
-pipeline are not required to obtain the first internal Pattern; they remain
+Adapter Tasks 1–9, including the credential model and queue/idempotency suite,
+are complete. Task 10 supplies the reproducible preflight and this handoff;
+neither substitutes for a live Gate 4 run. Administrator OIDC and the replay
+restore drill are not required to obtain the first internal Pattern; they remain
 public-rollout gates below.
 
 ## Paths after the common engineering gates
 
 | Path | Ontology accepted | Account scope | Endpoint state reached | Additional blockers |
 | --- | --- | --- | --- | --- |
-| Internal canary — shortest | signed `synthetic_internal` or `machine_pipeline` | exact allowlist only | `PATTERN_AI_ROLLOUT=internal` | Adapter Tasks 6–9, internal ontology plan, Gates 1–8 |
-| Public `first_open` | signed `machine_pipeline` only, backed by authorized `licensed_excerpt` corpus | first-open cohort | `PATTERN_AI_ROLLOUT=first_open` | Automated ontology plan, Gate 9 certification, admin role boundary, replay runtime/drill, sustained metrics |
+| Internal canary — shortest | signed `synthetic_internal` or `machine_pipeline` | exact allowlist only | `PATTERN_AI_ROLLOUT=internal` | Gate 1, one activated ontology path, and Gates 2–8 |
+| Public `first_open` | signed `machine_pipeline` only, backed by authorized `licensed_excerpt` corpus | first-open cohort | `PATTERN_AI_ROLLOUT=first_open` | Automated ontology Task 11 evidence, Gate 9 certification, admin role boundary, replay runtime/drill, sustained metrics |
 | Public `enabled` | active `machine_pipeline` release | remaining eligible cohort | `PATTERN_AI_ROLLOUT=enabled` | Separate product authorization after successful first-open observation |
 
 The internal release is never promoted into a public release. The first machine
@@ -91,7 +94,9 @@ release recalls it and triggers withdrawal for documents based on it.
 
 ## Gate 1 — complete and freeze the code candidate
 
-**Current state:** open. Adapter Tasks 6–10 remain unchecked.
+**Current state:** Task 10 implementation is present. This gate stays open until
+the full command set has passed against the final candidate revision and that
+revision is recorded below.
 
 Run from the repository root:
 
@@ -108,13 +113,16 @@ Required evidence:
 - the focused OpenAI Pattern integration suite proves duplicate delivery,
   expired lease, provider-success/D1-failure adoption, bounded attempt
   exhaustion, coarse failures, and no second accepted document;
+- the hermetic Pattern-model verification lane proves the live command's model
+  lookup, strict `pattern` request, incomplete-output refusal, and prose-free
+  failures without making a provider request;
 - `contracts/m0` through `contracts/m6` are unchanged;
 - M7 changes are only recorded additive amendments and fixtures;
 - both Wrangler blocks still declare `PATTERN_AI_ROLLOUT="off"`; and
 - no production secret or remote resource changed during this gate.
 
-**Stop:** any failure, unchecked adapter task, unrecorded contract drift, or
-non-`off` committed rollout.
+**Stop:** any failure, unresolved adapter requirement, unrecorded contract
+drift, or non-`off` committed rollout.
 
 ## Gate 2 — inventory production and apply forward-only migrations
 
@@ -162,8 +170,8 @@ Record the Worker version id and prove:
 - no Pattern queue delivery decrypts a command or calls a provider while off.
 
 **Also decide the scheduler here, and record the decision.**
-`[env.production.triggers]` is an explicit `crons = []` override
-(`apps/api/wrangler.toml:208`), so **no cron runs in production today** and
+`[env.production.triggers]` is an explicit `crons = []` override in
+`apps/api/wrangler.toml`, so **no cron runs in production today** and
 `sweepPatternJobs` never fires there. That was harmless while every Pattern
 delivery either advanced or died. Since Task 6 it is not: a retryable provider
 failure calls `retryStage`, which returns the job to `queued` with
@@ -183,19 +191,27 @@ traffic. Roll back the Worker version; do not roll back the forward migration.
 
 ## Gate 4 — fresh model and strict-schema preflight
 
-**Current state:** repository evidence exists from 2026-08-19, but rollout needs
-a fresh run against the credential and exact model used by the deployed version.
+**Current state:** the reproducible command is implemented and hermetically
+tested. Repository evidence exists from 2026-08-19, but no fresh live run is
+recorded for this candidate.
 
-Run the adapter plan's `publisher:pattern:model:verify` command after it lands.
+Run from the repository root only when the provider call is authorized:
+
+```text
+npm run publisher:pattern:model:verify -w @patternlike/api
+```
+
 It must prove both:
 
 1. the pinned model exists for the authorized OpenAI account; and
 2. a minimal strict `json_schema` response carrying the contract's `pattern`
    keyword is accepted.
 
-The command records model id, request id/hash, verdict, and timestamp only. It
-must not print generated response text. Repeat this gate for any later model,
-model tier, or strict-schema derivation change.
+The command records model id, response id/hash, verdict, and timestamp only. A
+live 200 proves that the provider accepts the retained keyword; the command also
+confirms locally that the generated object conforms to the regex, but never
+prints that object or provider error prose. Repeat this gate for any later
+model, model tier, or strict-schema derivation change.
 
 **Stop:** missing model, refused schema keyword, unexpected billing account, or
 any output containing provider prose.
@@ -319,7 +335,10 @@ refusal. `evaluator_passed` and `regression_passed` remain honestly false.
 
 ### Gate 7B — public-capable path
 
-Execute `docs/superpowers/plans/2026-08-20-automated-ontology-pipeline.md`.
+Engineering Tasks 1–10 in
+`docs/superpowers/plans/2026-08-20-automated-ontology-pipeline.md` are present in
+the repository despite the plan's stale checkboxes. Execute Task 11's
+production-shaped candidate and rollout handoff.
 Required evidence: authorized `licensed_excerpt` corpus identity/hash,
 deterministic compiler pass, one independent evaluation per rule, 30-chart
 regression report meeting all hard gates and class thresholds, separate signing
