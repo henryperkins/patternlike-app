@@ -382,11 +382,15 @@ OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = "4000"
 PATTERN_INPUT_MAX_BYTES = "98304"
 PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100"
 PATTERN_ARTIFACT_RETENTION_DAYS = "30"
+# Public verification material for machine ontology releases. The matching
+# private key exists only on patternlike-ontology-signer-production.
+PATTERN_ONTOLOGY_KEYS = '{"ontology-machine-2026-08":{"alg":"Ed25519","public_key":"Tn_Znz14aq2viq6CGwdI1b1xLV2jp-IR_OwI7nKDSp8"}}'
 
-# Automated ontology pipeline. Production stays off until the independent
-# evaluator, frozen regression lane, and operational run approval are ready.
+# Automated ontology pipeline. Internal control-plane execution was approved on
+# 2026-08-22 for the 60-fragment Gate 7B candidate. This does not admit consumer
+# Pattern generation; PATTERN_AI_ROLLOUT remains the independent product switch.
 # The artifact keyring remains a Worker secret declared above, never a var.
-ONTOLOGY_PIPELINE_ROLLOUT = "off"
+ONTOLOGY_PIPELINE_ROLLOUT = "internal"
 ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1"
 OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol"
 OPENAI_ONTOLOGY_GENERATOR_REASONING = "high"
