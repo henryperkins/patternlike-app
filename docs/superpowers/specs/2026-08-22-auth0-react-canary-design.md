@@ -90,9 +90,9 @@ pass:
 - `clientId`: `VITE_AUTH0_CLIENT_ID` with the existing SPA client ID as its
   public default;
 - `authorizationParams.redirect_uri`: `window.location.origin`;
-- `authorizationParams.scope`: `openid`, matching the application's existing
-  explicit request while leaving the official SDK's built-in OIDC defaults
-  intact;
+- `authorizationParams.scope`: `openid`, overriding the SDK's optional
+  `profile email` defaults and matching the existing exchange's
+  least-privilege request;
 - in-memory caching; and
 - refresh tokens disabled.
 
