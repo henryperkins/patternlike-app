@@ -304,4 +304,68 @@ export async function recallOntologyAndWithdraw(
   return documents.length;
 }
 
+/**
+ * Finish the first machine-pipeline activation by retiring every earlier
+ * internal-only ontology lineage. Machine identity is proven by the committed
+ * evidence row that `storeOntologyRelease` requires, not by trusting mutable
+ * status or an unverified provenance field.
+ *
+ * Recalled internal releases stay in the scan deliberately. If a Worker dies
+ * after the D1 withdrawal batch but before an R2 delete finishes, the next
+ * ingestion delivery repeats the idempotent cleanup instead of losing the only
+ * durable reference to that release.
+ */
+export async function reconcileMachineOntologyActivation(
+  env: Env,
+  activeMachineVersion: string,
+): Promise<number> {
+  const active = await env.DB.prepare(
+    `SELECT 1 AS present
+     FROM pattern_ontology_pointer pointer
+     JOIN pattern_ontology_releases release
+       ON release.version = pointer.active_version
+     JOIN pattern_ontology_pipeline_evidence evidence
+       ON evidence.ontology_version = release.version
+      AND evidence.bundle_hash = release.bundle_hash
+     WHERE pointer.id = 1
+       AND pointer.active_version = ?
+       AND release.status = 'active'
+       AND evidence.run_status = 'succeeded'
+       AND evidence.evidence_status = 'committed'
+       AND evidence.evaluation_artifact_status = 'committed'
+       AND evidence.compiler_passed = 1
+       AND evidence.evaluator_passed = 1
+       AND evidence.unevaluated_fixture_count = 0`,
+  ).bind(activeMachineVersion).first<{ present: number }>();
+  if (!active) {
+    throw new Error("machine_ontology_activation_not_committed");
+  }
+
+  const { results } = await env.DB.prepare(
+    `SELECT release.version
+     FROM pattern_ontology_releases release
+     WHERE release.version != ?
+       AND release.status IN ('superseded', 'recalled')
+       AND NOT EXISTS (
+         SELECT 1
+         FROM pattern_ontology_pipeline_evidence evidence
+         WHERE evidence.ontology_version = release.version
+           AND evidence.bundle_hash = release.bundle_hash
+           AND evidence.run_status = 'succeeded'
+           AND evidence.evidence_status = 'committed'
+       )
+     ORDER BY release.version`,
+  ).bind(activeMachineVersion).all<{ version: string }>();
+
+  let withdrawn = 0;
+  for (const row of results) {
+    withdrawn += await recallOntologyAndWithdraw(
+      env,
+      row.version,
+      "machine_pipeline_activation",
+    );
+  }
+  return withdrawn;
+}
+
 export { loadAnyClaim, hashChartFingerprint, loadClaimForFingerprint };

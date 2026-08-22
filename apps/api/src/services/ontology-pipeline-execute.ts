@@ -136,6 +136,7 @@ import {
   verifyOntologySignature,
   type SignedOntologyRelease,
 } from "./pattern-ontology-verify.js";
+import { reconcileMachineOntologyActivation } from "./pattern-lifecycle.js";
 
 const textEncoder = new TextEncoder();
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
@@ -2626,6 +2627,7 @@ async function executeIngesting(
   );
   const objectKey = `${ONTOLOGY_OBJECT_PREFIX}${release.ontology_version}.json`;
   await storeOntologyRelease(env, signed, objectKey, evidence);
+  await reconcileMachineOntologyActivation(env, release.ontology_version);
   await putArtifact(
     env,
     claim,

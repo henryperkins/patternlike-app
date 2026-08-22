@@ -23,6 +23,7 @@ import {
   testOntologyPipelineArtifactKeyring,
   type TestCorpusManifest,
 } from "../../test/ontology-pipeline-fixtures.js";
+import { seedActiveOntology } from "../../test/helpers.js";
 import type { Env, OntologyPipelineMessage } from "../env.js";
 import {
   claimOntologyPipelineRun,
@@ -2275,7 +2276,16 @@ describe("ontology pipeline execution", () => {
   }, 60_000);
 
   it("runs all 30 fixtures one provider pass per delivery, signs, and activates", async () => {
+    const sliceAVersion = `ontology-slice-a-${crypto.randomUUID()}`;
+    await seedActiveOntology(sliceAVersion);
     const { fixture, publisher } = await driveActivationToRegression();
+    const frozen = await env.DB.prepare(
+      `SELECT configuration_json
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(fixture.runId).first<{ configuration_json: string }>();
+    expect((JSON.parse(frozen!.configuration_json) as {
+      generator_input: { active_machine_predecessor: unknown };
+    }).generator_input.active_machine_predecessor).toBeNull();
 
     const patternPublisher = new FakeRegressionPatternPublisher();
     let regressionDeliveries = 0;
@@ -2365,6 +2375,9 @@ describe("ontology pipeline execution", () => {
       `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_evidence
        WHERE run_id = ? AND bundle_hash = ?`,
     ).bind(fixture.runId, succeeded.bundle_hash).first()).toEqual({ count: 1 });
+    expect(await env.DB.prepare(
+      `SELECT status FROM pattern_ontology_releases WHERE version = ?`,
+    ).bind(sliceAVersion).first()).toEqual({ status: "recalled" });
   }, 60_000);
 
   it("fails a claim transaction closed without acquiring a receipt", async () => {
