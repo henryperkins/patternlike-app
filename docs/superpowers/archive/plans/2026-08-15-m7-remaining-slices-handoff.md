@@ -1,12 +1,16 @@
 # M7 AI-generated Pattern — Remaining Slices Scoping Handoff
 
+> **ARCHIVED 2026-08-22 — historical.** Current M7 status lives in
+> [`../../plans/2026-08-15-m7-remaining-slices-ledger.md`](../../plans/2026-08-15-m7-remaining-slices-ledger.md)
+> and `docs/deploy/openai-pattern-rollout.md`. Index: [`../README.md`](../README.md).
+
 **Historical scoping brief.** Do not use this file for current task status. The
 repository was reconciled on 2026-08-20 in
-`2026-08-15-m7-remaining-slices-ledger.md`; Slice A and B designs are approved,
-their open questions are resolved, and their executable plans are
-`2026-08-20-internal-ontology-activation.md` and
-`2026-08-20-automated-ontology-pipeline.md`. The adapter plan records Tasks
-1–5a complete and Tasks 6–10 open. Operational order and evidence live in
+`../../plans/2026-08-15-m7-remaining-slices-ledger.md`; Slice A and B designs are
+approved, their open questions are resolved, and their executable plans are
+`../../plans/2026-08-20-internal-ontology-activation.md` and
+`../../plans/2026-08-20-automated-ontology-pipeline.md`. The adapter plan carries its own
+task status; the counts once quoted here are stale. Operational order and evidence live in
 `docs/deploy/openai-pattern-rollout.md`.
 
 Paste everything below the rule into a fresh session. It is written to be read

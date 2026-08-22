@@ -6,7 +6,7 @@
 > when picked up. It is the web-side counterpart of
 > [`2026-08-01-backend-completion-roadmap.md`](2026-08-01-backend-completion-roadmap.md)
 > and assumes the identity work recorded in
-> [`2026-08-01-identity-and-sessions.md`](2026-08-01-identity-and-sessions.md)
+> [`2026-08-01-identity-and-sessions.md`](../archive/plans/2026-08-01-identity-and-sessions.md)
 > (executed, `38e13c9..e758f48`).
 
 **Goal:** Take `apps/web` from "renders only under `AUTH_STUB=1` behind the Vite

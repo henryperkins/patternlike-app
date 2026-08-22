@@ -1,8 +1,14 @@
 # Privacy Lifecycle and Daily Check-In Design
 
+> **ARCHIVED 2026-08-22 — implemented.** Index: [`../README.md`](../README.md).
+
 **Date:** 2026-08-11
 
-**Status:** Revised after repository review; awaiting re-approval
+**Status:** Implemented and archived 2026-08-22 — M6 shipped: `contracts/m6`,
+`db/d1/0004_privacy_context.sql`, `db/d1/0006_usr05_topic_exclusions.sql`,
+`apps/api/src/routes/privacy.ts`, and the check-in and life-event surfaces. The
+`501 not_implemented` routes this design targeted are gone. Read "Revised after
+repository review; awaiting re-approval" when written.
 
 **Baseline:** `main` at `6e0c71d`
 

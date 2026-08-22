@@ -1,5 +1,12 @@
 # OpenAI Daily Reading Publisher Implementation Plan
 
+> **ARCHIVED 2026-08-22 — complete.** M5 shipped: `contracts/m5`,
+> `db/d1/0003_m5_openai_reading_publisher.sql`, and
+> `apps/api/src/services/openai-reading-publisher.ts`. Its design stays in
+> `docs/superpowers/specs/` rather than moving here, because the frozen
+> `contracts/m5/common.schema.json` names that file a normative source.
+> Do not execute. Index: [`../README.md`](../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
 **Goal:** Replace the active-editorial-release prerequisite for new daily readings with an autonomous OpenAI publisher, grounded in reproducible daily-sky calculations and consented context, while preserving deterministic eligibility, encrypted provenance, bounded retries, and atomic publication.

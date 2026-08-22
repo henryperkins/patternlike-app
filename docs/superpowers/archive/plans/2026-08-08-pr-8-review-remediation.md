@@ -1,5 +1,10 @@
 # PR 8 Review Remediation Implementation Plan
 
+> **ARCHIVED 2026-08-22 — complete.** PR #8 was merged and the production API it
+> gated has been live since 2026-08-08 (`docs/deploy/api-production.md`), so the
+> five unticked boxes covering commit, merge, deploy, and verification were in
+> fact carried out. Do not execute. Index: [`../README.md`](../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make PR #8 merge-ready by correcting confirmed ingestion, concurrency, configuration, and operational-safety defects, then merge and deploy the verified head.

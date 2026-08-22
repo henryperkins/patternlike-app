@@ -1,5 +1,8 @@
 # M5 OpenAI Daily Reading Publisher — Handoff Prompt, Tasks 9–17
 
+> **ARCHIVED 2026-08-22 — complete.** All seventeen tasks landed and M5 shipped.
+> "Tasks 9–17 remain", below, was true when written. Do not execute. Index: [`../README.md`](../README.md).
+
 Paste everything below the rule into a fresh session. It supersedes
 `2026-08-10-openai-daily-reading-publisher-handoff.md`, which covered Tasks 5–17
 and is now historical.
@@ -16,10 +19,10 @@ Read these three, in this order, before touching anything:
 1. `docs/superpowers/specs/2026-08-10-openai-daily-reading-publisher-design.md`
    — the approved design. Authoritative. If implementation evidence requires a
    behavioural change, stop and amend the design before changing code.
-2. `docs/superpowers/plans/2026-08-10-openai-daily-reading-publisher.md` — the
+2. `docs/superpowers/archive/plans/2026-08-10-openai-daily-reading-publisher.md` — the
    task-by-task plan, including 41 Global Constraints that bind every task.
    Tasks 9–17 start at "### Task 9".
-3. `docs/superpowers/plans/2026-08-10-openai-daily-reading-publisher-execution-notes.md`
+3. `docs/superpowers/archive/plans/2026-08-10-openai-daily-reading-publisher-execution-notes.md`
    — the ledger, the recorded implementation base, and every deviation from
    Tasks 1–8 with its reason.
 

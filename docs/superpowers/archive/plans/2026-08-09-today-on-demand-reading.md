@@ -1,5 +1,10 @@
 # Today On-Demand Reading Implementation Plan
 
+> **ARCHIVED 2026-08-22 — complete.** Shipped as `PUT /v1/readings/today`
+> (`apps/api/src/routes/readings.ts`) and
+> `apps/api/src/services/ensure-today-reading.ts`. The Windows implementation
+> workspace named below no longer exists. Do not execute. Index: [`../README.md`](../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make an authenticated, fully configured reader's Today-page load idempotently create or recover the current local day's reading and render it automatically when publication completes.
@@ -8,7 +13,7 @@
 
 **Tech Stack:** TypeScript, Hono, Cloudflare Workers, D1, Cloudflare Queues, React 19, Vitest, Testing Library, JSON Schema 2020-12, OpenAPI 3.1, Python 3.11 jsonschema validation.
 
-**Approved design:** `docs/superpowers/specs/2026-08-09-today-on-demand-reading-design.md`
+**Approved design:** `docs/superpowers/archive/specs/2026-08-09-today-on-demand-reading-design.md`
 
 **Implementation workspace:** `C:\Users\htper\patternlike-app-today-on-demand` on branch `m3-today-on-demand`, based on `91da5bfcd2eb71032e2b9aaa38e27f02afda7bf4`.
 

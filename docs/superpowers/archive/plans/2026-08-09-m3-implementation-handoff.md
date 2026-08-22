@@ -1,6 +1,10 @@
 # M3 Implementation — Handoff
 
-> **Read this with** [`2026-08-09-m3-daily-reading-pipeline.md`](./2026-08-09-m3-daily-reading-pipeline.md),
+> **ARCHIVED 2026-08-22 — superseded.** The M3 pipeline shipped in full, phases
+> 0 through 7; the invariants it left behind are documented under "Daily reading
+> generation" in `CLAUDE.md`. Index: [`../README.md`](../README.md).
+
+> **Read this with** [`2026-08-09-m3-daily-reading-pipeline.md`](../../plans/2026-08-09-m3-daily-reading-pipeline.md),
 > which is the design. **The design has now been reconciled with the code**
 > (2026-08-09): the nine corrections in §4 and the divergences in §10 are folded
 > into it, so it no longer lags. This document remains the record of how that
@@ -9,7 +13,8 @@
 **Task:** implement the M3 daily-reading pipeline design, with nine corrections
 found by verifying the design against the tree first.
 
-**Status: phases 0, 1, 2, and 3 complete and verified. Phases 4–7 not started.**
+**Status when written: phases 0, 1, 2, and 3 complete and verified; phases 4–7
+not started.** All seven phases have since shipped.
 
 ---
 
@@ -359,5 +364,6 @@ and why, not as a list of things the design still gets wrong.
 
 **Task 6 of the original plan — updating the design document to match — is
 done** (2026-08-09). Every item in §4 and §10 above is now folded into
-`2026-08-09-m3-daily-reading-pipeline.md` itself, so the design no longer lags
+`../../plans/2026-08-09-m3-daily-reading-pipeline.md` itself, so the design no
+longer lags
 the code and this list is history rather than a TODO.

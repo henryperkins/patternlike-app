@@ -13,7 +13,7 @@ Companion documents:
 - `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` — the M7
   design. Authoritative. §31 is its work decomposition, §32 its acceptance
   criteria.
-- `docs/superpowers/plans/2026-08-15-m7-remaining-slices-handoff.md` — the
+- `docs/superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md` — the
   scoping brief for slices A–D. It records settled decisions and constraints,
   and it is **not** itself a design or a plan for any slice.
 - `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` —

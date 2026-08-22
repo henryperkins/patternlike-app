@@ -162,7 +162,7 @@ M7 may cluster connected aspects for document organization, but it must not name
 
 ## 3. Relationship to existing specifications
 
-This document supersedes only the **Your Pattern** portions of `docs/superpowers/specs/2026-08-13-your-pattern-time-travel-v02-design.md` once the AI rollout reaches the applicable cohort.
+This document supersedes only the **Your Pattern** portions of `docs/superpowers/archive/specs/2026-08-13-your-pattern-time-travel-v02-design.md` once the AI rollout reaches the applicable cohort.
 
 It does not supersede:
 

@@ -1,10 +1,14 @@
 # Timing Live Surface Design
 
+> **ARCHIVED 2026-08-22 — implemented.** Index: [`../README.md`](../README.md).
+
 **Date:** 2026-08-09
 
 **Revised:** 2026-08-10
 
-**Status:** Approved for implementation planning
+**Status:** Implemented and archived 2026-08-22 — `apps/api/src/routes/timing.ts`
+and `apps/web/src/components/TimingView.tsx`. Read "Approved for implementation
+planning" when written.
 
 **Scope:** Authenticated `GET /v1/timing`, its additive M3 response contract,
 and the responsive Timing screen that renders persisted cycle facts

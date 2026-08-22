@@ -1,5 +1,10 @@
 # M3 Generation Follow-up Implementation Plan
 
+> **ARCHIVED 2026-08-22 — complete.** D1 write batching, placeholder-grammar
+> validation, canonicalization fixtures, and persistent queue backoff all
+> shipped. The unticked boxes below were never ticked back; the behaviour is in
+> `apps/api/src`. Do not execute. Index: [`../README.md`](../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Integrate the safe, additive parts of the daily-reading follow-up on top of the already-merged PR #11 hardening, then ship the verified Worker release.

@@ -1,5 +1,9 @@
 # Timing Live Surface Implementation Plan
 
+> **ARCHIVED 2026-08-22 — complete.** Shipped as `apps/api/src/routes/timing.ts`
+> and `apps/web/src/components/TimingView.tsx`; `GET /v1/timing` no longer
+> returns 501. Do not execute. Index: [`../README.md`](../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the authenticated `GET /v1/timing` 501 and its placeholder screen with a schema-valid, user-scoped, read-only view of persisted active and upcoming cycle facts.
@@ -10,7 +14,7 @@
 
 ## Global Constraints
 
-- Treat `docs/superpowers/specs/2026-08-09-timing-live-surface-design.md` as the approved design authority. If code and this plan disagree, stop and reconcile against that document before editing behavior.
+- Treat `docs/superpowers/archive/specs/2026-08-09-timing-live-surface-design.md` as the approved design authority. If code and this plan disagree, stop and reconcile against that document before editing behavior.
 - `GET /v1/timing` is read-only: no calculation-service fetch, queue send, D1 mutation, refresh flag, date override, user-id input, or request body.
 - Read passes only from `cycle_instances.cycle_json`. Never join or reconstruct from `cycle_passes`; a refined scan can legitimately make the two storage projections diverge.
 - Push ownership and aging into SQL with `user_id = ? AND status = 'active' AND end_at >= ?`. Do not load another user's rows or every historical cycle for TypeScript filtering.

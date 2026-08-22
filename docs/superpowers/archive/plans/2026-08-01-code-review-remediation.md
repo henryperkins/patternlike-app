@@ -1,5 +1,8 @@
 # Code Review Remediation Implementation Plan
 
+> **ARCHIVED 2026-08-22 — executed and closed.** Kept as the record of what was
+> changed and why. Do not execute. Index: [`../README.md`](../README.md).
+
 > **STATUS: EXECUTED.** All nine tasks were implemented and committed, `53847f0..0d2784b`.
 > Final state: `npm run typecheck` clean, calc-stub 33 tests pass, api 26 tests pass,
 > `npm run test:contracts` passes, `npm run build` exits 0 with `apps/calc-stub/dist` populated.
@@ -11,7 +14,7 @@
 >    The build context is the repo root, so a file inside `apps/calc-stub` would have no effect.
 >
 > Contract-level findings deliberately not patched in code are recorded in
-> [`docs/reviews/2026-08-01-spec-escalations.md`](../../reviews/2026-08-01-spec-escalations.md).
+> [`docs/reviews/2026-08-01-spec-escalations.md`](../../../reviews/2026-08-01-spec-escalations.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -2491,7 +2494,7 @@ validated against.
 
 Code-level findings from the same review were fixed in commits on `main`
 between the baseline (`53847f0`) and this document. See
-`docs/superpowers/plans/2026-08-01-code-review-remediation.md`.
+`docs/superpowers/archive/plans/2026-08-01-code-review-remediation.md`.
 
 ## Blocking a contract revision
 
@@ -2637,4 +2640,4 @@ git commit -m "docs: escalate contract-level review findings and correct README 
 
 **Deliberately not fixed in code**, and escalated in Task 9 instead: the fingerprint's omission of latitude and longitude when angles are suppressed (correct given suppression, but it means a birthplace correction is a no-op for an unknown-time user — a product decision); `snapshot_json` plaintext precision; AAD binding; the `.rhai` quality gate; `techniques_enabled`; `container_digest`. Each is named in the escalation document with the reason.
 
-**Known gap — since closed.** Tasks 5, 6, and 7 changed request-handling behaviour that the test setup at the time could not exercise: `apps/api` had no Miniflare harness, so no test bound a real D1. That was addressed after this plan completed, in commit `5f45063` — `@cloudflare/vitest-pool-workers` with real D1 bindings, 41 new tests covering the rewritten handler. See the "Testing posture" section of [`docs/reviews/2026-08-01-spec-escalations.md`](../../reviews/2026-08-01-spec-escalations.md) for what is and is not covered now.
+**Known gap — since closed.** Tasks 5, 6, and 7 changed request-handling behaviour that the test setup at the time could not exercise: `apps/api` had no Miniflare harness, so no test bound a real D1. That was addressed after this plan completed, in commit `5f45063` — `@cloudflare/vitest-pool-workers` with real D1 bindings, 41 new tests covering the rewritten handler. See the "Testing posture" section of [`docs/reviews/2026-08-01-spec-escalations.md`](../../../reviews/2026-08-01-spec-escalations.md) for what is and is not covered now.

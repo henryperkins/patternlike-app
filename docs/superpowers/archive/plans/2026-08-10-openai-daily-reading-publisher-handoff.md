@@ -1,5 +1,10 @@
 # M5 OpenAI Daily Reading Publisher — Handoff Prompt
 
+> **ARCHIVED 2026-08-22 — superseded, then completed.** Superseded by
+> [`2026-08-10-openai-daily-reading-publisher-handoff-tasks-9-17.md`](2026-08-10-openai-daily-reading-publisher-handoff-tasks-9-17.md);
+> all seventeen tasks have since landed. "Tasks 5–17 remain", below, was true
+> when written. Do not execute. Index: [`../README.md`](../README.md).
+
 Paste everything below the rule into a fresh session. It is written to be read
 by the agent picking the work up, not about them.
 
@@ -15,9 +20,9 @@ Read these three, in this order, before touching anything:
 1. `docs/superpowers/specs/2026-08-10-openai-daily-reading-publisher-design.md`
    — the approved design. Authoritative. If implementation evidence requires a
    behavioural change, stop and amend the design before changing code.
-2. `docs/superpowers/plans/2026-08-10-openai-daily-reading-publisher.md` — the
+2. `docs/superpowers/archive/plans/2026-08-10-openai-daily-reading-publisher.md` — the
    task-by-task plan, including 41 Global Constraints that bind every task.
-3. `docs/superpowers/plans/2026-08-10-openai-daily-reading-publisher-execution-notes.md`
+3. `docs/superpowers/archive/plans/2026-08-10-openai-daily-reading-publisher-execution-notes.md`
    — the ledger, the recorded implementation base, and Phase A's deviations.
 
 Also read `CLAUDE.md` and `AGENTS.md`. The invariants in `CLAUDE.md` are real

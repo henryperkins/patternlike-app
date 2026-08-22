@@ -26,7 +26,7 @@ amend the subject:
 
 - [`docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md`](../superpowers/specs/2026-08-15-openai-pattern-adapter-design.md)
 - [`docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md`](../superpowers/plans/2026-08-15-openai-pattern-adapter.md)
-- [`docs/superpowers/plans/2026-08-15-m7-remaining-slices-handoff.md`](../superpowers/plans/2026-08-15-m7-remaining-slices-handoff.md)
+- [`docs/superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md`](../superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md)
 
 ---
 

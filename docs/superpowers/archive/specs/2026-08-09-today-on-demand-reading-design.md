@@ -1,8 +1,12 @@
 # Today On-Demand Reading Design
 
+> **ARCHIVED 2026-08-22 — implemented.** Index: [`../README.md`](../README.md).
+
 **Date:** 2026-08-09
 
-**Status:** Approved for implementation planning
+**Status:** Implemented and archived 2026-08-22 — `PUT /v1/readings/today` and
+`apps/api/src/services/ensure-today-reading.ts`. Read "Approved for
+implementation planning" when written.
 
 **Scope:** Authenticated Today-page loading and the product API path that ensures the current local day's reading
 

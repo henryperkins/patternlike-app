@@ -1,5 +1,12 @@
 # Gate 6 output-budget and collective-scope remediation
 
+> **ARCHIVED 2026-08-22 — code complete; one rollout action still outstanding.**
+> The 4,000-token ceiling, the `1.0.1` corpus and prompt identity, and the
+> `max_output_tokens_exhausted` classification are all in `apps/api/src`. The
+> live 6/6 Gate 6 rerun this plan explicitly defers is a rollout action tracked
+> in `docs/deploy/openai-daily-reading-rollout.md`, not unfinished plan work.
+> Do not execute. Index: [`../README.md`](../README.md).
+
 **Goal:** Remove the two demonstrated Gate 6 failure modes without weakening validation: nondeterministic Responses API truncation at the 1,800-token ceiling and possessive personalization of collective-only facts.
 
 **Scope boundary:** This plan changes code, tests, fixtures, corpus pins, and rollout documentation only. It does not call OpenAI, approve Gate 5 spend, rerun the live corpus, commit, push, deploy, or unblock rollout.

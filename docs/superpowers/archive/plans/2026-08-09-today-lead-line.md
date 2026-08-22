@@ -1,5 +1,9 @@
 # Today Lead Line Implementation Plan
 
+> **ARCHIVED 2026-08-22 — complete.** Shipped in
+> `apps/web/src/components/TodayView.tsx` and its Today-scoped `styles.css`
+> rules. Do not execute. Index: [`../README.md`](../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Today theme-first by implementing the approved Lead Line composition while preserving every existing reading, preference, error, and evidence behavior.

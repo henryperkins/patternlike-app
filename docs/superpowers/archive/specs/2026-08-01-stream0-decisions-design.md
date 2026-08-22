@@ -1,7 +1,11 @@
 # Stream 0 — Decision Record
 
-> **Status: DECIDED, not implemented.** This resolves the five open decisions in
-> [`../plans/2026-08-01-backend-completion-roadmap.md`](../plans/2026-08-01-backend-completion-roadmap.md)
+> **ARCHIVED 2026-08-22 — decided and implemented.** Streams 1, 2, 4, and 5 all
+> landed. Kept as the rationale record: decision 0.2's `crypto_subject` split is
+> still cited from `apps/api/src/db/users.ts`. Index: [`../README.md`](../README.md).
+
+> **Status when written: DECIDED, not implemented.** This resolves the five open decisions in
+> [`../../plans/2026-08-01-backend-completion-roadmap.md`](../../plans/2026-08-01-backend-completion-roadmap.md)
 > §"Stream 0", plus one sub-decision that surfaced while resolving them. Each
 > affected stream still needs its own task-level plan per `superpowers:writing-plans`.
 

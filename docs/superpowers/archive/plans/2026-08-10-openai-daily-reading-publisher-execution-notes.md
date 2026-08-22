@@ -1,7 +1,10 @@
 # OpenAI Daily Reading Publisher — Execution Notes
 
+> **ARCHIVED 2026-08-22.** Execution record for work that completed. The base
+> commit and pin values below stay useful for archaeology. Index: [`../README.md`](../README.md).
+
 Companion to `2026-08-10-openai-daily-reading-publisher.md` (the plan) and
-`../specs/2026-08-10-openai-daily-reading-publisher-design.md` (the approved
+`../../specs/2026-08-10-openai-daily-reading-publisher-design.md` (the approved
 design). This file records the facts a later shell cannot re-derive.
 
 ## Implementation base

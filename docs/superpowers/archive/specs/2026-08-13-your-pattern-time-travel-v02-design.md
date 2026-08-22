@@ -1,8 +1,14 @@
 # Your Pattern and Time Travel v0.2 Design
 
+> **ARCHIVED 2026-08-22 — implemented.** Index: [`../README.md`](../README.md).
+
 **Date:** 2026-08-13
 
-**Status:** Revised after committed-spec review; awaiting reapproval
+**Status:** Implemented and archived 2026-08-22 — M4 shipped: `contracts/m4`,
+`db/d1/0005_m4_pattern_time_travel.sql`, `apps/api/src/routes/pattern.ts`, and
+`apps/api/src/routes/time-travel.ts`. Superseded for the AI cohort by
+`../../specs/2026-08-14-ai-generated-pattern-design.md`. Read "Revised after
+committed-spec review; awaiting reapproval" when written.
 
 **Baseline:** committed M6 privacy/context implementation at `98e2ee5`
 

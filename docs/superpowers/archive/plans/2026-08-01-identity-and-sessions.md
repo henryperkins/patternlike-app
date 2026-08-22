@@ -1,5 +1,8 @@
 # Identity and Sessions Implementation Plan
 
+> **ARCHIVED 2026-08-22 — executed and closed.** Kept as the record of what was
+> changed and why. Do not execute. Index: [`../README.md`](../README.md).
+
 > **STATUS: EXECUTED.** All ten tasks implemented and committed, `38e13c9..e758f48`,
 > on branch `feat/identity-and-sessions`. Final state: `npm test` exits 0 —
 > shared 4, calc-stub 33, **api 164** (from 87), web 12, contracts pass;
@@ -1049,7 +1052,7 @@ identity-link time in Task 5.
 /**
  * A user's two identifiers. `userId` addresses rows; `cryptoSubject` addresses
  * ciphertext. They are deliberately not interchangeable — see
- * docs/superpowers/specs/2026-08-01-stream0-decisions-design.md §0.2.
+ * docs/superpowers/archive/specs/2026-08-01-stream0-decisions-design.md §0.2.
  */
 export interface UserIdentity {
   userId: string;
