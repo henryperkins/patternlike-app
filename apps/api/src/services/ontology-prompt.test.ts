@@ -18,7 +18,7 @@ import {
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
   generator_reasoning: "high",
-  generator_prompt_version: "1.0.2",
+  generator_prompt_version: "1.0.3",
   generator_max_output_tokens: 8000,
   evaluator_model: "gpt-5.6-sol",
   evaluator_reasoning: "high",
@@ -62,12 +62,18 @@ function deepKeys(value: unknown): string[] {
 
 describe("ontology provider prompts", () => {
   it("pins completion and deterministic record policy to the revised generator prompt", () => {
-    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.2");
+    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.3");
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target",
     );
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Set complete to false when any coverage target remains",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Emit one source-supported record for every remaining coverage target in this chunk",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Do not exhaust the corpus or create a record for every fragment",
     );
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Do not copy or paraphrase a cited fragment's exclusions into prohibited_claims",
