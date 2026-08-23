@@ -30,7 +30,8 @@ import {
   generatePatternReplayTestKeys,
   installPatternReplayTestKeys,
 } from "../../test/pattern-replay-fixtures.js";
-import { getArtifactAt, loadPatternJob } from "./pattern-execute.js";
+import { getArtifactAt } from "./pattern-execute.js";
+import { loadPatternJob } from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
 const QUEUE = "patternlike-pattern-generation-dev";

@@ -17,12 +17,13 @@ import {
 import { sha256Hex } from "@patternlike/shared";
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
 import {
-  cancelJob,
   executePatternJob,
-  failJob,
   getArtifact,
-  loadPatternJob,
 } from "../services/pattern-execute.js";
+import {
+  commitPatternTransition,
+  loadPatternJob,
+} from "../services/pattern-stage-protocol.js";
 import {
   recallOntologyAndWithdraw,
   reconcilePatternAfterChartCorrection,
@@ -423,7 +424,7 @@ describe("M7 AI-generated Pattern", () => {
     expect(row?.status).toBe("recalled");
   });
 
-  it("ignores a stale failJob after another worker published", async () => {
+  it("ignores a stale failure transition after another worker published", async () => {
     enablePatternAi();
     await seedActiveOntology();
     const reserved = await json("/v1/pattern-generations", {
@@ -440,9 +441,11 @@ describe("M7 AI-generated Pattern", () => {
     expect(await drain(generationId)).toBe("succeeded");
     const job = await loadPatternJob(env, generationId);
     expect(job).not.toBeNull();
-    expect(await failJob(env, job!, "clm_stale_token_does_not_own", "stale_worker", "checking_claims")).toBe(
-      false,
-    );
+    expect(await commitPatternTransition(env, job!, "clm_stale_token_does_not_own", {
+      kind: "fail",
+      failureClass: "stale_worker",
+      publicStage: "checking_claims",
+    })).toBeNull();
     const claim = await env.DB.prepare(
       `SELECT status FROM pattern_generation_claims WHERE user_id = ?`,
     )
@@ -594,6 +597,82 @@ describe("M7 AI-generated Pattern", () => {
       result_class: null,
       stage: "reserved",
       failure_class: null,
+    });
+  });
+
+  it("fails an exhausted expired lease through the stage protocol", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const reserved = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-exhausted-expired-lease" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(reserved.status, JSON.stringify(reserved.body)).toBe(202);
+    const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
+    const before = await loadPatternJob(env, generationId);
+    expect(before).not.toBeNull();
+    const now = new Date("2026-08-20T12:00:00.000Z");
+    await env.DB.prepare(
+      `UPDATE jobs
+       SET status = 'running', attempts = 16, claim_token = 'clm_expired_exhausted',
+           lease_expires_at = ?, result_class = NULL
+       WHERE id = ?`,
+    )
+      .bind(new Date(now.getTime() - 60_000).toISOString(), before!.job_id)
+      .run();
+
+    await sweepPatternJobs(env, now);
+
+    const after = await env.DB.prepare(
+      `SELECT j.status AS job_status, j.result_class,
+              p.stage, p.stage_generation,
+              p.planner_attempts, p.writer_attempts, p.verifier_attempts,
+              p.plan_hash, p.candidate_hash, p.semantic_verdict_hash,
+              p.public_failure_stage, p.failure_class, p.retention_expires_at,
+              c.status AS claim_status
+       FROM pattern_generation_jobs p
+       JOIN jobs j ON j.id = p.job_id
+       JOIN pattern_generation_claims c ON c.id = p.claim_id
+       WHERE p.generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{
+        job_status: string;
+        result_class: string | null;
+        stage: string;
+        stage_generation: number;
+        planner_attempts: number;
+        writer_attempts: number;
+        verifier_attempts: number;
+        plan_hash: string | null;
+        candidate_hash: string | null;
+        semantic_verdict_hash: string | null;
+        public_failure_stage: string | null;
+        failure_class: string | null;
+        retention_expires_at: string | null;
+        claim_status: string;
+      }>();
+    expect(after).toEqual({
+      job_status: "failed",
+      result_class: "stage_attempts_exhausted",
+      stage: "failed",
+      stage_generation: before!.stage_generation + 1,
+      planner_attempts: before!.planner_attempts,
+      writer_attempts: before!.writer_attempts,
+      verifier_attempts: before!.verifier_attempts,
+      plan_hash: before!.plan_hash,
+      candidate_hash: before!.candidate_hash,
+      semantic_verdict_hash: before!.semantic_verdict_hash,
+      public_failure_stage: "organizing_evidence",
+      failure_class: "stage_attempts_exhausted",
+      retention_expires_at: "2026-09-19T12:00:00.000Z",
+      claim_status: "available",
     });
   });
 
@@ -913,9 +992,11 @@ describe("M7 AI-generated Pattern", () => {
     )
       .bind("pgen_winner_other_generation", USER_A)
       .run();
-    expect(
-      await failJob(env, winner!, "clm_stale_loser", "stale_loser", "organizing_evidence"),
-    ).toBe(true);
+    expect(await commitPatternTransition(env, winner!, "clm_stale_loser", {
+      kind: "fail",
+      failureClass: "stale_loser",
+      publicStage: "organizing_evidence",
+    })).not.toBeNull();
     const afterFail = await env.DB.prepare(
       `SELECT status, active_generation_id FROM pattern_generation_claims WHERE user_id = ?`,
     )
@@ -955,7 +1036,10 @@ describe("M7 AI-generated Pattern", () => {
     )
       .bind("pgen_winner_after_retry", USER_A)
       .run();
-    expect(await cancelJob(env, cancelTarget!, "clm_stale_cancel", "cancel_stale")).toBe(true);
+    expect(await commitPatternTransition(env, cancelTarget!, "clm_stale_cancel", {
+      kind: "cancel",
+      reason: "cancel_stale",
+    })).not.toBeNull();
     const afterCancel = await env.DB.prepare(
       `SELECT status, active_generation_id FROM pattern_generation_claims WHERE user_id = ?`,
     )

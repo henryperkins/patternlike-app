@@ -1,4 +1,11 @@
-import { PATTERN_JOB_TYPE, publicStageFor, type PatternDomainStage } from "./pattern-command.js";
+import { PATTERN_JOB_TYPE } from "./pattern-command.js";
+import {
+  planPatternTransition,
+  patternStageOwner,
+  publicStageFor,
+  type PatternDomainStage,
+  type PatternStageState,
+} from "./pattern-stage-protocol.js";
 import { markDispatched } from "../db/generation.js";
 import type { Env } from "../env.js";
 import { safeLog } from "./safe-log.js";
@@ -40,7 +47,7 @@ export async function reconcilePatternGeneration(
     .bind(generationId)
     .first<{
       generation_id: string;
-      stage: string;
+      stage: PatternDomainStage;
       stage_generation: number;
       job_id: string;
       job_status: string;
@@ -48,9 +55,7 @@ export async function reconcilePatternGeneration(
   if (!row) return { ok: false, status: 404, code: "not_found" };
 
   const terminal =
-    row.stage === "succeeded" ||
-    row.stage === "failed" ||
-    row.stage === "cancelled" ||
+    patternStageOwner(row.stage) === "terminal" ||
     row.job_status === "succeeded" ||
     row.job_status === "failed" ||
     row.job_status === "cancelled";
@@ -132,18 +137,23 @@ export async function resumePausedPatternJobsAfterRollout(
  */
 async function failExhaustedPatternJob(
   env: Env,
-  row: {
+  row: PatternStageState & {
     job_id: string;
-    generation_id: string;
-    stage: PatternDomainStage;
-    stage_generation: number;
     user_id: string;
     claim_id: string;
   },
   nowIso: string,
 ): Promise<void> {
-  const retentionExpiresAt = new Date(Date.parse(nowIso) + 30 * 86400_000).toISOString();
   try {
+    const effect = planPatternTransition(
+      row,
+      {
+        kind: "fail",
+        failureClass: "stage_attempts_exhausted",
+        publicStage: publicStageFor(row.stage) ?? "organizing_evidence",
+      },
+      new Date(nowIso),
+    );
     await env.DB.batch([
       env.DB.prepare(
         `UPDATE jobs SET status = 'failed', claim_token = NULL, lease_expires_at = NULL,
@@ -152,16 +162,27 @@ async function failExhaustedPatternJob(
       ).bind(nowIso, row.job_id, PATTERN_JOB_TYPE, nowIso),
       env.DB.prepare(
         `UPDATE pattern_generation_jobs
-         SET stage = 'failed', stage_generation = stage_generation + 1, updated_at = ?,
-             finished_at = ?, public_failure_stage = ?, failure_class = 'stage_attempts_exhausted',
-             retention_expires_at = ?
+         SET stage = ?, stage_generation = ?,
+             planner_attempts = ?, writer_attempts = ?, verifier_attempts = ?,
+             plan_hash = ?, candidate_hash = ?, semantic_verdict_hash = ?,
+             updated_at = ?, finished_at = ?, public_failure_stage = ?,
+             failure_class = ?, retention_expires_at = ?
          WHERE generation_id = ? AND stage_generation = ?
            AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
       ).bind(
+        effect.next.stage,
+        effect.next.stage_generation,
+        effect.next.planner_attempts,
+        effect.next.writer_attempts,
+        effect.next.verifier_attempts,
+        effect.next.plan_hash,
+        effect.next.candidate_hash,
+        effect.next.semantic_verdict_hash,
         nowIso,
         nowIso,
-        publicStageFor(row.stage) ?? "organizing_evidence",
-        retentionExpiresAt,
+        effect.publicFailureStage!,
+        effect.resultClass!,
+        effect.retentionExpiresAt!.toISOString(),
         row.generation_id,
         row.stage_generation,
       ),
@@ -255,6 +276,8 @@ export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void
 
   const { results: expiredLeases } = await env.DB.prepare(
     `SELECT j.id AS job_id, j.attempts, p.generation_id, p.stage, p.stage_generation,
+            p.planner_attempts, p.writer_attempts, p.verifier_attempts,
+            p.plan_hash, p.candidate_hash, p.semantic_verdict_hash,
             p.user_id, p.claim_id
      FROM jobs j
      JOIN pattern_generation_jobs p ON p.job_id = j.id
@@ -270,6 +293,12 @@ export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void
       generation_id: string;
       stage: PatternDomainStage;
       stage_generation: number;
+      planner_attempts: number;
+      writer_attempts: number;
+      verifier_attempts: number;
+      plan_hash: string | null;
+      candidate_hash: string | null;
+      semantic_verdict_hash: string | null;
       user_id: string;
       claim_id: string;
     }>();

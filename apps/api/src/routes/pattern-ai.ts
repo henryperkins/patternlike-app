@@ -22,11 +22,13 @@ import {
   revokePatternGenerationConsent,
 } from "../services/pattern-lifecycle.js";
 import {
-  publicFailureStageFor,
   patternFailureIsRetryable,
+} from "../services/pattern-command.js";
+import {
+  publicFailureStageFor,
   publicStageFor,
   type PatternDomainStage,
-} from "../services/pattern-command.js";
+} from "../services/pattern-stage-protocol.js";
 import { hashChartFingerprint, loadAnyClaim, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { loadPreferences } from "../db/preferences.js";
 import { isInternalPatternAccount } from "../services/pattern-rollout.js";

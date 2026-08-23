@@ -24,10 +24,23 @@ import { consumePatternProviderCallBudget, utcDateFor } from "../db/pattern-prov
 import {
   PATTERN_JOB_TYPE,
   isPatternCommand,
-  publicStageFor,
   type GeneratePatternCommandV1,
-  type PatternDomainStage,
 } from "./pattern-command.js";
+import {
+  buildPatternTransitionStatements,
+  commitPatternTransition,
+  loadPatternJob,
+  patternArtifactId,
+  patternAttemptCoordinate,
+  patternDeliveryIsCurrent,
+  patternPassProtocol,
+  patternStageOwner,
+  planPatternTransition,
+  publicStageFor,
+  type PatternAttemptCoordinate,
+  type PatternJobRow,
+  type PatternTransition,
+} from "./pattern-stage-protocol.js";
 import { hashesEqual } from "./content-release.js";
 import {
   OPENAI_PATTERN_WRITER_MODEL,
@@ -153,74 +166,6 @@ async function runPublisherPass<T>(
   return outcome;
 }
 
-// ---------------------------------------------------------------------------
-// The stage protocol
-//
-// One pass per delivery, in one order, at every stage:
-//
-//   1. claim by CAS; a zero-row claim is a duplicate and acknowledges
-//   2. decrypt the command; recheck eligibility, ontology, feature-set identity
-//   3. read the durable attempt index k; if k >= max, fail terminally WITHOUT
-//      calling the provider
-//   4. probe the response artifact at (class, stage_generation, k); on a hit,
-//      skip to step 9 with the stored bytes
-//   5. build the minimized input document; ban-list check and byte cap
-//   6. write the request artifact (create-only)
-//   7. consume one budget unit
-//   8. call the provider once
-//   9. run the deterministic validator, unchanged
-//  10. write the response artifact (create-only) and read back its plaintext hash
-//  11. advance with that hash, retryStage, returnToWriter, or failJob -- each
-//      with ownershipProbes at the head of its batch
-//  12. nudge, and swallow the send failure: the D1 row is the outbox
-//
-// Step 4 precedes step 7, so an adopted artifact spends nothing. Step 7 is
-// inside the publisher, immediately before its fetch, reached through the
-// `reserve` callback on `PatternPassOptions` -- a reservation taken at stage
-// entry is spent by a delivery that may never reach a provider, which is what
-// section 25.3 forbids.
-// ---------------------------------------------------------------------------
-
-/**
- * Where each pass's durable attempt index lives.
- *
- * `<pass>_attempts` is a zero-based NEXT-attempt index, not a count of completed
- * attempts: the columns are `DEFAULT 0` and the ceiling is checked as `k >= max`
- * before the call, so a pass that made one successful call and advanced still
- * reads `0`. Reading it as a completed count yields `max + 1` calls.
- */
-const PASS_ATTEMPT_COLUMN = {
-  planner: "planner_attempts",
-  writer: "writer_attempts",
-  verifier: "verifier_attempts",
-} as const satisfies Record<PatternStageClass, keyof PatternJobRow>;
-
-/** The exact bytes sent, kept so a call with no answer is still recoverable. */
-const PASS_REQUEST_CLASS = {
-  planner: "planner_request",
-  writer: "writer_request",
-  verifier: "verifier_request",
-} as const satisfies Record<PatternStageClass, string>;
-
-/**
- * The artifact whose presence is the skip condition.
- *
- * Only the response artifact's. A request artifact is written before the call,
- * so its presence proves nothing about whether an answer ever arrived.
- */
-const PASS_RESPONSE_CLASS = {
-  planner: "planner_response",
-  writer: "writer_response",
-  verifier: "verifier_response",
-} as const satisfies Record<PatternStageClass, string>;
-
-/** The coarse stage a reader sees when a pass fails. */
-const PASS_PUBLIC_STAGE = {
-  planner: "organizing_evidence",
-  writer: "writing",
-  verifier: "checking_claims",
-} as const satisfies Record<PatternStageClass, string>;
-
 /** The M7 stage-aware backoff, with `retry_after_seconds` acting as a floor. */
 const PASS_RETRY_BACKOFF_SECONDS = [30, 120, 600] as const;
 
@@ -263,27 +208,6 @@ function passFailureClass(code: string, detail: string): string {
     : code;
 }
 
-/**
- * The artifact identity a redelivery can recompute and a retry cannot collide
- * with.
- *
- * Four components, not three. With `attempt` absent, a genuine retry recomputed
- * the identity of the attempt before it: the create-only put failed, the stored
- * first response was kept, the second was discarded, and `advance` then wrote a
- * hash taken over the response that was thrown away. The next stage loaded the
- * stored plan, compared hashes, and failed `plan_missing`. Deterministic
- * stand-ins made the two responses identical and hid it.
- */
-export async function patternArtifactId(
-  generationId: string,
-  artifactClass: string,
-  stageGeneration: number,
-  attempt: number,
-): Promise<string> {
-  const digest = await sha256Hex(`${generationId}:${artifactClass}:${stageGeneration}:${attempt}`);
-  return `part_${digest.slice(0, 32)}`;
-}
-
 async function nudgeNextStage(
   env: Env,
   job: PatternJobRow,
@@ -301,42 +225,26 @@ async function nudgeNextStage(
   }
 }
 
-export interface PatternJobRow {
-  generation_id: string;
-  job_id: string;
-  user_id: string;
-  claim_id: string;
-  stage: PatternDomainStage;
-  stage_generation: number;
-  planner_attempts: number;
-  writer_attempts: number;
-  verifier_attempts: number;
-  plan_hash: string | null;
-  candidate_hash: string | null;
-  locale: string;
-  locale_revision: number;
+type QueuedPatternTransition = Extract<
+  PatternTransition,
+  { kind: "advance" | "retry" | "return_to_writer" }
+>;
+
+async function commitAndNudgePatternTransition(
+  env: Env,
+  job: PatternJobRow,
+  token: string,
+  transition: QueuedPatternTransition,
+): Promise<boolean> {
+  const effect = await commitPatternTransition(env, job, token, transition);
+  if (!effect?.nextQueueCoordinate) return false;
+  await nudgeNextStage(env, job, effect.nextQueueCoordinate.stageGeneration);
+  return true;
 }
 
 export type PatternExecuteOutcome =
   | { ok: true; terminal: boolean }
   | { ok: false; reason: "duplicate" | "retry" | "terminal"; failureClass: string };
-
-async function loadJob(env: Env, generationId: string): Promise<PatternJobRow | null> {
-  return env.DB.prepare(
-    `SELECT generation_id, job_id, user_id, claim_id, stage, stage_generation,
-            planner_attempts, writer_attempts, verifier_attempts, plan_hash,
-            candidate_hash, locale, locale_revision
-     FROM pattern_generation_jobs WHERE generation_id = ?`,
-  )
-    .bind(generationId)
-    .first<PatternJobRow>();
-}
-
-const TERMINAL_STAGES: ReadonlySet<PatternDomainStage> = new Set<PatternDomainStage>([
-  "succeeded",
-  "failed",
-  "cancelled",
-]);
 
 /**
  * Did this message name a stage the job has already moved past?
@@ -348,10 +256,12 @@ const TERMINAL_STAGES: ReadonlySet<PatternDomainStage> = new Set<PatternDomainSt
  */
 async function stageMovedOn(env: Env, message: PatternGenerationMessage): Promise<boolean> {
   try {
-    const job = await loadJob(env, message.generation_id);
+    const job = await loadPatternJob(env, message.generation_id);
     if (!job) return true;
-    if (job.stage_generation !== message.stage_generation) return true;
-    return TERMINAL_STAGES.has(job.stage);
+    return !patternDeliveryIsCurrent(job, {
+      generationId: message.generation_id,
+      stageGeneration: message.stage_generation,
+    });
   } catch {
     return false;
   }
@@ -433,7 +343,7 @@ async function claimStage(
   // the job is parked or terminal. All of those are handled elsewhere, so the
   // message is done here.
   if (!jobUpdate?.meta.changes) return { status: "duplicate" };
-  const job = await loadJob(env, message.generation_id);
+  const job = await loadPatternJob(env, message.generation_id);
   if (!job || job.stage_generation !== message.stage_generation) return { status: "duplicate" };
   return { status: "claimed", token, job };
 }
@@ -805,290 +715,6 @@ export async function getArtifactAt<T>(
   return { value, plaintextHash };
 }
 
-function ownershipProbes(env: Env, job: PatternJobRow, token: string) {
-  return [
-    env.DB.prepare(
-      `INSERT INTO assertion_probe (id, reason)
-       SELECT 1, 'pattern job token no longer owns running lease'
-       WHERE NOT EXISTS (
-         SELECT 1 FROM jobs
-         WHERE id = ? AND claim_token = ? AND status = 'running' AND job_type = ?
-       )`,
-    ).bind(job.job_id, token, PATTERN_JOB_TYPE),
-    env.DB.prepare(
-      `INSERT INTO assertion_probe (id, reason)
-       SELECT 1, 'pattern domain stage no longer owned'
-       WHERE NOT EXISTS (
-         SELECT 1 FROM pattern_generation_jobs
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')
-       )`,
-    ).bind(job.generation_id, job.stage_generation),
-  ];
-}
-
-async function advance(
-  env: Env,
-  job: PatternJobRow,
-  token: string,
-  next: PatternDomainStage,
-  extra: Record<string, string | number | null> = {},
-): Promise<boolean> {
-  const now = new Date().toISOString();
-  const terminal = next === "succeeded" || next === "failed" || next === "cancelled";
-  const jobStatus = next === "succeeded" ? "succeeded" : next === "cancelled" ? "cancelled" : next === "failed" ? "failed" : "queued";
-  try {
-    await env.DB.batch([
-      ...ownershipProbes(env, job, token),
-      env.DB.prepare(
-        `UPDATE jobs SET status = ?, claim_token = NULL, lease_expires_at = NULL,
-                dispatched_at = NULL, finished_at = CASE WHEN ? THEN ? ELSE finished_at END
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(jobStatus, terminal ? 1 : 0, now, job.job_id, token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = ?, stage_generation = stage_generation + 1, plan_hash = COALESCE(?, plan_hash),
-             candidate_hash = COALESCE(?, candidate_hash), updated_at = ?,
-             verifier_attempts = CASE WHEN ? = 'semantic_verifying' THEN 0 ELSE verifier_attempts END,
-             finished_at = CASE WHEN ? THEN ? ELSE finished_at END,
-             public_failure_stage = COALESCE(?, public_failure_stage),
-             failure_class = COALESCE(?, failure_class)
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(
-        next,
-        extra.plan_hash ?? null,
-        extra.candidate_hash ?? null,
-        now,
-        next,
-        terminal ? 1 : 0,
-        now,
-        extra.public_failure_stage ?? null,
-        extra.failure_class ?? null,
-        job.generation_id,
-        job.stage_generation,
-      ),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Same stage, same `stage_generation`, next attempt.
- *
- * Neither an advance nor a failure. `advance` is the success path and must NOT
- * touch the counter of the pass whose result it commits -- a crash between a
- * provider success and `advance` has to leave the counter unchanged so the
- * redelivery recomputes the same `k` and adopts the stored artifact instead of
- * buying a second response.
- *
- * The increment commits inside the same guarded batch as the transition that
- * authorizes the next call. Before that transition, a redelivery recomputes the
- * same k and adopts a stored response. After it, the durable k+1 deliberately
- * names a new attempt; an indistinguishable old queue message may spend that
- * attempt, but the pass and daily ceilings still bound it.
- *
- * Because `dispatched_at` is cleared and the row returns to `queued`, the
- * undispatched lane of `sweepPatternJobs` recovers a lost nudge here exactly as
- * it does after a normal advance -- including when `availableAt` is in the
- * future, where the immediate nudge is deliberately a no-op claim.
- */
-export async function retryStage(
-  env: Env,
-  job: PatternJobRow,
-  token: string,
-  pass: PatternStageClass,
-  availableAt: Date | null,
-): Promise<boolean> {
-  const now = new Date().toISOString();
-  // Interpolated from a closed record keyed by a closed union, never from input.
-  const column = PASS_ATTEMPT_COLUMN[pass];
-  try {
-    await env.DB.batch([
-      ...ownershipProbes(env, job, token),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
-                dispatched_at = NULL, available_at = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(availableAt ? availableAt.toISOString() : null, job.job_id, token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET ${column} = ${column} + 1, updated_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(now, job.generation_id, job.stage_generation),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Cross-stage correction transition after a semantic rejection.
- *
- * The verifier result authorizes another WRITER call, so this increments the
- * writer's zero-based next-attempt index while leaving the verifier index
- * untouched. The correction artifact is committed at the successor writing
- * coordinate before the guarded batch; a crash after that write can therefore
- * adopt the same closed document without ever reconstructing it from rejected
- * prose.
- */
-export async function returnToWriter(
-  env: Env,
-  identity: UserIdentity,
-  job: PatternJobRow,
-  token: string,
-  correction: PatternCorrectionDocument,
-  expiresAt: string,
-  availableAt: Date | null,
-): Promise<boolean> {
-  const now = new Date().toISOString();
-  const nextStageGeneration = job.stage_generation + 1;
-  const nextWriterAttempt = job.writer_attempts + 1;
-  await putArtifact(
-    env,
-    identity,
-    job,
-    "correction_document",
-    correction,
-    expiresAt,
-    nextWriterAttempt,
-    nextStageGeneration,
-  );
-
-  try {
-    await env.DB.batch([
-      ...ownershipProbes(env, job, token),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
-                dispatched_at = NULL, available_at = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(availableAt ? availableAt.toISOString() : null, job.job_id, token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'writing', stage_generation = stage_generation + 1,
-             writer_attempts = writer_attempts + 1, candidate_hash = NULL, updated_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage IN ('semantic_verifying', 'publishing')`,
-      ).bind(now, job.generation_id, job.stage_generation),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function failJob(
-  env: Env,
-  job: PatternJobRow,
-  token: string,
-  failureClass: string,
-  publicStage: string,
-): Promise<boolean> {
-  const now = new Date().toISOString();
-  try {
-    await env.DB.batch([
-      ...ownershipProbes(env, job, token),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'failed', claim_token = NULL, lease_expires_at = NULL,
-                finished_at = ?, result_class = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(now, failureClass, job.job_id, token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'failed', stage_generation = stage_generation + 1, updated_at = ?,
-             finished_at = ?, public_failure_stage = ?, failure_class = ?, retention_expires_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(
-        now,
-        now,
-        publicStage,
-        failureClass,
-        new Date(Date.now() + 30 * 86400_000).toISOString(),
-        job.generation_id,
-        job.stage_generation,
-      ),
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'available', active_generation_id = NULL, updated_at = ?
-         WHERE id = ? AND status = 'reserved' AND consumed_at IS NULL
-           AND active_generation_id = ?`,
-      ).bind(now, job.claim_id, job.generation_id),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function cancelJob(env: Env, job: PatternJobRow, token: string, reason: string): Promise<boolean> {
-  const now = new Date().toISOString();
-  try {
-    await env.DB.batch([
-      ...ownershipProbes(env, job, token),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL, finished_at = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(now, job.job_id, token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'cancelled', cancellation_reason = ?, updated_at = ?, finished_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(reason, now, now, job.generation_id, job.stage_generation),
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'available', active_generation_id = NULL, updated_at = ?
-         WHERE id = ? AND status = 'reserved' AND consumed_at IS NULL
-           AND active_generation_id = ?`,
-      ).bind(now, job.claim_id, job.generation_id),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Release only the queue lease after publication could not finish.
- *
- * Once a `claim_consumed` intent exists, no failure path may return its claim
- * to `available`. Keeping the same stage generation also lets the redelivery
- * adopt the already committed verifier artifacts and the exact replay event.
- */
-async function releasePublicationRetry(
-  env: Env,
-  job: PatternJobRow,
-  token: string,
-  now: Date,
-): Promise<boolean> {
-  const updatedAt = now.toISOString();
-  const availableAt = new Date(now.getTime() + 60_000).toISOString();
-  try {
-    await env.DB.batch([
-      ...ownershipProbes(env, job, token),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
-                dispatched_at = NULL, available_at = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(availableAt, job.job_id, token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'publishing', updated_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage IN ('semantic_verifying', 'publishing')`,
-      ).bind(updatedAt, job.generation_id, job.stage_generation),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function eligibility(
   env: Env,
   identity: UserIdentity,
@@ -1163,18 +789,28 @@ async function handlePassFailure(
     // to wait 30 seconds from a moment ninety seconds in the past -- no backoff
     // at all, and `retry_after_seconds` from a 429 silently ignored with it.
     const availableAt = retryAvailableAt(new Date(), attempt, failure.retry_after_seconds);
-    if (!(await retryStage(env, job, token, pass, availableAt))) {
+    if (!(await commitAndNudgePatternTransition(env, job, token, {
+      kind: "retry",
+      pass,
+      availableAt,
+    }))) {
       return { ok: false, reason: "duplicate", failureClass: "duplicate" };
     }
-    // The SAME stage generation, not the successor: the stage is being redone,
-    // not left behind.
-    await nudgeNextStage(env, job, job.stage_generation);
     return { ok: true, terminal: false };
   }
-  await failJob(env, job, token, failureClass, PASS_PUBLIC_STAGE[pass]);
+  await commitPatternTransition(env, job, token, {
+    kind: "fail",
+    failureClass,
+    publicStage: patternPassProtocol(pass).publicFailureStage,
+  });
   return { ok: false, reason: "terminal", failureClass };
 }
 
+// Durable delivery orchestration lives here: claim, snapshot checks, artifact
+// adoption, provider call, deterministic validation, and queue nudge.
+// pattern-stage-protocol.ts is the sole owner of domain-stage legality,
+// attempt arithmetic, stage-generation effects, hash effects, public-stage
+// mapping, and guarded job transition statements.
 export async function executePatternJob(
   env: Env,
   message: PatternGenerationMessage,
@@ -1198,10 +834,15 @@ export async function executePatternJob(
   if (claim.status !== "claimed") return { ok: false, reason: "duplicate", failureClass: "duplicate" };
   const claimed = claim;
   const stage = claimed.job.stage;
+  const stageOwner = patternStageOwner(stage);
 
-  const identityRow = await loadUserIdentity(env, (await loadJob(env, message.generation_id))!.user_id);
+  const identityRow = await loadUserIdentity(env, (await loadPatternJob(env, message.generation_id))!.user_id);
   if (!identityRow) {
-    await failJob(env, claimed.job, claimed.token, "account_inactive", "organizing_evidence");
+    await commitPatternTransition(env, claimed.job, claimed.token, {
+      kind: "fail",
+      failureClass: "account_inactive",
+      publicStage: "organizing_evidence",
+    });
     return { ok: false, reason: "terminal", failureClass: "account_inactive" };
   }
   const identity: UserIdentity = { userId: identityRow.userId, cryptoSubject: identityRow.cryptoSubject };
@@ -1209,13 +850,20 @@ export async function executePatternJob(
   try {
     command = await loadCommand(env, identity, claimed.job.job_id);
   } catch {
-    await failJob(env, claimed.job, claimed.token, "payload_undecryptable", "organizing_evidence");
+    await commitPatternTransition(env, claimed.job, claimed.token, {
+      kind: "fail",
+      failureClass: "payload_undecryptable",
+      publicStage: "organizing_evidence",
+    });
     return { ok: false, reason: "terminal", failureClass: "payload_undecryptable" };
   }
 
   const gate = await eligibility(env, identity, command, now);
   if (gate !== "ok") {
-    await cancelJob(env, claimed.job, claimed.token, gate);
+    await commitPatternTransition(env, claimed.job, claimed.token, {
+      kind: "cancel",
+      reason: gate,
+    });
     return { ok: true, terminal: true };
   }
 
@@ -1231,13 +879,11 @@ export async function executePatternJob(
     if (!resolved.ok || !resolved.config) {
       // A half-configured gateway, a missing credential, or a pin that does not
       // match its compiled constant. None of the three improves on a retry.
-      await failJob(
-        env,
-        claimed.job,
-        claimed.token,
-        "publisher_not_configured",
-        publicStageFor(stage) ?? "organizing_evidence",
-      );
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "fail",
+        failureClass: "publisher_not_configured",
+        publicStage: publicStageFor(stage) ?? "organizing_evidence",
+      });
       return { ok: false, reason: "terminal", failureClass: "publisher_not_configured" };
     }
     const config: PatternPublisherConfig = resolved.config;
@@ -1248,14 +894,20 @@ export async function executePatternJob(
 
     const ontology = await loadOntologyByVersion(env, command.ontology_version);
     if (!ontology || !hashesEqual(ontology.bundleHash, command.ontology_bundle_hash)) {
-      await cancelJob(env, claimed.job, claimed.token, "cancel_ontology");
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "cancel",
+        reason: "cancel_ontology",
+      });
       return { ok: true, terminal: true };
     }
     const frozenOntology = ontology;
 
     const features = await ensureNatalFeatureSet(env, identity.userId, command.chart_id, now);
     if (features.featureSetHash !== command.feature_set_hash) {
-      await cancelJob(env, claimed.job, claimed.token, "cancel_stale");
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "cancel",
+        reason: "cancel_stale",
+      });
       return { ok: true, terminal: true };
     }
 
@@ -1284,13 +936,11 @@ export async function executePatternJob(
 
     const openai = pin.publisher === PATTERN_PUBLISHER_OPENAI;
     if (openai && !config.credential) {
-      await failJob(
-        env,
-        claimed.job,
-        claimed.token,
-        "publisher_not_configured",
-        publicStageFor(stage) ?? "organizing_evidence",
-      );
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "fail",
+        failureClass: "publisher_not_configured",
+        publicStage: publicStageFor(stage) ?? "organizing_evidence",
+      });
       return { ok: false, reason: "terminal", failureClass: "publisher_not_configured" };
     }
 
@@ -1339,18 +989,18 @@ export async function executePatternJob(
     // Step 6: the exact bytes sent, written before the call that sends them, so
     // a call that never answers is still recoverable.
     const writeRequestArtifact = async (
-      pass: PatternStageClass,
+      coordinate: PatternAttemptCoordinate,
       document: unknown,
-      attempt: number,
     ): Promise<void> => {
       await putArtifact(
         env,
         identity,
         claimed.job,
-        PASS_REQUEST_CLASS[pass],
+        coordinate.requestArtifactClass,
         document,
         expiresAt,
-        attempt,
+        coordinate.attempt,
+        coordinate.stageGeneration,
       );
     };
 
@@ -1359,24 +1009,32 @@ export async function executePatternJob(
       pass: PatternStageClass,
       result: { ok: false; code: string },
     ): Promise<PatternExecuteOutcome> => {
-      await failJob(env, claimed.job, claimed.token, result.code, PASS_PUBLIC_STAGE[pass]);
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "fail",
+        failureClass: result.code,
+        publicStage: patternPassProtocol(pass).publicFailureStage,
+      });
       return { ok: false, reason: "terminal", failureClass: result.code };
     };
 
-    if (stage === "reserved" || stage === "planning" || stage === "plan_validating") {
-      const attempt = claimed.job.planner_attempts;
-      if (attempt >= command.planner_attempts_max) {
-        await failJob(env, claimed.job, claimed.token, "planner_attempts_exhausted", "organizing_evidence");
+    if (stageOwner === "planner") {
+      const coordinate = patternAttemptCoordinate(claimed.job, "planner");
+      if (coordinate.attempt >= command.planner_attempts_max) {
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "planner_attempts_exhausted",
+          publicStage: "organizing_evidence",
+        });
         return { ok: false, reason: "terminal", failureClass: "planner_attempts_exhausted" };
       }
 
       const adopted = await getArtifactAt<PatternPlannerOutput>(
         env,
         identity,
-        command.generation_id,
-        PASS_RESPONSE_CLASS.planner,
-        claimed.job.stage_generation,
-        attempt,
+        coordinate.generationId,
+        coordinate.responseArtifactClass,
+        coordinate.stageGeneration,
+        coordinate.attempt,
       );
 
       let plannerOutput: PatternPlannerOutput;
@@ -1385,8 +1043,8 @@ export async function executePatternJob(
       } else {
         const input = buildPlannerInput(selected.packet, records, limits);
         if (!input.ok) return refuseInput("planner", input);
-        await writeRequestArtifact("planner", input.document, attempt);
-        const outcome = await runPublisherPass(pin, "planner", attempt, () =>
+        await writeRequestArtifact(coordinate, input.document);
+        const outcome = await runPublisherPass(pin, "planner", coordinate.attempt, () =>
           publisherImpl.plan(input.document, passOptions("planner")),
         );
         if (!outcome.ok) {
@@ -1395,7 +1053,7 @@ export async function executePatternJob(
             claimed.job,
             claimed.token,
             "planner",
-            attempt,
+            coordinate.attempt,
             command.planner_attempts_max,
             outcome,
           );
@@ -1414,21 +1072,28 @@ export async function executePatternJob(
       try {
         planCheck = validatePatternPlan(plannerOutput, selected.packet, records);
       } catch {
-        return handlePassFailure(env, claimed.job, claimed.token, "planner", attempt, command.planner_attempts_max, {
+        return handlePassFailure(env, claimed.job, claimed.token, "planner", coordinate.attempt, command.planner_attempts_max, {
           code: "publisher_output_invalid",
           safe_detail_code: "schema_mismatch",
           retry_after_seconds: null,
         });
       }
       if (!planCheck.ok) {
-        if (attempt + 1 < command.planner_attempts_max) {
-          if (!(await retryStage(env, claimed.job, claimed.token, "planner", null))) {
+        if (coordinate.attempt + 1 < command.planner_attempts_max) {
+          if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, {
+            kind: "retry",
+            pass: "planner",
+            availableAt: null,
+          }))) {
             return { ok: false, reason: "duplicate", failureClass: "duplicate" };
           }
-          await nudgeNextStage(env, claimed.job, claimed.job.stage_generation);
           return { ok: true, terminal: false };
         }
-        await failJob(env, claimed.job, claimed.token, "plan_invalid", "organizing_evidence");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "plan_invalid",
+          publicStage: "organizing_evidence",
+        });
         return { ok: false, reason: "terminal", failureClass: "plan_invalid" };
       }
 
@@ -1438,49 +1103,65 @@ export async function executePatternJob(
             env,
             identity,
             claimed.job,
-            PASS_RESPONSE_CLASS.planner,
+            coordinate.responseArtifactClass,
             plannerOutput,
             expiresAt,
-            attempt,
+            coordinate.attempt,
+            coordinate.stageGeneration,
           );
       const plan: PatternPlan = {
         ...plannerOutput,
         plan_hash: planHash,
         sparse_pattern: selected.packet.selection_constraints.sparse_pattern,
       };
-      await putArtifact(env, identity, claimed.job, "fact_packet", selected.packet, expiresAt, attempt);
-      await putArtifact(env, identity, claimed.job, "validated_plan", plan, expiresAt, attempt);
-      if (!(await advance(env, claimed.job, claimed.token, "writing", { plan_hash: planHash }))) {
+      await putArtifact(env, identity, claimed.job, "fact_packet", selected.packet, expiresAt, coordinate.attempt, coordinate.stageGeneration);
+      await putArtifact(env, identity, claimed.job, "validated_plan", plan, expiresAt, coordinate.attempt, coordinate.stageGeneration);
+      if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, {
+        kind: "advance",
+        nextStage: "writing",
+        hashes: { planHash },
+      }))) {
         return { ok: false, reason: "duplicate", failureClass: "duplicate" };
       }
-      await nudgeNextStage(env, claimed.job, claimed.job.stage_generation + 1);
       return { ok: true, terminal: false };
     }
 
-    if (stage === "writing" || stage === "candidate_validating") {
-      const attempt = claimed.job.writer_attempts;
-      if (attempt >= command.writer_attempts_max) {
-        await failJob(env, claimed.job, claimed.token, "writer_attempts_exhausted", "writing");
+    if (stageOwner === "writer") {
+      const coordinate = patternAttemptCoordinate(claimed.job, "writer");
+      if (coordinate.attempt >= command.writer_attempts_max) {
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "writer_attempts_exhausted",
+          publicStage: "writing",
+        });
         return { ok: false, reason: "terminal", failureClass: "writer_attempts_exhausted" };
       }
       const planHash = claimed.job.plan_hash;
       if (!planHash) {
-        await failJob(env, claimed.job, claimed.token, "plan_missing", "writing");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "plan_missing",
+          publicStage: "writing",
+        });
         return { ok: false, reason: "terminal", failureClass: "plan_missing" };
       }
       const plan = await getArtifact<PatternPlan>(env, identity, command.generation_id, "validated_plan");
       if (!plan || plan.plan_hash !== planHash) {
-        await failJob(env, claimed.job, claimed.token, "plan_missing", "writing");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "plan_missing",
+          publicStage: "writing",
+        });
         return { ok: false, reason: "terminal", failureClass: "plan_missing" };
       }
 
       const adopted = await getArtifactAt<PatternWriterOutput>(
         env,
         identity,
-        command.generation_id,
-        PASS_RESPONSE_CLASS.writer,
-        claimed.job.stage_generation,
-        attempt,
+        coordinate.generationId,
+        coordinate.responseArtifactClass,
+        coordinate.stageGeneration,
+        coordinate.attempt,
       );
 
       let writer: PatternWriterOutput;
@@ -1493,13 +1174,13 @@ export async function executePatternJob(
         // silently falling back to the base prompt. The command ceiling is at
         // most three, so this bounded reverse probe reads at most two objects.
         let correction: { value: PatternCorrectionDocument } | null = null;
-        for (let correctionAttempt = attempt; correctionAttempt > 0; correctionAttempt -= 1) {
+        for (let correctionAttempt = coordinate.attempt; correctionAttempt > 0; correctionAttempt -= 1) {
           correction = await getArtifactAt<PatternCorrectionDocument>(
             env,
             identity,
-            command.generation_id,
+            coordinate.generationId,
             "correction_document",
-            claimed.job.stage_generation,
+            coordinate.stageGeneration,
             correctionAttempt,
           );
           if (correction) break;
@@ -1512,8 +1193,8 @@ export async function executePatternJob(
           correction?.value,
         );
         if (!input.ok) return refuseInput("writer", input);
-        await writeRequestArtifact("writer", input.document, attempt);
-        const outcome = await runPublisherPass(pin, "writer", attempt, () =>
+        await writeRequestArtifact(coordinate, input.document);
+        const outcome = await runPublisherPass(pin, "writer", coordinate.attempt, () =>
           publisherImpl.write(input.document, passOptions("writer")),
         );
         if (!outcome.ok) {
@@ -1522,7 +1203,7 @@ export async function executePatternJob(
             claimed.job,
             claimed.token,
             "writer",
-            attempt,
+            coordinate.attempt,
             command.writer_attempts_max,
             outcome,
           );
@@ -1534,19 +1215,24 @@ export async function executePatternJob(
       try {
         candidate = validatePatternCandidate(writer, plan, selected.packet, records);
       } catch {
-        return handlePassFailure(env, claimed.job, claimed.token, "writer", attempt, command.writer_attempts_max, {
+        return handlePassFailure(env, claimed.job, claimed.token, "writer", coordinate.attempt, command.writer_attempts_max, {
           code: "publisher_output_invalid",
           safe_detail_code: "schema_mismatch",
           retry_after_seconds: null,
         });
       }
       if (!candidate.ok) {
-        if (attempt + 1 < command.writer_attempts_max) {
-          const nextAttempt = attempt + 1;
+        const transition = {
+          kind: "retry",
+          pass: "writer",
+          availableAt: null,
+        } as const satisfies PatternTransition;
+        const planned = planPatternTransition(claimed.job, transition);
+        if (planned.next.writer_attempts < command.writer_attempts_max) {
           const correction = buildCorrectionDocument(
             plan,
             { deterministic: candidate.failures },
-            nextAttempt,
+            planned.next.writer_attempts,
           );
           await putArtifact(
             env,
@@ -1555,15 +1241,19 @@ export async function executePatternJob(
             "correction_document",
             correction,
             expiresAt,
-            nextAttempt,
+            planned.next.writer_attempts,
+            planned.next.stage_generation,
           );
-          if (!(await retryStage(env, claimed.job, claimed.token, "writer", null))) {
+          if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, transition))) {
             return { ok: false, reason: "duplicate", failureClass: "duplicate" };
           }
-          await nudgeNextStage(env, claimed.job, claimed.job.stage_generation);
           return { ok: true, terminal: false };
         }
-        await failJob(env, claimed.job, claimed.token, "candidate_invalid", "writing");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "candidate_invalid",
+          publicStage: "writing",
+        });
         return { ok: false, reason: "terminal", failureClass: "candidate_invalid" };
       }
       const candidateHash = adopted
@@ -1572,26 +1262,30 @@ export async function executePatternJob(
             env,
             identity,
             claimed.job,
-            PASS_RESPONSE_CLASS.writer,
+            coordinate.responseArtifactClass,
             writer,
             expiresAt,
-            attempt,
+            coordinate.attempt,
+            coordinate.stageGeneration,
           );
-      if (
-        !(await advance(env, claimed.job, claimed.token, "semantic_verifying", {
-          candidate_hash: candidateHash,
-        }))
-      ) {
+      if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, {
+        kind: "advance",
+        nextStage: "semantic_verifying",
+        hashes: { candidateHash },
+      }))) {
         return { ok: false, reason: "duplicate", failureClass: "duplicate" };
       }
-      await nudgeNextStage(env, claimed.job, claimed.job.stage_generation + 1);
       return { ok: true, terminal: false };
     }
 
-    if (stage === "semantic_verifying" || stage === "publishing") {
-      const attempt = claimed.job.verifier_attempts;
-      if (attempt >= command.verifier_attempts_max) {
-        await failJob(env, claimed.job, claimed.token, "verifier_attempts_exhausted", "checking_claims");
+    if (stageOwner === "verifier" || stageOwner === "publication") {
+      const coordinate = patternAttemptCoordinate(claimed.job, "verifier");
+      if (coordinate.attempt >= command.verifier_attempts_max) {
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "verifier_attempts_exhausted",
+          publicStage: "checking_claims",
+        });
         return { ok: false, reason: "terminal", failureClass: "verifier_attempts_exhausted" };
       }
       const plan = await getArtifact<PatternPlan>(env, identity, command.generation_id, "validated_plan");
@@ -1599,10 +1293,14 @@ export async function executePatternJob(
         env,
         identity,
         command.generation_id,
-        PASS_RESPONSE_CLASS.writer,
+        patternPassProtocol("writer").responseArtifactClass,
       );
       if (!plan || !writer) {
-        await failJob(env, claimed.job, claimed.token, "plan_missing", "checking_claims");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "plan_missing",
+          publicStage: "checking_claims",
+        });
         return { ok: false, reason: "terminal", failureClass: "plan_missing" };
       }
 
@@ -1615,17 +1313,21 @@ export async function executePatternJob(
       // recomputed over whatever was read back.
       const candidateHash = await contentHash(JSON.stringify(writer));
       if (!claimed.job.candidate_hash || candidateHash !== claimed.job.candidate_hash) {
-        await failJob(env, claimed.job, claimed.token, "candidate_missing", "checking_claims");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "candidate_missing",
+          publicStage: "checking_claims",
+        });
         return { ok: false, reason: "terminal", failureClass: "candidate_missing" };
       }
 
       const adopted = await getArtifactAt<PatternSemanticVerdict>(
         env,
         identity,
-        command.generation_id,
-        PASS_RESPONSE_CLASS.verifier,
-        claimed.job.stage_generation,
-        attempt,
+        coordinate.generationId,
+        coordinate.responseArtifactClass,
+        coordinate.stageGeneration,
+        coordinate.attempt,
       );
 
       let verdict: PatternSemanticVerdict;
@@ -1634,8 +1336,8 @@ export async function executePatternJob(
       } else {
         const input = buildVerifierInput(writer, plan, selected.packet, records, limits);
         if (!input.ok) return refuseInput("verifier", input);
-        await writeRequestArtifact("verifier", input.document, attempt);
-        const outcome = await runPublisherPass(pin, "verifier", attempt, () =>
+        await writeRequestArtifact(coordinate, input.document);
+        const outcome = await runPublisherPass(pin, "verifier", coordinate.attempt, () =>
           publisherImpl.verify(input.document, passOptions("verifier")),
         );
         if (!outcome.ok) {
@@ -1644,7 +1346,7 @@ export async function executePatternJob(
             claimed.job,
             claimed.token,
             "verifier",
-            attempt,
+            coordinate.attempt,
             command.verifier_attempts_max,
             outcome,
           );
@@ -1660,7 +1362,7 @@ export async function executePatternJob(
       // the verifier was the reason. Both are provider-output problems.
       const verdictProblem = findSemanticVerdictProblem(verdict);
       if (verdictProblem) {
-        return handlePassFailure(env, claimed.job, claimed.token, "verifier", attempt, command.verifier_attempts_max, {
+        return handlePassFailure(env, claimed.job, claimed.token, "verifier", coordinate.attempt, command.verifier_attempts_max, {
           code: "publisher_output_invalid",
           safe_detail_code: "schema_mismatch",
           retry_after_seconds: null,
@@ -1673,41 +1375,58 @@ export async function executePatternJob(
             env,
             identity,
             claimed.job,
-            PASS_RESPONSE_CLASS.verifier,
+            coordinate.responseArtifactClass,
             verdict,
             expiresAt,
-            attempt,
+            coordinate.attempt,
+            coordinate.stageGeneration,
           );
       // The verdict of record, under the class an operator and the retention
       // sweep look for. The same bytes as the response artifact; a different
       // role, and the response coordinate is what the artifact-first probe needs.
-      await putArtifact(env, identity, claimed.job, "semantic_verdict", verdict, expiresAt, attempt);
+      await putArtifact(
+        env,
+        identity,
+        claimed.job,
+        "semantic_verdict",
+        verdict,
+        expiresAt,
+        coordinate.attempt,
+        coordinate.stageGeneration,
+      );
 
       if (verdict.verdict !== "pass") {
-        const nextWriterAttempt = claimed.job.writer_attempts + 1;
-        if (nextWriterAttempt < command.writer_attempts_max) {
+        const transition = {
+          kind: "return_to_writer",
+          availableAt: null,
+        } as const satisfies PatternTransition;
+        const planned = planPatternTransition(claimed.job, transition);
+        if (planned.next.writer_attempts < command.writer_attempts_max) {
           const correction = buildCorrectionDocument(
             plan,
             { semantic: verdict.findings },
-            nextWriterAttempt,
+            planned.next.writer_attempts,
           );
-          if (
-            !(await returnToWriter(
-              env,
-              identity,
-              claimed.job,
-              claimed.token,
-              correction,
-              expiresAt,
-              null,
-            ))
-          ) {
+          await putArtifact(
+            env,
+            identity,
+            claimed.job,
+            "correction_document",
+            correction,
+            expiresAt,
+            planned.next.writer_attempts,
+            planned.next.stage_generation,
+          );
+          if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, transition))) {
             return { ok: false, reason: "duplicate", failureClass: "duplicate" };
           }
-          await nudgeNextStage(env, claimed.job, claimed.job.stage_generation + 1);
           return { ok: true, terminal: false };
         }
-        await failJob(env, claimed.job, claimed.token, "semantic_verification_failed", "checking_claims");
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "semantic_verification_failed",
+          publicStage: "checking_claims",
+        });
         return { ok: false, reason: "terminal", failureClass: "semantic_verification_failed" };
       }
       const publication = await publishPattern(
@@ -1723,7 +1442,10 @@ export async function executePatternJob(
         now,
       );
       if (publication.status === "retry") {
-        await releasePublicationRetry(env, claimed.job, claimed.token, now);
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "publication_retry",
+          availableAt: new Date(now.getTime() + 60_000),
+        }, now);
         return {
           ok: false,
           reason: "retry",
@@ -1733,11 +1455,19 @@ export async function executePatternJob(
       return { ok: true, terminal: true };
     }
 
-    await failJob(env, claimed.job, claimed.token, "unknown_stage", publicStageFor(stage) ?? "organizing_evidence");
+    await commitPatternTransition(env, claimed.job, claimed.token, {
+      kind: "fail",
+      failureClass: "unknown_stage",
+      publicStage: publicStageFor(stage) ?? "organizing_evidence",
+    });
     return { ok: false, reason: "terminal", failureClass: "unknown_stage" };
   } catch (error) {
     safeLog({ event: "pattern_stage_failed" });
-    await failJob(env, claimed.job, claimed.token, "execution_error", publicStageFor(stage) ?? "organizing_evidence");
+    await commitPatternTransition(env, claimed.job, claimed.token, {
+      kind: "fail",
+      failureClass: "execution_error",
+      publicStage: publicStageFor(stage) ?? "organizing_evidence",
+    });
     return { ok: false, reason: "terminal", failureClass: "execution_error" };
   }
 }
@@ -1824,6 +1554,17 @@ async function publishPattern(
     };
   }
   try {
+    const publicationTransition = buildPatternTransitionStatements(
+      env,
+      claimed.job,
+      claimed.token,
+      {
+        kind: "publish",
+        candidateHash,
+        semanticVerdictHash: verdictHash,
+      },
+      now,
+    );
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -1833,7 +1574,7 @@ async function publishPattern(
            WHERE id = ? AND status = 'reserved' AND active_generation_id = ? AND consumed_at IS NULL
          )`,
       ).bind(command.claim_id, command.generation_id),
-      ...ownershipProbes(env, claimed.job, claimed.token),
+      ...publicationTransition.guards,
       ...replay.receiptStatements(env),
       env.DB.prepare(
         `DELETE FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash != ?`,
@@ -1870,17 +1611,7 @@ async function publishPattern(
          SET status = 'accepted', active_generation_id = NULL, consumed_at = ?, accepted_at = ?, updated_at = ?
          WHERE id = ? AND status = 'reserved'`,
       ).bind(generatedAt, generatedAt, generatedAt, command.claim_id),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'succeeded', claim_token = NULL, lease_expires_at = NULL, finished_at = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(generatedAt, command.job_id, claimed.token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'succeeded', stage_generation = stage_generation + 1, candidate_hash = ?,
-             semantic_verdict_hash = ?, updated_at = ?, finished_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(candidateHash, verdictHash, generatedAt, generatedAt, command.generation_id, claimed.job.stage_generation),
+      ...publicationTransition.mutations,
       env.DB.prepare(
         `INSERT INTO audit_events
            (id, actor_type, actor_id, action, resource_type, resource_id, result, detail_class, created_at)
@@ -1892,5 +1623,3 @@ async function publishPattern(
     return { status: "retry", failureClass: "publication_commit_failed" };
   }
 }
-
-export { loadJob as loadPatternJob };

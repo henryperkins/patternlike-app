@@ -44,10 +44,12 @@ import { findSemanticVerdictProblem } from "./pattern-semantic.js";
 import {
   executePatternJob,
   getArtifactAt,
+} from "./pattern-execute.js";
+import {
+  commitPatternTransition,
   loadPatternJob,
   patternArtifactId,
-  retryStage,
-} from "./pattern-execute.js";
+} from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
 
@@ -285,6 +287,7 @@ describe("Pattern stage protocol", () => {
 
     expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
     expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    const beforePublication = await loadPatternJob(env, generationId);
 
     let failPublicationBatch = true;
     let publicationPrepared = false;
@@ -320,6 +323,15 @@ describe("Pattern stage protocol", () => {
       reason: "retry",
       failureClass: "publication_commit_failed",
     });
+    const publishing = await loadPatternJob(env, generationId);
+    expect(publishing).toMatchObject({
+      stage: "publishing",
+      stage_generation: beforePublication!.stage_generation,
+      planner_attempts: beforePublication!.planner_attempts,
+      writer_attempts: beforePublication!.writer_attempts,
+      verifier_attempts: beforePublication!.verifier_attempts,
+      candidate_hash: beforePublication!.candidate_hash,
+    });
     expect((await env.PATTERN_REPLAY_LEDGER!.list({
       prefix: "pattern-erasure-replay/",
     })).objects).toHaveLength(1);
@@ -332,6 +344,13 @@ describe("Pattern stage protocol", () => {
 
     await clearBackoff(generationId);
     expect(await deliver(generationId, retryEnv)).toEqual({ ok: true, terminal: true });
+    const succeeded = await loadPatternJob(env, generationId);
+    expect(succeeded).toMatchObject({
+      stage: "succeeded",
+      stage_generation: beforePublication!.stage_generation + 1,
+      candidate_hash: beforePublication!.candidate_hash,
+      semantic_verdict_hash: expect.any(String),
+    });
     expect((await env.PATTERN_REPLAY_LEDGER!.list({
       prefix: "pattern-erasure-replay/",
     })).objects).toHaveLength(1);
@@ -557,7 +576,7 @@ describe("Pattern stage protocol", () => {
     );
     expect(atZero).not.toBeNull();
 
-    // Rewind and hand the same stage back through `retryStage`, which holds the
+    // Rewind and hand the same stage back through the typed retry transition, which holds the
     // stage generation and moves the durable attempt index.
     await env.DB.prepare(
       `UPDATE pattern_generation_jobs
@@ -573,7 +592,12 @@ describe("Pattern stage protocol", () => {
       .run();
 
     const rewound = await loadPatternJob(env, generationId);
-    expect(await retryStage(env, rewound!, "clm_test_retry", "planner", null)).toBe(true);
+    expect(await commitPatternTransition(
+      env,
+      rewound!,
+      "clm_test_retry",
+      { kind: "retry", pass: "planner", availableAt: null },
+    )).not.toBeNull();
 
     const retried = await loadPatternJob(env, generationId);
     expect(retried!.planner_attempts).toBe(1);
