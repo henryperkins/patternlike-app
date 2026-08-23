@@ -435,7 +435,7 @@ written ceiling approval.
 `pattern-ontology-source-manual-en-us-0.1.0` is registered with corpus hash
 `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`.
 The isolated signing identity, API verification keyring, and pipeline artifact
-keyring are provisioned. Nine immutable production candidates have failed
+keyring are provisioned. Twelve immutable production candidates have failed
 closed. Versions `0.1.0` through `0.1.4` exposed completion, record-policy, and
 bounded-coverage failures. `0.1.5` then failed candidate validation after two
 generator calls. The first reviewed source bridge allowed `0.1.6` to compile
@@ -444,14 +444,22 @@ failed after seven fixtures. A transient nine-hint V4 command for `0.1.7`
 reached regression before the scoped eight-hint Worker rejected its frozen
 identity; the exact-eight `0.1.8` V4 command was inversely rejected before any
 artifact or provider call when a concurrent deployment restored the nine-hint
-Worker. Both incompatible commands had reused V4. Commit `9381693` therefore
-separates the exact-eight command as V5; API
-`0aded7f1-b115-4bc7-9d2e-4dc2a19eb42a` is deployed with prompt `1.0.5`, the
-unchanged 16-chunk limit, ontology rollout `internal`, and Pattern rollout
-`off`. Usage for 2026-08-23 remains 31/500 calls (2 generator, 17 evaluator,
-12 regression). No V5 candidate was reserved, no bundle exists, and no machine
-release is active. A candidate must still pass every existing 7B criterion
-before activation.
+Worker. Both incompatible commands had reused V4. Commit `9381693` separated
+the exact-eight command as V5. Candidates `0.1.9` and `0.1.10` then reached the
+existing regression hard gates; commits `4494d30` and `23b9485` restored the
+already-bounded writer correction path for the two proven writer-origin finding
+classes. Candidate `0.1.11` passed generation, compilation, and all ten
+independent evaluations, then failed closed after 71 regression results when
+its second and final planner call produced no response artifact; the terminal
+transition 121.077 seconds after request creation is consistent with the fixed
+120-second deadline.
+API deployment `ca84f4f7-ebbc-4140-a4b3-dbfcee150ef2` (code upload
+`baa82c35-7eef-4bb9-9c4e-0ae06645e703`) is at 100% with prompt `1.0.5`, the
+unchanged pass and 16-chunk limits, ontology rollout `internal`, and Pattern
+rollout `off`. Usage for 2026-08-23 is 186/500 calls (5 generator, 47 evaluator,
+134 regression). No regression report or bundle exists, and no machine release
+is active. A candidate must still pass every existing 7B criterion before
+activation.
 
 ### Gate 7A — shortest internal path
 
@@ -610,6 +618,9 @@ until its evidence exists.
 | 2026-08-23 | 7B attempt 7 | API `a6c6e3e5`; prompt `1.0.4`; command V3 | `0012` | candidate `pattern-ontology-en-us-0.1.6`; none active | run `oprun_096cd5d7-4afb-4450-8da5-5d1f109076b5`, config `sha256:ee90697e450f78105743d7dd0cc49c6b1ca1044e5fb3b1ebc2798a9eaa41f66a`, candidate `sha256:17f49b7d72438e563d323adf8eb5a1c08b2181b96a066fbc4996ce76baf4a474`, compiler `sha256:65ed3c63f50fb73922eeff4ff1d1cc961d89f142e801b352c7c4690ebc50acc1`, evaluator `sha256:822a6d012a095ca92fdd0d934079d2ca19570db0d38c940ec6434d83ed800ae9`; 1 generator, 6 evaluator, and 7 regression calls; no regression report or bundle | failed closed at existing regression gate |
 | 2026-08-23 | 7B attempt 8 | API `98a22276`; prompt `1.0.5`; command V4 | `0012` | candidate `0.1.7`; none active | run `oprun_5f60bf80-7e7d-4aed-8fc6-940cdd1cf913`, nine-hint config `sha256:aff09b5379586bb71a6a55edd60e0deb972255fef87fb3c92e11a006e824327b`, candidate `sha256:af4aded09b60c677a484d42253484354ecf87f4f8be9f3d50f079d45f6181107`, compiler `sha256:2fb89d0978eeada64b4633430a4771349c40ddad0ba05e3c3a7d31294d747e36`, evaluator `sha256:8f77fbc671d3045531efaf5a0ec4762676b5edd74cb536ca2833c1394ce3813c`; 1 generator, 11 evaluator, and 5 regression calls before the scoped eight-hint deployment rejected the incompatible V4 identity; no regression report or bundle | failed closed as `configuration_invalid`; no activation |
 | 2026-08-23 | 7B attempt 9 | `9381693`; API `0aded7f1`; prompt `1.0.5`; command V5 deployed after failure | `0012` | candidate `pattern-ontology-en-us-0.1.8`; none active | run `oprun_c3cb1a82-a7af-44aa-8358-77ea89466399`, exact-eight V4 config `sha256:9983b8c20101d282a63c2450698b960b1dbc6d7c78565186a0d3738d1aa59d56`, failed before artifacts/provider use when a concurrent deployment restored the incompatible nine-hint V4 Worker; command identity was separated as V5, 120 affected tests plus full typecheck/build passed, usage remained 31/500, active pointer remained null, and Pattern rollout stayed `off` | failed closed as `configuration_invalid`; V5 fix deployed; no retry reserved |
+| 2026-08-23 | 7B attempt 10 | `4494d30` deployed after failure; prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.9`; none active | run `oprun_a6d9b4ca-27ce-4963-8126-1a38e28293df`, config `sha256:26ad231398ebd179b3264d2f494b279b9cf4b33ba0419370a43f81896fb78c25`, candidate `sha256:6835fc4b6e13503ae1b2dd01eaec265ba01f46ae74e118e9cffeb035870877ff`, compiler `sha256:22b7e4e9d702ff428ed7fc84c79ccce2df1c374bdeb795cbdac1c2c5899c9fad`, evaluator `sha256:e37857bdeb59e1ba2ba7d36ccf5c7412419d941d591622252e8dc63d3f533054`; failed at the existing sole `prohibited_claim` regression gate after three regression results; the bounded writer correction route was repaired and verified without changing any ceiling | failed closed; no regression report, bundle, or activation |
+| 2026-08-23 | 7B attempt 11 | `23b9485` deployed after failure; prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.10`; none active | run `oprun_e2f70a73-6bc2-4df4-8ee5-0be90e1d94ce`, config `sha256:7d020fc4074d7560d09c0bc5a27581e278c8e22ae8e01039125c8a7874c626e8`, candidate `sha256:7cd86c984b42716b7ef0d8ae4bf3ea0cbebbda726c2947aad4073613883222fa`, compiler `sha256:4620e0eac2372546c3490f68247a2cd6367802766c21379be442b16786f9922c`, evaluator `sha256:24e2a71544f80e6b8e20374fe9721d455f35f71cf6529fbf2403e23a6de7ea38`; failed at the existing sole writer-origin `suppressed_feature_leak` regression gate after 46 regression results; the bounded correction route was repaired and verified without changing any ceiling | failed closed; no regression report, bundle, or activation |
+| 2026-08-23 | 7B attempt 12 | `23b9485`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.11`; none active | run `oprun_9026280d-067f-4c13-ac62-1f4e1a4b61c3`, config `sha256:24103de2e86eb7fde4d1fcbf7565cec153f35897d7094ea97f221fdd16d973bc`, candidate `sha256:d76fad38a873d86149a3f78e0a7cad7d73f689c0718d9ca7f782fdca22a6554d`, compiler `sha256:6b926310ed04ab5c98eb44339a72f9a04074e5b459d0e2c9134f8525e1326199`, evaluator `sha256:3ef00438683dbf273438f30836c586ea4ac6f10da7186c5b0850f76c8291e6f7`; all ten evaluations passed and regression produced 71 results. The final two planner requests have the same hash; the first was invalid, while the reserved second call produced no response artifact and terminaled 121.077 seconds after request creation, consistent with the fixed 120-second deadline. A third planner call was correctly refused by the unchanged inclusive two-call ceiling | failed closed as `regression_failed`; no regression report, bundle, or activation |
 | 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb`, `3a47565` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, replay bucket, and production `pattern-replay-2026-08` signing key/keyring are deployed; restore procedure recorded without claiming execution | implementation/signing complete; drill and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |
