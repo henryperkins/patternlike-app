@@ -4,7 +4,7 @@
 
 **Status:** Core adapter, automated-ontology, and erasure-replay engineering are
 present. Gate 6 is approved. Gate 7B has failed closed through candidate
-`pattern-ontology-en-us-0.1.4`; Gates 8–10 remain open. This file is the
+`pattern-ontology-en-us-0.1.8`; Gates 8–10 remain open. This file is the
 operational source of truth; updating it does not itself authorize a deployment,
 secret change, ontology activation, provider call, or rollout advance.
 
@@ -42,7 +42,7 @@ override a failed machine gate.
 
 This table describes repository evidence, not unqueried live state.
 
-| Area | State at 2026-08-22 | Evidence / next owner |
+| Area | State at 2026-08-23 | Evidence / next owner |
 | --- | --- | --- |
 | Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a |
 | Executor/provider path and queue-level integration | Deployed with rollout off | Worker `c20fa0da-273b-4d63-8fdd-7fc53d972c05`; `pattern-execute.ts`, `pattern-execute-openai.test.ts` |
@@ -51,11 +51,11 @@ This table describes repository evidence, not unqueried live state.
 | `0009` / `0010` / `0011` / `0012` | Applied to production in order | Gate 2 evidence below; integrity and shape checks clean |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
-| Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; five immutable candidates failed before compilation/evaluation; no machine release is active |
+| Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; nine immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active |
 | Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
 | Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
 | Numeric call-limit value | `100` in committed production config | Gate 6 approved the nine-Pattern/99-call operating ceiling and 100-call hard ceiling |
-| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 7B | API `70de1b79-315a-4881-b33e-df61539365d7`; corpus, ontology signing, and replay signing identities are provisioned; active ontology is null; Pattern rollout remains `off` |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 7B | API `0aded7f1-b115-4bc7-9d2e-4dc2a19eb42a`; corpus, ontology signing, and replay signing identities are provisioned; active ontology is null; Pattern rollout remains `off` |
 
 ## What remains before the first generated Pattern
 
@@ -435,18 +435,23 @@ written ceiling approval.
 `pattern-ontology-source-manual-en-us-0.1.0` is registered with corpus hash
 `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`.
 The isolated signing identity, API verification keyring, and pipeline artifact
-keyring are provisioned. Five fresh production candidates failed closed before
-compilation, evaluation, signing, or activation. Versions `0.1.0` and `0.1.1`
-exposed completion/exclusion ambiguity and `coverage_incomplete`; `0.1.2`
-failed deterministic record policy after ten zero-retry chunks. Versions
-`0.1.3` and `0.1.4` each durably wrote all 16 zero-retry request/response/chunk
-triplets and then failed `candidate_invalid` at the unchanged generation bound,
-without a candidate hash. Prompt pins `1.0.2` and `1.0.3` clarified the frozen
-record policy and that coverage—not corpus exhaustion—defines completion; no
-limit, schema, evaluator rule, or acceptance criterion changed. Daily pipeline
-usage ended at 44 generator calls, zero evaluator calls, and zero regression
-calls against the approved 500-call ceiling. No machine release is active. A
-candidate must still pass every existing 7B criterion before activation.
+keyring are provisioned. Nine immutable production candidates have failed
+closed. Versions `0.1.0` through `0.1.4` exposed completion, record-policy, and
+bounded-coverage failures. `0.1.5` then failed candidate validation after two
+generator calls. The first reviewed source bridge allowed `0.1.6` to compile
+and pass six independent evaluator calls, but the existing regression gate
+failed after seven fixtures. A transient nine-hint V4 command for `0.1.7`
+reached regression before the scoped eight-hint Worker rejected its frozen
+identity; the exact-eight `0.1.8` V4 command was inversely rejected before any
+artifact or provider call when a concurrent deployment restored the nine-hint
+Worker. Both incompatible commands had reused V4. Commit `9381693` therefore
+separates the exact-eight command as V5; API
+`0aded7f1-b115-4bc7-9d2e-4dc2a19eb42a` is deployed with prompt `1.0.5`, the
+unchanged 16-chunk limit, ontology rollout `internal`, and Pattern rollout
+`off`. Usage for 2026-08-23 remains 31/500 calls (2 generator, 17 evaluator,
+12 regression). No V5 candidate was reserved, no bundle exists, and no machine
+release is active. A candidate must still pass every existing 7B criterion
+before activation.
 
 ### Gate 7A — shortest internal path
 
@@ -601,9 +606,13 @@ until its evidence exists.
 | 2026-08-22 | 7B attempt 3 | API `57830965`; prompt `1.0.1` | `0012` | candidate `pattern-ontology-en-us-0.1.2`; none active | run `oprun_9e5a3a4e-335c-4f38-8878-27df47a46c36`, config `sha256:be5a0312d729c3cc9aaf5afa001e2474c6176f503de0929dffbbb74203c06219`, wrote ten zero-retry triplets and failed `record_policy_invalid`; no candidate/report/bundle hash | failed closed; record policy clarified |
 | 2026-08-22 | 7B attempt 4 | `400091f`; API `de5520b6`; prompt `1.0.2` | `0012` | candidate `pattern-ontology-en-us-0.1.3`; none active | run `oprun_0c92ac15-458e-4a31-82db-df7e5875dbaf`, config `sha256:83c3111cfa2873255eff2dabab23219ffe96d330fc91ade13f93b9209ebe0767`, wrote 16 zero-retry triplets and failed `candidate_invalid` at the fixed bound; no candidate/report/bundle hash | failed closed; completion scope clarified |
 | 2026-08-22 | 7B attempt 5 | `56f49fe`; API `70de1b79`; prompt `1.0.3` | `0012` | candidate `pattern-ontology-en-us-0.1.4`; none active | full verification passed (1,719 API, 207 web, 19 signer, 18 content tests plus contracts/migrations); run `oprun_c97ec6f1-d383-4a5b-aeba-29660e295574`, config `sha256:910ae07a3aa426229b6a7acb6df07c8054ccdd37339b2c06a088c03a90a60533`, wrote 16 zero-retry triplets and failed `candidate_invalid`; daily usage 44/500, all generator | failed closed; Gate 7B remains open |
+| 2026-08-22 | 7B attempt 6 | prompt `1.0.3`; command V2 | `0012` | candidate `pattern-ontology-en-us-0.1.5`; none active | run `oprun_33f87369-e73e-462b-8a90-7fd81419404b`, config `sha256:4b144018ac321e4c096eab082b6082589d17183eed934facfdf2e94d3460e2e3`, wrote two generator triplets and failed `candidate_invalid`; no candidate/report/bundle hash | failed closed at candidate validation |
+| 2026-08-23 | 7B attempt 7 | API `a6c6e3e5`; prompt `1.0.4`; command V3 | `0012` | candidate `pattern-ontology-en-us-0.1.6`; none active | run `oprun_096cd5d7-4afb-4450-8da5-5d1f109076b5`, config `sha256:ee90697e450f78105743d7dd0cc49c6b1ca1044e5fb3b1ebc2798a9eaa41f66a`, candidate `sha256:17f49b7d72438e563d323adf8eb5a1c08b2181b96a066fbc4996ce76baf4a474`, compiler `sha256:65ed3c63f50fb73922eeff4ff1d1cc961d89f142e801b352c7c4690ebc50acc1`, evaluator `sha256:822a6d012a095ca92fdd0d934079d2ca19570db0d38c940ec6434d83ed800ae9`; 1 generator, 6 evaluator, and 7 regression calls; no regression report or bundle | failed closed at existing regression gate |
+| 2026-08-23 | 7B attempt 8 | API `98a22276`; prompt `1.0.5`; command V4 | `0012` | candidate `0.1.7`; none active | run `oprun_5f60bf80-7e7d-4aed-8fc6-940cdd1cf913`, nine-hint config `sha256:aff09b5379586bb71a6a55edd60e0deb972255fef87fb3c92e11a006e824327b`, candidate `sha256:af4aded09b60c677a484d42253484354ecf87f4f8be9f3d50f079d45f6181107`, compiler `sha256:2fb89d0978eeada64b4633430a4771349c40ddad0ba05e3c3a7d31294d747e36`, evaluator `sha256:8f77fbc671d3045531efaf5a0ec4762676b5edd74cb536ca2833c1394ce3813c`; 1 generator, 11 evaluator, and 5 regression calls before the scoped eight-hint deployment rejected the incompatible V4 identity; no regression report or bundle | failed closed as `configuration_invalid`; no activation |
+| 2026-08-23 | 7B attempt 9 | `9381693`; API `0aded7f1`; prompt `1.0.5`; command V5 deployed after failure | `0012` | candidate `pattern-ontology-en-us-0.1.8`; none active | run `oprun_c3cb1a82-a7af-44aa-8358-77ea89466399`, exact-eight V4 config `sha256:9983b8c20101d282a63c2450698b960b1dbc6d7c78565186a0d3738d1aa59d56`, failed before artifacts/provider use when a concurrent deployment restored the incompatible nine-hint V4 Worker; command identity was separated as V5, 120 affected tests plus full typecheck/build passed, usage remained 31/500, active pointer remained null, and Pattern rollout stayed `off` | failed closed as `configuration_invalid`; V5 fix deployed; no retry reserved |
 | 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb`, `3a47565` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, replay bucket, and production `pattern-replay-2026-08` signing key/keyring are deployed; restore procedure recorded without claiming execution | implementation/signing complete; drill and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |
 | 2026-08-22 | Auth0 canary preflight | `01049cc`, `b4e1770`; API `d784b0ea` (135) | `0012` | none active | existing identity reused through deployed Universal Login; SPA URL lists restored exactly after the unusable CLI loopback; Worker session accepted; canary `usr_3ca4f7c2f2498c4eab97511fc3c6ff97` is active with one chart and confirmed en-US; zero Pattern claims, jobs, documents, or grants; no reservation | canary prepared; Gate 8 remains blocked |
 | 2026-08-22 | 9 preflight | `24804ee` | `0012` | none | static admin bearer remains; replay table has zero rows and no runtime writer/replayer/drill implementation; identity path and both draft designs await operator decision/approval | blocked before certification |
-| 2026-08-22 | 10 | `56f49fe`; API `70de1b79` | `0012` | none active | Gate 7B has no accepted machine release; Gate 8 has no designated/consented canary; Gate 9 drill and auditor identity remain open; rollout verified `off` | blocked by existing prerequisites; not attempted |
+| 2026-08-23 | 10 | `9381693`; API `0aded7f1` | `0012` | none active | Gate 7B has no accepted machine release; Gate 8 has no designated/consented canary; Gate 9 drill and auditor identity remain open; rollout verified `off` | blocked by existing prerequisites; not attempted |
