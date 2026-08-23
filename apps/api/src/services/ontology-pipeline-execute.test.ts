@@ -419,11 +419,6 @@ function approvedCoverageHints() {
       feature_predicate: { type: "aspect" as const, aspect: "sextile" },
     },
     {
-      feature_class: "aspect" as const,
-      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.opposition,
-      feature_predicate: { type: "aspect" as const, aspect: "opposition" },
-    },
-    {
       feature_class: "pattern" as const,
       source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.stellium,
       feature_predicate: { type: "pattern" as const, pattern: "stellium" },
@@ -1132,7 +1127,7 @@ describe("ontology pipeline execution", () => {
       .toEqual(approvedCoverageHints());
     expect(hintedRecords[0]!.feature_predicate).not.toHaveProperty("house");
     expect(hintedRecords[2]!.feature_predicate).not.toHaveProperty("body_a");
-    expect(hintedRecords[8]!.feature_predicate).not.toHaveProperty("accuracy");
+    expect(hintedRecords[7]!.feature_predicate).not.toHaveProperty("accuracy");
   });
 
   it("closes a continuation that reduces neither class nor exact-hint deficits", async () => {
@@ -2416,8 +2411,16 @@ describe("ontology pipeline execution", () => {
     ).bind(fixture.runId).first()).toEqual({ count: 0 });
   });
 
-  it("fails mandatory regression coverage before the first Pattern provider request", async () => {
+  it("does not add a mandatory-coverage gate before the existing regression", async () => {
     const fixture = await reserveFixture();
+    const mandatoryMoon = loadOntologyRegressionCorpus().fixtures[0]!.features
+      .find((feature) =>
+        feature.feature_class === "position" && feature.body === "moon"
+      );
+    expect(mandatoryMoon).toBeDefined();
+    expect(fixture.records.some((record) =>
+      ontologyRecordMatchesFeature(record, mandatoryMoon!)
+    )).toBe(false);
     const publisher = new FakeOntologyPublisher(
       [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
       fixture.records.map((record) => passingVerdict(record.id)),
@@ -2429,34 +2432,26 @@ describe("ontology pipeline execution", () => {
     expect(await runRow(fixture.runId)).toMatchObject({ stage: "regressing" });
 
     const patternPublisher = new FakeRegressionPatternPublisher();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await deliver(
       fixture,
       publisher,
       undefined,
       fixture.pipelineEnv,
       patternPublisher,
-    )).toEqual({ status: "terminal" });
+    )).toMatchObject({ status: "advanced" });
 
     expect(await runRow(fixture.runId)).toMatchObject({
-      stage: "failed",
-      stage_cursor: 0,
-      failure_class: "regression_failed",
+      stage: "regressing",
+      stage_cursor: 1,
+      failure_class: null,
       regression_report_hash: null,
       bundle_hash: null,
     });
-    expect(patternPublisher.providerCalls).toBe(0);
+    expect(patternPublisher.providerCalls).toBe(1);
     expect(await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
        WHERE run_id = ? AND artifact_class = 'regression_request'`,
-    ).bind(fixture.runId).first()).toEqual({ count: 0 });
-    expect(warn).toHaveBeenCalledWith(
-      "ontology_regression_preflight_failed",
-      {
-        trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
-        missing_feature_classes: ["aspect", "position", "uncertainty"],
-      },
-    );
+    ).bind(fixture.runId).first()).toEqual({ count: 1 });
   }, 60_000);
 
   it("adopts a persisted regression response after a result-write crash without another call", async () => {

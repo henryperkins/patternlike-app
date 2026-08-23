@@ -15,7 +15,6 @@ import {
 import {
   projectPublicPattern,
   selectPatternEvidence,
-  ontologyRecordMatchesFeature,
   validatePatternCandidate,
   validatePatternPlan,
   type PatternSelectionResult,
@@ -404,33 +403,6 @@ function isOntologyRegressionMandatoryFeature(feature: NatalFeature): boolean {
     (feature.feature_class === "aspect" && feature.orb <= 6 &&
       [feature.body_a, feature.body_b].some((body) =>
         body === "sun" || body === "moon"));
-}
-
-export interface OntologyRegressionMandatoryCoverageResult {
-  ok: boolean;
-  missing_feature_classes: NatalFeature["feature_class"][];
-}
-
-/** Fail without a provider call when the candidate cannot cover frozen mandatory facts. */
-export function evaluateOntologyRegressionMandatoryCoverage(
-  ontology: readonly PatternOntologyRecord[],
-): OntologyRegressionMandatoryCoverageResult {
-  const missing = new Set<NatalFeature["feature_class"]>();
-  for (const fixture of loadOntologyRegressionCorpus().fixtures) {
-    for (const feature of fixture.features) {
-      if (
-        isOntologyRegressionMandatoryFeature(feature) &&
-        !ontology.some((record) => ontologyRecordMatchesFeature(record, feature))
-      ) {
-        missing.add(feature.feature_class);
-      }
-    }
-  }
-  const missingFeatureClasses = [...missing].sort();
-  return {
-    ok: missingFeatureClasses.length === 0,
-    missing_feature_classes: missingFeatureClasses,
-  };
 }
 
 function mandatoryAccountingFails(

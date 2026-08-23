@@ -108,10 +108,6 @@ export type SafeLogEvent =
       remaining_feature_classes: NatalFeatureClass[];
     }
   | {
-      event: "ontology_regression_preflight_failed";
-      missing_feature_classes: NatalFeatureClass[];
-    }
-  | {
       event: "ontology_regression_hard_gate_failed";
       fixture_index: number;
       pass: PatternStageClass;
@@ -294,12 +290,6 @@ export function safeLog(input: SafeLogEvent): string {
         trace_id,
         safe_detail_code: input.safe_detail_code,
         remaining_feature_classes: input.remaining_feature_classes,
-      });
-      break;
-    case "ontology_regression_preflight_failed":
-      console.warn(input.event, {
-        trace_id,
-        missing_feature_classes: input.missing_feature_classes,
       });
       break;
     case "ontology_regression_hard_gate_failed":
