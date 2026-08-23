@@ -44,10 +44,12 @@ import { findSemanticVerdictProblem } from "./pattern-semantic.js";
 import {
   executePatternJob,
   getArtifactAt,
-  loadPatternJob,
-  retryStage,
 } from "./pattern-execute.js";
-import { patternArtifactId } from "./pattern-stage-protocol.js";
+import {
+  commitPatternTransition,
+  loadPatternJob,
+  patternArtifactId,
+} from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
 
@@ -557,7 +559,7 @@ describe("Pattern stage protocol", () => {
     );
     expect(atZero).not.toBeNull();
 
-    // Rewind and hand the same stage back through `retryStage`, which holds the
+    // Rewind and hand the same stage back through the typed retry transition, which holds the
     // stage generation and moves the durable attempt index.
     await env.DB.prepare(
       `UPDATE pattern_generation_jobs
@@ -573,7 +575,12 @@ describe("Pattern stage protocol", () => {
       .run();
 
     const rewound = await loadPatternJob(env, generationId);
-    expect(await retryStage(env, rewound!, "clm_test_retry", "planner", null)).toBe(true);
+    expect(await commitPatternTransition(
+      env,
+      rewound!,
+      "clm_test_retry",
+      { kind: "retry", pass: "planner", availableAt: null },
+    )).not.toBeNull();
 
     const retried = await loadPatternJob(env, generationId);
     expect(retried!.planner_attempts).toBe(1);

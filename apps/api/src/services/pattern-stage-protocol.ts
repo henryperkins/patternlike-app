@@ -4,6 +4,8 @@ import {
   type PatternPublicStage,
 } from "@patternlike/shared";
 
+import type { Env } from "../env.js";
+import { PATTERN_JOB_TYPE } from "./pattern-command.js";
 import type { PatternStageClass } from "./pattern-publisher.js";
 
 export type PatternDomainStage =
@@ -298,5 +300,166 @@ export function planPatternTransition(
         nextQueueCoordinate: null,
         nextProviderCallAuthorized: false,
       };
+  }
+}
+
+export interface PatternJobRow extends PatternStageState {
+  job_id: string;
+  user_id: string;
+  claim_id: string;
+  locale: string;
+  locale_revision: number;
+}
+
+export interface PatternTransitionStatements {
+  effect: PatternTransitionEffect;
+  guards: D1PreparedStatement[];
+  mutations: D1PreparedStatement[];
+}
+
+export async function loadPatternJob(
+  env: Pick<Env, "DB">,
+  generationId: string,
+): Promise<PatternJobRow | null> {
+  return env.DB.prepare(
+    `SELECT generation_id, job_id, user_id, claim_id, stage, stage_generation,
+            planner_attempts, writer_attempts, verifier_attempts, plan_hash,
+            candidate_hash, semantic_verdict_hash, locale, locale_revision
+     FROM pattern_generation_jobs WHERE generation_id = ?`,
+  )
+    .bind(generationId)
+    .first<PatternJobRow>();
+}
+
+function ownershipProbes(
+  env: Pick<Env, "DB">,
+  job: PatternJobRow,
+  token: string,
+): D1PreparedStatement[] {
+  return [
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'pattern job token no longer owns running lease'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM jobs
+         WHERE id = ? AND claim_token = ? AND status = 'running' AND job_type = ?
+       )`,
+    ).bind(job.job_id, token, PATTERN_JOB_TYPE),
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'pattern domain stage no longer owned'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM pattern_generation_jobs
+         WHERE generation_id = ? AND stage_generation = ?
+           AND stage NOT IN ('succeeded', 'failed', 'cancelled')
+       )`,
+    ).bind(job.generation_id, job.stage_generation),
+  ];
+}
+
+export function buildPatternTransitionStatements(
+  env: Pick<Env, "DB">,
+  job: PatternJobRow,
+  token: string,
+  transition: PatternTransition,
+  now = new Date(),
+): PatternTransitionStatements {
+  const effect = planPatternTransition(job, transition, now);
+  if (transition.kind === "publish") {
+    throw new Error("publish transition requires atomic publication composition");
+  }
+  const nowIso = now.toISOString();
+  const writeAvailableAt = effect.availableAt !== undefined;
+  const writeResultClass = effect.resultClass !== undefined;
+  const writePublicFailureStage = effect.publicFailureStage !== undefined;
+  const writeCancellationReason = effect.cancellationReason !== undefined;
+  const writeRetention = effect.retentionExpiresAt !== undefined;
+
+  const mutations: D1PreparedStatement[] = [
+    env.DB.prepare(
+      `UPDATE jobs
+       SET status = ?, claim_token = NULL, lease_expires_at = NULL,
+           dispatched_at = CASE WHEN ? THEN NULL ELSE dispatched_at END,
+           available_at = CASE WHEN ? THEN ? ELSE available_at END,
+           finished_at = CASE WHEN ? THEN ? ELSE finished_at END,
+           result_class = CASE WHEN ? THEN ? ELSE result_class END
+       WHERE id = ? AND claim_token = ? AND status = 'running'`,
+    ).bind(
+      effect.jobStatus,
+      effect.clearDispatchedAt ? 1 : 0,
+      writeAvailableAt ? 1 : 0,
+      effect.availableAt?.toISOString() ?? null,
+      effect.finish ? 1 : 0,
+      nowIso,
+      writeResultClass ? 1 : 0,
+      effect.resultClass ?? null,
+      job.job_id,
+      token,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_generation_jobs
+       SET stage = ?, stage_generation = ?,
+           planner_attempts = ?, writer_attempts = ?, verifier_attempts = ?,
+           plan_hash = ?, candidate_hash = ?, semantic_verdict_hash = ?,
+           updated_at = ?,
+           finished_at = CASE WHEN ? THEN ? ELSE finished_at END,
+           public_failure_stage = CASE WHEN ? THEN ? ELSE public_failure_stage END,
+           failure_class = CASE WHEN ? THEN ? ELSE failure_class END,
+           cancellation_reason = CASE WHEN ? THEN ? ELSE cancellation_reason END,
+           retention_expires_at = CASE WHEN ? THEN ? ELSE retention_expires_at END
+       WHERE generation_id = ? AND stage_generation = ?
+         AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
+    ).bind(
+      effect.next.stage,
+      effect.next.stage_generation,
+      effect.next.planner_attempts,
+      effect.next.writer_attempts,
+      effect.next.verifier_attempts,
+      effect.next.plan_hash,
+      effect.next.candidate_hash,
+      effect.next.semantic_verdict_hash,
+      nowIso,
+      effect.finish ? 1 : 0,
+      nowIso,
+      writePublicFailureStage ? 1 : 0,
+      effect.publicFailureStage ?? null,
+      writeResultClass ? 1 : 0,
+      effect.resultClass ?? null,
+      writeCancellationReason ? 1 : 0,
+      effect.cancellationReason ?? null,
+      writeRetention ? 1 : 0,
+      effect.retentionExpiresAt?.toISOString() ?? null,
+      job.generation_id,
+      job.stage_generation,
+    ),
+  ];
+
+  if (effect.releaseUnconsumedClaim) {
+    mutations.push(
+      env.DB.prepare(
+        `UPDATE pattern_generation_claims
+         SET status = 'available', active_generation_id = NULL, updated_at = ?
+         WHERE id = ? AND status = 'reserved' AND consumed_at IS NULL
+           AND active_generation_id = ?`,
+      ).bind(nowIso, job.claim_id, job.generation_id),
+    );
+  }
+
+  return { effect, guards: ownershipProbes(env, job, token), mutations };
+}
+
+export async function commitPatternTransition(
+  env: Pick<Env, "DB">,
+  job: PatternJobRow,
+  token: string,
+  transition: Exclude<PatternTransition, { kind: "publish" }>,
+  now = new Date(),
+): Promise<PatternTransitionEffect | null> {
+  try {
+    const statements = buildPatternTransitionStatements(env, job, token, transition, now);
+    await env.DB.batch([...statements.guards, ...statements.mutations]);
+    return statements.effect;
+  } catch {
+    return null;
   }
 }
