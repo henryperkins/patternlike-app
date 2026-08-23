@@ -2601,12 +2601,15 @@ describe("ontology pipeline execution", () => {
     ).first()).toEqual({ regression_calls: 2 });
   }, 60_000);
 
-  it("makes a prohibited claim hard-gate failure terminal before signing", async () => {
+  it("routes a prohibited claim through the remaining writer correction loop", async () => {
     const { fixture, publisher } = await driveActivationToRegression();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let writerCalls = 0;
     const patternPublisher = new FakeRegressionPatternPublisher((writer) => {
-      writer.chapters[0]!.sections[0]!.text =
-        "This placement guarantees a future medical diagnosis.";
+      writerCalls += 1;
+      if (writerCalls === 1) {
+        writer.chapters[0]!.sections[0]!.text +=
+          " This placement guarantees a future medical diagnosis.";
+      }
     });
     expect(await deliver(
       fixture,
@@ -2628,10 +2631,10 @@ describe("ontology pipeline execution", () => {
       undefined,
       fixture.pipelineEnv,
       patternPublisher,
-    )).toEqual({ status: "terminal" });
+    )).toEqual({ status: "advanced" });
     expect(await runRow(fixture.runId)).toMatchObject({
-      stage: "failed",
-      failure_class: "regression_failed",
+      stage: "regressing",
+      failure_class: null,
       regression_report_hash: null,
       bundle_hash: null,
     });
@@ -2659,11 +2662,120 @@ describe("ontology pipeline execution", () => {
       ),
     );
     expect(JSON.parse(new TextDecoder().decode(result!.plaintext))).toMatchObject({
-      result: {
-        accepted: false,
-        hard_gate_failures: ["prohibited_claim"],
+      complete: false,
+      phase: "writer",
+      correction: {
+        attempt: 1,
+        items: [{
+          code: "prohibited_claim",
+          origin: "deterministic",
+        }],
       },
     });
+
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "advanced" });
+    const correctedWriterInput = patternPublisher.writeInvocations.mock.calls[1]![0] as {
+      correction?: {
+        attempt: number;
+        items: Array<{ code: string; origin: string }>;
+        preserve: { plan_hash: string };
+      };
+    };
+    expect(correctedWriterInput.correction).toMatchObject({
+      attempt: 1,
+      items: [{ code: "prohibited_claim", origin: "deterministic" }],
+      preserve: { plan_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/) },
+    });
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "regressing",
+      failure_class: null,
+      regression_report_hash: null,
+      bundle_hash: null,
+    });
+    expect(patternPublisher.providerCalls).toBe(5);
+    const correctedResultRow = await env.DB.prepare(
+      `SELECT stage_generation, stage_attempt FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'regression_result'
+       ORDER BY stage_generation DESC LIMIT 1`,
+    ).bind(fixture.runId).first<{
+      stage_generation: number;
+      stage_attempt: number;
+    }>();
+    const correctedResult = await readOntologyPipelineArtifact(
+      fixture.pipelineEnv,
+      coordinate(
+        fixture.runId,
+        "regressing",
+        correctedResultRow!.stage_generation,
+        correctedResultRow!.stage_attempt,
+        "regression_result",
+      ),
+    );
+    expect(JSON.parse(new TextDecoder().decode(correctedResult!.plaintext))).toMatchObject({
+      complete: true,
+      phase: "complete",
+      result: {
+        accepted: true,
+        hard_gate_failures: [],
+        provider_calls: 5,
+      },
+    });
+    expect(await env.DB.prepare(
+      `SELECT regression_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ regression_calls: 5 });
+  }, 60_000);
+
+  it("keeps a prohibited claim terminal after writer corrections are exhausted", async () => {
+    const { fixture, publisher } = await driveActivationToRegression();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const patternPublisher = new FakeRegressionPatternPublisher((writer) => {
+      writer.chapters[0]!.sections[0]!.text +=
+        " This placement guarantees a future medical diagnosis.";
+    });
+
+    for (let delivery = 0; delivery < 6; delivery += 1) {
+      expect(await deliver(
+        fixture,
+        publisher,
+        undefined,
+        fixture.pipelineEnv,
+        patternPublisher,
+      )).toEqual({ status: "advanced" });
+    }
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "terminal" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "regression_failed",
+      regression_report_hash: null,
+      bundle_hash: null,
+    });
+    expect(patternPublisher.providerCalls).toBe(7);
+    expect(await env.DB.prepare(
+      `SELECT regression_calls FROM pattern_ontology_provider_daily_usage`,
+    ).first()).toEqual({ regression_calls: 7 });
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class IN ('unsigned_bundle', 'signed_bundle')`,
+    ).bind(fixture.runId).first()).toEqual({ count: 0 });
     expect(warn).toHaveBeenCalledWith(
       "ontology_regression_hard_gate_failed",
       {

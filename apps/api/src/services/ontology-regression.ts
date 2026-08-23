@@ -886,6 +886,28 @@ export async function applyOntologyRegressionPass(input: {
     ontology: input.ontology,
     sourceFragmentIds: input.sourceFragmentIds,
   });
+  if (
+    hardGateFailures.length === 1 &&
+    hardGateFailures[0] === "prohibited_claim" &&
+    state.writer_calls < 3
+  ) {
+    return {
+      ...state,
+      phase: "writer",
+      candidate: null,
+      correction: buildCorrectionDocument(
+        state.plan,
+        {
+          deterministic: [{
+            code: "prohibited_claim",
+            message: "",
+          }],
+        },
+        state.writer_calls,
+      ),
+      verifier_calls_for_candidate: 0,
+    };
+  }
   return finishRegressionFixture(
     state,
     input.fixture,

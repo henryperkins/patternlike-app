@@ -356,6 +356,182 @@ describe("M7 ontology activation regression", () => {
     });
   });
 
+  it("returns a post-verifier prohibited claim to the remaining writer correction loop", async () => {
+    const corpus = loadOntologyRegressionCorpus();
+    const fixture = corpus.fixtures[0]!;
+    const ontology = corpus.manifest.reference_ontology_records;
+    let state = createOntologyRegressionFixtureState(0, fixture);
+
+    const plannerInput = prepareOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      inputMaxBytes: 98_304,
+    });
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "planner",
+      value: buildDeterministicPlan(plannerInput.selection.packet, ontology),
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "planner",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+        provider_request_id: "planner-hard-gate-correction",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"b".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+
+    const writerInput = prepareOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      inputMaxBytes: 98_304,
+    });
+    const prohibitedWriter = buildDeterministicWriterOutput(
+      state.plan!,
+      writerInput.selection.packet,
+      ontology,
+    );
+    prohibitedWriter.chapters[0]!.sections[0]!.text +=
+      " The chart guarantees a future diagnosis.";
+    expect(validatePatternCandidate(
+      prohibitedWriter,
+      state.plan!,
+      writerInput.selection.packet,
+      ontology,
+    )).toMatchObject({ ok: true });
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "writer",
+      value: prohibitedWriter,
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "writer",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+        provider_request_id: "writer-hard-gate-correction",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"c".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "verifier",
+      value: evaluateSemanticVerdict(prohibitedWriter, { forceReject: false }),
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "verifier",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0-verifier",
+        provider_request_id: "verifier-hard-gate-correction",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"d".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+
+    expect(state).toMatchObject({
+      complete: false,
+      phase: "writer",
+      writer_calls: 1,
+      verifier_calls_for_candidate: 0,
+      provider_calls: 3,
+      candidate: null,
+      correction: {
+        attempt: 1,
+        items: [{
+          code: "prohibited_claim",
+          origin: "deterministic",
+          target_key: null,
+          feature_aliases: [],
+          ontology_rule_ids: [],
+        }],
+      },
+    });
+  });
+
+  it("does not retry another hard gate alone or combined with a prohibited claim", async () => {
+    const corpus = loadOntologyRegressionCorpus();
+    const fixture = corpus.fixtures[0]!;
+    const cases = [
+      {
+        writer: structuredClone(fixture.chain.writer),
+        hardGateFailures: ["source_dependency_failure"],
+      },
+      {
+        writer: structuredClone(fixture.chain.writer),
+        hardGateFailures: ["prohibited_claim", "source_dependency_failure"],
+      },
+    ];
+    cases[1]!.writer.chapters[0]!.sections[0]!.text +=
+      " The chart guarantees a future diagnosis.";
+
+    for (const [index, testCase] of cases.entries()) {
+      const state = {
+        ...createOntologyRegressionFixtureState(0, fixture),
+        phase: "verifier" as const,
+        planner_calls: 1,
+        writer_calls: 1,
+        provider_calls: 2,
+        input_tokens: 2,
+        output_tokens: 2,
+        plan: fixture.chain.plan,
+        candidate: testCase.writer,
+      };
+      const next = await applyOntologyRegressionPass({
+        state,
+        fixture,
+        ontology: corpus.manifest.reference_ontology_records,
+        sourceFragmentIds: new Set(),
+        pass: "verifier",
+        value: fixture.chain.verdict,
+        deliveryAttempt: 0,
+        metadata: {
+          provider: "openai",
+          pass: "verifier",
+          model: "gpt-5.6-sol",
+          prompt_version: "1.0.0-verifier",
+          provider_request_id: `verifier-other-hard-gate-${index}`,
+          input_tokens: 1,
+          output_tokens: 1,
+          provider_response_hash: `sha256:${"e".repeat(64)}`,
+        },
+        ontologyVersion: "ontology-regression-test",
+      });
+
+      expect(next).toMatchObject({
+        complete: true,
+        phase: "complete",
+        correction: null,
+        provider_calls: 3,
+        result: {
+          accepted: false,
+          hard_gate_failures: testCase.hardGateFailures,
+        },
+      });
+    }
+  });
+
   it("enforces 2 planner + 3 writer + 3×2 verifier and resets verifier scope", async () => {
     const corpus = loadOntologyRegressionCorpus();
     const fixture = corpus.fixtures[0]!;
