@@ -54,13 +54,13 @@ The lifecycle service's bulk consent, correction, and recall cancellation SQL is
 **Files:**
 - Create: `apps/api/src/services/pattern-stage-protocol.ts`
 - Create: `apps/api/src/services/pattern-stage-protocol.test.ts`
-- Modify: `apps/api/src/services/pattern-command.ts:1-131`
-- Modify: `apps/api/src/services/pattern-enqueue.ts:29-35`
-- Modify: `apps/api/src/services/pattern-state.ts:21-26`
-- Modify: `apps/api/src/services/pattern-sweep.ts:1`
-- Modify: `apps/api/src/routes/pattern-ai.ts:24-29`
-- Modify: `apps/api/src/services/pattern-execute.ts:23-45,192-287,304-335`
-- Modify: `apps/api/src/services/pattern-execute-protocol.test.ts:42-52`
+- Modify: `apps/api/src/services/pattern-command.ts` — stage/public-stage declarations
+- Modify: `apps/api/src/services/pattern-enqueue.ts` — stage imports and stored-reservation annotations
+- Modify: `apps/api/src/services/pattern-state.ts` — stage/public-stage imports
+- Modify: `apps/api/src/services/pattern-sweep.ts` — stage imports and reconciliation classification
+- Modify: `apps/api/src/routes/pattern-ai.ts` — stage/public-stage imports
+- Modify: `apps/api/src/services/pattern-execute.ts` — protocol metadata, artifact identity, job row, and stage dispatch
+- Modify: `apps/api/src/services/pattern-execute-protocol.test.ts` — executor/protocol import block
 
 **Interfaces:**
 - Consumes: `PatternStageClass` from `pattern-publisher.ts`, `PatternPublicStage` and `sha256Hex` from `@patternlike/shared`.
@@ -907,11 +907,11 @@ git commit -m "api: define Pattern stage protocol"
 **Files:**
 - Modify: `apps/api/src/services/pattern-stage-protocol.ts`
 - Modify: `apps/api/src/services/pattern-stage-protocol.test.ts`
-- Modify: `apps/api/src/services/pattern-execute.ts:304-335,808-1090,1148-1174,1178-1741`
-- Modify: `apps/api/src/services/pattern-execute-protocol.test.ts:42-52,546-580`
-- Modify: `apps/api/src/services/pattern-execute-openai.test.ts:33`
-- Modify: `apps/api/src/services/pattern-sweep.ts:125-180,255-300`
-- Modify: `apps/api/src/routes/pattern-ai.integration.test.ts:13-25,430-465,900-970`
+- Modify: `apps/api/src/services/pattern-execute.ts` — job loading, ownership/transition helpers, failure handling, and stage outcomes
+- Modify: `apps/api/src/services/pattern-execute-protocol.test.ts` — import block and `writes a genuine retry...`
+- Modify: `apps/api/src/services/pattern-execute-openai.test.ts` — job-loader import
+- Modify: `apps/api/src/services/pattern-sweep.ts` — `failExhaustedPatternJob()` and expired-lease query
+- Modify: `apps/api/src/routes/pattern-ai.integration.test.ts` — transition imports, stale-transition tests, and stage-claim ceiling tests
 
 **Interfaces:**
 - Consumes: `PatternTransition` and `planPatternTransition` from Task 1; `PATTERN_JOB_TYPE` from `pattern-command.ts`; `Env` from `env.ts`.
@@ -1098,6 +1098,11 @@ export async function commitPatternTransition(
 ```
 
 The generalized SQL deliberately writes the pure planner's exact next counters and hashes. It does not use `counter = counter + 1` or `stage_generation = stage_generation + 1`; those decisions exist only in `planPatternTransition`. Returning the committed effect lets queue nudges use `nextQueueCoordinate.stageGeneration` without recomputing `+1` in the executor.
+
+Preserve the current transition-helper failure behavior: a rejected guarded D1
+batch returns `null` (formerly `false`) without adding a new transition-specific
+log. The baseline helpers contain no `skipped pattern transition` logger to
+retain; adding one would be a separate observability change.
 
 - [ ] **Step 5: Migrate executor outcomes to the typed commit**
 
@@ -1426,8 +1431,8 @@ git commit -m "api: centralize Pattern stage transitions"
 **Files:**
 - Modify: `apps/api/src/services/pattern-stage-protocol.ts`
 - Modify: `apps/api/src/services/pattern-stage-protocol.test.ts`
-- Modify: `apps/api/src/services/pattern-execute.ts:1745-1894`
-- Modify: `apps/api/src/services/pattern-execute-protocol.test.ts:281-343`
+- Modify: `apps/api/src/services/pattern-execute.ts` — `publishPattern()`
+- Modify: `apps/api/src/services/pattern-execute-protocol.test.ts` — `adopts the write-ahead publication intent after a D1 failure`
 
 **Interfaces:**
 - Consumes: `PatternTransitionStatements` and the `publish` transition from Tasks 1 and 2.
@@ -1435,13 +1440,16 @@ git commit -m "api: centralize Pattern stage transitions"
 
 - [ ] **Step 1: Add a failing composable-publication test**
 
-In `pattern-stage-protocol.test.ts`, use the Cloudflare test `env` and a complete `PatternJobRow` fixture to require statement composition without executing a partial publication:
+In `pattern-stage-protocol.test.ts`, add `vi` to the existing Vitest import, use
+the Cloudflare test `env`, and define a complete `PatternJobRow` fixture:
 
 ```ts
+import { describe, expect, it, vi } from "vitest";
 import { env } from "cloudflare:test";
 import {
   buildPatternTransitionStatements,
   commitPatternTransition,
+  type PatternTransition,
   type PatternJobRow,
 } from "./pattern-stage-protocol.js";
 
@@ -1458,12 +1466,32 @@ const publicationJob: PatternJobRow = {
   locale_revision: 1,
 };
 
+const publicationTransition = {
+  kind: "publish",
+  candidateHash: "candidate-a",
+  semanticVerdictHash: "verdict-a",
+} as const satisfies PatternTransition;
+
+type StandalonePatternTransition = Parameters<typeof commitPatternTransition>[3];
+// @ts-expect-error publication must be composed into the enclosing D1 batch
+const illegalStandaloneTransition: StandalonePatternTransition = publicationTransition;
+void illegalStandaloneTransition;
+
+const standalonePrepare = vi.fn();
+const standaloneBatch = vi.fn();
+const standaloneEnv = {
+  DB: {
+    prepare: standalonePrepare,
+    batch: standaloneBatch,
+  } as unknown as D1Database,
+};
+
 it("builds guarded publication mutations without committing them alone", () => {
   const statements = buildPatternTransitionStatements(
     env,
     publicationJob,
     "clm_protocol",
-    { kind: "publish", candidateHash: "candidate-a", semanticVerdictHash: "verdict-a" },
+    publicationTransition,
     at,
   );
   expect(statements.effect.next).toMatchObject({
@@ -1477,19 +1505,25 @@ it("builds guarded publication mutations without committing them alone", () => {
   expect(statements.mutations).toHaveLength(2);
 });
 
-it("refuses to commit publication outside its enclosing transaction", async () => {
+it("currently resolves null before D1 when the publication builder refuses standalone commit", async () => {
+  standalonePrepare.mockClear();
+  standaloneBatch.mockClear();
   await expect(commitPatternTransition(
-    env,
+    standaloneEnv,
     publicationJob,
     "clm_protocol",
-    { kind: "publish", candidateHash: "candidate-a", semanticVerdictHash: "verdict-a" } as never,
+    publicationTransition as never,
     at,
-  )).rejects.toThrow("publish transition requires atomic publication composition");
+  )).resolves.toBeNull();
+  expect(standalonePrepare).not.toHaveBeenCalled();
+  expect(standaloneBatch).not.toHaveBeenCalled();
 });
 ```
 
-The `as never` is deliberate test-only evidence that the public TypeScript
-signature rejects this call while the runtime boundary also fails closed.
+The `@ts-expect-error` assignment is the type-level contract: if standalone
+commit ever accepts `publish`, typechecking fails because the directive becomes
+unused. The `as never` on the call deliberately bypasses that compile-time
+boundary only so the separate runtime behavior can be characterized.
 
 - [ ] **Step 2: Run the publication-unit test and verify the deliberate refusal**
 
@@ -1501,9 +1535,9 @@ npm exec -w @patternlike/api -- vitest run \
   -t "publication"
 ```
 
-Expected: both new tests FAIL: the builder still throws instead of returning
-composable statements, while standalone commit still catches that error and
-resolves `null` instead of enforcing the explicit runtime refusal.
+Expected: the composable-builder test FAILS because the builder still throws.
+The standalone-commit characterization PASSES: Task 2 catches the builder error,
+resolves `null`, and calls neither `DB.prepare` nor `DB.batch`.
 
 - [ ] **Step 3: Permit publish in the statement builder but not standalone commit**
 
@@ -1528,6 +1562,25 @@ export async function commitPatternTransition(
     return null;
   }
 }
+```
+
+Now change the standalone runtime test from its Task 2 characterization to the
+final contract, retaining both no-D1 assertions:
+
+```ts
+it("throws before D1 when publication is passed to standalone commit", async () => {
+  standalonePrepare.mockClear();
+  standaloneBatch.mockClear();
+  await expect(commitPatternTransition(
+    standaloneEnv,
+    publicationJob,
+    "clm_protocol",
+    publicationTransition as never,
+    at,
+  )).rejects.toThrow("publish transition requires atomic publication composition");
+  expect(standalonePrepare).not.toHaveBeenCalled();
+  expect(standaloneBatch).not.toHaveBeenCalled();
+});
 ```
 
 This makes the only publication path compositional: callers can place the two ownership guards and two job mutations inside a larger D1 batch, but cannot mark a job succeeded in a separate transaction through `commitPatternTransition()`.
@@ -1684,7 +1737,7 @@ git commit -m "api: compose publication through stage protocol"
 ### Task 4: Remove Duplicate Authority and Run the PR2 Gate
 
 **Files:**
-- Modify: `apps/api/src/services/pattern-execute.ts:150-190`
+- Modify: `apps/api/src/services/pattern-execute.ts` — durable-delivery ownership header
 - Verify: `apps/api/src/services/pattern-stage-protocol.ts`
 - Verify: `apps/api/src/services/pattern-stage-protocol.test.ts`
 - Verify: `apps/api/src/services/pattern-execute-protocol.test.ts`
@@ -1752,6 +1805,19 @@ rg -n "const attempt = claimed\.job\.(planner_attempts|writer_attempts|verifier_
 Expected: no output. All provider and artifact coordinates come from
 `patternAttemptCoordinate()`.
 
+Run:
+
+```bash
+if rg -n "planPatternLifecycleCancellation" apps/api/src; then
+  echo "unexpected PR2 lifecycle planner"
+  exit 1
+fi
+```
+
+Expected: exit zero with no output. PR2 does not add a lifecycle-cancellation planner or claim
+that bulk lifecycle cancellation is protocol-owned; that path remains the
+explicit PR3 exception.
+
 - [ ] **Step 3: Run the complete PR2 targeted gate**
 
 Run:
@@ -1776,7 +1842,12 @@ Run:
 
 ```bash
 git diff --check
-git diff --exit-code a35101d -- db/d1 contracts/m7 packages/shared/src/m7-types.ts apps/api/wrangler.toml
+git diff --exit-code a35101d -- \
+  db/d1 \
+  contracts/m7 \
+  packages/shared/src/m7-types.ts \
+  apps/api/wrangler.toml \
+  apps/api/src/services/pattern-lifecycle.ts
 git show HEAD:apps/api/wrangler.toml | rg -n '^PATTERN_AI_ROLLOUT = "off"$'
 git status --short
 ```
@@ -1784,7 +1855,7 @@ git status --short
 Expected:
 
 - no whitespace errors;
-- no D1, M7 contract, public M7 type, or Wrangler changes;
+- no D1, M7 contract, public M7 type, Wrangler, or bulk lifecycle changes;
 - exactly two committed `PATTERN_AI_ROLLOUT = "off"` values; and
 - the feature worktree has no uncommitted PR2 files after the planned commits; the original shared checkout's unrelated user files were never copied, staged, or modified by this work.
 
@@ -1802,7 +1873,8 @@ If Task 3 already included the exact final header and there is no diff, do not c
 
 ## Pull Request 2 Review Checklist
 
-- [ ] `pattern-stage-protocol.ts` is the only module defining pass-to-counter, pass-to-artifact, domain-to-public-stage, and durable-executor transition-to-stage-generation mappings; bulk lifecycle cancellation remains the explicit pull-request-3 exception documented in the file map.
+- [ ] `pattern-stage-protocol.ts` is the only module defining pass-to-counter, pass-to-artifact, domain-to-public-stage, and durable-executor transition-to-stage-generation mappings.
+- [ ] PR2 does not define `planPatternLifecycleCancellation` or map bulk lifecycle cancellation into the protocol; `pattern-lifecycle.ts` remains unchanged as the explicit pull-request-3 exception.
 - [ ] `pattern-execute.ts` chooses typed transitions and performs orchestration; it does not contain an independent transition table or counter-mutating SQL.
 - [ ] Planner success keeps `planner_attempts` unchanged.
 - [ ] Writer success keeps `writer_attempts` unchanged and resets `verifier_attempts` to zero.
