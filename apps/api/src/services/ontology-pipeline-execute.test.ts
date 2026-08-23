@@ -19,6 +19,9 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  APPROVED_COVERAGE_HINT_CORPUS_HASH,
+  APPROVED_COVERAGE_HINT_FRAGMENT_ID,
+  buildApprovedCoverageHintCorpusManifest,
   buildTestCorpusManifest,
   testOntologyPipelineArtifactKeyring,
   type TestCorpusManifest,
@@ -37,6 +40,9 @@ import {
 import {
   enqueueOntologyPipelineRun,
 } from "./ontology-pipeline-enqueue.js";
+import {
+  buildOntologyPipelineCommand,
+} from "./ontology-pipeline-command.js";
 import {
   readOntologyPipelineArtifact,
   type OntologyPipelineArtifactClass,
@@ -317,7 +323,7 @@ async function providerSuccess<T>(
       provider: "openai",
       pass,
       model: "gpt-5.6-sol",
-      prompt_version: pass === "generator" ? "1.0.3" : "1.0.0-evaluator",
+      prompt_version: pass === "generator" ? "1.0.4" : "1.0.0-evaluator",
       provider_request_id: `resp_task_6_${pass}_${call}`,
       input_tokens: 11,
       output_tokens: 7,
@@ -402,7 +408,7 @@ function configuredEnv(
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
     OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
-    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.3",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.4",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
@@ -457,11 +463,13 @@ async function reserveFixture(
     dailyLimit?: number;
     clockStartMs?: number;
     allowedTransformations?: PatternTransformationClass[];
+    manifest?: TestCorpusManifest;
   } = {},
 ): Promise<ReservedFixture> {
   const suffix = crypto.randomUUID();
-  const releaseId = `corpus-task-6-${suffix}`;
-  const manifest = await buildTestCorpusManifest(
+  const releaseId =
+    options.manifest?.corpus_release_id ?? `corpus-task-6-${suffix}`;
+  const manifest = options.manifest ?? await buildTestCorpusManifest(
     releaseId,
     "en-US",
     "internal_synthetic",
@@ -999,6 +1007,161 @@ describe("ontology pipeline execution", () => {
       stage_generation: 4,
     });
     expect(publisher.generatorProviderCalls).toBe(2);
+  });
+
+  it("sends the frozen stellium bridge unchanged to a pattern-only continuation", async () => {
+    const manifest = await buildApprovedCoverageHintCorpusManifest();
+    expect(manifest.corpus_hash).toBe(APPROVED_COVERAGE_HINT_CORPUS_HASH);
+    const fixture = await reserveFixture({ manifest });
+    const mappedPatternRecord = {
+      ...fixture.records[2]!,
+      feature_predicate: { type: "pattern" as const, pattern: "stellium" as const },
+      source_fragment_ids: [APPROVED_COVERAGE_HINT_FRAGMENT_ID],
+    };
+    const firstChunkRecords = fixture.records.filter((_, index) => index !== 2);
+    const publisher = new FakeOntologyPublisher([
+      {
+        schema_version: "0.7.0",
+        records: firstChunkRecords,
+        complete: true,
+      },
+      {
+        schema_version: "0.7.0",
+        records: [mappedPatternRecord],
+        complete: true,
+      },
+    ]);
+
+    await driveToGenerating(fixture, publisher);
+    expect(await deliver(fixture, publisher)).toEqual({ status: "advanced" });
+    expect(await deliver(fixture, publisher)).toEqual({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "compiling",
+      stage_cursor: 0,
+      failure_class: null,
+    });
+    expect(publisher.generateInvocations).toHaveBeenCalledTimes(2);
+    const firstPacket = publisher.generateInvocations.mock.calls[0]![0] as {
+      document: Record<string, unknown>;
+    };
+    const secondPacket = publisher.generateInvocations.mock.calls[1]![0] as {
+      document: {
+        continuation: { remaining_coverage_targets: unknown[] };
+        coverage_source_hints: unknown[];
+      };
+    };
+    expect(secondPacket.document.continuation.remaining_coverage_targets)
+      .toEqual([{
+        feature_class: "pattern",
+        minimum_source_supported: 1,
+        minimum_total: 1,
+      }]);
+    expect(secondPacket.document.coverage_source_hints).toEqual([{
+      feature_class: "pattern",
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_ID,
+      feature_predicate: { type: "pattern", pattern: "stellium" },
+    }]);
+    expect(canonicalJson(firstPacket.document.coverage_source_hints)).toBe(
+      canonicalJson(secondPacket.document.coverage_source_hints),
+    );
+    expect(mappedPatternRecord.feature_predicate).not.toHaveProperty("body");
+  });
+
+  it("rejects any frozen coverage-hint mapping drift before a provider request", async () => {
+    const manifest = await buildApprovedCoverageHintCorpusManifest();
+    await registerOntologyCorpus(env, manifest);
+    const otherExistingFragmentId = manifest.fragments.find((fragment) =>
+      fragment.id !== APPROVED_COVERAGE_HINT_FRAGMENT_ID
+    )!.id;
+    type FrozenCommand = {
+      command_version: string;
+      generator_input: {
+        coverage_source_hints: Array<{
+          source_fragment_id: string;
+          feature_predicate: { type: string; pattern: string };
+        }>;
+      };
+    };
+    const mutators: Array<(command: FrozenCommand) => void> = [
+      (command) => {
+        command.generator_input.coverage_source_hints[0]!.source_fragment_id =
+          `srcf_${"f".repeat(32)}`;
+      },
+      (command) => {
+        command.generator_input.coverage_source_hints[0]!.source_fragment_id =
+          otherExistingFragmentId;
+      },
+      (command) => {
+        command.generator_input.coverage_source_hints[0]!
+          .feature_predicate.pattern = "grand_trine";
+      },
+      (command) => {
+        command.generator_input.coverage_source_hints = [];
+      },
+      (command) => {
+        command.command_version = "OntologyPipelineCommandV2";
+      },
+    ];
+
+    for (const mutate of mutators) {
+      const suffix = crypto.randomUUID();
+      const { queue } = fakeQueue();
+      const pipelineEnv = configuredEnv(queue);
+      const clock = new TestClock();
+      const version = `ontology-task-6-tamper-${suffix}`;
+      const command = await buildOntologyPipelineCommand(
+        pipelineEnv,
+        manifest.corpus_release_id,
+        version,
+      ) as unknown as FrozenCommand;
+      mutate(command);
+      const configurationJson = canonicalJson(command);
+      const runId = `oprun_hint_tamper_${suffix}`;
+      const at = clock.now().toISOString();
+      await env.DB.prepare(
+        `INSERT INTO pattern_ontology_pipeline_runs (
+           run_id, idempotency_key, corpus_release_id, corpus_hash,
+           candidate_ontology_version, configuration_json, configuration_hash,
+           stage, stage_generation, stage_cursor, stage_attempt,
+           claim_token, lease_expires_at, available_at, dispatched_at,
+           failure_class, candidate_hash, compilation_report_hash,
+           evaluation_report_hash, regression_report_hash, bundle_hash,
+           failed_artifact_expires_at, created_at, updated_at,
+           finished_at, succeeded_at, failed_at
+         ) VALUES (
+           ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0,
+           NULL, NULL, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+           ?, ?, NULL, NULL, NULL
+         )`,
+      ).bind(
+        runId,
+        `task-6-hint-tamper-${suffix}`,
+        manifest.corpus_release_id,
+        manifest.corpus_hash,
+        version,
+        configurationJson,
+        await contentHash(configurationJson),
+        at,
+        at,
+        at,
+      ).run();
+      const fixture: ReservedFixture = {
+        pipelineEnv,
+        manifest,
+        records: pipelineRecords(manifest.fragments[0]!.id),
+        runId,
+        version,
+        clock,
+      };
+      const publisher = new FakeOntologyPublisher([]);
+
+      expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+      expect(await runRow(fixture.runId)).toMatchObject({
+        stage: "failed",
+        failure_class: "configuration_invalid",
+      });
+      expect(publisher.generateInvocations).not.toHaveBeenCalled();
+    }
   });
 
   it("stores a valid non-covering chunk then closes stalled generation without another request", async () => {

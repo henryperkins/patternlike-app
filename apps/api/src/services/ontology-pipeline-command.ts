@@ -24,10 +24,14 @@ import {
   readRegisteredOntologyCorpus,
   type OntologyCorpusLicenseClass,
 } from "./ontology-corpus.js";
+import {
+  buildOntologyCoverageSourceHints,
+  type OntologyCoverageSourceHint,
+} from "./ontology-coverage-source-hints.js";
 import type { OntologyCoverageTarget } from "./ontology-packet.js";
 
 export const ONTOLOGY_PIPELINE_COMMAND_VERSION =
-  "OntologyPipelineCommandV2" as const;
+  "OntologyPipelineCommandV3" as const;
 export const ONTOLOGY_COMPILER_POLICY_VERSION = "1.0.0" as const;
 export const ONTOLOGY_REGRESSION_POLICY_VERSION = "1.0.0" as const;
 export const ONTOLOGY_PROHIBITED_CLAIM_POLICY_VERSION = "1.0.0" as const;
@@ -90,6 +94,7 @@ export interface OntologyPipelineCommand {
   generator_input: {
     feature_vocabulary: readonly NatalFeatureClass[];
     coverage_targets: readonly OntologyCoverageTarget[];
+    coverage_source_hints: readonly OntologyCoverageSourceHint[];
     active_machine_predecessor: OntologyPipelinePredecessorReference | null;
   };
   input_max_bytes: number;
@@ -203,6 +208,10 @@ export async function buildOntologyPipelineCommand(
     fail("ontology_pipeline_not_enabled");
   }
   const corpus = await readRegisteredOntologyCorpus(env, corpusReleaseId);
+  const coverageSourceHints = buildOntologyCoverageSourceHints(corpus);
+  if (!coverageSourceHints.ok) {
+    fail("ontology_pipeline_coverage_source_hint_invalid");
+  }
   const activeMachinePredecessor = machinePredecessorReference(
     await loadActiveOntology(env),
   );
@@ -240,6 +249,7 @@ export async function buildOntologyPipelineCommand(
         minimum_source_supported: target.minimum_source_supported,
         minimum_total: target.minimum_total,
       })),
+      coverage_source_hints: coverageSourceHints.hints,
       active_machine_predecessor: activeMachinePredecessor,
     },
     input_max_bytes: pin.input_max_bytes,

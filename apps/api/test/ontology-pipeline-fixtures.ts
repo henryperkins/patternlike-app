@@ -3,6 +3,14 @@ import {
   contentHash,
   type PatternTransformationClass,
 } from "@patternlike/shared";
+import authoredOntologyFragments from "../../../pattern-corpus/fragments.json";
+
+export const APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID =
+  "pattern-ontology-source-manual-en-us-0.1.0";
+export const APPROVED_COVERAGE_HINT_CORPUS_HASH =
+  "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c";
+export const APPROVED_COVERAGE_HINT_FRAGMENT_ID =
+  "srcf_70a53d65d1e84c127bd1249147a880d9";
 
 export type TestCorpusLicenseClass =
   | "licensed_excerpt"
@@ -18,6 +26,11 @@ export interface TestCorpusManifest {
     id: string;
     corpus_release_id: string;
     locale: string;
+    title?: string;
+    author?: string;
+    edition?: string;
+    location?: string;
+    exclusions?: string[];
     normalized_proposition: string;
     excerpt: string;
     license_class: TestCorpusLicenseClass;
@@ -118,6 +131,56 @@ export async function buildTestCorpusManifest(
         ],
       },
     ],
+  };
+  return {
+    ...body,
+    corpus_hash: await contentHash(canonicalJson(body)),
+  };
+}
+
+async function sourceFragmentId(
+  corpusReleaseId: string,
+  reference: string,
+): Promise<string> {
+  const identity = [
+    "pattern-source-fragment-v1",
+    corpusReleaseId,
+    reference,
+  ].join("\n");
+  return `srcf_${(await contentHash(identity)).slice("sha256:".length, 39)}`;
+}
+
+/** Build the checked-in authorized corpus without asserting or logging prose. */
+export async function buildApprovedCoverageHintCorpusManifest(): Promise<
+  TestCorpusManifest
+> {
+  const authored = [...authoredOntologyFragments].sort((left, right) =>
+    left.ref.localeCompare(right.ref)
+  );
+  const fragments = await Promise.all(authored.map(async (fragment) => ({
+    id: await sourceFragmentId(
+      APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+      fragment.ref,
+    ),
+    corpus_release_id: APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+    locale: fragment.locale,
+    title: fragment.title,
+    author: fragment.author,
+    edition: fragment.edition,
+    location: fragment.location,
+    exclusions: [...fragment.exclusions],
+    normalized_proposition: fragment.normalized_proposition,
+    excerpt: fragment.excerpt,
+    license_class: fragment.license_class as TestCorpusLicenseClass,
+    allowed_transformations:
+      [...fragment.allowed_transformations] as PatternTransformationClass[],
+  })));
+  const body = {
+    schema_version: "0.7.0" as const,
+    corpus_release_id: APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+    locale: "en-US",
+    license_resolved: true as const,
+    fragments,
   };
   return {
     ...body,

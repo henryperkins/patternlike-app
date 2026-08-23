@@ -4,7 +4,7 @@ import {
   canonicalJson,
   type PatternOntologyRelease,
 } from "@patternlike/shared";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   IDENTITY_A,
   USER_A,
@@ -23,6 +23,8 @@ import {
   type ReleaseSigningKey,
 } from "../../test/content-release-fixtures.js";
 import {
+  APPROVED_COVERAGE_HINT_CORPUS_HASH,
+  APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
   buildTestCorpusManifest,
   buildTestEvaluationArtifact,
   buildTestEvaluationReport,
@@ -296,7 +298,7 @@ describe("POST /internal/ontology-pipeline-runs", () => {
     env.ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1";
     env.OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol";
     env.OPENAI_ONTOLOGY_GENERATOR_REASONING = "high";
-    env.OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.3";
+    env.OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.4";
     env.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "120000";
     env.OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = "8000";
     env.OPENAI_ONTOLOGY_EVALUATOR_MODEL = "gpt-5.6-sol";
@@ -332,6 +334,7 @@ describe("POST /internal/ontology-pipeline-runs", () => {
     env.OPENAI_CREDENTIAL_SOURCE = "";
     env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING = "";
     env.OPENAI_API_KEY = "";
+    vi.restoreAllMocks();
   });
 
   it("reserves and dispatches a registered corpus through the service-authenticated route", async () => {
@@ -510,6 +513,45 @@ describe("POST /internal/ontology-pipeline-runs", () => {
         request_id: expect.any(String),
       },
     });
+  });
+
+  it("maps a stale approved coverage-hint corpus to the closed command response", async () => {
+    const staleCorpus = await buildTestCorpusManifest(
+      APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+      "en-US",
+      "licensed_excerpt",
+    );
+    expect(staleCorpus.corpus_hash).not.toBe(
+      APPROVED_COVERAGE_HINT_CORPUS_HASH,
+    );
+    expect((await postCorpus(staleCorpus)).status).toBe(201);
+    const dispatch = vi.spyOn(env.ONTOLOGY_PIPELINE_QUEUE, "send");
+
+    const response = await SELF.fetch(
+      "http://api.test/internal/ontology-pipeline-runs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: "rollout-stale-coverage-hint-corpus",
+          corpus_release_id: APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+          candidate_ontology_version: "ontology-stale-coverage-hint-corpus",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "ontology_pipeline_command_invalid",
+        message: "Pipeline run command is invalid",
+        request_id: expect.any(String),
+      },
+    });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_runs",
+    ).first<{ count: number }>()).toEqual({ count: 0 });
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("refuses a run whose corpus was not registered", async () => {

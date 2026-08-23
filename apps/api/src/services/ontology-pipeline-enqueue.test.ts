@@ -8,6 +8,10 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  APPROVED_COVERAGE_HINT_CORPUS_HASH,
+  APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+  APPROVED_COVERAGE_HINT_FRAGMENT_ID,
+  buildApprovedCoverageHintCorpusManifest,
   buildTestCorpusManifest,
 } from "../../test/ontology-pipeline-fixtures.js";
 import {
@@ -26,6 +30,9 @@ import {
   ONTOLOGY_PIPELINE_COMMAND_VERSION,
   type OntologyPipelineCommand,
 } from "./ontology-pipeline-command.js";
+import {
+  buildOntologyCoverageSourceHints,
+} from "./ontology-coverage-source-hints.js";
 import {
   dispatchUndispatchedOntologyPipelineRuns,
   enqueueOntologyPipelineRun,
@@ -64,7 +71,7 @@ function configuredEnv(queue: Queue<OntologyPipelineMessage>): Env {
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
     OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
-    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.3",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.4",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
@@ -213,7 +220,7 @@ describe("ontology pipeline immutable command", () => {
       "1.0.0-candidate",
     );
 
-    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV2");
+    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV3");
     expect(command).toEqual({
       command_version: ONTOLOGY_PIPELINE_COMMAND_VERSION,
       schema_version: "0.7.0",
@@ -229,7 +236,7 @@ describe("ontology pipeline immutable command", () => {
       generator: {
         model: "gpt-5.6-sol",
         reasoning: "high",
-        prompt_version: "1.0.3",
+        prompt_version: "1.0.4",
         timeout_ms: 120000,
         max_output_tokens: 8000,
       },
@@ -257,6 +264,7 @@ describe("ontology pipeline immutable command", () => {
           { feature_class: "house_cusp", minimum_source_supported: 1, minimum_total: 1 },
           { feature_class: "uncertainty", minimum_source_supported: 1, minimum_total: 1 },
         ],
+        coverage_source_hints: [],
         active_machine_predecessor: null,
       },
       input_max_bytes: 98304,
@@ -304,7 +312,59 @@ describe("ontology pipeline immutable command", () => {
     expect(frozen).not.toContain("fragments");
   });
 
-  it("rejects replaying a V1 command identity after the V2 limit freeze", async () => {
+  it("freezes the exact approved corpus hint into the immutable command", async () => {
+    const manifest = await buildApprovedCoverageHintCorpusManifest();
+    expect(manifest.corpus_release_id).toBe(
+      APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+    );
+    expect(manifest.corpus_hash).toBe(APPROVED_COVERAGE_HINT_CORPUS_HASH);
+    expect(manifest.fragments.some((fragment) =>
+      fragment.id === APPROVED_COVERAGE_HINT_FRAGMENT_ID
+    )).toBe(true);
+    await registerOntologyCorpus(env, manifest);
+    const { queue } = fakeQueue();
+
+    const command = await buildOntologyPipelineCommand(
+      configuredEnv(queue),
+      manifest.corpus_release_id,
+      "0.1.6",
+    );
+
+    expect(command.generator_input.coverage_source_hints).toEqual([{
+      feature_class: "pattern",
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_ID,
+      feature_predicate: { type: "pattern", pattern: "stellium" },
+    }]);
+    expect(command.generator_input).not.toHaveProperty("fragments");
+    expect(command.generator_input.coverage_source_hints[0]).not.toHaveProperty(
+      "normalized_proposition",
+    );
+  });
+
+  it("fails closed when the approved corpus id resolves to a stale hash", async () => {
+    const stale = await buildTestCorpusManifest(
+      APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
+      "en-US",
+      "licensed_excerpt",
+    );
+    expect(stale.corpus_hash).not.toBe(APPROVED_COVERAGE_HINT_CORPUS_HASH);
+    expect(buildOntologyCoverageSourceHints({
+      release: stale,
+      canonicalBytes: canonicalJson(stale),
+      objectKey:
+        `pattern-ontology-corpora/${stale.corpus_release_id}.json`,
+      licenseClass: "licensed_excerpt",
+      publicCapable: true,
+      fragmentIndex: new Map(stale.fragments.map((fragment) => [
+        fragment.id,
+        fragment,
+      ])),
+    })).toEqual({
+      ok: false,
+    });
+  });
+
+  it("rejects replaying a V2 command identity after the V3 hint freeze", async () => {
     const corpus = await registeredCorpus();
     const { queue } = fakeQueue();
     const pipelineEnv = configuredEnv(queue);
@@ -317,11 +377,15 @@ describe("ontology pipeline immutable command", () => {
       candidateVersion,
     );
     const oldShape = { ...current } as Record<string, unknown>;
-    oldShape.command_version = "OntologyPipelineCommandV1";
-    delete oldShape.limits;
+    oldShape.command_version = "OntologyPipelineCommandV2";
+    const oldGeneratorInput = {
+      ...(oldShape.generator_input as Record<string, unknown>),
+    };
+    delete oldGeneratorInput.coverage_source_hints;
+    oldShape.generator_input = oldGeneratorInput;
     const oldJson = canonicalJson(oldShape);
     const oldHash = await contentHash(oldJson);
-    const runId = `oprun_v1_conflict_${suffix}`;
+    const runId = `oprun_v2_conflict_${suffix}`;
     await env.DB.prepare(
       `INSERT INTO pattern_ontology_pipeline_runs (
          run_id, idempotency_key, corpus_release_id, corpus_hash,

@@ -18,7 +18,7 @@ import {
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
   generator_reasoning: "high",
-  generator_prompt_version: "1.0.3",
+  generator_prompt_version: "1.0.4",
   generator_max_output_tokens: 8000,
   evaluator_model: "gpt-5.6-sol",
   evaluator_reasoning: "high",
@@ -62,7 +62,7 @@ function deepKeys(value: unknown): string[] {
 
 describe("ontology provider prompts", () => {
   it("pins completion and deterministic record policy to the revised generator prompt", () => {
-    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.3");
+    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.4");
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target",
     );
@@ -89,6 +89,15 @@ describe("ontology provider prompts", () => {
     );
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "even as a negation",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "use exactly its feature_predicate and include its source_fragment_id",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "Ground every meaning-bearing field only in the cited corpus fragment",
+    );
+    expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
+      "reviewed coverage_source_hints for source-id and predicate routing only",
     );
   });
 

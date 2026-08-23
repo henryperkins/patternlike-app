@@ -18,6 +18,16 @@ const SOURCE_RULE_ID = `ont_${"1".repeat(32)}`;
 const CANDIDATE_RULE_ID = `ont_${"2".repeat(32)}`;
 const OTHER_RULE_ID = `ont_${"3".repeat(32)}`;
 const PRIVATE_SENTINEL = `usr_${"9".repeat(32)}`;
+const HINTED_CORPUS_RELEASE_ID =
+  "pattern-ontology-source-manual-en-us-0.1.0";
+const HINTED_CORPUS_HASH =
+  "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c";
+const HINTED_FRAGMENT_ID = "srcf_70a53d65d1e84c127bd1249147a880d9";
+const STELLIUM_HINT = {
+  feature_class: "pattern",
+  source_fragment_id: HINTED_FRAGMENT_ID,
+  feature_predicate: { type: "pattern", pattern: "stellium" },
+} as const;
 
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
@@ -127,6 +137,47 @@ function registeredCorpus(excerpt = "A short, licensed source excerpt."): Regist
   };
 }
 
+function hintedCorpus(options: {
+  corpusReleaseId?: string;
+  corpusHash?: string;
+  includeMappedFragment?: boolean;
+} = {}): RegisteredOntologyCorpus {
+  const base = registeredCorpus();
+  const corpusReleaseId =
+    options.corpusReleaseId ?? HINTED_CORPUS_RELEASE_ID;
+  const mapped = {
+    ...base.release.fragments[0]!,
+    id: HINTED_FRAGMENT_ID,
+    corpus_release_id: corpusReleaseId,
+    locale: "en-US",
+    license_class: "licensed_excerpt" as const,
+  };
+  const other = {
+    ...base.release.fragments[1]!,
+    corpus_release_id: corpusReleaseId,
+    locale: "en-US",
+    license_class: "licensed_excerpt" as const,
+  };
+  const fragments = options.includeMappedFragment === false
+    ? [other]
+    : [mapped, other];
+  const release = {
+    ...base.release,
+    corpus_release_id: corpusReleaseId,
+    corpus_hash: options.corpusHash ?? HINTED_CORPUS_HASH,
+    locale: "en-US",
+    fragments,
+  };
+  return {
+    release,
+    canonicalBytes: canonicalJson(release),
+    objectKey: `pattern-ontology-corpora/${corpusReleaseId}.json`,
+    licenseClass: "licensed_excerpt",
+    publicCapable: true,
+    fragmentIndex: new Map(fragments.map((fragment) => [fragment.id, fragment])),
+  };
+}
+
 function activeMachineRelease(): PatternOntologyRelease {
   return {
     schema_version: "0.7.0",
@@ -189,11 +240,99 @@ function generatorInput(corpus = registeredCorpus()) {
     policy: POLICY,
     activeMachinePredecessor: activeMachinePredecessor(),
     continuation: null,
+    coverageSourceHints: [],
   };
 }
 
 describe("ontology provider packet builders", () => {
   describe("generator minimization", () => {
+    it("includes the hash-pinned stellium bridge only for applicable coverage", () => {
+      const initial = buildOntologyGeneratorPacket({
+        ...generatorInput(hintedCorpus()),
+        coverageTargets: [
+          { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
+        ],
+        coverageSourceHints: [STELLIUM_HINT],
+      }, PIN);
+      const nonPatternContinuation = buildOntologyGeneratorPacket({
+        ...generatorInput(hintedCorpus()),
+        coverageTargets: [
+          { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
+        ],
+        coverageSourceHints: [STELLIUM_HINT],
+        continuation: {
+          chunk_index: 1,
+          maximum_generation_chunks: 16,
+          maximum_candidate_records: 64,
+          maximum_evaluator_calls: 64,
+          maximum_candidate_bytes: 262144,
+          accepted_ordered_chunk_plaintext_hashes: [`sha256:${"d".repeat(64)}`],
+          accepted_ordered_record_ids: [SOURCE_RULE_ID],
+          remaining_coverage_targets: [
+            { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
+          ],
+        },
+      }, PIN);
+
+      expect(initial.ok).toBe(true);
+      expect(nonPatternContinuation.ok).toBe(true);
+      if (!initial.ok || !nonPatternContinuation.ok) return;
+      expect(initial.document.coverage_source_hints).toEqual([STELLIUM_HINT]);
+      expect(nonPatternContinuation.document).not.toHaveProperty(
+        "coverage_source_hints",
+      );
+    });
+
+    it("preserves the exact frozen stellium bridge in a pattern-only continuation", () => {
+      const result = buildOntologyGeneratorPacket({
+        ...generatorInput(hintedCorpus()),
+        coverageTargets: [
+          { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
+          { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
+        ],
+        coverageSourceHints: [STELLIUM_HINT],
+        continuation: {
+          chunk_index: 1,
+          maximum_generation_chunks: 16,
+          maximum_candidate_records: 64,
+          maximum_evaluator_calls: 64,
+          maximum_candidate_bytes: 262144,
+          accepted_ordered_chunk_plaintext_hashes: [`sha256:${"d".repeat(64)}`],
+          accepted_ordered_record_ids: [SOURCE_RULE_ID],
+          remaining_coverage_targets: [
+            { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
+          ],
+        },
+      }, PIN);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.document.coverage_source_hints).toEqual([STELLIUM_HINT]);
+      expect(JSON.parse(result.serialized).coverage_source_hints)
+        .toEqual([STELLIUM_HINT]);
+    });
+
+    it("fails closed when the pinned hint corpus or mapped fragment is stale", () => {
+      for (const corpus of [
+        hintedCorpus({ corpusHash: `sha256:${"f".repeat(64)}` }),
+        hintedCorpus({ corpusReleaseId: "corpus-stale-hint" }),
+        hintedCorpus({ includeMappedFragment: false }),
+      ]) {
+        expect(buildOntologyGeneratorPacket({
+          ...generatorInput(corpus),
+          coverageTargets: [
+            { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
+          ],
+          coverageSourceHints: [STELLIUM_HINT],
+        }, PIN)).toEqual({
+          ok: false,
+          code: "ontology_input_coverage_source_hint_invalid",
+        });
+      }
+    });
+
     it("copies only the reviewed immutable corpus, vocabulary, targets, policies, and active machine records", () => {
       const result = buildOntologyGeneratorPacket(generatorInput(), PIN);
 
@@ -422,6 +561,8 @@ describe("ontology provider packet builders", () => {
           allowed_transformations: ["intersection", "tension"],
         },
       ]);
+      expect(result.document).not.toHaveProperty("coverage_source_hints");
+      expect(result.serialized).not.toContain("coverage_source_hints");
       expect(result.document.compiler_summary).toEqual(compilerSummary());
       expect(result.serialized).not.toContain(OTHER_RULE_ID);
       expect(result.serialized).not.toContain(OTHER_FRAGMENT_ID);
@@ -565,6 +706,24 @@ describe("ontology provider packet builders", () => {
         generatorInput(registeredCorpus(`${configuredCapExcerpt}x`)),
         PIN,
       )).toEqual({ ok: false, code: "ontology_input_too_large" });
+    });
+
+    it("counts provider-visible coverage hints against the exact packet byte cap", () => {
+      const input = {
+        ...generatorInput(hintedCorpus()),
+        coverageTargets: [
+          { feature_class: "pattern" as const, minimum_source_supported: 1, minimum_total: 1 },
+        ],
+        coverageSourceHints: [STELLIUM_HINT],
+      };
+      const packet = buildOntologyGeneratorPacket(input, PIN);
+      expect(packet.ok).toBe(true);
+      if (!packet.ok) return;
+
+      expect(buildOntologyGeneratorPacket(input, {
+        ...PIN,
+        input_max_bytes: packet.bytes - 1,
+      })).toEqual({ ok: false, code: "ontology_input_too_large" });
     });
 
     it("keeps instruction-shaped excerpts inert as one escaped JSON string value", () => {

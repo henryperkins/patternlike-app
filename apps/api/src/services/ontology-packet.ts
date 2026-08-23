@@ -21,6 +21,11 @@ import type {
   RegisteredOntologyCorpus,
 } from "./ontology-corpus.js";
 import {
+  copyOntologyCoverageSourceHint,
+  frozenOntologyCoverageSourceHintsMatchCorpus,
+  type OntologyCoverageSourceHint,
+} from "./ontology-coverage-source-hints.js";
+import {
   findPrivateOpaqueIdPrefix,
   type PrivateOpaqueIdPrefix,
 } from "./private-opaque-identifiers.js";
@@ -69,6 +74,7 @@ export interface OntologyGeneratorPacketInput {
   /** A release already loaded through the verified active-ontology seam. */
   activeMachinePredecessor: ActiveOntology | null;
   continuation: OntologyGeneratorContinuation | null;
+  coverageSourceHints: readonly OntologyCoverageSourceHint[];
 }
 
 export interface OntologyEvaluatorPacketInput {
@@ -129,6 +135,7 @@ export interface OntologyGeneratorDocument {
     accepted_ordered_record_ids: string[];
     remaining_coverage_targets: OntologyCoverageTarget[];
   } | null;
+  coverage_source_hints?: OntologyCoverageSourceHint[];
 }
 
 export interface OntologyEvaluatorDocument {
@@ -168,6 +175,7 @@ export type OntologyPacketFailureCode =
   | "ontology_input_compiler_summary_mismatch"
   | "ontology_input_cited_meaning_missing"
   | "ontology_input_fragment_missing"
+  | "ontology_input_coverage_source_hint_invalid"
   | "ontology_input_continuation_invalid"
   | "ontology_input_forbidden_key"
   | "ontology_input_unexpected_key"
@@ -249,6 +257,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "corpus",
   "feature_vocabulary",
   "coverage_targets",
+  "coverage_source_hints",
   "policy",
   "active_machine_predecessor",
   "continuation",
@@ -299,6 +308,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "meaning_class",
   "feature_predicate",
   "source_fragment_ids",
+  "source_fragment_id",
   "input_meaning_ids",
   "transformation_class",
   "tensions",
@@ -549,6 +559,12 @@ export function buildOntologyGeneratorPacket(
   if (!validContinuation(input.continuation, input.coverageTargets)) {
     return { ok: false, code: "ontology_input_continuation_invalid" };
   }
+  if (!frozenOntologyCoverageSourceHintsMatchCorpus(
+    input.corpus,
+    input.coverageSourceHints,
+  )) {
+    return { ok: false, code: "ontology_input_coverage_source_hint_invalid" };
+  }
 
   const release = input.corpus.release;
   const predecessor = input.activeMachinePredecessor?.release ?? null;
@@ -584,6 +600,22 @@ export function buildOntologyGeneratorPacket(
         },
     continuation: copyContinuation(input.continuation),
   };
+  const applicableCoverage = input.continuation?.remaining_coverage_targets ??
+    input.coverageTargets;
+  const applicableFeatureClasses = new Set(
+    applicableCoverage
+      .filter((target) =>
+        target.minimum_source_supported > 0 || target.minimum_total > 0)
+      .map((target) => target.feature_class),
+  );
+  const applicableHints = input.coverageSourceHints.filter((hint) =>
+    applicableFeatureClasses.has(hint.feature_class)
+  );
+  if (applicableHints.length > 0) {
+    document.coverage_source_hints = applicableHints.map(
+      copyOntologyCoverageSourceHint,
+    );
+  }
   return serialize("generator", document, pin);
 }
 

@@ -189,6 +189,19 @@ internalOntologyPipelineRoutes.post("/ontology-pipeline-runs", async (c) => {
     }
     if (
       cause instanceof OntologyPipelineCommandError &&
+      cause.code === "ontology_pipeline_coverage_source_hint_invalid"
+    ) {
+      return c.json(
+        error(
+          requestId,
+          "ontology_pipeline_command_invalid",
+          "Pipeline run command is invalid",
+        ),
+        400,
+      );
+    }
+    if (
+      cause instanceof OntologyPipelineCommandError &&
       cause.code === "ontology_pipeline_not_enabled"
     ) {
       return c.json(

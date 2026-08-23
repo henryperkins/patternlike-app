@@ -57,6 +57,9 @@ import {
   type RegisteredOntologyCorpus,
 } from "./ontology-corpus.js";
 import {
+  frozenOntologyCoverageSourceHintsMatchIdentity,
+} from "./ontology-coverage-source-hints.js";
+import {
   buildOntologyEvaluatorPacket,
   buildOntologyGeneratorPacket,
 } from "./ontology-packet.js";
@@ -325,6 +328,7 @@ function commandIsExecutable(
     !isRecord(generatorInput) ||
     !hasExactKeys(generatorInput, [
       "active_machine_predecessor",
+      "coverage_source_hints",
       "coverage_targets",
       "feature_vocabulary",
     ]) ||
@@ -403,6 +407,12 @@ function commandIsExecutable(
       ONTOLOGY_PIPELINE_FEATURE_VOCABULARY,
     ) &&
     coverageTargetsAreFrozen(generatorInput.coverage_targets) &&
+    frozenOntologyCoverageSourceHintsMatchIdentity({
+      corpus_release_id: corpus.corpus_release_id,
+      corpus_hash: corpus.corpus_hash,
+      license_class: corpus.license_class,
+      public_capable: corpus.public_capable,
+    }, generatorInput.coverage_source_hints) &&
     predecessorReferenceIsValid(
       generatorInput.active_machine_predecessor,
     ) &&
@@ -1151,6 +1161,8 @@ async function executeGenerating(
       policy: generationPolicy(context.command),
       activeMachinePredecessor: predecessor,
       continuation: generatorContinuation(context.command, progress),
+      coverageSourceHints:
+        context.command.generator_input.coverage_source_hints,
     }, pinFromCommand(context.command));
     if (!packet.ok) terminal("candidate_invalid");
     const pin = pinFromCommand(context.command);

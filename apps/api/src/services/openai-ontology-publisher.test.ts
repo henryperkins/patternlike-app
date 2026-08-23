@@ -154,6 +154,7 @@ function generatorPacket(excerpt?: string) {
     policy: POLICY,
     activeMachinePredecessor: null,
     continuation: null,
+    coverageSourceHints: [],
   }, pin());
   if (!result.ok) throw new Error(result.code);
   return result;
