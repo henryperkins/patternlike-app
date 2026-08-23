@@ -1187,7 +1187,7 @@ describe("ontology pipeline execution", () => {
         command.generator_input.coverage_source_hints = [];
       },
       (command) => {
-        command.command_version = "OntologyPipelineCommandV3";
+        command.command_version = "OntologyPipelineCommandV4";
       },
     ];
 

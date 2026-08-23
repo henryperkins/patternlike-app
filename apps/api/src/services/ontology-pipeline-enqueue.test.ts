@@ -221,7 +221,7 @@ describe("ontology pipeline immutable command", () => {
       "1.0.0-candidate",
     );
 
-    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV4");
+    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV5");
     expect(command).toEqual({
       command_version: ONTOLOGY_PIPELINE_COMMAND_VERSION,
       schema_version: "0.7.0",
@@ -402,7 +402,7 @@ describe("ontology pipeline immutable command", () => {
     });
   });
 
-  it("rejects replaying a V3 command identity after the V4 exact-hint freeze", async () => {
+  it("rejects replaying a V4 command identity after the V5 exact-hint freeze", async () => {
     const corpus = await registeredCorpus();
     const { queue } = fakeQueue();
     const pipelineEnv = configuredEnv(queue);
@@ -415,7 +415,7 @@ describe("ontology pipeline immutable command", () => {
       candidateVersion,
     );
     const oldShape = { ...current } as Record<string, unknown>;
-    oldShape.command_version = "OntologyPipelineCommandV3";
+    oldShape.command_version = "OntologyPipelineCommandV4";
     const oldJson = canonicalJson(oldShape);
     const oldHash = await contentHash(oldJson);
     const runId = `oprun_v2_conflict_${suffix}`;
