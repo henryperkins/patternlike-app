@@ -19,11 +19,13 @@ import { loadPatternGenerationGrant, patternConsentDocument } from "../db/patter
 import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount } from "../db/pattern-ontology.js";
 import { decryptUnderContentKey, unwrapContentKey } from "./pattern-crypto.js";
 import {
-  publicFailureStageFor,
   patternFailureIsRetryable,
+} from "./pattern-command.js";
+import {
+  publicFailureStageFor,
   publicStageFor,
   type PatternDomainStage,
-} from "./pattern-command.js";
+} from "./pattern-stage-protocol.js";
 import {
   isInternalPatternAccount,
   readPatternAiRollout,

@@ -45,9 +45,9 @@ import {
   executePatternJob,
   getArtifactAt,
   loadPatternJob,
-  patternArtifactId,
   retryStage,
 } from "./pattern-execute.js";
+import { patternArtifactId } from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
 

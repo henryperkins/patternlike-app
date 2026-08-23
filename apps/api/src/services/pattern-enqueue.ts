@@ -29,10 +29,13 @@ import {
 import {
   PATTERN_COMMAND_VERSION,
   PATTERN_JOB_TYPE,
-  acceptedReplayStage,
   type GeneratePatternCommandV1,
   type PatternReservationReason,
 } from "./pattern-command.js";
+import {
+  acceptedReplayStage,
+  type PatternDomainStage,
+} from "./pattern-stage-protocol.js";
 import {
   resolvePatternPublisherConfiguration,
 } from "./pattern-publisher.js";
@@ -65,7 +68,7 @@ async function loadStoredReservation(
   env: Env,
   identity: UserIdentity,
   idempotencyKey: string,
-): Promise<{ generationId: string; consentId: string; stage: import("./pattern-command.js").PatternDomainStage } | null> {
+): Promise<{ generationId: string; consentId: string; stage: PatternDomainStage } | null> {
   const row = await env.DB.prepare(
     `SELECT j.id AS job_id, p.generation_id, p.consent_id, p.stage
      FROM jobs j
@@ -73,7 +76,7 @@ async function loadStoredReservation(
      WHERE j.job_type = ? AND j.user_id = ? AND j.idempotency_key = ?`,
   )
     .bind(PATTERN_JOB_TYPE, identity.userId, idempotencyKey)
-    .first<{ job_id: string; generation_id: string; consent_id: string; stage: import("./pattern-command.js").PatternDomainStage }>();
+    .first<{ job_id: string; generation_id: string; consent_id: string; stage: PatternDomainStage }>();
   return row
     ? { generationId: row.generation_id, consentId: row.consent_id, stage: row.stage }
     : null;
@@ -188,7 +191,7 @@ export async function enqueuePatternGeneration(
       `SELECT stage FROM pattern_generation_jobs WHERE generation_id = ? AND user_id = ?`,
     )
       .bind(claim.active_generation_id, identity.userId)
-      .first<{ stage: import("./pattern-command.js").PatternDomainStage }>();
+      .first<{ stage: PatternDomainStage }>();
     return {
       ok: true,
       replay: true,
@@ -418,7 +421,7 @@ export async function enqueuePatternGeneration(
         `SELECT stage FROM pattern_generation_jobs WHERE generation_id = ? AND user_id = ?`,
       )
         .bind(winner.active_generation_id, identity.userId)
-        .first<{ stage: import("./pattern-command.js").PatternDomainStage }>();
+        .first<{ stage: PatternDomainStage }>();
       return {
         ok: true,
         replay: true,

@@ -24,10 +24,17 @@ import { consumePatternProviderCallBudget, utcDateFor } from "../db/pattern-prov
 import {
   PATTERN_JOB_TYPE,
   isPatternCommand,
-  publicStageFor,
   type GeneratePatternCommandV1,
-  type PatternDomainStage,
 } from "./pattern-command.js";
+import {
+  patternArtifactId,
+  patternAttemptCoordinate,
+  patternPassProtocol,
+  patternStageOwner,
+  publicStageFor,
+  type PatternAttemptCoordinate,
+  type PatternDomainStage,
+} from "./pattern-stage-protocol.js";
 import { hashesEqual } from "./content-release.js";
 import {
   OPENAI_PATTERN_WRITER_MODEL,
@@ -153,74 +160,6 @@ async function runPublisherPass<T>(
   return outcome;
 }
 
-// ---------------------------------------------------------------------------
-// The stage protocol
-//
-// One pass per delivery, in one order, at every stage:
-//
-//   1. claim by CAS; a zero-row claim is a duplicate and acknowledges
-//   2. decrypt the command; recheck eligibility, ontology, feature-set identity
-//   3. read the durable attempt index k; if k >= max, fail terminally WITHOUT
-//      calling the provider
-//   4. probe the response artifact at (class, stage_generation, k); on a hit,
-//      skip to step 9 with the stored bytes
-//   5. build the minimized input document; ban-list check and byte cap
-//   6. write the request artifact (create-only)
-//   7. consume one budget unit
-//   8. call the provider once
-//   9. run the deterministic validator, unchanged
-//  10. write the response artifact (create-only) and read back its plaintext hash
-//  11. advance with that hash, retryStage, returnToWriter, or failJob -- each
-//      with ownershipProbes at the head of its batch
-//  12. nudge, and swallow the send failure: the D1 row is the outbox
-//
-// Step 4 precedes step 7, so an adopted artifact spends nothing. Step 7 is
-// inside the publisher, immediately before its fetch, reached through the
-// `reserve` callback on `PatternPassOptions` -- a reservation taken at stage
-// entry is spent by a delivery that may never reach a provider, which is what
-// section 25.3 forbids.
-// ---------------------------------------------------------------------------
-
-/**
- * Where each pass's durable attempt index lives.
- *
- * `<pass>_attempts` is a zero-based NEXT-attempt index, not a count of completed
- * attempts: the columns are `DEFAULT 0` and the ceiling is checked as `k >= max`
- * before the call, so a pass that made one successful call and advanced still
- * reads `0`. Reading it as a completed count yields `max + 1` calls.
- */
-const PASS_ATTEMPT_COLUMN = {
-  planner: "planner_attempts",
-  writer: "writer_attempts",
-  verifier: "verifier_attempts",
-} as const satisfies Record<PatternStageClass, keyof PatternJobRow>;
-
-/** The exact bytes sent, kept so a call with no answer is still recoverable. */
-const PASS_REQUEST_CLASS = {
-  planner: "planner_request",
-  writer: "writer_request",
-  verifier: "verifier_request",
-} as const satisfies Record<PatternStageClass, string>;
-
-/**
- * The artifact whose presence is the skip condition.
- *
- * Only the response artifact's. A request artifact is written before the call,
- * so its presence proves nothing about whether an answer ever arrived.
- */
-const PASS_RESPONSE_CLASS = {
-  planner: "planner_response",
-  writer: "writer_response",
-  verifier: "verifier_response",
-} as const satisfies Record<PatternStageClass, string>;
-
-/** The coarse stage a reader sees when a pass fails. */
-const PASS_PUBLIC_STAGE = {
-  planner: "organizing_evidence",
-  writer: "writing",
-  verifier: "checking_claims",
-} as const satisfies Record<PatternStageClass, string>;
-
 /** The M7 stage-aware backoff, with `retry_after_seconds` acting as a floor. */
 const PASS_RETRY_BACKOFF_SECONDS = [30, 120, 600] as const;
 
@@ -263,27 +202,6 @@ function passFailureClass(code: string, detail: string): string {
     : code;
 }
 
-/**
- * The artifact identity a redelivery can recompute and a retry cannot collide
- * with.
- *
- * Four components, not three. With `attempt` absent, a genuine retry recomputed
- * the identity of the attempt before it: the create-only put failed, the stored
- * first response was kept, the second was discarded, and `advance` then wrote a
- * hash taken over the response that was thrown away. The next stage loaded the
- * stored plan, compared hashes, and failed `plan_missing`. Deterministic
- * stand-ins made the two responses identical and hid it.
- */
-export async function patternArtifactId(
-  generationId: string,
-  artifactClass: string,
-  stageGeneration: number,
-  attempt: number,
-): Promise<string> {
-  const digest = await sha256Hex(`${generationId}:${artifactClass}:${stageGeneration}:${attempt}`);
-  return `part_${digest.slice(0, 32)}`;
-}
-
 async function nudgeNextStage(
   env: Env,
   job: PatternJobRow,
@@ -313,6 +231,7 @@ export interface PatternJobRow {
   verifier_attempts: number;
   plan_hash: string | null;
   candidate_hash: string | null;
+  semantic_verdict_hash: string | null;
   locale: string;
   locale_revision: number;
 }
@@ -325,7 +244,7 @@ async function loadJob(env: Env, generationId: string): Promise<PatternJobRow | 
   return env.DB.prepare(
     `SELECT generation_id, job_id, user_id, claim_id, stage, stage_generation,
             planner_attempts, writer_attempts, verifier_attempts, plan_hash,
-            candidate_hash, locale, locale_revision
+            candidate_hash, semantic_verdict_hash, locale, locale_revision
      FROM pattern_generation_jobs WHERE generation_id = ?`,
   )
     .bind(generationId)
@@ -904,7 +823,7 @@ export async function retryStage(
 ): Promise<boolean> {
   const now = new Date().toISOString();
   // Interpolated from a closed record keyed by a closed union, never from input.
-  const column = PASS_ATTEMPT_COLUMN[pass];
+  const column = patternPassProtocol(pass).attemptColumn;
   try {
     await env.DB.batch([
       ...ownershipProbes(env, job, token),
@@ -1171,7 +1090,7 @@ async function handlePassFailure(
     await nudgeNextStage(env, job, job.stage_generation);
     return { ok: true, terminal: false };
   }
-  await failJob(env, job, token, failureClass, PASS_PUBLIC_STAGE[pass]);
+  await failJob(env, job, token, failureClass, patternPassProtocol(pass).publicFailureStage);
   return { ok: false, reason: "terminal", failureClass };
 }
 
@@ -1198,6 +1117,7 @@ export async function executePatternJob(
   if (claim.status !== "claimed") return { ok: false, reason: "duplicate", failureClass: "duplicate" };
   const claimed = claim;
   const stage = claimed.job.stage;
+  const stageOwner = patternStageOwner(stage);
 
   const identityRow = await loadUserIdentity(env, (await loadJob(env, message.generation_id))!.user_id);
   if (!identityRow) {
@@ -1339,18 +1259,18 @@ export async function executePatternJob(
     // Step 6: the exact bytes sent, written before the call that sends them, so
     // a call that never answers is still recoverable.
     const writeRequestArtifact = async (
-      pass: PatternStageClass,
+      coordinate: PatternAttemptCoordinate,
       document: unknown,
-      attempt: number,
     ): Promise<void> => {
       await putArtifact(
         env,
         identity,
         claimed.job,
-        PASS_REQUEST_CLASS[pass],
+        coordinate.requestArtifactClass,
         document,
         expiresAt,
-        attempt,
+        coordinate.attempt,
+        coordinate.stageGeneration,
       );
     };
 
@@ -1359,13 +1279,13 @@ export async function executePatternJob(
       pass: PatternStageClass,
       result: { ok: false; code: string },
     ): Promise<PatternExecuteOutcome> => {
-      await failJob(env, claimed.job, claimed.token, result.code, PASS_PUBLIC_STAGE[pass]);
+      await failJob(env, claimed.job, claimed.token, result.code, patternPassProtocol(pass).publicFailureStage);
       return { ok: false, reason: "terminal", failureClass: result.code };
     };
 
-    if (stage === "reserved" || stage === "planning" || stage === "plan_validating") {
-      const attempt = claimed.job.planner_attempts;
-      if (attempt >= command.planner_attempts_max) {
+    if (stageOwner === "planner") {
+      const coordinate = patternAttemptCoordinate(claimed.job, "planner");
+      if (coordinate.attempt >= command.planner_attempts_max) {
         await failJob(env, claimed.job, claimed.token, "planner_attempts_exhausted", "organizing_evidence");
         return { ok: false, reason: "terminal", failureClass: "planner_attempts_exhausted" };
       }
@@ -1373,10 +1293,10 @@ export async function executePatternJob(
       const adopted = await getArtifactAt<PatternPlannerOutput>(
         env,
         identity,
-        command.generation_id,
-        PASS_RESPONSE_CLASS.planner,
-        claimed.job.stage_generation,
-        attempt,
+        coordinate.generationId,
+        coordinate.responseArtifactClass,
+        coordinate.stageGeneration,
+        coordinate.attempt,
       );
 
       let plannerOutput: PatternPlannerOutput;
@@ -1385,8 +1305,8 @@ export async function executePatternJob(
       } else {
         const input = buildPlannerInput(selected.packet, records, limits);
         if (!input.ok) return refuseInput("planner", input);
-        await writeRequestArtifact("planner", input.document, attempt);
-        const outcome = await runPublisherPass(pin, "planner", attempt, () =>
+        await writeRequestArtifact(coordinate, input.document);
+        const outcome = await runPublisherPass(pin, "planner", coordinate.attempt, () =>
           publisherImpl.plan(input.document, passOptions("planner")),
         );
         if (!outcome.ok) {
@@ -1395,7 +1315,7 @@ export async function executePatternJob(
             claimed.job,
             claimed.token,
             "planner",
-            attempt,
+            coordinate.attempt,
             command.planner_attempts_max,
             outcome,
           );
@@ -1414,14 +1334,14 @@ export async function executePatternJob(
       try {
         planCheck = validatePatternPlan(plannerOutput, selected.packet, records);
       } catch {
-        return handlePassFailure(env, claimed.job, claimed.token, "planner", attempt, command.planner_attempts_max, {
+        return handlePassFailure(env, claimed.job, claimed.token, "planner", coordinate.attempt, command.planner_attempts_max, {
           code: "publisher_output_invalid",
           safe_detail_code: "schema_mismatch",
           retry_after_seconds: null,
         });
       }
       if (!planCheck.ok) {
-        if (attempt + 1 < command.planner_attempts_max) {
+        if (coordinate.attempt + 1 < command.planner_attempts_max) {
           if (!(await retryStage(env, claimed.job, claimed.token, "planner", null))) {
             return { ok: false, reason: "duplicate", failureClass: "duplicate" };
           }
@@ -1438,18 +1358,19 @@ export async function executePatternJob(
             env,
             identity,
             claimed.job,
-            PASS_RESPONSE_CLASS.planner,
+            coordinate.responseArtifactClass,
             plannerOutput,
             expiresAt,
-            attempt,
+            coordinate.attempt,
+            coordinate.stageGeneration,
           );
       const plan: PatternPlan = {
         ...plannerOutput,
         plan_hash: planHash,
         sparse_pattern: selected.packet.selection_constraints.sparse_pattern,
       };
-      await putArtifact(env, identity, claimed.job, "fact_packet", selected.packet, expiresAt, attempt);
-      await putArtifact(env, identity, claimed.job, "validated_plan", plan, expiresAt, attempt);
+      await putArtifact(env, identity, claimed.job, "fact_packet", selected.packet, expiresAt, coordinate.attempt, coordinate.stageGeneration);
+      await putArtifact(env, identity, claimed.job, "validated_plan", plan, expiresAt, coordinate.attempt, coordinate.stageGeneration);
       if (!(await advance(env, claimed.job, claimed.token, "writing", { plan_hash: planHash }))) {
         return { ok: false, reason: "duplicate", failureClass: "duplicate" };
       }
@@ -1457,9 +1378,9 @@ export async function executePatternJob(
       return { ok: true, terminal: false };
     }
 
-    if (stage === "writing" || stage === "candidate_validating") {
-      const attempt = claimed.job.writer_attempts;
-      if (attempt >= command.writer_attempts_max) {
+    if (stageOwner === "writer") {
+      const coordinate = patternAttemptCoordinate(claimed.job, "writer");
+      if (coordinate.attempt >= command.writer_attempts_max) {
         await failJob(env, claimed.job, claimed.token, "writer_attempts_exhausted", "writing");
         return { ok: false, reason: "terminal", failureClass: "writer_attempts_exhausted" };
       }
@@ -1477,10 +1398,10 @@ export async function executePatternJob(
       const adopted = await getArtifactAt<PatternWriterOutput>(
         env,
         identity,
-        command.generation_id,
-        PASS_RESPONSE_CLASS.writer,
-        claimed.job.stage_generation,
-        attempt,
+        coordinate.generationId,
+        coordinate.responseArtifactClass,
+        coordinate.stageGeneration,
+        coordinate.attempt,
       );
 
       let writer: PatternWriterOutput;
@@ -1493,13 +1414,13 @@ export async function executePatternJob(
         // silently falling back to the base prompt. The command ceiling is at
         // most three, so this bounded reverse probe reads at most two objects.
         let correction: { value: PatternCorrectionDocument } | null = null;
-        for (let correctionAttempt = attempt; correctionAttempt > 0; correctionAttempt -= 1) {
+        for (let correctionAttempt = coordinate.attempt; correctionAttempt > 0; correctionAttempt -= 1) {
           correction = await getArtifactAt<PatternCorrectionDocument>(
             env,
             identity,
-            command.generation_id,
+            coordinate.generationId,
             "correction_document",
-            claimed.job.stage_generation,
+            coordinate.stageGeneration,
             correctionAttempt,
           );
           if (correction) break;
@@ -1512,8 +1433,8 @@ export async function executePatternJob(
           correction?.value,
         );
         if (!input.ok) return refuseInput("writer", input);
-        await writeRequestArtifact("writer", input.document, attempt);
-        const outcome = await runPublisherPass(pin, "writer", attempt, () =>
+        await writeRequestArtifact(coordinate, input.document);
+        const outcome = await runPublisherPass(pin, "writer", coordinate.attempt, () =>
           publisherImpl.write(input.document, passOptions("writer")),
         );
         if (!outcome.ok) {
@@ -1522,7 +1443,7 @@ export async function executePatternJob(
             claimed.job,
             claimed.token,
             "writer",
-            attempt,
+            coordinate.attempt,
             command.writer_attempts_max,
             outcome,
           );
@@ -1534,15 +1455,15 @@ export async function executePatternJob(
       try {
         candidate = validatePatternCandidate(writer, plan, selected.packet, records);
       } catch {
-        return handlePassFailure(env, claimed.job, claimed.token, "writer", attempt, command.writer_attempts_max, {
+        return handlePassFailure(env, claimed.job, claimed.token, "writer", coordinate.attempt, command.writer_attempts_max, {
           code: "publisher_output_invalid",
           safe_detail_code: "schema_mismatch",
           retry_after_seconds: null,
         });
       }
       if (!candidate.ok) {
-        if (attempt + 1 < command.writer_attempts_max) {
-          const nextAttempt = attempt + 1;
+        if (coordinate.attempt + 1 < command.writer_attempts_max) {
+          const nextAttempt = coordinate.attempt + 1;
           const correction = buildCorrectionDocument(
             plan,
             { deterministic: candidate.failures },
@@ -1556,6 +1477,7 @@ export async function executePatternJob(
             correction,
             expiresAt,
             nextAttempt,
+            coordinate.stageGeneration,
           );
           if (!(await retryStage(env, claimed.job, claimed.token, "writer", null))) {
             return { ok: false, reason: "duplicate", failureClass: "duplicate" };
@@ -1572,10 +1494,11 @@ export async function executePatternJob(
             env,
             identity,
             claimed.job,
-            PASS_RESPONSE_CLASS.writer,
+            coordinate.responseArtifactClass,
             writer,
             expiresAt,
-            attempt,
+            coordinate.attempt,
+            coordinate.stageGeneration,
           );
       if (
         !(await advance(env, claimed.job, claimed.token, "semantic_verifying", {
@@ -1588,9 +1511,9 @@ export async function executePatternJob(
       return { ok: true, terminal: false };
     }
 
-    if (stage === "semantic_verifying" || stage === "publishing") {
-      const attempt = claimed.job.verifier_attempts;
-      if (attempt >= command.verifier_attempts_max) {
+    if (stageOwner === "verifier" || stageOwner === "publication") {
+      const coordinate = patternAttemptCoordinate(claimed.job, "verifier");
+      if (coordinate.attempt >= command.verifier_attempts_max) {
         await failJob(env, claimed.job, claimed.token, "verifier_attempts_exhausted", "checking_claims");
         return { ok: false, reason: "terminal", failureClass: "verifier_attempts_exhausted" };
       }
@@ -1599,7 +1522,7 @@ export async function executePatternJob(
         env,
         identity,
         command.generation_id,
-        PASS_RESPONSE_CLASS.writer,
+        patternPassProtocol("writer").responseArtifactClass,
       );
       if (!plan || !writer) {
         await failJob(env, claimed.job, claimed.token, "plan_missing", "checking_claims");
@@ -1622,10 +1545,10 @@ export async function executePatternJob(
       const adopted = await getArtifactAt<PatternSemanticVerdict>(
         env,
         identity,
-        command.generation_id,
-        PASS_RESPONSE_CLASS.verifier,
-        claimed.job.stage_generation,
-        attempt,
+        coordinate.generationId,
+        coordinate.responseArtifactClass,
+        coordinate.stageGeneration,
+        coordinate.attempt,
       );
 
       let verdict: PatternSemanticVerdict;
@@ -1634,8 +1557,8 @@ export async function executePatternJob(
       } else {
         const input = buildVerifierInput(writer, plan, selected.packet, records, limits);
         if (!input.ok) return refuseInput("verifier", input);
-        await writeRequestArtifact("verifier", input.document, attempt);
-        const outcome = await runPublisherPass(pin, "verifier", attempt, () =>
+        await writeRequestArtifact(coordinate, input.document);
+        const outcome = await runPublisherPass(pin, "verifier", coordinate.attempt, () =>
           publisherImpl.verify(input.document, passOptions("verifier")),
         );
         if (!outcome.ok) {
@@ -1644,7 +1567,7 @@ export async function executePatternJob(
             claimed.job,
             claimed.token,
             "verifier",
-            attempt,
+            coordinate.attempt,
             command.verifier_attempts_max,
             outcome,
           );
@@ -1660,7 +1583,7 @@ export async function executePatternJob(
       // the verifier was the reason. Both are provider-output problems.
       const verdictProblem = findSemanticVerdictProblem(verdict);
       if (verdictProblem) {
-        return handlePassFailure(env, claimed.job, claimed.token, "verifier", attempt, command.verifier_attempts_max, {
+        return handlePassFailure(env, claimed.job, claimed.token, "verifier", coordinate.attempt, command.verifier_attempts_max, {
           code: "publisher_output_invalid",
           safe_detail_code: "schema_mismatch",
           retry_after_seconds: null,
@@ -1673,15 +1596,25 @@ export async function executePatternJob(
             env,
             identity,
             claimed.job,
-            PASS_RESPONSE_CLASS.verifier,
+            coordinate.responseArtifactClass,
             verdict,
             expiresAt,
-            attempt,
+            coordinate.attempt,
+            coordinate.stageGeneration,
           );
       // The verdict of record, under the class an operator and the retention
       // sweep look for. The same bytes as the response artifact; a different
       // role, and the response coordinate is what the artifact-first probe needs.
-      await putArtifact(env, identity, claimed.job, "semantic_verdict", verdict, expiresAt, attempt);
+      await putArtifact(
+        env,
+        identity,
+        claimed.job,
+        "semantic_verdict",
+        verdict,
+        expiresAt,
+        coordinate.attempt,
+        coordinate.stageGeneration,
+      );
 
       if (verdict.verdict !== "pass") {
         const nextWriterAttempt = claimed.job.writer_attempts + 1;

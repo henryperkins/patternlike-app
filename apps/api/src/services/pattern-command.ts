@@ -1,8 +1,4 @@
-import {
-  PATTERN_PUBLIC_STAGES,
-  type BirthTimeAccuracy,
-  type PatternPublicStage,
-} from "@patternlike/shared";
+import type { BirthTimeAccuracy } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { hasPatternProviderCallCapacity } from "../db/pattern-provider-usage.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
@@ -15,18 +11,6 @@ export type PatternReservationReason =
   | "first_open_retry"
   | "failed_attempt_retry"
   | "chart_correction";
-
-export type PatternDomainStage =
-  | "reserved"
-  | "planning"
-  | "plan_validating"
-  | "writing"
-  | "candidate_validating"
-  | "semantic_verifying"
-  | "publishing"
-  | "succeeded"
-  | "failed"
-  | "cancelled";
 
 export interface GeneratePatternCommandV1 {
   command_version: typeof PATTERN_COMMAND_VERSION;
@@ -89,26 +73,6 @@ export function isPatternCommand(value: unknown): value is GeneratePatternComman
   );
 }
 
-export function publicStageFor(stage: PatternDomainStage): "organizing_evidence" | "writing" | "checking_claims" | null {
-  if (stage === "reserved" || stage === "planning" || stage === "plan_validating") return "organizing_evidence";
-  if (stage === "writing") return "writing";
-  if (
-    stage === "candidate_validating" ||
-    stage === "semantic_verifying" ||
-    stage === "publishing"
-  ) {
-    return "checking_claims";
-  }
-  return null;
-}
-
-/** Read a stored terminal stage through the frozen public vocabulary. */
-export function publicFailureStageFor(value: string | null): PatternPublicStage | null {
-  return (PATTERN_PUBLIC_STAGES as readonly string[]).includes(value ?? "")
-    ? (value as PatternPublicStage)
-    : null;
-}
-
 /** Budget failures are retryable only when the current shared ledger has room. */
 export async function patternFailureIsRetryable(
   env: Env,
@@ -117,16 +81,6 @@ export async function patternFailureIsRetryable(
 ): Promise<boolean> {
   if (failureClass !== "publisher_budget_exhausted") return true;
   return hasPatternProviderCallCapacity(env, now);
-}
-
-/** Idempotent POST replay: in-progress public stage, or ready once accepted. */
-export type PatternAcceptedReplayStage = NonNullable<ReturnType<typeof publicStageFor>> | "ready";
-
-export function acceptedReplayStage(stage: PatternDomainStage): PatternAcceptedReplayStage {
-  const pub = publicStageFor(stage);
-  if (pub) return pub;
-  if (stage === "succeeded") return "ready";
-  return "organizing_evidence";
 }
 
 export type { BirthTimeAccuracy };

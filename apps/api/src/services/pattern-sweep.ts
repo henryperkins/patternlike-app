@@ -1,4 +1,9 @@
-import { PATTERN_JOB_TYPE, publicStageFor, type PatternDomainStage } from "./pattern-command.js";
+import { PATTERN_JOB_TYPE } from "./pattern-command.js";
+import {
+  patternStageOwner,
+  publicStageFor,
+  type PatternDomainStage,
+} from "./pattern-stage-protocol.js";
 import { markDispatched } from "../db/generation.js";
 import type { Env } from "../env.js";
 import { safeLog } from "./safe-log.js";
@@ -40,7 +45,7 @@ export async function reconcilePatternGeneration(
     .bind(generationId)
     .first<{
       generation_id: string;
-      stage: string;
+      stage: PatternDomainStage;
       stage_generation: number;
       job_id: string;
       job_status: string;
@@ -48,9 +53,7 @@ export async function reconcilePatternGeneration(
   if (!row) return { ok: false, status: 404, code: "not_found" };
 
   const terminal =
-    row.stage === "succeeded" ||
-    row.stage === "failed" ||
-    row.stage === "cancelled" ||
+    patternStageOwner(row.stage) === "terminal" ||
     row.job_status === "succeeded" ||
     row.job_status === "failed" ||
     row.job_status === "cancelled";
