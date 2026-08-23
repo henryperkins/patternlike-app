@@ -115,6 +115,8 @@ export type SafeLogEvent =
     }
   /** A stage exhausted its claim ceiling and the sweep failed the job. */
   | { event: "pattern_stage_terminal_failure" }
+  /** That repair could not commit, so the jobs row is still holding a slot. */
+  | { event: "pattern_stage_terminal_failure_write_failed" }
   /** Retention prune or expired-artifact cleanup could not complete. */
   | { event: "pattern_artifact_cleanup_failed" }
   /** Lazy derivation could not produce a receipted set for a Pattern read. */
@@ -316,6 +318,7 @@ export function safeLog(input: SafeLogEvent): string {
     case "pattern_dispatch_failed":
     case "pattern_stage_failed":
     case "pattern_stage_terminal_failure":
+    case "pattern_stage_terminal_failure_write_failed":
     case "pattern_artifact_cleanup_failed":
     case "natal_feature_derivation_failed":
     case "natal_feature_set_hash_conflict":

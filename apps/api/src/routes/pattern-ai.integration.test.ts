@@ -676,6 +676,86 @@ describe("M7 AI-generated Pattern", () => {
     });
   });
 
+  it("repairs an exhausted expired lease whose domain stage is already terminal", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const reserved = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-exhausted-torn-row" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(reserved.status, JSON.stringify(reserved.body)).toBe(202);
+    const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
+    const before = await loadPatternJob(env, generationId);
+    expect(before).not.toBeNull();
+    const now = new Date("2026-08-20T12:00:00.000Z");
+
+    // The torn state this sweep produces itself: a worker stole the lease
+    // between the SELECT and the batch, so the domain row committed `failed`
+    // while the jobs row stayed `running`. The expired-lease selector does not
+    // filter on p.stage, so the row comes back every tick until something
+    // repairs the jobs row -- and planPatternTransition refuses a terminal
+    // input, so only the domain statement may drop out.
+    await env.DB.prepare(
+      `UPDATE pattern_generation_jobs SET stage = 'failed' WHERE generation_id = ?`,
+    )
+      .bind(generationId)
+      .run();
+    await env.DB.prepare(
+      `UPDATE jobs
+       SET status = 'running', attempts = 16, claim_token = 'clm_expired_torn',
+           lease_expires_at = ?, result_class = NULL
+       WHERE id = ?`,
+    )
+      .bind(new Date(now.getTime() - 60_000).toISOString(), before!.job_id)
+      .run();
+
+    await sweepPatternJobs(env, now);
+
+    const after = await env.DB.prepare(
+      `SELECT j.status AS job_status, j.result_class, j.claim_token, j.lease_expires_at,
+              p.stage, p.stage_generation, c.status AS claim_status
+       FROM pattern_generation_jobs p
+       JOIN jobs j ON j.id = p.job_id
+       JOIN pattern_generation_claims c ON c.id = p.claim_id
+       WHERE p.generation_id = ?`,
+    )
+      .bind(generationId)
+      .first<{
+        job_status: string;
+        result_class: string | null;
+        claim_token: string | null;
+        lease_expires_at: string | null;
+        stage: string;
+        stage_generation: number;
+        claim_status: string;
+      }>();
+    expect(after).toEqual({
+      job_status: "failed",
+      result_class: "stage_attempts_exhausted",
+      claim_token: null,
+      lease_expires_at: null,
+      // Already terminal, so the domain row is left exactly as it was found.
+      stage: "failed",
+      stage_generation: before!.stage_generation,
+      claim_status: "available",
+    });
+
+    // Repaired for good: a second tick no longer sees the row at all.
+    await sweepPatternJobs(env, new Date(now.getTime() + 60_000));
+    const stillFailed = await env.DB.prepare(
+      `SELECT status FROM jobs WHERE id = ?`,
+    )
+      .bind(before!.job_id)
+      .first<{ status: string }>();
+    expect(stillFailed?.status).toBe("failed");
+  });
+
   it("refuses publication when semantic verification rejects", async () => {
     enablePatternAi();
     env.PATTERN_SEMANTIC_FORCE_REJECT = "1";
