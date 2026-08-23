@@ -298,10 +298,7 @@ function coreWriterText(writer: PatternWriterOutput): string {
   ]).join("\n");
 }
 
-function hasSuppressedLeak(
-  packet: PatternFactPacket,
-  writer: PatternWriterOutput,
-): boolean {
+function hasSuppressedPacketFeatureLeak(packet: PatternFactPacket): boolean {
   const suppressed = new Set(packet.uncertainty.suppressed_classes);
   if (
     suppressed.has("houses") &&
@@ -317,6 +314,14 @@ function hasSuppressedLeak(
   ) {
     return true;
   }
+  return false;
+}
+
+function hasSuppressedWriterLeak(
+  packet: PatternFactPacket,
+  writer: PatternWriterOutput,
+): boolean {
+  const suppressed = new Set(packet.uncertainty.suppressed_classes);
   const core = coreWriterText(writer)
     .split(/(?<=[.!?])\s+|\n+/)
     .filter((sentence) =>
@@ -350,6 +355,14 @@ function hasSuppressedLeak(
     (suppressed.has("angle_transits") && angleTransitLeak) ||
     (suppressed.has("moon_time_sensitive") && moonTimeSensitiveLeak)
   );
+}
+
+function hasSuppressedLeak(
+  packet: PatternFactPacket,
+  writer: PatternWriterOutput,
+): boolean {
+  return hasSuppressedPacketFeatureLeak(packet) ||
+    hasSuppressedWriterLeak(packet, writer);
 }
 
 function sourceDependenciesFail(
@@ -886,11 +899,14 @@ export async function applyOntologyRegressionPass(input: {
     ontology: input.ontology,
     sourceFragmentIds: input.sourceFragmentIds,
   });
-  if (
-    hardGateFailures.length === 1 &&
-    hardGateFailures[0] === "prohibited_claim" &&
-    state.writer_calls < 3
-  ) {
+  const writerCorrectableHardGate = hardGateFailures.length === 1 &&
+    (hardGateFailures[0] === "prohibited_claim" ||
+      (hardGateFailures[0] === "suppressed_feature_leak" &&
+        !hasSuppressedPacketFeatureLeak(selection.packet) &&
+        hasSuppressedWriterLeak(selection.packet, state.candidate)))
+    ? hardGateFailures[0]
+    : null;
+  if (writerCorrectableHardGate && state.writer_calls < 3) {
     return {
       ...state,
       phase: "writer",
@@ -899,7 +915,7 @@ export async function applyOntologyRegressionPass(input: {
         state.plan,
         {
           deterministic: [{
-            code: "prohibited_claim",
+            code: writerCorrectableHardGate,
             message: "",
           }],
         },

@@ -470,6 +470,350 @@ describe("M7 ontology activation regression", () => {
     });
   });
 
+  it("returns a post-verifier suppressed feature leak to the remaining writer correction loop", async () => {
+    const corpus = loadOntologyRegressionCorpus();
+    const fixtureIndex = 12;
+    const fixture = corpus.fixtures[fixtureIndex]!;
+    const writer = structuredClone(fixture.chain.writer);
+    writer.chapters[0]!.sections[0]!.text +=
+      " The Moon in Aries fixes the emotional tone of this theme.";
+    const state = {
+      ...createOntologyRegressionFixtureState(fixtureIndex, fixture),
+      phase: "verifier" as const,
+      planner_calls: 1,
+      writer_calls: 1,
+      provider_calls: 2,
+      input_tokens: 2,
+      output_tokens: 2,
+      plan: fixture.chain.plan,
+      candidate: writer,
+    };
+
+    let next = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology: corpus.manifest.reference_ontology_records,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "verifier",
+      value: fixture.chain.verdict,
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "verifier",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0-verifier",
+        provider_request_id: "verifier-suppressed-feature-correction",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"e".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+
+    expect(next).toMatchObject({
+      complete: false,
+      phase: "writer",
+      writer_calls: 1,
+      verifier_calls_for_candidate: 0,
+      provider_calls: 3,
+      candidate: null,
+      correction: {
+        attempt: 1,
+        items: [{
+          code: "suppressed_feature_leak",
+          origin: "deterministic",
+          target_key: null,
+          feature_aliases: [],
+          ontology_rule_ids: [],
+        }],
+      },
+    });
+
+    const correctedWriterInput = prepareOntologyRegressionPass({
+      state: next,
+      fixture,
+      ontology: corpus.manifest.reference_ontology_records,
+      inputMaxBytes: 98_304,
+    });
+    expect(correctedWriterInput.document).toMatchObject({
+      pass: "writer",
+      correction: {
+        attempt: 1,
+        items: [{
+          code: "suppressed_feature_leak",
+          origin: "deterministic",
+        }],
+      },
+    });
+
+    next = await applyOntologyRegressionPass({
+      state: next,
+      fixture,
+      ontology: corpus.manifest.reference_ontology_records,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "writer",
+      value: fixture.chain.writer,
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "writer",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+        provider_request_id: "writer-suppressed-feature-corrected",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"f".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+    next = await applyOntologyRegressionPass({
+      state: next,
+      fixture,
+      ontology: corpus.manifest.reference_ontology_records,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "verifier",
+      value: fixture.chain.verdict,
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "verifier",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0-verifier",
+        provider_request_id: "verifier-suppressed-feature-corrected",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"a".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+    expect(next).toMatchObject({
+      complete: true,
+      phase: "complete",
+      provider_calls: 5,
+      result: {
+        accepted: true,
+        hard_gate_failures: [],
+      },
+    });
+  });
+
+  it("keeps a suppressed feature leak terminal after writer corrections are exhausted", async () => {
+    const corpus = loadOntologyRegressionCorpus();
+    const fixtureIndex = 12;
+    const fixture = corpus.fixtures[fixtureIndex]!;
+    const ontology = corpus.manifest.reference_ontology_records;
+    let state = createOntologyRegressionFixtureState(fixtureIndex, fixture);
+    const plannerInput = prepareOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      inputMaxBytes: 98_304,
+    });
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "planner",
+      value: buildDeterministicPlan(plannerInput.selection.packet, ontology),
+      deliveryAttempt: 1,
+      metadata: {
+        provider: "openai",
+        pass: "planner",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+        provider_request_id: "planner-suppressed-feature-exhausted",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"b".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const writerInput = prepareOntologyRegressionPass({
+        state,
+        fixture,
+        ontology,
+        inputMaxBytes: 98_304,
+      });
+      const writer = buildDeterministicWriterOutput(
+        state.plan!,
+        writerInput.selection.packet,
+        ontology,
+      );
+      writer.chapters[0]!.sections[0]!.text +=
+        " The Moon in Aries fixes the emotional tone of this theme.";
+      state = await applyOntologyRegressionPass({
+        state,
+        fixture,
+        ontology,
+        sourceFragmentIds: corpus.source_fragment_ids,
+        pass: "writer",
+        value: writer,
+        deliveryAttempt: 0,
+        metadata: {
+          provider: "openai",
+          pass: "writer",
+          model: "gpt-5.6-sol",
+          prompt_version: "1.0.0",
+          provider_request_id: `writer-suppressed-feature-exhausted-${attempt}`,
+          input_tokens: 1,
+          output_tokens: 1,
+          provider_response_hash: `sha256:${"c".repeat(64)}`,
+        },
+        ontologyVersion: "ontology-regression-test",
+      });
+      state = await applyOntologyRegressionPass({
+        state,
+        fixture,
+        ontology,
+        sourceFragmentIds: corpus.source_fragment_ids,
+        pass: "verifier",
+        value: evaluateSemanticVerdict(writer, { forceReject: false }),
+        deliveryAttempt: 1,
+        metadata: {
+          provider: "openai",
+          pass: "verifier",
+          model: "gpt-5.6-sol",
+          prompt_version: "1.0.0-verifier",
+          provider_request_id: `verifier-suppressed-feature-exhausted-${attempt}`,
+          input_tokens: 1,
+          output_tokens: 1,
+          provider_response_hash: `sha256:${"d".repeat(64)}`,
+        },
+        ontologyVersion: "ontology-regression-test",
+      });
+      if (attempt < 3) {
+        expect(state).toMatchObject({
+          complete: false,
+          phase: "writer",
+          correction: {
+            attempt,
+            items: [{ code: "suppressed_feature_leak" }],
+          },
+        });
+      }
+    }
+
+    expect(state).toMatchObject({
+      complete: true,
+      phase: "complete",
+      correction: null,
+      planner_calls: 2,
+      writer_calls: 3,
+      verifier_calls_for_candidate: 2,
+      provider_calls: 11,
+      result: {
+        accepted: false,
+        provider_calls: 11,
+        hard_gate_failures: ["suppressed_feature_leak"],
+      },
+    });
+  });
+
+  it("keeps a packet-origin suppressed feature leak immediately terminal", async () => {
+    const corpus = loadOntologyRegressionCorpus();
+    const fixtureIndex = 20;
+    const fixture = structuredClone(corpus.fixtures[fixtureIndex]!);
+    const angle = structuredClone(
+      corpus.fixtures[1]!.features.find((feature) =>
+        feature.feature_class === "angle")!,
+    );
+    fixture.features.push(angle);
+    const ontology = corpus.manifest.reference_ontology_records;
+    let state = createOntologyRegressionFixtureState(fixtureIndex, fixture);
+    const plannerInput = prepareOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      inputMaxBytes: 98_304,
+    });
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "planner",
+      value: buildDeterministicPlan(plannerInput.selection.packet, ontology),
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "planner",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+        provider_request_id: "planner-packet-suppressed-feature",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"e".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+    const writerInput = prepareOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      inputMaxBytes: 98_304,
+    });
+    const writer = buildDeterministicWriterOutput(
+      state.plan!,
+      writerInput.selection.packet,
+      ontology,
+    );
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "writer",
+      value: writer,
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "writer",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0",
+        provider_request_id: "writer-packet-suppressed-feature",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"f".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+    state = await applyOntologyRegressionPass({
+      state,
+      fixture,
+      ontology,
+      sourceFragmentIds: corpus.source_fragment_ids,
+      pass: "verifier",
+      value: evaluateSemanticVerdict(writer, { forceReject: false }),
+      deliveryAttempt: 0,
+      metadata: {
+        provider: "openai",
+        pass: "verifier",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.0-verifier",
+        provider_request_id: "verifier-packet-suppressed-feature",
+        input_tokens: 1,
+        output_tokens: 1,
+        provider_response_hash: `sha256:${"a".repeat(64)}`,
+      },
+      ontologyVersion: "ontology-regression-test",
+    });
+
+    expect(state).toMatchObject({
+      complete: true,
+      phase: "complete",
+      correction: null,
+      writer_calls: 1,
+      provider_calls: 3,
+      result: {
+        accepted: false,
+        hard_gate_failures: ["suppressed_feature_leak"],
+      },
+    });
+  });
+
   it("does not retry another hard gate alone or combined with a prohibited claim", async () => {
     const corpus = loadOntologyRegressionCorpus();
     const fixture = corpus.fixtures[0]!;
