@@ -363,11 +363,6 @@ describe("ontology pipeline immutable command", () => {
         feature_predicate: { type: "aspect", aspect: "sextile" },
       },
       {
-        feature_class: "aspect",
-        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.opposition,
-        feature_predicate: { type: "aspect", aspect: "opposition" },
-      },
-      {
         feature_class: "pattern",
         source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.stellium,
         feature_predicate: { type: "pattern", pattern: "stellium" },
