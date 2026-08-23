@@ -806,6 +806,11 @@ async function handlePassFailure(
   return { ok: false, reason: "terminal", failureClass };
 }
 
+// Durable delivery orchestration lives here: claim, snapshot checks, artifact
+// adoption, provider call, deterministic validation, and queue nudge.
+// pattern-stage-protocol.ts is the sole owner of domain-stage legality,
+// attempt arithmetic, stage-generation effects, hash effects, public-stage
+// mapping, and guarded job transition statements.
 export async function executePatternJob(
   env: Env,
   message: PatternGenerationMessage,
