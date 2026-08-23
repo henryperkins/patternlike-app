@@ -64,6 +64,11 @@ const APPROVED_HINTS = [
     source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sextile,
     feature_predicate: { type: "aspect", aspect: "sextile" },
   },
+  {
+    feature_class: "aspect",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.opposition,
+    feature_predicate: { type: "aspect", aspect: "opposition" },
+  },
   STELLIUM_HINT,
   {
     feature_class: "uncertainty",

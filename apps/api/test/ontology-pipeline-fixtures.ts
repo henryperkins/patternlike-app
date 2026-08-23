@@ -16,6 +16,7 @@ export const APPROVED_COVERAGE_HINT_FRAGMENT_IDS = {
   square: "srcf_240e363f233eb6e45d14c724fc1f7761",
   trine: "srcf_69a4979a0e67ea57ba9ca26128adddaa",
   sextile: "srcf_505836d6affe1a481f59d42dfd80f78e",
+  opposition: "srcf_cda42ce7a01ce877ef238bc50166925a",
   stellium: "srcf_70a53d65d1e84c127bd1249147a880d9",
   uncertainty: "srcf_c063ee9a41d23b5640ad360d5e4a265f",
 } as const;

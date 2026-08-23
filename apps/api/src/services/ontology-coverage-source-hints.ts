@@ -60,6 +60,11 @@ const APPROVED_HINTS = [
     feature_predicate: { type: "aspect", aspect: "sextile" },
   },
   {
+    feature_class: "aspect",
+    source_fragment_id: "srcf_cda42ce7a01ce877ef238bc50166925a",
+    feature_predicate: { type: "aspect", aspect: "opposition" },
+  },
+  {
     feature_class: "pattern",
     source_fragment_id: "srcf_70a53d65d1e84c127bd1249147a880d9",
     feature_predicate: { type: "pattern", pattern: "stellium" },

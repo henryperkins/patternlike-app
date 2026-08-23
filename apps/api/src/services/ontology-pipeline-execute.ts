@@ -108,6 +108,7 @@ import {
   applyOntologyRegressionPass,
   createCanonicalOntologyRegressionReport,
   createOntologyRegressionFixtureState,
+  evaluateOntologyRegressionMandatoryCoverage,
   loadOntologyRegressionCorpus,
   ontologyRegressionPassCanAttempt,
   ontologyRegressionPassMaximumOutputTokens,
@@ -2330,6 +2331,16 @@ async function executeRegressing(
     context.command,
     sourceCorpus,
   );
+  const mandatoryCoverage = evaluateOntologyRegressionMandatoryCoverage(
+    candidate.records,
+  );
+  if (!mandatoryCoverage.ok) {
+    safeLog({
+      event: "ontology_regression_preflight_failed",
+      missing_feature_classes: mandatoryCoverage.missing_feature_classes,
+    });
+    terminal("regression_failed");
+  }
   const regressionCorpus = loadOntologyRegressionCorpus();
   const prior = await loadPriorRegressionState(env, claim);
   const fixtureIndex = prior?.complete

@@ -144,6 +144,7 @@ const FEATURE_PREDICATE_SCHEMA = {
             "square",
             "trine",
             "sextile",
+            "opposition",
           ],
         },
       },

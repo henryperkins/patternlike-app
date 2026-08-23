@@ -324,6 +324,7 @@ describe("ontology provider prompts", () => {
       { type: "aspect", aspect: "square" },
       { type: "aspect", aspect: "trine" },
       { type: "aspect", aspect: "sextile" },
+      { type: "aspect", aspect: "opposition" },
       { type: "uncertainty" },
     ]) {
       expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
@@ -334,7 +335,6 @@ describe("ontology provider prompts", () => {
       { type: "position", body: "mercury" },
       { type: "position" },
       { type: "aspect" },
-      { type: "aspect", aspect: "opposition" },
     ]) {
       expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
         .toBe(false);
