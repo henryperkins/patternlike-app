@@ -365,9 +365,6 @@ export function buildPatternTransitionStatements(
   now = new Date(),
 ): PatternTransitionStatements {
   const effect = planPatternTransition(job, transition, now);
-  if (transition.kind === "publish") {
-    throw new Error("publish transition requires atomic publication composition");
-  }
   const nowIso = now.toISOString();
   const writeAvailableAt = effect.availableAt !== undefined;
   const writeResultClass = effect.resultClass !== undefined;
@@ -455,6 +452,9 @@ export async function commitPatternTransition(
   transition: Exclude<PatternTransition, { kind: "publish" }>,
   now = new Date(),
 ): Promise<PatternTransitionEffect | null> {
+  if ((transition as { kind: string }).kind === "publish") {
+    throw new Error("publish transition requires atomic publication composition");
+  }
   try {
     const statements = buildPatternTransitionStatements(env, job, token, transition, now);
     await env.DB.batch([...statements.guards, ...statements.mutations]);

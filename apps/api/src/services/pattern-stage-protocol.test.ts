@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:test";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   acceptedReplayStage,
+  buildPatternTransitionStatements,
+  commitPatternTransition,
   patternArtifactId,
   patternAttemptCoordinate,
   patternDeliveryIsCurrent,
@@ -10,6 +13,7 @@ import {
   planPatternTransition,
   publicFailureStageFor,
   publicStageFor,
+  type PatternJobRow,
   type PatternStageState,
   type PatternTransition,
 } from "./pattern-stage-protocol.js";
@@ -28,6 +32,39 @@ const base = (overrides: Partial<PatternStageState> = {}): PatternStageState => 
 });
 
 const at = new Date("2026-08-23T12:00:00.000Z");
+
+const publicationJob: PatternJobRow = {
+  ...base({
+    stage: "publishing",
+    plan_hash: "plan-a",
+    candidate_hash: "candidate-a",
+  }),
+  job_id: "job_protocol",
+  user_id: "usr_protocol",
+  claim_id: "pgc_protocol",
+  locale: "en-US",
+  locale_revision: 1,
+};
+
+const publicationTransition = {
+  kind: "publish",
+  candidateHash: "candidate-a",
+  semanticVerdictHash: "verdict-a",
+} as const satisfies PatternTransition;
+
+type StandalonePatternTransition = Parameters<typeof commitPatternTransition>[3];
+// @ts-expect-error publication must be composed into the enclosing D1 batch
+const illegalStandaloneTransition: StandalonePatternTransition = publicationTransition;
+void illegalStandaloneTransition;
+
+const standalonePrepare = vi.fn();
+const standaloneBatch = vi.fn();
+const standaloneEnv = {
+  DB: {
+    prepare: standalonePrepare,
+    batch: standaloneBatch,
+  } as unknown as D1Database,
+};
 
 const cases: Array<{
   name: string;
@@ -389,5 +426,38 @@ describe("Pattern stage protocol", () => {
     expect(artifactId).not.toBe(await patternArtifactId("pgen_protocol", "writer_response", 7, 0));
     expect(artifactId).not.toBe(await patternArtifactId("pgen_protocol", "planner_response", 8, 0));
     expect(artifactId).not.toBe(await patternArtifactId("pgen_protocol", "planner_response", 7, 1));
+  });
+
+  it("builds guarded publication mutations without committing them alone", () => {
+    const statements = buildPatternTransitionStatements(
+      env,
+      publicationJob,
+      "clm_protocol",
+      publicationTransition,
+      at,
+    );
+    expect(statements.effect.next).toMatchObject({
+      stage: "succeeded",
+      stage_generation: 8,
+      candidate_hash: "candidate-a",
+      semantic_verdict_hash: "verdict-a",
+    });
+    expect(statements.effect.releaseUnconsumedClaim).toBe(false);
+    expect(statements.guards).toHaveLength(2);
+    expect(statements.mutations).toHaveLength(2);
+  });
+
+  it("throws before D1 when publication is passed to standalone commit", async () => {
+    standalonePrepare.mockClear();
+    standaloneBatch.mockClear();
+    await expect(commitPatternTransition(
+      standaloneEnv,
+      publicationJob,
+      "clm_protocol",
+      publicationTransition as never,
+      at,
+    )).rejects.toThrow("publish transition requires atomic publication composition");
+    expect(standalonePrepare).not.toHaveBeenCalled();
+    expect(standaloneBatch).not.toHaveBeenCalled();
   });
 });

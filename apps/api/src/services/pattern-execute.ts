@@ -27,6 +27,7 @@ import {
   type GeneratePatternCommandV1,
 } from "./pattern-command.js";
 import {
+  buildPatternTransitionStatements,
   commitPatternTransition,
   loadPatternJob,
   patternArtifactId,
@@ -712,30 +713,6 @@ export async function getArtifactAt<T>(
     throw new Error("pattern artifact identity conflict");
   }
   return { value, plaintextHash };
-}
-
-// Publication still owns its larger atomic batch until Task 3 composes the
-// protocol statements into it. Its guards move with that composition.
-function publicationOwnershipProbes(env: Env, job: PatternJobRow, token: string) {
-  return [
-    env.DB.prepare(
-      `INSERT INTO assertion_probe (id, reason)
-       SELECT 1, 'pattern job token no longer owns running lease'
-       WHERE NOT EXISTS (
-         SELECT 1 FROM jobs
-         WHERE id = ? AND claim_token = ? AND status = 'running' AND job_type = ?
-       )`,
-    ).bind(job.job_id, token, PATTERN_JOB_TYPE),
-    env.DB.prepare(
-      `INSERT INTO assertion_probe (id, reason)
-       SELECT 1, 'pattern domain stage no longer owned'
-       WHERE NOT EXISTS (
-         SELECT 1 FROM pattern_generation_jobs
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')
-       )`,
-    ).bind(job.generation_id, job.stage_generation),
-  ];
 }
 
 async function eligibility(
@@ -1572,6 +1549,17 @@ async function publishPattern(
     };
   }
   try {
+    const publicationTransition = buildPatternTransitionStatements(
+      env,
+      claimed.job,
+      claimed.token,
+      {
+        kind: "publish",
+        candidateHash,
+        semanticVerdictHash: verdictHash,
+      },
+      now,
+    );
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -1581,7 +1569,7 @@ async function publishPattern(
            WHERE id = ? AND status = 'reserved' AND active_generation_id = ? AND consumed_at IS NULL
          )`,
       ).bind(command.claim_id, command.generation_id),
-      ...publicationOwnershipProbes(env, claimed.job, claimed.token),
+      ...publicationTransition.guards,
       ...replay.receiptStatements(env),
       env.DB.prepare(
         `DELETE FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash != ?`,
@@ -1618,17 +1606,7 @@ async function publishPattern(
          SET status = 'accepted', active_generation_id = NULL, consumed_at = ?, accepted_at = ?, updated_at = ?
          WHERE id = ? AND status = 'reserved'`,
       ).bind(generatedAt, generatedAt, generatedAt, command.claim_id),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'succeeded', claim_token = NULL, lease_expires_at = NULL, finished_at = ?
-         WHERE id = ? AND claim_token = ? AND status = 'running'`,
-      ).bind(generatedAt, command.job_id, claimed.token),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'succeeded', stage_generation = stage_generation + 1, candidate_hash = ?,
-             semantic_verdict_hash = ?, updated_at = ?, finished_at = ?
-         WHERE generation_id = ? AND stage_generation = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(candidateHash, verdictHash, generatedAt, generatedAt, command.generation_id, claimed.job.stage_generation),
+      ...publicationTransition.mutations,
       env.DB.prepare(
         `INSERT INTO audit_events
            (id, actor_type, actor_id, action, resource_type, resource_id, result, detail_class, created_at)
