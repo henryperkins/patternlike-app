@@ -15,6 +15,7 @@ import {
 import {
   projectPublicPattern,
   selectPatternEvidence,
+  ontologyRecordMatchesFeature,
   validatePatternCandidate,
   validatePatternPlan,
   type PatternSelectionResult,
@@ -396,19 +397,49 @@ function containsUnqualifiedProhibitedClaim(text: string): boolean {
   return false;
 }
 
+function isOntologyRegressionMandatoryFeature(feature: NatalFeature): boolean {
+  return feature.feature_class === "uncertainty" ||
+    (feature.feature_class === "position" &&
+      (feature.body === "sun" || feature.body === "moon")) ||
+    (feature.feature_class === "aspect" && feature.orb <= 6 &&
+      [feature.body_a, feature.body_b].some((body) =>
+        body === "sun" || body === "moon"));
+}
+
+export interface OntologyRegressionMandatoryCoverageResult {
+  ok: boolean;
+  missing_feature_classes: NatalFeature["feature_class"][];
+}
+
+/** Fail without a provider call when the candidate cannot cover frozen mandatory facts. */
+export function evaluateOntologyRegressionMandatoryCoverage(
+  ontology: readonly PatternOntologyRecord[],
+): OntologyRegressionMandatoryCoverageResult {
+  const missing = new Set<NatalFeature["feature_class"]>();
+  for (const fixture of loadOntologyRegressionCorpus().fixtures) {
+    for (const feature of fixture.features) {
+      if (
+        isOntologyRegressionMandatoryFeature(feature) &&
+        !ontology.some((record) => ontologyRecordMatchesFeature(record, feature))
+      ) {
+        missing.add(feature.feature_class);
+      }
+    }
+  }
+  const missingFeatureClasses = [...missing].sort();
+  return {
+    ok: missingFeatureClasses.length === 0,
+    missing_feature_classes: missingFeatureClasses,
+  };
+}
+
 function mandatoryAccountingFails(
   fixture: OntologyRegressionFixture,
   manifest: PatternSelectionManifest,
 ): boolean {
   const byFeature = new Map(manifest.accounting.map((entry) => [entry.feature_id, entry]));
   return fixture.features.some((feature) => {
-    const mandatory = feature.feature_class === "uncertainty" ||
-      (feature.feature_class === "position" &&
-        (feature.body === "sun" || feature.body === "moon")) ||
-      (feature.feature_class === "aspect" && feature.orb <= 6 &&
-        [feature.body_a, feature.body_b].some((body) =>
-          body === "sun" || body === "moon"));
-    if (!mandatory) return false;
+    if (!isOntologyRegressionMandatoryFeature(feature)) return false;
     const accounting = byFeature.get(feature.feature_id);
     return !accounting ||
       (feature.feature_class === "uncertainty"

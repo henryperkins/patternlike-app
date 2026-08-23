@@ -32,12 +32,12 @@ const INERTNESS =
 const GENERATOR_POLICY = [
   "You generate source-grounded machine ontology records for Pattern/Like.",
   "Return one bounded generation chunk. The pipeline assembles all chunks and activates nothing until the complete candidate passes every later gate.",
-  "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target and form the entire candidate.",
-  "Set complete to false when any coverage target remains; the next call will include accepted record ids and the remaining targets.",
+  "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target and every coverage_source_hint and form the entire candidate.",
+  "Set complete to false when any coverage target or coverage_source_hint remains; the next call will include accepted record ids, remaining targets, and remaining exact hints.",
   "Emit one source-supported record for every remaining coverage target in this chunk before adding any other record.",
   "When coverage_source_hints are present, emit one source-supported record per hint, use exactly its feature_predicate and include its source_fragment_id in source_fragment_ids.",
   "Coverage-source hints are calculation-label bridges only. Ground every meaning-bearing field only in the cited corpus fragment, including normalized_proposition, tensions, counter_expressions, prohibited_claims, salience, presentation priority, and cluster tags.",
-  "The candidate is complete once no coverage target remains.",
+  "The candidate is complete once no coverage target or coverage_source_hint remains.",
   "Do not exhaust the corpus or create a record for every fragment.",
   "Use only the registered corpus fragments, closed feature vocabulary, coverage targets, reviewed coverage_source_hints for source-id and predicate routing only, policy versions, and eligible active machine predecessor records in the input.",
   "Use the corpus locale exactly for every record and never repeat a record id from this chunk or accepted_ordered_record_ids.",
@@ -113,6 +113,15 @@ const FEATURE_PREDICATE_SCHEMA = {
     {
       type: "object",
       additionalProperties: false,
+      required: ["type", "body"],
+      properties: {
+        type: { type: "string", enum: ["position"] },
+        body: { type: "string", enum: ["sun", "moon"] },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
       required: ["type", "body", "house"],
       properties: {
         type: { type: "string", enum: ["position"] },
@@ -120,6 +129,24 @@ const FEATURE_PREDICATE_SCHEMA = {
         // M7's projection has no `sign` member, so the frozen M4 position
         // predicate can be represented only through its required house arm.
         house: HOUSE_SCHEMA,
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "aspect"],
+      properties: {
+        type: { type: "string", enum: ["aspect"] },
+        aspect: {
+          type: "string",
+          enum: [
+            "conjunction",
+            "square",
+            "trine",
+            "sextile",
+            "opposition",
+          ],
+        },
       },
     },
     {
@@ -174,6 +201,14 @@ const FEATURE_PREDICATE_SCHEMA = {
           type: "string",
           enum: m0CommonSchema.$defs.birthTimeAccuracy.enum,
         },
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["type"],
+      properties: {
+        type: { type: "string", enum: ["uncertainty"] },
       },
     },
   ],

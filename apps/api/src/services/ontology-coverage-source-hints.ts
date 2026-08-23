@@ -28,13 +28,53 @@ const APPROVED_CORPUS_RELEASE_ID =
 const APPROVED_CORPUS_HASH =
   "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c";
 const APPROVED_CORPUS_LOCALE = "en-US";
-const APPROVED_FRAGMENT_ID = "srcf_70a53d65d1e84c127bd1249147a880d9";
-
-const APPROVED_HINTS = [{
-  feature_class: "pattern",
-  source_fragment_id: APPROVED_FRAGMENT_ID,
-  feature_predicate: { type: "pattern", pattern: "stellium" },
-}] as const satisfies readonly OntologyCoverageSourceHint[];
+const APPROVED_HINTS = [
+  {
+    feature_class: "position",
+    source_fragment_id: "srcf_32312edcef85aa77ffee8fa6b723e165",
+    feature_predicate: { type: "position", body: "sun" },
+  },
+  {
+    feature_class: "position",
+    source_fragment_id: "srcf_78d2386c07e8152516a2a23aa54d7b0c",
+    feature_predicate: { type: "position", body: "moon" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: "srcf_73dbb8b5679edd15e4da92f778961c3b",
+    feature_predicate: { type: "aspect", aspect: "conjunction" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: "srcf_240e363f233eb6e45d14c724fc1f7761",
+    feature_predicate: { type: "aspect", aspect: "square" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: "srcf_69a4979a0e67ea57ba9ca26128adddaa",
+    feature_predicate: { type: "aspect", aspect: "trine" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: "srcf_505836d6affe1a481f59d42dfd80f78e",
+    feature_predicate: { type: "aspect", aspect: "sextile" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: "srcf_cda42ce7a01ce877ef238bc50166925a",
+    feature_predicate: { type: "aspect", aspect: "opposition" },
+  },
+  {
+    feature_class: "pattern",
+    source_fragment_id: "srcf_70a53d65d1e84c127bd1249147a880d9",
+    feature_predicate: { type: "pattern", pattern: "stellium" },
+  },
+  {
+    feature_class: "uncertainty",
+    source_fragment_id: "srcf_c063ee9a41d23b5640ad360d5e4a265f",
+    feature_predicate: { type: "uncertainty" },
+  },
+] as const satisfies readonly OntologyCoverageSourceHint[];
 
 function copyPredicate(
   predicate: PatternFeaturePredicate,
@@ -99,7 +139,7 @@ function mappedFragmentIsRegistered(
     canonicalJson(matching[0]) === canonicalJson(indexed);
 }
 
-/** Resolve the only reviewed bridge while the registered corpus is in hand. */
+/** Resolve the reviewed bridges while the registered corpus is in hand. */
 export function buildOntologyCoverageSourceHints(
   corpus: RegisteredOntologyCorpus,
 ): CoverageSourceHintResolution {

@@ -31,7 +31,7 @@ import {
 import type { OntologyCoverageTarget } from "./ontology-packet.js";
 
 export const ONTOLOGY_PIPELINE_COMMAND_VERSION =
-  "OntologyPipelineCommandV3" as const;
+  "OntologyPipelineCommandV4" as const;
 export const ONTOLOGY_COMPILER_POLICY_VERSION = "1.0.0" as const;
 export const ONTOLOGY_REGRESSION_POLICY_VERSION = "1.0.0" as const;
 export const ONTOLOGY_PROHIBITED_CLAIM_POLICY_VERSION = "1.0.0" as const;

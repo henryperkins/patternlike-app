@@ -10,6 +10,7 @@ import {
 import {
   contentHash,
   type PatternDocumentInternal,
+  type PatternOntologyRecord,
   type PatternSemanticVerdict,
 } from "@patternlike/shared";
 
@@ -21,6 +22,7 @@ import {
   applyOntologyRegressionPass,
   createCanonicalOntologyRegressionReport,
   createOntologyRegressionFixtureState,
+  evaluateOntologyRegressionMandatoryCoverage,
   evaluateOntologyRegressionHardGates,
   evaluateOntologyRegressionThresholds,
   loadOntologyRegressionCorpus,
@@ -28,6 +30,38 @@ import {
 } from "./ontology-regression.js";
 import { deriveNatalFeatureSet } from "./natal-features.js";
 import { evaluateSemanticVerdict } from "./pattern-semantic.js";
+
+function regressionRecord(
+  index: number,
+  featurePredicate: PatternOntologyRecord["feature_predicate"],
+): PatternOntologyRecord {
+  return {
+    id: `ont_${index.toString(16).padStart(32, "0")}`,
+    meaning_class: "source_supported",
+    locale: "en-US",
+    feature_predicate: featurePredicate,
+    normalized_proposition: `Regression coverage proposition ${index}.`,
+    source_fragment_ids: [`srcf_${index.toString(16).padStart(32, "0")}`],
+    input_meaning_ids: [],
+    transformation_class: null,
+    tensions: [`Regression coverage tension ${index}.`],
+    counter_expressions: [`Regression coverage counter-expression ${index}.`],
+    prohibited_claims: ["No diagnosis, prediction, fate, or biography."],
+    salience_band: "medium",
+    presentation_priority: index,
+    cluster_tags: [featurePredicate.type],
+  };
+}
+
+const mandatoryCoveragePredicates: PatternOntologyRecord["feature_predicate"][] = [
+  { type: "position", body: "sun" },
+  { type: "position", body: "moon" },
+  { type: "aspect", aspect: "conjunction" },
+  { type: "aspect", aspect: "sextile" },
+  { type: "aspect", aspect: "square" },
+  { type: "aspect", aspect: "trine" },
+  { type: "uncertainty" },
+];
 
 describe("M7 ontology activation regression", () => {
   it("loads exactly the authored 10/10/10 corpus and every required axis", () => {
@@ -42,6 +76,56 @@ describe("M7 ontology activation regression", () => {
       .toEqual(new Set(corpus.manifest.required_axes));
     expect(corpus.manifest.authored_chains).toHaveLength(30);
     expect(corpus.source_fragment_ids.size).toBeGreaterThan(0);
+  });
+
+  it("rejects superficial six-class coverage when only one luminary is covered", () => {
+    const onePerClass = [
+      regressionRecord(1, { type: "position", body: "sun" }),
+      regressionRecord(2, { type: "aspect" }),
+      regressionRecord(3, { type: "pattern" }),
+      regressionRecord(4, { type: "angle" }),
+      regressionRecord(5, { type: "house_cusp" }),
+      regressionRecord(6, { type: "uncertainty" }),
+    ];
+
+    expect(evaluateOntologyRegressionMandatoryCoverage(onePerClass)).toEqual({
+      ok: false,
+      missing_feature_classes: ["position"],
+    });
+  });
+
+  it("accepts the minimal partial predicates needed by the frozen mandatory corpus", () => {
+    const ontology = mandatoryCoveragePredicates.map((predicate, index) =>
+      regressionRecord(index + 1, predicate)
+    );
+
+    expect(evaluateOntologyRegressionMandatoryCoverage(ontology)).toEqual({
+      ok: true,
+      missing_feature_classes: [],
+    });
+  });
+
+  it("reports only closed missing feature classes for an empty candidate", () => {
+    expect(evaluateOntologyRegressionMandatoryCoverage([])).toEqual({
+      ok: false,
+      missing_feature_classes: ["aspect", "position", "uncertainty"],
+    });
+  });
+
+  it("fails when any required mandatory-coverage predicate is removed", () => {
+    const ontology = mandatoryCoveragePredicates.map((predicate, index) =>
+      regressionRecord(index + 1, predicate)
+    );
+
+    for (let index = 0; index < ontology.length; index += 1) {
+      const result = evaluateOntologyRegressionMandatoryCoverage(
+        ontology.filter((_, recordIndex) => recordIndex !== index),
+      );
+      expect(result.ok, JSON.stringify(mandatoryCoveragePredicates[index])).toBe(false);
+      expect(result.missing_feature_classes).toEqual([
+        mandatoryCoveragePredicates[index]!.type,
+      ]);
+    }
   });
 
   it("replays all 30 checked-in chart-to-public chains through the landed seams", async () => {

@@ -56,6 +56,7 @@ export interface OntologyGeneratorContinuation {
   accepted_ordered_chunk_plaintext_hashes: readonly string[];
   accepted_ordered_record_ids: readonly string[];
   remaining_coverage_targets: readonly OntologyCoverageTarget[];
+  remaining_coverage_source_hints: readonly OntologyCoverageSourceHint[];
 }
 
 export interface OntologyCompilerSummary {
@@ -134,6 +135,7 @@ export interface OntologyGeneratorDocument {
     accepted_ordered_chunk_plaintext_hashes: string[];
     accepted_ordered_record_ids: string[];
     remaining_coverage_targets: OntologyCoverageTarget[];
+    remaining_coverage_source_hints: OntologyCoverageSourceHint[];
   } | null;
   coverage_source_hints?: OntologyCoverageSourceHint[];
 }
@@ -297,6 +299,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "accepted_ordered_chunk_plaintext_hashes",
   "accepted_ordered_record_ids",
   "remaining_coverage_targets",
+  "remaining_coverage_source_hints",
   "rule",
   "cited_meanings",
   "permitted_fragments",
@@ -465,6 +468,7 @@ const ONTOLOGY_RULE_ID = /^ont_[a-f0-9]{32}$/;
 function validContinuation(
   continuation: OntologyGeneratorContinuation | null,
   coverageTargets: readonly OntologyCoverageTarget[],
+  coverageSourceHints: readonly OntologyCoverageSourceHint[],
 ): boolean {
   if (continuation === null) return true;
   if (
@@ -479,6 +483,8 @@ function validContinuation(
       ONTOLOGY_PIPELINE_LIMITS.maximum_evaluator_calls ||
     continuation.maximum_candidate_bytes !==
       ONTOLOGY_PIPELINE_LIMITS.maximum_candidate_bytes ||
+    !Array.isArray(continuation.remaining_coverage_targets) ||
+    !Array.isArray(continuation.remaining_coverage_source_hints) ||
     continuation.accepted_ordered_chunk_plaintext_hashes.length !==
       continuation.chunk_index ||
     continuation.accepted_ordered_chunk_plaintext_hashes.some(
@@ -495,7 +501,7 @@ function validContinuation(
     return false;
   }
   let previousCoverageIndex = -1;
-  return continuation.remaining_coverage_targets.every((target) => {
+  if (!continuation.remaining_coverage_targets.every((target) => {
     const coverageIndex = coverageTargets.findIndex(
       (frozen) => frozen.feature_class === target.feature_class,
     );
@@ -515,6 +521,16 @@ function validContinuation(
       return false;
     }
     previousCoverageIndex = coverageIndex;
+    return true;
+  })) return false;
+  let previousHintIndex = -1;
+  return continuation.remaining_coverage_source_hints.every((hint) => {
+    const hintIdentity = canonicalJson(hint);
+    const hintIndex = coverageSourceHints.findIndex(
+      (frozen) => canonicalJson(frozen) === hintIdentity,
+    );
+    if (hintIndex <= previousHintIndex) return false;
+    previousHintIndex = hintIndex;
     return true;
   });
 }
@@ -540,6 +556,10 @@ function copyContinuation(
         minimum_total: target.minimum_total,
       }),
     ),
+    remaining_coverage_source_hints:
+      continuation.remaining_coverage_source_hints.map(
+        copyOntologyCoverageSourceHint,
+      ),
   };
 }
 
@@ -556,7 +576,11 @@ export function buildOntologyGeneratorPacket(
   ) {
     return { ok: false, code: "ontology_input_predecessor_invalid" };
   }
-  if (!validContinuation(input.continuation, input.coverageTargets)) {
+  if (!validContinuation(
+    input.continuation,
+    input.coverageTargets,
+    input.coverageSourceHints,
+  )) {
     return { ok: false, code: "ontology_input_continuation_invalid" };
   }
   if (!frozenOntologyCoverageSourceHintsMatchCorpus(
@@ -600,17 +624,8 @@ export function buildOntologyGeneratorPacket(
         },
     continuation: copyContinuation(input.continuation),
   };
-  const applicableCoverage = input.continuation?.remaining_coverage_targets ??
-    input.coverageTargets;
-  const applicableFeatureClasses = new Set(
-    applicableCoverage
-      .filter((target) =>
-        target.minimum_source_supported > 0 || target.minimum_total > 0)
-      .map((target) => target.feature_class),
-  );
-  const applicableHints = input.coverageSourceHints.filter((hint) =>
-    applicableFeatureClasses.has(hint.feature_class)
-  );
+  const applicableHints = input.continuation
+    ?.remaining_coverage_source_hints ?? input.coverageSourceHints;
   if (applicableHints.length > 0) {
     document.coverage_source_hints = applicableHints.map(
       copyOntologyCoverageSourceHint,

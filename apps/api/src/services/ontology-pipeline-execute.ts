@@ -58,6 +58,7 @@ import {
 } from "./ontology-corpus.js";
 import {
   frozenOntologyCoverageSourceHintsMatchIdentity,
+  type OntologyCoverageSourceHint,
 } from "./ontology-coverage-source-hints.js";
 import {
   buildOntologyEvaluatorPacket,
@@ -107,6 +108,7 @@ import {
   applyOntologyRegressionPass,
   createCanonicalOntologyRegressionReport,
   createOntologyRegressionFixtureState,
+  evaluateOntologyRegressionMandatoryCoverage,
   loadOntologyRegressionCorpus,
   ontologyRegressionPassCanAttempt,
   ontologyRegressionPassMaximumOutputTokens,
@@ -958,9 +960,33 @@ function remainingCoverageTargets(
   );
 }
 
-function coverageStrictlyDecreases(
+function recordMatchesCoverageSourceHint(
+  record: PatternOntologyRecord,
+  hint: OntologyCoverageSourceHint,
+): boolean {
+  return record.feature_predicate.type === hint.feature_class &&
+    canonicalJson(record.feature_predicate) ===
+      canonicalJson(hint.feature_predicate);
+}
+
+function remainingCoverageSourceHints(
+  command: OntologyPipelineCommand,
+  acceptedRecords: readonly PatternOntologyRecord[],
+): OntologyCoverageSourceHint[] {
+  return command.generator_input.coverage_source_hints.filter((hint) =>
+    !acceptedRecords.some((record) =>
+      recordMatchesCoverageSourceHint(record, hint) &&
+      record.meaning_class === "source_supported" &&
+      record.source_fragment_ids.includes(hint.source_fragment_id)
+    )
+  );
+}
+
+function generationDeficitsStrictlyDecrease(
   before: readonly CoverageDeficit[],
   after: readonly CoverageDeficit[],
+  beforeHints: readonly OntologyCoverageSourceHint[],
+  afterHints: readonly OntologyCoverageSourceHint[],
 ): boolean {
   if (before.length !== after.length) return false;
   let decreased = false;
@@ -981,6 +1007,14 @@ function coverageStrictlyDecreases(
       decreased = true;
     }
   }
+  const beforeHintIdentities = new Set(beforeHints.map(canonicalJson));
+  if (
+    afterHints.length > beforeHints.length ||
+    afterHints.some((hint) => !beforeHintIdentities.has(canonicalJson(hint)))
+  ) {
+    return false;
+  }
+  if (afterHints.length < beforeHints.length) decreased = true;
   return decreased;
 }
 
@@ -1003,6 +1037,10 @@ function generatorContinuation(
       command,
       progress.records,
     ),
+    remaining_coverage_source_hints: remainingCoverageSourceHints(
+      command,
+      progress.records,
+    ),
   };
 }
 
@@ -1021,6 +1059,21 @@ function validateCurrentChunk(
   for (const record of chunk.records) {
     if (ids.has(record.id)) terminal("candidate_invalid");
     ids.add(record.id);
+  }
+  const records = [...progress.records, ...chunk.records];
+  for (const hint of command.generator_input.coverage_source_hints) {
+    const matching = records.filter((record) =>
+      recordMatchesCoverageSourceHint(record, hint)
+    );
+    if (
+      matching.length > 1 ||
+      matching.some((record) =>
+        record.meaning_class !== "source_supported" ||
+        !record.source_fragment_ids.includes(hint.source_fragment_id)
+      )
+    ) {
+      terminal("candidate_invalid");
+    }
   }
 }
 
@@ -1083,6 +1136,7 @@ async function buildCompleteCandidate(
     permittedFragmentIds: new Set(corpus.fragmentIndex.keys()),
     fragments: corpus.fragmentIndex,
     coverageTargets: command.generator_input.coverage_targets,
+    coverageSourceHints: command.generator_input.coverage_source_hints,
     maximumCandidateRecords: command.limits.maximum_candidate_records,
     maximumCandidateBytes: command.limits.maximum_candidate_bytes,
   });
@@ -1213,10 +1267,21 @@ async function executeGenerating(
     context.command,
     [...progress.records, ...chunk.records],
   );
-  const remainingFeatureClasses = postChunkCoverageDeficits
+  const preChunkCoverageSourceHints = remainingCoverageSourceHints(
+    context.command,
+    progress.records,
+  );
+  const postChunkCoverageSourceHints = remainingCoverageSourceHints(
+    context.command,
+    [...progress.records, ...chunk.records],
+  );
+  const remainingFeatureClasses = [...new Set([
+    ...postChunkCoverageDeficits
     .filter((deficit) =>
       deficit.minimum_total > 0 || deficit.minimum_source_supported > 0)
-    .map((deficit) => deficit.feature_class);
+      .map((deficit) => deficit.feature_class),
+    ...postChunkCoverageSourceHints.map((hint) => hint.feature_class),
+  ])];
   // `complete` is a provider declaration, not an authority boundary. If the
   // immutable coverage targets prove work remains, persist this otherwise
   // valid chunk as an incomplete predecessor and continue within the frozen
@@ -1224,10 +1289,13 @@ async function executeGenerating(
   // response artifact; only the pipeline's accepted chunk state is narrowed.
   if (
     chunk.complete &&
-    remainingCoverageTargets(
-      context.command,
-      [...progress.records, ...chunk.records],
-    ).length > 0
+    (
+      remainingCoverageTargets(
+        context.command,
+        [...progress.records, ...chunk.records],
+      ).length > 0 ||
+      postChunkCoverageSourceHints.length > 0
+    )
   ) {
     chunk = { ...chunk, complete: false };
   }
@@ -1251,11 +1319,14 @@ async function executeGenerating(
   );
   if (!chunk.complete) {
     if (
-      preChunkCoverageDeficits.some((deficit) =>
-        deficit.minimum_total > 0 || deficit.minimum_source_supported > 0) &&
-      !coverageStrictlyDecreases(
+      (preChunkCoverageDeficits.some((deficit) =>
+        deficit.minimum_total > 0 || deficit.minimum_source_supported > 0) ||
+        preChunkCoverageSourceHints.length > 0) &&
+      !generationDeficitsStrictlyDecrease(
         preChunkCoverageDeficits,
         postChunkCoverageDeficits,
+        preChunkCoverageSourceHints,
+        postChunkCoverageSourceHints,
       )
     ) {
       safeLog({
@@ -1411,6 +1482,7 @@ async function parseCandidateRelease(
     permittedFragmentIds: new Set(corpus.fragmentIndex.keys()),
     fragments: corpus.fragmentIndex,
     coverageTargets: command.generator_input.coverage_targets,
+    coverageSourceHints: command.generator_input.coverage_source_hints,
     maximumCandidateRecords: command.limits.maximum_candidate_records,
     maximumCandidateBytes: command.limits.maximum_candidate_bytes,
   });
@@ -2259,6 +2331,16 @@ async function executeRegressing(
     context.command,
     sourceCorpus,
   );
+  const mandatoryCoverage = evaluateOntologyRegressionMandatoryCoverage(
+    candidate.records,
+  );
+  if (!mandatoryCoverage.ok) {
+    safeLog({
+      event: "ontology_regression_preflight_failed",
+      missing_feature_classes: mandatoryCoverage.missing_feature_classes,
+    });
+    terminal("regression_failed");
+  }
   const regressionCorpus = loadOntologyRegressionCorpus();
   const prior = await loadPriorRegressionState(env, claim);
   const fixtureIndex = prior?.complete
@@ -2441,6 +2523,12 @@ async function executeRegressing(
   }
 
   if (nextState.result?.hard_gate_failures.length) {
+    safeLog({
+      event: "ontology_regression_hard_gate_failed",
+      fixture_index: nextState.fixture_index,
+      pass: prepared.pass,
+      hard_gate_failures: [...nextState.result.hard_gate_failures],
+    });
     terminal("regression_failed");
   }
   if (!nextState.complete || fixtureIndex < regressionCorpus.fixtures.length - 1) {

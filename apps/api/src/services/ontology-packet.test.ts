@@ -1,6 +1,9 @@
 import { canonicalJson, type PatternOntologyRecord, type PatternOntologyRelease } from "@patternlike/shared";
 import { describe, expect, it } from "vitest";
 
+import {
+  APPROVED_COVERAGE_HINT_FRAGMENT_IDS,
+} from "../../test/ontology-pipeline-fixtures.js";
 import type { ActiveOntology } from "../db/pattern-ontology.js";
 import type { OntologyPipelineConfigPin } from "../middleware/config-guard.js";
 import type { RegisteredOntologyCorpus } from "./ontology-corpus.js";
@@ -22,12 +25,57 @@ const HINTED_CORPUS_RELEASE_ID =
   "pattern-ontology-source-manual-en-us-0.1.0";
 const HINTED_CORPUS_HASH =
   "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c";
-const HINTED_FRAGMENT_ID = "srcf_70a53d65d1e84c127bd1249147a880d9";
+const HINTED_FRAGMENT_ID = APPROVED_COVERAGE_HINT_FRAGMENT_IDS.stellium;
+const SUN_HINT = {
+  feature_class: "position",
+  source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sun,
+  feature_predicate: { type: "position", body: "sun" },
+} as const;
+const MOON_HINT = {
+  feature_class: "position",
+  source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.moon,
+  feature_predicate: { type: "position", body: "moon" },
+} as const;
 const STELLIUM_HINT = {
   feature_class: "pattern",
   source_fragment_id: HINTED_FRAGMENT_ID,
   feature_predicate: { type: "pattern", pattern: "stellium" },
 } as const;
+const APPROVED_HINTS = [
+  SUN_HINT,
+  MOON_HINT,
+  {
+    feature_class: "aspect",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.conjunction,
+    feature_predicate: { type: "aspect", aspect: "conjunction" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.square,
+    feature_predicate: { type: "aspect", aspect: "square" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.trine,
+    feature_predicate: { type: "aspect", aspect: "trine" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sextile,
+    feature_predicate: { type: "aspect", aspect: "sextile" },
+  },
+  {
+    feature_class: "aspect",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.opposition,
+    feature_predicate: { type: "aspect", aspect: "opposition" },
+  },
+  STELLIUM_HINT,
+  {
+    feature_class: "uncertainty",
+    source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.uncertainty,
+    feature_predicate: { type: "uncertainty" },
+  },
+] as const;
 
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
@@ -145,13 +193,13 @@ function hintedCorpus(options: {
   const base = registeredCorpus();
   const corpusReleaseId =
     options.corpusReleaseId ?? HINTED_CORPUS_RELEASE_ID;
-  const mapped = {
+  const mapped = APPROVED_HINTS.map((hint) => ({
     ...base.release.fragments[0]!,
-    id: HINTED_FRAGMENT_ID,
+    id: hint.source_fragment_id,
     corpus_release_id: corpusReleaseId,
     locale: "en-US",
     license_class: "licensed_excerpt" as const,
-  };
+  }));
   const other = {
     ...base.release.fragments[1]!,
     corpus_release_id: corpusReleaseId,
@@ -160,7 +208,7 @@ function hintedCorpus(options: {
   };
   const fragments = options.includeMappedFragment === false
     ? [other]
-    : [mapped, other];
+    : [...mapped, other];
   const release = {
     ...base.release,
     corpus_release_id: corpusReleaseId,
@@ -246,22 +294,22 @@ function generatorInput(corpus = registeredCorpus()) {
 
 describe("ontology provider packet builders", () => {
   describe("generator minimization", () => {
-    it("includes the hash-pinned stellium bridge only for applicable coverage", () => {
+    it("includes all missing reviewed bridges initially and only exact missing hints on continuation", () => {
       const initial = buildOntologyGeneratorPacket({
         ...generatorInput(hintedCorpus()),
         coverageTargets: [
           { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
           { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
         ],
-        coverageSourceHints: [STELLIUM_HINT],
+        coverageSourceHints: APPROVED_HINTS,
       }, PIN);
-      const nonPatternContinuation = buildOntologyGeneratorPacket({
+      const oneHintContinuation = buildOntologyGeneratorPacket({
         ...generatorInput(hintedCorpus()),
         coverageTargets: [
           { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
           { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
         ],
-        coverageSourceHints: [STELLIUM_HINT],
+        coverageSourceHints: APPROVED_HINTS,
         continuation: {
           chunk_index: 1,
           maximum_generation_chunks: 16,
@@ -273,16 +321,18 @@ describe("ontology provider packet builders", () => {
           remaining_coverage_targets: [
             { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
           ],
+          remaining_coverage_source_hints: [SUN_HINT],
         },
       }, PIN);
 
       expect(initial.ok).toBe(true);
-      expect(nonPatternContinuation.ok).toBe(true);
-      if (!initial.ok || !nonPatternContinuation.ok) return;
-      expect(initial.document.coverage_source_hints).toEqual([STELLIUM_HINT]);
-      expect(nonPatternContinuation.document).not.toHaveProperty(
-        "coverage_source_hints",
-      );
+      expect(oneHintContinuation.ok).toBe(true);
+      if (!initial.ok || !oneHintContinuation.ok) return;
+      expect(initial.document.coverage_source_hints).toEqual(APPROVED_HINTS);
+      expect(oneHintContinuation.document.continuation)
+        .toMatchObject({ remaining_coverage_source_hints: [SUN_HINT] });
+      expect(oneHintContinuation.document.coverage_source_hints)
+        .toEqual([SUN_HINT]);
     });
 
     it("preserves the exact frozen stellium bridge in a pattern-only continuation", () => {
@@ -292,7 +342,7 @@ describe("ontology provider packet builders", () => {
           { feature_class: "position", minimum_source_supported: 1, minimum_total: 1 },
           { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
         ],
-        coverageSourceHints: [STELLIUM_HINT],
+        coverageSourceHints: APPROVED_HINTS,
         continuation: {
           chunk_index: 1,
           maximum_generation_chunks: 16,
@@ -304,6 +354,7 @@ describe("ontology provider packet builders", () => {
           remaining_coverage_targets: [
             { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
           ],
+          remaining_coverage_source_hints: [STELLIUM_HINT],
         },
       }, PIN);
 
@@ -325,7 +376,7 @@ describe("ontology provider packet builders", () => {
           coverageTargets: [
             { feature_class: "pattern", minimum_source_supported: 1, minimum_total: 1 },
           ],
-          coverageSourceHints: [STELLIUM_HINT],
+          coverageSourceHints: APPROVED_HINTS,
         }, PIN)).toEqual({
           ok: false,
           code: "ontology_input_coverage_source_hint_invalid",
@@ -383,6 +434,7 @@ describe("ontology provider packet builders", () => {
         remaining_coverage_targets: [
           { feature_class: "aspect" as const, minimum_source_supported: 1, minimum_total: 2 },
         ],
+        remaining_coverage_source_hints: [],
       };
       const input = { ...generatorInput(), continuation };
       const first = buildOntologyGeneratorPacket(input, PIN);
@@ -427,6 +479,7 @@ describe("ontology provider packet builders", () => {
         remaining_coverage_targets: [
           { feature_class: "aspect" as const, minimum_source_supported: 1, minimum_total: 2 },
         ],
+        remaining_coverage_source_hints: [],
       };
       for (const changed of [
         { ...continuation, maximum_generation_chunks: 17 },
@@ -437,6 +490,51 @@ describe("ontology provider packet builders", () => {
         expect(buildOntologyGeneratorPacket({
           ...generatorInput(),
           continuation: changed,
+        }, PIN)).toEqual({
+          ok: false,
+          code: "ontology_input_continuation_invalid",
+        });
+      }
+    });
+
+    it("rejects omitted, duplicated, reordered, or tampered remaining exact hints", () => {
+      const base = {
+        chunk_index: 1,
+        maximum_generation_chunks: 16,
+        maximum_candidate_records: 64,
+        maximum_evaluator_calls: 64,
+        maximum_candidate_bytes: 262144,
+        accepted_ordered_chunk_plaintext_hashes: [`sha256:${"d".repeat(64)}`],
+        accepted_ordered_record_ids: [SOURCE_RULE_ID],
+        remaining_coverage_targets: [
+          { feature_class: "position" as const, minimum_source_supported: 1, minimum_total: 1 },
+        ],
+        remaining_coverage_source_hints: [SUN_HINT, MOON_HINT],
+      };
+      const { remaining_coverage_source_hints: _omitted, ...omitted } = base;
+      const changed = [
+        omitted,
+        { ...base, remaining_coverage_source_hints: [SUN_HINT, SUN_HINT] },
+        { ...base, remaining_coverage_source_hints: [MOON_HINT, SUN_HINT] },
+        {
+          ...base,
+          remaining_coverage_source_hints: [{
+            ...SUN_HINT,
+            source_fragment_id: `srcf_${"f".repeat(32)}`,
+          }],
+        },
+      ];
+
+      for (const continuation of changed) {
+        expect(() => buildOntologyGeneratorPacket({
+          ...generatorInput(hintedCorpus()),
+          coverageSourceHints: APPROVED_HINTS,
+          continuation: continuation as never,
+        }, PIN)).not.toThrow();
+        expect(buildOntologyGeneratorPacket({
+          ...generatorInput(hintedCorpus()),
+          coverageSourceHints: APPROVED_HINTS,
+          continuation: continuation as never,
         }, PIN)).toEqual({
           ok: false,
           code: "ontology_input_continuation_invalid",
@@ -714,7 +812,7 @@ describe("ontology provider packet builders", () => {
         coverageTargets: [
           { feature_class: "pattern" as const, minimum_source_supported: 1, minimum_total: 1 },
         ],
-        coverageSourceHints: [STELLIUM_HINT],
+        coverageSourceHints: APPROVED_HINTS,
       };
       const packet = buildOntologyGeneratorPacket(input, PIN);
       expect(packet.ok).toBe(true);

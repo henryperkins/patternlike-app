@@ -10,6 +10,9 @@ import type {
 import type {
   OntologyCandidateSafeDetailCode,
 } from "./ontology-candidate-validation.js";
+import type {
+  OntologyRegressionHardGateFailure,
+} from "./ontology-regression.js";
 
 export type ConfigurationCode =
   | "reading_rollout_invalid"
@@ -103,6 +106,16 @@ export type SafeLogEvent =
         | "coverage_no_progress"
         | "generation_chunk_limit_exhausted";
       remaining_feature_classes: NatalFeatureClass[];
+    }
+  | {
+      event: "ontology_regression_preflight_failed";
+      missing_feature_classes: NatalFeatureClass[];
+    }
+  | {
+      event: "ontology_regression_hard_gate_failed";
+      fixture_index: number;
+      pass: PatternStageClass;
+      hard_gate_failures: OntologyRegressionHardGateFailure[];
     }
   /** A stage exhausted its claim ceiling and the sweep failed the job. */
   | { event: "pattern_stage_terminal_failure" }
@@ -281,6 +294,20 @@ export function safeLog(input: SafeLogEvent): string {
         trace_id,
         safe_detail_code: input.safe_detail_code,
         remaining_feature_classes: input.remaining_feature_classes,
+      });
+      break;
+    case "ontology_regression_preflight_failed":
+      console.warn(input.event, {
+        trace_id,
+        missing_feature_classes: input.missing_feature_classes,
+      });
+      break;
+    case "ontology_regression_hard_gate_failed":
+      console.warn(input.event, {
+        trace_id,
+        fixture_index: input.fixture_index,
+        pass: input.pass,
+        hard_gate_failures: input.hard_gate_failures,
       });
       break;
     case "unhandled_error":

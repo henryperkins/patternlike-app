@@ -9,6 +9,66 @@ afterEach(() => {
 });
 
 describe("safe logging", () => {
+  it("projects only closed ontology regression preflight metadata", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "ontology_regression_preflight_failed",
+      missing_feature_classes: ["aspect", "position"],
+      fixture_id: SENTINEL,
+      chart: SENTINEL,
+      candidate: SENTINEL,
+      corpus: SENTINEL,
+      response_prose: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    const payload = warn.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      missing_feature_classes: ["aspect", "position"],
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+    });
+    expect(Object.keys(payload).sort()).toEqual([
+      "missing_feature_classes",
+      "trace_id",
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
+
+  it("projects only closed ontology regression hard-gate metadata", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "ontology_regression_hard_gate_failed",
+      fixture_index: 2,
+      pass: "verifier",
+      hard_gate_failures: ["mandatory_feature_omission"],
+      fixture_id: SENTINEL,
+      chart: SENTINEL,
+      candidate: SENTINEL,
+      corpus: SENTINEL,
+      response_prose: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    const payload = warn.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      fixture_index: 2,
+      pass: "verifier",
+      hard_gate_failures: ["mandatory_feature_omission"],
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+    });
+    expect(Object.keys(payload).sort()).toEqual([
+      "fixture_index",
+      "hard_gate_failures",
+      "pass",
+      "trace_id",
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
+
   it("projects only the closed stalled-generation diagnostic", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const hostile = {

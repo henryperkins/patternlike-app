@@ -18,7 +18,7 @@ import {
 const PIN: OntologyPipelineConfigPin = {
   generator_model: "gpt-5.6-sol",
   generator_reasoning: "high",
-  generator_prompt_version: "1.0.4",
+  generator_prompt_version: "1.0.5",
   generator_max_output_tokens: 8000,
   evaluator_model: "gpt-5.6-sol",
   evaluator_reasoning: "high",
@@ -62,12 +62,12 @@ function deepKeys(value: unknown): string[] {
 
 describe("ontology provider prompts", () => {
   it("pins completion and deterministic record policy to the revised generator prompt", () => {
-    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.4");
+    expect(OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION).toBe("1.0.5");
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
-      "Set complete to true only when the accepted earlier chunks plus this chunk satisfy every coverage target",
+      "satisfy every coverage target and every coverage_source_hint",
     );
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
-      "Set complete to false when any coverage target remains",
+      "Set complete to false when any coverage target or coverage_source_hint remains",
     );
     expect(ONTOLOGY_SYSTEM_POLICY.generator).toContain(
       "Emit one source-supported record for every remaining coverage target in this chunk",
@@ -280,17 +280,61 @@ describe("ontology provider prompts", () => {
 
     for (const predicate of [
       { type: "position", body: "ceres", house: 1 },
-      { type: "position", body: "sun" },
       {
         type: "aspect",
         body_a: "sun",
         body_b: "moon",
         aspect: "quincunx",
       },
-      { type: "aspect", aspect: "square" },
       { type: "pattern", pattern: "invented_configuration" },
       { type: "angle", angle: "descendant" },
       { type: "uncertainty", accuracy: "precise-ish" },
+    ]) {
+      expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
+        .toBe(false);
+    }
+  });
+
+  it("admits only the reviewed partial M7 predicate shapes at the generator boundary", () => {
+    const base = {
+      id: `ont_${"1".repeat(32)}`,
+      meaning_class: "source_supported",
+      locale: "en-US",
+      normalized_proposition: "A bounded proposition.",
+      source_fragment_ids: [`srcf_${"2".repeat(32)}`],
+      input_meaning_ids: [],
+      transformation_class: null,
+      tensions: ["A tension."],
+      counter_expressions: ["A counter-expression."],
+      prohibited_claims: ["No diagnosis."],
+      salience_band: "medium",
+      presentation_priority: 0,
+      cluster_tags: ["reviewed-partial"],
+    };
+    const chunk = (featurePredicate: unknown) => ({
+      schema_version: "0.7.0",
+      records: [{ ...base, feature_predicate: featurePredicate }],
+      complete: true,
+    });
+
+    for (const predicate of [
+      { type: "position", body: "sun" },
+      { type: "position", body: "moon" },
+      { type: "aspect", aspect: "conjunction" },
+      { type: "aspect", aspect: "square" },
+      { type: "aspect", aspect: "trine" },
+      { type: "aspect", aspect: "sextile" },
+      { type: "aspect", aspect: "opposition" },
+      { type: "uncertainty" },
+    ]) {
+      expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
+        .toBe(true);
+    }
+
+    for (const predicate of [
+      { type: "position", body: "mercury" },
+      { type: "position" },
+      { type: "aspect" },
     ]) {
       expect(isOntologyGenerationChunk(chunk(predicate)), JSON.stringify(predicate))
         .toBe(false);

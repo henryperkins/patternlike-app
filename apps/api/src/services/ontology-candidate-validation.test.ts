@@ -8,8 +8,12 @@ import { describe, expect, it } from "vitest";
 import {
   validateOntologyCandidateRelease,
 } from "./ontology-candidate-validation.js";
+import type {
+  OntologyCoverageSourceHint,
+} from "./ontology-coverage-source-hints.js";
 
 const FRAGMENT_ID = `srcf_${"a".repeat(32)}`;
+const OTHER_FRAGMENT_ID = `srcf_${"e".repeat(32)}`;
 
 const FRAGMENT = {
   id: FRAGMENT_ID,
@@ -20,6 +24,17 @@ const FRAGMENT = {
   license_class: "internal_synthetic" as const,
   allowed_transformations: ["intersection" as const],
 };
+
+const OTHER_FRAGMENT = {
+  ...FRAGMENT,
+  id: OTHER_FRAGMENT_ID,
+};
+
+const SUN_HINT = {
+  feature_class: "position",
+  source_fragment_id: FRAGMENT_ID,
+  feature_predicate: { type: "position", body: "sun" },
+} as const satisfies OntologyCoverageSourceHint;
 
 function release(): PatternOntologyRelease {
   return {
@@ -58,24 +73,98 @@ function release(): PatternOntologyRelease {
   };
 }
 
-function validate(candidate: PatternOntologyRelease) {
+function validate(
+  candidate: PatternOntologyRelease,
+  coverageSourceHints: readonly OntologyCoverageSourceHint[] = [],
+) {
   const canonicalBytes = canonicalJson(candidate);
   return validateOntologyCandidateRelease(candidate, {
     canonicalBytes,
     corpusLocale: "en-US",
-    permittedFragmentIds: new Set([FRAGMENT_ID]),
-    fragments: new Map([[FRAGMENT_ID, FRAGMENT]]),
+    permittedFragmentIds: new Set([FRAGMENT_ID, OTHER_FRAGMENT_ID]),
+    fragments: new Map([
+      [FRAGMENT_ID, FRAGMENT],
+      [OTHER_FRAGMENT_ID, OTHER_FRAGMENT],
+    ]),
     coverageTargets: [{
       feature_class: "house_cusp",
       minimum_source_supported: 1,
       minimum_total: 1,
     }],
+    coverageSourceHints,
     maximumCandidateRecords: 64,
     maximumCandidateBytes: 262144,
   });
 }
 
 describe("frozen ontology candidate validation", () => {
+  it("admits only exact frozen partial predicates and requires one correctly mapped source record per hint", () => {
+    const hinted = release();
+    const hintedRecord: PatternOntologyRecord = {
+      ...hinted.records[0]!,
+      id: `ont_${"2".repeat(32)}`,
+      feature_predicate: { type: "position", body: "sun" },
+      source_fragment_ids: [FRAGMENT_ID],
+    };
+    hinted.records.push(hintedRecord);
+    expect(validate(hinted, [SUN_HINT])).toMatchObject({ ok: true });
+
+    const missing = release();
+    expect(validate(missing, [SUN_HINT])).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_source_hint_invalid",
+    });
+
+    const duplicate = structuredClone(hinted);
+    duplicate.records.push({
+      ...hintedRecord,
+      id: `ont_${"3".repeat(32)}`,
+    });
+    expect(validate(duplicate, [SUN_HINT])).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_source_hint_invalid",
+    });
+
+    const derivedDuplicate = structuredClone(hinted);
+    derivedDuplicate.records.push({
+      ...hintedRecord,
+      id: `ont_${"4".repeat(32)}`,
+      meaning_class: "derived_synthesis",
+      source_fragment_ids: [],
+      input_meaning_ids: [
+        derivedDuplicate.records[0]!.id,
+        derivedDuplicate.records[1]!.id,
+      ],
+      transformation_class: "intersection",
+    });
+    expect(validate(derivedDuplicate, [SUN_HINT])).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_source_hint_invalid",
+    });
+
+    const wrongSource = structuredClone(hinted);
+    wrongSource.records[1]!.source_fragment_ids = [OTHER_FRAGMENT_ID];
+    expect(validate(wrongSource, [SUN_HINT])).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_source_hint_invalid",
+    });
+
+    const unreviewedPartial = release();
+    unreviewedPartial.records.push({
+      ...hintedRecord,
+      feature_predicate: { type: "position", body: "moon" },
+    });
+    expect(validate(unreviewedPartial, [SUN_HINT])).toEqual({
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "predicate_invalid",
+    });
+  });
+
   it("uses the exact frozen release and record schemas as runtime authority", () => {
     expect(validate(release())).toMatchObject({ ok: true });
 
@@ -240,6 +329,7 @@ describe("frozen ontology candidate validation", () => {
         minimum_source_supported: 1,
         minimum_total: 1,
       }],
+      coverageSourceHints: [],
       maximumCandidateRecords: 64,
       maximumCandidateBytes: 262144,
     })).toEqual({
@@ -262,6 +352,7 @@ describe("frozen ontology candidate validation", () => {
         minimum_source_supported: 1,
         minimum_total: 1,
       }],
+      coverageSourceHints: [],
       maximumCandidateRecords: 64,
       maximumCandidateBytes: 262144,
     })).toEqual({

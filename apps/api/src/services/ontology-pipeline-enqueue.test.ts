@@ -11,6 +11,7 @@ import {
   APPROVED_COVERAGE_HINT_CORPUS_HASH,
   APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID,
   APPROVED_COVERAGE_HINT_FRAGMENT_ID,
+  APPROVED_COVERAGE_HINT_FRAGMENT_IDS,
   buildApprovedCoverageHintCorpusManifest,
   buildTestCorpusManifest,
 } from "../../test/ontology-pipeline-fixtures.js";
@@ -71,7 +72,7 @@ function configuredEnv(queue: Queue<OntologyPipelineMessage>): Env {
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
     OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
-    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.4",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.5",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
@@ -220,7 +221,7 @@ describe("ontology pipeline immutable command", () => {
       "1.0.0-candidate",
     );
 
-    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV3");
+    expect(ONTOLOGY_PIPELINE_COMMAND_VERSION).toBe("OntologyPipelineCommandV4");
     expect(command).toEqual({
       command_version: ONTOLOGY_PIPELINE_COMMAND_VERSION,
       schema_version: "0.7.0",
@@ -236,7 +237,7 @@ describe("ontology pipeline immutable command", () => {
       generator: {
         model: "gpt-5.6-sol",
         reasoning: "high",
-        prompt_version: "1.0.4",
+        prompt_version: "1.0.5",
         timeout_ms: 120000,
         max_output_tokens: 8000,
       },
@@ -330,11 +331,53 @@ describe("ontology pipeline immutable command", () => {
       "0.1.6",
     );
 
-    expect(command.generator_input.coverage_source_hints).toEqual([{
-      feature_class: "pattern",
-      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_ID,
-      feature_predicate: { type: "pattern", pattern: "stellium" },
-    }]);
+    expect(command.generator_input.coverage_source_hints).toEqual([
+      {
+        feature_class: "position",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sun,
+        feature_predicate: { type: "position", body: "sun" },
+      },
+      {
+        feature_class: "position",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.moon,
+        feature_predicate: { type: "position", body: "moon" },
+      },
+      {
+        feature_class: "aspect",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.conjunction,
+        feature_predicate: { type: "aspect", aspect: "conjunction" },
+      },
+      {
+        feature_class: "aspect",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.square,
+        feature_predicate: { type: "aspect", aspect: "square" },
+      },
+      {
+        feature_class: "aspect",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.trine,
+        feature_predicate: { type: "aspect", aspect: "trine" },
+      },
+      {
+        feature_class: "aspect",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sextile,
+        feature_predicate: { type: "aspect", aspect: "sextile" },
+      },
+      {
+        feature_class: "aspect",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.opposition,
+        feature_predicate: { type: "aspect", aspect: "opposition" },
+      },
+      {
+        feature_class: "pattern",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.stellium,
+        feature_predicate: { type: "pattern", pattern: "stellium" },
+      },
+      {
+        feature_class: "uncertainty",
+        source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.uncertainty,
+        feature_predicate: { type: "uncertainty" },
+      },
+    ]);
     expect(command.generator_input).not.toHaveProperty("fragments");
     expect(command.generator_input.coverage_source_hints[0]).not.toHaveProperty(
       "normalized_proposition",
@@ -364,7 +407,7 @@ describe("ontology pipeline immutable command", () => {
     });
   });
 
-  it("rejects replaying a V2 command identity after the V3 hint freeze", async () => {
+  it("rejects replaying a V3 command identity after the V4 exact-hint freeze", async () => {
     const corpus = await registeredCorpus();
     const { queue } = fakeQueue();
     const pipelineEnv = configuredEnv(queue);
@@ -377,12 +420,7 @@ describe("ontology pipeline immutable command", () => {
       candidateVersion,
     );
     const oldShape = { ...current } as Record<string, unknown>;
-    oldShape.command_version = "OntologyPipelineCommandV2";
-    const oldGeneratorInput = {
-      ...(oldShape.generator_input as Record<string, unknown>),
-    };
-    delete oldGeneratorInput.coverage_source_hints;
-    oldShape.generator_input = oldGeneratorInput;
+    oldShape.command_version = "OntologyPipelineCommandV3";
     const oldJson = canonicalJson(oldShape);
     const oldHash = await contentHash(oldJson);
     const runId = `oprun_v2_conflict_${suffix}`;

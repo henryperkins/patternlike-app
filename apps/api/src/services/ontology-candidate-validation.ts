@@ -16,6 +16,7 @@ import ontologyEvaluationSchema from "../../../../contracts/m7/pattern-ontology-
 import ontologyRecordSchema from "../../../../contracts/m7/pattern-ontology-record.schema.json";
 import ontologyReleaseSchema from "../../../../contracts/m7/pattern-ontology-release.schema.json";
 import type { OntologyCorpusFragment } from "./ontology-corpus.js";
+import type { OntologyCoverageSourceHint } from "./ontology-coverage-source-hints.js";
 import type { OntologyCoverageTarget } from "./ontology-packet.js";
 
 export type OntologyCandidateSafeDetailCode =
@@ -24,6 +25,7 @@ export type OntologyCandidateSafeDetailCode =
   | "locale_invalid"
   | "predicate_invalid"
   | "record_policy_invalid"
+  | "coverage_source_hint_invalid"
   | "coverage_incomplete";
 
 export type OntologyCandidateValidationResult =
@@ -43,6 +45,7 @@ export interface OntologyCandidateValidationOptions {
   permittedFragmentIds: ReadonlySet<string>;
   fragments: ReadonlyMap<string, OntologyCorpusFragment>;
   coverageTargets: readonly OntologyCoverageTarget[];
+  coverageSourceHints: readonly OntologyCoverageSourceHint[];
   maximumCandidateRecords: number;
   maximumCandidateBytes: number;
 }
@@ -298,6 +301,39 @@ function coverageIsComplete(
   });
 }
 
+function predicateMatchesHint(
+  predicate: PatternOntologyRecord["feature_predicate"],
+  hint: OntologyCoverageSourceHint,
+): boolean {
+  return predicate.type === hint.feature_class &&
+    canonicalJson(predicate) === canonicalJson(hint.feature_predicate);
+}
+
+function coverageSourceHintsAreSatisfied(
+  records: readonly PatternOntologyRecord[],
+  hints: readonly OntologyCoverageSourceHint[],
+): boolean {
+  const identities = new Set<string>();
+  for (const hint of hints) {
+    const identity = canonicalJson(hint);
+    if (identities.has(identity)) return false;
+    identities.add(identity);
+    const matchingRecords = records.filter((record) =>
+      predicateMatchesHint(record.feature_predicate, hint)
+    );
+    if (
+      matchingRecords.length !== 1 ||
+      matchingRecords[0]!.meaning_class !== "source_supported" ||
+      !matchingRecords[0]!.source_fragment_ids.includes(
+        hint.source_fragment_id,
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Frozen JSON Schema is the structural authority; policy checks only add cross-record facts. */
 export function validateOntologyCandidateRelease(
   value: unknown,
@@ -333,7 +369,11 @@ export function validateOntologyCandidateRelease(
   }
   if (
     !value.records.every((record) => {
-      if (!validateFrozenPredicate(record.feature_predicate)) return false;
+      if (!validateFrozenPredicate(record.feature_predicate)) {
+        return options.coverageSourceHints.some((hint) =>
+          predicateMatchesHint(record.feature_predicate, hint)
+        );
+      }
       return record.feature_predicate.type !== "pattern" ||
         (typeof record.feature_predicate.pattern === "string" &&
           FROZEN_PATTERN_TYPES.has(record.feature_predicate.pattern));
@@ -350,6 +390,16 @@ export function validateOntologyCandidateRelease(
       ok: false,
       code: "candidate_policy_invalid",
       safe_detail_code: "record_policy_invalid",
+    };
+  }
+  if (!coverageSourceHintsAreSatisfied(
+    value.records,
+    options.coverageSourceHints,
+  )) {
+    return {
+      ok: false,
+      code: "candidate_policy_invalid",
+      safe_detail_code: "coverage_source_hint_invalid",
     };
   }
   if (!coverageIsComplete(value.records, options.coverageTargets)) {

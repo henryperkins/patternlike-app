@@ -9,8 +9,19 @@ export const APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID =
   "pattern-ontology-source-manual-en-us-0.1.0";
 export const APPROVED_COVERAGE_HINT_CORPUS_HASH =
   "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c";
+export const APPROVED_COVERAGE_HINT_FRAGMENT_IDS = {
+  sun: "srcf_32312edcef85aa77ffee8fa6b723e165",
+  moon: "srcf_78d2386c07e8152516a2a23aa54d7b0c",
+  conjunction: "srcf_73dbb8b5679edd15e4da92f778961c3b",
+  square: "srcf_240e363f233eb6e45d14c724fc1f7761",
+  trine: "srcf_69a4979a0e67ea57ba9ca26128adddaa",
+  sextile: "srcf_505836d6affe1a481f59d42dfd80f78e",
+  opposition: "srcf_cda42ce7a01ce877ef238bc50166925a",
+  stellium: "srcf_70a53d65d1e84c127bd1249147a880d9",
+  uncertainty: "srcf_c063ee9a41d23b5640ad360d5e4a265f",
+} as const;
 export const APPROVED_COVERAGE_HINT_FRAGMENT_ID =
-  "srcf_70a53d65d1e84c127bd1249147a880d9";
+  APPROVED_COVERAGE_HINT_FRAGMENT_IDS.stellium;
 
 export type TestCorpusLicenseClass =
   | "licensed_excerpt"

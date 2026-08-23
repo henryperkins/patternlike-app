@@ -21,6 +21,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   APPROVED_COVERAGE_HINT_CORPUS_HASH,
   APPROVED_COVERAGE_HINT_FRAGMENT_ID,
+  APPROVED_COVERAGE_HINT_FRAGMENT_IDS,
   buildApprovedCoverageHintCorpusManifest,
   buildTestCorpusManifest,
   testOntologyPipelineArtifactKeyring,
@@ -323,7 +324,7 @@ async function providerSuccess<T>(
       provider: "openai",
       pass,
       model: "gpt-5.6-sol",
-      prompt_version: pass === "generator" ? "1.0.4" : "1.0.0-evaluator",
+      prompt_version: pass === "generator" ? "1.0.5" : "1.0.0-evaluator",
       provider_request_id: `resp_task_6_${pass}_${call}`,
       input_tokens: 11,
       output_tokens: 7,
@@ -385,6 +386,75 @@ function pipelineRecords(sourceId: string): PatternOntologyRecord[] {
   }));
 }
 
+function approvedCoverageHints() {
+  return [
+    {
+      feature_class: "position" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sun,
+      feature_predicate: { type: "position" as const, body: "sun" },
+    },
+    {
+      feature_class: "position" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.moon,
+      feature_predicate: { type: "position" as const, body: "moon" },
+    },
+    {
+      feature_class: "aspect" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.conjunction,
+      feature_predicate: { type: "aspect" as const, aspect: "conjunction" },
+    },
+    {
+      feature_class: "aspect" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.square,
+      feature_predicate: { type: "aspect" as const, aspect: "square" },
+    },
+    {
+      feature_class: "aspect" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.trine,
+      feature_predicate: { type: "aspect" as const, aspect: "trine" },
+    },
+    {
+      feature_class: "aspect" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.sextile,
+      feature_predicate: { type: "aspect" as const, aspect: "sextile" },
+    },
+    {
+      feature_class: "aspect" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.opposition,
+      feature_predicate: { type: "aspect" as const, aspect: "opposition" },
+    },
+    {
+      feature_class: "pattern" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.stellium,
+      feature_predicate: { type: "pattern" as const, pattern: "stellium" },
+    },
+    {
+      feature_class: "uncertainty" as const,
+      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_IDS.uncertainty,
+      feature_predicate: { type: "uncertainty" as const },
+    },
+  ];
+}
+
+function approvedHintRecords(): PatternOntologyRecord[] {
+  return approvedCoverageHints().map((hint, index) => ({
+    id: `ont_${(index + 10).toString(16).padStart(32, "0")}`,
+    meaning_class: "source_supported",
+    locale: "en-US",
+    feature_predicate: hint.feature_predicate,
+    normalized_proposition: `Reviewed coverage proposition ${index + 1}.`,
+    source_fragment_ids: [hint.source_fragment_id],
+    input_meaning_ids: [],
+    transformation_class: null,
+    tensions: [`Reviewed coverage tension ${index + 1}.`],
+    counter_expressions: [`Reviewed coverage counter-expression ${index + 1}.`],
+    prohibited_claims: ["No diagnosis, prediction, fate, or biography."],
+    salience_band: "medium",
+    presentation_priority: 100 + index,
+    cluster_tags: [hint.feature_class],
+  }));
+}
+
 function fakeQueue(): {
   queue: Queue<OntologyPipelineMessage>;
   send: ReturnType<typeof vi.fn>;
@@ -408,7 +478,7 @@ function configuredEnv(
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
     OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
-    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.4",
+    OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.5",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
@@ -1009,36 +1079,35 @@ describe("ontology pipeline execution", () => {
     expect(publisher.generatorProviderCalls).toBe(2);
   });
 
-  it("sends the frozen stellium bridge unchanged to a pattern-only continuation", async () => {
+  it("continues after class coverage until every exact reviewed hint is satisfied", async () => {
     const manifest = await buildApprovedCoverageHintCorpusManifest();
     expect(manifest.corpus_hash).toBe(APPROVED_COVERAGE_HINT_CORPUS_HASH);
     const fixture = await reserveFixture({ manifest });
-    const mappedPatternRecord = {
-      ...fixture.records[2]!,
-      feature_predicate: { type: "pattern" as const, pattern: "stellium" as const },
-      source_fragment_ids: [APPROVED_COVERAGE_HINT_FRAGMENT_ID],
-    };
-    const firstChunkRecords = fixture.records.filter((_, index) => index !== 2);
+    const hintedRecords = approvedHintRecords();
     const publisher = new FakeOntologyPublisher([
       {
         schema_version: "0.7.0",
-        records: firstChunkRecords,
+        records: fixture.records,
         complete: true,
       },
       {
         schema_version: "0.7.0",
-        records: [mappedPatternRecord],
+        records: hintedRecords,
         complete: true,
       },
     ]);
 
     await driveToGenerating(fixture, publisher);
     expect(await deliver(fixture, publisher)).toEqual({ status: "advanced" });
-    expect(await deliver(fixture, publisher)).toEqual({ status: "advanced" });
-    expect(await runRow(fixture.runId)).toMatchObject({
-      stage: "compiling",
-      stage_cursor: 0,
-      failure_class: null,
+    const secondOutcome = await deliver(fixture, publisher);
+    const secondRow = await runRow(fixture.runId);
+    expect({ secondOutcome, secondRow }).toMatchObject({
+      secondOutcome: { status: "advanced" },
+      secondRow: {
+        stage: "compiling",
+        stage_cursor: 0,
+        failure_class: null,
+      },
     });
     expect(publisher.generateInvocations).toHaveBeenCalledTimes(2);
     const firstPacket = publisher.generateInvocations.mock.calls[0]![0] as {
@@ -1046,25 +1115,49 @@ describe("ontology pipeline execution", () => {
     };
     const secondPacket = publisher.generateInvocations.mock.calls[1]![0] as {
       document: {
-        continuation: { remaining_coverage_targets: unknown[] };
+        continuation: {
+          remaining_coverage_targets: unknown[];
+          remaining_coverage_source_hints: unknown[];
+        };
         coverage_source_hints: unknown[];
       };
     };
     expect(secondPacket.document.continuation.remaining_coverage_targets)
-      .toEqual([{
-        feature_class: "pattern",
-        minimum_source_supported: 1,
-        minimum_total: 1,
-      }]);
-    expect(secondPacket.document.coverage_source_hints).toEqual([{
-      feature_class: "pattern",
-      source_fragment_id: APPROVED_COVERAGE_HINT_FRAGMENT_ID,
-      feature_predicate: { type: "pattern", pattern: "stellium" },
-    }]);
-    expect(canonicalJson(firstPacket.document.coverage_source_hints)).toBe(
-      canonicalJson(secondPacket.document.coverage_source_hints),
-    );
-    expect(mappedPatternRecord.feature_predicate).not.toHaveProperty("body");
+      .toEqual([]);
+    expect(secondPacket.document.continuation.remaining_coverage_source_hints)
+      .toEqual(approvedCoverageHints());
+    expect(secondPacket.document.coverage_source_hints)
+      .toEqual(approvedCoverageHints());
+    expect(firstPacket.document.coverage_source_hints)
+      .toEqual(approvedCoverageHints());
+    expect(hintedRecords[0]!.feature_predicate).not.toHaveProperty("house");
+    expect(hintedRecords[2]!.feature_predicate).not.toHaveProperty("body_a");
+    expect(hintedRecords[8]!.feature_predicate).not.toHaveProperty("accuracy");
+  });
+
+  it("closes a continuation that reduces neither class nor exact-hint deficits", async () => {
+    const manifest = await buildApprovedCoverageHintCorpusManifest();
+    const fixture = await reserveFixture({ manifest });
+    const unrelated = {
+      ...fixture.records[0]!,
+      id: `ont_${"f".repeat(32)}`,
+      feature_predicate: { type: "position" as const, body: "mercury", house: 2 },
+    };
+    const publisher = new FakeOntologyPublisher([
+      { schema_version: "0.7.0", records: fixture.records, complete: true },
+      { schema_version: "0.7.0", records: [unrelated], complete: true },
+    ]);
+
+    await driveToGenerating(fixture, publisher);
+    expect(await deliver(fixture, publisher)).toEqual({ status: "advanced" });
+    expect(await deliver(fixture, publisher)).toEqual({ status: "terminal" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      failure_class: "candidate_invalid",
+      stage_cursor: 1,
+    });
+    expect(publisher.generatorProviderCalls).toBe(2);
+    expect(publisher.evaluateInvocations).not.toHaveBeenCalled();
   });
 
   it("rejects any frozen coverage-hint mapping drift before a provider request", async () => {
@@ -1078,7 +1171,7 @@ describe("ontology pipeline execution", () => {
       generator_input: {
         coverage_source_hints: Array<{
           source_fragment_id: string;
-          feature_predicate: { type: string; pattern: string };
+          feature_predicate: Record<string, unknown>;
         }>;
       };
     };
@@ -1093,13 +1186,13 @@ describe("ontology pipeline execution", () => {
       },
       (command) => {
         command.generator_input.coverage_source_hints[0]!
-          .feature_predicate.pattern = "grand_trine";
+          .feature_predicate.body = "moon";
       },
       (command) => {
         command.generator_input.coverage_source_hints = [];
       },
       (command) => {
-        command.command_version = "OntologyPipelineCommandV2";
+        command.command_version = "OntologyPipelineCommandV3";
       },
     ];
 
@@ -1306,6 +1399,7 @@ describe("ontology pipeline execution", () => {
         { feature_class: "house_cusp", minimum_source_supported: 1, minimum_total: 1 },
         { feature_class: "uncertainty", minimum_source_supported: 1, minimum_total: 1 },
       ],
+      remaining_coverage_source_hints: [],
     });
     expect(secondText).not.toBe(firstText);
     for (const forbidden of [fixture.runId, "stage_generation", "object_key", "oprun_"]) {
@@ -2322,6 +2416,49 @@ describe("ontology pipeline execution", () => {
     ).bind(fixture.runId).first()).toEqual({ count: 0 });
   });
 
+  it("fails mandatory regression coverage before the first Pattern provider request", async () => {
+    const fixture = await reserveFixture();
+    const publisher = new FakeOntologyPublisher(
+      [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
+      fixture.records.map((record) => passingVerdict(record.id)),
+    );
+    await driveToEvaluating(fixture, publisher);
+    while ((await runRow(fixture.runId)).stage === "evaluating") {
+      expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+    }
+    expect(await runRow(fixture.runId)).toMatchObject({ stage: "regressing" });
+
+    const patternPublisher = new FakeRegressionPatternPublisher();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await deliver(
+      fixture,
+      publisher,
+      undefined,
+      fixture.pipelineEnv,
+      patternPublisher,
+    )).toEqual({ status: "terminal" });
+
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "failed",
+      stage_cursor: 0,
+      failure_class: "regression_failed",
+      regression_report_hash: null,
+      bundle_hash: null,
+    });
+    expect(patternPublisher.providerCalls).toBe(0);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND artifact_class = 'regression_request'`,
+    ).bind(fixture.runId).first()).toEqual({ count: 0 });
+    expect(warn).toHaveBeenCalledWith(
+      "ontology_regression_preflight_failed",
+      {
+        trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+        missing_feature_classes: ["aspect", "position", "uncertainty"],
+      },
+    );
+  }, 60_000);
+
   it("adopts a persisted regression response after a result-write crash without another call", async () => {
     const { fixture, publisher } = await driveActivationToRegression();
     const patternPublisher = new FakeRegressionPatternPublisher();
@@ -2471,6 +2608,7 @@ describe("ontology pipeline execution", () => {
 
   it("makes a prohibited claim hard-gate failure terminal before signing", async () => {
     const { fixture, publisher } = await driveActivationToRegression();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const patternPublisher = new FakeRegressionPatternPublisher((writer) => {
       writer.chapters[0]!.sections[0]!.text =
         "This placement guarantees a future medical diagnosis.";
@@ -2531,6 +2669,15 @@ describe("ontology pipeline execution", () => {
         hard_gate_failures: ["prohibited_claim"],
       },
     });
+    expect(warn).toHaveBeenCalledWith(
+      "ontology_regression_hard_gate_failed",
+      {
+        trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+        fixture_index: 0,
+        pass: "verifier",
+        hard_gate_failures: ["prohibited_claim"],
+      },
+    );
   }, 60_000);
 
   it("runs all 30 fixtures one provider pass per delivery, signs, and activates", async () => {
