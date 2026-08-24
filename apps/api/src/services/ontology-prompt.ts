@@ -372,7 +372,10 @@ export interface OntologyEvaluatorResponsesRequest {
   input: OntologyResponsesInputMessage[];
   reasoning: { effort: "high" };
   text: { verbosity: "low"; format: OntologyResponsesFormat };
-  max_output_tokens: number;
+  /** Absent on the Codex backend, which rejects the parameter outright. */
+  max_output_tokens?: number;
+  /** Required `true` on the Codex backend, which refuses a non-streaming call. */
+  stream?: true;
 }
 
 function input(serialized: string): OntologyResponsesInputMessage[] {

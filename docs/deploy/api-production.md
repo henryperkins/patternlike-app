@@ -264,8 +264,8 @@ The configuration lives in `[env.production.assets]` in
   missing from that array is not a 404: static assets answer first, and
   `not_found_handling = "single-page-application"` returns `index.html` with a
   **200**, so a forgotten route silently serves HTML to an API client. It
-  currently reads `["/health", "/v1/*", "/internal/*"]` — keep it in sync with
-  `apps/api/src/index.ts`.
+  currently reads `["/health", "/v1/*", "/internal/*", "/admin/*",
+  "/codex-provider/*"]` — keep it in sync with `apps/api/src/index.ts`.
 - **`assets` is scoped to `[env.production]`, not top-level.**
   `@cloudflare/vitest-pool-workers` loads this file, and a top-level
   `assets.directory` pointing at an unbuilt `apps/web/dist` would break the API
@@ -278,9 +278,9 @@ npm run deploy:api     # builds @patternlike/web, then wrangler deploy --env pro
 ```
 
 Requests that match a static asset never invoke the Worker and are free and
-unlimited; only `/v1/*`, `/internal/*`, and `/health` cost a request. A useful
-consequence: a `503 configuration_error` from `configGuard` degrades the API
-only — the app shell still loads.
+unlimited; only `/v1/*`, `/internal/*`, `/admin/*`, `/codex-provider/*`, and
+`/health` cost a request. A useful consequence: a `503 configuration_error`
+from `configGuard` degrades the API only — the app shell still loads.
 
 Verify:
 

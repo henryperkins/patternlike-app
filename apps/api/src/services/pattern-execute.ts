@@ -21,6 +21,7 @@ import { loadActiveOntology, loadOntologyByVersion } from "../db/pattern-ontolog
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { isConsumedStatus, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { consumePatternProviderCallBudget, utcDateFor } from "../db/pattern-provider-usage.js";
+import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import {
   PATTERN_JOB_TYPE,
   isPatternCommand,
@@ -44,7 +45,11 @@ import {
 import { hashesEqual } from "./content-release.js";
 import {
   OPENAI_PATTERN_WRITER_MODEL,
+  PATTERN_PUBLISHER_CODEX,
   PATTERN_PUBLISHER_OPENAI,
+  PATTERN_PUBLISHER_WORKERS_AI,
+  WORKERS_AI_PATTERN_WRITER_MODEL,
+  patternProviderDisplayName,
   resolvePatternPublisherConfiguration,
   type PatternPassOutcome,
   type PatternPassOptions,
@@ -57,6 +62,9 @@ import {
   createOpenAiPatternPublisher,
   createSyntheticPatternPublisher,
 } from "./pattern-publisher-factory.js";
+import { createWorkersAiPatternPublisher } from "./workers-ai-pattern-publisher.js";
+import { createCodexPatternPublisher } from "./codex-pattern-publisher.js";
+import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
 import {
   PATTERN_PACKET_LIMITS_DEFAULT,
   buildCorrectionDocument,
@@ -94,18 +102,41 @@ const CLAIM_LEASE_MS = 5 * 60 * 1000;
  */
 const MODEL_FAMILY_BY_WRITER_MODEL: Readonly<Record<string, string>> = {
   [OPENAI_PATTERN_WRITER_MODEL]: "gpt",
+  [WORKERS_AI_PATTERN_WRITER_MODEL]: "gpt-oss",
 };
 
 function provenanceFromExecutedPin(pin: PatternPublisherPin): {
   provider: string;
   model_family: string;
 } {
-  if (pin.publisher !== PATTERN_PUBLISHER_OPENAI) {
-    return { provider: "synthetic", model_family: "synthetic" };
+  if (pin.publisher === PATTERN_PUBLISHER_WORKERS_AI) {
+    const family = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
+    if (!family) throw new Error("unsupported Pattern writer model family");
+    return {
+      provider: patternProviderDisplayName(pin.publisher),
+      model_family: family,
+    };
+  }
+  if (
+    pin.publisher !== PATTERN_PUBLISHER_OPENAI &&
+    pin.publisher !== PATTERN_PUBLISHER_CODEX
+  ) {
+    return {
+      provider: patternProviderDisplayName(pin.publisher),
+      model_family: "synthetic",
+    };
   }
   const modelFamily = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
   if (!modelFamily) throw new Error("unsupported Pattern writer model family");
-  return { provider: "OpenAI", model_family: modelFamily };
+  // The document says who actually wrote it. Reporting "OpenAI" for a Codex
+  // pass would put a false provenance record in front of a reader, which is the
+  // exact failure the executed-pin check and the closed model-family allowlist
+  // exist to prevent -- the reader-facing `provider` is a plain string in the
+  // frozen contract precisely so a second honest value costs no schema bump.
+  return {
+    provider: patternProviderDisplayName(pin.publisher),
+    model_family: modelFamily,
+  };
 }
 
 /**
@@ -122,13 +153,22 @@ async function runPublisherPass<T>(
 ): Promise<PatternPassOutcome<T>> {
   const startedAt = Date.now();
   const outcome = await invoke();
-  if (pin.publisher !== PATTERN_PUBLISHER_OPENAI) return outcome;
+  if (!outcome.ok && outcome.code === "publisher_pending") return outcome;
+  // Both real providers are measured and provenance-checked. Only the
+  // deterministic stand-in is exempt, because it never spoke to anyone.
+  if (
+    pin.publisher !== PATTERN_PUBLISHER_OPENAI &&
+    pin.publisher !== PATTERN_PUBLISHER_CODEX &&
+    pin.publisher !== PATTERN_PUBLISHER_WORKERS_AI
+  ) {
+    return outcome;
+  }
 
   const latencyMs = Math.max(0, Date.now() - startedAt);
   if (!outcome.ok) {
     safeLog({
       event: "pattern_publisher_attempt_failed",
-      provider: PATTERN_PUBLISHER_OPENAI,
+      provider: pin.publisher,
       pass,
       model: pin[`${pass}_model`],
       prompt_version: pin[`${pass}_prompt_version`],
@@ -142,7 +182,10 @@ async function runPublisherPass<T>(
 
   const metadata = outcome.metadata;
   if (
-    metadata.provider !== PATTERN_PUBLISHER_OPENAI ||
+    // Still exact, just no longer hardcoded to one provider: a pass that
+    // answered from a different transport than the frozen pin names is
+    // inconsistent provenance, whichever of the two it was.
+    metadata.provider !== pin.publisher ||
     metadata.pass !== pass ||
     metadata.model !== pin[`${pass}_model`] ||
     metadata.prompt_version !== pin[`${pass}_prompt_version`] ||
@@ -806,6 +849,34 @@ async function handlePassFailure(
   return { ok: false, reason: "terminal", failureClass };
 }
 
+async function awaitPatternProvider(
+  env: Env,
+  job: PatternJobRow,
+  token: string,
+  providerJobId: string,
+): Promise<PatternExecuteOutcome> {
+  const effect = await commitPatternTransition(
+    env,
+    job,
+    token,
+    { kind: "await_provider" },
+  );
+  if (!effect) {
+    return { ok: false, reason: "duplicate", failureClass: "duplicate" };
+  }
+  // Close the enqueue/defer race: an unusually fast runner may finish while
+  // this delivery still owns the domain claim. Once ownership is released,
+  // repair the nudge immediately instead of waiting for maintenance.
+  const providerJob = await loadCodexProviderJob(env, providerJobId);
+  if (
+    providerJob &&
+    (providerJob.status === "completed" || providerJob.status === "failed")
+  ) {
+    await nudgeCodexProviderOwner(env, providerJob);
+  }
+  return { ok: true, terminal: false };
+}
+
 // Durable delivery orchestration lives here: claim, snapshot checks, artifact
 // adoption, provider call, deterministic validation, and queue nudge.
 // pattern-stage-protocol.ts is the sole owner of domain-stage legality,
@@ -934,8 +1005,22 @@ export async function executePatternJob(
       bounds: PATTERN_PACKET_LIMITS_DEFAULT.bounds,
     };
 
-    const openai = pin.publisher === PATTERN_PUBLISHER_OPENAI;
-    if (openai && !config.credential) {
+    const workersAi = pin.publisher === PATTERN_PUBLISHER_WORKERS_AI;
+    const remoteProvider =
+      pin.publisher === PATTERN_PUBLISHER_OPENAI ||
+      pin.publisher === PATTERN_PUBLISHER_CODEX ||
+      workersAi;
+    // Workers AI carries no credential; its binding is the thing that must
+    // exist, and a deployment naming it without one fails the same way.
+    if (workersAi && !env.AI) {
+      await commitPatternTransition(env, claimed.job, claimed.token, {
+        kind: "fail",
+        failureClass: "publisher_not_configured",
+        publicStage: publicStageFor(stage) ?? "organizing_evidence",
+      });
+      return { ok: false, reason: "terminal", failureClass: "publisher_not_configured" };
+    }
+    if (pin.publisher === PATTERN_PUBLISHER_OPENAI && !config.credential) {
       await commitPatternTransition(env, claimed.job, claimed.token, {
         kind: "fail",
         failureClass: "publisher_not_configured",
@@ -953,7 +1038,7 @@ export async function executePatternJob(
     // consume a unit, and nothing is refunded: the bound is on spend, not on
     // success. A synthetic pass gets a reserve that never charges, because the
     // ledger counts provider calls and there is no provider.
-    const reserve = openai
+    const reserve = remoteProvider && pin.publisher !== PATTERN_PUBLISHER_CODEX
       ? async (stageClass: PatternStageClass) => {
           const budget = await consumePatternProviderCallBudget(
             env,
@@ -965,7 +1050,15 @@ export async function executePatternJob(
         }
       : async (_stageClass: PatternStageClass) => ({ ok: true });
 
-    const publisherImpl: PatternPublisher = openai
+    // One transport serves both remote providers: the credential it is handed
+    // selects the endpoint, the header set, and the request shape. A second
+    // near-identical publisher would be a second place for the pass ceilings
+    // and the provenance metadata to drift.
+    const publisherImpl: PatternPublisher = workersAi
+      ? createWorkersAiPatternPublisher(env.AI as never)
+      : pin.publisher === PATTERN_PUBLISHER_CODEX
+      ? createCodexPatternPublisher(env)
+      : remoteProvider
       ? createOpenAiPatternPublisher(config.credential!, config.gatewayRoute)
       : createSyntheticPatternPublisher({
           forceReject: resolveSemanticForceReject(env),
@@ -984,6 +1077,18 @@ export async function executePatternJob(
       timeoutMs: passTimeoutMs[pass],
       pin,
       reserve,
+      ...(pin.publisher === PATTERN_PUBLISHER_CODEX
+        ? {
+            codexJob: {
+              pipeline: "pattern" as const,
+              ownerId: command.generation_id,
+              userId: identity.userId,
+              stageGeneration: claimed.job.stage_generation,
+              stageAttempt: claimed.job[patternPassProtocol(pass).attemptColumn],
+              dailyCallLimit: config.dailyCallLimit,
+            },
+          }
+        : {}),
     });
 
     // Step 6: the exact bytes sent, written before the call that sends them, so
@@ -1048,6 +1153,14 @@ export async function executePatternJob(
           publisherImpl.plan(input.document, passOptions("planner")),
         );
         if (!outcome.ok) {
+          if (outcome.code === "publisher_pending") {
+            return awaitPatternProvider(
+              env,
+              claimed.job,
+              claimed.token,
+              outcome.job_id,
+            );
+          }
           return handlePassFailure(
             env,
             claimed.job,
@@ -1198,6 +1311,14 @@ export async function executePatternJob(
           publisherImpl.write(input.document, passOptions("writer")),
         );
         if (!outcome.ok) {
+          if (outcome.code === "publisher_pending") {
+            return awaitPatternProvider(
+              env,
+              claimed.job,
+              claimed.token,
+              outcome.job_id,
+            );
+          }
           return handlePassFailure(
             env,
             claimed.job,
@@ -1341,6 +1462,14 @@ export async function executePatternJob(
           publisherImpl.verify(input.document, passOptions("verifier")),
         );
         if (!outcome.ok) {
+          if (outcome.code === "publisher_pending") {
+            return awaitPatternProvider(
+              env,
+              claimed.job,
+              claimed.token,
+              outcome.job_id,
+            );
+          }
           return handlePassFailure(
             env,
             claimed.job,

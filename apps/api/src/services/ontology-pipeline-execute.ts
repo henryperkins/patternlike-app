@@ -19,14 +19,17 @@ import {
   advanceOntologyPipelineCursor,
   advanceOntologyPipelineStage,
   claimOntologyPipelineRun,
+  deferOntologyPipelineForProvider,
   failOntologyPipelineRun,
   retryOntologyPipelineStage,
   succeedOntologyPipelineRun,
   type ClaimedOntologyPipelineRun,
   type OntologyPipelineFailureClass,
 } from "../db/ontology-pipeline.js";
+import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import {
   validateOntologyCandidateRelease,
+  type OntologyCandidateSafeDetailCode,
 } from "./ontology-candidate-validation.js";
 import { safeLog } from "./safe-log.js";
 import {
@@ -98,8 +101,12 @@ import type {
   OntologyPassOutcome,
   OntologyPublisher,
   OntologyRuleVerdict,
+  OntologyVerdictDimension,
 } from "./ontology-publisher.js";
 import { createOpenAiOntologyPublisher } from "./openai-ontology-publisher.js";
+import { createCodexOntologyPublisher } from "./codex-ontology-publisher.js";
+import { createCodexPatternPublisher } from "./codex-pattern-publisher.js";
+import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
 import {
   ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL,
   ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
@@ -123,6 +130,7 @@ import type {
   PatternPassOutcome,
   PatternPassProvenance,
   PatternPublisher,
+  PatternPublisherPin,
   PatternStageClass,
 } from "./pattern-publisher.js";
 import {
@@ -365,7 +373,7 @@ function commandIsExecutable(
   const pin = configuration.pin;
   return value.command_version === ONTOLOGY_PIPELINE_COMMAND_VERSION &&
     value.schema_version === M7_SCHEMA_VERSION &&
-    value.provider === "openai" &&
+    value.provider === configuration.publisher &&
     value.candidate_ontology_version === row.candidate_ontology_version &&
     corpus.corpus_release_id === row.corpus_release_id &&
     corpus.corpus_hash === row.corpus_hash &&
@@ -580,6 +588,7 @@ function parseCanonicalVerdict(bytes: Uint8Array): OntologyRuleVerdict {
 function parseRawProviderValue<T>(
   bytes: Uint8Array,
   guard: (value: unknown) => value is T,
+  provider: "openai" | "codex" = "openai",
 ): T {
   const raw = decodeUtf8(bytes);
   const jsonText = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
@@ -589,13 +598,15 @@ function parseRawProviderValue<T>(
   } catch {
     terminal("provider_response_invalid");
   }
-  const extracted = extractOutputText(envelope);
-  if (!extracted.ok) terminal("provider_response_invalid");
-  let value: unknown;
-  try {
-    value = JSON.parse(extracted.text);
-  } catch {
-    terminal("provider_response_invalid");
+  let value: unknown = envelope;
+  if (provider === "openai") {
+    const extracted = extractOutputText(envelope);
+    if (!extracted.ok) terminal("provider_response_invalid");
+    try {
+      value = JSON.parse(extracted.text);
+    } catch {
+      terminal("provider_response_invalid");
+    }
   }
   if (!guard(value)) terminal("provider_response_invalid");
   return value;
@@ -620,7 +631,7 @@ function providerMetadataMatches(
   command: OntologyPipelineCommand,
 ): boolean {
   const expected = pass === "generator" ? command.generator : command.evaluator;
-  return outcome.metadata.provider === "openai" &&
+  return outcome.metadata.provider === command.provider &&
     outcome.metadata.pass === pass &&
     outcome.metadata.model === expected.model &&
     outcome.metadata.prompt_version === expected.prompt_version &&
@@ -731,6 +742,9 @@ async function advanceCursor(
 function providerFailureClass(
   outcome: Extract<OntologyPassOutcome<unknown>, { ok: false }>,
 ): { failureClass: OntologyPipelineFailureClass; retryable: boolean } {
+  if (outcome.code === "publisher_pending") {
+    return { failureClass: "provider_unavailable", retryable: true };
+  }
   if (outcome.code === "publisher_budget_exhausted") {
     return { failureClass: "provider_budget_exhausted", retryable: false };
   }
@@ -766,6 +780,19 @@ async function handleProviderFailure(
   outcome: Extract<OntologyPassOutcome<unknown>, { ok: false }>,
   clock: () => Date,
 ): Promise<OntologyPipelineExecuteOutcome> {
+  if (outcome.code === "publisher_pending") {
+    if (!await deferOntologyPipelineForProvider(env, claim, clock())) {
+      return { status: "duplicate" };
+    }
+    const providerJob = await loadCodexProviderJob(env, outcome.job_id);
+    if (
+      providerJob &&
+      (providerJob.status === "completed" || providerJob.status === "failed")
+    ) {
+      await nudgeCodexProviderOwner(env, providerJob, clock());
+    }
+    return { status: "parked" };
+  }
   const mapped = providerFailureClass(outcome);
   if (!mapped.retryable) terminal(mapped.failureClass);
   if (claim.stageAttempt + 1 >= MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS) {
@@ -1043,20 +1070,43 @@ function generatorContinuation(
   };
 }
 
+/**
+ * Reject a generated chunk, naming the reason.
+ *
+ * These exits were silent, and they are the ones a real run hits: they fire
+ * before the `candidate_chunk` artifact is written, so a rejected run leaves a
+ * `generator_response` blob, no chunk, and nothing to read. Diagnosing one then
+ * costs an artifact decryption, which is the same "the operator is left
+ * guessing" failure the blind regression correction loop had. `reason` is a
+ * closed code beside the existing `ontology_candidate_rejected` event; no
+ * record id, fragment id, or generated text is ever logged.
+ */
+function rejectChunk(
+  reason: OntologyCandidateSafeDetailCode,
+  detail: { record_count: number },
+): never {
+  safeLog({
+    event: "ontology_candidate_rejected",
+    reason,
+    record_count: detail.record_count,
+  });
+  terminal("candidate_invalid");
+}
+
 function validateCurrentChunk(
   chunk: OntologyGenerationChunk,
   progress: AcceptedGenerationProgress,
   command: OntologyPipelineCommand,
 ): void {
-  if (
-    progress.records.length + chunk.records.length >
-      command.limits.maximum_candidate_records
-  ) {
-    terminal("candidate_invalid");
+  const recordCount = progress.records.length + chunk.records.length;
+  if (recordCount > command.limits.maximum_candidate_records) {
+    rejectChunk("limit_exceeded", { record_count: recordCount });
   }
   const ids = new Set(progress.orderedRecordIds);
   for (const record of chunk.records) {
-    if (ids.has(record.id)) terminal("candidate_invalid");
+    if (ids.has(record.id)) {
+      rejectChunk("record_policy_invalid", { record_count: recordCount });
+    }
     ids.add(record.id);
   }
   const records = [...progress.records, ...chunk.records];
@@ -1071,7 +1121,9 @@ function validateCurrentChunk(
         !record.source_fragment_ids.includes(hint.source_fragment_id)
       )
     ) {
-      terminal("candidate_invalid");
+      rejectChunk("coverage_source_hint_invalid", {
+        record_count: recordCount,
+      });
     }
   }
 }
@@ -1184,6 +1236,7 @@ async function executeGenerating(
       chunk = parseRawProviderValue(
         adoptedResponse.plaintext,
         isOntologyGenerationChunk,
+        context.command.provider,
       );
     }
   }
@@ -1194,7 +1247,7 @@ async function executeGenerating(
       claim,
       "generator_request",
     );
-    if (ambiguousRequest) {
+    if (ambiguousRequest && context.command.provider !== "codex") {
       return await rescheduleAmbiguousProviderRequest(env, claim, clock);
     }
     await assertProviderRunCapacity(
@@ -1239,6 +1292,16 @@ async function executeGenerating(
           now: clock,
         },
       ),
+      ...(context.command.provider === "codex"
+        ? {
+            codexJob: {
+              ownerId: claim.runId,
+              stageGeneration: claim.stageGeneration,
+              stageAttempt: claim.stageAttempt,
+              dailyCallLimit: context.command.daily_provider_call_limit,
+            },
+          }
+        : {}),
     });
     if (!outcome.ok) {
       return await handleProviderFailure(env, claim, outcome, clock);
@@ -1250,6 +1313,7 @@ async function executeGenerating(
     const storedValue = parseRawProviderValue(
       textEncoder.encode(outcome.raw),
       isOntologyGenerationChunk,
+      context.command.provider,
     );
     if (canonicalJson(storedValue) !== canonicalJson(outcome.value)) {
       terminal("provider_response_invalid");
@@ -1307,6 +1371,12 @@ async function executeGenerating(
     textEncoder.encode(prospectiveCandidate.canonicalBytes).byteLength >
       context.command.limits.maximum_candidate_bytes
   ) {
+    // Also pre-chunk-artifact, so also silent until now.
+    safeLog({
+      event: "ontology_candidate_rejected",
+      reason: "limit_exceeded",
+      record_count: progress.records.length + chunk.records.length,
+    });
     terminal("candidate_invalid");
   }
   const chunkArtifact = await putArtifact(
@@ -1566,7 +1636,8 @@ async function orderedVerdictEvidence(
     if (!stored) terminal("artifact_integrity_failed");
     const verdict = parseCanonicalVerdict(stored.plaintext);
     const assessment = assessOntologyRuleVerdict(records[index]!.id, verdict);
-    if (!assessment.ok || assessment.rejected) terminal("evaluation_rejected");
+    if (!assessment.ok) terminal("evaluation_rejected");
+    if (assessment.rejected) rejectEvaluation(index, verdict);
     evidence.push({
       ruleId: records[index]!.id,
       verdictHash: stored.artifact.plaintextSha256,
@@ -1641,6 +1712,7 @@ async function executeEvaluating(
       verdict = parseRawProviderValue(
         adoptedResponse.plaintext,
         isOntologyRuleVerdict,
+        context.command.provider,
       );
     }
   }
@@ -1651,7 +1723,7 @@ async function executeEvaluating(
       claim,
       "evaluator_request",
     );
-    if (ambiguousRequest) {
+    if (ambiguousRequest && context.command.provider !== "codex") {
       return await rescheduleAmbiguousProviderRequest(env, claim, clock);
     }
     await assertProviderRunCapacity(
@@ -1688,6 +1760,16 @@ async function executeEvaluating(
           now: clock,
         },
       ),
+      ...(context.command.provider === "codex"
+        ? {
+            codexJob: {
+              ownerId: claim.runId,
+              stageGeneration: claim.stageGeneration,
+              stageAttempt: claim.stageAttempt,
+              dailyCallLimit: context.command.daily_provider_call_limit,
+            },
+          }
+        : {}),
     });
     if (!outcome.ok) {
       return await handleProviderFailure(env, claim, outcome, clock);
@@ -1699,6 +1781,7 @@ async function executeEvaluating(
     const storedValue = parseRawProviderValue(
       textEncoder.encode(outcome.raw),
       isOntologyRuleVerdict,
+      context.command.provider,
     );
     if (canonicalJson(storedValue) !== canonicalJson(outcome.value)) {
       terminal("provider_response_invalid");
@@ -1715,7 +1798,9 @@ async function executeEvaluating(
     canonicalJson(verdict),
     clock,
   );
-  if (assessment.rejected) terminal("evaluation_rejected");
+  if (assessment.rejected) {
+    rejectEvaluation(claim.stageCursor, verdict);
+  }
 
   const finalRuleIndex = candidate.records.length - 1;
   if (claim.stageCursor !== finalRuleIndex) {
@@ -1895,11 +1980,38 @@ function parseCanonicalRegressionState(
   return parsed as unknown as OntologyRegressionFixtureState;
 }
 
+/** The publisher the run's resolved credential actually reaches. */
+function regressionPublisherName(
+  configuration: OntologyPipelineConfiguration,
+): "openai" | "codex" {
+  return configuration.publisher;
+}
+
+/**
+ * The regression Pattern pin as executed.
+ *
+ * `publisher` is part of the hashed regression configuration, so recording
+ * `openai` while a ChatGPT subscription answered would make two different
+ * provider configurations share one configuration hash.
+ */
+function regressionPatternPin(
+  configuration: OntologyPipelineConfiguration,
+): PatternPublisherPin {
+  return {
+    ...ONTOLOGY_REGRESSION_PATTERN_PIN,
+    publisher: regressionPublisherName(configuration),
+  };
+}
+
 function regressionMetadataMatches(
   metadata: PatternPassProvenance,
   pass: PatternStageClass,
+  publisher: "openai" | "codex",
 ): boolean {
-  return metadata.provider === "openai" &&
+  // Still exact, just no longer hardcoded to one provider: the regression
+  // evidence must record whichever transport actually answered, and a response
+  // from a different one than the run resolved is an integrity failure.
+  return metadata.provider === publisher &&
     metadata.pass === pass &&
     metadata.model === ONTOLOGY_REGRESSION_PATTERN_PIN[`${pass}_model`] &&
     metadata.prompt_version ===
@@ -1924,6 +2036,7 @@ async function parseRegressionResponse(
   fixtureIndex: number,
   fixtureId: string,
   pass: PatternStageClass,
+  publisher: "openai" | "codex",
 ): Promise<RegressionResponseDocument> {
   const parsed = parseCanonicalObject(bytes);
   if (
@@ -1947,7 +2060,7 @@ async function parseRegressionResponse(
   }
   const metadata = parsed.metadata as unknown as PatternPassProvenance;
   if (
-    !regressionMetadataMatches(metadata, pass) ||
+    !regressionMetadataMatches(metadata, pass, publisher) ||
     await contentHash(parsed.raw) !== metadata.provider_response_hash
   ) {
     terminal("artifact_integrity_failed");
@@ -1955,6 +2068,7 @@ async function parseRegressionResponse(
   const providerValue = parseRawProviderValue(
     textEncoder.encode(parsed.raw),
     isRecord,
+    publisher,
   );
   if (canonicalJson(providerValue) !== canonicalJson(parsed.document)) {
     terminal("provider_response_invalid");
@@ -2104,6 +2218,19 @@ async function handleRegressionProviderFailure(
   if (reservationFailure === "exhausted") {
     terminal("provider_budget_exhausted");
   }
+  if (outcome.code === "publisher_pending") {
+    if (!await deferOntologyPipelineForProvider(env, claim, clock())) {
+      return { status: "duplicate" };
+    }
+    const providerJob = await loadCodexProviderJob(env, outcome.job_id);
+    if (
+      providerJob &&
+      (providerJob.status === "completed" || providerJob.status === "failed")
+    ) {
+      await nudgeCodexProviderOwner(env, providerJob, clock());
+    }
+    return { status: "parked" };
+  }
   if (outcome.code === "publisher_budget_exhausted") {
     return retryRegressionProviderPass(env, claim, state, 0, clock);
   }
@@ -2211,6 +2338,7 @@ async function createCompletedRegressionReport(input: {
       parsed.fixture_index as number,
       parsed.fixture_id,
       parsed.pass as PatternStageClass,
+      regressionPublisherName(input.context.configuration),
     );
     successfulInputTokens += response.metadata.input_tokens!;
     successfulOutputTokens += response.metadata.output_tokens!;
@@ -2286,7 +2414,7 @@ async function createCompletedRegressionReport(input: {
     terminal("regression_failed");
   }
   const configurationHash = await contentHash(
-    canonicalJson(ONTOLOGY_REGRESSION_PATTERN_PIN),
+    canonicalJson(regressionPatternPin(input.context.configuration)),
   );
   return createCanonicalOntologyRegressionReport({
     ontologyVersion: input.context.command.candidate_ontology_version,
@@ -2376,6 +2504,7 @@ async function executeRegressing(
       fixtureIndex,
       fixture.fixture_id,
       prepared.pass,
+      regressionPublisherName(context.configuration),
     );
   }
 
@@ -2410,7 +2539,7 @@ async function executeRegressing(
       claim,
       "regression_request",
     );
-    if (ambiguousRequest) {
+    if (ambiguousRequest && context.command.provider !== "codex") {
       if (decodeUtf8(ambiguousRequest.plaintext) !== requestBytes) {
         terminal("artifact_integrity_failed");
       }
@@ -2426,7 +2555,9 @@ async function executeRegressing(
       | "claim_unavailable"
       | "run_exhausted"
       | null = null;
-    const timeoutMs = ontologyRegressionPassTimeoutMs(prepared.pass);
+    const timeoutMs = context.command.provider === "codex"
+      ? 900_000
+      : ontologyRegressionPassTimeoutMs(prepared.pass);
     const outcome = await runRegressionPublisherPass(
       publisher,
       prepared.pass,
@@ -2434,7 +2565,19 @@ async function executeRegressing(
       {
         requestId: `opreq_${crypto.randomUUID()}`,
         timeoutMs,
-        pin: ONTOLOGY_REGRESSION_PATTERN_PIN,
+        pin: regressionPatternPin(context.configuration),
+        ...(context.command.provider === "codex"
+          ? {
+              codexJob: {
+                pipeline: "ontology" as const,
+                ownerId: claim.runId,
+                userId: null,
+                stageGeneration: claim.stageGeneration,
+                stageAttempt: claim.stageAttempt,
+                dailyCallLimit: context.command.daily_provider_call_limit,
+              },
+            }
+          : {}),
         reserve: async (stageClass) => {
           if (stageClass !== prepared.pass) {
             reservationFailure = "claim_unavailable";
@@ -2466,7 +2609,11 @@ async function executeRegressing(
       );
     }
     if (
-      !regressionMetadataMatches(outcome.metadata, prepared.pass) ||
+      !regressionMetadataMatches(
+      outcome.metadata,
+      prepared.pass,
+      regressionPublisherName(context.configuration),
+    ) ||
       outcome.raw === null ||
       await contentHash(outcome.raw) !== outcome.metadata.provider_response_hash
     ) {
@@ -2487,6 +2634,7 @@ async function executeRegressing(
       fixtureIndex,
       fixture.fixture_id,
       prepared.pass,
+      regressionPublisherName(context.configuration),
     );
   }
 
@@ -2547,6 +2695,30 @@ async function executeRegressing(
     { regressionReportHash: report.plaintextHash },
     clock,
   );
+}
+
+/**
+ * Reject an evaluated rule, naming the dimensions that failed.
+ *
+ * `evaluation_rejected` was silent, so a run that reached the evaluator and
+ * died there told the operator only that some record failed some dimension --
+ * the third instance of the same defect, after the blind regression correction
+ * loop and the silent chunk rejection. The verdict is durable in its encrypted
+ * `evaluator_verdict` artifact, but reading it costs a decryption.
+ *
+ * Every dimension name is a fixed key and every value is `"pass" | "reject"`,
+ * so the failing names are closed vocabulary. The rule *index* travels, never
+ * the rule id, and no rationale or generated text is ever logged.
+ */
+function rejectEvaluation(ruleIndex: number, verdict: OntologyRuleVerdict): never {
+  safeLog({
+    event: "ontology_evaluation_rejected",
+    rule_index: ruleIndex,
+    rejected_dimensions: (
+      Object.keys(verdict.dimensions) as OntologyVerdictDimension[]
+    ).filter((name) => verdict.dimensions[name] === "reject").sort(),
+  });
+  terminal("evaluation_rejected");
 }
 
 async function loadUniquePipelineArtifact(
@@ -2899,9 +3071,13 @@ export async function executeOntologyPipelineDelivery(
 
   try {
     const context = await loadExecutionContext(env, claim, resolved.config);
-    const publisher = options.publisher ?? createOpenAiOntologyPublisher(
-      resolved.config.credential,
-      resolved.config.gatewayRoute,
+    const publisher = options.publisher ?? (
+      resolved.config.publisher === "codex"
+        ? createCodexOntologyPublisher(env)
+        : createOpenAiOntologyPublisher(
+            resolved.config.credential!,
+            resolved.config.gatewayRoute,
+          )
     );
     switch (claim.stage) {
       case "reserved":
@@ -2920,9 +3096,13 @@ export async function executeOntologyPipelineDelivery(
           env,
           claim,
           context,
-          options.patternPublisher ?? createOpenAiPatternPublisher(
-            resolved.config.credential,
-            resolved.config.gatewayRoute,
+          options.patternPublisher ?? (
+            resolved.config.publisher === "codex"
+              ? createCodexPatternPublisher(env)
+              : createOpenAiPatternPublisher(
+                  resolved.config.credential!,
+                  resolved.config.gatewayRoute,
+                )
           ),
           clock,
         );

@@ -19,6 +19,17 @@ export {
   MAX_ELIGIBLE_ALIASES,
   MAX_MANDATORY_ALIASES,
   MAX_CLUSTER_SIZE,
+  CHAPTER_WORD_MIN,
+  CHAPTER_WORD_MAX,
+  PARAGRAPH_WORD_MAX,
+  SECTIONS_MIN,
+  SECTIONS_MAX,
+  SIGNATURE_WORD_MIN,
+  SIGNATURE_WORD_MAX,
+  TOTAL_WORD_MIN,
+  TOTAL_WORD_MAX,
+  UNCERTAINTY_WORD_MIN,
+  UNCERTAINTY_WORD_MAX,
 } from "./policy.js";
 export { compileOntologyRelease, ontologyRecordMatchesFeature } from "./ontology.js";
 export { selectPatternEvidence, SelectionCapacityError } from "./selection.js";

@@ -545,7 +545,7 @@ In `docs/deploy/openai-pattern-rollout.md`:
 
 - update Gate 3 to say a reusable authenticated canary and baseline now exist, while leaving the gate open until an actual before/after deployment pair is recorded;
 - update Gate 8 to record the opaque `CANARY_USER_ID` as the candidate, one active chart, confirmed `en-US`, zero Pattern claims/generations/documents/grants, and no reservation;
-- keep Gate 8 blocked on the active ontology, rollout/allowlist deployment, first-use confirmation, scheduler decision, and every other prerequisite already listed;
+- keep Gate 8 blocked on the active ontology, rollout/allowlist deployment, first-use confirmation, and every other prerequisite already listed;
 - append one evidence-ledger row with the Auth0 callback-restoration result, Worker-session acceptance, safe endpoint statuses, and eligibility counts; and
 - do not include the email password, any token/cookie, Auth0 subject, birth data, chart fingerprint, response content, or temporary file path.
 
@@ -647,6 +647,6 @@ Report:
 - callback restoration and Worker-session acceptance;
 - the runbook commit ID, if evidence was committed;
 - that Pattern consent remains ungranted and no claim was consumed or reserved; and
-- every remaining rollout blocker, especially the eligible active ontology, scheduler decision, allowlist/rollout deployment, Gate 8 first-use confirmation, and later Gate 9 certification.
+- every remaining rollout blocker, especially the eligible active ontology, allowlist/rollout deployment, Gate 8 first-use confirmation, and later Gate 9 certification.
 
 Do not claim that Pattern generation is on. It remains off at the end of this plan.

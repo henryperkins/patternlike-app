@@ -25,27 +25,49 @@ import type {
   PublisherFailureCode,
   PublisherSafeDetailCode,
 } from "./openai-responses-adapter.js";
+import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
 
 export const PATTERN_PUBLISHER_OPENAI = "openai" as const;
 export const PATTERN_PUBLISHER_SYNTHETIC = "synthetic" as const;
+/**
+ * The Codex Responses backend on a ChatGPT subscription.
+ *
+ * A real provider, not a stand-in: a constrained model authors the prose, so
+ * unlike `synthetic` this is permitted outside development. It is a distinct
+ * publisher rather than an OpenAI credential mode because the document must be
+ * able to say truthfully who wrote it -- see `provenanceFromExecutedPin`.
+ */
+export const PATTERN_PUBLISHER_CODEX = "codex" as const;
+/**
+ * Experimental Cloudflare Workers AI publisher, reached through the `AI`
+ * binding. It remains development-only until its model contract and rollout
+ * are independently reviewed; production configuration refuses it below.
+ */
+export const PATTERN_PUBLISHER_WORKERS_AI = "workers_ai" as const;
+
+export const WORKERS_AI_PATTERN_PLANNER_MODEL = "@cf/openai/gpt-oss-120b";
+export const WORKERS_AI_PATTERN_WRITER_MODEL = "@cf/openai/gpt-oss-120b";
+export const WORKERS_AI_PATTERN_VERIFIER_MODEL = "@cf/deepseek-ai/deepseek-v4-pro-0813";
+export const WORKERS_AI_PATTERN_PROMPT_VERSION = "1.0.0";
+export const WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 
 export const OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
 export const OPENAI_PATTERN_PLANNER_REASONING = "high" as const;
 export const OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0";
 export const OPENAI_PATTERN_PLANNER_TIMEOUT_MS = 120_000;
-export const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 4000;
+export const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 32000;
 
 export const OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
 export const OPENAI_PATTERN_WRITER_REASONING = "high" as const;
 export const OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.0";
 export const OPENAI_PATTERN_WRITER_TIMEOUT_MS = 120_000;
-export const OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = 8000;
+export const OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = 32000;
 
 export const OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
 export const OPENAI_PATTERN_VERIFIER_REASONING = "high" as const;
 export const OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 export const OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = 120_000;
-export const OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = 4000;
+export const OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = 32000;
 
 /**
  * Section 14.2: the verifier configuration must not be identical to the
@@ -77,7 +99,30 @@ export const PATTERN_INPUT_MAX_BYTES = 98_304;
 export const PATTERN_DAILY_PROVIDER_CALL_LIMIT = 100;
 export const PATTERN_ARTIFACT_RETENTION_DAYS = 30;
 
-export type PatternPublisherName = typeof PATTERN_PUBLISHER_OPENAI | typeof PATTERN_PUBLISHER_SYNTHETIC;
+export type PatternPublisherName =
+  | typeof PATTERN_PUBLISHER_OPENAI
+  | typeof PATTERN_PUBLISHER_SYNTHETIC
+  | typeof PATTERN_PUBLISHER_CODEX
+  | typeof PATTERN_PUBLISHER_WORKERS_AI;
+
+/**
+ * The reader-facing provider label for a publisher.
+ *
+ * One definition on purpose. Two places publish this string -- the executed pin
+ * in `pattern-execute.ts` and the ontology regression projection in
+ * `ontology-regression.ts` -- and the second was a hand-copied
+ * `provider === "openai" ? "OpenAI" : "synthetic"`, which labelled every Codex
+ * pass "synthetic" for the whole internal Codex canary. A duplicated mapping is
+ * the defect; the labels belong here.
+ */
+export function patternProviderDisplayName(
+  publisher: PatternPublisherName,
+): string {
+  if (publisher === PATTERN_PUBLISHER_WORKERS_AI) return "Cloudflare Workers AI";
+  if (publisher === PATTERN_PUBLISHER_CODEX) return "Codex";
+  if (publisher === PATTERN_PUBLISHER_OPENAI) return "OpenAI";
+  return "synthetic";
+}
 
 /** Closed failures returned by either Pattern publisher implementation. */
 export type PatternPublisherFailureCode =
@@ -186,12 +231,16 @@ export function resolvePatternPublisherConfiguration(
     };
   }
 
+  const configuredPublisher = env.PATTERN_PUBLISHER?.trim();
+  const expectedTimeout = configuredPublisher === PATTERN_PUBLISHER_CODEX
+    ? CODEX_PROVIDER_TIMEOUT_MS
+    : OPENAI_PATTERN_PLANNER_TIMEOUT_MS;
   const pins: Array<[string | undefined, number, string]> = [
-    [env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "OPENAI_PATTERN_PLANNER_TIMEOUT_MS"],
+    [env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, expectedTimeout, "OPENAI_PATTERN_PLANNER_TIMEOUT_MS"],
     [env.OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS, OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS, "OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS"],
-    [env.OPENAI_PATTERN_WRITER_TIMEOUT_MS, OPENAI_PATTERN_WRITER_TIMEOUT_MS, "OPENAI_PATTERN_WRITER_TIMEOUT_MS"],
+    [env.OPENAI_PATTERN_WRITER_TIMEOUT_MS, expectedTimeout, "OPENAI_PATTERN_WRITER_TIMEOUT_MS"],
     [env.OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS, OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS, "OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS"],
-    [env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, "OPENAI_PATTERN_VERIFIER_TIMEOUT_MS"],
+    [env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, expectedTimeout, "OPENAI_PATTERN_VERIFIER_TIMEOUT_MS"],
     [env.OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS, OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS, "OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS"],
     [env.PATTERN_INPUT_MAX_BYTES, PATTERN_INPUT_MAX_BYTES, "PATTERN_INPUT_MAX_BYTES"],
     [env.PATTERN_ARTIFACT_RETENTION_DAYS, PATTERN_ARTIFACT_RETENTION_DAYS, "PATTERN_ARTIFACT_RETENTION_DAYS"],
@@ -217,17 +266,24 @@ export function resolvePatternPublisherConfiguration(
     if (problem) return misconfigured(problem);
   }
 
-  const publisher = env.PATTERN_PUBLISHER?.trim();
+  const publisher = configuredPublisher;
   if (
     publisher !== undefined &&
     publisher !== "" &&
     publisher !== PATTERN_PUBLISHER_OPENAI &&
-    publisher !== PATTERN_PUBLISHER_SYNTHETIC
+    publisher !== PATTERN_PUBLISHER_SYNTHETIC &&
+    publisher !== PATTERN_PUBLISHER_CODEX &&
+    publisher !== PATTERN_PUBLISHER_WORKERS_AI
   ) {
-    return misconfigured("PATTERN_PUBLISHER must be openai or synthetic");
+    return misconfigured(
+      "PATTERN_PUBLISHER must be openai, codex, workers_ai, or synthetic",
+    );
   }
   if (publisher === PATTERN_PUBLISHER_SYNTHETIC && !isDevEnvironment(env.ENVIRONMENT)) {
     return misconfigured("PATTERN_PUBLISHER=synthetic is refused outside development");
+  }
+  if (publisher === PATTERN_PUBLISHER_WORKERS_AI && !isDevEnvironment(env.ENVIRONMENT)) {
+    return misconfigured("PATTERN_PUBLISHER=workers_ai is refused outside development");
   }
 
   const callLimitRaw = env.PATTERN_DAILY_PROVIDER_CALL_LIMIT?.trim();
@@ -245,7 +301,10 @@ export function resolvePatternPublisherConfiguration(
   if (!publisherName) return misconfigured("PATTERN_PUBLISHER is required when Pattern rollout is enabled");
   if (!callLimit) return misconfigured("PATTERN_DAILY_PROVIDER_CALL_LIMIT is required when Pattern rollout is enabled");
 
-  if (publisherName === PATTERN_PUBLISHER_OPENAI) {
+  if (
+    publisherName === PATTERN_PUBLISHER_OPENAI ||
+    publisherName === PATTERN_PUBLISHER_CODEX
+  ) {
     // `OPENAI_API_KEY` is deliberately NOT in this list. Under
     // `OPENAI_CREDENTIAL_SOURCE=gateway_stored` the key must be ABSENT -- a key
     // on the request wins over the gateway-stored one -- so requiring it here
@@ -260,7 +319,7 @@ export function resolvePatternPublisherConfiguration(
       env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
     ];
     if (required.some((value) => !value?.trim())) {
-      return misconfigured("The Pattern openai publisher is enabled but not fully configured");
+      return misconfigured("The Pattern model publisher is enabled but not fully configured");
     }
   }
 
@@ -295,19 +354,85 @@ export function resolvePatternPublisherConfiguration(
     credential = resolved.mode;
   }
 
+  if (publisherName === PATTERN_PUBLISHER_CODEX) {
+    // The same section 14.2 separation applies: Codex runs the identical three
+    // passes, so writer and verifier must still differ in model or prompt
+    // version. Skipping the check for a second provider would reintroduce
+    // exactly the "sole author and judge" defect it was added to close.
+    const independence = verifierIndependenceProblem(
+      OPENAI_PATTERN_WRITER_MODEL,
+      OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+      OPENAI_PATTERN_VERIFIER_MODEL,
+      OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
+    );
+    if (independence) return misconfigured(independence);
+
+    const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
+    const keyring = env.CODEX_PROVIDER_ARTIFACT_KEYRING?.trim() ?? "";
+    if (!/^[A-Za-z0-9._-]{32,512}$/.test(runnerToken)) {
+      return misconfigured("CODEX_RUNNER_TOKEN is required when PATTERN_PUBLISHER=codex");
+    }
+    if (keyring === "" || !env.ARTIFACTS) {
+      return misconfigured(
+        "CODEX_PROVIDER_ARTIFACT_KEYRING and ARTIFACTS are required when PATTERN_PUBLISHER=codex",
+      );
+    }
+    // AI Gateway config belongs to the OpenAI transport. Refuse the ambiguous
+    // combination instead of implying the outbound runner uses that route.
+    const gateway = resolveAiGatewayRoute(env);
+    if (!gateway.ok) return misconfigured(gateway.message);
+    if (gateway.route !== null) {
+      return misconfigured("PATTERN_PUBLISHER=codex cannot be routed through AI Gateway");
+    }
+  }
+
+  if (publisherName === PATTERN_PUBLISHER_WORKERS_AI) {
+    // No credential to resolve: the `AI` binding authenticates itself, and its
+    // absence is caught at execute time where the binding is actually in hand.
+    // The same 14.2 separation still has to hold, and here it is carried by two
+    // genuinely different models rather than by the prompt version alone.
+    const independence = verifierIndependenceProblem(
+      WORKERS_AI_PATTERN_WRITER_MODEL,
+      WORKERS_AI_PATTERN_PROMPT_VERSION,
+      WORKERS_AI_PATTERN_VERIFIER_MODEL,
+      WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION,
+    );
+    if (independence) return misconfigured(independence);
+    const gateway = resolveAiGatewayRoute(env);
+    if (!gateway.ok) return misconfigured(gateway.message);
+    if (gateway.route !== null) {
+      return misconfigured(
+        "PATTERN_PUBLISHER=workers_ai cannot be routed through AI Gateway",
+      );
+    }
+  }
+
+  const workersAi = publisherName === PATTERN_PUBLISHER_WORKERS_AI;
   const pin: PatternPublisherPin = {
     publisher: publisherName,
-    planner_model: OPENAI_PATTERN_PLANNER_MODEL,
+    planner_model: workersAi
+      ? WORKERS_AI_PATTERN_PLANNER_MODEL
+      : OPENAI_PATTERN_PLANNER_MODEL,
     planner_reasoning: OPENAI_PATTERN_PLANNER_REASONING,
-    planner_prompt_version: OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
+    planner_prompt_version: workersAi
+      ? WORKERS_AI_PATTERN_PROMPT_VERSION
+      : OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
     planner_max_output_tokens: OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS,
-    writer_model: OPENAI_PATTERN_WRITER_MODEL,
+    writer_model: workersAi
+      ? WORKERS_AI_PATTERN_WRITER_MODEL
+      : OPENAI_PATTERN_WRITER_MODEL,
     writer_reasoning: OPENAI_PATTERN_WRITER_REASONING,
-    writer_prompt_version: OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+    writer_prompt_version: workersAi
+      ? WORKERS_AI_PATTERN_PROMPT_VERSION
+      : OPENAI_PATTERN_WRITER_PROMPT_VERSION,
     writer_max_output_tokens: OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS,
-    verifier_model: OPENAI_PATTERN_VERIFIER_MODEL,
+    verifier_model: workersAi
+      ? WORKERS_AI_PATTERN_VERIFIER_MODEL
+      : OPENAI_PATTERN_VERIFIER_MODEL,
     verifier_reasoning: OPENAI_PATTERN_VERIFIER_REASONING,
-    verifier_prompt_version: OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
+    verifier_prompt_version: workersAi
+      ? WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION
+      : OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
     verifier_max_output_tokens: OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS,
     input_max_bytes: PATTERN_INPUT_MAX_BYTES,
     selection_policy_version: "1.0.0",
@@ -319,9 +444,15 @@ export function resolvePatternPublisherConfiguration(
     rollout,
     config: {
       pin,
-      plannerTimeoutMs: OPENAI_PATTERN_PLANNER_TIMEOUT_MS,
-      writerTimeoutMs: OPENAI_PATTERN_WRITER_TIMEOUT_MS,
-      verifierTimeoutMs: OPENAI_PATTERN_VERIFIER_TIMEOUT_MS,
+      plannerTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX
+        ? CODEX_PROVIDER_TIMEOUT_MS
+        : OPENAI_PATTERN_PLANNER_TIMEOUT_MS,
+      writerTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX
+        ? CODEX_PROVIDER_TIMEOUT_MS
+        : OPENAI_PATTERN_WRITER_TIMEOUT_MS,
+      verifierTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX
+        ? CODEX_PROVIDER_TIMEOUT_MS
+        : OPENAI_PATTERN_VERIFIER_TIMEOUT_MS,
       dailyCallLimit: callLimit,
       artifactRetentionDays: PATTERN_ARTIFACT_RETENTION_DAYS,
       apiKey: env.OPENAI_API_KEY?.trim() || null,
@@ -358,6 +489,15 @@ export interface PatternPassOptions {
    * never charges: the ledger counts provider calls, and there is no provider.
    */
   reserve: (stageClass: PatternStageClass) => Promise<{ ok: boolean }>;
+  /** Immutable domain coordinate used only by the asynchronous Codex provider. */
+  codexJob?: {
+    pipeline: "pattern" | "ontology";
+    ownerId: string;
+    userId: string | null;
+    stageGeneration: number;
+    stageAttempt: number;
+    dailyCallLimit: number;
+  };
 }
 
 /**
@@ -369,6 +509,14 @@ export interface PatternPassOptions {
  */
 export type PatternPassOutcome<T> =
   | { ok: true; value: T; raw: string | null; metadata: PatternPassProvenance }
+  | {
+      ok: false;
+      code: "publisher_pending";
+      job_id: string;
+      safe_detail_code?: never;
+      retry_after_seconds?: never;
+      origin_layer?: never;
+    }
   | {
       ok: false;
       code: PatternPublisherFailureCode;

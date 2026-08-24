@@ -17,6 +17,13 @@ database_name = "patternlike-ops"
 database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
+# Development-only experimental Workers AI publisher binding. Production
+# configuration refuses `PATTERN_PUBLISHER=workers_ai`; the binding remains in
+# both blocks only to reproduce the deployed Worker configuration while the
+# experiment is reviewed separately. Named environments do not inherit it.
+[ai]
+binding = "AI"
+
 # Immutable artifacts: signed editorial release bundles today, chart renders and
 # exports later. The default name is deliberately not the production bucket, so
 # a remote development command cannot reserve an immutable production key. The
@@ -214,19 +221,19 @@ OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol"
 OPENAI_PATTERN_PLANNER_REASONING = "high"
 OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0"
 OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "120000"
-OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = "4000"
+OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = "32000"
 OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol"
 OPENAI_PATTERN_WRITER_REASONING = "high"
 OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.0"
 OPENAI_PATTERN_WRITER_TIMEOUT_MS = "120000"
-OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = "8000"
+OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = "32000"
 OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol"
 OPENAI_PATTERN_VERIFIER_REASONING = "high"
 # Verifier prompt version differs from the writer tuple on purpose: the two
 # passes must not be the same compiled prompt even when they share a model.
 OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier"
 OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "120000"
-OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = "4000"
+OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = "32000"
 PATTERN_INPUT_MAX_BYTES = "98304"
 # Conservative launch ceiling. Three provider calls per generation, once per
 # chart; 100 UTC-day calls is an operator-replaceable default, not a spend
@@ -368,22 +375,25 @@ TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
 # switch that moves accounts that still have one.
 PATTERN_AI_ROLLOUT = "off"
 PATTERN_INTERNAL_ACCOUNT_IDS = ""
+# `codex` uses the dedicated outbound-polling runner. The Worker receives only
+# CODEX_RUNNER_TOKEN and CODEX_PROVIDER_ARTIFACT_KEYRING as secrets; ChatGPT
+# authentication remains in the Codex CLI's local credential store on its host.
 PATTERN_PUBLISHER = "openai"
 OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol"
 OPENAI_PATTERN_PLANNER_REASONING = "high"
 OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0"
 OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "120000"
-OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = "4000"
+OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = "32000"
 OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol"
 OPENAI_PATTERN_WRITER_REASONING = "high"
 OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.0"
 OPENAI_PATTERN_WRITER_TIMEOUT_MS = "120000"
-OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = "8000"
+OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = "32000"
 OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol"
 OPENAI_PATTERN_VERIFIER_REASONING = "high"
 OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier"
 OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "120000"
-OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = "4000"
+OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = "32000"
 PATTERN_INPUT_MAX_BYTES = "98304"
 PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100"
 PATTERN_ARTIFACT_RETENTION_DAYS = "30"
@@ -396,16 +406,17 @@ PATTERN_ONTOLOGY_KEYS = '{"ontology-machine-2026-08":{"alg":"Ed25519","public_ke
 # Pattern generation; PATTERN_AI_ROLLOUT remains the independent product switch.
 # The artifact keyring remains a Worker secret declared above, never a var.
 ONTOLOGY_PIPELINE_ROLLOUT = "internal"
+ONTOLOGY_PIPELINE_PUBLISHER = "codex"
 ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1"
 OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol"
 OPENAI_ONTOLOGY_GENERATOR_REASONING = "high"
 OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.5"
-OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "120000"
+OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "900000"
 OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = "8000"
 OPENAI_ONTOLOGY_EVALUATOR_MODEL = "gpt-5.6-sol"
 OPENAI_ONTOLOGY_EVALUATOR_REASONING = "high"
 OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION = "1.0.0-evaluator"
-OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = "120000"
+OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = "900000"
 OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS = "4000"
 ONTOLOGY_PIPELINE_INPUT_MAX_BYTES = "98304"
 ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT = "500"
@@ -468,7 +479,7 @@ READING_DAILY_PROVIDER_CALL_LIMIT = "10000"
 [env.production.assets]
 directory = "../web/dist"
 not_found_handling = "single-page-application"
-run_worker_first = [ "/health", "/v1/*", "/internal/*", "/admin/*" ]
+run_worker_first = [ "/health", "/v1/*", "/internal/*", "/admin/*", "/codex-provider/*" ]
 
 # Real database, created 2026-08-08 in region ENAM. Schema applied with
 # `wrangler d1 execute patternlike-ops --env production --remote --file=...`.
@@ -477,6 +488,9 @@ binding = "DB"
 database_name = "patternlike-ops"
 database_id = "1305a75d-0a8a-4a21-b201-d94fda0aaf93"
 migrations_dir = "../../db/d1"
+
+[env.production.ai]
+binding = "AI"
 
 [[env.production.r2_buckets]]
 binding = "ARTIFACTS"

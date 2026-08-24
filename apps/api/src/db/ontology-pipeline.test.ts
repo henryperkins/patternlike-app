@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
+import { deferOntologyPipelineForProvider } from "./ontology-pipeline.js";
 
 const NOW = "2026-08-21T00:00:00.000Z";
 const HASH = (pair: string): string => `sha256:${pair.repeat(32)}`;
@@ -615,6 +616,45 @@ describe("ontology pipeline migration", () => {
       stage_cursor: 1,
       stage_attempt: 0,
       dispatched_at: null,
+    });
+  });
+
+  it("releases a provider wait without changing its exact coordinate", async () => {
+    await insertCorpus();
+    await insertRun();
+    await advanceRunTo("generating");
+    await claimCurrentRun(
+      "claim-provider-wait",
+      "2030-08-21T00:05:00.000Z",
+    );
+
+    expect(await deferOntologyPipelineForProvider(
+      env,
+      {
+        status: "claimed",
+        runId: RUN.run_id,
+        stage: "generating",
+        stageGeneration: 2,
+        stageCursor: 0,
+        stageAttempt: 0,
+        claimToken: "claim-provider-wait",
+        leaseExpiresAt: "2030-08-21T00:05:00.000Z",
+      },
+      new Date(NOW),
+    )).toBe(true);
+
+    expect(await env.DB.prepare(
+      `SELECT stage, stage_generation, stage_cursor, stage_attempt,
+              claim_token, lease_expires_at, dispatched_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(RUN.run_id).first()).toEqual({
+      stage: "generating",
+      stage_generation: 2,
+      stage_cursor: 0,
+      stage_attempt: 0,
+      claim_token: null,
+      lease_expires_at: null,
+      dispatched_at: NOW,
     });
   });
 

@@ -92,8 +92,19 @@ export interface Env {
    * Configure only with `wrangler secret put`; never add it to wrangler vars.
    */
   ONTOLOGY_PIPELINE_ARTIFACT_KEYRING?: string;
+  /**
+   * Secret v1 AES-256-GCM keyring for external Codex job request/response
+   * envelopes. ChatGPT authentication is deliberately not part of this Worker.
+   */
+  CODEX_PROVIDER_ARTIFACT_KEYRING?: string;
+  /** Dedicated bearer secret for the outbound-only Codex runner. */
+  CODEX_RUNNER_TOKEN?: string;
+  /** Development-only experimental Workers AI publisher binding. */
+  AI?: Ai;
   /** Staged machine-ontology pipeline rollout: `off` | `internal`. */
   ONTOLOGY_PIPELINE_ROLLOUT?: string;
+  /** `openai` (default) or `codex`. Selects the frozen provider transport. */
+  ONTOLOGY_PIPELINE_PUBLISHER?: string;
   /** Exact acknowledgement required while the generator and evaluator model pins match. */
   ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS?: string;
   OPENAI_ONTOLOGY_GENERATOR_MODEL?: string;

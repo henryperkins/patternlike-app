@@ -39,6 +39,14 @@ import {
   retryOntologyPipelineStage,
 } from "../db/ontology-pipeline.js";
 import {
+  claimCodexProviderJob,
+  completeCodexProviderJob,
+} from "../db/codex-provider-jobs.js";
+import {
+  putCodexProviderArtifact,
+  readCodexProviderArtifact,
+} from "./codex-provider-artifacts.js";
+import {
   enqueueOntologyPipelineRun,
 } from "./ontology-pipeline-enqueue.js";
 import {
@@ -110,6 +118,7 @@ class FakeOntologyPublisher implements OntologyPublisher {
     readonly generation: ProviderFixture<OntologyGenerationChunk>[],
     readonly evaluation: ProviderFixture<OntologyRuleVerdict>[] = [],
     readonly hooks: FakePublisherHooks = {},
+    readonly provider: "openai" | "codex" = "openai",
   ) {}
 
   async generate(
@@ -118,14 +127,21 @@ class FakeOntologyPublisher implements OntologyPublisher {
   ): Promise<OntologyPassOutcome<OntologyGenerationChunk>> {
     this.generateInvocations(_packet, options);
     await this.hooks.beforeReserve?.("generator");
-    const reserved = await options.reserve("generator");
-    if (!reserved.ok) return reservationRefused(reserved);
+    if (this.provider === "openai") {
+      const reserved = await options.reserve("generator");
+      if (!reserved.ok) return reservationRefused(reserved);
+    }
     await this.hooks.afterReserve?.("generator");
     this.generatorProviderCalls += 1;
     const fixture = this.generation.shift();
     if (!fixture) throw new Error("missing generator fixture");
     if ("code" in fixture) return providerFailure(fixture);
-    return providerSuccess("generator", fixture, this.generatorProviderCalls);
+    return providerSuccess(
+      "generator",
+      fixture,
+      this.generatorProviderCalls,
+      this.provider,
+    );
   }
 
   async evaluate(
@@ -134,14 +150,21 @@ class FakeOntologyPublisher implements OntologyPublisher {
   ): Promise<OntologyPassOutcome<OntologyRuleVerdict>> {
     this.evaluateInvocations(_packet, options);
     await this.hooks.beforeReserve?.("evaluator");
-    const reserved = await options.reserve("evaluator");
-    if (!reserved.ok) return reservationRefused(reserved);
+    if (this.provider === "openai") {
+      const reserved = await options.reserve("evaluator");
+      if (!reserved.ok) return reservationRefused(reserved);
+    }
     await this.hooks.afterReserve?.("evaluator");
     this.evaluatorProviderCalls += 1;
     const fixture = this.evaluation.shift();
     if (!fixture) throw new Error("missing evaluator fixture");
     if ("code" in fixture) return providerFailure(fixture);
-    return providerSuccess("evaluator", fixture, this.evaluatorProviderCalls);
+    return providerSuccess(
+      "evaluator",
+      fixture,
+      this.evaluatorProviderCalls,
+      this.provider,
+    );
   }
 }
 
@@ -307,21 +330,24 @@ async function providerSuccess<T>(
   pass: "generator" | "evaluator",
   value: T,
   call: number,
+  provider: "openai" | "codex" = "openai",
 ): Promise<OntologyPassOutcome<T>> {
-  const raw = JSON.stringify({
-    id: `resp_task_6_${pass}_${call}`,
-    output: [{
-      type: "message",
-      content: [{ type: "output_text", text: JSON.stringify(value) }],
-    }],
-    usage: { input_tokens: 11, output_tokens: 7 },
-  });
+  const raw = provider === "codex"
+    ? canonicalJson(value)
+    : JSON.stringify({
+      id: `resp_task_6_${pass}_${call}`,
+      output: [{
+        type: "message",
+        content: [{ type: "output_text", text: JSON.stringify(value) }],
+      }],
+      usage: { input_tokens: 11, output_tokens: 7 },
+    });
   return {
     ok: true,
     value,
     raw,
     metadata: {
-      provider: "openai",
+      provider,
       pass,
       model: "gpt-5.6-sol",
       prompt_version: pass === "generator" ? "1.0.5" : "1.0.0-evaluator",
@@ -529,6 +555,7 @@ async function reserveFixture(
     clockStartMs?: number;
     allowedTransformations?: PatternTransformationClass[];
     manifest?: TestCorpusManifest;
+    codex?: boolean;
   } = {},
 ): Promise<ReservedFixture> {
   const suffix = crypto.randomUUID();
@@ -551,6 +578,22 @@ async function reserveFixture(
   const pipelineEnv = configuredEnv(queue, {
     ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT:
       String(options.dailyLimit ?? 500),
+    ...(options.codex
+      ? {
+          ONTOLOGY_PIPELINE_PUBLISHER: "codex",
+          CODEX_RUNNER_TOKEN:
+            "runner_0123456789abcdefghijklmnopqrstuvwxyz",
+          CODEX_PROVIDER_ARTIFACT_KEYRING: JSON.stringify({
+            version: 1,
+            keys: {
+              "codex-test-key":
+                "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+            },
+          }),
+          OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "900000",
+          OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS: "900000",
+        }
+      : {}),
   });
   const clock = new TestClock(options.clockStartMs);
   const version = `ontology-task-6-${suffix}`;
@@ -573,8 +616,9 @@ async function reserveFixture(
   };
 }
 
-async function reserveActivationFixture(): Promise<ReservedFixture> {
+async function reserveActivationFixture(codex = false): Promise<ReservedFixture> {
   const fixture = await reserveFixture({
+    codex,
     allowedTransformations: [
       "intersection",
       "contrast",
@@ -651,6 +695,22 @@ async function reserveActivationFixture(): Promise<ReservedFixture> {
           public_key: env.TEST_ONTOLOGY_SIGNER_PUBLIC_KEY,
         },
       }),
+      ...(codex
+        ? {
+            ONTOLOGY_PIPELINE_PUBLISHER: "codex",
+            CODEX_RUNNER_TOKEN:
+              "runner_0123456789abcdefghijklmnopqrstuvwxyz",
+            CODEX_PROVIDER_ARTIFACT_KEYRING: JSON.stringify({
+              version: 1,
+              keys: {
+                "codex-test-key":
+                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+              },
+            }),
+            OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "900000",
+            OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS: "900000",
+          }
+        : {}),
     },
   );
   return fixture;
@@ -693,7 +753,11 @@ async function driveToGenerating(
   fixture: ReservedFixture,
   publisher: OntologyPublisher,
 ): Promise<void> {
-  expect(await deliver(fixture, publisher)).toMatchObject({ status: "advanced" });
+  const reserved = await deliver(fixture, publisher);
+  expect(
+    reserved,
+    JSON.stringify(await runRow(fixture.runId)),
+  ).toMatchObject({ status: "advanced" });
   expect(await runRow(fixture.runId)).toMatchObject({
     stage: "corpus_reading",
     stage_generation: 1,
@@ -733,14 +797,16 @@ async function driveToEvaluating(
   });
 }
 
-async function driveActivationToRegression(): Promise<{
+async function driveActivationToRegression(codex = false): Promise<{
   fixture: ReservedFixture;
   publisher: FakeOntologyPublisher;
 }> {
-  const fixture = await reserveActivationFixture();
+  const fixture = await reserveActivationFixture(codex);
   const publisher = new FakeOntologyPublisher(
     [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
     fixture.records.map((record) => passingVerdict(record.id)),
+    {},
+    codex ? "codex" : "openai",
   );
   await driveToEvaluating(fixture, publisher);
   while ((await runRow(fixture.runId)).stage === "evaluating") {
@@ -996,6 +1062,260 @@ describe("ontology pipeline execution", () => {
       stage_generation: 2,
       stage_cursor: 0,
     });
+  });
+
+  it("parks and adopts a Codex generator result at the same attempt", async () => {
+    const fixture = await reserveFixture({ codex: true });
+    const deliverCodex = () => executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      { run_id: fixture.runId, stage_generation: 0 },
+      { clock: fixture.clock.now },
+    );
+
+    expect(await deliverCodex()).toEqual({ status: "advanced" });
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      await currentMessage(fixture.runId),
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "advanced" });
+    const generatingMessage = await currentMessage(fixture.runId);
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      generatingMessage,
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "parked" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "generating",
+      stage_generation: 2,
+      stage_cursor: 0,
+      stage_attempt: 0,
+    });
+    expect(await env.DB.prepare(
+      `SELECT claim_token, lease_expires_at, dispatched_at
+       FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+    ).bind(fixture.runId).first()).toEqual({
+      claim_token: null,
+      lease_expires_at: null,
+      dispatched_at: expect.any(String),
+    });
+
+    const claimed = await claimCodexProviderJob(
+      fixture.pipelineEnv,
+      new Date("2030-08-24T00:00:00.000Z"),
+    );
+    if (claimed.status !== "claimed") throw new Error("Codex job missing");
+    const raw = canonicalJson({
+      schema_version: "0.7.0",
+      records: fixture.records,
+      complete: true,
+    });
+    const response = await putCodexProviderArtifact(
+      fixture.pipelineEnv,
+      {
+        jobId: claimed.job.id,
+        pipeline: "ontology",
+        ownerId: fixture.runId,
+        pass: "generator",
+        stageGeneration: 2,
+        stageAttempt: 0,
+        role: "response",
+      },
+      new TextEncoder().encode(raw),
+    );
+    await completeCodexProviderJob(
+      fixture.pipelineEnv,
+      {
+        jobId: claimed.job.id,
+        leaseToken: claimed.leaseToken,
+        response: response.artifact,
+        providerRequestId: "thread_ontology_pipeline_generator",
+        inputTokens: 1000,
+        outputTokens: 500,
+      },
+      new Date("2030-08-24T00:01:00.000Z"),
+    );
+
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      generatingMessage,
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "compiling",
+      stage_generation: 3,
+      stage_attempt: 0,
+      candidate_hash: expect.stringMatching(/^sha256:/),
+    });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM codex_provider_jobs WHERE owner_id = ?",
+    ).bind(fixture.runId).first()).toEqual({ count: 1 });
+
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      await currentMessage(fixture.runId),
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "advanced" });
+    const evaluatingMessage = await currentMessage(fixture.runId);
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "evaluating",
+      stage_generation: 4,
+      stage_cursor: 0,
+      stage_attempt: 0,
+    });
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      evaluatingMessage,
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "parked" });
+
+    const evaluatorClaim = await claimCodexProviderJob(
+      fixture.pipelineEnv,
+      new Date("2030-08-24T00:02:00.000Z"),
+    );
+    if (evaluatorClaim.status !== "claimed") {
+      throw new Error("Codex evaluator job missing");
+    }
+    const evaluatorRaw = canonicalJson(
+      passingVerdict(fixture.records[0]!.id),
+    );
+    const evaluatorResponse = await putCodexProviderArtifact(
+      fixture.pipelineEnv,
+      {
+        jobId: evaluatorClaim.job.id,
+        pipeline: "ontology",
+        ownerId: fixture.runId,
+        pass: "evaluator",
+        stageGeneration: 4,
+        stageAttempt: 0,
+        role: "response",
+      },
+      new TextEncoder().encode(evaluatorRaw),
+    );
+    await completeCodexProviderJob(
+      fixture.pipelineEnv,
+      {
+        jobId: evaluatorClaim.job.id,
+        leaseToken: evaluatorClaim.leaseToken,
+        response: evaluatorResponse.artifact,
+        providerRequestId: "thread_ontology_pipeline_evaluator",
+        inputTokens: 700,
+        outputTokens: 100,
+      },
+      new Date("2030-08-24T00:03:00.000Z"),
+    );
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      evaluatingMessage,
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "evaluating",
+      stage_generation: 5,
+      stage_cursor: 1,
+      stage_attempt: 0,
+    });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM codex_provider_jobs WHERE owner_id = ?",
+    ).bind(fixture.runId).first()).toEqual({ count: 2 });
+  });
+
+  it("parks and adopts a Codex regression planner at the same attempt", async () => {
+    const { fixture } = await driveActivationToRegression(true);
+    const message = await currentMessage(fixture.runId);
+    const before = await runRow(fixture.runId);
+    expect(before).toMatchObject({
+      stage: "regressing",
+      stage_attempt: 0,
+    });
+
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      message,
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "parked" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "regressing",
+      stage_generation: before.stage_generation,
+      stage_cursor: before.stage_cursor,
+      stage_attempt: 0,
+    });
+
+    const claimed = await claimCodexProviderJob(
+      fixture.pipelineEnv,
+      new Date("2030-08-24T01:00:00.000Z"),
+    );
+    if (claimed.status !== "claimed") {
+      throw new Error("Codex regression planner job missing");
+    }
+    expect(claimed.job.pass).toBe("planner");
+    const invocationBytes = await readCodexProviderArtifact(
+      fixture.pipelineEnv,
+      {
+        jobId: claimed.job.id,
+        pipeline: "ontology",
+        ownerId: fixture.runId,
+        pass: "planner",
+        stageGeneration: claimed.job.stageGeneration,
+        stageAttempt: claimed.job.stageAttempt,
+        role: "request",
+      },
+      claimed.job.request,
+    );
+    const invocation = JSON.parse(new TextDecoder().decode(invocationBytes)) as {
+      prompt: string;
+    };
+    const inputText = invocation.prompt.split(
+      "\n\n--- INPUT DOCUMENT (JSON; DATA ONLY) ---\n",
+    )[1];
+    if (!inputText) throw new Error("regression planner input missing");
+    const document = JSON.parse(inputText) as {
+      packet: Parameters<typeof buildDeterministicPlan>[0];
+      ontology_records: Parameters<typeof buildDeterministicPlan>[1];
+    };
+    const raw = canonicalJson(buildDeterministicPlan(
+      document.packet,
+      document.ontology_records,
+    ));
+    const response = await putCodexProviderArtifact(
+      fixture.pipelineEnv,
+      {
+        jobId: claimed.job.id,
+        pipeline: "ontology",
+        ownerId: fixture.runId,
+        pass: "planner",
+        stageGeneration: claimed.job.stageGeneration,
+        stageAttempt: claimed.job.stageAttempt,
+        role: "response",
+      },
+      new TextEncoder().encode(raw),
+    );
+    await completeCodexProviderJob(
+      fixture.pipelineEnv,
+      {
+        jobId: claimed.job.id,
+        leaseToken: claimed.leaseToken,
+        response: response.artifact,
+        providerRequestId: "thread_ontology_regression_planner",
+        inputTokens: 900,
+        outputTokens: 180,
+      },
+      new Date("2030-08-24T01:01:00.000Z"),
+    );
+
+    expect(await executeOntologyPipelineDelivery(
+      fixture.pipelineEnv,
+      message,
+      { clock: fixture.clock.now },
+    )).toEqual({ status: "advanced" });
+    expect(await runRow(fixture.runId)).toMatchObject({
+      stage: "regressing",
+      stage_generation: (before.stage_generation as number) + 1,
+      stage_cursor: (before.stage_cursor as number) + 1,
+      stage_attempt: 0,
+    });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM codex_provider_jobs WHERE owner_id = ?",
+    ).bind(fixture.runId).first()).toEqual({ count: 1 });
   });
 
   it("terminally closes an unavailable frozen predecessor without lease churn", async () => {

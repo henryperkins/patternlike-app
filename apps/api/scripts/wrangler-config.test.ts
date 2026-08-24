@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,40 @@ import { unstable_readConfig } from "wrangler";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.resolve(here, "../wrangler.toml");
 
-test("production enables only ontology maintenance and not the incumbent scheduler", () => {
+async function sourceFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(entries.map(async (entry) => {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(target);
+    return entry.isFile() && entry.name.endsWith(".ts") &&
+      !entry.name.endsWith(".test.ts")
+      ? [target]
+      : [];
+  }));
+  return nested.flat();
+}
+
+test("Worker source and configuration contain no private ChatGPT transport", async () => {
+  const files = [
+    ...await sourceFiles(path.resolve(here, "../src")),
+    path.resolve(here, "../wrangler.toml"),
+    path.resolve(here, "../test/hermetic-bindings.ts"),
+  ];
+  const forbidden = [
+    "chatgpt.com/backend-api/codex/responses",
+    "chatgpt-account-id",
+    "CODEX_AUTH_TOKEN",
+    "CODEX_ACCOUNT_ID",
+  ];
+  for (const file of files) {
+    const source = await readFile(file, "utf8");
+    for (const literal of forbidden) {
+      assert.equal(source.includes(literal), false, `${literal} remains in ${file}`);
+    }
+  }
+});
+
+test("production enables the internal Codex ontology canary and keeps Pattern off", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
@@ -23,7 +57,26 @@ test("production enables only ontology maintenance and not the incumbent schedul
     "7,22,37,52 * * * *",
   ]);
   assert.equal(production.vars.ONTOLOGY_PIPELINE_ROLLOUT, "internal");
+  assert.equal(production.vars.ONTOLOGY_PIPELINE_PUBLISHER, "codex");
+  assert.equal(production.vars.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS, "900000");
+  assert.equal(production.vars.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS, "900000");
   assert.equal(production.vars.PATTERN_AI_ROLLOUT, "off");
+  assert.equal(production.vars.PATTERN_PUBLISHER, "openai");
+});
+
+test("production sends every API namespace through the Worker before assets", () => {
+  const production = unstable_readConfig({
+    config: configPath,
+    env: "production",
+  });
+
+  assert.deepEqual(production.assets?.run_worker_first, [
+    "/health",
+    "/v1/*",
+    "/internal/*",
+    "/admin/*",
+    "/codex-provider/*",
+  ]);
 });
 
 test("ontology pipeline queues are distinct and fully redeclared", () => {

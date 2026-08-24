@@ -9,6 +9,11 @@ import {
   OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
   OPENAI_PATTERN_WRITER_MODEL,
   OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+  PATTERN_PUBLISHER_CODEX,
+  PATTERN_PUBLISHER_OPENAI,
+  PATTERN_PUBLISHER_SYNTHETIC,
+  PATTERN_PUBLISHER_WORKERS_AI,
+  patternProviderDisplayName,
   resolvePatternPublisherConfiguration,
   verifierIndependenceProblem,
   type PatternPassOptions,
@@ -31,17 +36,17 @@ function env(overrides: Record<string, string | undefined> = {}) {
     OPENAI_PATTERN_PLANNER_REASONING: "high",
     OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.0",
     OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "120000",
-    OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "4000",
+    OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_WRITER_REASONING: "high",
     OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.0",
     OPENAI_PATTERN_WRITER_TIMEOUT_MS: "120000",
-    OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "8000",
+    OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_VERIFIER_REASONING: "high",
     OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
     OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "120000",
-    OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "4000",
+    OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
     ...overrides,
   } as never;
 }
@@ -125,6 +130,17 @@ describe("Pattern publisher configuration", () => {
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     expect(outcome.config?.pin.publisher).toBe("openai");
+  });
+
+  it("refuses the experimental Workers AI publisher outside development", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ PATTERN_PUBLISHER: "workers_ai" }),
+    );
+    expect(outcome).toEqual({
+      ok: false,
+      code: "pattern_publisher_misconfigured",
+      message: "PATTERN_PUBLISHER=workers_ai is refused outside development",
+    });
   });
 
   describe("verifier independence (section 14.2)", () => {
@@ -290,6 +306,34 @@ describe("Pattern publisher configuration", () => {
       );
       expect(outcome.ok).toBe(true);
     });
+  });
+});
+
+describe("Pattern provider labels", () => {
+  it("names every publisher honestly from one definition", () => {
+    // The document says who actually wrote it. A second hand-copied mapping in
+    // the ontology regression harness read `provider === "openai" ? "OpenAI" :
+    // "synthetic"`, which labelled every Codex pass "synthetic" for the whole
+    // internal Codex canary. Both call sites now resolve here.
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_OPENAI)).toBe("OpenAI");
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_CODEX)).toBe("Codex");
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_WORKERS_AI))
+      .toBe("Cloudflare Workers AI");
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_SYNTHETIC))
+      .toBe("synthetic");
+  });
+
+  it("never reports a real provider as synthetic", () => {
+    for (
+      const publisher of [
+        PATTERN_PUBLISHER_OPENAI,
+        PATTERN_PUBLISHER_CODEX,
+        PATTERN_PUBLISHER_WORKERS_AI,
+      ] as const
+    ) {
+      expect(patternProviderDisplayName(publisher), publisher)
+        .not.toBe("synthetic");
+    }
   });
 });
 

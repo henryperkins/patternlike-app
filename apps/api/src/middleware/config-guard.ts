@@ -13,6 +13,7 @@ import {
   type AiGatewayRoute,
   type ProviderCredentialMode,
 } from "../services/reading-publisher.js";
+import { CODEX_PROVIDER_TIMEOUT_MS } from "../services/codex-provider-contract.js";
 
 export const ONTOLOGY_PIPELINE_ROLLOUT_MODES = ["off", "internal"] as const;
 export type OntologyPipelineRollout = (typeof ONTOLOGY_PIPELINE_ROLLOUT_MODES)[number];
@@ -48,6 +49,7 @@ export interface OntologyPipelineConfigPin {
 }
 
 export interface OntologyPipelineConfiguration {
+  publisher: "openai" | "codex";
   pin: OntologyPipelineConfigPin;
   generatorTimeoutMs: number;
   evaluatorTimeoutMs: number;
@@ -57,7 +59,7 @@ export interface OntologyPipelineConfiguration {
   configurationEqual: boolean;
   regressionMinimumPassRate: number;
   gatewayRoute: AiGatewayRoute | null;
-  credential: ProviderCredentialMode;
+  credential: ProviderCredentialMode | null;
 }
 
 export type OntologyPipelineConfigurationOutcome =
@@ -125,11 +127,20 @@ export function resolveOntologyPipelineConfiguration(
     };
   }
   const rollout: OntologyPipelineRollout = rolloutRaw === "internal" ? "internal" : "off";
+  const pipelinePublisher = env.ONTOLOGY_PIPELINE_PUBLISHER?.trim() || "openai";
+  if (pipelinePublisher !== "openai" && pipelinePublisher !== "codex") {
+    return ontologyPipelineMisconfigured(
+      "ONTOLOGY_PIPELINE_PUBLISHER must be openai or codex",
+    );
+  }
+  const expectedProviderTimeout = pipelinePublisher === "codex"
+    ? CODEX_PROVIDER_TIMEOUT_MS
+    : OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS;
 
   const integerPins: Array<[string | undefined, number, string]> = [
     [
       env.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS,
-      OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS,
+      expectedProviderTimeout,
       "OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS",
     ],
     [
@@ -139,7 +150,7 @@ export function resolveOntologyPipelineConfiguration(
     ],
     [
       env.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS,
-      OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS,
+      expectedProviderTimeout,
       "OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS",
     ],
     [
@@ -297,8 +308,35 @@ export function resolveOntologyPipelineConfiguration(
       "ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS=1 is required while model pins are equal",
     );
   }
-  const credential = resolveProviderCredentialMode(env, gateway.route);
-  if (!credential.ok) return ontologyPipelineMisconfigured(credential.message);
+  // The pipeline's provider, selected the same way the Pattern path selects
+  // its own. Defaulting to `openai` keeps every existing deployment's meaning
+  // unchanged; `codex` creates a durable job for the dedicated CLI runner.
+  let credentialMode: ProviderCredentialMode | null = null;
+  if (pipelinePublisher === "codex") {
+    const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
+    const keyring = env.CODEX_PROVIDER_ARTIFACT_KEYRING?.trim() ?? "";
+    if (!/^[A-Za-z0-9._-]{32,512}$/.test(runnerToken)) {
+      return ontologyPipelineMisconfigured(
+        "CODEX_RUNNER_TOKEN is required when ONTOLOGY_PIPELINE_PUBLISHER=codex",
+      );
+    }
+    if (keyring === "" || !env.ARTIFACTS) {
+      return ontologyPipelineMisconfigured(
+        "CODEX_PROVIDER_ARTIFACT_KEYRING and ARTIFACTS are required when ONTOLOGY_PIPELINE_PUBLISHER=codex",
+      );
+    }
+    // A configured AI Gateway names the OpenAI transport, not the dedicated
+    // runner. Refuse the ambiguous combination instead of implying it applies.
+    if (gateway.route !== null) {
+      return ontologyPipelineMisconfigured(
+        "ONTOLOGY_PIPELINE_PUBLISHER=codex cannot be routed through AI Gateway",
+      );
+    }
+  } else {
+    const credential = resolveProviderCredentialMode(env, gateway.route);
+    if (!credential.ok) return ontologyPipelineMisconfigured(credential.message);
+    credentialMode = credential.mode;
+  }
   const missing = required.filter(([value]) => value === undefined || value === null || value === "");
   if (missing.length > 0) {
     return ontologyPipelineMisconfigured(
@@ -310,6 +348,7 @@ export function resolveOntologyPipelineConfiguration(
     ok: true,
     rollout,
     config: {
+      publisher: pipelinePublisher,
       pin: {
         generator_model: OPENAI_ONTOLOGY_GENERATOR_MODEL,
         generator_reasoning: OPENAI_ONTOLOGY_GENERATOR_REASONING,
@@ -321,8 +360,12 @@ export function resolveOntologyPipelineConfiguration(
         evaluator_max_output_tokens: OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS,
         input_max_bytes: ONTOLOGY_PIPELINE_INPUT_MAX_BYTES,
       },
-      generatorTimeoutMs: OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS,
-      evaluatorTimeoutMs: OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS,
+      generatorTimeoutMs: pipelinePublisher === "codex"
+        ? CODEX_PROVIDER_TIMEOUT_MS
+        : OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS,
+      evaluatorTimeoutMs: pipelinePublisher === "codex"
+        ? CODEX_PROVIDER_TIMEOUT_MS
+        : OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS,
       dailyProviderCallLimit: dailyProviderCallLimit!,
       failedArtifactRetentionDays: ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS,
       configurationEqual: equalModels,
@@ -330,7 +373,7 @@ export function resolveOntologyPipelineConfiguration(
         ? ONTOLOGY_PIPELINE_EQUAL_MODEL_REGRESSION_MINIMUM_PASS_RATE
         : ONTOLOGY_PIPELINE_DEFAULT_REGRESSION_MINIMUM_PASS_RATE,
       gatewayRoute: gateway.route,
-      credential: credential.mode,
+      credential: credentialMode,
     },
   };
 }
@@ -364,21 +407,20 @@ export interface ConfigFailure {
 export const PLACEHOLDER_OIDC_HOST = "issuer.invalid";
 
 export function checkSecureConfig(
-  env:
-    | Pick<
-        Env,
-        | "ENVIRONMENT"
-        | "AUTH_STUB"
-        | "ROOT_KEK"
-        | "OIDC_ISSUER"
-        | "OIDC_AUDIENCE"
-        | "OIDC_JWKS_URL"
-        | "CHECK_IN_RETENTION_MONTHS"
-        | "TIME_TRAVEL_RECEIPT_EPOCH"
-        | "TIME_TRAVEL_DAILY_SCAN_LIMIT"
-      >
-    | Partial<Env>,
+  env: Partial<Env>,
 ): ConfigFailure | null {
+  const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
+  const aliasedRunnerAuthority = runnerToken !== "" && [
+    env.SERVICE_AUTH_TOKEN,
+    env.PATTERN_ADMIN_TOKEN,
+  ].some((value) => value?.trim() === runnerToken);
+  if (aliasedRunnerAuthority) {
+    return {
+      code: "codex_runner_authority_aliased",
+      message: "CODEX_RUNNER_TOKEN must be unique to the Codex runner authority",
+    };
+  }
+
   const checkInRetention = resolveCheckInRetentionMonths(
     env.CHECK_IN_RETENTION_MONTHS,
   );

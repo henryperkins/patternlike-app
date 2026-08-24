@@ -39,6 +39,8 @@ const TABLES = [
   "timezone_changes",
   "natal_feature_sets",
   "natal_features",
+  "codex_provider_response_uploads",
+  "codex_provider_jobs",
   "pattern_generation_artifacts",
   "pattern_generation_artifact_keys",
   "pattern_documents",
@@ -175,6 +177,16 @@ export async function resetDb(): Promise<void> {
     cursor = undefined;
     do {
       const page = await env.ARTIFACTS.list({ prefix: "pattern-ontology/", cursor });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+    cursor = undefined;
+    do {
+      const page = await env.ARTIFACTS.list({
+        prefix: "codex-provider-jobs/",
+        cursor,
+      });
       const keys = page.objects.map((object) => object.key);
       if (keys.length > 0) await env.ARTIFACTS.delete(keys);
       cursor = page.truncated ? page.cursor : undefined;
@@ -616,6 +628,27 @@ export function enablePatternOpenAi(): void {
   env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 }
 
+export function enablePatternCodex(): void {
+  enablePatternAi();
+  env.PATTERN_PUBLISHER = "codex";
+  env.CODEX_RUNNER_TOKEN = "runner_0123456789abcdefghijklmnopqrstuvwxyz";
+  env.CODEX_PROVIDER_ARTIFACT_KEYRING = JSON.stringify({
+    version: 1,
+    keys: {
+      "codex-test-key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+    },
+  });
+  env.OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
+  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0";
+  env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "900000";
+  env.OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
+  env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.0";
+  env.OPENAI_PATTERN_WRITER_TIMEOUT_MS = "900000";
+  env.OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
+  env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
+  env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "900000";
+}
+
 export function disablePatternAi(): void {
   env.PATTERN_AI_ROLLOUT = "off";
   env.PATTERN_PUBLISHER = "";
@@ -634,4 +667,9 @@ export function disablePatternAi(): void {
   env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "";
   env.OPENAI_PATTERN_VERIFIER_MODEL = "";
   env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "";
+  env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "";
+  env.OPENAI_PATTERN_WRITER_TIMEOUT_MS = "";
+  env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "";
+  env.CODEX_RUNNER_TOKEN = "";
+  env.CODEX_PROVIDER_ARTIFACT_KEYRING = "";
 }

@@ -46,6 +46,9 @@ export interface OntologyRuleVerdict {
   };
 }
 
+/** The nine fixed evaluator dimensions. Closed vocabulary, safe to log. */
+export type OntologyVerdictDimension = keyof OntologyRuleVerdict["dimensions"];
+
 export interface OntologyPassOptions {
   /** Worker's internal correlation only; never provider-visible. */
   requestId: string;
@@ -57,10 +60,16 @@ export interface OntologyPassOptions {
   reserve: (
     stageClass: OntologyProviderPass,
   ) => Promise<OntologyProviderReservationOutcome>;
+  codexJob?: {
+    ownerId: string;
+    stageGeneration: number;
+    stageAttempt: number;
+    dailyCallLimit: number;
+  };
 }
 
 export interface OntologyPassMetadata {
-  provider: "openai";
+  provider: "openai" | "codex";
   pass: OntologyProviderPass;
   model: string;
   prompt_version: string;
@@ -93,6 +102,14 @@ export type OntologyPassOutcome<T> =
       /** Exact provider response bytes. Encrypt before persistence; never log. */
       raw: string;
       metadata: OntologyPassMetadata;
+    }
+  | {
+      ok: false;
+      code: "publisher_pending";
+      job_id: string;
+      safe_detail_code?: never;
+      retry_after_seconds?: never;
+      origin_layer?: never;
     }
   | {
       ok: false;

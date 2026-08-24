@@ -19,6 +19,19 @@
  * not thereby unenforced: they are re-checked in the Worker after parsing.
  */
 
+import {
+  CHAPTER_WORD_MIN,
+  CHAPTER_WORD_MAX,
+  PARAGRAPH_WORD_MAX,
+  SECTIONS_MIN,
+  SECTIONS_MAX,
+  SIGNATURE_WORD_MIN,
+  SIGNATURE_WORD_MAX,
+  TOTAL_WORD_MIN,
+  TOTAL_WORD_MAX,
+  UNCERTAINTY_WORD_MIN,
+  UNCERTAINTY_WORD_MAX,
+} from "@patternlike/pattern-engine";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 import {
   OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
@@ -277,6 +290,70 @@ export const PATTERN_WRITER_CORRECTION_POLICY = [
   "You may rephrase and reorganize sections inside a chapter.",
   "You may not change chapter membership, the number of chapters, the omitted features, or which ontology rules are authorized.",
   "Every key listed under preserve must come back exactly as it is given.",
+].join("\n");
+
+
+/**
+ * The planner policy for the Workers AI pin, under its own prompt version.
+ *
+ * The shipped policy states the two rules a person would infer -- "at most one
+ * chapter", "record every feature you do not use" -- but not the closure
+ * property `validatePatternPlan` actually enforces. Measured against
+ * `@cf/openai/gpt-oss-120b` on a real 40-alias packet, the omissions that came
+ * back cited a `covered_by` chapter key that did not exist, and mandatory
+ * aliases were being recorded as omissions rather than assigned. Both are
+ * mechanical rules, so they are stated mechanically.
+ *
+ * Deliberately additive to the shared policy rather than a rewrite: the
+ * editorial substance is identical, and only the accounting is made explicit.
+ * It rides `WORKERS_AI_PATTERN_PROMPT_VERSION`, so the OpenAI pin's frozen
+ * prompt is untouched.
+ */
+export const WORKERS_AI_PLANNER_POLICY = [
+  PLANNER_POLICY,
+  "",
+  "COVERAGE IS CHECKED MECHANICALLY. Before returning, verify all of the following:",
+  "1. Every alias in the packet's features array appears EXACTLY ONCE, either in some chapter's feature_aliases or in omissions -- never in both, never twice.",
+  "2. Every feature whose coverage is 'mandatory_core' or 'mandatory_any' MUST be assigned. It may NEVER appear in omissions.",
+  "3. A 'mandatory_core' alias must be assigned to a chapter, not to a signature.",
+  "4. If you set covered_by on an omission, it must equal a chapter_key or signature_key you actually emitted. If no such unit exists, leave covered_by null.",
+  "5. Count the aliases you emitted and compare with the packet's feature count. If they differ, correct the plan before returning it.",
+  "6. A chapter may NOT contain only uncertainty-class features. Place the uncertainty feature in a chapter that also holds at least one non-uncertainty feature.",
+  "7. Set each chapter's ontology_rule_ids to EXACTLY the union of the ontology_rule_ids carried by the features you assigned to that chapter. Never include a rule id belonging to a feature you assigned elsewhere, and never add one that appears on no assigned feature.",
+  "7b. Every id in required_tension_ids, required_counter_expression_ids and required_resource_ids must be built from that same chapter's ontology_rule_ids -- either the bare rule id, or that rule id followed by '#tension', '#counter' or '#resource'. Never invent one.",
+  "8. Each chapter needs at least one required_tension_ids entry and at least one required_counter_expression_ids entry.",
+  "9. Work through the packet's features array in order and place each alias before moving to the next. Do not summarise or sample: a plan that covers 35 of 40 aliases is rejected outright, exactly as one that covers none.",
+].join("\n");
+
+
+/**
+ * The writer policy for the Workers AI pin, under its own prompt version.
+ *
+ * `toStrictProviderSchema` strips `minLength`/`maxLength`, so the word bounds
+ * the Worker enforces are invisible to the model in the schema it receives. The
+ * shipped policy says only "stay inside the supplied section and word bounds" —
+ * true, but it never supplies them. Measured against `@cf/openai/gpt-oss-120b`
+ * on a real 40-alias packet, three consecutive candidates were rejected for
+ * `chapter_word_count` alone while every other check passed, and the correction
+ * loop was converging on numbers it had to infer one rejection at a time.
+ * Stating them costs nothing and is what the shipped sentence already promised.
+ */
+export const WORKERS_AI_WRITER_POLICY = [
+  WRITER_POLICY,
+  "",
+  "WORD COUNTS ARE CHECKED MECHANICALLY. Count words as whitespace-separated tokens.",
+  `Each core chapter: ${CHAPTER_WORD_MIN}-${CHAPTER_WORD_MAX} words in total across its sections, tensions, resources and counter-expression. Aim for ${Math.round((CHAPTER_WORD_MIN + CHAPTER_WORD_MAX) / 2)}.`,
+  `Each additional signature: ${SIGNATURE_WORD_MIN}-${SIGNATURE_WORD_MAX} words.`,
+  `The uncertainty statement: ${UNCERTAINTY_WORD_MIN}-${UNCERTAINTY_WORD_MAX} words.`,
+  `No single paragraph may exceed ${PARAGRAPH_WORD_MAX} words. Split a long one into several sections instead.`,
+  `Each chapter needs between ${SECTIONS_MIN} and ${SECTIONS_MAX} sections.`,
+  `The whole document: ${TOTAL_WORD_MIN}-${TOTAL_WORD_MAX} words.`,
+  "A chapter below its minimum is rejected outright, so write it out fully rather than summarising.",
+  "",
+  "The chapter minimum and the paragraph maximum have to be satisfied TOGETHER, which fixes how many sections a chapter needs:",
+  `a ${CHAPTER_WORD_MIN}-word chapter cannot be one or two paragraphs, because no paragraph may exceed ${PARAGRAPH_WORD_MAX} words.`,
+  `Plan on 3 sections of roughly 120-150 words each, plus the tension, resource and counter-expression entries. Lengthening a chapter means ADDING a section, never growing a paragraph past ${PARAGRAPH_WORD_MAX} words.`,
+  "If a correction tells you a chapter was too short, add another section rather than expanding an existing one.",
 ].join("\n");
 
 export const PATTERN_SYSTEM_POLICY: Record<PatternPass, string> = {

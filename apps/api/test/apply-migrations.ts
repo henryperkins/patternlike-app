@@ -6,13 +6,15 @@ const expectedTail = [
   "0010_pattern_stage_class_usage.sql",
   "0011_ontology_pipeline_evidence.sql",
   "0012_ontology_pipeline.sql",
+  "0013_codex_provider_jobs.sql",
+  "0014_codex_provider_response_uploads.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
   JSON.stringify(expectedTail)
 ) {
   throw new Error(
-    `ontology migration tail is missing or out of order: ${JSON.stringify(migrationNames.slice(-4))}`,
+    `ontology migration tail is missing or out of order: ${JSON.stringify(migrationNames.slice(-expectedTail.length))}`,
   );
 }
 
@@ -20,6 +22,8 @@ const correctionMigrationIndex = migrationNames.indexOf(expectedTail[0]);
 const usageMigrationIndex = migrationNames.indexOf(expectedTail[1]);
 const evidenceMigrationIndex = migrationNames.indexOf(expectedTail[2]);
 const pipelineMigrationIndex = migrationNames.indexOf(expectedTail[3]);
+const codexProviderMigrationIndex = migrationNames.indexOf(expectedTail[4]);
+const codexResponseUploadMigrationIndex = migrationNames.indexOf(expectedTail[5]);
 
 // Main-test storage starts empty and receives the exact ordered migration set.
 // This is the fresh-database lane; individual tests then exercise the schema.
@@ -252,7 +256,7 @@ await upgradeDb.prepare(
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(pipelineMigrationIndex),
+  env.TEST_MIGRATIONS.slice(pipelineMigrationIndex, codexProviderMigrationIndex),
 );
 
 const evidenceAfter = await upgradeDb.prepare(
@@ -276,11 +280,51 @@ for (const table of [
   if (!found) throw new Error(`0012 did not create ${table} on populated upgrade`);
 }
 
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(
+    codexProviderMigrationIndex,
+    codexResponseUploadMigrationIndex,
+  ),
+);
+
+const codexProviderTable = await upgradeDb.prepare(
+  "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'codex_provider_jobs'",
+).first();
+if (!codexProviderTable) {
+  throw new Error("0013 did not create codex_provider_jobs on populated upgrade");
+}
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(codexResponseUploadMigrationIndex),
+);
+
+const codexResponseUploadTable = await upgradeDb.prepare(
+  `SELECT name FROM sqlite_master
+   WHERE type = 'table' AND name = 'codex_provider_response_uploads'`,
+).first();
+if (!codexResponseUploadTable) {
+  throw new Error(
+    "0014 did not create codex_provider_response_uploads on populated upgrade",
+  );
+}
+
+const evidenceAfterCodexMigration = await upgradeDb.prepare(
+  `SELECT ${Object.keys(evidenceBefore).join(", ")}
+   FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
+)
+  .bind(evidenceBefore.run_id)
+  .first();
+if (JSON.stringify(evidenceAfterCodexMigration) !== JSON.stringify(evidenceBefore)) {
+  throw new Error("0013 did not preserve the populated ontology evidence row byte-for-byte");
+}
+
 const finalForeignKeyCheck = await upgradeDb.prepare("PRAGMA foreign_key_check").all();
 if (finalForeignKeyCheck.results.length !== 0) {
-  throw new Error("0012 left foreign-key violations on the populated upgrade");
+  throw new Error("0014 left foreign-key violations on the populated upgrade");
 }
 const assertionRows = await upgradeDb.prepare("SELECT * FROM assertion_probe").all();
 if (assertionRows.results.length !== 0) {
-  throw new Error("0012 left an assertion probe armed");
+  throw new Error("0014 left an assertion probe armed");
 }
