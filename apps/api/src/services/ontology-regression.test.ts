@@ -18,6 +18,7 @@ import {
   ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS,
   ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS,
   ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
+  ONTOLOGY_REGRESSION_PATTERN_PIN,
   applyOntologyRegressionPass,
   createCanonicalOntologyRegressionReport,
   createOntologyRegressionFixtureState,
@@ -277,12 +278,12 @@ describe("M7 ontology activation regression", () => {
 
   it("binds report evidence and refuses call or token arithmetic above the ceiling", async () => {
     const corpus = loadOntologyRegressionCorpus();
-    const results = corpus.fixtures.map((fixture) => ({
+    const results = corpus.fixtures.map((fixture, index) => ({
       fixture_id: fixture.fixture_id,
       accuracy: fixture.effective_accuracy,
       accepted: true,
       declared_outcome: fixture.declared_outcome,
-      result_hash: `sha256:${"a".repeat(64)}`,
+      result_hash: `sha256:${(index + 1).toString(16).padStart(64, "0")}`,
       provider_calls: 3,
       input_tokens: 10,
       output_tokens: 10,
@@ -317,6 +318,16 @@ describe("M7 ontology activation regression", () => {
     });
     expect(JSON.stringify(report.document)).toContain(base.commandHash);
     expect(JSON.stringify(report.document)).toContain(base.evaluationReportHash);
+    expect(
+      (report.document.provider_usage as Record<string, unknown>)
+        .maximum_arithmetic,
+    ).toBe(
+      `30 * (11 * 98304 input-token upper-bound units + ` +
+        `(2 * ${ONTOLOGY_REGRESSION_PATTERN_PIN.planner_max_output_tokens} + ` +
+        `3 * ${ONTOLOGY_REGRESSION_PATTERN_PIN.writer_max_output_tokens} + ` +
+        `3 * 2 * ${ONTOLOGY_REGRESSION_PATTERN_PIN.verifier_max_output_tokens}) ` +
+        `output tokens)`,
+    );
 
     await expect(createCanonicalOntologyRegressionReport({
       ...base,

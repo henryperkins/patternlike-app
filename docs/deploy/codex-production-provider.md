@@ -1,10 +1,13 @@
 # Codex production provider runbook
 
-**Status (2026-08-24):** the rollout-off control plane, migration `0013`, and
-Worker secrets are deployed. Release hardening adds migration `0014`, which
-must be applied before the hardened Worker is deployed. The existing
-DigitalOcean droplet is explicitly approved as the runner host; installation,
-interactive service-account login, and the ontology/Pattern canaries remain.
+**Status (2026-08-24):** the read-only production audit found migrations `0013`
+and `0014` applied, and 124 completed Codex provider jobs, demonstrating
+historical successful execution. Current live runner health was not rechecked by
+this audit. Production ontology is `internal` / `codex` with 900000-ms pass
+timeouts; Pattern remains `off` / `openai` with 120000-ms pass timeouts. The
+existing DigitalOcean droplet is the approved runner host. Neither this status
+nor any later runbook edit authorizes a deployment, provider call, ontology
+activation, or rollout advance.
 
 This runbook operates the supported Codex CLI provider for Pattern generation
 and the ontology pipeline. The API Worker owns durable jobs, budgets,
@@ -15,6 +18,15 @@ login.
 The runner has no inbound port. Never copy its Codex credential store to
 Cloudflare, put a ChatGPT token in Worker configuration, or place this service
 on the AGPL calculation host.
+
+**Gate 6 status:** this runbook does not assert current Codex spend
+certification. Before its first durable ontology or Pattern job, obtain the
+selected-provider Gate 6 written approval in
+[`openai-pattern-rollout.md`](./openai-pattern-rollout.md): authorized
+account/plan, 100/500 D1 call ceilings, the effective output envelope of 8k
+ontology-generator, 4k ontology-evaluator, and 32k Pattern/regression
+planner/writer/verifier limits, 900000-ms timeout, concurrency 1, and applicable
+attempt/input limits.
 
 ## 1. Preconditions
 
@@ -62,8 +74,21 @@ Read-only preflight queries should record counts for `users`,
 
 Migrations `0013_codex_provider_jobs.sql` and
 `0014_codex_provider_response_uploads.sql` are additive and must exist before
-the matching Worker code can receive traffic. Production already has `0013`;
-the hardened release adds `0014`. Apply pending migrations in recorded order:
+the matching Worker code can receive traffic. The 2026-08-24 read-only audit
+found both applied in production. First inspect the migration list:
+
+```bash
+npx wrangler d1 migrations list patternlike-ops --config apps/api/wrangler.toml --env production --remote
+```
+
+If `0015_ontology_pipeline_regression_evidence` is pending, do **not** run the
+provider-only apply command below. Leave this section and follow ontology Gate 2
+in [`openai-pattern-rollout.md`](./openai-pattern-rollout.md), which owns its
+backup, prechecks, application, and compatible-Worker sequencing. Stop if any
+other migration is pending.
+
+Only in a fresh provider environment with `0013` and/or `0014` pending (or when
+neither is pending, as a no-op) run:
 
 ```bash
 npx wrangler d1 migrations apply patternlike-ops --config apps/api/wrangler.toml --env production --remote
@@ -72,14 +97,18 @@ npx wrangler d1 execute patternlike-ops --config apps/api/wrangler.toml --env pr
 
 Expected result:
 
-- in the recorded 2026-08-24 production state, only migration `0014` is newly
+- in the recorded 2026-08-24 production state, `0013` and `0014` are already
   applied; a fresh pre-provider environment applies `0013` then `0014`;
 - `PRAGMA foreign_key_check` returns no rows;
 - the preflight table counts are unchanged;
-- `codex_provider_jobs` and `codex_provider_response_uploads` exist and are
-  empty.
+- `codex_provider_jobs` and `codex_provider_response_uploads` exist; record and
+  compare their status counts to the preflight, with no unexpected pending or
+  leased jobs; and
+- uploads are consistent with retained jobs. Empty job/upload tables are
+  expected only for a fresh provider environment.
 
-Stop if any other migration is pending or any foreign-key row is returned.
+Stop if any foreign-key row is returned. `0015` remains branch-pending and is
+not represented as applied in this provider-only procedure.
 
 ## 4. Provision Worker secrets
 
@@ -221,7 +250,9 @@ the 15-minute provider timeout.
 
 ## 7. Rollout-off protocol smoke
 
-With both domain rollouts still off:
+Use this protocol only when both domain rollouts are intentionally off. It is
+not a claim about the current production audit, which found ontology `internal`
+and Pattern `off` as recorded above.
 
 - verify repeated runner polls receive no work;
 - verify no D1 provider budget is consumed;
@@ -241,9 +272,20 @@ Change the production ontology pins together in one reviewed deployment:
 - `ONTOLOGY_PIPELINE_ROLLOUT="internal"`;
 - all existing model, prompt, input, attempt, and daily-call pins unchanged.
 
+For `codex`, generator, evaluator, and regression passes are all fixed at
+900000 ms. Each claimed provider job has a 1200000-ms lease, preserving a
+five-minute terminal-upload margin. The Codex contract rejects another timeout;
+do not mix these values with the 120000-ms OpenAI path.
+
 Reserve exactly one new immutable candidate through the existing authenticated
 internal operation. Do not use the local diagnostic corpus. Monitor only safe
-state and counters.
+state and counters. The ordinary generator job is the reachable Codex Gate 4
+check for the generator schema: let the runner claim that durable job; do not
+create a diagnostic job or invoke a separate runner route. Close that schema's
+Gate 4 evidence only if its terminal response is schema-valid within timeout
+with the pinned model/prompt and safe ids, hashes, and counters. Otherwise stop
+the candidate. Do not reserve it until the selected Codex Gate 6 approval above
+is recorded.
 
 Acceptance evidence:
 
@@ -270,8 +312,20 @@ After ontology activation, deploy these production changes together:
 - all existing model, prompt, output, input, attempt, retention, and daily-call
   pins unchanged.
 
-Use the normal authenticated consent and first-open generation flow. Never
-enqueue a synthetic document directly into the reader pipeline.
+For `codex`, planner, writer, and verifier passes are all fixed at 900000 ms,
+with the same 1200000-ms provider-job lease and five-minute terminal-upload
+margin. The Pattern canary changes the publisher and all three timeout pins
+together; it does not inherit the production OpenAI 120000-ms values.
+
+Use the normal authenticated, confirmed first-use flow. It creates the current
+Pattern-generation grant and reservation atomically; only chart-correction
+auto-reservation needs a prior grant. Never enqueue a synthetic document
+directly into the reader pipeline. The ordinary planner job is the reachable
+Codex Gate 4 check for the Pattern strict schema: let the runner claim that
+durable job, with no added diagnostic job or runner route. Close that schema's
+Gate 4 evidence only on a terminal schema-valid response within timeout with
+the pinned model/prompt and safe ids, hashes, and counters; otherwise stop the
+canary.
 
 Acceptance evidence:
 

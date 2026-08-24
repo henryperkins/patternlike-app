@@ -3207,6 +3207,28 @@ describe("ontology pipeline execution", () => {
       `SELECT COUNT(*) AS count FROM pattern_ontology_pipeline_evidence
        WHERE run_id = ? AND bundle_hash = ?`,
     ).bind(fixture.runId, succeeded.bundle_hash).first()).toEqual({ count: 1 });
+    const regressionArtifact = await env.DB.prepare(
+      `SELECT object_key, envelope_sha256, ciphertext_sha256,
+              stage_generation, stage_attempt
+       FROM pattern_ontology_pipeline_artifacts
+       WHERE run_id = ? AND stage = 'regressing'
+         AND artifact_class = 'regression_report' AND deleted_at IS NULL`,
+    ).bind(fixture.runId).first<Record<string, unknown>>();
+    expect(await env.DB.prepare(
+      `SELECT regression_report_hash, regression_artifact_object_key,
+              regression_artifact_envelope_hash,
+              regression_artifact_ciphertext_hash,
+              regression_artifact_stage_generation,
+              regression_artifact_stage_attempt
+       FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
+    ).bind(fixture.runId).first()).toEqual({
+      regression_report_hash: succeeded.regression_report_hash,
+      regression_artifact_object_key: regressionArtifact?.object_key,
+      regression_artifact_envelope_hash: regressionArtifact?.envelope_sha256,
+      regression_artifact_ciphertext_hash: regressionArtifact?.ciphertext_sha256,
+      regression_artifact_stage_generation: regressionArtifact?.stage_generation,
+      regression_artifact_stage_attempt: regressionArtifact?.stage_attempt,
+    });
     expect(await env.DB.prepare(
       `SELECT status FROM pattern_ontology_releases WHERE version = ?`,
     ).bind(sliceAVersion).first()).toEqual({ status: "recalled" });

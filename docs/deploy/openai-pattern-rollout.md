@@ -3,10 +3,13 @@
 **Created:** 2026-08-20
 
 **Status:** Core adapter, automated-ontology, and erasure-replay engineering are
-present. Gate 6 is approved. Gate 7B has failed closed through candidate
-`pattern-ontology-en-us-0.1.8`; Gates 8–10 remain open. This file is the
-operational source of truth; updating it does not itself authorize a deployment,
-secret change, ontology activation, provider call, or rollout advance.
+present. Gate 6 is open for both provider paths: the historical OpenAI approval
+does not cover current pins, and the selected Codex path is not certified. Gate
+7B most recently failed closed for Codex candidate
+`pattern-ontology-en-us-0.1.16-fixcheck-04`; no ontology release is active.
+Gates 8–10 remain open. This file is the operational source of truth; updating
+it does not itself authorize a deployment, secret change, ontology activation,
+provider call, or rollout advance.
 
 **Companion artifacts:**
 
@@ -42,37 +45,45 @@ override a failed machine gate.
 
 This table describes repository evidence, not unqueried live state.
 
-| Area | State at 2026-08-23 | Evidence / next owner |
+| Area | State / date | Evidence / next owner |
 | --- | --- | --- |
 | Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a |
 | Executor/provider path and queue-level integration | Deployed with rollout off | Worker `c20fa0da-273b-4d63-8fdd-7fc53d972c05`; `pattern-execute.ts`, `pattern-execute-openai.test.ts` |
 | Artifact-first idempotency, attempts, writer↔verifier correction, 11-call loop | Complete | `pattern-execute.ts`; exact ceiling in `pattern-execute-protocol.test.ts` |
 | Executed-pin provenance and per-stage usage | Complete | `pattern-execute.ts`; migration `0010_pattern_stage_class_usage.sql` |
-| `0009` / `0010` / `0011` / `0012` | Applied to production in order | Gate 2 evidence below; integrity and shape checks clean |
+| Historical `0009` / `0010` / `0011` / `0012` | Applied to production in order | 2026-08-22 Gate 2 evidence below; integrity and shape checks clean |
+| Current migration inventory (2026-08-24 audit / this branch) | Production is through `0014`; `0015_ontology_pipeline_regression_evidence` is pending on this branch | `0013` / `0014` were read-only-audited as applied. `0015` is additive, not applied or deployed, and belongs to the compatible Worker change while rollout remains contained. |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
-| Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; nine immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active |
+| Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active. See the evidence ledger for individual runs. |
 | Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
 | Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
-| Numeric call-limit value | `100` in committed production config | Gate 6 approved the nine-Pattern/99-call operating ceiling and 100-call hard ceiling |
+| Gate 6 spend certification | Open for OpenAI and Codex | `100` Pattern and `500` ontology calls/day remain enforcement ceilings. The 2026-08-22 OpenAI approval used old 4k/8k/4k output pins and is historical evidence, not authorization for the current mixed ontology/Pattern envelope or Codex. |
 | Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 7B | API `0aded7f1-b115-4bc7-9d2e-4dc2a19eb42a`; corpus, ontology signing, and replay signing identities are provisioned; active ontology is null; Pattern rollout remains `off` |
 
 ## What remains before the first generated Pattern
 
-The shortest supported route is the internal path. In order:
+The shortest supported route is the internal path. Follow the common gates
+first, then choose exactly one ontology branch:
 
-1. pass Gate 1 on the final adapter candidate;
-2. execute the internal ontology plan, or run the implemented automated pipeline
-   instead, and activate a signed release;
-3. inventory production, apply required migrations, and deploy with rollout
-   still `off`;
-4. freshly prove the model/schema, configure one valid credential mode, and approve the
-   worst-case spend ceiling;
-5. set exactly the canary account in `PATTERN_INTERNAL_ACCOUNT_IDS`, move only to
-   `internal`, and use an account with an active chart, confirmed `en-US` locale,
-   valid Pattern consent, and an unconsumed chart fingerprint; and
-6. reserve once and let the machine pipeline reach `ready` or an honest terminal
-   failure.
+1. pass Gate 1, complete Gate 2's required migration procedure, and deploy the
+   compatible Gate 3 Worker with rollout contained;
+2. for `synthetic_internal`, execute and activate the signed internal ontology
+   without provider Gates 4–6; then close the selected Pattern provider's Gates
+   5–6 before Gate 8. A Codex Pattern strict-schema Gate 4 closes only on the
+   ordinary Gate 8 planner job, not through a diagnostic job;
+3. for machine Gate 7B, close the selected provider's Gates 5–6 before
+   reservation. In particular, Codex Gate 6 must close before any durable Codex
+   job. Reserve exactly one authorized immutable candidate, co-execute its
+   generator-schema Gate 4 evidence with that ordinary job, and activate only
+   if every machine gate passes;
+4. after an active ontology exists, prepare the one-account internal Pattern
+   canary with an active chart, confirmed `en-US` locale, current first-use
+   confirmation, and an unconsumed chart fingerprint. The Codex Pattern
+   strict-schema Gate 4 evidence closes on that ordinary Gate 8 planner job;
+5. set exactly the canary account in `PATTERN_INTERNAL_ACCOUNT_IDS`, move only
+   to `internal`, reserve once, and let the machine pipeline reach `ready` or an
+   honest terminal failure.
 
 Adapter Tasks 1–9, including the credential model and queue/idempotency suite,
 are complete. Task 10 supplies the reproducible preflight and this handoff;
@@ -129,10 +140,19 @@ drift, or non-`off` committed rollout.
 
 ## Gate 2 — inventory production and apply forward-only migrations
 
-**Current state:** complete on 2026-08-22. The initial production ledger ended
+**Historical state (2026-08-22):** complete. The initial production ledger ended
 at `0008`. The operator explicitly approved including the unexpected but
 additive `0012_ontology_pipeline.sql`; `0009` through `0012` were then applied
 in numeric order.
+
+**Current state (2026-08-24):** a read-only audit found `0013` and `0014`
+applied in production. This branch introduces additive
+`0015_ontology_pipeline_regression_evidence`; it is not applied or deployed.
+Apply it immediately before deploying its compatible Worker in the same approved
+change window, with rollouts contained. It performs no backfill: legacy
+committed `0011` receipts retain NULL regression pins and fail closed for machine
+public activation. New machine receipts require the complete regression evidence
+tuple.
 
 Recorded evidence:
 
@@ -164,14 +184,25 @@ Apply pending migrations in numeric order with the same explicit config and
 environment. For adapter rollout, `0009` widens the artifact-class CHECK and
 `0010` adds stage-class usage counters. `0011` adds the terminal pipeline
 evidence receipt and `0012` adds the automated pipeline control-plane tables.
-Preserve populated artifact rows byte-for-byte through the `0009` rebuild.
+`0015_ontology_pipeline_regression_evidence` is the known reviewed pending
+migration on this branch: it adds the full regression evidence tuple and
+no-delete/complete-tuple guards without backfilling legacy receipts. Apply it
+immediately before its compatible Worker, not as a standalone rollout change.
+Preserve populated artifact rows byte-for-byte through the `0009` rebuild and
+preserve populated `0011` evidence rows through `0015`.
 
 Afterward, record the migration list, `foreign_key_check` (zero rows),
-`quick_check` (`ok`), empty `assertion_probe`, table SQL, and pre/post row counts.
+`quick_check` (`ok`), empty `assertion_probe`, table SQL, and pre/post row
+counts. For `0015`, additionally prove populated `0011` rows are preserved,
+legacy regression pins remain all NULL, the full regression tuple is accepted
+only when complete, and the no-delete/immutability guards are exercised.
+Record that no rollout change or provider call occurred during the migration
+step.
 
 **Stop:** an unexpected pending migration, non-empty assertion probe, integrity
-error, row-count/hash drift, or a migration that applied before its compatible
-Worker candidate was ready.
+error, row-count/hash drift, failed tuple/no-delete guard, a rollout/provider
+call during this migration step, or a migration that applied before its
+compatible Worker candidate was ready.
 
 ## Gate 3 — deploy the compatible Worker with rollout off
 
@@ -234,6 +265,15 @@ traffic. Roll back the Worker version; do not roll back the forward migration.
 
 ## Gate 4 — fresh model and strict-schema preflight
 
+**Provider selection:** Gates 4–6 apply to the publisher selected for the
+candidate. The OpenAI procedures below are required for `openai`. A `codex`
+candidate uses the Codex equivalents in each gate; it does not claim OpenAI
+model lookup, Responses strict-schema acceptance, AI Gateway state, upstream
+retention, or token-priced billing evidence. These alternatives preserve the
+same hard gate. The selected provider's Gate 6 must close before the first
+durable Gate 7B job; these procedures do not otherwise authorize a provider call
+or rollout change.
+
 **Current state:** complete for candidate `611884e` on 2026-08-22. A fresh live
 run passed model lookup for `gpt-5.6-sol` and the minimal strict `pattern`
 schema. It recorded response id
@@ -261,6 +301,19 @@ model, model tier, or strict-schema derivation change.
 
 **Stop:** missing model, refused schema keyword, unexpected billing account, or
 any output containing provider prose.
+
+### Codex equivalent
+
+Complete Gates 1–3 and the Codex Gate 5–6 equivalents first. The runner claims
+only ordinary durable jobs; there is no standalone invocation route and no
+diagnostic job. Co-execute this evidence with the first provider step of the
+one authorized immutable Gate 7B candidate (the generator schema), and with
+the Gate 8 Pattern planner job (the Pattern strict schema). For each schema,
+close Gate 4 evidence only when the runner's normal claimed job reaches a
+terminal schema-valid response within timeout with the pinned model/prompt and
+safe request id, hashes, and counters. Authentication failure, an unavailable
+pin, schema failure, or timeout stops that candidate or canary; do not create a
+second diagnostic job.
 
 ## Gate 5 — configure one credential route and verify AI Gateway state
 
@@ -333,12 +386,27 @@ spend model.
 `Authorization` in stored mode, missing request override, unexpected gateway
 log entry, or unrecorded upstream-retention posture.
 
+### Codex equivalent
+
+Verify that the Worker holds only `CODEX_RUNNER_TOKEN` and
+`CODEX_PROVIDER_ARTIFACT_KEYRING` for the Codex provider, while the runner host
+alone holds the interactive ChatGPT credential. Verify outbound-only polling,
+no listening socket, rejection of an invalid runner bearer, encrypted R2
+request/response envelopes, and runner health with the applicable rollout(s)
+off. AI Gateway and OpenAI retention checks do not apply; runner-host credential
+isolation and encrypted artifact handling are hard requirements.
+
 ## Gate 6 — approve the numeric spend ceiling
 
-**Current state:** complete. On 2026-08-22 the operator gave written approval in
-this deployment session for the numeric Pattern and ontology-pipeline ceilings
-recorded below. The committed value `100` remains only the enforcement value;
-the approval is the evidence that authorizes its stated operating envelope.
+**Current provider state:** Gate 6 is open. The 2026-08-22 OpenAI approval is
+historical only: it covered 4,000 planner, 8,000 writer, and 4,000 verifier
+output bounds, not the current effective envelope of 8,000 ontology-generator,
+4,000 ontology-evaluator, and 32,000 Pattern/regression
+planner/writer/verifier output limits. Before an OpenAI provider job, re-cost
+that current envelope using a freshly verified official rate and obtain explicit
+written approval; do not infer current pricing or dollars from the historical
+calculation. The selected Codex path is also not certified; its required written
+approval is stated in the Codex equivalent below.
 
 The 2026-08-22 production preflight pins a conservative `110,000` input-token
 planning bound for every Pattern and ontology-pipeline pass. The bound covers
@@ -387,7 +455,12 @@ hard call-ledger ceiling. Carry-over work can make a UTC day writer-heavy, so
 `maximum_new_patterns_per_utc_day * pattern_max_cost` alone is not the hard
 daily spend cap.
 
-### 2026-08-22 approved ceiling
+### Historical 2026-08-22 approval — old pins, not current authorization
+
+**Non-authorizing historical record:** the following rate observation and
+arithmetic apply only to the 4k/8k/4k bounds recorded here. They do not approve
+the current mixed ontology/Pattern envelope, any current OpenAI price, or any
+Codex job.
 
 The exact model is `gpt-5.6-sol`. The
 [official model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
@@ -417,6 +490,17 @@ approved that candidate-run ceiling in the same written approval.
 **Stop:** missing input bound, stale price, arithmetic not based on 11, or no
 written ceiling approval.
 
+### Codex equivalent
+
+**Current state: not certified.** Before the first Codex durable Gate 7B job,
+obtain explicit written approval naming the authorized account/plan, the 100
+Pattern and 500 ontology D1 call ceilings, the effective output envelope of 8k
+ontology-generator, 4k ontology-evaluator, and 32k Pattern/regression
+planner/writer/verifier limits, 900000-ms timeout, runner concurrency 1, and
+every applicable attempt and input limit. A ChatGPT login does not provide a
+trustworthy per-token price feed, so do not invent dollar arithmetic. A missing
+approval or change to any listed limit keeps this gate open.
+
 ## Gate 7 — activate an ontology on the selected path
 
 **Current state:** Gate 7B is blocked on an accepted machine candidate. The authorized 60-fragment
@@ -424,8 +508,9 @@ written ceiling approval.
 `pattern-ontology-source-manual-en-us-0.1.0` is registered with corpus hash
 `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`.
 The isolated signing identity, API verification keyring, and pipeline artifact
-keyring are provisioned. Thirteen immutable production candidates have failed
-closed. Versions `0.1.0` through `0.1.4` exposed completion, record-policy, and
+keyring are provisioned. Multiple immutable production candidates have failed
+closed; see the evidence ledger for the complete historical sequence. Versions
+`0.1.0` through `0.1.4` exposed completion, record-policy, and
 bounded-coverage failures. `0.1.5` then failed candidate validation after two
 generator calls. The first reviewed source bridge allowed `0.1.6` to compile
 and pass six independent evaluator calls, but the existing regression gate
@@ -458,7 +543,7 @@ every existing 7B criterion before activation.
 `0.1.13` failed `evaluation_rejected` at cursor 0. `0.1.14` failed
 `regression_failed` at cursor 68 — the furthest any candidate has reached
 against a 30-fixture set. Counting the stored regression artifacts per run
-separates the fourteen failures into two classes that had been reported as one:
+separates the recorded failures into two classes that had been reported as one:
 
 | candidate | failure | cursor | requests | responses |
 | --- | --- | --- | --- | --- |
@@ -482,8 +567,9 @@ was reproduced locally against the live Responses API: it consumed the entire
 4000-token allowance on reasoning tokens and returned `status: "incomplete"`,
 `incomplete_details.reason: "max_output_tokens"`, with no output text, after
 55.8 seconds. That is precisely the "identical request attempts produced no
-response" signature recorded for `0.1.11` and `0.1.12`. The pins are now `32000`
-for all three passes, and `ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS` derives
+response" signature recorded for `0.1.11` and `0.1.12`. The regression Pattern
+pins are now `32000` for all three passes, and
+`ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS` derives
 from them rather than restating `2 * 4_000 + 3 * 8_000 + 3 * 2 * 4_000` as
 literals — that duplication silently mispriced the budget the moment a pin
 moved. Deployed as version `1aaed29c-29eb-436b-86f3-990379ce94c4` with Pattern
@@ -505,17 +591,18 @@ fragments, `licensed_excerpt`, `public_capable = 1`. Contrary to earlier notes,
 both `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING` (API) and
 `PATTERN_ONTOLOGY_SIGNING_KEY` (signer) **are** provisioned.
 
-**The single remaining blocker is provider credit, confirmed on production
-rather than inferred.** Run `oprun_ae8a9369-94e5-467c-ac19-07aa260acc54`
+**Historical direct-OpenAI-path blocker evidence (2026-08-23):** provider
+credit exhaustion was confirmed on production rather than inferred. Run
+`oprun_ae8a9369-94e5-467c-ac19-07aa260acc54`
 (candidate `pattern-ontology-en-us-0.1.15`, configuration
 `sha256:dd76aa95016d82d2b4776778d877f70da30cd28d7002ae9a2ef7c9a9ecab3484` —
 which differs from earlier runs precisely because the max-output-token pins are
 part of the command identity) was reserved and dispatched against the deployed
 Worker. It reached `generating` and consumed generator calls 9 through 13 across
 five attempts, every one failing and rescheduling behind a backoff, never
-producing a candidate hash. The Worker's own `OPENAI_API_KEY` therefore reaches
-the same exhausted account as a local probe does. The run is bounded by
-`MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS = 16` and will fail closed on its own.
+producing a candidate hash. The Worker's own `OPENAI_API_KEY` therefore reached
+the same exhausted account as the local probe. The run was bounded by
+`MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS = 16` and failed closed.
 
 > **Superseded 2026-08-24:** the direct Worker transport described in the next
 > paragraphs was removed. Production Codex inference now uses the durable,
@@ -546,22 +633,34 @@ pass as `publisher_auth_failed`. That is an access control and is not to be
 worked around. The provider remains in the tree, tested, and documented as
 unreachable from Workers.
 
-The OpenAI account answers HTTP
-`429` `insufficient_quota` / `credit_balance_exhausted` to a content-free probe.
-Both remaining steps need it: a new ontology candidate cannot be generated or
-regression-tested, and a Pattern cannot be planned, written, or verified. There
-is no credit-free path to an active ontology either — `POST
-/internal/pattern-ontology-releases` verifies the signature against
-`PATTERN_ONTOLOGY_KEYS`, and the matching private key exists only inside the
-signer Worker, reachable only through the pipeline's `signOntology` RPC.
+Historical direct-OpenAI-path probe evidence recorded HTTP `429`
+`insufficient_quota` / `credit_balance_exhausted`. That evidence blocks the
+historical direct OpenAI path; it does not describe the selected Codex runner
+path. The current operational blockers are the failed Codex regression candidate
+and resulting absence of an active signed ontology release, plus the open
+selected-provider Gate 6. A new Codex candidate must pass every existing hard
+gate before activation; there is no manual or credit-free shortcut to a signed
+active release.
+
+**Fixcheck-04 evidence (2026-08-24):** Codex run
+`oprun_a342be36-0460-4644-9669-6c8a51cc9a6c` failed closed at
+`2026-08-24T12:53:26.613Z`. Trace
+`trc_4a69607fb3641e8e27c3c22db92bce5b` records verifier failure on fixture
+index 21, `m7-unknown-02`, with the sole hard gate
+`suppressed_feature_leak`. No regression report, bundle, or ontology-pointer
+change occurred. This safe event identifies the failed verifier gate only; it
+does not establish which upstream component introduced the condition.
 
 ### Gate 7A — shortest internal path
 
 Execute `docs/superpowers/plans/2026-08-20-internal-ontology-activation.md`.
 Required evidence: signed `synthetic_internal` bundle hash, compiler pass,
-signature/key id, active pointer, allowlisted reservation success, byte-identical
-external `ontology_unavailable` refusal, and zero provider/budget use on that
-refusal. `evaluator_passed` and `regression_passed` remain honestly false.
+signature/key id, active pointer, allowlisted reservation success, and an
+unallowlisted authenticated account receiving the normal
+`503 pattern_generation_unavailable` containment response while
+`PATTERN_AI_ROLLOUT=internal`. The denied request must leave zero claim,
+consent, generation-job, provider-budget, or artifact side effects.
+`evaluator_passed` and `regression_passed` remain honestly false.
 
 ### Gate 7B — public-capable path
 
@@ -585,22 +684,31 @@ attempt to make Slice A public.
 ## Gate 8 — enable and certify the first internal Pattern
 
 **Current state:** blocked before reservation. Production has four active
-accounts, four active charts, and four confirmed `en-US` locales, but zero
-current Pattern-generation grants and therefore zero currently eligible canary
-accounts. Canary `usr_3ca4f7c2f2498c4eab97511fc3c6ff97` is active with one
+accounts, four active charts, and four confirmed `en-US` locales. Canary
+`usr_3ca4f7c2f2498c4eab97511fc3c6ff97` is active with one
 active chart, confirmed `en-US` from `user_confirmed`, and a live Worker
 session. It has zero Pattern claims, generation jobs, documents, and grants; no
-claim was reserved. The account is prepared but not designated. Gate 8 remains
-blocked on an eligible active ontology, separate authorization and deployment
-of the exact internal allowlist/rollout change, and first-use Pattern consent.
-This is the first point a generated Pattern may exist outside hermetic tests.
+claim was reserved. This is expected before first use: the normal authenticated,
+confirmed request creates the current grant and reservation atomically. The
+account is prepared but not designated. Gate 8 remains blocked on an eligible
+active ontology and separate authorization and deployment of the exact internal
+allowlist/rollout change. This is the first point a generated Pattern may exist
+outside hermetic tests.
 
-Deploy one exact `PATTERN_INTERNAL_ACCOUNT_IDS` entry and set
-`PATTERN_AI_ROLLOUT=internal`. The account must have:
+For a Codex canary, deploy one atomic production change that sets
+`PATTERN_PUBLISHER=codex`, all of
+`OPENAI_PATTERN_PLANNER_TIMEOUT_MS`, `OPENAI_PATTERN_WRITER_TIMEOUT_MS`, and
+`OPENAI_PATTERN_VERIFIER_TIMEOUT_MS` to `900000`, one exact
+`PATTERN_INTERNAL_ACCOUNT_IDS` entry, and `PATTERN_AI_ROLLOUT=internal`.
+Follow the Codex publisher and lease procedure in
+[`codex-production-provider.md`](./codex-production-provider.md); do not leave
+the Pattern path on its production `openai` / `120000` pins. The account must
+have:
 
 - active account and chart;
 - confirmed `en-US` content locale matching the active ontology;
-- current Pattern-generation consent;
+- submission of the current consent-policy version and confirmation through the
+  normal authenticated first-use flow, which creates the current grant;
 - no consumed claim for the chart fingerprint; and
 - a reservation reason admitted by the internal rollout.
 
@@ -613,9 +721,11 @@ If a retryable provider failure leaves the canary queued, wait for its frozen
 route for that same generation. This recovery is part of operating the one
 canary, not a separate rollout gate.
 
-Success is one accepted `ready` document plus one external account receiving the
-indistinguishable ontology refusal. A terminal failure is honest evidence of a
-failed canary, not permission to edit or approve the Pattern manually.
+Success is one accepted `ready` document plus the unallowlisted containment
+check: `503 pattern_generation_unavailable` with zero claim, consent,
+generation-job, provider-budget, or artifact side effects. A terminal failure
+is honest evidence of a failed canary, not permission to edit or approve the
+Pattern manually.
 
 **Stop:** more than 11 calls, a human content step, unexpected account admitted,
 wrong provenance, validation bypass, plaintext log, budget mismatch, or anything
@@ -657,14 +767,15 @@ restore resurrection, plaintext exposure, or exception waived by a person.
 
 ## Gate 10 — advance to `first_open`
 
-**Current state:** not attempted. Gate 6 is complete; Gate 7B failed closed and
-Gates 8 and 9 remain open. There is no active machine release or sustained
-internal observation interval.
+**Current state:** not attempted. Gate 6 is open for the selected provider;
+Gate 7B failed closed and Gates 8 and 9 remain open. There is no active machine
+release or sustained internal observation interval.
 
-Prerequisites: Gate 7B's active machine release, Gate 9 complete, no active
-Slice A release, and sustained internal observations within the approved bounds
-for provider success, deterministic validation, semantic rejection, queue age,
-attempts, token use, and spend.
+Prerequisites: the selected provider's current Gate 6 approval, Gate 7B's active
+machine release, Gate 9 complete, no active Slice A release, and sustained
+internal observations within the approved bounds for provider success,
+deterministic validation, semantic rejection, queue age, attempts, token use,
+and spend.
 
 Set only `PATTERN_AI_ROLLOUT=first_open`, deploy one version, and record the
 cohort rule and version. Monitor the closed operational metrics; never inspect
@@ -705,7 +816,7 @@ until its evidence exists.
 | 2026-08-22 | 3 | `611884e`; signer `9533269b`; API `c20fa0da` | `0012`, compatible | none | health 200; rollout off; Pattern queue/DLQ batch 1/concurrency 2; zero Pattern usage/claims/artifacts; scheduler stays off; authenticated read replay unavailable; signer key absent and fail-closed | deployed; gate open on authenticated replay |
 | 2026-08-22 | 4 | `611884e`; API `c20fa0da` | `0012` | none | live `gpt-5.6-sol` lookup and strict `pattern` schema passed; response id/hash/time recorded without prose | complete |
 | 2026-08-22 | 5 | `611884e`; API `c20fa0da` | `0012` | none | direct Worker mode is internally consistent; OpenAI secret present and gateway fields/token absent; upstream organization/project retention could not be read with project key (403) | route verified; gate open on retention evidence |
-| 2026-08-22 | 6 | `24804ee` | `0012` | none | official promotional rate and 110,000 input-token planning bound; operator approved $5.96/Pattern, nine/99 calls and $53.64 operating day, $60 hard 100-call day, plus $221.68/410-call pipeline candidate and $300 hard 500-call day | complete |
+| 2026-08-22 | 6 | `24804ee` | `0012` | none | historical old-pin evidence only: official promotional rate and 110,000 input-token planning bound; operator approved $5.96/Pattern, nine/99 calls and $53.64 operating day, $60 hard 100-call day, plus $221.68/410-call pipeline candidate and $300 hard 500-call day | historical approval; current Gate 6 reopened |
 | 2026-08-22 | 7B attempt 1 | API `af2b6cea` | `0012` | candidate `pattern-ontology-en-us-0.1.0`; none active | authorized 60-fragment corpus and signing identities registered; run `oprun_32783057-32b8-4341-b8c9-a0134d104f8a` failed closed as `candidate_invalid` on completion/exclusion ambiguity; no evaluation, signing, or activation | failed closed; prompt corrected |
 | 2026-08-22 | 7B attempt 2 | API `af2b6cea` | `0012` | candidate `pattern-ontology-en-us-0.1.1`; none active | run `oprun_26101c6b-1960-4328-bd8a-9f0a20d8e3a7` failed closed as `coverage_incomplete`; provider completion was found advisory while frozen coverage remained; bounded continuation fix and regression coverage committed | failed closed; fresh run required |
 | 2026-08-22 | 7B attempt 3 | API `57830965`; prompt `1.0.1` | `0012` | candidate `pattern-ontology-en-us-0.1.2`; none active | run `oprun_9e5a3a4e-335c-4f38-8878-27df47a46c36`, config `sha256:be5a0312d729c3cc9aaf5afa001e2474c6176f503de0929dffbbb74203c06219`, wrote ten zero-retry triplets and failed `record_policy_invalid`; no candidate/report/bundle hash | failed closed; record policy clarified |
@@ -719,6 +830,7 @@ until its evidence exists.
 | 2026-08-23 | 7B attempt 11 | `23b9485` deployed after failure; prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.10`; none active | run `oprun_e2f70a73-6bc2-4df4-8ee5-0be90e1d94ce`, config `sha256:7d020fc4074d7560d09c0bc5a27581e278c8e22ae8e01039125c8a7874c626e8`, candidate `sha256:7cd86c984b42716b7ef0d8ae4bf3ea0cbebbda726c2947aad4073613883222fa`, compiler `sha256:4620e0eac2372546c3490f68247a2cd6367802766c21379be442b16786f9922c`, evaluator `sha256:24e2a71544f80e6b8e20374fe9721d455f35f71cf6529fbf2403e23a6de7ea38`; failed at the existing sole writer-origin `suppressed_feature_leak` regression gate after 46 regression results; the bounded correction route was repaired and verified without changing any ceiling | failed closed; no regression report, bundle, or activation |
 | 2026-08-23 | 7B attempt 12 | `23b9485`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.11`; none active | run `oprun_9026280d-067f-4c13-ac62-1f4e1a4b61c3`, config `sha256:24103de2e86eb7fde4d1fcbf7565cec153f35897d7094ea97f221fdd16d973bc`, candidate `sha256:d76fad38a873d86149a3f78e0a7cad7d73f689c0718d9ca7f782fdca22a6554d`, compiler `sha256:6b926310ed04ab5c98eb44339a72f9a04074e5b459d0e2c9134f8525e1326199`, evaluator `sha256:3ef00438683dbf273438f30836c586ea4ac6f10da7186c5b0850f76c8291e6f7`; all ten evaluations passed and regression produced 71 results. The final two planner requests have the same hash; the first was invalid, while the reserved second call produced no response artifact and terminaled 121.077 seconds after request creation, consistent with the fixed 120-second deadline. A third planner call was correctly refused by the unchanged inclusive two-call ceiling | failed closed as `regression_failed`; no regression report, bundle, or activation |
 | 2026-08-23 | 7B attempt 13 | `a9a45b7`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.12`; none active | run `oprun_f2013b4f-c09d-40f4-a992-f64a7639d928`, config `sha256:f6c7c04e254f1a04b22d99308e9c94218c3bb08d70bb4fa3ace0e21e9f54be37`, candidate `sha256:c46a5e1a076e4fb3247764a7c0f1f5d4aee9f6a45cbd36da9bcb07255a75442c`, compiler `sha256:f1e7dd4677cb9fd52b7c4f217d01793eead9c0c94d454404f5b39fe763f491ee`, evaluator `sha256:c7ca6052af09f9449885244e81c2c742945cdc021387ee13036c059fef2f2db1`; all ten evaluations passed and regression produced 14 results. Generation 28 persisted two identical planner requests and no response; the first exhausted its deadline and the retry also failed closed. A subsequent content-free strict-schema probe reproduced HTTP `429`, type `insufficient_quota`, code `credit_balance_exhausted`; usage reached 214/500 | failed closed as `regression_failed`; no regression report, bundle, or activation |
+| 2026-08-24 | 7B fixcheck-04 | Codex runner; trace `trc_4a69607fb3641e8e27c3c22db92bce5b` | `0013` / `0014` applied | candidate `pattern-ontology-en-us-0.1.16-fixcheck-04`; run `oprun_a342be36-0460-4644-9669-6c8a51cc9a6c`; none active | failed `2026-08-24T12:53:26.613Z` on verifier fixture index 21 `m7-unknown-02` with sole hard gate `suppressed_feature_leak`; no regression report, bundle, or pointer change | failed closed; no activation |
 | 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb`, `3a47565` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, replay bucket, and production `pattern-replay-2026-08` signing key/keyring are deployed; restore procedure recorded without claiming execution | implementation/signing complete; drill and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |

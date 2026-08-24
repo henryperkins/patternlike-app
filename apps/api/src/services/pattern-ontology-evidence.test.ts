@@ -11,6 +11,7 @@ import {
   buildTestCorpusManifest,
   buildTestEvaluationArtifact,
   buildTestEvaluationReport,
+  buildTestPassedRegressionReport,
   putTestCorpusManifest,
   putTestEvaluationArtifact,
   testOntologyPipelineArtifactKeyring,
@@ -27,12 +28,16 @@ import {
   type CommitOntologyPipelineEvidenceInput,
 } from "./pattern-ontology-evidence.js";
 import {
+  advanceOntologyPipelineStage,
   claimOntologyPipelineRun,
   retryOntologyPipelineStage,
+  succeedOntologyPipelineRun,
 } from "../db/ontology-pipeline.js";
 import { putOntologyPipelineArtifact } from "./ontology-pipeline-artifacts.js";
 import {
   loadActiveOntology,
+  loadOntologyByVersion,
+  ontologyServesAccount,
   storeOntologyRelease,
 } from "../db/pattern-ontology.js";
 
@@ -42,6 +47,12 @@ interface MachineRelease extends PatternOntologyRelease {
 
 type EvidenceInputWithEnvelope = CommitOntologyPipelineEvidenceInput & {
   evaluationArtifactEnvelopeHash: string;
+  regressionReportHash: string;
+  regressionArtifactObjectKey: string;
+  regressionArtifactEnvelopeHash: string;
+  regressionArtifactCiphertextHash: string;
+  regressionArtifactStageGeneration: number;
+  regressionArtifactStageAttempt: number;
 };
 
 interface EvidenceFixture {
@@ -90,6 +101,11 @@ async function evidenceFixture(
     evaluationReport?: string;
     artifactOptions?: TestEvaluationArtifactOptions;
     inputOverrides?: Partial<EvidenceInputWithEnvelope>;
+    regressionAttempt?: 0 | 1;
+    minimalRegressionReport?: boolean;
+    mutateRegressionReport?: (report: Record<string, unknown>) => void;
+    mutateCommand?: (command: Record<string, unknown>) => void;
+    leaveRunSigning?: boolean;
   } = {},
 ): Promise<EvidenceFixture> {
   const runId = `ontrun_${value.ontology_version}`;
@@ -113,12 +129,195 @@ async function evidenceFixture(
     options.artifactOptions,
   );
   value.evaluation.evaluation_report_hash = artifact.plaintextHash;
-  value.bundle_hash = await computeOntologyBundleHash(value);
   const objectKey = await putTestEvaluationArtifact(
     env.ARTIFACTS!,
     runId,
     artifact.bytes,
   );
+  const now = new Date(Date.now() - 1_000);
+  const candidateHash = `sha256:${"1".repeat(64)}`;
+  const command: Record<string, unknown> = {
+    candidate_ontology_version: value.ontology_version,
+    configuration_equal: true,
+    corpus: {
+      corpus_hash: corpus.corpus_hash,
+      corpus_release_id: corpusReleaseId,
+    },
+    provider: "openai",
+    regression: {
+      fixture_count: 30,
+      maximum_provider_calls_per_fixture: 11,
+      minimum_pass_rate: 1,
+    },
+  };
+  options.mutateCommand?.(command);
+  const configuration = canonicalJson(command);
+  const configurationHash = await contentHash(configuration);
+  await env.DB.prepare(
+    `INSERT INTO pattern_source_corpus_releases (
+       corpus_release_id, corpus_hash, locale, object_key, fragment_count,
+       license_class, public_capable, created_at, registered_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    corpus.corpus_release_id,
+    corpus.corpus_hash,
+    corpus.locale,
+    corpusObjectKey,
+    corpus.fragments.length,
+    corpusLicenseClass,
+    options.corpusPublicCapable ?? corpusLicenseClass === "licensed_excerpt"
+      ? 1
+      : 0,
+    now.toISOString(),
+    now.toISOString(),
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO pattern_ontology_pipeline_runs (
+       run_id, idempotency_key, corpus_release_id, corpus_hash,
+       candidate_ontology_version, configuration_json, configuration_hash,
+       stage, stage_generation, stage_cursor, stage_attempt, claim_token,
+       lease_expires_at, available_at, dispatched_at, failure_class,
+       candidate_hash, compilation_report_hash, evaluation_report_hash,
+       regression_report_hash, bundle_hash, failed_artifact_expires_at,
+       created_at, updated_at, finished_at, succeeded_at, failed_at
+     ) VALUES (
+       ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0, NULL, NULL, ?, NULL, NULL,
+       NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL
+     )`,
+  ).bind(
+    runId,
+    `evidence-${crypto.randomUUID()}`,
+    corpusReleaseId,
+    value.corpus_release_hash,
+    value.ontology_version,
+    configuration,
+    configurationHash,
+    now.toISOString(),
+    now.toISOString(),
+    now.toISOString(),
+  ).run();
+  for (const [index, stage] of [
+    "corpus_reading",
+    "generating",
+    "compiling",
+    "evaluating",
+    "regressing",
+  ].entries()) {
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = ?, stage_generation = ?, stage_cursor = 0,
+           stage_attempt = 0, claim_token = NULL, lease_expires_at = NULL,
+           dispatched_at = NULL, updated_at = ?,
+           candidate_hash = CASE WHEN ? = 'compiling' THEN ? ELSE candidate_hash END,
+           compilation_report_hash = CASE WHEN ? = 'evaluating' THEN ? ELSE compilation_report_hash END,
+           evaluation_report_hash = CASE WHEN ? = 'regressing' THEN ? ELSE evaluation_report_hash END
+       WHERE run_id = ?`,
+    ).bind(
+      stage,
+      index + 1,
+      now.toISOString(),
+      stage,
+      candidateHash,
+      stage,
+      `sha256:${"2".repeat(64)}`,
+      stage,
+      artifact.plaintextHash,
+      runId,
+    ).run();
+  }
+  let regressionClaim = await claimOntologyPipelineRun(
+    env,
+    { run_id: runId, stage_generation: 5 },
+    now,
+    "regression-evidence-attempt-zero",
+  );
+  if (regressionClaim.status !== "claimed") {
+    throw new Error("regression evidence claim failed");
+  }
+  if (options.regressionAttempt === 1) {
+    expect(await retryOntologyPipelineStage(
+      env,
+      regressionClaim,
+      new Date(now.getTime() + 1),
+    )).toBe(true);
+    regressionClaim = await claimOntologyPipelineRun(
+      env,
+      { run_id: runId, stage_generation: 5 },
+      new Date(now.getTime() + 1),
+      "regression-evidence-attempt-one",
+    );
+    if (regressionClaim.status !== "claimed") {
+      throw new Error("regression evidence retry claim failed");
+    }
+  }
+  const completeRegressionReport = await buildTestPassedRegressionReport({
+    ontologyVersion: value.ontology_version,
+    commandHash: configurationHash,
+    corpusReleaseId,
+    corpusHash: corpus.corpus_hash,
+    candidateHash,
+    evaluationReportHash: artifact.plaintextHash,
+  });
+  const regressionDocument = structuredClone(
+    completeRegressionReport.document,
+  );
+  options.mutateRegressionReport?.(regressionDocument);
+  const regressionReport = options.minimalRegressionReport
+    ? canonicalJson({
+        candidate_hash: candidateHash,
+        command_hash: configurationHash,
+        corpus: {
+          corpus_hash: corpus.corpus_hash,
+          corpus_release_id: corpusReleaseId,
+        },
+        evaluation_report_hash: artifact.plaintextHash,
+        ontology_version: value.ontology_version,
+        passed: true,
+        schema_version: "ontology-regression-report/v1",
+      })
+    : canonicalJson(regressionDocument);
+  const regressionArtifact = await putOntologyPipelineArtifact(
+    env,
+    {
+      runId,
+      stage: "regressing",
+      stageGeneration: regressionClaim.stageGeneration,
+      stageAttempt: regressionClaim.stageAttempt,
+      artifactClass: "regression_report",
+    },
+    new TextEncoder().encode(regressionReport),
+    regressionClaim,
+    new Date(now.getTime() + 2),
+  );
+  expect(await advanceOntologyPipelineStage(
+    env,
+    regressionClaim,
+    "signing",
+    { regressionReportHash: regressionArtifact.artifact.plaintextSha256 },
+    new Date(now.getTime() + 3),
+  )).toBe(true);
+  value.evaluation.regression_passed = true;
+  value.evaluation.regression_report_hash =
+    regressionArtifact.artifact.plaintextSha256;
+  value.bundle_hash = await computeOntologyBundleHash(value);
+  if (!options.leaveRunSigning) {
+    const signingClaim = await claimOntologyPipelineRun(
+      env,
+      { run_id: runId, stage_generation: 6 },
+      new Date(now.getTime() + 4),
+      "regression-evidence-signing",
+    );
+    if (signingClaim.status !== "claimed") {
+      throw new Error("regression evidence signing claim failed");
+    }
+    expect(await advanceOntologyPipelineStage(
+      env,
+      signingClaim,
+      "ingesting",
+      { bundleHash: value.bundle_hash },
+      new Date(now.getTime() + 5),
+    )).toBe(true);
+  }
   const input: EvidenceInputWithEnvelope = {
     runId,
     ontologyVersion: value.ontology_version,
@@ -133,6 +332,14 @@ async function evidenceFixture(
     evaluationArtifactObjectKey: objectKey,
     evaluationArtifactEnvelopeHash: artifact.envelopeHash,
     evaluationArtifactCiphertextHash: artifact.ciphertextHash,
+    regressionReportHash: regressionArtifact.artifact.plaintextSha256,
+    regressionArtifactObjectKey: regressionArtifact.artifact.objectKey,
+    regressionArtifactEnvelopeHash: regressionArtifact.artifact.envelopeSha256,
+    regressionArtifactCiphertextHash:
+      regressionArtifact.artifact.ciphertextSha256,
+    regressionArtifactStageGeneration:
+      regressionArtifact.artifact.stageGeneration,
+    regressionArtifactStageAttempt: regressionArtifact.artifact.stageAttempt,
     signingKeyId: "ontology-signing-2026",
     compilerPassed: true,
     evaluatorPassed: true,
@@ -154,120 +361,6 @@ async function replaceArtifactEnvelope(
 ): Promise<void> {
   await env.ARTIFACTS!.put(fixture.input.evaluationArtifactObjectKey, bytes);
   fixture.input.evaluationArtifactEnvelopeHash = await contentHash(bytes);
-}
-
-async function replaceWithRetryEvaluationArtifact(
-  value: MachineRelease,
-  fixture: EvidenceFixture,
-): Promise<void> {
-  const now = new Date(Date.now() - 1_000);
-  const configuration = canonicalJson({ test: "retry-evidence" });
-  await env.DB.prepare(
-    `INSERT INTO pattern_source_corpus_releases (
-       corpus_release_id, corpus_hash, locale, object_key, fragment_count,
-       license_class, public_capable, created_at, registered_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    fixture.corpus.corpus_release_id,
-    fixture.corpus.corpus_hash,
-    fixture.corpus.locale,
-    fixture.corpusObjectKey,
-    fixture.corpus.fragments.length,
-    fixture.input.corpusLicenseClass,
-    fixture.input.corpusPublicCapable ? 1 : 0,
-    now.toISOString(),
-    now.toISOString(),
-  ).run();
-  await env.DB.prepare(
-    `INSERT INTO pattern_ontology_pipeline_runs (
-       run_id, idempotency_key, corpus_release_id, corpus_hash,
-       candidate_ontology_version, configuration_json, configuration_hash,
-       stage, stage_generation, stage_cursor, stage_attempt, claim_token,
-       lease_expires_at, available_at, dispatched_at, failure_class,
-       candidate_hash, compilation_report_hash, evaluation_report_hash,
-       regression_report_hash, bundle_hash, failed_artifact_expires_at,
-       created_at, updated_at, finished_at, succeeded_at, failed_at
-     ) VALUES (
-       ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0, NULL, NULL, ?, NULL, NULL,
-       NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL
-     )`,
-  ).bind(
-    fixture.input.runId,
-    `retry-evidence-${crypto.randomUUID()}`,
-    fixture.input.corpusReleaseId,
-    fixture.input.corpusReleaseHash,
-    fixture.input.ontologyVersion,
-    configuration,
-    await contentHash(configuration),
-    now.toISOString(),
-    now.toISOString(),
-    now.toISOString(),
-  ).run();
-  for (const [index, stage] of [
-    "corpus_reading",
-    "generating",
-    "compiling",
-    "evaluating",
-  ].entries()) {
-    await env.DB.prepare(
-      `UPDATE pattern_ontology_pipeline_runs
-       SET stage = ?, stage_generation = ?, stage_cursor = 0,
-           stage_attempt = 0, claim_token = NULL, lease_expires_at = NULL,
-           dispatched_at = NULL, updated_at = ?,
-           candidate_hash = CASE WHEN ? = 'compiling' THEN ? ELSE candidate_hash END,
-           compilation_report_hash = CASE WHEN ? = 'evaluating' THEN ? ELSE compilation_report_hash END
-       WHERE run_id = ?`,
-    ).bind(
-      stage,
-      index + 1,
-      now.toISOString(),
-      stage,
-      `sha256:${"1".repeat(64)}`,
-      stage,
-      `sha256:${"2".repeat(64)}`,
-      fixture.input.runId,
-    ).run();
-  }
-  const first = await claimOntologyPipelineRun(
-    env,
-    { run_id: fixture.input.runId, stage_generation: 4 },
-    now,
-    "retry-evidence-attempt-zero",
-  );
-  if (first.status !== "claimed") throw new Error("retry evidence claim failed");
-  expect(await retryOntologyPipelineStage(
-    env,
-    first,
-    new Date(now.getTime() + 1),
-  )).toBe(true);
-  const retry = await claimOntologyPipelineRun(
-    env,
-    { run_id: fixture.input.runId, stage_generation: 4 },
-    new Date(now.getTime() + 1),
-    "retry-evidence-attempt-one",
-  );
-  if (retry.status !== "claimed") throw new Error("retry evidence retry claim failed");
-  const stored = await putOntologyPipelineArtifact(
-    env,
-    {
-      runId: fixture.input.runId,
-      stage: "evaluating",
-      stageGeneration: 4,
-      stageAttempt: 1,
-      artifactClass: "evaluation_report",
-    },
-    new TextEncoder().encode(buildTestEvaluationReport(value.ontology_version)),
-    retry,
-    new Date(now.getTime() + 2),
-  );
-  await env.ARTIFACTS!.delete(fixture.input.evaluationArtifactObjectKey);
-  fixture.input.evaluationReportHash = stored.artifact.plaintextSha256;
-  fixture.input.evaluationArtifactObjectKey = stored.artifact.objectKey;
-  fixture.input.evaluationArtifactEnvelopeHash = stored.artifact.envelopeSha256;
-  fixture.input.evaluationArtifactCiphertextHash = stored.artifact.ciphertextSha256;
-  value.evaluation.evaluation_report_hash = stored.artifact.plaintextSha256;
-  value.bundle_hash = await computeOntologyBundleHash(value);
-  fixture.input.bundleHash = value.bundle_hash;
 }
 
 describe("machine ontology evidence", () => {
@@ -304,20 +397,283 @@ describe("machine ontology evidence", () => {
         input.evaluationArtifactEnvelopeHash,
       evaluationArtifactCiphertextHash:
         input.evaluationArtifactCiphertextHash,
+      regressionReportHash: input.regressionReportHash,
+      regressionArtifactObjectKey: input.regressionArtifactObjectKey,
+      regressionArtifactEnvelopeHash:
+        input.regressionArtifactEnvelopeHash,
+      regressionArtifactCiphertextHash:
+        input.regressionArtifactCiphertextHash,
+      regressionArtifactStageGeneration:
+        input.regressionArtifactStageGeneration,
+      regressionArtifactStageAttempt: input.regressionArtifactStageAttempt,
       signingKeyId: input.signingKeyId,
       compilerPassed: true,
       evaluatorPassed: true,
+      regressionPassed: true,
       unevaluatedFixtureCount: 0,
       evidenceSummary: expect.any(String),
     });
   });
 
-  it("commits and re-verifies an attempt-one Task 5 evaluation report", async () => {
-    const value = await release("ontology-evidence-true-retry");
-    const fixture = await evidenceFixture(value);
-    await replaceWithRetryEvaluationArtifact(value, fixture);
+  it("refuses the former seven-field passed regression report stub", async () => {
+    const value = await release("ontology-evidence-regression-stub");
+    const { input } = await evidenceFixture(value, {
+      minimalRegressionReport: true,
+    });
 
-    expect(fixture.input.evaluationArtifactObjectKey).toMatch(
+    await expect(commitOntologyPipelineEvidence(env, input))
+      .rejects.toMatchObject({ code: "ontology_regression_report_invalid" });
+  });
+
+  it.each([
+    "configuration_hash",
+    "activation_manifest_hash",
+    "fixture_count",
+    "threshold",
+    "hard_gate_count",
+    "fixture_result",
+    "duplicate_fixture_id",
+    "duplicate_result_hash",
+    "provider_accounting",
+    "provider_fixed_field",
+  ] as const)(
+    "refuses a complete regression report with tampered %s",
+    async (tamper) => {
+      const value = await release(`ontology-evidence-regression-${tamper}`);
+      const { input } = await evidenceFixture(value, {
+        mutateRegressionReport(report) {
+          if (tamper === "configuration_hash") {
+            report.configuration_hash = `sha256:${"9".repeat(64)}`;
+          } else if (tamper === "activation_manifest_hash") {
+            (report.corpus as Record<string, unknown>)
+              .activation_manifest_hash = `sha256:${"9".repeat(64)}`;
+          } else if (tamper === "fixture_count") {
+            (report.corpus as Record<string, unknown>).fixture_count = 29;
+          } else if (tamper === "threshold") {
+            (report.threshold as Record<string, unknown>)
+              .required_per_cohort = 9;
+          } else if (tamper === "hard_gate_count") {
+            (report.hard_gate_counts as Record<string, unknown>)
+              .prohibited_claim = 1;
+          } else if (tamper === "fixture_result") {
+            const results = report.ordered_fixture_results as Array<
+              Record<string, unknown>
+            >;
+            results[0]!.accepted = false;
+          } else if (tamper === "duplicate_fixture_id") {
+            const results = report.ordered_fixture_results as Array<
+              Record<string, unknown>
+            >;
+            results[1]!.fixture_id = results[0]!.fixture_id;
+          } else if (tamper === "duplicate_result_hash") {
+            const results = report.ordered_fixture_results as Array<
+              Record<string, unknown>
+            >;
+            results[1]!.result_hash = results[0]!.result_hash;
+          } else if (tamper === "provider_accounting") {
+            (report.provider_usage as Record<string, unknown>)
+              .request_artifact_count = 89;
+          } else {
+            (report.provider_usage as Record<string, unknown>)
+              .maximum_arithmetic = "stale arithmetic";
+          }
+        },
+      });
+
+      await expect(commitOntologyPipelineEvidence(env, input))
+        .rejects.toMatchObject({
+          code: "ontology_regression_report_invalid",
+        });
+    },
+  );
+
+  it("requires the pipeline run to have reached ingesting", async () => {
+    const value = await release("ontology-evidence-run-still-signing");
+    const { input } = await evidenceFixture(value, {
+      leaveRunSigning: true,
+    });
+
+    await expect(commitOntologyPipelineEvidence(env, input))
+      .rejects.toMatchObject({
+        code: "ontology_regression_run_identity_mismatch",
+      });
+  });
+
+  it.each([
+    "fixture_count",
+    "maximum_provider_calls_per_fixture",
+    "minimum_pass_rate",
+  ] as const)("rejects a run with a non-authoritative regression %s", async (field) => {
+    const value = await release(`ontology-evidence-command-${field}`);
+    const { input } = await evidenceFixture(value, {
+      mutateCommand(command) {
+        const regression = command.regression as Record<string, unknown>;
+        regression[field] = field === "minimum_pass_rate" ? 0.9 : 1;
+      },
+    });
+
+    await expect(commitOntologyPipelineEvidence(env, input))
+      .rejects.toMatchObject({
+        code: "ontology_regression_run_identity_mismatch",
+      });
+  });
+
+  it("binds the evidence bundle hash to the ingesting pipeline run", async () => {
+    const value = await release("ontology-evidence-run-bundle-mismatch");
+    const { input } = await evidenceFixture(value);
+    input.bundleHash = `sha256:${"9".repeat(64)}`;
+
+    await expect(commitOntologyPipelineEvidence(env, input))
+      .rejects.toMatchObject({
+        code: "ontology_regression_run_identity_mismatch",
+      });
+  });
+
+  it("refuses evidence from release A before writing release B bytes", async () => {
+    const valueA = await release("ontology-evidence-store-release-a");
+    const { input } = await evidenceFixture(valueA);
+    await commitOntologyPipelineEvidence(env, input);
+    const evidenceA = await verifyPatternOntologyEvidence(
+      env,
+      valueA,
+      input.signingKeyId,
+    );
+    const valueB = structuredClone(valueA);
+    valueB.ontology_version = "ontology-evidence-store-release-b";
+    valueB.evaluation.ontology_version = valueB.ontology_version;
+    valueB.bundle_hash = await computeOntologyBundleHash(valueB);
+    const objectKeyB = `pattern-ontology/${valueB.ontology_version}.json`;
+    env.PATTERN_ONTOLOGY_KEYS = "";
+
+    await expect(
+      storeOntologyRelease(env, valueB, objectKeyB, evidenceA),
+    ).rejects.toThrow("ontology_pipeline_evidence_mismatch");
+    await expect(env.ARTIFACTS!.get(objectKeyB)).resolves.toBeNull();
+  });
+
+  it("falls back to internal scope when the regression receipt summary is incomplete", async () => {
+    const value = await release("ontology-evidence-read-time-regression");
+    const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
+    const verified = await verifyPatternOntologyEvidence(
+      env,
+      value,
+      input.signingKeyId,
+    );
+    env.PATTERN_ONTOLOGY_KEYS = "";
+    await storeOntologyRelease(
+      env,
+      value,
+      `pattern-ontology/${value.ontology_version}.json`,
+      verified,
+    );
+    await expect(loadActiveOntology(env)).resolves.toMatchObject({
+      activationScope: "public",
+    });
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_evaluation_runs
+       SET summary_json = json_remove(
+         summary_json,
+         '$.regression_report_hash',
+         '$.regression_artifact_object_key',
+         '$.regression_artifact_envelope_hash',
+         '$.regression_artifact_ciphertext_hash',
+         '$.regression_artifact_stage_generation',
+         '$.regression_artifact_stage_attempt',
+         '$.regression_passed'
+       )
+       WHERE ontology_version = ?`,
+    ).bind(value.ontology_version).run();
+
+    const active = await loadActiveOntology(env);
+    expect(active).toMatchObject({
+      activationScope: "internal",
+    });
+    expect(ontologyServesAccount(active, false)).toBe(false);
+  });
+
+  it("treats a migrated all-null legacy regression tuple as internal", async () => {
+    const value = await release("ontology-evidence-read-time-legacy-null");
+    const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
+    const verified = await verifyPatternOntologyEvidence(
+      env,
+      value,
+      input.signingKeyId,
+    );
+    env.PATTERN_ONTOLOGY_KEYS = "";
+    await storeOntologyRelease(
+      env,
+      value,
+      `pattern-ontology/${value.ontology_version}.json`,
+      verified,
+    );
+    await env.DB.prepare(
+      "DROP TRIGGER pattern_ontology_pipeline_evidence_committed_immutable",
+    ).run();
+    try {
+      await env.DB.prepare(
+        `UPDATE pattern_ontology_pipeline_evidence
+         SET regression_report_hash = NULL,
+             regression_artifact_object_key = NULL,
+             regression_artifact_envelope_hash = NULL,
+             regression_artifact_ciphertext_hash = NULL,
+             regression_artifact_stage_generation = NULL,
+             regression_artifact_stage_attempt = NULL
+         WHERE ontology_version = ?`,
+      ).bind(value.ontology_version).run();
+    } finally {
+      await env.DB.prepare(
+        `CREATE TRIGGER pattern_ontology_pipeline_evidence_committed_immutable
+         BEFORE UPDATE ON pattern_ontology_pipeline_evidence
+         FOR EACH ROW
+         WHEN OLD.evidence_status = 'committed'
+         BEGIN
+           SELECT RAISE(ABORT, 'committed ontology pipeline evidence is immutable');
+         END`,
+      ).run();
+    }
+
+    const active = await loadActiveOntology(env);
+    expect(active).toMatchObject({
+      activationScope: "internal",
+    });
+    expect(ontologyServesAccount(active, false)).toBe(false);
+    await expect(loadOntologyByVersion(env, value.ontology_version))
+      .resolves.toMatchObject({ activationScope: "internal" });
+  });
+
+  it("rejects a forged verified-evidence object at the activation D1 batch boundary", async () => {
+    const value = await release("ontology-evidence-forged-ts-object");
+    const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
+    const verified = await verifyPatternOntologyEvidence(
+      env,
+      value,
+      input.signingKeyId,
+    );
+    env.PATTERN_ONTOLOGY_KEYS = "";
+
+    await expect(storeOntologyRelease(
+      env,
+      value,
+      `pattern-ontology/${value.ontology_version}.json`,
+      {
+        ...verified,
+        regressionArtifactStageAttempt:
+          verified.regressionArtifactStageAttempt + 1,
+      },
+    )).rejects.toThrow();
+    await expect(env.DB.prepare(
+      `SELECT version FROM pattern_ontology_releases WHERE version = ?`,
+    ).bind(value.ontology_version).first()).resolves.toBeNull();
+  });
+
+  it("commits and re-verifies an attempt-one generic regression report", async () => {
+    const value = await release("ontology-evidence-true-retry");
+    const fixture = await evidenceFixture(value, { regressionAttempt: 1 });
+
+    expect(fixture.input.regressionArtifactObjectKey).toMatch(
       /\/opart_[a-f0-9]{40}\.enc$/,
     );
     await expect(commitOntologyPipelineEvidence(env, fixture.input))
@@ -329,7 +685,9 @@ describe("machine ontology evidence", () => {
     );
     expect(verified).toMatchObject({
       runId: fixture.input.runId,
-      evaluationArtifactObjectKey: fixture.input.evaluationArtifactObjectKey,
+      regressionArtifactObjectKey: fixture.input.regressionArtifactObjectKey,
+      regressionArtifactStageGeneration: 5,
+      regressionArtifactStageAttempt: 1,
     });
     env.PATTERN_ONTOLOGY_KEYS = "";
     await storeOntologyRelease(
@@ -344,6 +702,26 @@ describe("machine ontology evidence", () => {
     });
   });
 
+  it("re-verifies committed regression evidence after the run succeeds", async () => {
+    const value = await release("ontology-evidence-terminal-succeeded");
+    const fixture = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, fixture.input);
+    const claim = await claimOntologyPipelineRun(
+      env,
+      { run_id: fixture.input.runId, stage_generation: 7 },
+      new Date(),
+      "regression-evidence-terminal-success",
+    );
+    if (claim.status !== "claimed") throw new Error("ingesting claim failed");
+    expect(await succeedOntologyPipelineRun(env, claim, new Date())).toBe(true);
+
+    await expect(verifyPatternOntologyEvidence(
+      env,
+      value,
+      fixture.input.signingKeyId,
+    )).resolves.toMatchObject({ runId: fixture.input.runId });
+  });
+
   it("accepts a locale admitted by the frozen corpus contract", async () => {
     const value = await release("ontology-evidence-contract-locale");
     value.locale = "en-abcdefghij";
@@ -354,33 +732,56 @@ describe("machine ontology evidence", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("does not consult regression fields when verifying evidence", async () => {
+  it("fails closed when the release does not carry a passing regression result", async () => {
     const value = await release("ontology-evidence-no-regression");
-    value.evaluation.regression_passed = false;
-    delete value.evaluation.regression_report_hash;
     const { input } = await evidenceFixture(value);
     await commitOntologyPipelineEvidence(env, input);
+    value.evaluation.regression_passed = false;
+    delete value.evaluation.regression_report_hash;
 
     await expect(
       verifyPatternOntologyEvidence(env, value, input.signingKeyId),
-    ).resolves.toMatchObject({ runId: input.runId });
+    ).rejects.toMatchObject({ code: "ontology_regression_not_passed" });
   });
 
-  it("does not consult regression fields inside the decrypted report", async () => {
-    const value = await release("ontology-evidence-report-regression-ignored");
-    const report = buildTestEvaluationReport(value.ontology_version, {
-      regression_passed: false,
-      regression_report_hash: null,
-    });
-    const { input } = await evidenceFixture(value, {
-      evaluationReport: report,
-    });
-
-    await commitOntologyPipelineEvidence(env, input);
+  it("fails closed for a legacy all-null regression evidence receipt", async () => {
+    const value = await release("ontology-evidence-legacy-regression");
+    const { input } = await evidenceFixture(value);
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_evidence (
+         run_id, ontology_version, corpus_release_id, corpus_release_hash,
+         corpus_license_class, corpus_public_capable, activation_scope,
+         bundle_hash, evaluation_report_hash, evaluation_artifact_object_key,
+         evaluation_artifact_envelope_hash,
+         evaluation_artifact_ciphertext_hash, evaluation_artifact_status,
+         signing_key_id, run_status, evidence_status, compiler_passed,
+         evaluator_passed, unevaluated_fixture_count, created_at, committed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'committed', ?,
+         'succeeded', 'committed', 1, 1, 0, ?, ?)`,
+    ).bind(
+      input.runId,
+      input.ontologyVersion,
+      input.corpusReleaseId,
+      input.corpusReleaseHash,
+      input.corpusLicenseClass,
+      input.corpusPublicCapable ? 1 : 0,
+      input.activationScope,
+      input.bundleHash,
+      input.evaluationReportHash,
+      input.evaluationArtifactObjectKey,
+      input.evaluationArtifactEnvelopeHash,
+      input.evaluationArtifactCiphertextHash,
+      input.signingKeyId,
+      now,
+      now,
+    ).run();
 
     await expect(
       verifyPatternOntologyEvidence(env, value, input.signingKeyId),
-    ).resolves.toMatchObject({ runId: input.runId });
+    ).rejects.toMatchObject({
+      code: "ontology_regression_evidence_missing",
+    });
   });
 
   it("refuses a self-consistent envelope encrypted under an untrusted key", async () => {
@@ -598,6 +999,17 @@ describe("machine ontology evidence", () => {
     ).rejects.toMatchObject({ code: "ontology_evidence_immutable" });
   });
 
+  it("refuses a regression artifact pin that does not exactly match its inventory row", async () => {
+    const value = await release("ontology-evidence-regression-pin-mismatch");
+    const { input } = await evidenceFixture(value);
+    input.regressionArtifactEnvelopeHash = `sha256:${"7".repeat(64)}`;
+
+    await expect(commitOntologyPipelineEvidence(env, input))
+      .rejects.toMatchObject({
+        code: "ontology_regression_artifact_identity_mismatch",
+      });
+  });
+
   it("refuses to commit a receipt before its evaluation artifact exists", async () => {
     const value = await release("ontology-evidence-no-artifact");
     const { input } = await evidenceFixture(value);
@@ -737,27 +1149,22 @@ describe("machine ontology evidence", () => {
   ] as const)("refuses a mismatched %s independently", async (field, code) => {
     const value = await release(`ontology-evidence-mismatch-${field}`);
     const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
     if (field === "corpus_release_hash") {
       value.corpus_release_hash = `sha256:${"9".repeat(64)}`;
       value.bundle_hash = await computeOntologyBundleHash(value);
-      input.bundleHash = value.bundle_hash;
     } else if (field === "bundle_hash") {
-      input.bundleHash = `sha256:${"9".repeat(64)}`;
+      value.bundle_hash = `sha256:${"9".repeat(64)}`;
     } else if (field === "evaluation_report_hash") {
       value.evaluation.evaluation_report_hash = `sha256:${"9".repeat(64)}`;
-      value.bundle_hash = await computeOntologyBundleHash(value);
-      input.bundleHash = value.bundle_hash;
-    } else {
-      input.signingKeyId = "ontology-signing-other";
     }
-    await commitOntologyPipelineEvidence(env, input);
 
     await expect(
       verifyPatternOntologyEvidence(
         env,
         value,
         field === "signing_key_id"
-          ? "ontology-signing-2026"
+          ? "ontology-signing-other"
           : input.signingKeyId,
       ),
     ).rejects.toMatchObject({ code });
@@ -930,6 +1337,22 @@ describe("machine ontology evidence", () => {
     });
   });
 
+  it("re-verifies and refuses a replaced generic regression artifact", async () => {
+    const value = await release("ontology-evidence-regression-tamper");
+    const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
+    await env.ARTIFACTS!.put(
+      input.regressionArtifactObjectKey,
+      canonicalJson({ replacement: "not the committed regression envelope" }),
+    );
+
+    await expect(
+      verifyPatternOntologyEvidence(env, value, input.signingKeyId),
+    ).rejects.toMatchObject({
+      code: "ontology_regression_artifact_integrity_failed",
+    });
+  });
+
   it("refuses a corpus manifest replaced after evidence commit", async () => {
     const value = await release("ontology-evidence-corpus-tamper");
     const fixture = await evidenceFixture(value);
@@ -972,6 +1395,24 @@ describe("machine ontology evidence", () => {
       .bind(input.runId)
       .first<{ signing_key_id: string }>();
     expect(row?.signing_key_id).toBe(input.signingKeyId);
+    await expect(
+      env.DB.prepare(
+        `UPDATE pattern_ontology_pipeline_evidence
+         SET regression_artifact_stage_attempt = 99 WHERE run_id = ?`,
+      ).bind(input.runId).run(),
+    ).rejects.toThrow(/immutable/);
+  });
+
+  it("prevents deletion of committed legacy and regression evidence rows", async () => {
+    const value = await release("ontology-evidence-sql-no-delete");
+    const { input } = await evidenceFixture(value);
+    await commitOntologyPipelineEvidence(env, input);
+
+    await expect(
+      env.DB.prepare(
+        `DELETE FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
+      ).bind(input.runId).run(),
+    ).rejects.toThrow(/cannot be deleted/);
   });
 
   it("enforces public corpus capability at the SQL boundary", async () => {

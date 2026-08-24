@@ -4,6 +4,11 @@ import {
   type PatternTransformationClass,
 } from "@patternlike/shared";
 import authoredOntologyFragments from "../../../pattern-corpus/fragments.json";
+import {
+  createCanonicalOntologyRegressionReport,
+  loadOntologyRegressionCorpus,
+  ontologyRegressionConfigurationHash,
+} from "../src/services/ontology-regression.js";
 
 export const APPROVED_COVERAGE_HINT_CORPUS_RELEASE_ID =
   "pattern-ontology-source-manual-en-us-0.1.0";
@@ -73,6 +78,54 @@ export interface TestEvaluationArtifactOptions {
 
 export const TEST_ONTOLOGY_PIPELINE_ARTIFACT_KEY_ID =
   "test-evaluation-envelope-key";
+
+export async function buildTestPassedRegressionReport(input: {
+  ontologyVersion: string;
+  commandHash: string;
+  corpusReleaseId: string;
+  corpusHash: string;
+  candidateHash: string;
+  evaluationReportHash: string;
+  publisher?: "openai" | "codex";
+}): Promise<{
+  document: Record<string, unknown>;
+  canonicalBytes: string;
+  plaintextHash: string;
+  configurationHash: string;
+}> {
+  const corpus = loadOntologyRegressionCorpus();
+  const configurationHash = await ontologyRegressionConfigurationHash(
+    input.publisher ?? "openai",
+  );
+  const results = corpus.fixtures.map((fixture, index) => ({
+    fixture_id: fixture.fixture_id,
+    accuracy: fixture.effective_accuracy,
+    accepted: true,
+    declared_outcome: fixture.declared_outcome,
+    result_hash: `sha256:${(index + 1).toString(16).padStart(64, "0")}`,
+    provider_calls: 3,
+    input_tokens: 10,
+    output_tokens: 10,
+    hard_gate_failures: [],
+  }));
+  const report = await createCanonicalOntologyRegressionReport({
+    ontologyVersion: input.ontologyVersion,
+    commandHash: input.commandHash,
+    configurationHash,
+    corpusReleaseId: input.corpusReleaseId,
+    corpusHash: input.corpusHash,
+    corpusManifestHash: corpus.manifest_hash,
+    candidateHash: input.candidateHash,
+    evaluationReportHash: input.evaluationReportHash,
+    configurationEqual: true,
+    results,
+    requestArtifactCount: 90,
+    responseArtifactCount: 90,
+    inputTokens: 300,
+    outputTokens: 300,
+  });
+  return { ...report, configurationHash };
+}
 
 const TEST_ONTOLOGY_PIPELINE_ARTIFACT_KEY = Uint8Array.from(
   { length: 32 },

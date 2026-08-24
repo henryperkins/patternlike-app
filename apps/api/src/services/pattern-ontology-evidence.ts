@@ -3,6 +3,10 @@ import {
   type PatternOntologyRelease,
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import {
+  ONTOLOGY_PIPELINE_DEFAULT_REGRESSION_MINIMUM_PASS_RATE,
+  ONTOLOGY_PIPELINE_EQUAL_MODEL_REGRESSION_MINIMUM_PASS_RATE,
+} from "../middleware/config-guard.js";
 import { hashesEqual } from "./content-release.js";
 import {
   PatternOntologyCorpusError,
@@ -19,6 +23,11 @@ import {
   readOntologyPipelineArtifact,
   type OntologyPipelineArtifactCoordinate,
 } from "./ontology-pipeline-artifacts.js";
+import {
+  ONTOLOGY_REGRESSION_ACTIVATION_MANIFEST_HASH,
+  ontologyRegressionConfigurationHash,
+  parseCanonicalOntologyRegressionReport,
+} from "./ontology-regression-report.js";
 
 const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
@@ -55,6 +64,12 @@ export interface CommitOntologyPipelineEvidenceInput {
   evaluationArtifactObjectKey: string;
   evaluationArtifactEnvelopeHash: string;
   evaluationArtifactCiphertextHash: string;
+  regressionReportHash: string;
+  regressionArtifactObjectKey: string;
+  regressionArtifactEnvelopeHash: string;
+  regressionArtifactCiphertextHash: string;
+  regressionArtifactStageGeneration: number;
+  regressionArtifactStageAttempt: number;
   signingKeyId: string;
   compilerPassed: true;
   evaluatorPassed: true;
@@ -74,6 +89,12 @@ interface EvidenceRow {
   evaluation_artifact_object_key: string;
   evaluation_artifact_envelope_hash: string;
   evaluation_artifact_ciphertext_hash: string;
+  regression_report_hash: string | null;
+  regression_artifact_object_key: string | null;
+  regression_artifact_envelope_hash: string | null;
+  regression_artifact_ciphertext_hash: string | null;
+  regression_artifact_stage_generation: number | null;
+  regression_artifact_stage_attempt: number | null;
   evaluation_artifact_status: "pending" | "committed";
   signing_key_id: string;
   run_status: "succeeded" | "failed";
@@ -98,9 +119,16 @@ export interface VerifiedPatternOntologyEvidence {
   evaluationArtifactObjectKey: string;
   evaluationArtifactEnvelopeHash: string;
   evaluationArtifactCiphertextHash: string;
+  regressionReportHash: string;
+  regressionArtifactObjectKey: string;
+  regressionArtifactEnvelopeHash: string;
+  regressionArtifactCiphertextHash: string;
+  regressionArtifactStageGeneration: number;
+  regressionArtifactStageAttempt: number;
   signingKeyId: string;
   compilerPassed: true;
   evaluatorPassed: true;
+  regressionPassed: true;
   unevaluatedFixtureCount: 0;
   evidenceSummary: string;
 }
@@ -133,6 +161,16 @@ function inputIsValid(input: CommitOntologyPipelineEvidenceInput): boolean {
     CONTENT_HASH.test(input.evaluationReportHash) &&
     CONTENT_HASH.test(input.evaluationArtifactEnvelopeHash) &&
     CONTENT_HASH.test(input.evaluationArtifactCiphertextHash) &&
+    CONTENT_HASH.test(input.regressionReportHash) &&
+    typeof input.regressionArtifactObjectKey === "string" &&
+    input.regressionArtifactObjectKey.length > 0 &&
+    input.regressionArtifactObjectKey.length <= 1024 &&
+    CONTENT_HASH.test(input.regressionArtifactEnvelopeHash) &&
+    CONTENT_HASH.test(input.regressionArtifactCiphertextHash) &&
+    Number.isSafeInteger(input.regressionArtifactStageGeneration) &&
+    input.regressionArtifactStageGeneration > 0 &&
+    Number.isSafeInteger(input.regressionArtifactStageAttempt) &&
+    input.regressionArtifactStageAttempt >= 0 &&
     evaluationObjectKeyIsValid(
       input.runId,
       input.evaluationArtifactObjectKey,
@@ -535,6 +573,149 @@ async function verifyCorpus(
   }
 }
 
+interface RegressionRunRow {
+  stage: string;
+  candidate_ontology_version: string;
+  configuration_json: string;
+  configuration_hash: string;
+  corpus_release_id: string;
+  corpus_hash: string;
+  candidate_hash: string | null;
+  evaluation_report_hash: string | null;
+  regression_report_hash: string | null;
+  bundle_hash: string | null;
+}
+
+interface ExpectedRegressionArtifact {
+  runId: string;
+  ontologyVersion: string;
+  corpusReleaseId: string;
+  corpusReleaseHash: string;
+  evaluationReportHash: string;
+  regressionReportHash: string;
+  bundleHash: string;
+  objectKey: string;
+  envelopeHash: string;
+  ciphertextHash: string;
+  stageGeneration: number;
+  stageAttempt: number;
+}
+
+async function verifyRegressionReport(
+  plaintext: Uint8Array,
+  expected: ExpectedRegressionArtifact,
+  run: RegressionRunRow,
+): Promise<void> {
+  let command: unknown;
+  let commandHash: string;
+  try {
+    command = JSON.parse(run.configuration_json);
+    commandHash = await hashOntologyArtifactBytes(
+      new TextEncoder().encode(run.configuration_json),
+    );
+  } catch {
+    fail("ontology_regression_run_identity_mismatch");
+  }
+  if (
+    !isRecord(command) ||
+    canonicalJson(command) !== run.configuration_json ||
+    commandHash !== run.configuration_hash ||
+    (command.provider !== "openai" && command.provider !== "codex") ||
+    typeof command.configuration_equal !== "boolean" ||
+    command.candidate_ontology_version !== run.candidate_ontology_version ||
+    !isRecord(command.corpus) ||
+    command.corpus.corpus_release_id !== run.corpus_release_id ||
+    command.corpus.corpus_hash !== run.corpus_hash ||
+    !isRecord(command.regression) ||
+    command.regression.fixture_count !== 30 ||
+    command.regression.maximum_provider_calls_per_fixture !== 11 ||
+    command.regression.minimum_pass_rate !==
+      (command.configuration_equal
+        ? ONTOLOGY_PIPELINE_EQUAL_MODEL_REGRESSION_MINIMUM_PASS_RATE
+        : ONTOLOGY_PIPELINE_DEFAULT_REGRESSION_MINIMUM_PASS_RATE)
+  ) {
+    fail("ontology_regression_run_identity_mismatch");
+  }
+  try {
+    const configurationHash = await ontologyRegressionConfigurationHash(
+      command.provider,
+    );
+    await parseCanonicalOntologyRegressionReport(plaintext, {
+      ontologyVersion: expected.ontologyVersion,
+      commandHash: run.configuration_hash,
+      configurationHash,
+      corpusReleaseId: expected.corpusReleaseId,
+      corpusHash: expected.corpusReleaseHash,
+      corpusManifestHash: ONTOLOGY_REGRESSION_ACTIVATION_MANIFEST_HASH,
+      candidateHash: run.candidate_hash!,
+      evaluationReportHash: expected.evaluationReportHash,
+      configurationEqual: command.configuration_equal,
+    });
+  } catch {
+    fail("ontology_regression_report_invalid");
+  }
+}
+
+async function verifyRegressionArtifact(
+  env: Env,
+  expected: ExpectedRegressionArtifact,
+  stageExpectation: "commit" | "reverify",
+): Promise<void> {
+  const run = await env.DB.prepare(
+    `SELECT stage, candidate_ontology_version, configuration_json,
+            configuration_hash,
+            corpus_release_id, corpus_hash, candidate_hash,
+            evaluation_report_hash, regression_report_hash, bundle_hash
+     FROM pattern_ontology_pipeline_runs WHERE run_id = ?`,
+  ).bind(expected.runId).first<RegressionRunRow>();
+  if (
+    !run ||
+    (stageExpectation === "commit"
+      ? run.stage !== "ingesting"
+      : run.stage !== "ingesting" && run.stage !== "succeeded") ||
+    run.candidate_ontology_version !== expected.ontologyVersion ||
+    run.corpus_release_id !== expected.corpusReleaseId ||
+    !hashesEqual(run.corpus_hash, expected.corpusReleaseHash) ||
+    !CONTENT_HASH.test(run.configuration_hash) ||
+    !run.candidate_hash ||
+    !CONTENT_HASH.test(run.candidate_hash) ||
+    !run.evaluation_report_hash ||
+    !hashesEqual(run.evaluation_report_hash, expected.evaluationReportHash) ||
+    !run.regression_report_hash ||
+    !hashesEqual(run.regression_report_hash, expected.regressionReportHash) ||
+    !run.bundle_hash ||
+    !hashesEqual(run.bundle_hash, expected.bundleHash)
+  ) {
+    fail("ontology_regression_run_identity_mismatch");
+  }
+  const coordinate: OntologyPipelineArtifactCoordinate = {
+    runId: expected.runId,
+    stage: "regressing",
+    stageGeneration: expected.stageGeneration,
+    stageAttempt: expected.stageAttempt,
+    artifactClass: "regression_report",
+  };
+  let stored;
+  try {
+    stored = await readOntologyPipelineArtifact(env, coordinate);
+  } catch {
+    fail("ontology_regression_artifact_integrity_failed");
+  }
+  if (!stored) fail("ontology_regression_artifact_missing");
+  if (
+    stored.artifact.objectKey !== expected.objectKey ||
+    !hashesEqual(
+      stored.artifact.plaintextSha256,
+      expected.regressionReportHash,
+    ) ||
+    !hashesEqual(stored.artifact.envelopeSha256, expected.envelopeHash) ||
+    !hashesEqual(stored.artifact.ciphertextSha256, expected.ciphertextHash)
+  ) {
+    fail("ontology_regression_artifact_identity_mismatch");
+  }
+  await verifyRegressionReport(stored.plaintext, expected, run);
+}
+
 function rowMatchesInput(
   row: EvidenceRow,
   input: CommitOntologyPipelineEvidenceInput,
@@ -559,6 +740,23 @@ function rowMatchesInput(
       row.evaluation_artifact_ciphertext_hash,
       input.evaluationArtifactCiphertextHash,
     ) &&
+    row.regression_report_hash !== null &&
+    hashesEqual(row.regression_report_hash, input.regressionReportHash) &&
+    row.regression_artifact_object_key === input.regressionArtifactObjectKey &&
+    row.regression_artifact_envelope_hash !== null &&
+    hashesEqual(
+      row.regression_artifact_envelope_hash,
+      input.regressionArtifactEnvelopeHash,
+    ) &&
+    row.regression_artifact_ciphertext_hash !== null &&
+    hashesEqual(
+      row.regression_artifact_ciphertext_hash,
+      input.regressionArtifactCiphertextHash,
+    ) &&
+    row.regression_artifact_stage_generation ===
+      input.regressionArtifactStageGeneration &&
+    row.regression_artifact_stage_attempt ===
+      input.regressionArtifactStageAttempt &&
     row.evaluation_artifact_status === "committed" &&
     row.signing_key_id === input.signingKeyId &&
     row.run_status === "succeeded" &&
@@ -616,6 +814,20 @@ export async function commitOntologyPipelineEvidence(
       ciphertextHash: input.evaluationArtifactCiphertextHash,
     },
   );
+  await verifyRegressionArtifact(env, {
+    runId: input.runId,
+    ontologyVersion: input.ontologyVersion,
+    corpusReleaseId: input.corpusReleaseId,
+    corpusReleaseHash: input.corpusReleaseHash,
+    evaluationReportHash: input.evaluationReportHash,
+    regressionReportHash: input.regressionReportHash,
+    bundleHash: input.bundleHash,
+    objectKey: input.regressionArtifactObjectKey,
+    envelopeHash: input.regressionArtifactEnvelopeHash,
+    ciphertextHash: input.regressionArtifactCiphertextHash,
+    stageGeneration: input.regressionArtifactStageGeneration,
+    stageAttempt: input.regressionArtifactStageAttempt,
+  }, "commit");
 
   const existing = await loadEvidenceByIdentity(
     env,
@@ -635,11 +847,15 @@ export async function commitOntologyPipelineEvidence(
          corpus_license_class, corpus_public_capable, activation_scope,
          bundle_hash, evaluation_report_hash, evaluation_artifact_object_key,
          evaluation_artifact_envelope_hash,
-         evaluation_artifact_ciphertext_hash, evaluation_artifact_status,
+         evaluation_artifact_ciphertext_hash, regression_report_hash,
+         regression_artifact_object_key, regression_artifact_envelope_hash,
+         regression_artifact_ciphertext_hash,
+         regression_artifact_stage_generation, regression_artifact_stage_attempt,
+         evaluation_artifact_status,
          signing_key_id, run_status, evidence_status, compiler_passed,
          evaluator_passed, unevaluated_fixture_count, created_at, committed_at
        ) VALUES (
-         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'committed',
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'committed',
          ?, 'succeeded', 'committed', 1, 1, 0, ?, ?
        )`,
     )
@@ -656,6 +872,12 @@ export async function commitOntologyPipelineEvidence(
         input.evaluationArtifactObjectKey,
         input.evaluationArtifactEnvelopeHash,
         input.evaluationArtifactCiphertextHash,
+        input.regressionReportHash,
+        input.regressionArtifactObjectKey,
+        input.regressionArtifactEnvelopeHash,
+        input.regressionArtifactCiphertextHash,
+        input.regressionArtifactStageGeneration,
+        input.regressionArtifactStageAttempt,
         input.signingKeyId,
         now,
         now,
@@ -678,6 +900,7 @@ export async function verifyPatternOntologyEvidence(
   signingKeyId: string,
 ): Promise<VerifiedPatternOntologyEvidence> {
   const evaluationHash = release.evaluation.evaluation_report_hash;
+  const regressionHash = release.evaluation.regression_report_hash;
   if (
     release.provenance?.origin !== "machine_pipeline" ||
     release.status !== "candidate" ||
@@ -690,6 +913,13 @@ export async function verifyPatternOntologyEvidence(
   ) {
     fail("ontology_evaluation_not_passed");
   }
+  if (
+    release.evaluation.regression_passed !== true ||
+    typeof regressionHash !== "string" ||
+    !CONTENT_HASH.test(regressionHash)
+  ) {
+    fail("ontology_regression_not_passed");
+  }
 
   const row = await env.DB.prepare(
     `SELECT * FROM pattern_ontology_pipeline_evidence
@@ -698,6 +928,16 @@ export async function verifyPatternOntologyEvidence(
     .bind(release.ontology_version)
     .first<EvidenceRow>();
   if (!row) fail("ontology_pipeline_evidence_missing");
+  if (
+    row.regression_report_hash === null ||
+    row.regression_artifact_object_key === null ||
+    row.regression_artifact_envelope_hash === null ||
+    row.regression_artifact_ciphertext_hash === null ||
+    row.regression_artifact_stage_generation === null ||
+    row.regression_artifact_stage_attempt === null
+  ) {
+    fail("ontology_regression_evidence_missing");
+  }
   if (
     row.run_status !== "succeeded" ||
     row.evidence_status !== "committed" ||
@@ -709,7 +949,16 @@ export async function verifyPatternOntologyEvidence(
     !CONTENT_HASH.test(row.bundle_hash) ||
     !CONTENT_HASH.test(row.evaluation_report_hash) ||
     !CONTENT_HASH.test(row.evaluation_artifact_envelope_hash) ||
-    !CONTENT_HASH.test(row.evaluation_artifact_ciphertext_hash)
+    !CONTENT_HASH.test(row.evaluation_artifact_ciphertext_hash) ||
+    !CONTENT_HASH.test(row.regression_report_hash) ||
+    !CONTENT_HASH.test(row.regression_artifact_envelope_hash) ||
+    !CONTENT_HASH.test(row.regression_artifact_ciphertext_hash) ||
+    row.regression_artifact_object_key.length === 0 ||
+    row.regression_artifact_object_key.length > 1024 ||
+    !Number.isSafeInteger(row.regression_artifact_stage_generation) ||
+    row.regression_artifact_stage_generation <= 0 ||
+    !Number.isSafeInteger(row.regression_artifact_stage_attempt) ||
+    row.regression_artifact_stage_attempt < 0
   ) {
     fail("ontology_evidence_not_committed");
   }
@@ -724,6 +973,9 @@ export async function verifyPatternOntologyEvidence(
   }
   if (!hashesEqual(row.evaluation_report_hash, evaluationHash)) {
     fail("ontology_evidence_evaluation_mismatch");
+  }
+  if (!hashesEqual(row.regression_report_hash, regressionHash)) {
+    fail("ontology_evidence_regression_mismatch");
   }
   if (row.signing_key_id !== signingKeyId) {
     fail("ontology_evidence_signing_key_mismatch");
@@ -753,6 +1005,20 @@ export async function verifyPatternOntologyEvidence(
       ciphertextHash: row.evaluation_artifact_ciphertext_hash,
     },
   );
+  await verifyRegressionArtifact(env, {
+    runId: row.run_id,
+    ontologyVersion: row.ontology_version,
+    corpusReleaseId: row.corpus_release_id,
+    corpusReleaseHash: row.corpus_release_hash,
+    evaluationReportHash: row.evaluation_report_hash,
+    regressionReportHash: row.regression_report_hash,
+    bundleHash: row.bundle_hash,
+    objectKey: row.regression_artifact_object_key,
+    envelopeHash: row.regression_artifact_envelope_hash,
+    ciphertextHash: row.regression_artifact_ciphertext_hash,
+    stageGeneration: row.regression_artifact_stage_generation,
+    stageAttempt: row.regression_artifact_stage_attempt,
+  }, "reverify");
 
   const evidenceSummary = canonicalJson({
     activation_scope: row.activation_scope,
@@ -771,6 +1037,15 @@ export async function verifyPatternOntologyEvidence(
     evaluator_passed: true,
     ontology_version: row.ontology_version,
     run_id: row.run_id,
+    regression_artifact_ciphertext_hash:
+      row.regression_artifact_ciphertext_hash,
+    regression_artifact_envelope_hash: row.regression_artifact_envelope_hash,
+    regression_artifact_object_key: row.regression_artifact_object_key,
+    regression_artifact_stage_attempt: row.regression_artifact_stage_attempt,
+    regression_artifact_stage_generation:
+      row.regression_artifact_stage_generation,
+    regression_passed: true,
+    regression_report_hash: row.regression_report_hash,
     signing_key_id: row.signing_key_id,
     unevaluated_fixture_count: 0,
   });
@@ -789,9 +1064,18 @@ export async function verifyPatternOntologyEvidence(
       row.evaluation_artifact_envelope_hash,
     evaluationArtifactCiphertextHash:
       row.evaluation_artifact_ciphertext_hash,
+    regressionReportHash: row.regression_report_hash,
+    regressionArtifactObjectKey: row.regression_artifact_object_key,
+    regressionArtifactEnvelopeHash: row.regression_artifact_envelope_hash,
+    regressionArtifactCiphertextHash:
+      row.regression_artifact_ciphertext_hash,
+    regressionArtifactStageGeneration:
+      row.regression_artifact_stage_generation,
+    regressionArtifactStageAttempt: row.regression_artifact_stage_attempt,
     signingKeyId: row.signing_key_id,
     compilerPassed: true,
     evaluatorPassed: true,
+    regressionPassed: true,
     unevaluatedFixtureCount: 0,
     evidenceSummary,
   };
