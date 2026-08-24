@@ -101,6 +101,7 @@ import type {
   OntologyPassOutcome,
   OntologyPublisher,
   OntologyRuleVerdict,
+  OntologyVerdictDimension,
 } from "./ontology-publisher.js";
 import { createOpenAiOntologyPublisher } from "./openai-ontology-publisher.js";
 import { createCodexOntologyPublisher } from "./codex-ontology-publisher.js";
@@ -1635,7 +1636,8 @@ async function orderedVerdictEvidence(
     if (!stored) terminal("artifact_integrity_failed");
     const verdict = parseCanonicalVerdict(stored.plaintext);
     const assessment = assessOntologyRuleVerdict(records[index]!.id, verdict);
-    if (!assessment.ok || assessment.rejected) terminal("evaluation_rejected");
+    if (!assessment.ok) terminal("evaluation_rejected");
+    if (assessment.rejected) rejectEvaluation(index, verdict);
     evidence.push({
       ruleId: records[index]!.id,
       verdictHash: stored.artifact.plaintextSha256,
@@ -1796,7 +1798,9 @@ async function executeEvaluating(
     canonicalJson(verdict),
     clock,
   );
-  if (assessment.rejected) terminal("evaluation_rejected");
+  if (assessment.rejected) {
+    rejectEvaluation(claim.stageCursor, verdict);
+  }
 
   const finalRuleIndex = candidate.records.length - 1;
   if (claim.stageCursor !== finalRuleIndex) {
@@ -2691,6 +2695,30 @@ async function executeRegressing(
     { regressionReportHash: report.plaintextHash },
     clock,
   );
+}
+
+/**
+ * Reject an evaluated rule, naming the dimensions that failed.
+ *
+ * `evaluation_rejected` was silent, so a run that reached the evaluator and
+ * died there told the operator only that some record failed some dimension --
+ * the third instance of the same defect, after the blind regression correction
+ * loop and the silent chunk rejection. The verdict is durable in its encrypted
+ * `evaluator_verdict` artifact, but reading it costs a decryption.
+ *
+ * Every dimension name is a fixed key and every value is `"pass" | "reject"`,
+ * so the failing names are closed vocabulary. The rule *index* travels, never
+ * the rule id, and no rationale or generated text is ever logged.
+ */
+function rejectEvaluation(ruleIndex: number, verdict: OntologyRuleVerdict): never {
+  safeLog({
+    event: "ontology_evaluation_rejected",
+    rule_index: ruleIndex,
+    rejected_dimensions: (
+      Object.keys(verdict.dimensions) as OntologyVerdictDimension[]
+    ).filter((name) => verdict.dimensions[name] === "reject").sort(),
+  });
+  terminal("evaluation_rejected");
 }
 
 async function loadUniquePipelineArtifact(

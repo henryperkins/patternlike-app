@@ -2,6 +2,7 @@ import { newId, type NatalFeatureClass } from "@patternlike/shared";
 import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { PublisherSafeDetailCode } from "./reading-publisher.js";
+import type { OntologyVerdictDimension } from "./ontology-publisher.js";
 import type {
   PatternPublisherFailureCode,
   PatternPublisherSafeDetailCode,
@@ -108,6 +109,12 @@ export type SafeLogEvent =
       reason: OntologyCandidateSafeDetailCode;
       /** Accepted + proposed record count. A count, never a record or an id. */
       record_count?: number;
+    }
+  | {
+      event: "ontology_evaluation_rejected";
+      /** Position in candidate order. Never the rule id. */
+      rule_index: number;
+      rejected_dimensions: OntologyVerdictDimension[];
     }
   | {
       event: "ontology_generation_stalled";

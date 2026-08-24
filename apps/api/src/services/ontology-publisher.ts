@@ -46,6 +46,9 @@ export interface OntologyRuleVerdict {
   };
 }
 
+/** The nine fixed evaluator dimensions. Closed vocabulary, safe to log. */
+export type OntologyVerdictDimension = keyof OntologyRuleVerdict["dimensions"];
+
 export interface OntologyPassOptions {
   /** Worker's internal correlation only; never provider-visible. */
   requestId: string;
