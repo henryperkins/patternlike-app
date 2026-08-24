@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`apps/api/` is the Hono Cloudflare Worker, `apps/ontology-signer/` the isolated ontology-signing Worker, `apps/calc-stub/` the AGPL Swiss Ephemeris service, and `packages/shared/` the shared TypeScript library. Frozen schemas, OpenAPI files, and fixtures live in `contracts/m0/`; D1 migrations in `db/d1/`; normative specs in `spec-bundle/`; licensing decisions in `docs/legal/`. Keep TypeScript tests beside their subjects as `src/**/*.test.ts`.
+`apps/api/` is the Hono Cloudflare Worker, `apps/ontology-signer/` the isolated ontology-signing Worker, `apps/calc-stub/` the AGPL Swiss Ephemeris service, and `apps/web/` the React/Vite PWA. Shared libraries live in `packages/shared`, `packages/reading-engine`, and `packages/pattern-engine`. Frozen schemas, OpenAPI files, and fixtures live in `contracts/m0/`, `contracts/m3/`, and `contracts/m4/`; D1 migrations in `db/d1/`; normative specs in `spec-bundle/`; licensing decisions in `docs/legal/`. Keep TypeScript tests beside their subjects as `src/**/*.test.ts`.
 
 ## Build, Test, and Development Commands
 
@@ -12,8 +12,8 @@ Run commands from the repository root with Node 20+ and Python 3.11+.
 - `npm run typecheck` runs strict TypeScript checks across every workspace.
 - `npm test` runs calculation, API, schema, OpenAPI, and D1 smoke tests. The calculation pretest may download ephemeris data.
 - `npm run build` builds the calculation service and performs a dry-run Worker build.
-- `npm run calc:dev` starts the calculation service on port 8080; `npm run dev:api` starts Wrangler on port 8787.
-- `npm run db:local` applies `0001_m0_core.sql` to local D1.
+- `npm run calc:dev` starts the calculation service on port 8080; `npm run dev:api` starts Wrangler on port 8787; `npm run web:dev` binds Vite to `http://127.0.0.1:5173/` only (Auth0 callback origin).
+- `npm run db:local` applies the ordered `db/d1/` directory (not only `0001`) to local D1. After a fresh apply, `node scripts/dev/seed-dev-user.mjs` inserts `usr_local_dev_0001` so `AUTH_STUB=1` / `X-User-Id` does not 401.
 - `npm run test:contracts` and `npm run calc:golden` run focused verification lanes.
 
 ## Coding Style & Naming Conventions
@@ -26,7 +26,7 @@ The API uses Vitest; the calculation service uses `node:test` through `tsx`. Nam
 
 ## Commit & Pull Request Guidelines
 
-This checkout has no `.git` history, so no convention can be inferred. Use focused, imperative subjects with an area prefix, for example `api: validate chart request`. Pull requests should explain scope and risk, link the issue, and list verification commands. Include screenshots for visible UI changes. Schema changes need fixtures and version/freeze notes; database changes need a migration and compatibility rationale. CI must pass before merge.
+Use focused, imperative subjects with an area prefix, for example `api: validate chart request`. Pull requests should explain scope and risk, link the issue, and list verification commands. Include screenshots for visible UI changes. Schema changes need fixtures and version/freeze notes; database changes need a migration and compatibility rationale. CI must pass before merge.
 
 ## Security, Contracts, and Licensing
 

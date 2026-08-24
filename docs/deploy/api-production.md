@@ -1,25 +1,28 @@
 # Deploying the production API
 
-Runbook for putting `patternlike-api-production` behind `patternlike-app.fly.dev/v1`.
+Runbook for `patternlike-api-production`. The PWA ships as Worker assets
+(`[env.production.assets]`); it is **not** served from Fly. `patternlike-app`
+was scaled to 0 on 2026-08-08. Do not `fly deploy -c fly.web.toml`.
 
-Status as of 2026-08-08:
+Status as of 2026-08-08, with later notes called out:
 
 | Step | State |
 | --- | --- |
 | D1 `patternlike-ops` created (`1305a75d-0a8a-4a21-b201-d94fda0aaf93`, ENAM) | done |
-| Schema applied `--remote` (22 tables) | done |
+| Schema applied `--remote` | done; remote ledger is at **0012** (see CLAUDE.md / Pattern rollout Gate 2) |
 | `database_id` wired into `[[env.production.d1_databases]]` | done |
-| Origin decided: PWA ships inside the API Worker (`[env.production.assets]`) | done, dry-run validated |
+| Origin decided: PWA ships inside the API Worker (`[env.production.assets]`) | done, live |
 | Auth0 tenant `dev-lqmwkyo17nm5mdjz.us.auth0.com` + SPA app `Pattern/Like Web` | done |
 | `OIDC_*` wired into `[env.production.vars]` | done — `identity_not_configured` cleared |
 | Worker deployed | **live** — `https://patternlike-api-production.lfd.workers.dev` |
 | `ROOT_KEK` / `CALC_SERVICE_AUTH_TOKEN` secrets | set via `wrangler secret bulk`; calc token rotated on Fly to match |
-| Sign-in code in `apps/web` | done — `src/lib/auth.ts`, `components/SignedOut.tsx` |
+| Sign-in | done — `@auth0/auth0-react` in `apps/web/src/main.tsx` + `src/lib/auth.ts`; Worker cookie remains the authorisation boundary |
 | `SERVICE_AUTH_TOKEN` (`/internal/*`) | set — the route now answers 401, not 503 |
 | `/v1/sessions` in the M0 contract | documented; amendment recorded in `SCHEMA_MANIFEST.json` |
 | `patternlike-app` on Fly (superseded PWA) | retired — scaled to 0 machines, no longer serving |
-| First real sign-in | **not done** — requires creating an Auth0 user |
+| First real sign-in | **not done** — requires creating an Auth0 user on a production tenant before the first real reader |
 | `ROOT_KEK` recorded off-machine | **not done — see the warning below** |
+| Incumbent `*/15` cron (readings / privacy / Pattern sweep) | **off** in `[env.production.triggers]`; only the ontology-pipeline cron runs |
 
 > **`ROOT_KEK` is unrecoverable.** Cloudflare secrets are write-only. The
 > generated values were written to the session scratchpad as
@@ -30,12 +33,8 @@ Status as of 2026-08-08:
 Verified live: `/` 200 `text/html`, `/health` 200 `application/json`, `/v1/chart`
 401 `application/json` (not a 200 of `index.html`, so `run_worker_first` is
 correct), `/v1/sessions` 401 on a malformed token and 400 on a missing one,
-and `X-User-Id` refused in production.
-| Retire `patternlike-app` on Fly | not started (superseded once the Worker serves) |
-| Sign-in UI in `apps/web` | not started (roadmap F2/F3) |
-
-The Worker has never been deployed: `wrangler deployments list --env production`
-returns `code: 10007, This Worker does not exist on your account`.
+and `X-User-Id` refused in production. `run_worker_first` must stay
+`["/health", "/v1/*", "/internal/*", "/admin/*"]`.
 
 ---
 
