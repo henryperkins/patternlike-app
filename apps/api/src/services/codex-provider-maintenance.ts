@@ -116,6 +116,18 @@ function objectKeys(job: CodexProviderJob): string[] {
     : [job.request.objectKey, job.response.objectKey];
 }
 
+async function hasUncommittedResponseUploads(
+  env: Pick<Env, "DB">,
+  job: CodexProviderJob,
+): Promise<boolean> {
+  const committedKey = job.response?.objectKey ?? null;
+  const pending = await env.DB.prepare(
+    `SELECT 1 AS present FROM codex_provider_response_uploads
+     WHERE job_id = ? AND (? IS NULL OR object_key != ?) LIMIT 1`,
+  ).bind(job.id, committedKey, committedKey).first<{ present: number }>();
+  return pending !== null;
+}
+
 async function purgeTerminalJobs(
   env: Env,
   now: Date,
@@ -156,7 +168,8 @@ async function purgeTerminalJobs(
     if (
       !job ||
       job.completedAt === null ||
-      await codexProviderOwnerIsCurrent(env, job, now)
+      await codexProviderOwnerIsCurrent(env, job, now) ||
+      await hasUncommittedResponseUploads(env, job)
     ) {
       continue;
     }

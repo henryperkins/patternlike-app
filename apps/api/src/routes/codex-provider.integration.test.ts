@@ -400,6 +400,109 @@ describe("Codex provider runner routes", () => {
     )).toBeNull();
   });
 
+  it("retains a terminal job while a stale response upload still needs cleanup", async () => {
+    const ownerId = `oprun_codex_retention_fence_${crypto.randomUUID()}`;
+    const jobId = await enqueueFixture({ ownerId });
+    const claimed = await claimCodexProviderJob(
+      env,
+      new Date("2026-08-24T02:00:00.000Z"),
+    );
+    if (claimed.status !== "claimed") throw new Error("fixture claim failed");
+    const response = await putCodexProviderArtifact(
+      env,
+      {
+        jobId,
+        pipeline: "ontology",
+        ownerId,
+        pass: "generator",
+        stageGeneration: 2,
+        stageAttempt: 0,
+        role: "response",
+      },
+      textEncoder.encode('{"answer":"committed"}'),
+    );
+    expect(await completeCodexProviderJob(env, {
+      jobId,
+      leaseToken: claimed.leaseToken,
+      response: response.artifact,
+      providerRequestId: "thread_retention_fence",
+      inputTokens: 3,
+      outputTokens: 2,
+    }, new Date("2026-08-24T02:01:00.000Z"))).toMatchObject({
+      status: "completed",
+    });
+
+    const staleLeaseHash = `sha256:${"b".repeat(64)}`;
+    const stale = await putCodexProviderArtifact(
+      env,
+      {
+        jobId,
+        pipeline: "ontology",
+        ownerId,
+        pass: "generator",
+        stageGeneration: 2,
+        stageAttempt: 0,
+        role: "response",
+        storageDiscriminator: staleLeaseHash.slice("sha256:".length),
+      },
+      textEncoder.encode('{"answer":"stale"}'),
+    );
+    await env.DB.prepare(
+      `INSERT INTO codex_provider_response_uploads (
+         job_id, lease_token_hash, object_key, created_at
+       ) VALUES (?, ?, ?, ?)`,
+    ).bind(
+      jobId,
+      staleLeaseHash,
+      stale.artifact.objectKey,
+      "2026-08-24T02:02:00.000Z",
+    ).run();
+
+    const ownerClaimedAt = new Date();
+    const owner = await claimOntologyPipelineRun(
+      env,
+      { run_id: ownerId, stage_generation: 2 },
+      ownerClaimedAt,
+      "ontology-retention-fence-owner",
+    );
+    if (owner.status !== "claimed") throw new Error("owner claim failed");
+    const failedAt = new Date(ownerClaimedAt.getTime() + 1_000);
+    expect(await failOntologyPipelineRun(
+      env,
+      owner,
+      "execution_error",
+      failedAt,
+    )).toBe(true);
+    const expiry = new Date(failedAt.getTime() + 7 * 24 * 60 * 60 * 1_000);
+    const deletion = vi.spyOn(env.ARTIFACTS!, "delete")
+      .mockRejectedValueOnce(new Error("temporary R2 deletion failure"));
+
+    await maintainCodexProviderJobs(env, expiry);
+
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE id = ?",
+    ).bind(jobId).first()).toEqual({ status: "completed" });
+    expect(await env.DB.prepare(
+      `SELECT object_key FROM codex_provider_response_uploads
+       WHERE object_key = ?`,
+    ).bind(stale.artifact.objectKey).first()).toEqual({
+      object_key: stale.artifact.objectKey,
+    });
+    expect(await env.ARTIFACTS!.head(stale.artifact.objectKey)).not.toBeNull();
+    expect(await env.ARTIFACTS!.head(response.artifact.objectKey)).not.toBeNull();
+
+    deletion.mockRestore();
+    await maintainCodexProviderJobs(
+      env,
+      new Date(expiry.getTime() + 1_000),
+    );
+    expect(await env.DB.prepare(
+      "SELECT id FROM codex_provider_jobs WHERE id = ?",
+    ).bind(jobId).first()).toBeNull();
+    expect(await env.ARTIFACTS!.head(stale.artifact.objectKey)).toBeNull();
+    expect(await env.ARTIFACTS!.head(response.artifact.objectKey)).toBeNull();
+  });
+
   it("maintenance deletes an uploaded response after its lease is reclaimed", async () => {
     const jobId = await enqueueFixture({
       ownerId: `oprun_codex_stale_upload_${crypto.randomUUID()}`,
