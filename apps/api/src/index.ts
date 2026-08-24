@@ -31,6 +31,8 @@ import { sessionRoutes } from "./routes/sessions.js";
 import { queue } from "./queue.js";
 import { scheduled } from "./scheduled.js";
 import { safeLog } from "./services/safe-log.js";
+import { codexRunnerAuth } from "./middleware/codex-runner-auth.js";
+import { codexProviderRoutes } from "./routes/codex-provider.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -95,6 +97,18 @@ app.route("/admin", admin);
 // Mounted under a prefix, not "/". A sub-app routed at "/" contributes its
 // `use("*", ...)` middleware to every path in the parent.
 app.route("/internal", internal);
+
+// Dedicated outbound-polling Codex runner. Its bearer secret is intentionally
+// separate from consumer sessions, Pattern administration, and service auth.
+const codexProvider = new Hono<{
+  Bindings: Env;
+  Variables: AppVariables;
+}>();
+codexProvider.use("*", configGuard);
+codexProvider.use("*", codexRunnerAuth);
+codexProvider.route("/", codexProviderRoutes);
+app.route("/codex-provider", codexProvider);
+
 app.route("/", api);
 
 // Without this, Hono's default handler returns 500 as text/plain, so the

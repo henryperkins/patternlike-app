@@ -392,7 +392,6 @@ export async function runOpenAiResponsesRequest(
       "provider",
     );
   }
-
   const url = responsesUrlFor(options.route);
   const headers = responsesHeaders(options.credential, options.route);
   const requestBody = options.serializedBody ?? JSON.stringify(options.body);

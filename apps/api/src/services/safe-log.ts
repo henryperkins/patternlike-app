@@ -13,6 +13,12 @@ import type {
 import type {
   OntologyRegressionHardGateFailure,
 } from "./ontology-regression.js";
+import type {
+  CodexProviderFailureCode,
+  CodexProviderPass,
+  CodexProviderPipeline,
+  CodexProviderSafeDetailCode,
+} from "../db/codex-provider-jobs.js";
 
 export type ConfigurationCode =
   | "reading_rollout_invalid"
@@ -148,6 +154,42 @@ export type SafeLogEvent =
   | { event: "life_event_unreadable"; unreadable_count: number }
   /** The life-event list could not be decrypted or normalized. */
   | { event: "life_event_list_integrity_failure" }
+  | {
+      event: "codex_provider_job_claimed";
+      job_id: string;
+      pipeline: CodexProviderPipeline;
+      pass: CodexProviderPass;
+      model: string;
+    }
+  | {
+      event: "codex_provider_job_completed";
+      job_id: string;
+      pipeline: CodexProviderPipeline;
+      pass: CodexProviderPass;
+      model: string;
+      input_tokens: number;
+      output_tokens: number;
+      response_hash: string;
+    }
+  | {
+      event: "codex_provider_job_failed";
+      job_id: string;
+      pipeline: CodexProviderPipeline;
+      pass: CodexProviderPass;
+      model: string;
+      failure_code: CodexProviderFailureCode;
+      safe_detail_code: CodexProviderSafeDetailCode;
+    }
+  | {
+      event: "codex_provider_job_conflict";
+      job_id: string;
+      operation: "claim" | "complete" | "fail";
+    }
+  | {
+      event: "codex_provider_dispatch_failed";
+      job_id: string;
+      pipeline: CodexProviderPipeline;
+    }
   /**
    * The provider CALL finished and returned a parseable candidate. Not an
    * acceptance: schema and candidate validation run after this, and a rejected
@@ -176,7 +218,7 @@ export type SafeLogEvent =
     }
   | {
       event: "pattern_publisher_call_completed";
-      provider: "openai";
+      provider: "openai" | "codex" | "workers_ai";
       pass: PatternStageClass;
       model: string;
       prompt_version: string;
@@ -187,7 +229,7 @@ export type SafeLogEvent =
     }
   | {
       event: "pattern_publisher_attempt_failed";
-      provider: "openai";
+      provider: "openai" | "codex" | "workers_ai";
       pass: PatternStageClass;
       model: string;
       prompt_version: string;
@@ -269,6 +311,52 @@ export function safeLog(input: SafeLogEvent): string {
         input_tokens: input.input_tokens,
         output_tokens: input.output_tokens,
         provider_response_hash: input.provider_response_hash,
+      });
+      break;
+    case "codex_provider_job_claimed":
+      console.info(input.event, {
+        trace_id,
+        job_id: input.job_id,
+        pipeline: input.pipeline,
+        pass: input.pass,
+        model: input.model,
+      });
+      break;
+    case "codex_provider_job_completed":
+      console.info(input.event, {
+        trace_id,
+        job_id: input.job_id,
+        pipeline: input.pipeline,
+        pass: input.pass,
+        model: input.model,
+        input_tokens: input.input_tokens,
+        output_tokens: input.output_tokens,
+        response_hash: input.response_hash,
+      });
+      break;
+    case "codex_provider_job_failed":
+      console.warn(input.event, {
+        trace_id,
+        job_id: input.job_id,
+        pipeline: input.pipeline,
+        pass: input.pass,
+        model: input.model,
+        failure_code: input.failure_code,
+        safe_detail_code: input.safe_detail_code,
+      });
+      break;
+    case "codex_provider_job_conflict":
+      console.warn(input.event, {
+        trace_id,
+        job_id: input.job_id,
+        operation: input.operation,
+      });
+      break;
+    case "codex_provider_dispatch_failed":
+      console.error(input.event, {
+        trace_id,
+        job_id: input.job_id,
+        pipeline: input.pipeline,
       });
       break;
     case "pattern_publisher_attempt_failed":

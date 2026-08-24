@@ -68,7 +68,7 @@ export interface OntologyPipelinePredecessorReference {
 export interface OntologyPipelineCommand {
   command_version: typeof ONTOLOGY_PIPELINE_COMMAND_VERSION;
   schema_version: typeof M7_SCHEMA_VERSION;
-  provider: "openai";
+  provider: "openai" | "codex";
   candidate_ontology_version: string;
   corpus: {
     corpus_release_id: string;
@@ -219,7 +219,7 @@ export async function buildOntologyPipelineCommand(
   return {
     command_version: ONTOLOGY_PIPELINE_COMMAND_VERSION,
     schema_version: M7_SCHEMA_VERSION,
-    provider: "openai",
+    provider: outcome.config.publisher,
     candidate_ontology_version: candidateOntologyVersion,
     corpus: {
       corpus_release_id: corpus.release.corpus_release_id,

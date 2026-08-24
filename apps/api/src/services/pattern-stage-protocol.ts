@@ -49,6 +49,7 @@ export interface PatternAttemptCoordinate {
 }
 
 export type PatternTransition =
+  | { kind: "await_provider" }
   | { kind: "advance"; nextStage: "writing"; hashes: { planHash: string } }
   | { kind: "advance"; nextStage: "semantic_verifying"; hashes: { candidateHash: string } }
   | { kind: "retry"; pass: PatternStageClass; availableAt: Date | null }
@@ -207,6 +208,22 @@ export function planPatternTransition(
   });
 
   switch (transition.kind) {
+    case "await_provider":
+      return {
+        transition,
+        next,
+        jobStatus: "queued",
+        availableAt: undefined,
+        clearDispatchedAt: false,
+        finish: false,
+        resultClass: undefined,
+        publicFailureStage: undefined,
+        cancellationReason: undefined,
+        retentionExpiresAt: undefined,
+        releaseUnconsumedClaim: false,
+        nextQueueCoordinate: null,
+        nextProviderCallAuthorized: false,
+      };
     case "advance": {
       if (transition.nextStage === "writing") {
         if (owner !== "planner") throw new Error(`${owner} cannot advance to writing`);

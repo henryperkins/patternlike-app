@@ -9,6 +9,39 @@ afterEach(() => {
 });
 
 describe("safe logging", () => {
+  it("projects only closed Codex control-plane completion metadata", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const hostile = {
+      event: "codex_provider_job_completed",
+      job_id: `cpjob_${"a".repeat(32)}`,
+      pipeline: "pattern",
+      pass: "writer",
+      model: "gpt-5.6-sol",
+      input_tokens: 120,
+      output_tokens: 40,
+      response_hash: `sha256:${"b".repeat(64)}`,
+      prompt: SENTINEL,
+      output: SENTINEL,
+      stderr: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(info).toHaveBeenCalledOnce();
+    const payload = info.mock.calls[0]![1] as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual([
+      "input_tokens",
+      "job_id",
+      "model",
+      "output_tokens",
+      "pass",
+      "pipeline",
+      "response_hash",
+      "trace_id",
+    ]);
+    expect(JSON.stringify(info.mock.calls)).not.toContain(SENTINEL);
+  });
+
   it("projects only closed ontology regression hard-gate metadata", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const hostile = {

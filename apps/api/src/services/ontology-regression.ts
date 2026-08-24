@@ -96,9 +96,24 @@ export const ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL = 98_304;
 export const ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS =
   ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS *
   ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL;
+/**
+ * The Q1 worst case per fixture, priced at the pinned per-pass ceilings: at
+ * most 2 planner calls, 3 writer calls against one frozen plan, and 2 verifier
+ * calls per candidate for each of those 3 candidates.
+ *
+ * Derived from the pins rather than restated as literals. It was written as
+ * `2 * 4_000 + 3 * 8_000 + 3 * 2 * 4_000`, which silently stopped describing
+ * the Pattern configuration the moment a max-output-token pin moved: the
+ * regression harness went on requesting the new per-call ceiling while this
+ * budget still priced the old one, and every regression cursor rescheduled on
+ * an exhausted budget instead of advancing. A duplicated constant is the defect;
+ * the multipliers are the attempt ceilings and stay here.
+ */
 export const ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS =
   ONTOLOGY_REGRESSION_FIXTURE_COUNT *
-  (2 * 4_000 + 3 * 8_000 + 3 * 2 * 4_000);
+  (2 * OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS +
+    3 * OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS +
+    3 * 2 * OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS);
 export const ONTOLOGY_REGRESSION_MAXIMUM_BILLABLE_TOKEN_UNITS =
   ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS +
   ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS;

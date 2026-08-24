@@ -317,6 +317,55 @@ export async function retryOntologyPipelineStage(
   return result.meta.changes === 1;
 }
 
+/**
+ * Releases a live claim while keeping the same provider coordinate parked.
+ * The two statements run in one D1 transaction: the first uses the migration's
+ * same-attempt recovery transition, and the second restores the outbox hold so
+ * only a provider completion (or repair) can redispatch it.
+ */
+export async function deferOntologyPipelineForProvider(
+  env: Pick<Env, "DB">,
+  claim: ClaimedOntologyPipelineRun,
+  now = new Date(),
+): Promise<boolean> {
+  const at = now.toISOString();
+  const [released, held] = await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET claim_token = NULL, lease_expires_at = NULL,
+           dispatched_at = NULL, updated_at = ?
+       WHERE ${claimWhere()}`,
+    ).bind(
+      at,
+      claim.runId,
+      claim.stage,
+      claim.stageGeneration,
+      claim.stageCursor,
+      claim.stageAttempt,
+      claim.claimToken,
+      claim.leaseExpiresAt,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET dispatched_at = ?, updated_at = ?
+       WHERE run_id = ? AND stage = ? AND stage_generation = ?
+         AND stage_cursor = ? AND stage_attempt = ?
+         AND claim_token IS NULL AND lease_expires_at IS NULL
+         AND dispatched_at IS NULL AND updated_at = ?`,
+    ).bind(
+      at,
+      at,
+      claim.runId,
+      claim.stage,
+      claim.stageGeneration,
+      claim.stageCursor,
+      claim.stageAttempt,
+      at,
+    ),
+  ]);
+  return released.meta.changes === 1 && held.meta.changes === 1;
+}
+
 /** Advances one iterative item and creates a new queue generation. */
 export async function advanceOntologyPipelineCursor(
   env: Pick<Env, "DB">,

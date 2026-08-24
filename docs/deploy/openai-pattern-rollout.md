@@ -219,26 +219,15 @@ Record the Worker version id and prove:
 - `PATTERN_AI_ROLLOUT=off` in the deployed version; and
 - no Pattern queue delivery decrypts a command or calls a provider while off.
 
-**Also decide the scheduler here, and record the decision.**
-`[env.production.triggers]` is an explicit `crons = []` override in
-`apps/api/wrangler.toml`, so **no cron runs in production today** and
-`sweepPatternJobs` never fires there. That was harmless while every Pattern
-delivery either advanced or died. Since Task 6 it is not: a retryable provider
-failure calls `retryStage`, which returns the job to `queued` with
-`available_at` set to the backoff floor and re-nudges immediately — and that
-immediate nudge is *deliberately* refused by `claimStage`'s
-`available_at <= now` condition. The undispatched lane of `sweepPatternJobs` is
-what re-sends it. With no cron, a backed-off Pattern job waits forever, holding
-the reader's one claim.
-
-**Scheduler decision for this run:** keep production `crons = []` through Gates
-2–5. Therefore a backed-off Pattern provider retry cannot recover until the
-scheduler is enabled. It must be enabled or separately resolved before Gate 8.
-
-Enabling the production cron is its own configuration change with its own gate
-(see `docs/deploy/openai-daily-reading-rollout.md`), because the same schedule
-drives the daily-reading scheduler. Either enable it before Gate 8, or record
-here, explicitly, that no Pattern provider retry can recover until it is on.
+Production currently runs only the separately routed ontology-pipeline
+maintenance cron. The incumbent reading/privacy/Pattern scheduler remains off,
+so `sweepPatternJobs` does not automatically re-send a Pattern job after its
+provider backoff expires. This is not a Gate 8 prerequisite. For the single
+Gate 8 canary, an operator uses the existing service-authenticated
+`POST /internal/pattern-generations/:generation_id/reconcile` route after the
+job's `available_at` time if a retry leaves it queued. Do not enable the
+incumbent scheduler as part of the Pattern rollout; its separate daily-reading
+rollout remains unchanged.
 
 **Stop:** any product regression, wrong binding, non-off rollout, or provider
 traffic. Roll back the Worker version; do not roll back the forward migration.
@@ -435,7 +424,7 @@ written ceiling approval.
 `pattern-ontology-source-manual-en-us-0.1.0` is registered with corpus hash
 `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c`.
 The isolated signing identity, API verification keyring, and pipeline artifact
-keyring are provisioned. Twelve immutable production candidates have failed
+keyring are provisioned. Thirteen immutable production candidates have failed
 closed. Versions `0.1.0` through `0.1.4` exposed completion, record-policy, and
 bounded-coverage failures. `0.1.5` then failed candidate validation after two
 generator calls. The first reviewed source bridge allowed `0.1.6` to compile
@@ -456,10 +445,115 @@ transition 121.077 seconds after request creation is consistent with the fixed
 API deployment `ca84f4f7-ebbc-4140-a4b3-dbfcee150ef2` (code upload
 `baa82c35-7eef-4bb9-9c4e-0ae06645e703`) is at 100% with prompt `1.0.5`, the
 unchanged pass and 16-chunk limits, ontology rollout `internal`, and Pattern
-rollout `off`. Usage for 2026-08-23 is 186/500 calls (5 generator, 47 evaluator,
-134 regression). No regression report or bundle exists, and no machine release
-is active. A candidate must still pass every existing 7B criterion before
-activation.
+rollout `off`. Candidate `0.1.12` subsequently passed generation, compilation,
+and all ten evaluations, then failed closed at regression cursor 14 after two
+identical request attempts produced no response. The daily ledger is now
+214/500 calls (6 generator, 57 evaluator, 151 regression). A content-free strict-
+schema probe after the run reproduced the provider condition as HTTP `429`, type
+`insufficient_quota`, code `credit_balance_exhausted`. No regression report or
+bundle exists, and no machine release is active. A candidate must still pass
+every existing 7B criterion before activation.
+
+**Observed 2026-08-23, later the same day.** Two further candidates ran.
+`0.1.13` failed `evaluation_rejected` at cursor 0. `0.1.14` failed
+`regression_failed` at cursor 68 — the furthest any candidate has reached
+against a 30-fixture set. Counting the stored regression artifacts per run
+separates the fourteen failures into two classes that had been reported as one:
+
+| candidate | failure | cursor | requests | responses |
+| --- | --- | --- | --- | --- |
+| `0.1.14` | `regression_failed` | 68 | 69 | 69 |
+| `0.1.12` | `regression_failed` | 14 | 17 | 14 |
+| `0.1.11` | `regression_failed` | 71 | 73 | 71 |
+| `0.1.10` | `regression_failed` | 45 | 46 | 46 |
+| `0.1.9` | `regression_failed` | 2 | 3 | 3 |
+| `0.1.6` | `regression_failed` | 6 | 7 | 7 |
+
+Where requests equal responses the model answered and a regression hard gate
+rejected the *content*. Where requests exceed responses the provider returned
+no output text at all. Only the second class is a transport or configuration
+condition; the first is the gate doing its job.
+
+The no-response class has a cause independent of billing.
+`ONTOLOGY_REGRESSION_PATTERN_PIN` prices the regression Pattern passes at the
+Pattern max-output-token pins, which were `4000` planner, `8000` writer, `4000`
+verifier while `reasoning` is pinned `high`. A real planner call at those values
+was reproduced locally against the live Responses API: it consumed the entire
+4000-token allowance on reasoning tokens and returned `status: "incomplete"`,
+`incomplete_details.reason: "max_output_tokens"`, with no output text, after
+55.8 seconds. That is precisely the "identical request attempts produced no
+response" signature recorded for `0.1.11` and `0.1.12`. The pins are now `32000`
+for all three passes, and `ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS` derives
+from them rather than restating `2 * 4_000 + 3 * 8_000 + 3 * 2 * 4_000` as
+literals — that duplication silently mispriced the budget the moment a pin
+moved. Deployed as version `1aaed29c-29eb-436b-86f3-990379ce94c4` with Pattern
+rollout still `off`. The regression output-token *cap* rises from 1,680,000 to
+10,560,000; actual spend rises only insofar as passes now complete instead of
+truncating.
+
+The pass timeouts were deliberately **not** raised.
+`consumeClaimedOntologyProviderCallBudget` admits a reservation only while the
+run's remaining lease covers `timeoutMs` plus a persistence margin, so raising
+`OPENAI_PATTERN_*_TIMEOUT_MS` to `600000` makes every regression reservation
+refuse and reschedule instead of advancing. They remain `120000`.
+
+Verified against production the same day: `pattern_ontology_releases` is empty
+and `pattern_ontology_pointer.active_version` is `NULL`; `content_releases` is
+empty; `users` is 4; `pattern_documents` and `pattern_generation_jobs` are both
+0. Corpus `pattern-ontology-source-manual-en-us-0.1.0` is registered with 60
+fragments, `licensed_excerpt`, `public_capable = 1`. Contrary to earlier notes,
+both `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING` (API) and
+`PATTERN_ONTOLOGY_SIGNING_KEY` (signer) **are** provisioned.
+
+**The single remaining blocker is provider credit, confirmed on production
+rather than inferred.** Run `oprun_ae8a9369-94e5-467c-ac19-07aa260acc54`
+(candidate `pattern-ontology-en-us-0.1.15`, configuration
+`sha256:dd76aa95016d82d2b4776778d877f70da30cd28d7002ae9a2ef7c9a9ecab3484` —
+which differs from earlier runs precisely because the max-output-token pins are
+part of the command identity) was reserved and dispatched against the deployed
+Worker. It reached `generating` and consumed generator calls 9 through 13 across
+five attempts, every one failing and rescheduling behind a backoff, never
+producing a candidate hash. The Worker's own `OPENAI_API_KEY` therefore reaches
+the same exhausted account as a local probe does. The run is bounded by
+`MAX_ONTOLOGY_PIPELINE_DELIVERY_CLAIMS = 16` and will fail closed on its own.
+
+> **Superseded 2026-08-24:** the direct Worker transport described in the next
+> paragraphs was removed. Production Codex inference now uses the durable,
+> outbound-polling CLI runner documented in
+> [`codex-production-provider.md`](./codex-production-provider.md). Its ChatGPT
+> login never enters Worker configuration.
+
+**Historical diagnosis:** `PATTERN_PUBLISHER=codex`
+and `ONTOLOGY_PIPELINE_PUBLISHER=codex` now exist: a real provider with its own
+fixed endpoint, its own subscription credential (`CODEX_AUTH_TOKEN` /
+`CODEX_ACCOUNT_ID`, both secrets), and truthful provenance — a Pattern authored
+this way records `provider: "Codex"`, not `"OpenAI"`. The frozen contract types
+`provenance.provider` as a plain string, so that honest second value costs no
+schema-version bump. The Codex surface differs in two measured ways, both
+handled: it refuses `stream: false`, and it rejects `max_output_tokens` outright.
+Its terminal `response.completed` event carries an **empty** `output` array, so
+the adapter reassembles the message from the `response.output_item.done` events
+before the existing envelope logic runs — reading only the completed event would
+be indistinguishable from a provider that returned no text.
+
+It is nevertheless unusable here. Measured from workerd on 2026-08-23 with valid
+credentials, `chatgpt.com/backend-api/codex/responses` answers `403` with a
+Cloudflare challenge page for **every** request — no User-Agent, the Codex CLI's,
+and a browser's all alike — while the identical request from an ordinary host
+answers `200`. The credential and request shape are fine; the edge refuses the
+caller. A Cloudflare Worker naming either codex publisher therefore fails every
+pass as `publisher_auth_failed`. That is an access control and is not to be
+worked around. The provider remains in the tree, tested, and documented as
+unreachable from Workers.
+
+The OpenAI account answers HTTP
+`429` `insufficient_quota` / `credit_balance_exhausted` to a content-free probe.
+Both remaining steps need it: a new ontology candidate cannot be generated or
+regression-tested, and a Pattern cannot be planned, written, or verified. There
+is no credit-free path to an active ontology either — `POST
+/internal/pattern-ontology-releases` verifies the signature against
+`PATTERN_ONTOLOGY_KEYS`, and the matching private key exists only inside the
+signer Worker, reachable only through the pipeline's `signOntology` RPC.
 
 ### Gate 7A — shortest internal path
 
@@ -497,10 +591,9 @@ accounts. Canary `usr_3ca4f7c2f2498c4eab97511fc3c6ff97` is active with one
 active chart, confirmed `en-US` from `user_confirmed`, and a live Worker
 session. It has zero Pattern claims, generation jobs, documents, and grants; no
 claim was reserved. The account is prepared but not designated. Gate 8 remains
-blocked on an eligible active ontology, the scheduler decision, separate
-authorization and deployment of the exact internal allowlist/rollout change,
-and first-use Pattern consent. This is the first point a generated Pattern may
-exist outside hermetic tests.
+blocked on an eligible active ontology, separate authorization and deployment
+of the exact internal allowlist/rollout change, and first-use Pattern consent.
+This is the first point a generated Pattern may exist outside hermetic tests.
 
 Deploy one exact `PATTERN_INTERNAL_ACCOUNT_IDS` entry and set
 `PATTERN_AI_ROLLOUT=internal`. The account must have:
@@ -515,6 +608,10 @@ Reserve once. Record opaque generation id, provider request hashes, per-pass
 call/token counts, stage timings, ontology version/hash, executed model/prompt
 pins, candidate/verdict hashes, and final public state. Do not record chart
 facts, packets, plans, candidate prose, verifier rationale, or document prose.
+If a retryable provider failure leaves the canary queued, wait for its frozen
+`available_at` backoff and invoke the existing service-authenticated reconcile
+route for that same generation. This recovery is part of operating the one
+canary, not a separate rollout gate.
 
 Success is one accepted `ready` document plus one external account receiving the
 indistinguishable ontology refusal. A terminal failure is honest evidence of a
@@ -621,6 +718,7 @@ until its evidence exists.
 | 2026-08-23 | 7B attempt 10 | `4494d30` deployed after failure; prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.9`; none active | run `oprun_a6d9b4ca-27ce-4963-8126-1a38e28293df`, config `sha256:26ad231398ebd179b3264d2f494b279b9cf4b33ba0419370a43f81896fb78c25`, candidate `sha256:6835fc4b6e13503ae1b2dd01eaec265ba01f46ae74e118e9cffeb035870877ff`, compiler `sha256:22b7e4e9d702ff428ed7fc84c79ccce2df1c374bdeb795cbdac1c2c5899c9fad`, evaluator `sha256:e37857bdeb59e1ba2ba7d36ccf5c7412419d941d591622252e8dc63d3f533054`; failed at the existing sole `prohibited_claim` regression gate after three regression results; the bounded writer correction route was repaired and verified without changing any ceiling | failed closed; no regression report, bundle, or activation |
 | 2026-08-23 | 7B attempt 11 | `23b9485` deployed after failure; prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.10`; none active | run `oprun_e2f70a73-6bc2-4df4-8ee5-0be90e1d94ce`, config `sha256:7d020fc4074d7560d09c0bc5a27581e278c8e22ae8e01039125c8a7874c626e8`, candidate `sha256:7cd86c984b42716b7ef0d8ae4bf3ea0cbebbda726c2947aad4073613883222fa`, compiler `sha256:4620e0eac2372546c3490f68247a2cd6367802766c21379be442b16786f9922c`, evaluator `sha256:24e2a71544f80e6b8e20374fe9721d455f35f71cf6529fbf2403e23a6de7ea38`; failed at the existing sole writer-origin `suppressed_feature_leak` regression gate after 46 regression results; the bounded correction route was repaired and verified without changing any ceiling | failed closed; no regression report, bundle, or activation |
 | 2026-08-23 | 7B attempt 12 | `23b9485`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.11`; none active | run `oprun_9026280d-067f-4c13-ac62-1f4e1a4b61c3`, config `sha256:24103de2e86eb7fde4d1fcbf7565cec153f35897d7094ea97f221fdd16d973bc`, candidate `sha256:d76fad38a873d86149a3f78e0a7cad7d73f689c0718d9ca7f782fdca22a6554d`, compiler `sha256:6b926310ed04ab5c98eb44339a72f9a04074e5b459d0e2c9134f8525e1326199`, evaluator `sha256:3ef00438683dbf273438f30836c586ea4ac6f10da7186c5b0850f76c8291e6f7`; all ten evaluations passed and regression produced 71 results. The final two planner requests have the same hash; the first was invalid, while the reserved second call produced no response artifact and terminaled 121.077 seconds after request creation, consistent with the fixed 120-second deadline. A third planner call was correctly refused by the unchanged inclusive two-call ceiling | failed closed as `regression_failed`; no regression report, bundle, or activation |
+| 2026-08-23 | 7B attempt 13 | `a9a45b7`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.12`; none active | run `oprun_f2013b4f-c09d-40f4-a992-f64a7639d928`, config `sha256:f6c7c04e254f1a04b22d99308e9c94218c3bb08d70bb4fa3ace0e21e9f54be37`, candidate `sha256:c46a5e1a076e4fb3247764a7c0f1f5d4aee9f6a45cbd36da9bcb07255a75442c`, compiler `sha256:f1e7dd4677cb9fd52b7c4f217d01793eead9c0c94d454404f5b39fe763f491ee`, evaluator `sha256:c7ca6052af09f9449885244e81c2c742945cdc021387ee13036c059fef2f2db1`; all ten evaluations passed and regression produced 14 results. Generation 28 persisted two identical planner requests and no response; the first exhausted its deadline and the retry also failed closed. A subsequent content-free strict-schema probe reproduced HTTP `429`, type `insufficient_quota`, code `credit_balance_exhausted`; usage reached 214/500 | failed closed as `regression_failed`; no regression report, bundle, or activation |
 | 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb`, `3a47565` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, replay bucket, and production `pattern-replay-2026-08` signing key/keyring are deployed; restore procedure recorded without claiming execution | implementation/signing complete; drill and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |

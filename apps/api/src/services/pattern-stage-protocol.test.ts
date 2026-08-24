@@ -81,6 +81,20 @@ const cases: Array<{
   };
 }> = [
   {
+    name: "provider wait preserves the exact planner coordinate",
+    state: base({ stage: "planning", planner_attempts: 1 }),
+    transition: { kind: "await_provider" },
+    expected: {
+      stage: "planning",
+      stageGeneration: 7,
+      attempts: [1, 0, 0],
+      hashes: [null, null, null],
+      jobStatus: "queued",
+      queue: null,
+      nextProviderCallAuthorized: false,
+    },
+  },
+  {
     name: "planning to writing",
     state: base(),
     transition: { kind: "advance", nextStage: "writing", hashes: { planHash: "plan-a" } },
@@ -382,6 +396,18 @@ describe("Pattern stage protocol", () => {
       releaseUnconsumedClaim: true,
       nextProviderCallAuthorized: false,
     });
+  });
+
+  it("holds the outbox marker while awaiting an external provider", () => {
+    expect(planPatternTransition(base(), { kind: "await_provider" }, at))
+      .toMatchObject({
+        clearDispatchedAt: false,
+        finish: false,
+        releaseUnconsumedClaim: false,
+        availableAt: undefined,
+        nextQueueCoordinate: null,
+        nextProviderCallAuthorized: false,
+      });
   });
 
   it("classifies stale and duplicate delivery without provider authorization", () => {

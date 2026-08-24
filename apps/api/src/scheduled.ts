@@ -10,6 +10,7 @@ import {
   recoverStaleOntologyPipelineDispatches,
 } from "./services/ontology-pipeline-enqueue.js";
 import { sweepExpiredOntologyPipelineArtifacts } from "./services/ontology-pipeline-artifacts.js";
+import { maintainCodexProviderJobs } from "./services/codex-provider-maintenance.js";
 
 export const ONTOLOGY_PIPELINE_MAINTENANCE_CRON =
   "7,22,37,52 * * * *";
@@ -40,12 +41,17 @@ async function runIncumbentMaintenance(
 ): Promise<void> {
   let laneFailure: unknown;
   try {
+    await maintainCodexProviderJobs(env, scheduledAt);
+  } catch (error) {
+    if (laneFailure === undefined) laneFailure = error;
+  }
+  try {
     const summary = await runReadingScheduler(env, scheduledAt);
     if (summary.repairQuotaExhausted) {
       safeLog({ event: "scheduler_repair_quota_exhausted" });
     }
   } catch (error) {
-    laneFailure = error;
+    if (laneFailure === undefined) laneFailure = error;
   }
   try {
     await runPrivacyMaintenance(env, scheduledAt);
@@ -65,6 +71,11 @@ async function runOntologyPipelineMaintenance(
   scheduledAt: Date,
 ): Promise<void> {
   let laneFailure: unknown;
+  try {
+    await maintainCodexProviderJobs(env, scheduledAt);
+  } catch {
+    laneFailure = new Error("codex_provider_maintenance_failed");
+  }
   try {
     await releaseExpiredOntologyPipelineLeases(env, scheduledAt);
   } catch {

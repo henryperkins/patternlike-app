@@ -34,6 +34,24 @@ export const DELETION_ARTIFACT_FAMILIES: readonly DeletionArtifactFamily[] = [
       return results.map((row) => row.object_key);
     },
   },
+  {
+    family: "codex_provider_jobs",
+    prefix: "codex-provider-jobs/",
+    async collectKeys(env, userId) {
+      const { results } = await env.DB.prepare(
+        `SELECT request_object_key, response_object_key
+         FROM codex_provider_jobs WHERE user_id = ? ORDER BY id`,
+      )
+        .bind(userId)
+        .all<{
+          request_object_key: string;
+          response_object_key: string | null;
+        }>();
+      return results.flatMap((row) => row.response_object_key === null
+        ? [row.request_object_key]
+        : [row.request_object_key, row.response_object_key]);
+    },
+  },
 ];
 
 export async function collectDeletionArtifactKeys(
@@ -70,6 +88,7 @@ export const DELETED_USER_TABLES = [
   "timezone_changes",
   "natal_feature_sets",
   "natal_features",
+  "codex_provider_jobs",
   "pattern_generation_artifacts",
   "pattern_generation_artifact_keys",
   "pattern_documents",
@@ -138,6 +157,7 @@ export const NON_PORTABLE_USER_TABLES = [
   "pattern_generation_jobs",
   "pattern_generation_artifact_keys",
   "pattern_generation_artifacts",
+  "codex_provider_jobs",
   /** M4: bounded recomputable Time Travel calculation cache. */
   "cycle_scan_receipts",
   /** M4: operational spend ledger; no selected date or natal fact. */

@@ -16,7 +16,10 @@ import {
   type PublisherFailureCode,
 } from "./openai-responses-adapter.js";
 import { buildPatternResponsesRequest, type PatternPass } from "./pattern-prompt.js";
-import { PATTERN_PUBLISHER_OPENAI, type PatternPublisherPin } from "./pattern-publisher.js";
+import {
+  PATTERN_PUBLISHER_OPENAI,
+  type PatternPublisherPin,
+} from "./pattern-publisher.js";
 
 export type PatternSafeDetailCode = OpenAiResponsesSafeDetailCode;
 export type PatternOriginLayer = OpenAiResponsesOriginLayer;
