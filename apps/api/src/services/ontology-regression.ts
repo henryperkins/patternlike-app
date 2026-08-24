@@ -51,6 +51,7 @@ import {
   OPENAI_PATTERN_WRITER_TIMEOUT_MS,
   PATTERN_INPUT_MAX_BYTES,
   PATTERN_PUBLISHER_OPENAI,
+  patternProviderDisplayName,
 } from "./pattern-publisher.js";
 import { narrowPlannerOutput } from "./pattern-execute.js";
 import { findSemanticVerdictProblem } from "./pattern-semantic.js";
@@ -283,34 +284,60 @@ function writerLedgerUnits(writer: PatternWriterOutput): Array<{
   return units;
 }
 
-function allWriterText(writer: PatternWriterOutput): string {
-  return [
-    writer.title,
-    ...writer.chapters.flatMap((chapter) => [
-      chapter.title,
-      chapter.summary,
-      ...chapter.sections.map((section) => section.text),
-      ...chapter.tensions.map((unit) => unit.text),
-      ...chapter.resources.map((unit) => unit.text),
-      chapter.counter_expression.text,
-    ]),
-    ...writer.additional_signatures.flatMap((signature) => [
-      signature.title,
-      signature.text,
-    ]),
-    writer.uncertainty_note?.text ?? "",
-  ].join("\n");
+/**
+ * One prose unit a text gate reads, tagged with the key that addresses it.
+ *
+ * These used to be `"\n"`-joined into one string per gate, which cost two
+ * things. A title carries no terminal punctuation, so the prohibited-claim
+ * splitter merged it with the next unit's first sentence and let an unrelated
+ * heading decide whether a trigger word met its qualifier. And a gate that
+ * fires on the joined string cannot say *which* unit tripped it, so the
+ * writer-correctable retry had nowhere to point: candidate 0.1.16 spent its
+ * entire three-call writer budget on fixture 0 re-answering "there is a
+ * prohibited claim somewhere in this document". See
+ * `docs/reviews/2026-08-24-ontology-regression-0.1.16-diagnosis.md`.
+ *
+ * `key` is null where no `CORRECTION_KEY_SHAPE` key addresses the unit -- the
+ * document title and the uncertainty note. Those still gate; they just cannot
+ * be pointed at, and the correction falls back to the code alone.
+ */
+interface KeyedWriterUnit {
+  key: string | null;
+  text: string;
 }
 
-function coreWriterText(writer: PatternWriterOutput): string {
+/** The chapter-scoped units, in document order. The suppression gate's scope. */
+function coreWriterUnits(writer: PatternWriterOutput): KeyedWriterUnit[] {
   return writer.chapters.flatMap((chapter) => [
-    chapter.title,
-    chapter.summary,
-    ...chapter.sections.map((section) => section.text),
-    ...chapter.tensions.map((unit) => unit.text),
-    ...chapter.resources.map((unit) => unit.text),
-    chapter.counter_expression.text,
-  ]).join("\n");
+    { key: chapter.chapter_key, text: chapter.title },
+    { key: chapter.chapter_key, text: chapter.summary },
+    ...chapter.sections.map((section) => ({
+      key: section.section_key,
+      text: section.text,
+    })),
+    ...chapter.tensions.map((unit) => ({
+      key: chapter.chapter_key,
+      text: unit.text,
+    })),
+    ...chapter.resources.map((unit) => ({
+      key: chapter.chapter_key,
+      text: unit.text,
+    })),
+    { key: chapter.chapter_key, text: chapter.counter_expression.text },
+  ]);
+}
+
+/** Every unit, in document order. The prohibited-claim gate's scope. */
+function allWriterUnits(writer: PatternWriterOutput): KeyedWriterUnit[] {
+  return [
+    { key: null, text: writer.title },
+    ...coreWriterUnits(writer),
+    ...writer.additional_signatures.flatMap((signature) => [
+      { key: signature.signature_key, text: signature.title },
+      { key: signature.signature_key, text: signature.text },
+    ]),
+    { key: null, text: writer.uncertainty_note?.text ?? "" },
+  ];
 }
 
 function hasSuppressedPacketFeatureLeak(packet: PatternFactPacket): boolean {
@@ -332,12 +359,30 @@ function hasSuppressedPacketFeatureLeak(packet: PatternFactPacket): boolean {
   return false;
 }
 
-function hasSuppressedWriterLeak(
+/**
+ * The first chapter unit that uses a withheld calculation, with its key.
+ *
+ * Per unit rather than over the joined chapter text, which is the same
+ * decision: the joined form split on `\n+` as well, so no sentence ever
+ * spanned two units and no `[^.!?\n]{0,80}` window ever crossed one. Iterating
+ * only changes what the gate can *report*.
+ */
+function findSuppressedWriterLeak(
   packet: PatternFactPacket,
   writer: PatternWriterOutput,
-): boolean {
+): KeyedWriterUnit | null {
   const suppressed = new Set(packet.uncertainty.suppressed_classes);
-  const core = coreWriterText(writer)
+  for (const unit of coreWriterUnits(writer)) {
+    if (suppressedUnitLeaks(suppressed, unit.text)) return unit;
+  }
+  return null;
+}
+
+function suppressedUnitLeaks(
+  suppressed: ReadonlySet<string>,
+  text: string,
+): boolean {
+  const core = text
     .split(/(?<=[.!?])\s+|\n+/)
     .filter((sentence) =>
       // Naming the withheld classes as a limitation is the required
@@ -370,6 +415,13 @@ function hasSuppressedWriterLeak(
     (suppressed.has("angle_transits") && angleTransitLeak) ||
     (suppressed.has("moon_time_sensitive") && moonTimeSensitiveLeak)
   );
+}
+
+function hasSuppressedWriterLeak(
+  packet: PatternFactPacket,
+  writer: PatternWriterOutput,
+): boolean {
+  return findSuppressedWriterLeak(packet, writer) !== null;
 }
 
 function hasSuppressedLeak(
@@ -410,18 +462,39 @@ function sourceDependenciesFail(
     unit.ontology_rule_ids.some((id) => !visit(id)));
 }
 
-function containsUnqualifiedProhibitedClaim(text: string): boolean {
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  for (const sentence of sentences) {
-    if (!/\b(?:diagnos(?:is|ed?)|predict(?:ion|ed|s)?|fate(?:d)?|biograph(?:y|ical)|guarantees?|inevitab(?:le|ly))\b/i.test(sentence)) {
-      continue;
-    }
-    if (/\b(?:not|never|cannot|can't|does not|isn't|rather than|without)\b/i.test(sentence)) {
-      continue;
-    }
-    return true;
-  }
-  return false;
+const PROHIBITED_CLAIM_TRIGGER =
+  /\b(?:diagnos(?:is|ed?)|predict(?:ion|ed|s)?|fate(?:d)?|biograph(?:y|ical)|guarantees?|inevitab(?:le|ly))\b/i;
+
+/**
+ * Negators that qualify a trigger word into a permitted statement.
+ *
+ * This was `not|never|cannot|can't|does not|isn't|rather than|without`, which
+ * recognised `does not` and `isn't` but not `doesn't`, `no`, `nothing`, `none`,
+ * `neither`, `won't` or `avoid`. Eight of twelve ordinary hedged sentences --
+ * "Nothing here is fated", "This doesn't predict your future", "There are no
+ * guarantees here" -- were therefore gated as prohibited claims, and a corpus
+ * that teaches "describe patterns, do not predict" pushes the writer into
+ * exactly that register. The gate was punishing the writer for complying.
+ *
+ * Widened deliberately, with the scope that makes it safe: this function is
+ * reachable only from the ontology regression harness and never runs on a
+ * reader-serving path. Neither regex carries `g`, so `.test` is stateless.
+ */
+const PROHIBITED_CLAIM_QUALIFIER =
+  /\b(?:not|never|no|none|nothing|neither|nor|cannot|can't|does not|doesn't|don't|won't|aren't|isn't|avoid|rather than|without)\b/i;
+
+function hasUnqualifiedProhibitedClaim(text: string): boolean {
+  return text.split(/(?<=[.!?])\s+/).some((sentence) =>
+    PROHIBITED_CLAIM_TRIGGER.test(sentence) &&
+    !PROHIBITED_CLAIM_QUALIFIER.test(sentence));
+}
+
+/** The first unit carrying an unqualified prohibited claim, with its key. */
+function findUnqualifiedProhibitedClaim(
+  writer: PatternWriterOutput,
+): KeyedWriterUnit | null {
+  return allWriterUnits(writer)
+    .find((unit) => hasUnqualifiedProhibitedClaim(unit.text)) ?? null;
 }
 
 function isOntologyRegressionMandatoryFeature(feature: NatalFeature): boolean {
@@ -493,7 +566,7 @@ export function evaluateOntologyRegressionHardGates(input: {
   )) {
     failures.add("source_dependency_failure");
   }
-  if (containsUnqualifiedProhibitedClaim(allWriterText(input.writer))) {
+  if (findUnqualifiedProhibitedClaim(input.writer)) {
     failures.add("prohibited_claim");
   }
   if (mandatoryAccountingFails(input.fixture, input.selectionManifest)) {
@@ -505,6 +578,31 @@ export function evaluateOntologyRegressionHardGates(input: {
   if (input.verdict.verdict !== "pass") failures.add("semantic_refusal");
   void input.plan;
   return [...failures].sort();
+}
+
+/**
+ * Where a writer-correctable hard gate fired, as a correction locator.
+ *
+ * `buildCorrectionDocument` reads a deterministic failure's `message` as a key
+ * and discards anything that is not `CORRECTION_KEY_SHAPE`, so the previous
+ * `message: ""` produced `target_key: null` -- a correction naming a code and
+ * nothing else. Three rewrites against that carry no more information than one,
+ * which is how candidate 0.1.16 burned its whole writer budget on one fixture
+ * without converging.
+ *
+ * Returns "" when the offending unit has no addressable key (the document title
+ * or the uncertainty note), which reproduces the old null and keeps the gate
+ * itself unchanged.
+ */
+function writerCorrectableHardGateTargetKey(
+  gate: OntologyRegressionHardGateFailure,
+  packet: PatternFactPacket,
+  writer: PatternWriterOutput,
+): string {
+  const unit = gate === "prohibited_claim"
+    ? findUnqualifiedProhibitedClaim(writer)
+    : findSuppressedWriterLeak(packet, writer);
+  return unit?.key ?? "";
 }
 
 export interface OntologyRegressionThresholdResult {
@@ -892,7 +990,7 @@ export async function applyOntologyRegressionPass(input: {
     artifact: state.candidate,
     compact_provenance: {
       assembly_mode: "constrained_model" as const,
-      provider: input.metadata.provider === "openai" ? "OpenAI" : "synthetic",
+      provider: patternProviderDisplayName(input.metadata.provider),
       model_family: input.metadata.model,
       raw_birth_details_sent: false as const,
       ontology_version: input.ontologyVersion,
@@ -931,7 +1029,13 @@ export async function applyOntologyRegressionPass(input: {
         {
           deterministic: [{
             code: writerCorrectableHardGate,
-            message: "",
+            // Read as a locator, not as prose: `buildCorrectionDocument` keeps
+            // it only if it is a chapter/section/signature key.
+            message: writerCorrectableHardGateTargetKey(
+              writerCorrectableHardGate,
+              selection.packet,
+              state.candidate,
+            ),
           }],
         },
         state.writer_calls,

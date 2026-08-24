@@ -49,6 +49,7 @@ import {
   PATTERN_PUBLISHER_OPENAI,
   PATTERN_PUBLISHER_WORKERS_AI,
   WORKERS_AI_PATTERN_WRITER_MODEL,
+  patternProviderDisplayName,
   resolvePatternPublisherConfiguration,
   type PatternPassOutcome,
   type PatternPassOptions,
@@ -111,13 +112,19 @@ function provenanceFromExecutedPin(pin: PatternPublisherPin): {
   if (pin.publisher === PATTERN_PUBLISHER_WORKERS_AI) {
     const family = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
     if (!family) throw new Error("unsupported Pattern writer model family");
-    return { provider: "Cloudflare Workers AI", model_family: family };
+    return {
+      provider: patternProviderDisplayName(pin.publisher),
+      model_family: family,
+    };
   }
   if (
     pin.publisher !== PATTERN_PUBLISHER_OPENAI &&
     pin.publisher !== PATTERN_PUBLISHER_CODEX
   ) {
-    return { provider: "synthetic", model_family: "synthetic" };
+    return {
+      provider: patternProviderDisplayName(pin.publisher),
+      model_family: "synthetic",
+    };
   }
   const modelFamily = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
   if (!modelFamily) throw new Error("unsupported Pattern writer model family");
@@ -127,7 +134,7 @@ function provenanceFromExecutedPin(pin: PatternPublisherPin): {
   // exist to prevent -- the reader-facing `provider` is a plain string in the
   // frozen contract precisely so a second honest value costs no schema bump.
   return {
-    provider: pin.publisher === PATTERN_PUBLISHER_CODEX ? "Codex" : "OpenAI",
+    provider: patternProviderDisplayName(pin.publisher),
     model_family: modelFamily,
   };
 }

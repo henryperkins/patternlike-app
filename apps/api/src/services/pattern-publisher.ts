@@ -105,6 +105,25 @@ export type PatternPublisherName =
   | typeof PATTERN_PUBLISHER_CODEX
   | typeof PATTERN_PUBLISHER_WORKERS_AI;
 
+/**
+ * The reader-facing provider label for a publisher.
+ *
+ * One definition on purpose. Two places publish this string -- the executed pin
+ * in `pattern-execute.ts` and the ontology regression projection in
+ * `ontology-regression.ts` -- and the second was a hand-copied
+ * `provider === "openai" ? "OpenAI" : "synthetic"`, which labelled every Codex
+ * pass "synthetic" for the whole internal Codex canary. A duplicated mapping is
+ * the defect; the labels belong here.
+ */
+export function patternProviderDisplayName(
+  publisher: PatternPublisherName,
+): string {
+  if (publisher === PATTERN_PUBLISHER_WORKERS_AI) return "Cloudflare Workers AI";
+  if (publisher === PATTERN_PUBLISHER_CODEX) return "Codex";
+  if (publisher === PATTERN_PUBLISHER_OPENAI) return "OpenAI";
+  return "synthetic";
+}
+
 /** Closed failures returned by either Pattern publisher implementation. */
 export type PatternPublisherFailureCode =
   | PublisherFailureCode

@@ -214,6 +214,50 @@ describe("M7 ontology activation regression", () => {
     }
   });
 
+  it("qualifies prohibited-claim vocabulary by ordinary negation, not just `not`", () => {
+    const corpus = loadOntologyRegressionCorpus();
+    // The escape list recognised `does not` and `isn't` but not `doesn't`,
+    // `no`, `nothing`, `none`, `neither`, `won't` or `avoid`, so hedged prose
+    // written to comply with the corpus was gated as a prohibited claim.
+    const qualified = [
+      "Nothing here is fated.",
+      "This doesn't predict your future.",
+      "There are no guarantees here.",
+      "None of this is inevitable.",
+      "Neither outcome is fated.",
+      "You won't find a prediction here.",
+      "Avoid reading this as a prediction.",
+      "This is not a prediction.",
+      "This describes a tendency, rather than a prediction.",
+    ];
+    // Still fatal: a trigger word with no negation anywhere in its sentence.
+    const unqualified = [
+      "The chart guarantees a future diagnosis.",
+      "This placement makes the outcome inevitable.",
+      "Your chart predicts the shape of the coming year.",
+    ];
+
+    const gateFires = (text: string): boolean => {
+      const fixture = structuredClone(corpus.fixtures[0]!);
+      fixture.chain.writer.chapters[0]!.sections[0]!.text = text;
+      fixture.chain.public_projection.core_chapters[0]!.sections[0] = { text };
+      return evaluateOntologyRegressionHardGates({
+        fixture,
+        selectionManifest: fixture.chain.selection_manifest,
+        packet: fixture.chain.fact_packet,
+        plan: fixture.chain.plan,
+        writer: fixture.chain.writer,
+        verdict: fixture.chain.verdict,
+        publicProjection: fixture.chain.public_projection,
+        ontology: corpus.manifest.reference_ontology_records,
+        sourceFragmentIds: corpus.source_fragment_ids,
+      }).includes("prohibited_claim");
+    };
+
+    for (const text of qualified) expect(gateFires(text), text).toBe(false);
+    for (const text of unqualified) expect(gateFires(text), text).toBe(true);
+  });
+
   it("uses independent cohort thresholds and raises equal models to 10/10", () => {
     const nineOfTen = [
       ...Array.from({ length: 10 }, (_, index) => ({ accuracy: "exact" as const, accepted: index > 0 })),
@@ -462,7 +506,10 @@ describe("M7 ontology activation regression", () => {
         items: [{
           code: "prohibited_claim",
           origin: "deterministic",
-          target_key: null,
+          // The correction names the unit that tripped the gate. A null key
+          // here is the 0.1.16 defect: three rewrites against "somewhere in
+          // this document" carry no more signal than one.
+          target_key: prohibitedWriter.chapters[0]!.sections[0]!.section_key,
           feature_aliases: [],
           ontology_rule_ids: [],
         }],
@@ -522,7 +569,7 @@ describe("M7 ontology activation regression", () => {
         items: [{
           code: "suppressed_feature_leak",
           origin: "deterministic",
-          target_key: null,
+          target_key: writer.chapters[0]!.sections[0]!.section_key,
           feature_aliases: [],
           ontology_rule_ids: [],
         }],

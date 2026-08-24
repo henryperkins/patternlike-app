@@ -9,6 +9,11 @@ import {
   OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
   OPENAI_PATTERN_WRITER_MODEL,
   OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+  PATTERN_PUBLISHER_CODEX,
+  PATTERN_PUBLISHER_OPENAI,
+  PATTERN_PUBLISHER_SYNTHETIC,
+  PATTERN_PUBLISHER_WORKERS_AI,
+  patternProviderDisplayName,
   resolvePatternPublisherConfiguration,
   verifierIndependenceProblem,
   type PatternPassOptions,
@@ -301,6 +306,34 @@ describe("Pattern publisher configuration", () => {
       );
       expect(outcome.ok).toBe(true);
     });
+  });
+});
+
+describe("Pattern provider labels", () => {
+  it("names every publisher honestly from one definition", () => {
+    // The document says who actually wrote it. A second hand-copied mapping in
+    // the ontology regression harness read `provider === "openai" ? "OpenAI" :
+    // "synthetic"`, which labelled every Codex pass "synthetic" for the whole
+    // internal Codex canary. Both call sites now resolve here.
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_OPENAI)).toBe("OpenAI");
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_CODEX)).toBe("Codex");
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_WORKERS_AI))
+      .toBe("Cloudflare Workers AI");
+    expect(patternProviderDisplayName(PATTERN_PUBLISHER_SYNTHETIC))
+      .toBe("synthetic");
+  });
+
+  it("never reports a real provider as synthetic", () => {
+    for (
+      const publisher of [
+        PATTERN_PUBLISHER_OPENAI,
+        PATTERN_PUBLISHER_CODEX,
+        PATTERN_PUBLISHER_WORKERS_AI,
+      ] as const
+    ) {
+      expect(patternProviderDisplayName(publisher), publisher)
+        .not.toBe("synthetic");
+    }
   });
 });
 
