@@ -42,7 +42,7 @@ test("Worker source and configuration contain no private ChatGPT transport", asy
   }
 });
 
-test("production enables only ontology maintenance and not the incumbent scheduler", () => {
+test("production enables only the internal Codex ontology canary and not Pattern", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
@@ -56,8 +56,12 @@ test("production enables only ontology maintenance and not the incumbent schedul
   assert.deepEqual(production.triggers.crons, [
     "7,22,37,52 * * * *",
   ]);
-  assert.equal(production.vars.ONTOLOGY_PIPELINE_ROLLOUT, "off");
+  assert.equal(production.vars.ONTOLOGY_PIPELINE_ROLLOUT, "internal");
+  assert.equal(production.vars.ONTOLOGY_PIPELINE_PUBLISHER, "codex");
+  assert.equal(production.vars.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS, "900000");
+  assert.equal(production.vars.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS, "900000");
   assert.equal(production.vars.PATTERN_AI_ROLLOUT, "off");
+  assert.equal(production.vars.PATTERN_PUBLISHER, "openai");
 });
 
 test("production sends every API namespace through the Worker before assets", () => {
