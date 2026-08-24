@@ -1,7 +1,9 @@
 # Ontology regression diagnosis — candidate 0.1.16
 
 **Date:** 2026-08-24
-**Status:** Diagnosis complete. Fixes A, B and C applied (see §6).
+**Status:** Diagnosis complete. Fixes A, B and C applied and deployed (§6). Live
+verification blocked upstream in `generating` (§7); the regression fixes remain
+unproven. `0.1.17` unspent.
 **Blocks:** creating immutable candidate `pattern-ontology-en-us-0.1.17`.
 
 The internal Codex ontology canary reached the regression gate and failed. This
@@ -282,7 +284,53 @@ and the regression projection both resolve through it. The harness's local
   terminate without a correction attempt — correct, but it means a corpus defect
   in those classes still costs a whole run to discover.
 
-## 7. Evidence handling
+## 7. Verification attempts, and a second defect
+
+The fixes were deployed to production (`ONTOLOGY_PIPELINE_ROLLOUT="internal"`
+restored, Pattern still `off`) and exercised against throwaway candidate
+versions so that `0.1.17` stays unspent.
+
+| run | candidate | outcome |
+| --- | --- | --- |
+| `oprun_89898449` | `…0.1.16-fixcheck-01` | `candidate_invalid` in `generating`, cursor 0 |
+| `oprun_9d23570f` | `…0.1.16-fixcheck-02` | `candidate_invalid` in `generating`, cursor 0 |
+
+**Neither reached the regression gate, so the §6 fixes remain unproven rather
+than disproven.** Both died upstream, in a stage none of them touch.
+
+Chasing the second failure surfaced a defect of the same family as §5A. Both
+runs left a `generator_response` artifact, no `candidate_chunk`, and **no log
+line at all**. Every exit in `validateCurrentChunk` — record-count ceiling,
+duplicate record id, coverage-source-hint violation — plus the
+`maximum_candidate_bytes` check, called `terminal("candidate_invalid")`
+silently. They all fire *before* the chunk artifact is written, so the only way
+to learn which constraint the model broke was to decrypt an artifact.
+
+That is §5A's shape one stage earlier: a run that already cost a candidate
+version, a generator call, and three minutes tells the operator nothing about
+why. The `ontology_generation_stalled` paths a few lines below already log a
+closed `safe_detail_code`; these did not. Fixed by reusing the existing
+`ontology_candidate_rejected` event and the closed
+`OntologyCandidateSafeDetailCode` vocabulary rather than minting a second one,
+plus an optional `record_count`. No record id, fragment id, or generated text
+is logged.
+
+On a first chunk only two of those exits can realistically fire, which bounds
+what the next run has to distinguish: a duplicate record id *within* the
+generated chunk, or a coverage-source-hint violation — two records matching one
+hint, or a matching record that is not `source_supported` or does not cite the
+hinted fragment.
+
+**Generation, not regression, is where this pipeline mostly dies.** `0.1.4`,
+`0.1.5` (twice), `0.1.13`, `0.1.15` and both fixchecks never reached the
+regression gate. Two consecutive failures is consistent with that historical
+rate and is not yet evidence of a new break; the next run's log line settles it
+either way. Fixing the regression gate only pays off on runs that survive
+generation, and roughly half do not — that is an undiagnosed defect class of
+its own, burning candidate versions and runner time at the same rate the
+regression gate was.
+
+## 8. Evidence handling
 
 Read-only D1 queries (runbook §10) and Workers Logs only. No artifact was
 decrypted; no prompt or response prose was read, exported, or reproduced here.
