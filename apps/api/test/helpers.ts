@@ -83,6 +83,16 @@ const TABLES = [
 
 const ONTOLOGY_PIPELINE_NO_DELETE_TRIGGERS = [
   {
+    name: "pattern_ontology_pipeline_evidence_no_delete",
+    create: `CREATE TRIGGER pattern_ontology_pipeline_evidence_no_delete
+      BEFORE DELETE ON pattern_ontology_pipeline_evidence
+      FOR EACH ROW
+      WHEN OLD.evidence_status = 'committed'
+      BEGIN
+        SELECT RAISE(ABORT, 'committed ontology pipeline evidence cannot be deleted');
+      END`,
+  },
+  {
     name: "pattern_ontology_pipeline_artifacts_no_delete",
     create: `CREATE TRIGGER pattern_ontology_pipeline_artifacts_no_delete
       BEFORE DELETE ON pattern_ontology_pipeline_artifacts

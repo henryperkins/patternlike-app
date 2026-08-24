@@ -39,6 +39,54 @@ const ONTOLOGY_ACTIVATION_SCOPE_SQL = `CASE
                  r.evaluation_json,
                  '$.evaluation_report_hash'
                ) = e.evaluation_report_hash
+               AND json_extract(
+                 r.evaluation_json,
+                 '$.regression_passed'
+               ) = 1
+               AND json_extract(
+                 r.evaluation_json,
+                 '$.regression_report_hash'
+               ) = e.regression_report_hash
+               AND length(e.regression_report_hash) = 71
+               AND substr(e.regression_report_hash, 1, 7) = 'sha256:'
+               AND substr(e.regression_report_hash, 8)
+                 NOT GLOB '*[^0-9a-f]*'
+               AND length(e.regression_artifact_object_key) BETWEEN 1 AND 1024
+               AND length(e.regression_artifact_envelope_hash) = 71
+               AND substr(e.regression_artifact_envelope_hash, 1, 7) =
+                 'sha256:'
+               AND substr(e.regression_artifact_envelope_hash, 8)
+                 NOT GLOB '*[^0-9a-f]*'
+               AND length(e.regression_artifact_ciphertext_hash) = 71
+               AND substr(e.regression_artifact_ciphertext_hash, 1, 7) =
+                 'sha256:'
+               AND substr(e.regression_artifact_ciphertext_hash, 8)
+                 NOT GLOB '*[^0-9a-f]*'
+               AND typeof(e.regression_artifact_stage_generation) = 'integer'
+               AND e.regression_artifact_stage_generation > 0
+               AND typeof(e.regression_artifact_stage_attempt) = 'integer'
+               AND e.regression_artifact_stage_attempt >= 0
+               AND EXISTS (
+                 SELECT 1
+                 FROM pattern_ontology_pipeline_artifacts regression_artifact
+                 WHERE regression_artifact.run_id = e.run_id
+                   AND regression_artifact.stage = 'regressing'
+                   AND regression_artifact.stage_generation =
+                     e.regression_artifact_stage_generation
+                   AND regression_artifact.stage_attempt =
+                     e.regression_artifact_stage_attempt
+                   AND regression_artifact.artifact_class = 'regression_report'
+                   AND regression_artifact.object_key =
+                     e.regression_artifact_object_key
+                   AND regression_artifact.plaintext_sha256 =
+                     e.regression_report_hash
+                   AND regression_artifact.envelope_sha256 =
+                     e.regression_artifact_envelope_hash
+                   AND regression_artifact.ciphertext_sha256 =
+                     e.regression_artifact_ciphertext_hash
+                   AND regression_artifact.expires_at IS NULL
+                   AND regression_artifact.deleted_at IS NULL
+               )
                AND length(e.evaluation_artifact_envelope_hash) = 71
                AND length(e.evaluation_artifact_ciphertext_hash) = 71
                AND (
@@ -116,6 +164,34 @@ const ONTOLOGY_ACTIVATION_SCOPE_SQL = `CASE
                      receipt.summary_json,
                      '$.evaluation_artifact_ciphertext_hash'
                    ) = e.evaluation_artifact_ciphertext_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_passed'
+                   ) = 1
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_report_hash'
+                   ) = e.regression_report_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_artifact_object_key'
+                   ) = e.regression_artifact_object_key
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_artifact_envelope_hash'
+                   ) = e.regression_artifact_envelope_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_artifact_ciphertext_hash'
+                   ) = e.regression_artifact_ciphertext_hash
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_artifact_stage_generation'
+                   ) = e.regression_artifact_stage_generation
+                   AND json_extract(
+                     receipt.summary_json,
+                     '$.regression_artifact_stage_attempt'
+                   ) = e.regression_artifact_stage_attempt
                    AND json_extract(
                      receipt.summary_json,
                      '$.signing_key_id'
@@ -314,6 +390,41 @@ export async function storeOntologyRelease(
   if (!isMachinePipeline && evidence) {
     throw new Error("ontology_pipeline_evidence_unexpected");
   }
+  if (
+    evidence &&
+    (
+      evidence.ontologyVersion !== unsigned.ontology_version ||
+      !hashesEqual(evidence.bundleHash, computed) ||
+      !hashesEqual(
+        evidence.corpusReleaseHash,
+        unsigned.corpus_release_hash,
+      ) ||
+      unsigned.evaluation.ontology_version !== unsigned.ontology_version ||
+      unsigned.evaluation.verdict !== "pass" ||
+      unsigned.evaluation.compiler_passed !== true ||
+      unsigned.evaluation.evaluator_passed !== true ||
+      unsigned.evaluation.regression_passed !== true ||
+      unsigned.evaluation.unevaluated_fixture_count !== 0 ||
+      typeof unsigned.evaluation.evaluation_report_hash !== "string" ||
+      !hashesEqual(
+        evidence.evaluationReportHash,
+        unsigned.evaluation.evaluation_report_hash,
+      ) ||
+      typeof unsigned.evaluation.regression_report_hash !== "string" ||
+      !hashesEqual(
+        evidence.regressionReportHash,
+        unsigned.evaluation.regression_report_hash,
+      ) ||
+      evidence.compilerPassed !== true ||
+      evidence.evaluatorPassed !== true ||
+      evidence.regressionPassed !== true ||
+      evidence.unevaluatedFixtureCount !== 0 ||
+      (release.signature !== undefined &&
+        release.signature.key_id !== evidence.signingKeyId)
+    )
+  ) {
+    throw new Error("ontology_pipeline_evidence_mismatch");
+  }
 
   const serialized = canonicalJson(stored);
   const put = await env.ARTIFACTS.put(objectKey, serialized, {
@@ -382,6 +493,12 @@ export async function storeOntologyRelease(
              AND evaluation_artifact_object_key = ?
              AND evaluation_artifact_envelope_hash = ?
              AND evaluation_artifact_ciphertext_hash = ?
+             AND regression_report_hash = ?
+             AND regression_artifact_object_key = ?
+             AND regression_artifact_envelope_hash = ?
+             AND regression_artifact_ciphertext_hash = ?
+             AND regression_artifact_stage_generation = ?
+             AND regression_artifact_stage_attempt = ?
              AND signing_key_id = ?
              AND activation_scope = ?
              AND run_status = 'succeeded'
@@ -403,6 +520,12 @@ export async function storeOntologyRelease(
         evidence.evaluationArtifactObjectKey,
         evidence.evaluationArtifactEnvelopeHash,
         evidence.evaluationArtifactCiphertextHash,
+        evidence.regressionReportHash,
+        evidence.regressionArtifactObjectKey,
+        evidence.regressionArtifactEnvelopeHash,
+        evidence.regressionArtifactCiphertextHash,
+        evidence.regressionArtifactStageGeneration,
+        evidence.regressionArtifactStageAttempt,
         evidence.signingKeyId,
         evidence.activationScope,
       ),

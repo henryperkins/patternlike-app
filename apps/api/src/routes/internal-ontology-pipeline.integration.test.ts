@@ -2,6 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
 import {
   canonicalJson,
+  contentHash,
   type PatternOntologyRelease,
 } from "@patternlike/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +29,7 @@ import {
   buildTestCorpusManifest,
   buildTestEvaluationArtifact,
   buildTestEvaluationReport,
+  buildTestPassedRegressionReport,
   putTestCorpusManifest,
   putTestEvaluationArtifact,
   testOntologyPipelineArtifactKeyring,
@@ -36,6 +38,13 @@ import {
   generatePatternReplayTestKeys,
   installPatternReplayTestKeys,
 } from "../../test/pattern-replay-fixtures.js";
+import {
+  advanceOntologyPipelineStage,
+  claimOntologyPipelineRun,
+} from "../db/ontology-pipeline.js";
+import {
+  putOntologyPipelineArtifact,
+} from "../services/ontology-pipeline-artifacts.js";
 import {
   commitOntologyPipelineEvidence,
   type CommitOntologyPipelineEvidenceInput,
@@ -119,10 +128,133 @@ async function prepareMachineRelease(
     evaluationReport,
   );
   release.evaluation.evaluation_report_hash = artifact.plaintextHash;
-  // Critical override proof: this intentionally disagrees with reality and has
-  // no artifact. It remains signed contract data and is never an admission gate.
-  release.evaluation.regression_passed = false;
-  release.evaluation.regression_report_hash = `sha256:${"9".repeat(64)}`;
+  const candidateHash = `sha256:${"1".repeat(64)}`;
+  const configuration = canonicalJson({
+    candidate_ontology_version: version,
+    configuration_equal: true,
+    corpus: {
+      corpus_hash: corpus.corpus_hash,
+      corpus_release_id: corpusReleaseId,
+    },
+    provider: "openai",
+    regression: {
+      fixture_count: 30,
+      maximum_provider_calls_per_fixture: 11,
+      minimum_pass_rate: 1,
+    },
+  });
+  const configurationHash = await contentHash(configuration);
+  const now = new Date(Date.now() - 1_000);
+  await env.DB.prepare(
+    `INSERT INTO pattern_source_corpus_releases (
+       corpus_release_id, corpus_hash, locale, object_key, fragment_count,
+       license_class, public_capable, created_at, registered_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    corpusReleaseId,
+    corpus.corpus_hash,
+    corpus.locale,
+    corpusObjectKey,
+    corpus.fragments.length,
+    corpusLicenseClass,
+    options.corpusPublicCapable ?? corpusLicenseClass === "licensed_excerpt"
+      ? 1
+      : 0,
+    now.toISOString(),
+    now.toISOString(),
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO pattern_ontology_pipeline_runs (
+       run_id, idempotency_key, corpus_release_id, corpus_hash,
+       candidate_ontology_version, configuration_json, configuration_hash,
+       stage, stage_generation, stage_cursor, stage_attempt, claim_token,
+       lease_expires_at, available_at, dispatched_at, failure_class,
+       candidate_hash, compilation_report_hash, evaluation_report_hash,
+       regression_report_hash, bundle_hash, failed_artifact_expires_at,
+       created_at, updated_at, finished_at, succeeded_at, failed_at
+     ) VALUES (
+       ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0, NULL, NULL, ?, NULL, NULL,
+       NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL
+     )`,
+  ).bind(
+    runId,
+    `route-evidence-${crypto.randomUUID()}`,
+    corpusReleaseId,
+    corpus.corpus_hash,
+    version,
+    configuration,
+    configurationHash,
+    now.toISOString(),
+    now.toISOString(),
+    now.toISOString(),
+  ).run();
+  for (const [index, stage] of [
+    "corpus_reading",
+    "generating",
+    "compiling",
+    "evaluating",
+    "regressing",
+  ].entries()) {
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = ?, stage_generation = ?, stage_cursor = 0,
+           stage_attempt = 0, claim_token = NULL, lease_expires_at = NULL,
+           dispatched_at = NULL, updated_at = ?,
+           candidate_hash = CASE WHEN ? = 'compiling' THEN ? ELSE candidate_hash END,
+           compilation_report_hash = CASE WHEN ? = 'evaluating' THEN ? ELSE compilation_report_hash END,
+           evaluation_report_hash = CASE WHEN ? = 'regressing' THEN ? ELSE evaluation_report_hash END
+       WHERE run_id = ?`,
+    ).bind(
+      stage,
+      index + 1,
+      now.toISOString(),
+      stage,
+      candidateHash,
+      stage,
+      `sha256:${"2".repeat(64)}`,
+      stage,
+      artifact.plaintextHash,
+      runId,
+    ).run();
+  }
+  const claimed = await claimOntologyPipelineRun(
+    env,
+    { run_id: runId, stage_generation: 5 },
+    now,
+    "route-regression-evidence",
+  );
+  if (claimed.status !== "claimed") throw new Error("route regression claim failed");
+  const regressionReport = await buildTestPassedRegressionReport({
+    ontologyVersion: version,
+    commandHash: configurationHash,
+    corpusReleaseId,
+    corpusHash: corpus.corpus_hash,
+    candidateHash,
+    evaluationReportHash: artifact.plaintextHash,
+  });
+  const regressionArtifact = await putOntologyPipelineArtifact(
+    env,
+    {
+      runId,
+      stage: "regressing",
+      stageGeneration: claimed.stageGeneration,
+      stageAttempt: claimed.stageAttempt,
+      artifactClass: "regression_report",
+    },
+    new TextEncoder().encode(regressionReport.canonicalBytes),
+    claimed,
+    new Date(now.getTime() + 1),
+  );
+  if (!await advanceOntologyPipelineStage(
+    env,
+    claimed,
+    "signing",
+    { regressionReportHash: regressionArtifact.artifact.plaintextSha256 },
+    new Date(now.getTime() + 2),
+  )) throw new Error("route regression stage advance failed");
+  release.evaluation.regression_passed = true;
+  release.evaluation.regression_report_hash =
+    regressionArtifact.artifact.plaintextSha256;
   if (options.evidenceMismatch === "corpus_release_hash") {
     release.corpus_release_hash = `sha256:${"8".repeat(64)}`;
   }
@@ -131,6 +263,25 @@ async function prepareMachineRelease(
       `sha256:${"8".repeat(64)}`;
   }
   release.bundle_hash = await computeOntologyBundleHash(release);
+  const evidenceBundleHash = options.evidenceMismatch === "bundle_hash"
+    ? `sha256:${"8".repeat(64)}`
+    : release.bundle_hash;
+  const signingClaim = await claimOntologyPipelineRun(
+    env,
+    { run_id: runId, stage_generation: 6 },
+    new Date(now.getTime() + 3),
+    "route-regression-signing",
+  );
+  if (signingClaim.status !== "claimed") {
+    throw new Error("route signing claim failed");
+  }
+  if (!await advanceOntologyPipelineStage(
+    env,
+    signingClaim,
+    "ingesting",
+    { bundleHash: evidenceBundleHash },
+    new Date(now.getTime() + 4),
+  )) throw new Error("route ingesting stage advance failed");
 
   const artifactObjectKey = await putTestEvaluationArtifact(
     env.ARTIFACTS!,
@@ -148,13 +299,20 @@ async function prepareMachineRelease(
         options.corpusPublicCapable ??
         corpusLicenseClass === "licensed_excerpt",
       activationScope: options.activationScope ?? "public",
-      bundleHash: options.evidenceMismatch === "bundle_hash"
-        ? `sha256:${"8".repeat(64)}`
-        : release.bundle_hash,
+      bundleHash: evidenceBundleHash,
       evaluationReportHash: artifact.plaintextHash,
       evaluationArtifactObjectKey: artifactObjectKey,
       evaluationArtifactEnvelopeHash: artifact.envelopeHash,
       evaluationArtifactCiphertextHash: artifact.ciphertextHash,
+      regressionReportHash: regressionArtifact.artifact.plaintextSha256,
+      regressionArtifactObjectKey: regressionArtifact.artifact.objectKey,
+      regressionArtifactEnvelopeHash:
+        regressionArtifact.artifact.envelopeSha256,
+      regressionArtifactCiphertextHash:
+        regressionArtifact.artifact.ciphertextSha256,
+      regressionArtifactStageGeneration:
+        regressionArtifact.artifact.stageGeneration,
+      regressionArtifactStageAttempt: regressionArtifact.artifact.stageAttempt,
       signingKeyId: options.evidenceMismatch === "signing_key_id"
         ? "different-signing-key"
         : key.keyId,

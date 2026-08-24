@@ -8,6 +8,7 @@ const expectedTail = [
   "0012_ontology_pipeline.sql",
   "0013_codex_provider_jobs.sql",
   "0014_codex_provider_response_uploads.sql",
+  "0015_ontology_pipeline_regression_evidence.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -24,6 +25,7 @@ const evidenceMigrationIndex = migrationNames.indexOf(expectedTail[2]);
 const pipelineMigrationIndex = migrationNames.indexOf(expectedTail[3]);
 const codexProviderMigrationIndex = migrationNames.indexOf(expectedTail[4]);
 const codexResponseUploadMigrationIndex = migrationNames.indexOf(expectedTail[5]);
+const regressionEvidenceMigrationIndex = migrationNames.indexOf(expectedTail[6]);
 
 // Main-test storage starts empty and receives the exact ordered migration set.
 // This is the fresh-database lane; individual tests then exercise the schema.
@@ -297,7 +299,10 @@ if (!codexProviderTable) {
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(codexResponseUploadMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    codexResponseUploadMigrationIndex,
+    regressionEvidenceMigrationIndex,
+  ),
 );
 
 const codexResponseUploadTable = await upgradeDb.prepare(
@@ -310,6 +315,94 @@ if (!codexResponseUploadTable) {
   );
 }
 
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(regressionEvidenceMigrationIndex),
+);
+
+const upgradedEvidence = await upgradeDb.prepare(
+  `SELECT ${Object.keys(evidenceBefore).join(", ")},
+          regression_report_hash, regression_artifact_object_key,
+          regression_artifact_envelope_hash,
+          regression_artifact_ciphertext_hash,
+          regression_artifact_stage_generation,
+          regression_artifact_stage_attempt
+   FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
+).bind(evidenceBefore.run_id).first();
+if (
+  JSON.stringify(upgradedEvidence) !== JSON.stringify({
+    ...evidenceBefore,
+    regression_report_hash: null,
+    regression_artifact_object_key: null,
+    regression_artifact_envelope_hash: null,
+    regression_artifact_ciphertext_hash: null,
+    regression_artifact_stage_generation: null,
+    regression_artifact_stage_attempt: null,
+  })
+) {
+  throw new Error("0015 did not preserve populated 0011 evidence with null regression pins");
+}
+
+let committedEvidenceDeleteRejected = false;
+try {
+  await upgradeDb.prepare(
+    `DELETE FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
+  ).bind(evidenceBefore.run_id).run();
+} catch {
+  committedEvidenceDeleteRejected = true;
+}
+if (!committedEvidenceDeleteRejected) {
+  throw new Error("0015 allowed deletion of committed ontology evidence");
+}
+
+let partialRegressionTupleRejected = false;
+try {
+  await upgradeDb.prepare(
+    `INSERT INTO pattern_ontology_pipeline_evidence (
+       run_id, ontology_version, corpus_release_id, corpus_release_hash,
+       corpus_license_class, corpus_public_capable, activation_scope,
+       bundle_hash, evaluation_report_hash, evaluation_artifact_object_key,
+       evaluation_artifact_envelope_hash, evaluation_artifact_ciphertext_hash,
+       evaluation_artifact_status, signing_key_id, run_status, evidence_status,
+       compiler_passed, evaluator_passed, unevaluated_fixture_count,
+       created_at, committed_at, regression_report_hash
+     ) VALUES (?, ?, ?, ?, 'internal_synthetic', 0, 'internal', ?, ?, ?, ?, ?,
+       'committed', ?, 'succeeded', 'committed', 1, 1, 0, ?, ?, ?)`,
+  ).bind(
+    "oprun_partial_regression_tuple",
+    "ontology-partial-regression-tuple",
+    "corpus-partial-regression-tuple",
+    `sha256:${"20".repeat(32)}`,
+    `sha256:${"21".repeat(32)}`,
+    `sha256:${"22".repeat(32)}`,
+    "migration-tests/partial-evaluation.enc",
+    `sha256:${"23".repeat(32)}`,
+    `sha256:${"24".repeat(32)}`,
+    "migration-test-signing-key",
+    evidenceBefore.created_at,
+    evidenceBefore.committed_at,
+    `sha256:${"25".repeat(32)}`,
+  ).run();
+} catch {
+  partialRegressionTupleRejected = true;
+}
+if (!partialRegressionTupleRejected) {
+  throw new Error("0015 admitted a partial regression evidence tuple");
+}
+
+let legacyEvidenceMutationRejected = false;
+try {
+  await upgradeDb.prepare(
+    `UPDATE pattern_ontology_pipeline_evidence
+     SET regression_report_hash = ? WHERE run_id = ?`,
+  ).bind(`sha256:${"26".repeat(32)}`, evidenceBefore.run_id).run();
+} catch {
+  legacyEvidenceMutationRejected = true;
+}
+if (!legacyEvidenceMutationRejected) {
+  throw new Error("0015 made a committed legacy evidence row mutable");
+}
+
 const evidenceAfterCodexMigration = await upgradeDb.prepare(
   `SELECT ${Object.keys(evidenceBefore).join(", ")}
    FROM pattern_ontology_pipeline_evidence WHERE run_id = ?`,
@@ -317,14 +410,14 @@ const evidenceAfterCodexMigration = await upgradeDb.prepare(
   .bind(evidenceBefore.run_id)
   .first();
 if (JSON.stringify(evidenceAfterCodexMigration) !== JSON.stringify(evidenceBefore)) {
-  throw new Error("0013 did not preserve the populated ontology evidence row byte-for-byte");
+  throw new Error("0015 did not preserve the original populated ontology evidence fields");
 }
 
 const finalForeignKeyCheck = await upgradeDb.prepare("PRAGMA foreign_key_check").all();
 if (finalForeignKeyCheck.results.length !== 0) {
-  throw new Error("0014 left foreign-key violations on the populated upgrade");
+  throw new Error("0015 left foreign-key violations on the populated upgrade");
 }
 const assertionRows = await upgradeDb.prepare("SELECT * FROM assertion_probe").all();
 if (assertionRows.results.length !== 0) {
-  throw new Error("0014 left an assertion probe armed");
+  throw new Error("0015 left an assertion probe armed");
 }

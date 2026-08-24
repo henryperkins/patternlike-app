@@ -1,5 +1,4 @@
 import {
-  canonicalJson,
   contentHash,
   type BirthTimeAccuracy,
   type ChartSnapshot,
@@ -30,31 +29,42 @@ import {
 } from "./pattern-packet.js";
 import type {
   PatternPassProvenance,
-  PatternPublisherPin,
   PatternStageClass,
 } from "./pattern-publisher.js";
 import {
-  OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS,
-  OPENAI_PATTERN_PLANNER_MODEL,
-  OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
-  OPENAI_PATTERN_PLANNER_REASONING,
   OPENAI_PATTERN_PLANNER_TIMEOUT_MS,
-  OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS,
-  OPENAI_PATTERN_VERIFIER_MODEL,
-  OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
-  OPENAI_PATTERN_VERIFIER_REASONING,
   OPENAI_PATTERN_VERIFIER_TIMEOUT_MS,
-  OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS,
-  OPENAI_PATTERN_WRITER_MODEL,
-  OPENAI_PATTERN_WRITER_PROMPT_VERSION,
-  OPENAI_PATTERN_WRITER_REASONING,
   OPENAI_PATTERN_WRITER_TIMEOUT_MS,
-  PATTERN_INPUT_MAX_BYTES,
-  PATTERN_PUBLISHER_OPENAI,
   patternProviderDisplayName,
 } from "./pattern-publisher.js";
 import { narrowPlannerOutput } from "./pattern-execute.js";
 import { findSemanticVerdictProblem } from "./pattern-semantic.js";
+import {
+  ONTOLOGY_REGRESSION_FIXTURE_COUNT,
+  ONTOLOGY_REGRESSION_PATTERN_PIN,
+  OntologyRegressionError,
+  type OntologyRegressionFixtureResult,
+  type OntologyRegressionHardGateFailure,
+} from "./ontology-regression-report.js";
+
+export {
+  ONTOLOGY_REGRESSION_FIXTURE_COUNT,
+  ONTOLOGY_REGRESSION_MAXIMUM_ARITHMETIC,
+  ONTOLOGY_REGRESSION_MAXIMUM_BILLABLE_TOKEN_UNITS,
+  ONTOLOGY_REGRESSION_MAXIMUM_CALLS_PER_FIXTURE,
+  ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS,
+  ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL,
+  ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS,
+  ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
+  ONTOLOGY_REGRESSION_PATTERN_PIN,
+  OntologyRegressionError,
+  createCanonicalOntologyRegressionReport,
+  evaluateOntologyRegressionThresholds,
+  ontologyRegressionConfigurationHash,
+  type OntologyRegressionFixtureResult,
+  type OntologyRegressionHardGateFailure,
+  type OntologyRegressionThresholdResult,
+} from "./ontology-regression-report.js";
 
 import manifestDocument from "../../../../contracts/m7/fixtures/corpus/manifest.json";
 import exact01 from "../../../../contracts/m7/fixtures/corpus/en-US/exact-01.json";
@@ -88,56 +98,6 @@ import unknown08 from "../../../../contracts/m7/fixtures/corpus/en-US/unknown-08
 import unknown09 from "../../../../contracts/m7/fixtures/corpus/en-US/unknown-09.json";
 import unknown10 from "../../../../contracts/m7/fixtures/corpus/en-US/unknown-10.json";
 
-export const ONTOLOGY_REGRESSION_FIXTURE_COUNT = 30;
-export const ONTOLOGY_REGRESSION_MAXIMUM_CALLS_PER_FIXTURE = 11;
-export const ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS =
-  ONTOLOGY_REGRESSION_FIXTURE_COUNT *
-  ONTOLOGY_REGRESSION_MAXIMUM_CALLS_PER_FIXTURE;
-export const ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL = 98_304;
-export const ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS =
-  ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS *
-  ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL;
-/**
- * The Q1 worst case per fixture, priced at the pinned per-pass ceilings: at
- * most 2 planner calls, 3 writer calls against one frozen plan, and 2 verifier
- * calls per candidate for each of those 3 candidates.
- *
- * Derived from the pins rather than restated as literals. It was written as
- * `2 * 4_000 + 3 * 8_000 + 3 * 2 * 4_000`, which silently stopped describing
- * the Pattern configuration the moment a max-output-token pin moved: the
- * regression harness went on requesting the new per-call ceiling while this
- * budget still priced the old one, and every regression cursor rescheduled on
- * an exhausted budget instead of advancing. A duplicated constant is the defect;
- * the multipliers are the attempt ceilings and stay here.
- */
-export const ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS =
-  ONTOLOGY_REGRESSION_FIXTURE_COUNT *
-  (2 * OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS +
-    3 * OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS +
-    3 * 2 * OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS);
-export const ONTOLOGY_REGRESSION_MAXIMUM_BILLABLE_TOKEN_UNITS =
-  ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS +
-  ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS;
-
-export const ONTOLOGY_REGRESSION_PATTERN_PIN: PatternPublisherPin = {
-  publisher: PATTERN_PUBLISHER_OPENAI,
-  planner_model: OPENAI_PATTERN_PLANNER_MODEL,
-  planner_reasoning: OPENAI_PATTERN_PLANNER_REASONING,
-  planner_prompt_version: OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
-  planner_max_output_tokens: OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS,
-  writer_model: OPENAI_PATTERN_WRITER_MODEL,
-  writer_reasoning: OPENAI_PATTERN_WRITER_REASONING,
-  writer_prompt_version: OPENAI_PATTERN_WRITER_PROMPT_VERSION,
-  writer_max_output_tokens: OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS,
-  verifier_model: OPENAI_PATTERN_VERIFIER_MODEL,
-  verifier_reasoning: OPENAI_PATTERN_VERIFIER_REASONING,
-  verifier_prompt_version: OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
-  verifier_max_output_tokens: OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS,
-  input_max_bytes: PATTERN_INPUT_MAX_BYTES,
-  selection_policy_version: "1.0.0",
-  validation_policy_version: "1.0.0",
-};
-
 export function ontologyRegressionPassTimeoutMs(
   pass: PatternStageClass,
 ): number {
@@ -153,15 +113,6 @@ export function ontologyRegressionPassMaximumOutputTokens(
 ): number {
   return ONTOLOGY_REGRESSION_PATTERN_PIN[`${pass}_max_output_tokens`];
 }
-
-export type OntologyRegressionHardGateFailure =
-  | "suppressed_feature_leak"
-  | "uncited_astrological_claim"
-  | "source_dependency_failure"
-  | "prohibited_claim"
-  | "mandatory_feature_omission"
-  | "private_projection_leak"
-  | "semantic_refusal";
 
 export interface OntologyRegressionFixture {
   schema_version: "ontology-regression-fixture/v1";
@@ -605,39 +556,6 @@ function writerCorrectableHardGateTargetKey(
   return unit?.key ?? "";
 }
 
-export interface OntologyRegressionThresholdResult {
-  passed: boolean;
-  required_per_cohort: 9 | 10;
-  cohorts: Record<BirthTimeAccuracy, {
-    accepted: number;
-    total: number;
-    passed: boolean;
-  }>;
-}
-
-export function evaluateOntologyRegressionThresholds(
-  results: readonly { accuracy: BirthTimeAccuracy; accepted: boolean }[],
-  configurationEqual: boolean,
-): OntologyRegressionThresholdResult {
-  const required = configurationEqual ? 10 : 9;
-  const cohorts = Object.fromEntries(
-    (["exact", "approximate", "unknown"] as const).map((accuracy) => {
-      const cohort = results.filter((result) => result.accuracy === accuracy);
-      const accepted = cohort.filter((result) => result.accepted).length;
-      return [accuracy, {
-        accepted,
-        total: cohort.length,
-        passed: cohort.length === 10 && accepted >= required,
-      }];
-    }),
-  ) as OntologyRegressionThresholdResult["cohorts"];
-  return {
-    passed: Object.values(cohorts).every((cohort) => cohort.passed),
-    required_per_cohort: required,
-    cohorts,
-  };
-}
-
 export interface OntologyRegressionFixtureState {
   schema_version: "ontology-regression-state/v1";
   fixture_index: number;
@@ -1054,127 +972,4 @@ export async function applyOntologyRegressionPass(input: {
       publicProjectionHash: await contentHash(JSON.stringify(projection)),
     },
   );
-}
-
-export interface OntologyRegressionFixtureResult {
-  fixture_id: string;
-  accuracy: BirthTimeAccuracy;
-  accepted: boolean;
-  declared_outcome: "accepted" | "refused";
-  result_hash: string;
-  provider_calls: number;
-  input_tokens: number;
-  output_tokens: number;
-  hard_gate_failures: OntologyRegressionHardGateFailure[];
-}
-
-export class OntologyRegressionError extends Error {
-  constructor(readonly code: "regression_failed" | "regression_budget_exceeded") {
-    super(code);
-    this.name = "OntologyRegressionError";
-  }
-}
-
-export async function createCanonicalOntologyRegressionReport(input: {
-  ontologyVersion: string;
-  commandHash: string;
-  configurationHash: string;
-  corpusReleaseId: string;
-  corpusHash: string;
-  corpusManifestHash: string;
-  candidateHash: string;
-  evaluationReportHash: string;
-  configurationEqual: boolean;
-  results: readonly OntologyRegressionFixtureResult[];
-  requestArtifactCount: number;
-  responseArtifactCount: number;
-  inputTokens: number;
-  outputTokens: number;
-}): Promise<{
-  document: Record<string, unknown>;
-  canonicalBytes: string;
-  plaintextHash: string;
-}> {
-  const usageValues = [
-    input.requestArtifactCount,
-    input.responseArtifactCount,
-    input.inputTokens,
-    input.outputTokens,
-  ];
-  const billableTokenUnits = input.inputTokens + input.outputTokens;
-  if (
-    usageValues.some((value) => !Number.isSafeInteger(value) || value < 0) ||
-    input.requestArtifactCount > ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS ||
-    input.responseArtifactCount > input.requestArtifactCount ||
-    input.inputTokens > ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS ||
-    input.outputTokens > ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS ||
-    billableTokenUnits > ONTOLOGY_REGRESSION_MAXIMUM_BILLABLE_TOKEN_UNITS
-  ) {
-    throw new OntologyRegressionError("regression_budget_exceeded");
-  }
-  const threshold = evaluateOntologyRegressionThresholds(
-    input.results,
-    input.configurationEqual,
-  );
-  const hardGateCounts = Object.fromEntries([
-    "suppressed_feature_leak",
-    "uncited_astrological_claim",
-    "source_dependency_failure",
-    "prohibited_claim",
-    "mandatory_feature_omission",
-    "private_projection_leak",
-    "semantic_refusal",
-  ].map((code) => [
-    code,
-    input.results.filter((result) =>
-      result.hard_gate_failures.includes(code as OntologyRegressionHardGateFailure)).length,
-  ]));
-  const behaviorRegressions = input.results.filter((result) =>
-    (result.declared_outcome === "accepted") !== result.accepted).length;
-  const hardGatesPassed = Object.values(hardGateCounts).every((count) => count === 0);
-  const passed = input.results.length === ONTOLOGY_REGRESSION_FIXTURE_COUNT &&
-    threshold.passed && hardGatesPassed && behaviorRegressions === 0;
-  const document = {
-    schema_version: "ontology-regression-report/v1",
-    ontology_version: input.ontologyVersion,
-    command_hash: input.commandHash,
-    configuration_hash: input.configurationHash,
-    corpus: {
-      corpus_release_id: input.corpusReleaseId,
-      corpus_hash: input.corpusHash,
-      activation_manifest_hash: input.corpusManifestHash,
-      fixture_count: ONTOLOGY_REGRESSION_FIXTURE_COUNT,
-    },
-    candidate_hash: input.candidateHash,
-    evaluation_report_hash: input.evaluationReportHash,
-    configuration_equal: input.configurationEqual,
-    threshold,
-    hard_gate_counts: hardGateCounts,
-    deterministic_behavior_regressions: behaviorRegressions,
-    ordered_fixture_results: input.results,
-    provider_usage: {
-      request_artifact_count: input.requestArtifactCount,
-      response_artifact_count: input.responseArtifactCount,
-      input_tokens: input.inputTokens,
-      output_tokens: input.outputTokens,
-      billable_token_units: billableTokenUnits,
-      maximum_provider_calls: ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
-      maximum_input_tokens: ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS,
-      maximum_output_tokens: ONTOLOGY_REGRESSION_MAXIMUM_OUTPUT_TOKENS,
-      maximum_billable_token_units:
-        ONTOLOGY_REGRESSION_MAXIMUM_BILLABLE_TOKEN_UNITS,
-      maximum_arithmetic:
-        "30 * (11 * 98304 input-token upper-bound units + (2 * 4000 + 3 * 8000 + 3 * 2 * 4000) output tokens)",
-      monetary_pricing_status:
-        "current-rate spend approval remains a separate pre-rollout gate",
-    },
-    passed,
-  };
-  if (!passed) throw new OntologyRegressionError("regression_failed");
-  const canonicalBytes = canonicalJson(document);
-  return {
-    document,
-    canonicalBytes,
-    plaintextHash: await contentHash(canonicalBytes),
-  };
 }

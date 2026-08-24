@@ -116,6 +116,7 @@ import {
   createCanonicalOntologyRegressionReport,
   createOntologyRegressionFixtureState,
   loadOntologyRegressionCorpus,
+  ontologyRegressionConfigurationHash,
   ontologyRegressionPassCanAttempt,
   ontologyRegressionPassMaximumOutputTokens,
   ontologyRegressionPassTimeoutMs,
@@ -1987,13 +1988,6 @@ function regressionPublisherName(
   return configuration.publisher;
 }
 
-/**
- * The regression Pattern pin as executed.
- *
- * `publisher` is part of the hashed regression configuration, so recording
- * `openai` while a ChatGPT subscription answered would make two different
- * provider configurations share one configuration hash.
- */
 function regressionPatternPin(
   configuration: OntologyPipelineConfiguration,
 ): PatternPublisherPin {
@@ -2413,8 +2407,8 @@ async function createCompletedRegressionReport(input: {
   ) {
     terminal("regression_failed");
   }
-  const configurationHash = await contentHash(
-    canonicalJson(regressionPatternPin(input.context.configuration)),
+  const configurationHash = await ontologyRegressionConfigurationHash(
+    regressionPublisherName(input.context.configuration),
   );
   return createCanonicalOntologyRegressionReport({
     ontologyVersion: input.context.command.candidate_ontology_version,
@@ -2954,6 +2948,12 @@ async function executeIngesting(
     "evaluating",
     "evaluation_report",
   );
+  const regressionArtifact = await loadUniquePipelineArtifact(
+    env,
+    claim.runId,
+    "regressing",
+    "regression_report",
+  );
   const signature = signed.signature;
   if (!signature) terminal("ingestion_failed");
   await commitOntologyPipelineEvidence(env, {
@@ -2969,6 +2969,14 @@ async function executeIngesting(
     evaluationArtifactObjectKey: evaluationArtifact.artifact.objectKey,
     evaluationArtifactEnvelopeHash: evaluationArtifact.artifact.envelopeSha256,
     evaluationArtifactCiphertextHash: evaluationArtifact.artifact.ciphertextSha256,
+    regressionReportHash: context.row.regression_report_hash,
+    regressionArtifactObjectKey: regressionArtifact.artifact.objectKey,
+    regressionArtifactEnvelopeHash: regressionArtifact.artifact.envelopeSha256,
+    regressionArtifactCiphertextHash:
+      regressionArtifact.artifact.ciphertextSha256,
+    regressionArtifactStageGeneration:
+      regressionArtifact.artifact.stageGeneration,
+    regressionArtifactStageAttempt: regressionArtifact.artifact.stageAttempt,
     signingKeyId: signature.key_id,
     compilerPassed: true,
     evaluatorPassed: true,
