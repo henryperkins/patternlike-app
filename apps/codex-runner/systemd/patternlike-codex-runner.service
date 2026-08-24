@@ -1,0 +1,45 @@
+[Unit]
+Description=Pattern/Like Codex production inference runner
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=15min
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=patternlike-codex
+Group=patternlike-codex
+WorkingDirectory=/var/lib/patternlike-codex-runner/workspace
+Environment=HOME=/var/lib/patternlike-codex-runner
+Environment=CODEX_HOME=/var/lib/patternlike-codex-runner/.codex
+Environment=PATH=/opt/patternlike-codex-runner/bin:/usr/bin:/bin
+EnvironmentFile=/etc/patternlike-codex-runner.env
+ExecStart=/opt/patternlike-codex-runner/bin/node /opt/patternlike-codex-runner/dist/index.js
+Restart=on-failure
+RestartSec=30s
+TimeoutStartSec=30s
+TimeoutStopSec=16min
+UMask=0077
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+ReadWritePaths=/var/lib/patternlike-codex-runner
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

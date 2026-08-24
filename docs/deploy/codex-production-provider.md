@@ -157,34 +157,53 @@ On the approved host:
 
 Never place the Worker artifact keyring in this file.
 
-Install a systemd unit with these effective properties:
+Install the checked-in
+`apps/codex-runner/systemd/patternlike-codex-runner.service` unit. Its effective
+properties are:
 
 ```ini
 [Unit]
 Description=Pattern/Like Codex production inference runner
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=15min
+StartLimitBurst=5
 
 [Service]
 Type=simple
 User=patternlike-codex
 Group=patternlike-codex
 WorkingDirectory=/var/lib/patternlike-codex-runner/workspace
+Environment=HOME=/var/lib/patternlike-codex-runner
+Environment=CODEX_HOME=/var/lib/patternlike-codex-runner/.codex
+Environment=PATH=/opt/patternlike-codex-runner/bin:/usr/bin:/bin
 EnvironmentFile=/etc/patternlike-codex-runner.env
-ExecStart=/usr/bin/node /opt/patternlike-codex-runner/dist/index.js
+ExecStart=/opt/patternlike-codex-runner/bin/node /opt/patternlike-codex-runner/dist/index.js
 Restart=on-failure
 RestartSec=30s
+TimeoutStartSec=30s
 TimeoutStopSec=16min
 UMask=0077
+CapabilityBoundingSet=
+AmbientCapabilities=
 NoNewPrivileges=true
+PrivateDevices=true
 PrivateTmp=true
+ProtectClock=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/patternlike-codex-runner
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target
