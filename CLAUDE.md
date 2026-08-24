@@ -16,9 +16,10 @@ npm run test:contracts     # python: JSON Schema/fixture validation + D1 SQL smo
 npm run build              # shared/calc/signer tsc-or-dry-run, Vite build, API production dry-run
 
 npm run calc:dev           # calc service      :8080
-npm run db:local -w @patternlike/api   # apply db/d1/0001_m0_core.sql to local D1
+npm run db:local -w @patternlike/api   # apply ordered db/d1 migrations (0001–0012), not only 0001
+node scripts/dev/seed-dev-user.mjs     # AUTH_STUB user usr_local_dev_0001 + wrapped DEK
 npm run dev:api            # Wrangler Worker   :8787
-npm run web:dev            # Vite PWA          :5173 (proxies /v1 → :8787)
+npm run web:dev            # Vite PWA          :5173 only (proxies /v1 → :8787)
 ```
 
 Single tests:
@@ -31,6 +32,8 @@ npm run calc:golden                        # Swiss Ephemeris golden fingerprints
 ```
 
 `@patternlike/calc-stub`'s `pretest` runs `scripts/download-ephe.mjs`, which fetches ephemeris data pinned by commit + SHA-256 in `apps/calc-stub/ephemeris.lock.json`. First test run needs network.
+
+Cloud Agent / Cursor environment bootstrap is `scripts/cloud-agent-install.sh` (`.cursor/environment.json`). It is the same sequence: Python contract deps, `npm ci`, pinned ephemeris, `db:local`, seed. Dev servers are listed under `terminals` there, never started by the install script.
 
 There is no linter or formatter — `npm run typecheck` is the only mechanical style gate.
 
@@ -46,7 +49,7 @@ Seven workspaces (`apps/*`, `packages/*`), one product request path plus an isol
 
 `apps/api/src/index.ts` mounts sub-apps deliberately: a Hono router mounted at `"/"` contributes its `use("*", …)` middleware to **every** path in the parent. That is why `configGuard` is attached to the two `/v1/sessions` paths directly, and why the service-token router is mounted under `/internal` rather than `/`. Adding a router with wildcard middleware at `"/"` re-introduces the bug.
 
-Order on the product API is `configGuard` → `authenticate`. Remaining unimplemented product surfaces (reading feedback) return 501 from `routes/stubs.ts`.
+Order on the product API is `configGuard` → `authenticate`. `privacyRoutes` (export, deletion, check-ins, context sources) and `readings.ts` (including feedback) are mounted before `routes/stubs.ts`. The leftover 501 registrations for those same paths are unreachable; Hono answers the first match. Do not treat a stub still sitting in `stubs.ts` as the live handler.
 
 The default export is `{ fetch, queue }`, not the Hono app — tests that drive it with `app.request()` import the named `app` export instead. **A queue message never enters the Hono pipeline, so `configGuard` does not run on it**; `src/queue.ts` calls `checkSecureConfig` itself. Deleting that call would leave the one surface that decrypts a frozen command and writes a user's prose as the only surface a development-shaped deployment could still run.
 
@@ -143,10 +146,11 @@ is a flat browser 401; detailed token-verification reasons remain server-only.
 
 ### D1 migration policy
 
-M0 is pre-production, so `0001_m0_core.sql` is edited **in place** rather than superseded. Every statement is `CREATE TABLE IF NOT EXISTS`, so re-running it over an existing local database changes nothing and still exits 0. After any schema or crypto-version change, delete and recreate:
+M0 is pre-production, so `0001_m0_core.sql` is edited **in place** rather than superseded. Every statement is `CREATE TABLE IF NOT EXISTS`, so re-running it over an existing local database changes nothing and still exits 0. `npm run db:local` applies the **ordered** `db/d1/` directory (`0001`–`0012`), not only `0001`. After any schema or crypto-version change, delete and recreate, then re-seed the AUTH_STUB user:
 
 ```bash
 rm -rf apps/api/.wrangler/state/v3/d1 && npm run db:local -w @patternlike/api
+node scripts/dev/seed-dev-user.mjs
 ```
 
 ### Tests
@@ -182,7 +186,7 @@ For M7 ontology corpora, `license_class` is a publication-rights flag, not an au
 ## Deployment
 
 - **API + PWA are one Worker.** `[env.production.assets]` in `apps/api/wrangler.toml` ships `apps/web/dist` alongside the API, so both live on one origin (`patternlike-api-production.lfd.workers.dev`). Deploy with `npm run deploy:api` from the root — it builds the web app first, which the upload requires. **Live** since 2026-08-08; see `docs/deploy/api-production.md`.
-- `run_worker_first` lists every path the Hono app serves (`["/health", "/v1/*", "/internal/*"]`). A path missing from it is **not** a 404 — static assets answer first and `not_found_handling: single-page-application` returns `index.html` with a 200, silently serving HTML to an API client. Keep it in sync with `src/index.ts`.
+- `run_worker_first` lists every path the Hono app serves (`["/health", "/v1/*", "/internal/*", "/admin/*"]`). A path missing from it is **not** a 404 — static assets answer first and `not_found_handling: single-page-application` returns `index.html` with a 200, silently serving HTML to an API client. Keep it in sync with `src/index.ts`.
 - `assets` is scoped to `[env.production]` deliberately: the vitest pool loads `wrangler.toml`, and a top-level `assets.directory` pointing at an unbuilt `apps/web/dist` breaks the API suite.
 - Same-origin is a requirement, not a preference: sessions ride an httpOnly cookie with `SameSite=Strict` and `Path=/v1`, and cross-origin makes it a third-party cookie that Safari's ITP blocks.
 - Calc service: Fly.io, `fly deploy` from the repository root → `patternlike-calc` (iad, always-on, 2 machines). The Dockerfile copies root-level `package.json`, `package-lock.json`, and `packages/shared`, so never `cd` into the app dir or pass `--build-context`.
@@ -191,6 +195,7 @@ For M7 ontology corpora, `license_class` is a publication-rights flag, not an au
 - Worker secrets go in after the first deploy (`wrangler secret put` prompts interactively on a Worker that does not exist yet): `ROOT_KEK`, `CALC_SERVICE_AUTH_TOKEN`, and `SERVICE_AUTH_TOKEN` for `/internal/*`. Ontology extras, each on the Worker that owns them: `PATTERN_ONTOLOGY_SIGNING_KEY` on `patternlike-ontology-signer-production` (`npm run deploy:signer` first), and `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING` on the API Worker. Named environments do not inherit secrets.
 - **The ontology signer must exist before the first API deploy that declares `ONTOLOGY_SIGNER`.** Production signer version `9533269b-08e8-4ece-9418-928405a16449` now exists, but `PATTERN_ONTOLOGY_SIGNING_KEY` is deliberately still unset because no operator-managed private key was available; signing therefore fails closed until that secret is provisioned. The API also still lacks `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING`. Set both before machine-ontology activation. Locally, `npx wrangler dev -c apps/api/wrangler.toml -c apps/ontology-signer/wrangler.toml` from the repository root resolves the service binding; a lone `npm run dev:api` cannot.
 - **Queues must exist before the first deploy that declares them**, or the upload fails on an unknown queue. Production now has distinct daily-reading, privacy, Pattern-generation, and ontology-pipeline queues and DLQs; Pattern generation is bound to batch size 1 and concurrency 2. Named environments do not inherit bindings, so both blocks declare their own producer and consumer.
+- **Production cron is ontology-pipeline only.** `[env.production.triggers]` is `["7,22,37,52 * * * *"]`, which `scheduled.ts` routes to `runOntologyPipelineMaintenance`. The `*/15 * * * *` incumbent lane (`runReadingScheduler`, `runPrivacyMaintenance`, `sweepPatternJobs`) is declared on the default/dev block and is **off** in production until a separate enablement. Queue redelivery still works; undispatched outbox rows and expired Pattern leases are not recovered by cron while that lane is off. Operator nudge for one Pattern job: `POST /internal/pattern-generations/:generation_id/reconcile` (see `docs/deploy/openai-pattern-rollout.md`).
 - `db/d1/0002_m3_daily_reading_pipeline.sql` **is applied** to the remote database (ledger entry 2026-08-09 10:38 UTC). Verified after the fact: the three new tables exist, every new column on `users`/`jobs`/`daily_readings`/`reading_sources`/`cycle_instances` is present, `assertion_probe` is empty, `PRAGMA foreign_key_check` returns zero rows, and `PRAGMA quick_check` is `ok`. Migrations from here go through `wrangler d1 migrations apply patternlike-ops --env production --remote` and the ordered runbook in `docs/superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md` §5 — bookmark and export first.
 - The remote ledger is now at **0012**. `0009` through `0012` were applied in order on 2026-08-22 after an external mode-0600 SQL export and Time Travel bookmark; `d1 migrations list` reports nothing pending, `foreign_key_check` is empty, `quick_check` is `ok`, and `assertion_probe` is empty. Target table counts remained zero and the expected correction class, six stage counters, four pipeline tables, and eight indexes are present. See `docs/deploy/openai-pattern-rollout.md` Gate 2 for the recovery coordinates. A missing pipeline evidence receipt still fails machine ingestion closed.
 - Production has **no content release** (`content_releases` is empty) and `CONTENT_RELEASE_KEYS` is unset, so generation there answers `release_not_active` until an editorial bundle is signed and ingested.

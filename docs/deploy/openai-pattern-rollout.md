@@ -14,6 +14,10 @@ secret change, ontology activation, provider call, or rollout advance.
   `docs/superpowers/specs/2026-08-15-openai-pattern-adapter-design.md`
 - adapter plan:
   `docs/superpowers/plans/2026-08-15-openai-pattern-adapter.md`
+- Pattern stage protocol (extracted 2026-08-23):
+  `docs/superpowers/plans/2026-08-23-pattern-stage-protocol.md`
+- invariant kernel:
+  `docs/superpowers/specs/2026-08-23-pattern-invariant-kernel-design.md`
 - internal ontology plan:
   `docs/superpowers/plans/2026-08-20-internal-ontology-activation.md`
 - automated ontology plan:
@@ -47,6 +51,7 @@ This table describes repository evidence, not unqueried live state.
 | Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a |
 | Executor/provider path and queue-level integration | Deployed with rollout off | Worker `c20fa0da-273b-4d63-8fdd-7fc53d972c05`; `pattern-execute.ts`, `pattern-execute-openai.test.ts` |
 | Artifact-first idempotency, attempts, writer↔verifier correction, 11-call loop | Complete | `pattern-execute.ts`; exact ceiling in `pattern-execute-protocol.test.ts` |
+| Durable stage protocol (`planPatternTransition` / guarded D1 commit) | Complete | `pattern-stage-protocol.ts`; sweep repair `8bcb112` |
 | Executed-pin provenance and per-stage usage | Complete | `pattern-execute.ts`; migration `0010_pattern_stage_class_usage.sql` |
 | `0009` / `0010` / `0011` / `0012` | Applied to production in order | Gate 2 evidence below; integrity and shape checks clean |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
@@ -576,6 +581,61 @@ breach.
 
 `enabled` is a later, separately authorized product transition. It is not an
 automatic consequence of a successful first-open interval.
+
+---
+
+## Stuck Pattern generation jobs
+
+The D1 `jobs` row is the durable outbox; `PATTERN_QUEUE` is a nudge. A send
+response is not proof of work. Runtime: `apps/api/src/services/pattern-sweep.ts`,
+`pattern-stage-protocol.ts`, `pattern-execute.ts`.
+
+### What recovers a job
+
+| Path | What it does | When it runs |
+| --- | --- | --- |
+| Queue redelivery | At-least-once consumer retries the same opaque `{job_id, generation_id, stage_generation}` | Always, while the queue/DLQ exist |
+| `sweepPatternJobs` | Re-sends undispatched `queued` rows; re-sends expired `running` leases until `attempts >= 16`; then `failExhaustedPatternJob` | Incumbent cron `*/15 * * * *` via `scheduled.ts` → `runIncumbentMaintenance` |
+| `POST /internal/pattern-generations/:generation_id/reconcile` | Re-nudges one job if `jobs.status` is `queued` or `running`. Terminal rows return `already_complete` | Operator, service-token auth |
+| `resumePausedPatternJobsAfterRollout` | Clears `result_class = 'rollout_paused'` when rollout leaves `off`; expired-lease `running` pause rows return to `queued` | Inside `sweepPatternJobs` only |
+
+**Production does not currently run the incumbent cron.**
+`[env.production.triggers]` is `["7,22,37,52 * * * *"]` (ontology-pipeline
+maintenance). `sweepPatternJobs` therefore does not tick in production. Do not
+expect undispatched outbox repair or exhausted-lease failure while that lane is
+off. Turning `PATTERN_AI_ROLLOUT` on without enabling `*/15` leaves recovery to
+queue redelivery plus manual reconcile.
+
+### Exhausted claims and torn rows
+
+`MAX_STAGE_CLAIMS` is **16** (12 expected deliveries in the 11-call worst case
+plus publication, plus 4 for lease expiry / artifact adoption / `{kind: "retry"}`).
+Provider spend is a separate ceiling (`PATTERN_DAILY_PROVIDER_CALL_LIMIT`).
+
+`planPatternTransition` throws if the domain stage is already terminal. The
+expired-lease selector filters on the `jobs` row alone, so a race with
+`claimStage` can leave `pattern_generation_jobs.stage` terminal while
+`jobs.status` is still `running`. `failExhaustedPatternJob` then **drops only
+the domain UPDATE** and still commits the `jobs` repair (`status = 'failed'`,
+`result_class = 'stage_attempts_exhausted'`) plus claim release. Skipping that
+repair keeps the row in the recovery window forever.
+
+Logs (no generation id): `pattern_stage_terminal_failure` on commit;
+`pattern_stage_terminal_failure_write_failed` if the batch fails. Retention
+prune of `jobs.payload_enc` is the same sweep (`retention_expires_at`, 30 days).
+
+### Reconcile example
+
+```bash
+curl -s -X POST \
+  "https://patternlike-api-production.lfd.workers.dev/internal/pattern-generations/${GENERATION_ID}/reconcile" \
+  -H "authorization: Bearer ${SERVICE_AUTH_TOKEN}"
+# 202 { generation_id, status: "accepted" | "already_complete", stage }
+# 404 { error.code: "not_found" }
+```
+
+Reconcile does not fail an exhausted job and does not run retention or R2
+cleanup. Those are sweep-only.
 
 ---
 

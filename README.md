@@ -1,22 +1,27 @@
 # Pattern-Like Astrology App
 
-Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculation authority; editorial content ships via signed WordPress releases; Fly.io is portable compute (not launch-critical).
+Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculation authority; editorial and Pattern content ships via signed releases; Fly.io hosts the portable calc service.
 
-**Spec:** `spec-bundle/` (v0.2) · **Contracts:** `contracts/m0/` · **D1:** `db/d1/`
+**Spec:** `spec-bundle/` (v0.6 Pattern / v0.5 daily reading; v0.2 is the superseded editorial baseline) · **Contracts:** `contracts/m0/`, `m3/`, `m4/` · **D1:** `db/d1/` (migrations `0001`–`0012`)
 
-**Open contract decisions:** [`docs/reviews/2026-08-01-spec-escalations.md`](docs/reviews/2026-08-01-spec-escalations.md) — twelve reviewed items where the code implements the frozen contract faithfully and the fix belongs in the spec.
+**Architecture invariants** (Worker routing, encryption, Pattern stage protocol, fail-closed config): [`CLAUDE.md`](CLAUDE.md). **PR/style conventions:** [`AGENTS.md`](AGENTS.md).
+
+**Open contract decisions:** [`docs/reviews/2026-08-01-spec-escalations.md`](docs/reviews/2026-08-01-spec-escalations.md) — items where the code implements the frozen contract faithfully and the fix belongs in the spec.
 
 ## Monorepo
 
 | Path | Role |
 | --- | --- |
-| `apps/api` | Cloudflare Worker (Hono) — birth/chart M1 path |
+| `apps/api` | Cloudflare Worker (Hono) — product API, queues, D1, R2 |
 | `apps/ontology-signer` | Isolated no-route Worker; holds the ontology signing key |
 | `apps/calc-stub` | Portable AGPL Swiss Ephemeris calculation service |
-| `apps/web` | React/Vite PWA — onboarding, chart evidence, and privacy surface |
-| `packages/shared` | Shared types, fingerprint helpers, constants |
-| `contracts/m0` | Frozen JSON Schema + OpenAPI + fixtures |
-| `db/d1` | Operational schema (encrypted birth, idempotent jobs) |
+| `apps/web` | React 19 / Vite PWA — Auth0 sign-in, Today, Pattern, Timing, Time Travel, privacy |
+| `packages/shared` | Wire types, id minting, canonical JSON, launch body/aspect lists |
+| `packages/reading-engine` | Deterministic daily-reading assembly |
+| `packages/pattern-engine` | Pattern ontology compile / match |
+| `contracts/m0` | Frozen JSON Schema + OpenAPI + fixtures (identity, birth, chart) |
+| `contracts/m3`, `contracts/m4` | Frozen daily-reading (0.3.0) and Pattern/Time Travel (0.4.0) packages |
+| `db/d1` | Operational schema (encrypted birth, jobs, readings, Pattern, privacy) |
 
 ## Prerequisites
 
@@ -35,21 +40,32 @@ npm run test
 # Calculation stub (terminal 1)
 npm run calc:dev
 
-# Apply D1 schema locally (terminal 2)
+# Apply every ordered migration under db/d1, then seed AUTH_STUB's local user
 npm run db:local -w @patternlike/api
+node scripts/dev/seed-dev-user.mjs
 
-# API (terminal 2)
+# API (terminal 2) — Wrangler :8787
 npm run dev:api
 
-# Web client (terminal 3)
+# Web client (terminal 3) — Vite binds 127.0.0.1:5173 strictly
 npm run web:dev
 ```
 
-The web client opens at `http://127.0.0.1:5173` and proxies `/v1` requests to
-the local Worker at `http://127.0.0.1:8787`. Development defaults to
-`usr_local_dev_0001`; override `VITE_DEV_USER_ID`, `VITE_CONSENT_ID`, or
-`VITE_API_PROXY_TARGET` in `apps/web/.env.local` when needed. These values are
-local scaffolding only while production identity and consent APIs remain M1 work.
+Cloud Agent / Cursor environment bootstrap is `scripts/cloud-agent-install.sh`
+(declared in `.cursor/environment.json`). It is idempotent: `npm ci`, pinned
+ephemeris download, `db:local`, and the same seed script.
+
+The web client **must** be `http://127.0.0.1:5173/` — Vite sets
+`--host 127.0.0.1 --port 5173 --strictPort`, and that origin is the Auth0
+callback allowlist. `localhost`, another port, or a LAN bind will start the
+app but Universal Login cannot return. `/v1` is proxied to
+`http://127.0.0.1:8787`.
+
+Local product requests default to `usr_local_dev_0001` via `X-User-Id` while
+`AUTH_STUB=1`. **That header names an existing user; it never creates one.**
+A fresh D1 answers `401` until `seed-dev-user.mjs` inserts the `users` row and
+its wrapped DEK. Override `VITE_DEV_USER_ID` or `VITE_API_PROXY_TARGET` in
+`apps/web/.env.local` only after seeding a matching row.
 
 ### Birth → chart (local)
 
@@ -66,7 +82,7 @@ curl -s http://127.0.0.1:8787/v1/chart \
   -H "x-user-id: usr_local_dev_0001"
 ```
 
-`AUTH_STUB=1` (default `[vars]` in `wrangler.toml`) accepts **`X-User-Id`** for local development only. It is absent from `[env.production]`, and the `configGuard` middleware returns `503 configuration_error` for any request when `AUTH_STUB=1` or `ROOT_KEK` is unset/placeholder outside `ENVIRONMENT=development|test`. `npm run deploy` targets `--env production`.
+`AUTH_STUB=1` (default `[vars]` in `wrangler.toml`) accepts **`X-User-Id`** for local development only. `[env.production]` sets `AUTH_STUB = "0"` explicitly. `configGuard` returns `503 configuration_error` on every request when `AUTH_STUB=1` or `ROOT_KEK` is unset/placeholder outside `ENVIRONMENT=development|test`. `npm run deploy:api` always passes `--env production`.
 
 Idempotency keys are scoped per user, so the static `demo-birth-001` above is safe across local users. Resubmitting the same birth data under a different key returns `409 chart_already_exists` rather than a 500.
 
@@ -129,28 +145,21 @@ curl http://127.0.0.1:8080/v1/engine
 
 Counsel should still review AGPL network obligations and app-store strategy before public end-user launch. Production boot still refuses `SE_LICENSE_MODE=pending`.
 
-## M1 status
+## Current status
 
-- [x] Monorepo + green CI on GitHub Actions
-- [x] Workers integration tests: `apps/api` runs inside workerd with a real local D1 (`@cloudflare/vitest-pool-workers`)
-- [x] M0 contracts validation in CI
-- [x] D1 core schema with encryption CHECKs
-- [x] Birth profile + chart calculation path
-- [x] Unknown birth-time mode: noon is a technical epoch only. It is never stored as the birth instant, and houses, angles, and time-sensitive Moon claims are suppressed whenever no real birth time was supplied — regardless of the accuracy label the caller sends. `birth_time_local` is required for `exact` and `approximate`.
-- [x] Real Swiss Ephemeris 2.10.03 + golden fingerprint tests
-- [x] SE licensing decision: **AGPL public path** (counsel + store strategy still open)
-- [x] Responsive web/PWA shell with birth onboarding, chart facts/evidence, uncertainty, and privacy status
-- [x] Production identity: OIDC token exchange, Worker-minted sessions, and a crypto identity decoupled from the user's public id
-- [x] Historical timezone resolution: birthplace coordinates resolve to an IANA zone (`POST /v1/timezone-lookup`), and the chart is calculated in that zone rather than the browser's current one
-- [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
-- [ ] Privacy center export/delete workflows (API stubs 501)
+Engineering through M7 is in the repository. Production (`patternlike-api-production`) has served the Worker + PWA on one origin since 2026-08-08. What is **not** live is generation: no active content release, `PATTERN_AI_ROLLOUT=off`, and machine ontology Gate 7B has failed closed. Implemented provider code is not evidence of a completed canary.
 
-## M2 status — editorial control plane
+| Area | In repo | Typical local pitfall |
+| --- | --- | --- |
+| Birth → chart, unknown-time suppression, historical timezone | yes | `401` until `seed-dev-user.mjs`; `409 chart_already_exists` on a second idempotency key with the same data |
+| Today (M3/M5), Timing, Time Travel (M4), life events, check-ins, context sources | yes | Generation withheld until timezone/locale are confirmed (`default_unconfirmed`) |
+| Privacy export / account deletion | yes — `routes/privacy.ts`, not the leftover 501 stubs | Mutating calls need `Idempotency-Key` |
+| Auth0 Universal Login + Worker `pl_session` cookie | yes (`@auth0/auth0-react`) | Origin must be exactly `http://127.0.0.1:5173/` |
+| Your Pattern (M4 editorial + M7 AI path) | yes | `GET /v1/pattern` is `503 pattern_release_not_active` without an M4 release; AI generation stays off until rollout + ontology |
+| Place-name geocoding | **open** — coordinates are still entered by hand | — |
+| WordPress authoring plugin | **open** — Cloudflare ingestion exists; the CMS that produces bundles does not | — |
 
-- [x] Cloudflare ingestion: `POST /internal/content-releases` verifies, stores, and activates signed bundles (see below)
-- [x] Release rollback by re-posting a stored bundle; activation and rollback are one D1 transaction with their audit row
-- [ ] WordPress.com plugin and content types — the authoring side that produces the bundles
-- [ ] Smoke-test fixtures: a bundle declaring `fixtures` is stored but held inactive until M3 can evaluate them
+Operator runbooks: [`docs/deploy/api-production.md`](docs/deploy/api-production.md), [`docs/deploy/openai-pattern-rollout.md`](docs/deploy/openai-pattern-rollout.md), [`docs/deploy/openai-daily-reading-rollout.md`](docs/deploy/openai-daily-reading-rollout.md).
 
 ## Content release ingestion
 
@@ -158,6 +167,13 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 pipeline. WordPress authors and reviews content, then signs a release bundle and
 posts it here; the Worker verifies the signature, stores the immutable bundle in
 R2, runs the smoke tests it can, and atomically activates the release pointer.
+
+Accepted `schema_version` values are **`0.3.0` (M3 Today)** and **`0.4.0` (M4
+Pattern / Time Travel)**. Dispatch is an explicit bounded map in
+`services/content-release.ts` — anything else, including a 0.2.0 bundle, fails
+closed *before* hashing, signing, R2, or D1 work. One active release pointer
+serves both Today and Your Pattern; rolling back to an M3-only bundle keeps
+Today working and makes `GET /v1/pattern` answer `503 pattern_release_not_active`.
 
 The threat model is that WordPress can be compromised, so nothing is trusted
 because the bundle asserts it. In order:
@@ -212,45 +228,64 @@ under.
 
 ## Authentication
 
-`POST /v1/sessions` exchanges an OIDC ID token for a session. Browsers receive
-an httpOnly `pl_session` cookie; native clients use the returned `token` as a
-bearer. Both resolve the same session row, so `DELETE /v1/sessions/current`
-logs out either. Sessions expire absolutely after 30 days and are revocable by
-row update, which is what makes "invalidate sessions" a real control rather
-than a wait for token expiry.
+Auth0 authenticates; the Worker authorises. `apps/web` mounts
+`@auth0/auth0-react`. After Universal Login returns, `apps/web/src/lib/auth.ts`
+exchanges the one-shot encoded `id_token` for a `pl_session` cookie via
+`POST /v1/sessions`. Auth0 in-memory state never grants product data — a 401
+from the API is “signed out,” even if the SDK still has a cached session.
+Refresh tokens stay disabled.
+
+`POST /v1/sessions` mints that session. Browsers receive an httpOnly
+`pl_session` cookie (`SameSite=Strict`, `Path=/v1`); native clients use the
+returned `token` as a bearer. Both resolve the same session row, so
+`DELETE /v1/sessions/current` logs out either. Sessions expire absolutely after
+30 days and are revocable by row update.
+
+`VITE_AUTH0_DOMAIN` / `VITE_AUTH0_CLIENT_ID` in the PWA must match
+`OIDC_ISSUER` / `OIDC_AUDIENCE` in `apps/api/wrangler.toml`. A mismatch is a
+flat browser 401; detailed verification reasons stay server-only.
+`identities.provider` stores the **issuer string itself** — changing
+`OIDC_ISSUER` orphans every existing account.
 
 Three variables are required outside development — `OIDC_ISSUER`,
-`OIDC_AUDIENCE`, and `OIDC_JWKS_URL`. They are configuration, not secrets (the
-JWKS document is public), so they belong in `wrangler.toml` `[vars]`. The
-shipped values point at `issuer.invalid`; `configGuard` rejects them outside
-development, so a deploy that forgets to replace them returns a loud
-`503 configuration_error` rather than opaque 401s from inside the verifier.
+`OIDC_AUDIENCE`, and `OIDC_JWKS_URL`. They are configuration, not secrets.
+The shipped `[vars]` values point at `issuer.invalid`; `configGuard` rejects
+them outside development.
 
 Local development keeps `AUTH_STUB=1` and the `X-User-Id` header. **That header
-now names an existing user — it no longer creates one**, because user creation
-moved to identity-link time and a crypto subject can never come from a request.
-Seed a user first (see `seedUser` in `apps/api/test/helpers.ts` for the shape:
-the `users` row, its `identities` row, and its wrapped DEK must land together).
+names an existing user — it never creates one.** Seed with
+`node scripts/dev/seed-dev-user.mjs` (local D1) or `seedUser()` in tests
+(users row + identities row + wrapped DEK).
 
 `ENVIRONMENT=test` counts as development and disables the config guard. Do not
 name a staging deployment `test`.
 
-## Deploying to Fly.io
+## Deploying
 
-Two Fly apps deploy from this repo. **All commands run from the repository
-root** — the Docker build context must remain the root so the Dockerfiles can
-copy `package.json`, `package-lock.json`, `tsconfig.base.json`, and
-`packages/shared`. The API is not on Fly; it remains a Cloudflare Worker
-backed by D1.
+**API + PWA are one Cloudflare Worker.** `[env.production.assets]` ships
+`apps/web/dist` alongside Hono, so both live on
+`patternlike-api-production.lfd.workers.dev`. Deploy with `npm run deploy:api`
+from the root (it builds the web app first). Same-origin is required: the
+session cookie is `SameSite=Strict` / `Path=/v1`. Keep `run_worker_first`
+(`["/health", "/v1/*", "/internal/*", "/admin/*"]`) in sync with
+`apps/api/src/index.ts` — a path missing from it is served as `index.html`
+with HTTP 200.
+
+The calc service is the only Fly app that should be deployed:
 
 | App | Serves | Config | Deploy |
 | --- | --- | --- | --- |
-| `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` |
-| `patternlike-app` | Web PWA (`apps/web`, static nginx) | `fly.web.toml` | `fly deploy -c fly.web.toml` |
+| `patternlike-calc` | Swiss Ephemeris (`apps/calc-stub`) | `fly.toml` | `fly deploy` from the **repository root** |
+
+`fly.web.toml` / `patternlike-app` is the **superseded** Fly copy of the PWA,
+retired 2026-08-08 (scaled to 0). The app name still exists, so
+`fly deploy -c fly.web.toml` would resurrect it. Do not.
 
 > **Do not** run `fly deploy` from inside an app directory and do not pass
-> `--build-context`. Both Dockerfiles expect root-level workspace files.
-> To recreate an app from scratch: `fly apps create <name> --org personal`.
+> `--build-context`. The calc Dockerfile copies root-level `package.json`,
+> `package-lock.json`, and `packages/shared`. After anything regenerates a Fly
+> config, diff the `app` / `primary_region` lines — Fly Launch once pointed
+> the calc Dockerfile at the web app's name.
 
 ### Calc service auth
 
@@ -266,7 +301,7 @@ Configure the same generated token on both sides; never commit it:
 ```bash
 fly secrets set CALC_SERVICE_AUTH_TOKEN="<generated-secret>" -a patternlike-calc
 
-# Worker side (when the production API deploys):
+# Worker side:
 npx wrangler secret put CALC_SERVICE_AUTH_TOKEN --env production
 ```
 
@@ -275,7 +310,6 @@ npx wrangler secret put CALC_SERVICE_AUTH_TOKEN --env production
 ```bash
 curl --fail https://patternlike-calc.fly.dev/health
 curl --fail https://patternlike-calc.fly.dev/v1/engine
-curl --fail https://patternlike-app.fly.dev/
 
 # 401 proves the calculate gate is enforcing:
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://patternlike-calc.fly.dev/v1/calculate
@@ -284,6 +318,19 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://patternlike-calc.fly.de
 The calc `/health` check has a 30-second grace period configured in `fly.toml`
 to allow for ephemeris initialisation on first start.
 
+## Common pitfalls
+
+| Symptom | Cause |
+| --- | --- |
+| Local API `401` with `X-User-Id: usr_local_dev_0001` | D1 has no seeded user. Run `node scripts/dev/seed-dev-user.mjs` after `db:local`. |
+| Auth0 callback fails / loops | Origin is not exactly `http://127.0.0.1:5173/`. Vite refuses other hosts/ports. |
+| `wrangler deploy --dry-run` looks like production | Bare dry-run validates the **dev** `[vars]` block (`AUTH_STUB=1`, `issuer.invalid`). Use `npm run deploy:api` / `--env production`. |
+| Ontology RPC 404 locally | `npm run dev:api` does not bind the signer. From the repo root: `npx wrangler dev -c apps/api/wrangler.toml -c apps/ontology-signer/wrangler.toml`. |
+| `GET /v1/pattern` → `503 pattern_release_not_active` | No active M4 content release. Draft files under `content/pattern-candidates/` are never a runtime fallback. |
+| Production Pattern/Today jobs sit `queued` with `dispatched_at` null | Production cron is ontology-pipeline only (`7,22,37,52 * * * *`). The `*/15` incumbent lane (readings, privacy, Pattern sweep) is off until separately enabled. |
+
 ## Architecture profile
 
 `cloudflare-first-wordpress-editorial-fly-portable-v1` — see `spec-bundle/pattern_like_astrology_app_platform_topology_v0.2.yaml`.
+
+Cross-cutting invariants (encryption AAD, Pattern stage protocol, Time Travel receipt epoch, fail-closed config) live in [`CLAUDE.md`](CLAUDE.md), not here.
