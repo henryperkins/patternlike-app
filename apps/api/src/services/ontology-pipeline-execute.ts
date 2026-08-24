@@ -29,6 +29,7 @@ import {
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import {
   validateOntologyCandidateRelease,
+  type OntologyCandidateSafeDetailCode,
 } from "./ontology-candidate-validation.js";
 import { safeLog } from "./safe-log.js";
 import {
@@ -1068,20 +1069,43 @@ function generatorContinuation(
   };
 }
 
+/**
+ * Reject a generated chunk, naming the reason.
+ *
+ * These exits were silent, and they are the ones a real run hits: they fire
+ * before the `candidate_chunk` artifact is written, so a rejected run leaves a
+ * `generator_response` blob, no chunk, and nothing to read. Diagnosing one then
+ * costs an artifact decryption, which is the same "the operator is left
+ * guessing" failure the blind regression correction loop had. `reason` is a
+ * closed code beside the existing `ontology_candidate_rejected` event; no
+ * record id, fragment id, or generated text is ever logged.
+ */
+function rejectChunk(
+  reason: OntologyCandidateSafeDetailCode,
+  detail: { record_count: number },
+): never {
+  safeLog({
+    event: "ontology_candidate_rejected",
+    reason,
+    record_count: detail.record_count,
+  });
+  terminal("candidate_invalid");
+}
+
 function validateCurrentChunk(
   chunk: OntologyGenerationChunk,
   progress: AcceptedGenerationProgress,
   command: OntologyPipelineCommand,
 ): void {
-  if (
-    progress.records.length + chunk.records.length >
-      command.limits.maximum_candidate_records
-  ) {
-    terminal("candidate_invalid");
+  const recordCount = progress.records.length + chunk.records.length;
+  if (recordCount > command.limits.maximum_candidate_records) {
+    rejectChunk("limit_exceeded", { record_count: recordCount });
   }
   const ids = new Set(progress.orderedRecordIds);
   for (const record of chunk.records) {
-    if (ids.has(record.id)) terminal("candidate_invalid");
+    if (ids.has(record.id)) {
+      rejectChunk("record_policy_invalid", { record_count: recordCount });
+    }
     ids.add(record.id);
   }
   const records = [...progress.records, ...chunk.records];
@@ -1096,7 +1120,9 @@ function validateCurrentChunk(
         !record.source_fragment_ids.includes(hint.source_fragment_id)
       )
     ) {
-      terminal("candidate_invalid");
+      rejectChunk("coverage_source_hint_invalid", {
+        record_count: recordCount,
+      });
     }
   }
 }
@@ -1344,6 +1370,12 @@ async function executeGenerating(
     textEncoder.encode(prospectiveCandidate.canonicalBytes).byteLength >
       context.command.limits.maximum_candidate_bytes
   ) {
+    // Also pre-chunk-artifact, so also silent until now.
+    safeLog({
+      event: "ontology_candidate_rejected",
+      reason: "limit_exceeded",
+      record_count: progress.records.length + chunk.records.length,
+    });
     terminal("candidate_invalid");
   }
   const chunkArtifact = await putArtifact(

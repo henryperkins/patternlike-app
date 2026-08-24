@@ -106,6 +106,8 @@ export type SafeLogEvent =
   | {
       event: "ontology_candidate_rejected";
       reason: OntologyCandidateSafeDetailCode;
+      /** Accepted + proposed record count. A count, never a record or an id. */
+      record_count?: number;
     }
   | {
       event: "ontology_generation_stalled";
