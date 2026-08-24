@@ -43,6 +43,10 @@ Do not use those historical instructions.
 - `PATTERN_AI_ROLLOUT="off"` and
   `ONTOLOGY_PIPELINE_ROLLOUT="off"`. The incumbent OpenAI publishers remain
   selected, so no reader or ontology traffic can enter Codex yet.
+- The reproducible release branch adds reviewed boundary hardening and additive
+  migration `0014_codex_provider_response_uploads.sql`. That migration is not
+  part of the deployed version above and must be applied before deploying the
+  hardened Worker; keep both rollouts off throughout the change.
 
 The remaining operational dependency is an approved always-on non-AGPL host
 and an interactive `codex login` for its dedicated unprivileged service

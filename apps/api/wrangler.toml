@@ -17,10 +17,10 @@ database_name = "patternlike-ops"
 database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
-# Cloudflare Workers AI. Required whenever a publisher is `workers_ai`; the
-# binding authenticates itself, so there is no matching secret and no outbound
-# credential leaves the Worker. Declared in BOTH blocks because a named
-# environment does not inherit bindings.
+# Development-only experimental Workers AI publisher binding. Production
+# configuration refuses `PATTERN_PUBLISHER=workers_ai`; the binding remains in
+# both blocks only to reproduce the deployed Worker configuration while the
+# experiment is reviewed separately. Named environments do not inherit it.
 [ai]
 binding = "AI"
 

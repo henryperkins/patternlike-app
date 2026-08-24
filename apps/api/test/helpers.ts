@@ -39,6 +39,7 @@ const TABLES = [
   "timezone_changes",
   "natal_feature_sets",
   "natal_features",
+  "codex_provider_response_uploads",
   "codex_provider_jobs",
   "pattern_generation_artifacts",
   "pattern_generation_artifact_keys",

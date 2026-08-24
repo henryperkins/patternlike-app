@@ -39,14 +39,9 @@ export const PATTERN_PUBLISHER_SYNTHETIC = "synthetic" as const;
  */
 export const PATTERN_PUBLISHER_CODEX = "codex" as const;
 /**
- * Cloudflare Workers AI, reached through the `AI` binding.
- *
- * The only real provider this deployment can both pay for and reach: it needs
- * no outbound credential (the binding authenticates itself), and it is not
- * subject to the egress refusal that makes `codex` unusable from a Worker.
- * Section 14.2 independence is stronger here than on the OpenAI path -- the
- * writer and verifier are genuinely different models, not one model under two
- * prompt versions.
+ * Experimental Cloudflare Workers AI publisher, reached through the `AI`
+ * binding. It remains development-only until its model contract and rollout
+ * are independently reviewed; production configuration refuses it below.
  */
 export const PATTERN_PUBLISHER_WORKERS_AI = "workers_ai" as const;
 
@@ -267,6 +262,9 @@ export function resolvePatternPublisherConfiguration(
   }
   if (publisher === PATTERN_PUBLISHER_SYNTHETIC && !isDevEnvironment(env.ENVIRONMENT)) {
     return misconfigured("PATTERN_PUBLISHER=synthetic is refused outside development");
+  }
+  if (publisher === PATTERN_PUBLISHER_WORKERS_AI && !isDevEnvironment(env.ENVIRONMENT)) {
+    return misconfigured("PATTERN_PUBLISHER=workers_ai is refused outside development");
   }
 
   const callLimitRaw = env.PATTERN_DAILY_PROVIDER_CALL_LIMIT?.trim();

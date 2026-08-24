@@ -30,6 +30,8 @@ export interface CodexProviderArtifactCoordinate {
   stageGeneration: number;
   stageAttempt: number;
   role: CodexProviderArtifactRole;
+  /** SHA-256 lease fence for response uploads; never the plaintext lease. */
+  storageDiscriminator?: string;
 }
 
 export type CodexProviderArtifactErrorCode =
@@ -126,7 +128,14 @@ function coordinateIsValid(value: CodexProviderArtifactCoordinate): boolean {
     value.stageGeneration >= 0 &&
     Number.isSafeInteger(value.stageAttempt) &&
     value.stageAttempt >= 0 &&
-    (value.role === "request" || value.role === "response");
+    (value.role === "request" || value.role === "response") &&
+    (
+      value.storageDiscriminator === undefined ||
+      (
+        value.role === "response" &&
+        /^[a-f0-9]{64}$/.test(value.storageDiscriminator)
+      )
+    );
 }
 
 function maximumPlaintextBytes(role: CodexProviderArtifactRole): number {
@@ -143,7 +152,31 @@ export function codexProviderArtifactObjectKey(
   coordinate: CodexProviderArtifactCoordinate,
 ): string {
   if (!coordinateIsValid(coordinate)) fail("codex_provider_artifact_invalid");
+  if (
+    coordinate.role === "response" &&
+    coordinate.storageDiscriminator !== undefined
+  ) {
+    return `codex-provider-jobs/${coordinate.jobId}/responses/${coordinate.storageDiscriminator}.json.enc`;
+  }
   return `codex-provider-jobs/${coordinate.jobId}/${coordinate.role}.json.enc`;
+}
+
+function coordinateForExpectedObject(
+  coordinate: CodexProviderArtifactCoordinate,
+  objectKey: string,
+): CodexProviderArtifactCoordinate {
+  if (objectKey === codexProviderArtifactObjectKey(coordinate)) {
+    return coordinate;
+  }
+  if (coordinate.role !== "response") {
+    fail("codex_provider_artifact_integrity_failed");
+  }
+  const prefix = `codex-provider-jobs/${coordinate.jobId}/responses/`;
+  const match = /^([a-f0-9]{64})\.json\.enc$/.exec(
+    objectKey.startsWith(prefix) ? objectKey.slice(prefix.length) : "",
+  );
+  if (!match) fail("codex_provider_artifact_integrity_failed");
+  return { ...coordinate, storageDiscriminator: match[1]! };
 }
 
 function authenticatedIdentity(
@@ -401,13 +434,14 @@ export async function readCodexProviderArtifact(
   coordinate: CodexProviderArtifactCoordinate,
   expected: CodexProviderArtifactPointer,
 ): Promise<Uint8Array> {
-  if (expected.objectKey !== codexProviderArtifactObjectKey(coordinate)) {
-    fail("codex_provider_artifact_integrity_failed");
-  }
+  const storedCoordinate = coordinateForExpectedObject(
+    coordinate,
+    expected.objectKey,
+  );
   const opened = await openEnvelope(
     env.CODEX_PROVIDER_ARTIFACT_KEYRING,
-    coordinate,
-    await readObject(env, coordinate),
+    storedCoordinate,
+    await readObject(env, storedCoordinate),
   );
   if (canonicalJson(opened.pointer) !== canonicalJson(expected)) {
     fail("codex_provider_artifact_integrity_failed");

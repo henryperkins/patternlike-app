@@ -99,10 +99,7 @@ export interface Env {
   CODEX_PROVIDER_ARTIFACT_KEYRING?: string;
   /** Dedicated bearer secret for the outbound-only Codex runner. */
   CODEX_RUNNER_TOKEN?: string;
-  /**
-   * Cloudflare Workers AI. Required whenever a publisher is `workers_ai`;
-   * the binding authenticates itself, so there is no matching secret.
-   */
+  /** Development-only experimental Workers AI publisher binding. */
   AI?: Ai;
   /** Staged machine-ontology pipeline rollout: `off` | `internal`. */
   ONTOLOGY_PIPELINE_ROLLOUT?: string;

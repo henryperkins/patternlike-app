@@ -24,6 +24,46 @@ export { CODEX_PROVIDER_MAX_RESPONSE_BYTES } from "./protocol.js";
 const CODEX_CLI_MAX_EVENT_BYTES = 256 * 1024;
 const PROVIDER_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
 const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
+const CODEX_CHILD_ENVIRONMENT_KEYS = [
+  "HOME",
+  "PATH",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "CODEX_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_STATE_HOME",
+  "TMPDIR",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TZ",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_EXTRA_CA_CERTS",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+] as const;
+
+/** Keep the runner bearer and application credentials out of Codex children. */
+export function buildCodexChildEnvironment(
+  source: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const child: NodeJS.ProcessEnv = {};
+  for (const key of CODEX_CHILD_ENVIRONMENT_KEYS) {
+    const value = source[key];
+    if (value !== undefined) child[key] = value;
+  }
+  return child;
+}
 
 export type CodexInvocationOutcome =
   | {
@@ -79,7 +119,7 @@ async function runProcess(
   return new Promise((resolve) => {
     const child = spawn(binary, args, {
       cwd: options.cwd,
-      env: options.env,
+      env: buildCodexChildEnvironment(options.env ?? process.env),
       shell: false,
       windowsHide: true,
       stdio: ["pipe", "pipe", "ignore"],
@@ -202,7 +242,7 @@ export async function checkCodexAuthentication(
   return new Promise((resolve) => {
     const child = spawn(codexBin, ["login", "status"], {
       cwd: options.cwd,
-      env: options.env,
+      env: buildCodexChildEnvironment(options.env ?? process.env),
       shell: false,
       windowsHide: true,
       stdio: "ignore",

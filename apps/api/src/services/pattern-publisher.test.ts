@@ -127,6 +127,17 @@ describe("Pattern publisher configuration", () => {
     expect(outcome.config?.pin.publisher).toBe("openai");
   });
 
+  it("refuses the experimental Workers AI publisher outside development", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ PATTERN_PUBLISHER: "workers_ai" }),
+    );
+    expect(outcome).toEqual({
+      ok: false,
+      code: "pattern_publisher_misconfigured",
+      message: "PATTERN_PUBLISHER=workers_ai is refused outside development",
+    });
+  });
+
   describe("verifier independence (section 14.2)", () => {
     it("refuses a verifier whose model AND prompt version both match the writer's", () => {
       // Checked against the compiled constants, not the environment: the env

@@ -407,21 +407,20 @@ export interface ConfigFailure {
 export const PLACEHOLDER_OIDC_HOST = "issuer.invalid";
 
 export function checkSecureConfig(
-  env:
-    | Pick<
-        Env,
-        | "ENVIRONMENT"
-        | "AUTH_STUB"
-        | "ROOT_KEK"
-        | "OIDC_ISSUER"
-        | "OIDC_AUDIENCE"
-        | "OIDC_JWKS_URL"
-        | "CHECK_IN_RETENTION_MONTHS"
-        | "TIME_TRAVEL_RECEIPT_EPOCH"
-        | "TIME_TRAVEL_DAILY_SCAN_LIMIT"
-      >
-    | Partial<Env>,
+  env: Partial<Env>,
 ): ConfigFailure | null {
+  const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
+  const aliasedRunnerAuthority = runnerToken !== "" && [
+    env.SERVICE_AUTH_TOKEN,
+    env.PATTERN_ADMIN_TOKEN,
+  ].some((value) => value?.trim() === runnerToken);
+  if (aliasedRunnerAuthority) {
+    return {
+      code: "codex_runner_authority_aliased",
+      message: "CODEX_RUNNER_TOKEN must be unique to the Codex runner authority",
+    };
+  }
+
   const checkInRetention = resolveCheckInRetentionMonths(
     env.CHECK_IN_RETENTION_MONTHS,
   );

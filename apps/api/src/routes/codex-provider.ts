@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
-import { canonicalJson } from "@patternlike/shared";
+import { canonicalJson, contentHash } from "@patternlike/shared";
 import {
   authorizeCodexProviderTerminalWrite,
   cancelCodexProviderJob,
@@ -10,6 +10,7 @@ import {
   completeCodexProviderJob,
   failCodexProviderJob,
   releaseCodexProviderJobLease,
+  reserveCodexProviderResponseUpload,
   type CodexProviderJob,
 } from "../db/codex-provider-jobs.js";
 import {
@@ -240,7 +241,7 @@ codexProviderRoutes.post("/v1/jobs/claim", async (c) => {
   const now = new Date();
   const claimed = await claimCodexProviderJob(c.env, now);
   if (claimed.status === "empty") return c.body(null, 204);
-  if (!await codexProviderOwnerIsCurrent(c.env, claimed.job)) {
+  if (!await codexProviderOwnerIsCurrent(c.env, claimed.job, now)) {
     await cancelCodexProviderJob(
       c.env,
       { jobId: claimed.job.id, leaseToken: claimed.leaseToken },
@@ -406,12 +407,65 @@ codexProviderRoutes.post("/v1/jobs/:jobId/complete", async (c) => {
     now,
   );
   if (!job) return terminalConflict(c);
+  if (job.status === "completed") {
+    if (
+      !job.response ||
+      await contentHash(completion.value.output) !==
+        job.response.plaintextHash
+    ) {
+      return terminalConflict(c);
+    }
+    const replay = await completeCodexProviderJob(
+      c.env,
+      {
+        jobId,
+        leaseToken: completion.value.lease_token,
+        response: job.response,
+        providerRequestId: completion.value.provider_request_id,
+        inputTokens: completion.value.input_tokens,
+        outputTokens: completion.value.output_tokens,
+      },
+      now,
+    );
+    return replay.status === "adopted"
+      ? terminalAccepted(c)
+      : terminalConflict(c);
+  }
+  if (
+    !await codexProviderOwnerIsCurrent(c.env, job, now)
+  ) {
+    await cancelCodexProviderJob(
+      c.env,
+      { jobId, leaseToken: completion.value.lease_token },
+      now,
+    );
+    return terminalConflict(c);
+  }
+
+  const upload = await reserveCodexProviderResponseUpload(
+    c.env,
+    { jobId, leaseToken: completion.value.lease_token },
+    now,
+  );
+  if (upload.status === "conflict") return terminalConflict(c);
+  if (!await codexProviderOwnerIsCurrent(c.env, job, now)) {
+    await cancelCodexProviderJob(
+      c.env,
+      { jobId, leaseToken: completion.value.lease_token },
+      now,
+    );
+    return terminalConflict(c);
+  }
+  const leaseHash = await contentHash(completion.value.lease_token);
 
   let response;
   try {
     response = await putCodexProviderArtifact(
       c.env,
-      artifactCoordinate(job, "response"),
+      {
+        ...artifactCoordinate(job, "response"),
+        storageDiscriminator: leaseHash.slice("sha256:".length),
+      },
       textEncoder.encode(completion.value.output),
     );
   } catch {
@@ -420,6 +474,18 @@ codexProviderRoutes.post("/v1/jobs/:jobId/complete", async (c) => {
       job_id: job.id,
       operation: "complete",
     });
+    return terminalConflict(c);
+  }
+  if (response.artifact.objectKey !== upload.objectKey) {
+    return terminalConflict(c);
+  }
+  const commitNow = new Date();
+  if (!await codexProviderOwnerIsCurrent(c.env, job, commitNow)) {
+    await cancelCodexProviderJob(
+      c.env,
+      { jobId, leaseToken: completion.value.lease_token },
+      commitNow,
+    );
     return terminalConflict(c);
   }
   const committed = await completeCodexProviderJob(
@@ -432,9 +498,14 @@ codexProviderRoutes.post("/v1/jobs/:jobId/complete", async (c) => {
       inputTokens: completion.value.input_tokens,
       outputTokens: completion.value.output_tokens,
     },
-    now,
+    commitNow,
   );
   if (committed.status === "conflict" || committed.status === "stale") {
+    await cancelCodexProviderJob(
+      c.env,
+      { jobId, leaseToken: completion.value.lease_token },
+      commitNow,
+    );
     safeLog({
       event: "codex_provider_job_conflict",
       job_id: job.id,
@@ -452,7 +523,7 @@ codexProviderRoutes.post("/v1/jobs/:jobId/complete", async (c) => {
     output_tokens: completion.value.output_tokens,
     response_hash: response.artifact.plaintextHash,
   });
-  await nudgeAndObserve(c.env, job, now);
+  await nudgeAndObserve(c.env, job, commitNow);
   return terminalAccepted(c);
 });
 
@@ -476,6 +547,17 @@ codexProviderRoutes.post("/v1/jobs/:jobId/fail", async (c) => {
     now,
   );
   if (!job) return terminalConflict(c);
+  if (
+    job.status === "leased" &&
+    !await codexProviderOwnerIsCurrent(c.env, job, now)
+  ) {
+    await cancelCodexProviderJob(
+      c.env,
+      { jobId, leaseToken: failure.value.lease_token },
+      now,
+    );
+    return terminalConflict(c);
+  }
   const committed = await failCodexProviderJob(
     c.env,
     {

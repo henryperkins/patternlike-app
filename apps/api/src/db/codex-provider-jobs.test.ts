@@ -7,6 +7,7 @@ import {
   completeCodexProviderJob,
   enqueueCodexProviderJob,
   failCodexProviderJob,
+  reserveCodexProviderResponseUpload,
 } from "./codex-provider-jobs.js";
 
 const REQUEST_HASH = `sha256:${"11".repeat(32)}`;
@@ -202,5 +203,46 @@ describe("Codex provider durable jobs", () => {
       failure_code: "publisher_unavailable",
       safe_detail_code: "request_timeout",
     });
+  });
+
+  it("fences response uploads by lease and gives a reclaimed lease a distinct key", async () => {
+    const startedAt = new Date("2026-08-24T00:00:00.000Z");
+    await enqueueCodexProviderJob(env, enqueueInput(), startedAt);
+    const first = await claimCodexProviderJob(env, startedAt);
+    if (first.status !== "claimed") throw new Error("claim missing");
+
+    const reserved = await reserveCodexProviderResponseUpload(
+      env,
+      { jobId: first.job.id, leaseToken: first.leaseToken },
+      new Date("2026-08-24T00:19:59.000Z"),
+    );
+    expect(reserved).toEqual({
+      status: "reserved",
+      objectKey: expect.stringMatching(
+        new RegExp(`^codex-provider-jobs/${first.job.id}/responses/[a-f0-9]{64}\\.json\\.enc$`),
+      ),
+    });
+    if (reserved.status !== "reserved") throw new Error("reservation missing");
+    expect(await claimCodexProviderJob(
+      env,
+      new Date("2026-08-24T00:20:01.000Z"),
+    )).toEqual({ status: "empty" });
+
+    const second = await claimCodexProviderJob(
+      env,
+      new Date("2026-08-24T00:25:00.001Z"),
+    );
+    if (second.status !== "claimed") throw new Error("reclaim missing");
+    const secondReservation = await reserveCodexProviderResponseUpload(
+      env,
+      { jobId: second.job.id, leaseToken: second.leaseToken },
+      new Date("2026-08-24T00:25:01.000Z"),
+    );
+    expect(secondReservation.status).toBe("reserved");
+    if (secondReservation.status !== "reserved") return;
+    expect(secondReservation.objectKey).not.toBe(reserved.objectKey);
+    expect(await rows<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM codex_provider_response_uploads",
+    )).toEqual([{ count: 2 }]);
   });
 });

@@ -47,9 +47,16 @@ export const DELETION_ARTIFACT_FAMILIES: readonly DeletionArtifactFamily[] = [
           request_object_key: string;
           response_object_key: string | null;
         }>();
+      const { results: uploads } = await env.DB.prepare(
+        `SELECT upload.object_key
+         FROM codex_provider_response_uploads upload
+         JOIN codex_provider_jobs job ON job.id = upload.job_id
+         WHERE job.user_id = ? ORDER BY upload.object_key`,
+      ).bind(userId).all<{ object_key: string }>();
       return results.flatMap((row) => row.response_object_key === null
         ? [row.request_object_key]
-        : [row.request_object_key, row.response_object_key]);
+        : [row.request_object_key, row.response_object_key])
+        .concat(uploads.map((row) => row.object_key));
     },
   },
 ];

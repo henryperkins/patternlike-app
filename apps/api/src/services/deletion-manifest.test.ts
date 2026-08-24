@@ -175,10 +175,18 @@ describe("account-deletion manifest", () => {
       at,
       at,
     ).run();
+    const staleUploadKey =
+      `codex-provider-jobs/${jobId}/responses/${"9".repeat(64)}.json.enc`;
+    await env.DB.prepare(
+      `INSERT INTO codex_provider_response_uploads (
+         job_id, lease_token_hash, object_key, created_at
+       ) VALUES (?, ?, ?, ?)`,
+    ).bind(jobId, hash("9"), staleUploadKey, at).run();
 
     expect(await collectDeletionArtifactKeys(env, USER_A)).toEqual([
       requestKey,
       responseKey,
+      staleUploadKey,
     ]);
     await deleteUserRows(env, USER_A, "job_deletion_fixture");
     expect(await env.DB.prepare(

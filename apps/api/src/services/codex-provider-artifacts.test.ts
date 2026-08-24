@@ -84,6 +84,26 @@ describe("Codex provider encrypted artifacts", () => {
     ).rejects.toMatchObject({ code: "codex_provider_artifact_conflict" });
   });
 
+  it("keeps responses from different lease fences at distinct object keys", async () => {
+    const first = await putCodexProviderArtifact(
+      env,
+      { ...coordinate, role: "response", storageDiscriminator: "1".repeat(64) },
+      textEncoder.encode('{"answer":"first"}'),
+    );
+    const second = await putCodexProviderArtifact(
+      env,
+      { ...coordinate, role: "response", storageDiscriminator: "2".repeat(64) },
+      textEncoder.encode('{"answer":"second"}'),
+    );
+
+    expect(first.artifact.objectKey).not.toBe(second.artifact.objectKey);
+    expect(textDecoder.decode(await readCodexProviderArtifact(
+      env,
+      { ...coordinate, role: "response" },
+      second.artifact,
+    ))).toBe('{"answer":"second"}');
+  });
+
   it("fails closed on tampering and an unavailable keyring", async () => {
     const written = await putCodexProviderArtifact(
       env,

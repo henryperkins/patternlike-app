@@ -47,7 +47,15 @@ export async function codexRunnerAuth(
   const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
   c.set("requestId", requestId);
   const expected = c.env.CODEX_RUNNER_TOKEN?.trim() ?? "";
-  if (expected.length < 32 || expected.length > 512) {
+  const aliasesAnotherAuthority = expected !== "" && [
+    c.env.SERVICE_AUTH_TOKEN,
+    c.env.PATTERN_ADMIN_TOKEN,
+  ].some((value) => value?.trim() === expected);
+  if (
+    expected.length < 32 ||
+    expected.length > 512 ||
+    aliasesAnotherAuthority
+  ) {
     return error(
       c,
       requestId,

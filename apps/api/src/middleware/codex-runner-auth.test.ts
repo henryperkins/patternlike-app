@@ -20,6 +20,8 @@ describe("Codex runner authentication", () => {
   beforeEach(async () => {
     await resetDb();
     env.CODEX_RUNNER_TOKEN = RUNNER_TOKEN;
+    env.SERVICE_AUTH_TOKEN = "";
+    env.PATTERN_ADMIN_TOKEN = "";
     env.CODEX_PROVIDER_ARTIFACT_KEYRING = JSON.stringify({
       version: 1,
       keys: {
@@ -45,6 +47,18 @@ describe("Codex runner authentication", () => {
       error: { code: "codex_runner_auth_not_configured" },
     });
   });
+
+  it.each(["SERVICE_AUTH_TOKEN", "PATTERN_ADMIN_TOKEN"] as const)(
+    "fails closed when the runner token aliases %s",
+    async (authority) => {
+      env[authority] = RUNNER_TOKEN;
+      const response = await claim(`Bearer ${RUNNER_TOKEN}`);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        error: { code: "configuration_error" },
+      });
+    },
+  );
 
   it("refuses malformed authorization instead of normalizing it", async () => {
     expect((await claim(`bearer ${RUNNER_TOKEN}`)).status).toBe(401);

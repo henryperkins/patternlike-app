@@ -18,6 +18,7 @@ export interface CodexProviderMaintenanceSummary {
   repaired: number;
   cancelled: number;
   purged: number;
+  uploadsPurged: number;
 }
 
 async function candidateJobs(
@@ -58,7 +59,7 @@ async function cancelStaleJobs(
   let cancelled = 0;
   for (const id of ids) {
     const job = await loadCodexProviderJob(env, id);
-    if (!job || await codexProviderOwnerIsCurrent(env, job)) continue;
+    if (!job || await codexProviderOwnerIsCurrent(env, job, now)) continue;
     if (await cancelStaleCodexProviderJob(env, id, now)) cancelled += 1;
   }
   return cancelled;
@@ -155,7 +156,7 @@ async function purgeTerminalJobs(
     if (
       !job ||
       job.completedAt === null ||
-      await codexProviderOwnerIsCurrent(env, job)
+      await codexProviderOwnerIsCurrent(env, job, now)
     ) {
       continue;
     }
@@ -178,6 +179,68 @@ async function purgeTerminalJobs(
   return purged;
 }
 
+async function purgeStaleResponseUploads(
+  env: Env,
+  now: Date,
+): Promise<number> {
+  if (!env.ARTIFACTS) return 0;
+  const nowIso = now.toISOString();
+  const { results } = await env.DB.prepare(
+    `SELECT upload.job_id, upload.lease_token_hash, upload.object_key
+     FROM codex_provider_response_uploads upload
+     JOIN codex_provider_jobs job ON job.id = upload.job_id
+     WHERE NOT (
+       job.status = 'completed'
+       AND job.response_object_key = upload.object_key
+     ) AND NOT (
+       job.status = 'leased'
+       AND job.lease_token_hash = upload.lease_token_hash
+       AND job.lease_expires_at > ?
+     )
+     ORDER BY upload.created_at, upload.job_id LIMIT ?`,
+  ).bind(nowIso, MAINTENANCE_LIMIT).all<{
+    job_id: string;
+    lease_token_hash: string;
+    object_key: string;
+  }>();
+  let purged = 0;
+  for (const upload of results) {
+    try {
+      await env.ARTIFACTS.delete(upload.object_key);
+      if (await env.ARTIFACTS.head(upload.object_key)) continue;
+      const deleted = await env.DB.prepare(
+        `DELETE FROM codex_provider_response_uploads
+         WHERE job_id = ? AND lease_token_hash = ? AND object_key = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM codex_provider_jobs job
+             WHERE job.id = codex_provider_response_uploads.job_id
+               AND (
+                 (
+                   job.status = 'completed'
+                   AND job.response_object_key =
+                     codex_provider_response_uploads.object_key
+                 ) OR (
+                   job.status = 'leased'
+                   AND job.lease_token_hash =
+                     codex_provider_response_uploads.lease_token_hash
+                   AND job.lease_expires_at > ?
+                 )
+               )
+           )`,
+      ).bind(
+        upload.job_id,
+        upload.lease_token_hash,
+        upload.object_key,
+        nowIso,
+      ).run();
+      if (deleted.meta.changes === 1) purged += 1;
+    } catch {
+      // The upload row remains the retry inventory.
+    }
+  }
+  return purged;
+}
+
 /** Bounded repair, stale cancellation, and retention for both provider domains. */
 export async function maintainCodexProviderJobs(
   env: Env,
@@ -186,11 +249,12 @@ export async function maintainCodexProviderJobs(
   let cancelled = 0;
   let repaired = 0;
   let purged = 0;
+  const uploadsPurged = await purgeStaleResponseUploads(env, now);
   for (const pipeline of ["pattern", "ontology"] as const) {
     if (!await hasPipelineJobs(env, pipeline)) continue;
     cancelled += await cancelStaleJobs(env, now, pipeline);
     repaired += await repairTerminalNudges(env, now, pipeline);
     purged += await purgeTerminalJobs(env, now, pipeline);
   }
-  return { repaired, cancelled, purged };
+  return { repaired, cancelled, purged, uploadsPurged };
 }

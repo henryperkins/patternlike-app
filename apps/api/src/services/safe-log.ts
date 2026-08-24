@@ -31,7 +31,8 @@ export type ConfigurationCode =
   | "pattern_rollout_invalid"
   | "pattern_publisher_misconfigured"
   | "ontology_pipeline_rollout_invalid"
-  | "ontology_pipeline_misconfigured";
+  | "ontology_pipeline_misconfigured"
+  | "codex_runner_authority_aliased";
 
 type OperationalFailureClass =
   | GenerationFailureCode

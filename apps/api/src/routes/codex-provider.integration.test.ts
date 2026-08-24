@@ -12,6 +12,7 @@ import {
   codexProviderJobId,
   completeCodexProviderJob,
   enqueueCodexProviderJob,
+  reserveCodexProviderResponseUpload,
 } from "../db/codex-provider-jobs.js";
 import {
   putCodexProviderArtifact,
@@ -24,6 +25,25 @@ const RUNNER_TOKEN = "runner_0123456789abcdefghijklmnopqrstuvwxyz";
 const FIXTURE_AT = "2026-08-24T00:00:00.000Z";
 const textEncoder = new TextEncoder();
 const HASH = `sha256:${"a".repeat(64)}`;
+
+function enableOntologyCodex(): void {
+  env.ONTOLOGY_PIPELINE_ROLLOUT = "internal";
+  env.ONTOLOGY_PIPELINE_PUBLISHER = "codex";
+  env.ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1";
+  env.OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol";
+  env.OPENAI_ONTOLOGY_GENERATOR_REASONING = "high";
+  env.OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.5";
+  env.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "900000";
+  env.OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = "8000";
+  env.OPENAI_ONTOLOGY_EVALUATOR_MODEL = "gpt-5.6-sol";
+  env.OPENAI_ONTOLOGY_EVALUATOR_REASONING = "high";
+  env.OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION = "1.0.0-evaluator";
+  env.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = "900000";
+  env.OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS = "4000";
+  env.ONTOLOGY_PIPELINE_INPUT_MAX_BYTES = "98304";
+  env.ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT = "500";
+  env.ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS = "7";
+}
 
 const invocation: CodexProviderInvocation = {
   schema_version: "codex-provider-invocation/v1",
@@ -162,15 +182,19 @@ async function claim(body = "{}") {
 async function claimedFixture(): Promise<{
   jobId: string;
   leaseToken: string;
+  ownerId: string;
 }> {
-  const jobId = await enqueueFixture();
+  const ownerId = `oprun_codex_route_${crypto.randomUUID()}`;
+  const jobId = await enqueueFixture({
+    ownerId,
+  });
   const response = await claim();
   expect(response.status).toBe(200);
   const body = await response.json<{
     job_id: string;
     lease_token: string;
   }>();
-  return { jobId, leaseToken: body.lease_token };
+  return { jobId, leaseToken: body.lease_token, ownerId };
 }
 
 async function complete(
@@ -217,6 +241,7 @@ describe("Codex provider runner routes", () => {
         "codex-test-key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
       },
     });
+    enableOntologyCodex();
   });
 
   it("leases one encrypted invocation and charges its existing budget", async () => {
@@ -375,6 +400,54 @@ describe("Codex provider runner routes", () => {
     )).toBeNull();
   });
 
+  it("maintenance deletes an uploaded response after its lease is reclaimed", async () => {
+    const jobId = await enqueueFixture({
+      ownerId: `oprun_codex_stale_upload_${crypto.randomUUID()}`,
+    });
+    const first = await claimCodexProviderJob(
+      env,
+      new Date("2026-08-24T02:00:00.000Z"),
+    );
+    if (first.status !== "claimed") throw new Error("first claim failed");
+    const upload = await reserveCodexProviderResponseUpload(
+      env,
+      { jobId, leaseToken: first.leaseToken },
+      new Date("2026-08-24T02:19:59.000Z"),
+    );
+    if (upload.status !== "reserved") throw new Error("upload reservation failed");
+    const leaseHash = await contentHash(first.leaseToken);
+    await putCodexProviderArtifact(
+      env,
+      {
+        jobId,
+        pipeline: "ontology",
+        ownerId: first.job.ownerId,
+        pass: "generator",
+        stageGeneration: 2,
+        stageAttempt: 0,
+        role: "response",
+        storageDiscriminator: leaseHash.slice("sha256:".length),
+      },
+      textEncoder.encode('{"answer":"stale"}'),
+    );
+    const second = await claimCodexProviderJob(
+      env,
+      new Date("2026-08-24T02:25:00.001Z"),
+    );
+    if (second.status !== "claimed") throw new Error("reclaim failed");
+
+    await maintainCodexProviderJobs(
+      env,
+      new Date("2026-08-24T02:25:01.000Z"),
+    );
+
+    expect(await env.ARTIFACTS!.head(upload.objectKey)).toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT object_key FROM codex_provider_response_uploads
+       WHERE object_key = ?`,
+    ).bind(upload.objectKey).first()).toBeNull();
+  });
+
   it("requires an empty exact-field claim document", async () => {
     await enqueueFixture();
     expect((await claim('{"extra":true}')).status).toBe(400);
@@ -387,7 +460,7 @@ describe("Codex provider runner routes", () => {
   });
 
   it("stores encrypted completion and adopts only an exact replay", async () => {
-    const { jobId, leaseToken } = await claimedFixture();
+    const { jobId, leaseToken, ownerId } = await claimedFixture();
     const send = vi.spyOn(env.ONTOLOGY_PIPELINE_QUEUE, "send");
     const document = {
       lease_token: leaseToken,
@@ -399,7 +472,7 @@ describe("Codex provider runner routes", () => {
 
     expect((await complete(jobId, document)).status).toBe(200);
     expect(send).toHaveBeenCalledWith({
-      run_id: "oprun_codex_route_fixture",
+      run_id: ownerId,
       stage_generation: 2,
     });
     expect((await complete(jobId, document)).status).toBe(200);
@@ -418,7 +491,9 @@ describe("Codex provider runner routes", () => {
     );
     expect(row).toEqual({
       status: "completed",
-      response_object_key: `codex-provider-jobs/${jobId}/response.json.enc`,
+      response_object_key: expect.stringMatching(
+        new RegExp(`^codex-provider-jobs/${jobId}/responses/[a-f0-9]{64}\\.json\\.enc$`),
+      ),
       provider_request_id: "thread_123",
       input_tokens: 10,
       output_tokens: 4,
@@ -528,7 +603,53 @@ describe("Codex provider runner routes", () => {
     expect(row).toEqual({ status: "cancelled" });
   });
 
+  it("cancels unclaimed work when the ontology rollout is disabled", async () => {
+    const jobId = await enqueueFixture();
+    env.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+
+    expect((await claim()).status).toBe(204);
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE id = ?",
+    ).bind(jobId).first()).toEqual({ status: "cancelled" });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_ontology_provider_daily_usage",
+    ).first()).toEqual({ count: 0 });
+  });
+
+  it("cancels a leased job instead of accepting completion after rollout disablement", async () => {
+    const { jobId, leaseToken } = await claimedFixture();
+    env.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+
+    const response = await complete(jobId, {
+      lease_token: leaseToken,
+      output: '{"answer":"must-not-be-stored"}',
+      provider_request_id: "thread_disabled",
+      input_tokens: 1,
+      output_tokens: 1,
+    });
+
+    expect(response.status).toBe(409);
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE id = ?",
+    ).bind(jobId).first()).toEqual({ status: "cancelled" });
+  });
+
+  it("cancels a leased job instead of accepting failure after rollout disablement", async () => {
+    const { jobId, leaseToken } = await claimedFixture();
+    env.ONTOLOGY_PIPELINE_ROLLOUT = "off";
+
+    expect((await fail(jobId, {
+      lease_token: leaseToken,
+      code: "publisher_unavailable",
+      safe_detail_code: "request_timeout",
+    })).status).toBe(409);
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE id = ?",
+    ).bind(jobId).first()).toEqual({ status: "cancelled" });
+  });
+
   it("records exhausted daily budget as a closed terminal result", async () => {
+    env.ONTOLOGY_PIPELINE_DAILY_PROVIDER_CALL_LIMIT = "1";
     await enqueueFixture({ dailyCallLimit: 1 });
     expect((await claim()).status).toBe(200);
 

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  buildCodexChildEnvironment,
   CODEX_PROVIDER_MAX_RESPONSE_BYTES,
   runCodexInvocation,
 } from "./codex-cli.js";
@@ -19,6 +20,28 @@ import type { CodexProviderClaim } from "./protocol.js";
 
 const PROMPT = "private prompt that must only use stdin";
 const OUTPUT = '{"answer":"private output"}';
+
+test("passes only the explicit Codex child environment allowlist", () => {
+  assert.deepEqual(buildCodexChildEnvironment({
+    HOME: "/var/lib/patternlike-codex-runner",
+    PATH: "/usr/local/bin:/usr/bin",
+    CODEX_HOME: "/var/lib/patternlike-codex-runner/.codex",
+    HTTPS_PROXY: "http://proxy.example.test:8080",
+    SSL_CERT_FILE: "/etc/ssl/custom.pem",
+    CODEX_RUNNER_TOKEN: "runner-secret",
+    PATTERNLIKE_API_ORIGIN: "https://api.example.test",
+    SERVICE_AUTH_TOKEN: "service-secret",
+    PATTERN_ADMIN_TOKEN: "admin-secret",
+    OPENAI_API_KEY: "provider-secret",
+    NODE_OPTIONS: "--require=/tmp/inject.cjs",
+  }), {
+    HOME: "/var/lib/patternlike-codex-runner",
+    PATH: "/usr/local/bin:/usr/bin",
+    CODEX_HOME: "/var/lib/patternlike-codex-runner/.codex",
+    HTTPS_PROXY: "http://proxy.example.test:8080",
+    SSL_CERT_FILE: "/etc/ssl/custom.pem",
+  });
+});
 
 function claim(overrides: Partial<CodexProviderClaim> = {}): CodexProviderClaim {
   return {
@@ -43,7 +66,7 @@ function claim(overrides: Partial<CodexProviderClaim> = {}): CodexProviderClaim 
   };
 }
 
-async function fixture() {
+async function fixture(mode = "success") {
   const root = await mkdtemp(join(tmpdir(), "codex-runner-test-"));
   const tempRoot = join(root, "attempts");
   const recordRoot = join(root, "record");
@@ -57,8 +80,8 @@ import { chmod, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 const args = process.argv.slice(2);
-const recordRoot = process.env.FAKE_CODEX_RECORD_ROOT;
-const mode = process.env.FAKE_CODEX_MODE ?? "success";
+const recordRoot = process.env.HOME;
+const mode = await readFile(join(recordRoot, "mode.txt"), "utf8");
 let prompt = "";
 process.stdin.setEncoding("utf8");
 for await (const chunk of process.stdin) prompt += chunk;
@@ -93,12 +116,17 @@ if (mode !== "missing-usage") {
   }) + "\\n");
 }
 `, { mode: 0o700 });
+  await writeFile(join(recordRoot, "mode.txt"), mode);
   await chmod(executable, 0o700);
   return {
     executable,
     root,
     tempRoot,
     recordRoot,
+    childEnv: {
+      HOME: recordRoot,
+      PATH: process.env.PATH,
+    },
     cleanup: () => rm(root, { recursive: true, force: true }),
   };
 }
@@ -110,7 +138,7 @@ test("invokes Codex with the exact safe argument surface and stdin-only prompt",
       claim: claim(),
       codexBin: f.executable,
       tempRoot: f.tempRoot,
-      env: { ...process.env, FAKE_CODEX_RECORD_ROOT: f.recordRoot },
+      env: f.childEnv,
     });
     assert.deepEqual(result, {
       ok: true,
@@ -148,17 +176,13 @@ test("invokes Codex with the exact safe argument surface and stdin-only prompt",
 
 for (const mode of ["missing-thread", "missing-usage"] as const) {
   test(`fails closed for ${mode}`, async () => {
-    const f = await fixture();
+    const f = await fixture(mode);
     try {
       const result = await runCodexInvocation({
         claim: claim(),
         codexBin: f.executable,
         tempRoot: f.tempRoot,
-        env: {
-          ...process.env,
-          FAKE_CODEX_RECORD_ROOT: f.recordRoot,
-          FAKE_CODEX_MODE: mode,
-        },
+        env: f.childEnv,
       });
       assert.deepEqual(result, {
         ok: false,
@@ -174,17 +198,13 @@ for (const mode of ["missing-thread", "missing-usage"] as const) {
 }
 
 test("rejects output over the provider response ceiling and cleans up", async () => {
-  const f = await fixture();
+  const f = await fixture("oversized");
   try {
     const result = await runCodexInvocation({
       claim: claim(),
       codexBin: f.executable,
       tempRoot: f.tempRoot,
-      env: {
-        ...process.env,
-        FAKE_CODEX_RECORD_ROOT: f.recordRoot,
-        FAKE_CODEX_MODE: "oversized",
-      },
+      env: f.childEnv,
     });
     assert.deepEqual(result, {
       ok: false,
@@ -199,17 +219,13 @@ test("rejects output over the provider response ceiling and cleans up", async ()
 });
 
 test("terminates a timed-out child and cleans up", async () => {
-  const f = await fixture();
+  const f = await fixture("hang");
   try {
     const result = await runCodexInvocation({
       claim: claim({ timeout_ms: 100 }),
       codexBin: f.executable,
       tempRoot: f.tempRoot,
-      env: {
-        ...process.env,
-        FAKE_CODEX_RECORD_ROOT: f.recordRoot,
-        FAKE_CODEX_MODE: "hang",
-      },
+      env: f.childEnv,
     });
     assert.deepEqual(result, {
       ok: false,

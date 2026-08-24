@@ -21,6 +21,7 @@ import {
 } from "../../test/pattern-replay-fixtures.js";
 import type { PatternGenerationMessage } from "../env.js";
 import { executePatternJob } from "./pattern-execute.js";
+import { revokePatternGenerationConsent } from "./pattern-lifecycle.js";
 import { loadPatternJob } from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
@@ -171,5 +172,48 @@ describe("Pattern execution through the durable Codex provider", () => {
     expect(await rows<{ count: number }>(
       "SELECT COUNT(*) AS count FROM codex_provider_jobs",
     )).toEqual([{ count: 1 }]);
+  });
+
+  it("cancels pending provider work when an internal account leaves the allowlist", async () => {
+    env.PATTERN_AI_ROLLOUT = "internal";
+    const generationId = await reserve();
+    const message = await currentMessage(generationId);
+    expect(await executePatternJob(env, message)).toEqual({
+      ok: true,
+      terminal: false,
+    });
+    env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
+
+    expect((await runner("/v1/jobs/claim", {})).status).toBe(204);
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE owner_id = ?",
+    ).bind(generationId).first()).toEqual({ status: "cancelled" });
+  });
+
+  it("refuses a leased completion after Pattern consent is revoked", async () => {
+    const generationId = await reserve();
+    const message = await currentMessage(generationId);
+    expect(await executePatternJob(env, message)).toEqual({
+      ok: true,
+      terminal: false,
+    });
+    const response = await runner("/v1/jobs/claim", {});
+    expect(response.status).toBe(200);
+    const claimed = await response.json<{
+      job_id: string;
+      lease_token: string;
+    }>();
+    await revokePatternGenerationConsent(env, IDENTITY_A);
+
+    expect((await runner(`/v1/jobs/${claimed.job_id}/complete`, {
+      lease_token: claimed.lease_token,
+      output: '{"answer":"must-not-be-stored"}',
+      provider_request_id: "thread_revoked",
+      input_tokens: 1,
+      output_tokens: 1,
+    })).status).toBe(409);
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE id = ?",
+    ).bind(claimed.job_id).first()).toEqual({ status: "cancelled" });
   });
 });

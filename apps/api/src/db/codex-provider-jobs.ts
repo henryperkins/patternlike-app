@@ -136,6 +136,7 @@ const SELECT_COLUMNS = `
   provider_request_id, input_tokens, output_tokens, failure_code,
   safe_detail_code, available_at, created_at, updated_at, completed_at
 `;
+const TERMINAL_UPLOAD_LEASE_EXTENSION_MS = 5 * 60 * 1000;
 
 function artifactFromRow(
   row: CodexProviderJobRow,
@@ -416,6 +417,76 @@ export async function claimCodexProviderJob(
     return { status: "claimed", job: jobFromRow(row), leaseToken };
   }
   return { status: "empty" };
+}
+
+export async function reserveCodexProviderResponseUpload(
+  env: Pick<Env, "DB">,
+  input: { jobId: string; leaseToken: string },
+  now: Date,
+): Promise<
+  | { status: "reserved"; objectKey: string }
+  | { status: "conflict" }
+> {
+  const leaseTokenHash = await contentHash(input.leaseToken);
+  const discriminator = leaseTokenHash.slice("sha256:".length);
+  const objectKey =
+    `codex-provider-jobs/${input.jobId}/responses/${discriminator}.json.enc`;
+  const nowIso = now.toISOString();
+  const extendedUntil = new Date(
+    now.getTime() + TERMINAL_UPLOAD_LEASE_EXTENSION_MS,
+  ).toISOString();
+  const [lease, inventory] = await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE codex_provider_jobs
+       SET lease_expires_at = CASE
+             WHEN lease_expires_at < ? THEN ? ELSE lease_expires_at
+           END,
+           updated_at = ?
+       WHERE id = ? AND status = 'leased' AND lease_token_hash = ?
+         AND lease_expires_at > ?
+         AND (
+           pipeline = 'ontology'
+           OR EXISTS (
+             SELECT 1 FROM users
+             WHERE users.id = codex_provider_jobs.user_id
+               AND users.status = 'active'
+           )
+         )`,
+    ).bind(
+      extendedUntil,
+      extendedUntil,
+      nowIso,
+      input.jobId,
+      leaseTokenHash,
+      nowIso,
+    ),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO codex_provider_response_uploads (
+         job_id, lease_token_hash, object_key, created_at
+       )
+       SELECT id, ?, ?, ? FROM codex_provider_jobs
+       WHERE id = ? AND status = 'leased' AND lease_token_hash = ?
+         AND lease_expires_at > ?`,
+    ).bind(
+      leaseTokenHash,
+      objectKey,
+      nowIso,
+      input.jobId,
+      leaseTokenHash,
+      nowIso,
+    ),
+  ]);
+  if (lease.meta.changes !== 1) return { status: "conflict" };
+  if (inventory.meta.changes === 1) {
+    return { status: "reserved", objectKey };
+  }
+  const existing = await env.DB.prepare(
+    `SELECT object_key FROM codex_provider_response_uploads
+     WHERE job_id = ? AND lease_token_hash = ?`,
+  ).bind(input.jobId, leaseTokenHash).first<{ object_key: string }>();
+  return existing?.object_key === objectKey
+    ? { status: "reserved", objectKey }
+    : { status: "conflict" };
 }
 
 export interface CompleteCodexProviderJobInput {

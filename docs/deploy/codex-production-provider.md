@@ -1,8 +1,10 @@
 # Codex production provider runbook
 
-**Status (2026-08-24):** implementation, D1 migration, Worker secrets, and the
-rollout-off control-plane deployment are complete. Dedicated-host installation,
-interactive service-account login, and the ontology/Pattern canaries remain.
+**Status (2026-08-24):** the rollout-off control plane, migration `0013`, and
+Worker secrets are deployed. Release hardening adds migration `0014`, which
+must be applied before the hardened Worker is deployed. Dedicated-host
+installation, interactive service-account login, and the ontology/Pattern
+canaries remain.
 
 This runbook operates the supported Codex CLI provider for Pattern generation
 and the ontology pipeline. The API Worker owns durable jobs, budgets,
@@ -57,8 +59,10 @@ Read-only preflight queries should record counts for `users`,
 
 ## 3. Apply migration before Worker code
 
-Migration `0013_codex_provider_jobs.sql` is additive and must exist before a
-Worker containing the provider code can receive traffic:
+Migrations `0013_codex_provider_jobs.sql` and
+`0014_codex_provider_response_uploads.sql` are additive and must exist before
+the matching Worker code can receive traffic. Production already has `0013`;
+the hardened release adds `0014`. Apply pending migrations in recorded order:
 
 ```bash
 npx wrangler d1 migrations apply patternlike-ops --config apps/api/wrangler.toml --env production --remote
@@ -67,10 +71,12 @@ npx wrangler d1 execute patternlike-ops --config apps/api/wrangler.toml --env pr
 
 Expected result:
 
-- only migration `0013` is newly applied;
+- in the recorded 2026-08-24 production state, only migration `0014` is newly
+  applied; a fresh pre-provider environment applies `0013` then `0014`;
 - `PRAGMA foreign_key_check` returns no rows;
 - the preflight table counts are unchanged;
-- `codex_provider_jobs` exists and is empty.
+- `codex_provider_jobs` and `codex_provider_response_uploads` exist and are
+  empty.
 
 Stop if any other migration is pending or any foreign-key row is returned.
 
@@ -79,7 +85,7 @@ Stop if any other migration is pending or any foreign-key row is returned.
 Generate two independent values in an approved secret-management workflow:
 
 - `CODEX_RUNNER_TOKEN`: 32–512 URL-safe characters, unique to this runner
-  authority and not reused as `SERVICE_AUTH_TOKEN`;
+  authority and not reused as `SERVICE_AUTH_TOKEN` or `PATTERN_ADMIN_TOKEN`;
 - `CODEX_PROVIDER_ARTIFACT_KEYRING`: a version-1 JSON keyring containing one
   random 32-byte AES key encoded as base64url.
 
@@ -303,7 +309,7 @@ The safe rollback is:
 
 1. set both rollouts to `off` and deploy;
 2. stop and disable the runner;
-3. leave migration `0013` and encrypted artifacts in place;
+3. leave migrations `0013` and `0014` and encrypted artifacts in place;
 4. investigate using only safe state, hashes, counters, and closed codes;
 5. redeploy the last known-good Worker only if its schema is compatible with
    the additive migration.
