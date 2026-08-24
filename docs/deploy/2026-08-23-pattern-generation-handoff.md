@@ -6,8 +6,8 @@
 implemented, and deployed replacement. The durable Codex control plane and
 secrets are live with both product rollouts off. A real local subscription call
 and an authenticated production idle poll passed. Installing the always-on
-runner on a dedicated host, activating one ontology, and generating the Pattern
-canary remain.
+runner on the explicitly approved existing DigitalOcean droplet, activating
+one ontology, and generating the Pattern canary remain.
 
 Current operations are in
 [`codex-production-provider.md`](./codex-production-provider.md). The direct
@@ -48,9 +48,10 @@ Do not use those historical instructions.
   part of the deployed version above and must be applied before deploying the
   hardened Worker; keep both rollouts off throughout the change.
 
-The remaining operational dependency is an approved always-on non-AGPL host
-and an interactive `codex login` for its dedicated unprivileged service
-account. After that, follow the ontology and Pattern canaries in
+The existing DigitalOcean droplet is explicitly approved as the always-on
+non-AGPL runner host. The remaining host dependency is installation and an
+interactive `codex login` for its dedicated unprivileged service account.
+After that, follow the ontology and Pattern canaries in
 [`codex-production-provider.md`](./codex-production-provider.md).
 
 The sections below preserve the 2026-08-23 investigation as historical context.

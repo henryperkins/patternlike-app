@@ -2,13 +2,13 @@
 
 **Status (2026-08-24):** the rollout-off control plane, migration `0013`, and
 Worker secrets are deployed. Release hardening adds migration `0014`, which
-must be applied before the hardened Worker is deployed. Dedicated-host
-installation, interactive service-account login, and the ontology/Pattern
-canaries remain.
+must be applied before the hardened Worker is deployed. The existing
+DigitalOcean droplet is explicitly approved as the runner host; installation,
+interactive service-account login, and the ontology/Pattern canaries remain.
 
 This runbook operates the supported Codex CLI provider for Pattern generation
 and the ontology pipeline. The API Worker owns durable jobs, budgets,
-validation, signing, publication, and encrypted artifacts. A dedicated
+validation, signing, publication, and encrypted artifacts. An approved
 non-AGPL host performs inference through `codex exec` using its local ChatGPT
 login.
 
@@ -21,8 +21,9 @@ on the AGPL calculation host.
 - Repository typecheck, tests, and production dry-run build are green.
 - The production D1 database and R2 bucket are healthy.
 - The Pattern and ontology queues and ontology signer Worker are healthy.
-- A dedicated non-AGPL Linux host with Node 20+ and the supported Codex CLI is
-  approved.
+- An always-on non-AGPL Linux host with Node 20+ and the supported Codex CLI is
+  approved. A dedicated VM is preferred; the existing DigitalOcean droplet was
+  explicitly approved for this rollout on 2026-08-24.
 - The operator has Cloudflare deployment access and a secure password-manager
   record for the shared runner bearer secret.
 - Both AI rollouts are `off` during migration and initial deployment.
@@ -124,7 +125,7 @@ and that `codex_provider_jobs` remains empty. An unauthenticated request to the
 runner routes must not reveal whether work exists. Keep the deployed Worker
 version id in the change record.
 
-## 6. Install the dedicated runner
+## 6. Install the runner
 
 Build the Node artifact on the release checkout:
 
