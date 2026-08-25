@@ -23,7 +23,7 @@ function pin(): PatternPublisherPin {
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",
-    writer_prompt_version: "1.0.0",
+    writer_prompt_version: "1.0.1",
     writer_max_output_tokens: 8000,
     verifier_model: "gpt-5.6-sol",
     verifier_reasoning: "high",

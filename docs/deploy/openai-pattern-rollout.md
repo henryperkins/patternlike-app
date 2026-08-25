@@ -52,14 +52,14 @@ This table describes repository evidence, not unqueried live state.
 | Artifact-first idempotency, attempts, writer↔verifier correction, 11-call loop | Complete | `pattern-execute.ts`; exact ceiling in `pattern-execute-protocol.test.ts` |
 | Executed-pin provenance and per-stage usage | Complete | `pattern-execute.ts`; migration `0010_pattern_stage_class_usage.sql` |
 | Historical `0009` / `0010` / `0011` / `0012` | Applied to production in order | 2026-08-22 Gate 2 evidence below; integrity and shape checks clean |
-| Current migration inventory (2026-08-24 audit / this branch) | Production is through `0014`; `0015_ontology_pipeline_regression_evidence` is pending on this branch | `0013` / `0014` were read-only-audited as applied. `0015` is additive, not applied or deployed, and belongs to the compatible Worker change while rollout remains contained. |
+| Current migration inventory (2026-08-25 query) | Production ledger is at `0015`; `wrangler d1 migrations list` reports nothing pending | `0015_ontology_pipeline_regression_evidence.sql` applied `2026-08-25 00:59:51`, ahead of the Worker that reads it. `0013` / `0014` remain applied. |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
 | Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active. See the evidence ledger for individual runs. |
 | Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
 | Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
 | Gate 6 spend certification | Open for OpenAI and Codex | `100` Pattern and `500` ontology calls/day remain enforcement ceilings. The 2026-08-22 OpenAI approval used old 4k/8k/4k output pins and is historical evidence, not authorization for the current mixed ontology/Pattern envelope or Codex. |
-| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried through Gate 7B | API `0aded7f1-b115-4bc7-9d2e-4dc2a19eb42a`; corpus, ontology signing, and replay signing identities are provisioned; active ontology is null; Pattern rollout remains `off` |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner is polling `/codex-provider/v1/jobs/claim` and answering `ok` |
 
 ## What remains before the first generated Pattern
 
@@ -676,6 +676,37 @@ Worker identity, report hashes, signed bundle, and atomic activation with
 
 An `internal_synthetic` corpus can prove engineering but cannot satisfy 7B. No
 operator can relabel it or waive a failed record.
+
+#### The recurring `suppressed_feature_leak` failure, and what was changed
+
+Two of the fourteen failed candidates died on the same gate rather than on
+their own content: attempt 11 (`0.1.10`, 46 regression results) and
+`fixcheck-04` (`0.1.16-fixcheck-04`, 89 regression results, verifier fixture
+index 21 `m7-unknown-02`), each with `suppressed_feature_leak` as the sole hard
+gate. Neither is an ontology defect. `hasSuppressedPacketFeatureLeak` was false
+in both cases — the frozen fixtures carry no `house_cusp` or `angle` feature and
+no position with a non-null house — so the leak was writer-origin, and the
+bounded three-attempt writer correction was spent without closing it.
+
+The cause is a mismatch between two rules that were never reconciled.
+`suppressedUnitLeaks` in `ontology-regression.ts` is a **lexical** scan of
+chapter prose for the vocabulary of each class in
+`uncertainty.suppressed_classes` — the bare word "house", "Ascendant",
+"Gemini Moon". The writer document supplies the class *names* and nothing else,
+and the shipped writer policy said only "Honor the supplied uncertainty rules in
+the meaning of the prose". A writer that complies with the stated rule about
+meaning still fails the unstated rule about words, and a correction naming a
+code and a section key cannot teach a vocabulary the policy never gave it. The
+exposure is wide: 20 of the 30 fixtures suppress `moon_time_sensitive` and
+`angle_transits`, and the 10 `unknown` fixtures add `angles` and `houses`.
+
+`OPENAI_PATTERN_WRITER_PROMPT_VERSION` `1.0.1` states each gated class and the
+words the scan matches, and confines the disclosure to the uncertainty note,
+which is the one writer field `coreWriterUnits` does not scan. The pin moves
+with the text because provenance naming one version for two prompts proves
+nothing. This changes the odds; it does not remove the gate. Fixtures 22–29
+have never been reached by any candidate, and a candidate can still fail closed
+on this or any other hard gate.
 
 **Stop:** hash/signature mismatch, recalled version, compiler/evaluator/
 regression failure, missing source authorization, wrong provenance, or an

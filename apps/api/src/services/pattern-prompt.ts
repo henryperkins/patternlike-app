@@ -224,6 +224,24 @@ const PLANNER_POLICY = [
   "Return only the structured object the schema describes.",
 ].join("\n");
 
+/**
+ * The withheld-calculation rules are spelled out because the check is lexical.
+ *
+ * `evaluateOntologyRegressionHardGates` scans chapter prose for the *vocabulary*
+ * of every class in `uncertainty.suppressed_classes` -- the bare word "house",
+ * "Ascendant", "Gemini Moon" -- and the document hands the model the class names
+ * and nothing else. "Honor the supplied uncertainty rules" is a rule about
+ * meaning; the gate is a rule about words, and a writer told only the former
+ * fails the latter while believing it complied. Candidate
+ * `pattern-ontology-en-us-0.1.16-fixcheck-04` died that way at regression
+ * fixture 21 of 30, on `suppressed_feature_leak`, after spending all three
+ * writer corrections -- the corrections name a code and a section key, which
+ * cannot teach a vocabulary the policy never stated.
+ *
+ * Stated mechanically for the same reason `WORKERS_AI_PLANNER_POLICY` states
+ * `validatePatternPlan`'s closure properties: a deterministic check the prompt
+ * leaves implicit is a check the model can only pass by luck.
+ */
 const WRITER_POLICY = [
   "You write a personal Pattern document from a frozen plan and its assigned calculated facts.",
   "",
@@ -234,6 +252,12 @@ const WRITER_POLICY = [
   "Never invent biography, current circumstances, relationships, or events.",
   "Keep possibility as possibility. Do not turn a tendency into a certainty.",
   "Honor the supplied uncertainty rules in the meaning of the prose, not only in a closing note.",
+  "`uncertainty.suppressed_classes` names calculations withheld because the birth time is not exact. Chapter prose -- titles, summaries, sections, tensions, resources and counter-expressions -- must not use a withheld class's vocabulary at all: not figuratively, and not in a sentence that names it only to disclaim it.",
+  "  - houses: no house, houses, house cusp, or numbered house.",
+  "  - angles: no Ascendant, Midheaven, or chart angle.",
+  "  - angle_transits: no angular transit, and no transit described as reaching an angle, the Ascendant, or the Midheaven.",
+  "  - moon_time_sensitive: no Moon sign, degree, longitude, or house. Not Moon in Gemini, not Gemini Moon, not the Moon's degree. The Moon may still be written about through its aspects and the qualified meaning its records carry.",
+  "What a withheld class costs the reading belongs in the uncertainty note, which is the only field exempt from this rule.",
   "Keep tension and counter-expression genuinely different possibilities rather than restatements.",
   "Respect every prohibited claim attached to a cited ontology record.",
   "Use a calm, plain, non-mystifying voice. No grandiosity, no fortune-telling register.",
