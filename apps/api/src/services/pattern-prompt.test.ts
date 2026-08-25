@@ -38,7 +38,7 @@ function pin(): PatternPublisherPin {
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",
-    writer_prompt_version: "1.0.0",
+    writer_prompt_version: "1.0.1",
     writer_max_output_tokens: 8000,
     verifier_model: "gpt-5.6-sol",
     verifier_reasoning: "high",
@@ -304,10 +304,54 @@ describe("Pattern prompt module", () => {
     });
   });
 
+  describe("withheld calculation vocabulary", () => {
+    // `suppressedUnitLeaks` in `ontology-regression.ts` scans chapter prose for
+    // the vocabulary of these four classes, and the writer document supplies
+    // only the class names. The policy has to name the words the scan matches,
+    // or a compliant-sounding chapter fails a check it was never shown.
+    const GATED_CLASSES = [
+      "houses",
+      "angles",
+      "angle_transits",
+      "moon_time_sensitive",
+    ];
+    const GATED_TERMS = [
+      "house cusp",
+      "Ascendant",
+      "Midheaven",
+      "chart angle",
+      "angular transit",
+      "Gemini Moon",
+    ];
+
+    it("names every suppressed class the regression hard gate scans", () => {
+      for (const name of GATED_CLASSES) {
+        expect(PATTERN_SYSTEM_POLICY.writer, `policy names ${name}`).toContain(name);
+      }
+    });
+
+    it("names the words the scan matches, not only the class", () => {
+      for (const term of GATED_TERMS) {
+        expect(PATTERN_SYSTEM_POLICY.writer, `policy names ${term}`).toContain(term);
+      }
+    });
+
+    it("exempts only the uncertainty note", () => {
+      expect(PATTERN_SYSTEM_POLICY.writer).toContain("uncertainty note");
+    });
+
+    it("carries the rule into the correction attempt", () => {
+      for (const name of GATED_CLASSES) {
+        expect(PATTERN_WRITER_CORRECTION_POLICY, `correction names ${name}`)
+          .toContain(name);
+      }
+    });
+  });
+
   describe("prompt versions", () => {
     it("re-exports the compiled versions the configuration pins against", () => {
       expect(PATTERN_PLANNER_PROMPT_VERSION).toBe("1.0.0");
-      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.0");
+      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.1");
       expect(PATTERN_VERIFIER_PROMPT_VERSION).toBe("1.0.0-verifier");
     });
 
