@@ -1379,15 +1379,41 @@ def check_normative_pointers(spec: dict, registry: Registry, label: str) -> list
 def check_openapi(package: Path, registry: Registry) -> list[str]:
     try:
         import yaml
+        from jsonschema_path.handlers import default_handlers
         from openapi_spec_validator import validate
+        from openapi_spec_validator.validation import OpenAPIV31SpecValidator
     except ImportError:
         print("OpenAPI SKIP (install openapi-spec-validator pyyaml to enable)")
         return []
+
+    def local_contract_handler(uri: str):
+        from urllib.parse import unquote, urlparse
+
+        parsed = urlparse(uri)
+        if parsed.netloc == "patternlike.app" and parsed.path.startswith("/contracts/"):
+            relative = Path(unquote(parsed.path.removeprefix("/contracts/")))
+            target = (ROOT / relative).resolve()
+            if target != ROOT and ROOT.resolve() not in target.parents:
+                raise ValueError(f"contract reference escapes contracts root: {uri}")
+            return json.loads(target.read_text(encoding="utf-8"))
+        return default_handlers["https"](uri)
+
+    class LocalContractOpenAPIV31SpecValidator(OpenAPIV31SpecValidator):
+        resolver_handlers = {
+            **default_handlers,
+            "https": local_contract_handler,
+        }
+
     errors: list[str] = []
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            validate(spec, base_uri=path.as_uri())
+            validator_cls = (
+                LocalContractOpenAPIV31SpecValidator
+                if package == M8
+                else None
+            )
+            validate(spec, base_uri=path.as_uri(), cls=validator_cls)
             print(
                 f"OK  openapi       {path.name} v{spec['info']['version']} "
                 f"paths={len(spec['paths'])}"
