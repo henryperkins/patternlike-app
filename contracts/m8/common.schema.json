@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/common.schema.json",
+  "title": "Pattern/Like M8 common definitions",
+  "description": "Additive consumer-contract vocabulary. M7 Pattern vocabulary is copied forward unchanged except for the package schema version; established ids and dates remain single-sourced through frozen common definitions.",
+  "$defs": {
+    "schemaVersion": { "type": "string", "const": "0.8.0" },
+    "placeId": { "type": "string", "pattern": "^plc_[0-9a-f]{32}$" },
+    "readingId": {
+      "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+    },
+    "localDate": {
+      "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDate"
+    },
+    "dateTime": {
+      "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime"
+    },
+    "nullableDateTime": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/dateTime" }
+      ]
+    },
+    "sessionToken": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._~-]+$"
+    },
+    "readingRevision": {
+      "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/readingRevision"
+    },
+    "revisionReason": {
+      "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/revisionReason"
+    },
+    "assemblyMode": {
+      "type": "string",
+      "enum": ["deterministic", "constrained_model"]
+    },
+    "patternId": { "type": "string", "pattern": "^pat_[0-9a-f]{32}$" },
+    "generationId": { "type": "string", "pattern": "^pgen_[0-9a-f]{32}$" },
+    "claimId": { "type": "string", "pattern": "^pgc_[0-9a-f]{32}$" },
+    "featureAlias": { "type": "string", "pattern": "^f[0-9]{3}$" },
+    "ontologyRuleId": { "type": "string", "pattern": "^ont_[0-9a-f]{32}$" },
+    "synthesisId": { "type": "string", "pattern": "^syn_[0-9a-f]{32}$" },
+    "sourceFragmentId": { "type": "string", "pattern": "^srcf_[0-9a-f]{32}$" },
+    "clusterId": { "type": "string", "pattern": "^clu_[0-9a-f]{8}$" },
+    "chapterKey": { "type": "string", "pattern": "^chapter_[0-9]{2}$" },
+    "signatureKey": { "type": "string", "pattern": "^signature_[0-9]{2}$" },
+    "patternState": {
+      "type": "string",
+      "enum": [
+        "chart_required",
+        "locale_confirmation_required",
+        "consent_required",
+        "ontology_unavailable",
+        "available",
+        "organizing_evidence",
+        "writing",
+        "checking_claims",
+        "ready",
+        "failed",
+        "deleted",
+        "withdrawn",
+        "editorial_catalog"
+      ]
+    },
+    "consentStatus": { "type": "string", "enum": ["granted", "not_granted"] },
+    "consentCategory": {
+      "type": "string",
+      "enum": [
+        "calculated_natal_features",
+        "accuracy_and_suppression",
+        "confirmed_content_locale",
+        "activated_interpretation_ontology",
+        "generated_pattern_plan_and_draft_for_validation"
+      ]
+    },
+    "coverageClass": {
+      "type": "string",
+      "enum": [
+        "mandatory_core",
+        "mandatory_any",
+        "eligible",
+        "redundant",
+        "suppressed",
+        "ontology_unsupported",
+        "capacity_omitted"
+      ]
+    },
+    "omissionReason": {
+      "type": "string",
+      "enum": [
+        "redundant_with_chapter",
+        "capacity_omitted",
+        "cluster_incompatible",
+        "sparse_document"
+      ]
+    },
+    "claimClass": {
+      "type": "string",
+      "enum": [
+        "reflective_interpretation",
+        "structural_description",
+        "tension",
+        "resource",
+        "counter_expression",
+        "uncertainty"
+      ]
+    },
+    "generationReason": {
+      "type": "string",
+      "enum": ["first_open", "first_open_retry", "failed_attempt_retry"]
+    },
+    "reservationReason": {
+      "type": "string",
+      "enum": ["first_open", "first_open_retry", "failed_attempt_retry", "chart_correction"]
+    },
+    "purposeClass": {
+      "type": "string",
+      "enum": ["quality_review", "safety_investigation", "incident_response", "retention_audit"]
+    },
+    "replayEventClass": {
+      "type": "string",
+      "enum": [
+        "claim_consumed",
+        "pattern_deleted",
+        "chart_correction_erased",
+        "pattern_withdrawn",
+        "ontology_recalled",
+        "account_deleted"
+      ]
+    },
+    "replayEventId": { "type": "string", "pattern": "^prel_[0-9a-f]{32}$" },
+    "artifactId": { "type": "string", "pattern": "^part_[0-9a-f]{32}$" },
+    "provenanceOrigin": {
+      "type": "string",
+      "enum": ["synthetic_internal", "machine_pipeline"]
+    },
+    "verdict": { "type": "string", "enum": ["pass", "reject"] },
+    "artifactClass": {
+      "type": "string",
+      "enum": [
+        "fact_packet",
+        "planner_request",
+        "planner_response",
+        "validated_plan",
+        "writer_request",
+        "writer_response",
+        "rejected_candidate",
+        "candidate_validation",
+        "correction_document",
+        "verifier_request",
+        "verifier_response",
+        "semantic_verdict",
+        "accepted_internal_document"
+      ]
+    },
+    "meaningClass": {
+      "type": "string",
+      "enum": ["source_supported", "derived_synthesis", "expression_guidance"]
+    },
+    "transformationClass": {
+      "type": "string",
+      "enum": [
+        "intersection",
+        "contrast",
+        "tension",
+        "counterbalance",
+        "developmental_arc",
+        "expression_range",
+        "shared_motif"
+      ]
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "birthCalcBudgetExhausted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "request_id", "details"],
+          "properties": {
+            "code": { "type": "string", "const": "birth_calc_budget_exhausted" },
+            "message": {
+              "type": "string",
+              "const": "The daily birth calculation limit has been reached"
+            },
+            "request_id": {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId"
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["resets_at"],
+              "properties": {
+                "resets_at": { "$ref": "#/$defs/dateTime" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

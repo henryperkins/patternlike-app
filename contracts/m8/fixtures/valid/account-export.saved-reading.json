@@ -1,0 +1,171 @@
+{
+  "schema_version": "0.8.0",
+  "export_id": "exp_0123456789abcdef0123456789abcdef",
+  "generated_at": "2026-08-26T13:00:00Z",
+  "account": {
+    "user_id": "usr_0123456789abcdef0123456789abcdef",
+    "status": "active",
+    "locale": "en-US",
+    "timezone": "Europe/London",
+    "entitlement_tier": "free",
+    "created_at": "2026-08-01T10:00:00Z"
+  },
+  "birth_profiles": [],
+  "chart_snapshots": [],
+  "preferences": {
+    "locale": "en-US",
+    "locale_source": "user_confirmed",
+    "timezone": "Europe/London",
+    "timezone_source": "user_confirmed",
+    "timezone_revision": 2,
+    "entitlement_tier": "free",
+    "next_due_at": "2026-08-27T00:05:00Z"
+  },
+  "timezone_changes": [],
+  "consents": [],
+  "context_sources": [],
+  "context_signals": [],
+  "readings": {
+    "status": "included",
+    "items": [
+      {
+        "id": "rdg_ffffffffffffffffffffffffffffffff",
+        "local_date": "2026-08-26",
+        "release_version": null,
+        "chart_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "contract_id": "daily-reading-v5",
+        "assembly_mode": "constrained_model",
+        "status": "published",
+        "revision": 1,
+        "revision_reason": "initial",
+        "supersedes_reading_id": null,
+        "invalidated_at": null,
+        "created_at": "2026-08-26T06:15:00Z",
+        "updated_at": "2026-08-26T06:16:00Z",
+        "artifact": {
+          "schema_version": "0.5.0",
+          "reading": {
+            "schema_version": "0.5.0",
+            "output_schema": "daily-reading-v5",
+            "reading_id": "rdg_ffffffffffffffffffffffffffffffff",
+            "local_date": "2026-08-26",
+            "generated_at": "2026-08-26T06:15:00Z",
+            "assembly_mode": "constrained_model",
+            "revision": 1,
+            "locale": "en-US",
+            "domain_preference": null,
+            "headline": "A smaller promise",
+            "disclosure": "Generated with OpenAI from your calculated chart and enabled context.",
+            "paragraphs": [
+              {
+                "paragraph_id": "par_0123456789abcdef0123456789abcdef",
+                "role": "primary_theme",
+                "order": 1,
+                "text": "Choose one promise small enough to keep today."
+              }
+            ]
+          },
+          "evidence_header": {
+            "schema_version": "0.5.0",
+            "reading_id": "rdg_ffffffffffffffffffffffffffffffff",
+            "revision": 1,
+            "revision_reason": "initial",
+            "generated_at": "2026-08-26T06:15:00Z",
+            "generation_input_id": "gin_0123456789abcdef0123456789abcdef",
+            "input_manifest_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "provider_response_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "calculation": {
+              "chart_contract_id": "patternlike.chart.launch",
+              "cycle_policy_version": "1.4.0",
+              "daily_sky_policy_version": "1.0.0",
+              "ephemeris_data_version": "se-2.10.03-1800-2399",
+              "container_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "tzdb_version": "2026a",
+              "local_day_resolution_policy_version": "1.0.0"
+            },
+            "model": {
+              "provider": "openai",
+              "model": "gpt-5.6-sol",
+              "prompt_version": "1.0.1",
+              "selection_policy_version": "1.0.0",
+              "validation_policy_version": "1.0.0",
+              "provider_request_id": "resp_0123456789abcdef0123456789abcdef",
+              "input_tokens": 1200,
+              "output_tokens": 120
+            },
+            "validation": {
+              "status": "passed",
+              "policy_version": "1.0.0",
+              "checks": [
+                {
+                  "code": "schema",
+                  "passed": true
+                }
+              ]
+            }
+          },
+          "invalidation": null
+        },
+        "evidence": {
+          "schema_version": "0.5.0",
+          "reading_id": "rdg_ffffffffffffffffffffffffffffffff",
+          "revision": 1,
+          "revision_reason": "initial",
+          "generated_at": "2026-08-26T06:15:00Z",
+          "generation_input_id": "gin_0123456789abcdef0123456789abcdef",
+          "input_manifest_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "provider_response_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "calculation": {
+            "chart_contract_id": "patternlike.chart.launch",
+            "cycle_policy_version": "1.4.0",
+            "daily_sky_policy_version": "1.0.0",
+            "ephemeris_data_version": "se-2.10.03-1800-2399",
+            "container_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "tzdb_version": "2026a",
+            "local_day_resolution_policy_version": "1.0.0"
+          },
+          "model": {
+            "provider": "openai",
+            "model": "gpt-5.6-sol",
+            "prompt_version": "1.0.1",
+            "selection_policy_version": "1.0.0",
+            "validation_policy_version": "1.0.0",
+            "provider_request_id": "resp_0123456789abcdef0123456789abcdef",
+            "input_tokens": 1200,
+            "output_tokens": 120
+          },
+          "paragraphs": [
+            {
+              "paragraph_id": "par_0123456789abcdef0123456789abcdef",
+              "role": "primary_theme",
+              "order": 1,
+              "fact_refs": [],
+              "context_refs": []
+            }
+          ],
+          "validation": {
+            "status": "passed",
+            "policy_version": "1.0.0",
+            "checks": [
+              {
+                "code": "schema",
+                "passed": true
+              }
+            ]
+          }
+        },
+        "saved_at": "2026-08-26T12:00:00Z"
+      }
+    ]
+  },
+  "journal": {
+    "status": "omitted_by_request",
+    "items": []
+  },
+  "patterns": {
+    "status": "not_available",
+    "items": []
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "package": "contracts/m8",
+  "schema_version": "0.8.0",
+  "document_date": "2026-08-26",
+  "status": "additive",
+  "milestone": "M8 - consumer core-loop contracts",
+  "predecessors": [
+    {
+      "package": "contracts/m0",
+      "schema_version": "0.2.0",
+      "manifest_sha256": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
+      "relationship": "launch_consumer_and_common_predecessor",
+      "note": "M8 reuses frozen launch ids, dates, locale tags, birth request/accepted responses, and error-envelope conventions without changing M0."
+    },
+    {
+      "package": "contracts/m3",
+      "schema_version": "0.3.0",
+      "manifest_sha256": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
+      "relationship": "deterministic_reading_predecessor",
+      "note": "Reading detail may return the frozen M3 success envelope. M8 adds library metadata and does not supersede stored M3 reading artifacts."
+    },
+    {
+      "package": "contracts/m4",
+      "schema_version": "0.4.0",
+      "manifest_sha256": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
+      "relationship": "consumer_pattern_and_context_predecessor",
+      "note": "M8 leaves M4 Pattern, Time Travel, and context contracts frozen."
+    },
+    {
+      "package": "contracts/m5",
+      "schema_version": "0.5.0",
+      "manifest_sha256": "57aadef51a6eca825866865c4cb0e75503cb29f497f998dc2a56b8971cc6674e",
+      "relationship": "constrained_model_reading_predecessor",
+      "note": "Reading detail may return the frozen M5 success envelope. M8 adds library metadata and does not supersede stored M5 reading artifacts."
+    },
+    {
+      "package": "contracts/m6",
+      "schema_version": "0.6.0",
+      "manifest_sha256": "4ead039fd6a264555c2712f1eb950352eccfb9ca78e10a8d9f03c1e00159c148",
+      "relationship": "privacy_and_export_structure_predecessor",
+      "note": "M8 preserves the portable account sections and privacy records carried forward through M7."
+    },
+    {
+      "package": "contracts/m7",
+      "schema_version": "0.7.0",
+      "manifest_sha256": "15dda8c063d22d94bb6b9fd1000ccff9a05e90f27ece8c115a3a9ab58bf023bc",
+      "relationship": "openapi_common_and_account_export_predecessor",
+      "note": "M8 copies the complete M7 API/common/export families, then adds consumer place, consent, reading-library, Save, export metadata, and birth-budget amendments."
+    }
+  ],
+  "supersedes": [
+    {
+      "family": "account-export",
+      "documents": [
+        "m7:account-export.schema.json#/$defs/accountExport"
+      ],
+      "note": "Forward-only successor for newly generated exports. Stored M7 export artifacts remain valid under the frozen M7 document; M3 and M5 reading artifacts are not superseded."
+    }
+  ],
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m8/common.schema.json",
+      "defines": [
+        "artifactClass",
+        "artifactId",
+        "assemblyMode",
+        "birthCalcBudgetExhausted",
+        "chapterKey",
+        "claimClass",
+        "claimId",
+        "clusterId",
+        "consentCategory",
+        "consentStatus",
+        "contentHash",
+        "coverageClass",
+        "dateTime",
+        "featureAlias",
+        "generationId",
+        "generationReason",
+        "localDate",
+        "meaningClass",
+        "nullableDateTime",
+        "omissionReason",
+        "ontologyRuleId",
+        "patternId",
+        "patternState",
+        "placeId",
+        "provenanceOrigin",
+        "purposeClass",
+        "readingId",
+        "readingRevision",
+        "replayEventClass",
+        "replayEventId",
+        "reservationReason",
+        "revisionReason",
+        "schemaVersion",
+        "sessionToken",
+        "signatureKey",
+        "sourceFragmentId",
+        "synthesisId",
+        "transformationClass",
+        "verdict"
+      ]
+    },
+    {
+      "file": "place-search.schema.json",
+      "id": "https://patternlike.app/contracts/m8/place-search.schema.json",
+      "defines": [
+        "placeSearchCandidate",
+        "placeSearchRequest",
+        "placeSearchResponse"
+      ]
+    },
+    {
+      "file": "place-resolution.schema.json",
+      "id": "https://patternlike.app/contracts/m8/place-resolution.schema.json",
+      "defines": [
+        "placeConfidence",
+        "placeQualifier",
+        "placeQualifierCode",
+        "placeResolutionRequest",
+        "placeResolutionResponse"
+      ]
+    },
+    {
+      "file": "geocoder-consent.schema.json",
+      "id": "https://patternlike.app/contracts/m8/geocoder-consent.schema.json",
+      "defines": [
+        "geocoderConsentGrantRequest",
+        "geocoderConsentResponse",
+        "geocoderConsentUiSurface",
+        "geocoderDisclosure",
+        "geocoderDisclosureLinks"
+      ]
+    },
+    {
+      "file": "reading-history.schema.json",
+      "id": "https://patternlike.app/contracts/m8/reading-history.schema.json",
+      "defines": [
+        "readingHistoryItem",
+        "readingHistoryResponse",
+        "readingHistoryStatus",
+        "readingHistoryView"
+      ]
+    },
+    {
+      "file": "reading-save-state.schema.json",
+      "id": "https://patternlike.app/contracts/m8/reading-save-state.schema.json",
+      "defines": [
+        "readingSaveState"
+      ]
+    },
+    {
+      "file": "account-export.schema.json",
+      "id": "https://patternlike.app/contracts/m8/account-export.schema.json",
+      "defines": [
+        "accountExport",
+        "exportedDailyReading",
+        "exportedPattern",
+        "patternSection",
+        "portableSection",
+        "readingSection"
+      ]
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.8.0",
+      "describes": "Complete M7 API plus consumer place search/resolution, revocable geocoder consent, reading History/Saved/detail/Save resources, and the birth calculation budget response."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "wire_format": "snake_case",
+    "frozen_unchanged_packages": [
+      "contracts/m0",
+      "contracts/m1",
+      "contracts/m2",
+      "contracts/m3",
+      "contracts/m4",
+      "contracts/m5",
+      "contracts/m6",
+      "contracts/m7"
+    ]
+  },
+  "amendments": []
+}

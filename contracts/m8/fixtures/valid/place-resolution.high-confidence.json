@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.8.0",
+  "place_id": "plc_0123456789abcdef0123456789abcdef",
+  "label": "London, United Kingdom",
+  "latitude": 51.5074,
+  "longitude": -0.1278,
+  "geocode_confidence": "high",
+  "qualifiers": []
+}

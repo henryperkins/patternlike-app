@@ -7,6 +7,8 @@ export * from "./daily-sky-types.js";
 export * from "./m5-reading-types.js";
 export * from "./m4-types.js";
 export * from "./m7-types.js";
+export * from "./m8-place-types.js";
+export * from "./m8-reading-history-types.js";
 export * from "./jcs.js";
 export * from "./timezone.js";
 

@@ -2535,6 +2535,23 @@ def check_m8_schema_projection() -> list[str]:
     if candidates.get("maxItems") != 8:
         errors.append("place search candidates are not bounded at eight")
 
+    session_token = common_defs.get("sessionToken") or {}
+    if (
+        session_token.get("minLength") != 8
+        or session_token.get("maxLength") != 128
+    ):
+        errors.append("M8 common sessionToken is not bounded at 8..128 characters")
+
+    resolution_defs = documents["place-resolution.schema.json"].get("$defs") or {}
+    qualifiers = (
+        ((resolution_defs.get("placeResolutionResponse") or {}).get("properties") or {}).get(
+            "qualifiers"
+        )
+        or {}
+    )
+    if qualifiers.get("maxItems") != 2:
+        errors.append("place resolution qualifiers are not bounded at two")
+
     history_defs = documents["reading-history.schema.json"].get("$defs") or {}
     history = history_defs.get("readingHistoryResponse") or {}
     items = (history.get("properties") or {}).get("items") or {}
@@ -2555,6 +2572,52 @@ def check_m8_schema_projection() -> list[str]:
         errors.append(
             "M8 account export must declare saved_at exactly once, on exportedDailyReading"
         )
+    account_defs = account.get("$defs") or {}
+    exported_reading = account_defs.get("exportedDailyReading") or {}
+    exported_reading_properties = exported_reading.get("properties") or {}
+    if (
+        (exported_reading_properties.get("saved_at") or {}).get("$ref")
+        != M8_BASE + "common.schema.json#/$defs/nullableDateTime"
+    ):
+        errors.append("M8 exported reading saved_at does not reuse common nullableDateTime")
+    expected_exported_reading_fields = {
+        "id",
+        "local_date",
+        "release_version",
+        "chart_fingerprint",
+        "contract_id",
+        "assembly_mode",
+        "status",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "invalidated_at",
+        "created_at",
+        "updated_at",
+        "artifact",
+        "evidence",
+        "saved_at",
+    }
+    if set(exported_reading.get("required") or []) != expected_exported_reading_fields:
+        errors.append("M8 exported reading does not preserve metadata/artifact/evidence fields")
+    reading_section_items = (
+        (((account_defs.get("readingSection") or {}).get("properties") or {}).get("items") or {})
+        .get("items")
+        or {}
+    )
+    if reading_section_items.get("$ref") != "#/$defs/exportedDailyReading":
+        errors.append("M8 account export readings section does not bind exportedDailyReading")
+    m7_account = json.loads(
+        (M7 / "account-export.schema.json").read_text(encoding="utf-8")
+    )
+    m7_account_export = (m7_account.get("$defs") or {}).get("accountExport") or {}
+    m8_account_export = account_defs.get("accountExport") or {}
+    if (
+        m8_account_export.get("required") != m7_account_export.get("required")
+        or set((m8_account_export.get("properties") or {}))
+        != set((m7_account_export.get("properties") or {}))
+    ):
+        errors.append("M8 account export does not preserve the complete M7 section structure")
 
     consent_defs = documents["geocoder-consent.schema.json"].get("$defs") or {}
     consent = consent_defs.get("geocoderConsentResponse") or {}
@@ -2571,19 +2634,44 @@ def check_m8_schema_projection() -> list[str]:
         if (consent_props.get(field) or {}).get("const") != expected:
             errors.append(f"geocoder consent does not pin {field} to {expected!r}")
     disclosure = consent_props.get("disclosure") or {}
+    if disclosure.get("$ref") == "#/$defs/geocoderDisclosure":
+        disclosure = consent_defs.get("geocoderDisclosure") or {}
     disclosure_props = disclosure.get("properties") or {}
     if (disclosure_props.get("text") or {}).get("const") != M8_DISCLOSURE_TEXT:
         errors.append("geocoder consent does not pin the immutable disclosure text")
-    links = (disclosure_props.get("links") or {}).get("properties") or {}
+    links_schema = disclosure_props.get("links") or {}
+    if links_schema.get("$ref") == "#/$defs/geocoderDisclosureLinks":
+        links_schema = consent_defs.get("geocoderDisclosureLinks") or {}
+    links = links_schema.get("properties") or {}
     for field, expected in M8_DISCLOSURE_LINKS.items():
         if (links.get(field) or {}).get("const") != expected:
             errors.append(f"geocoder consent does not pin disclosure link {field}")
+    allowed_uses = consent_props.get("allowed_uses") or {}
+    allowed_use_consts = [
+        item.get("const")
+        for item in allowed_uses.get("prefixItems") or []
+        if isinstance(item, dict)
+    ]
+    if (
+        allowed_use_consts != ["chart_fact", "timezone_resolution"]
+        or allowed_uses.get("minItems") != 2
+        or allowed_uses.get("maxItems") != 2
+        or allowed_uses.get("items") is not False
+    ):
+        errors.append("geocoder consent does not pin the ordered allowed-use tuple")
+    scopes = consent_props.get("scopes") or {}
+    if (
+        scopes.get("minItems") != 0
+        or scopes.get("maxItems") != 0
+        or scopes.get("items") is not False
+    ):
+        errors.append("geocoder consent does not pin scopes to the empty tuple")
 
     for filename in ("place-search.schema.json", "place-resolution.schema.json"):
         document = documents[filename]
         serialized = json.dumps(document).lower()
-        if M8_PROVIDER_ID in serialized:
-            errors.append(f"{filename} leaks the consumer geocoder provider id")
+        if M8_PROVIDER_ID in serialized or "google" in serialized:
+            errors.append(f"{filename} leaks consumer geocoder provider identity")
 
         def walk_keys(value: object):
             if isinstance(value, dict):
@@ -2706,12 +2794,23 @@ def check_m8_openapi_projection() -> list[str]:
             if retained is None:
                 errors.append(f"M8 OpenAPI drops M7 operation {method.upper()} {route}")
                 continue
-            old_statuses = set((path_item[method].get("responses") or {}))
-            new_statuses = set((retained.get("responses") or {}))
-            if new_statuses != old_statuses:
+            if retained != path_item[method]:
                 errors.append(
-                    f"M8 OpenAPI changes M7 statuses for {method.upper()} {route}: "
-                    f"{sorted(new_statuses)} vs {sorted(old_statuses)}"
+                    f"M8 OpenAPI changes the frozen M7 operation {method.upper()} {route}"
+                )
+
+    for top_level in ("servers", "security"):
+        if spec.get(top_level) != m7_spec.get(top_level):
+            errors.append(f"M8 OpenAPI changes frozen M7 {top_level}")
+    m7_components = m7_spec.get("components") or {}
+    m8_components = spec.get("components") or {}
+    for section_name, old_section in m7_components.items():
+        new_section = m8_components.get(section_name) or {}
+        for component_name, old_component in old_section.items():
+            if new_section.get(component_name) != old_component:
+                errors.append(
+                    f"M8 OpenAPI changes frozen M7 component "
+                    f"{section_name}.{component_name}"
                 )
 
     expected = {
@@ -2802,6 +2901,48 @@ def check_m8_openapi_projection() -> list[str]:
         != M8_POLICY_VERSION
     ):
         errors.append("M8 OpenAPI consent grant body is not the closed current policy")
+
+    list_readings = ((spec.get("paths") or {}).get("/v1/readings") or {}).get("get") or {}
+    list_parameters = {
+        item.get("name"): item
+        for item in list_readings.get("parameters") or []
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    view_parameter = list_parameters.get("view") or {}
+    if (
+        view_parameter.get("in") != "query"
+        or view_parameter.get("required") is not True
+        or (view_parameter.get("schema") or {}).get("enum") != ["history", "saved"]
+    ):
+        errors.append("M8 OpenAPI reading history does not require the closed view filter")
+    limit_schema = (list_parameters.get("limit") or {}).get("schema") or {}
+    if limit_schema.get("minimum") != 1 or limit_schema.get("maximum") != 50:
+        errors.append("M8 OpenAPI reading history limit is not bounded at 1..50")
+    cursor_schema = (list_parameters.get("cursor") or {}).get("schema") or {}
+    if (
+        cursor_schema.get("minLength") != 1
+        or cursor_schema.get("maxLength") != 2048
+        or cursor_schema.get("pattern") != "^[A-Za-z0-9_-]+$"
+    ):
+        errors.append("M8 OpenAPI reading history cursor is not bounded base64url")
+
+    def value_paths(value: object, expected: object, path: tuple[str, ...] = ()):
+        if value == expected:
+            yield path
+        if isinstance(value, dict):
+            for key, child in value.items():
+                yield from value_paths(child, expected, (*path, str(key)))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                yield from value_paths(child, expected, (*path, str(index)))
+
+    provider_paths = list(value_paths(spec, M8_PROVIDER_ID))
+    if provider_paths != [
+        ("components", "schemas", "GeocoderConsent", "properties", "provider", "const")
+    ]:
+        errors.append(
+            "M8 OpenAPI consumer provider id appears outside the geocoder consent document"
+        )
 
     detail = schemas.get("ReadingDetailResponse") or {}
     detail_refs = [

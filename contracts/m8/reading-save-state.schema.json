@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/reading-save-state.schema.json",
+  "title": "M8 reading Save resource",
+  "$defs": {
+    "readingSaveState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "reading_id", "saved", "saved_at"],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/schemaVersion"
+        },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/readingId"
+        },
+        "saved": { "type": "boolean" },
+        "saved_at": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/nullableDateTime"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "saved": { "const": true },
+            "saved_at": {
+              "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
+            }
+          },
+          "required": ["saved", "saved_at"]
+        },
+        {
+          "properties": {
+            "saved": { "const": false },
+            "saved_at": { "type": "null" }
+          },
+          "required": ["saved", "saved_at"]
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/readingSaveState"
+}

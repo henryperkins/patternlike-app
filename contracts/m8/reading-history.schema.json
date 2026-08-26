@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/reading-history.schema.json",
+  "title": "M8 reading history and Saved list",
+  "$defs": {
+    "readingHistoryView": {
+      "type": "string",
+      "enum": ["history", "saved"]
+    },
+    "readingHistoryStatus": {
+      "type": "string",
+      "enum": ["published", "superseded", "invalidated"]
+    },
+    "readingHistoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reading_id",
+        "local_date",
+        "revision",
+        "revision_reason",
+        "status",
+        "assembly_mode",
+        "headline",
+        "saved",
+        "saved_at",
+        "evidence_url"
+      ],
+      "properties": {
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/readingId"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/localDate"
+        },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/readingRevision"
+        },
+        "revision_reason": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/revisionReason"
+        },
+        "status": { "$ref": "#/$defs/readingHistoryStatus" },
+        "assembly_mode": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/assemblyMode"
+        },
+        "headline": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 200 }
+          ]
+        },
+        "saved": { "type": "boolean" },
+        "saved_at": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/nullableDateTime"
+        },
+        "evidence_url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "format": "uri-reference",
+          "pattern": "^/v1/readings/[A-Za-z0-9_.:-]+/evidence$"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "saved": { "const": true },
+            "saved_at": {
+              "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
+            }
+          },
+          "required": ["saved", "saved_at"]
+        },
+        {
+          "properties": {
+            "saved": { "const": false },
+            "saved_at": { "type": "null" }
+          },
+          "required": ["saved", "saved_at"]
+        }
+      ]
+    },
+    "readingHistoryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "view", "items", "next_cursor"],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/schemaVersion"
+        },
+        "view": { "$ref": "#/$defs/readingHistoryView" },
+        "items": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/readingHistoryItem" }
+        },
+        "next_cursor": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "view": { "const": "saved" } },
+            "required": ["view"]
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "items": {
+                  "properties": {
+                    "saved": { "const": true },
+                    "saved_at": {
+                      "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
+                    }
+                  },
+                  "required": ["saved", "saved_at"]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/readingHistoryResponse"
+}
