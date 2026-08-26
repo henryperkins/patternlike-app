@@ -81,12 +81,14 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   const [view, setView] = useState<AppRoute>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
   const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
+  const [hasValidatedSession, setHasValidatedSession] = useState(false);
   const [preferenceSyncRevision, setPreferenceSyncRevision] = useState(0);
   const [correctingBirth, setCorrectingBirth] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const chart = await getChart(signal);
+      setHasValidatedSession(true);
       setAuthState({ status: "signed-in" });
       setChartState({ status: "ready", chart });
     } catch (error) {
@@ -95,14 +97,17 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         // No session, or one that has expired or been revoked. The API answers
         // all three identically on purpose, so the client cannot distinguish
         // them either.
+        setHasValidatedSession(false);
         setAuthState({ status: "signed-out" });
         return;
       }
       setAuthState({ status: "signed-in" });
       if (error instanceof ApiError && error.status === 404) {
+        setHasValidatedSession(true);
         setChartState({ status: "missing" });
         return;
       }
+      setHasValidatedSession(false);
       setChartState({
         status: "offline",
         message: error instanceof Error ? error.message : "The chart could not be loaded.",
@@ -177,7 +182,7 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   ]);
 
   useEffect(() => {
-    if (authState.status !== "signed-in") return;
+    if (authState.status !== "signed-in" || !hasValidatedSession) return;
 
     const controller = new AbortController();
     let observed: Promise<DevicePreferenceSyncResult> | null = null;
@@ -208,7 +213,7 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
       controller.abort();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [authState.status]);
+  }, [authState.status, hasValidatedSession]);
 
   /**
    * A 401 from a view, rather than from the mount probe.
