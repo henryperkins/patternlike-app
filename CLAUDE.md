@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Run from the repository root. Node 20+ (CI uses 22), Python 3.11+ with `pip install jsonschema referencing pyyaml openapi-spec-validator`.
+Run from the repository root. Node 20+ (CI uses 22), Python 3.11+ with `pip install jsonschema referencing pyyaml openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt`.
 
 ```bash
 npm install
 npm run typecheck          # strict tsc --noEmit across every workspace
 npm test                   # shared + calc-stub + ontology-signer + api + web, then test:contracts
-npm run test:contracts     # python: JSON Schema/fixture validation + D1 SQL smoke apply
+npm run test:contracts     # python: deterministic spec rendering + JSON Schema/fixture validation + D1 SQL smoke apply
 npm run build              # shared/calc/signer tsc-or-dry-run, Vite build, API production dry-run
 
 npm run calc:dev           # calc service      :8080

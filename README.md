@@ -21,7 +21,7 @@ Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculatio
 ## Prerequisites
 
 - Node 20+
-- Python 3.11+ (`pip install jsonschema referencing pyyaml openapi-spec-validator`)
+- Python 3.11+ (`pip install jsonschema referencing pyyaml openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt`)
 - Wrangler 4+ (via workspace)
 
 ## Quick start
