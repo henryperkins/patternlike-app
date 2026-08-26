@@ -29,6 +29,7 @@ import zipfile
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
+from reportlab import rl_config
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -360,9 +361,7 @@ def write_pdf(blocks) -> None:
         "ReportLab reproducibility configuration",
         {
             "source_date_epoch": os.environ.get("SOURCE_DATE_EPOCH"),
-            "reportlab_invariant": getattr(
-                __import__("reportlab").rl_config, "invariant", None
-            ),
+            "reportlab_invariant": rl_config.invariant,
         },
     )
     # endregion
