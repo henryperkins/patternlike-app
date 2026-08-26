@@ -17,23 +17,22 @@ surface for the two renderings to disagree about.
 from __future__ import annotations
 
 import hashlib
-import importlib.metadata
 import io
 import json
 import os
 import re
 import sys
-import time
 import zipfile
+from functools import partial
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
-from reportlab import rl_config
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     ListFlowable,
     ListItem,
@@ -52,82 +51,12 @@ SOURCE = os.path.join(HERE, f"{STEM}.md")
 DOCX = os.path.join(HERE, f"{STEM}.docx")
 PDF = os.path.join(HERE, f"{STEM}.pdf")
 MANIFEST = os.path.join(HERE, f"{STEM}_manifest.json")
-DEBUG_LOG = "/opt/cursor/logs/debug.log"
 
 INK = RGBColor(0x17, 0x31, 0x2A)
 INK_HEX = colors.HexColor("#17312a")
 SOFT_HEX = colors.HexColor("#4e625b")
 RULE_HEX = colors.HexColor("#cec7b8")
-
-
-def _agent_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    with io.open(DEBUG_LOG, "a", encoding="utf-8") as handle:
-        handle.write(
-            json.dumps(
-                {
-                    "hypothesisId": hypothesis_id,
-                    "location": location,
-                    "message": message,
-                    "data": data,
-                    "timestamp": int(time.time() * 1000),
-                },
-                sort_keys=True,
-            )
-            + "\n"
-        )
-
-
-def _docx_probe() -> dict:
-    with zipfile.ZipFile(DOCX) as archive:
-        infos = archive.infolist()
-        payload_hash = hashlib.sha256()
-        for info in sorted(infos, key=lambda item: item.filename):
-            payload_hash.update(info.filename.encode("utf-8"))
-            payload_hash.update(b"\0")
-            payload_hash.update(archive.read(info.filename))
-        core_xml = archive.read("docProps/core.xml").decode("utf-8")
-    return {
-        "archive_sha256": digest(DOCX)[0],
-        "member_count": len(infos),
-        "member_timestamps": sorted(
-            {"-".join(f"{value:02d}" for value in info.date_time) for info in infos}
-        ),
-        "payload_sha256": payload_hash.hexdigest(),
-        "core_sha256": hashlib.sha256(core_xml.encode("utf-8")).hexdigest(),
-        "core_dates": re.findall(
-            r"<dcterms:(created|modified)[^>]*>(.*?)</dcterms:\1>", core_xml
-        ),
-    }
-
-
-def _pdf_probe() -> dict:
-    data = io.open(PDF, "rb").read()
-    dates = re.findall(rb"/(?:CreationDate|ModDate)\s*\(([^)]*)\)", data)
-    ids = re.findall(
-        rb"/ID\s*\[\s*<([^>]*)>\s*<([^>]*)>\s*\]",
-        data,
-        flags=re.DOTALL,
-    )
-    normalized = re.sub(
-        rb"/(?:CreationDate|ModDate)\s*\([^)]*\)",
-        b"/MetadataDate(DATE)",
-        data,
-    )
-    normalized = re.sub(
-        rb"/ID\s*\[\s*<[^>]*>\s*<[^>]*>\s*\]",
-        b"/ID[<ID><ID>]",
-        normalized,
-        flags=re.DOTALL,
-    )
-    return {
-        "pdf_sha256": hashlib.sha256(data).hexdigest(),
-        "metadata_dates": [value.decode("latin-1") for value in dates],
-        "trailer_ids": [
-            [value.decode("ascii") for value in pair]
-            for pair in ids
-        ],
-        "normalized_sha256": hashlib.sha256(normalized).hexdigest(),
-    }
+DOCX_ZIP_TIMESTAMP = (2000, 1, 1, 0, 0, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +196,28 @@ def rl_markup(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def normalize_docx_archive() -> None:
+    """Remove ZIP timestamps and platform attributes from the DOCX package."""
+    with zipfile.ZipFile(DOCX, "r") as source:
+        entries = [(info.filename, source.read(info.filename)) for info in source.infolist()]
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(
+        output,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as target:
+        for filename, data in entries:
+            info = zipfile.ZipInfo(filename, date_time=DOCX_ZIP_TIMESTAMP)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100600 << 16
+            target.writestr(info, data, compresslevel=9)
+
+    io.open(DOCX, "wb").write(output.getvalue())
+
+
 def write_docx(blocks) -> None:
     document = Document()
 
@@ -338,14 +289,7 @@ def write_docx(blocks) -> None:
             run.font.size = Pt(9)
 
     document.save(DOCX)
-    # region agent log
-    _agent_log(
-        "A,B,E",
-        "render_v0_5.py:write_docx-exit",
-        "DOCX archive metadata and payload probe",
-        _docx_probe(),
-    )
-    # endregion
+    normalize_docx_archive()
 
 
 # ---------------------------------------------------------------------------
@@ -354,17 +298,6 @@ def write_docx(blocks) -> None:
 
 
 def write_pdf(blocks) -> None:
-    # region agent log
-    _agent_log(
-        "C,D",
-        "render_v0_5.py:write_pdf-entry",
-        "ReportLab reproducibility configuration",
-        {
-            "source_date_epoch": os.environ.get("SOURCE_DATE_EPOCH"),
-            "reportlab_invariant": rl_config.invariant,
-        },
-    )
-    # endregion
     sheet = getSampleStyleSheet()
     body = ParagraphStyle(
         "SpecBody",
@@ -437,7 +370,7 @@ def write_pdf(blocks) -> None:
         canvas.drawRightString(LETTER[0] - 0.9 * inch, 0.6 * inch, str(document.page))
         canvas.restoreState()
 
-    SimpleDocTemplate(
+    document = SimpleDocTemplate(
         PDF,
         pagesize=LETTER,
         leftMargin=0.9 * inch,
@@ -446,15 +379,14 @@ def write_pdf(blocks) -> None:
         bottomMargin=0.9 * inch,
         title="Pattern/Like Product, UX, Data, and Platform Design Specification v0.5",
         author="Pattern/Like",
-    ).build(story, onFirstPage=furniture, onLaterPages=furniture)
-    # region agent log
-    _agent_log(
-        "C,D,E",
-        "render_v0_5.py:write_pdf-exit",
-        "PDF metadata, trailer ID, and normalized-byte probe",
-        _pdf_probe(),
+        invariant=1,
     )
-    # endregion
+    document.build(
+        story,
+        onFirstPage=furniture,
+        onLaterPages=furniture,
+        canvasmaker=partial(Canvas, invariant=1),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -502,35 +434,10 @@ def write_manifest() -> None:
 
 
 def main() -> int:
-    source_text = io.open(SOURCE, encoding="utf-8").read()
-    blocks = parse_blocks(source_text)
-    # region agent log
-    _agent_log(
-        "A,B,C,D,E",
-        "render_v0_5.py:main-entry",
-        "Renderer invocation and deterministic input probe",
-        {
-            "source_sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
-            "block_count": len(blocks),
-            "python_docx_version": importlib.metadata.version("python-docx"),
-            "reportlab_version": importlib.metadata.version("reportlab"),
-        },
-    )
-    # endregion
+    blocks = parse_blocks(io.open(SOURCE, encoding="utf-8").read())
     write_docx(blocks)
     write_pdf(blocks)
     write_manifest()
-    # region agent log
-    _agent_log(
-        "A,B,C,D,E",
-        "render_v0_5.py:main-exit",
-        "Renderer output hashes",
-        {
-            os.path.basename(path): digest(path)[0]
-            for path in (SOURCE, DOCX, PDF, MANIFEST)
-        },
-    )
-    # endregion
     for path in (DOCX, PDF, MANIFEST):
         sha, size = digest(path)
         print(f"{os.path.basename(path):60} {size:>9} bytes  {sha[:16]}")
