@@ -1,5 +1,13 @@
 # M7 Plan and Specification Implementation Audit
 
+> **Historical snapshot.** This audit is pinned to local `main` at `26990c1`.
+> The model-verification command, signed R2-first replay writer/replayer, later
+> ontology-pipeline stages, and associated migrations subsequently landed.
+> Preserve the findings below as the state of that baseline. Current engineering
+> and gate status is recorded in
+> [`docs/deploy/openai-pattern-rollout.md`](../deploy/openai-pattern-rollout.md)
+> and [`docs/deploy/pattern-erasure-replay-drill.md`](../deploy/pattern-erasure-replay-drill.md).
+
 No—not collectively. On local `main` at `26990c1`, the core adapter is implemented and verified, but documentation, rollout, admin authorization, and replay work remain incomplete.
 
 | Document | Verdict |

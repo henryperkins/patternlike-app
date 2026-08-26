@@ -1,5 +1,14 @@
 # Review of unimplemented M7 spec artifacts
 
+> **Historical snapshot.** This review identified gaps at commit `c31d0df`.
+> The additive M7 documents, fixed regression corpus, ontology pipeline, and
+> signed replay runtime subsequently landed. Its absence claims are preserved
+> below as review evidence, not current inventory. The remaining current work is
+> the administrator session/decrypt boundary and production evidence gates; see
+> [`contracts/m7/SCHEMA_MANIFEST.json`](../../contracts/m7/SCHEMA_MANIFEST.json),
+> [`docs/deploy/openai-pattern-rollout.md`](../deploy/openai-pattern-rollout.md),
+> and [`docs/deploy/pattern-erasure-replay-drill.md`](../deploy/pattern-erasure-replay-drill.md).
+
 **Date:** 2026-08-16
 **Subject:** [`docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`](../superpowers/specs/2026-08-14-ai-generated-pattern-design.md)
 **Repository baseline:** `henryperkins/patternlike-app` at `c31d0df74322728a5d8ae04667200f5f6008d494`
