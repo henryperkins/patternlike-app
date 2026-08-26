@@ -631,7 +631,7 @@ export function enablePatternOpenAi(): void {
   env.OPENAI_CREDENTIAL_SOURCE = "worker";
   env.OPENAI_API_KEY = "sk-test-pattern";
   env.OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0";
+  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.1";
   env.OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
   env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.1";
   env.OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
@@ -649,7 +649,7 @@ export function enablePatternCodex(): void {
     },
   });
   env.OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0";
+  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.1";
   env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "900000";
   env.OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
   env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.1";

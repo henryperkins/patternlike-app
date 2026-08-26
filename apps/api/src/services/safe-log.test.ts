@@ -75,6 +75,51 @@ describe("safe logging", () => {
     expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
   });
 
+  it("projects only closed ontology regression failure metadata", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "ontology_regression_failed",
+      reason: "pass_attempt_ceiling",
+      fixture_index: 21,
+      pass: "writer",
+      planner_calls: 2,
+      writer_calls: 3,
+      verifier_calls_for_candidate: 1,
+      delivery_attempt: 0,
+      fixture_id: SENTINEL,
+      rule_id: SENTINEL,
+      plan: SENTINEL,
+      candidate: SENTINEL,
+      verdict_rationale: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    const payload = warn.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      reason: "pass_attempt_ceiling",
+      fixture_index: 21,
+      pass: "writer",
+      planner_calls: 2,
+      writer_calls: 3,
+      verifier_calls_for_candidate: 1,
+      delivery_attempt: 0,
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+    });
+    expect(Object.keys(payload).sort()).toEqual([
+      "delivery_attempt",
+      "fixture_index",
+      "pass",
+      "planner_calls",
+      "reason",
+      "trace_id",
+      "verifier_calls_for_candidate",
+      "writer_calls",
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
+
   it("projects only the closed stalled-generation diagnostic", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const hostile = {

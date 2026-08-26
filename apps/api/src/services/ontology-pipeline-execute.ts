@@ -112,6 +112,7 @@ import {
   ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
   ONTOLOGY_REGRESSION_PATTERN_PIN,
   OntologyRegressionError,
+  type OntologyRegressionFailureReason,
   applyOntologyRegressionPass,
   createCanonicalOntologyRegressionReport,
   createOntologyRegressionFixtureState,
@@ -232,6 +233,50 @@ class TerminalPipelineFailure extends Error {
 
 function terminal(failureClass: OntologyPipelineFailureClass): never {
   throw new TerminalPipelineFailure(failureClass);
+}
+
+/**
+ * Fail the regressing stage, naming why.
+ *
+ * `regression_failed` is raised from eleven places here and, until now, exactly
+ * one of them -- the hard gate -- said anything. Run
+ * `oprun_4d24bc8b-83c8-465d-8877-05c6daffcb34` ended at stage generation 110
+ * having written no artifact and logged nothing, so the cause had to be
+ * inferred from provider-call arithmetic. That is the fourth instance of this
+ * defect class in the pipeline, after the blind correction loop, the silent
+ * chunk rejection, and the silent evaluator verdict.
+ *
+ * `reason` is closed, `pass` is a stage class, and the rest are counters. No
+ * fixture id, rule id, plan, candidate, verdict, or prose has a field here.
+ */
+/** The counters that decide `ontologyRegressionPassCanAttempt`, and nothing else. */
+function regressionStateDetail(
+  state: OntologyRegressionFixtureState,
+  deliveryAttempt: number,
+) {
+  return {
+    fixture_index: state.fixture_index,
+    ...(state.phase === "complete" ? {} : { pass: state.phase }),
+    planner_calls: state.planner_calls,
+    writer_calls: state.writer_calls,
+    verifier_calls_for_candidate: state.verifier_calls_for_candidate,
+    delivery_attempt: deliveryAttempt,
+  };
+}
+
+function failRegression(
+  reason: OntologyRegressionFailureReason,
+  detail: {
+    fixture_index?: number;
+    pass?: PatternStageClass;
+    planner_calls?: number;
+    writer_calls?: number;
+    verifier_calls_for_candidate?: number;
+    delivery_attempt?: number;
+  } = {},
+): never {
+  safeLog({ event: "ontology_regression_failed", reason, ...detail });
+  terminal("regression_failed");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -2127,7 +2172,9 @@ async function loadPriorRegressionState(
        AND stage_generation < ?
      ORDER BY stage_generation, stage_attempt`,
   ).bind(claim.runId, claim.stageGeneration).all<RegressionArtifactRow>();
-  if (results.length !== claim.stageCursor) terminal("regression_failed");
+  if (results.length !== claim.stageCursor) {
+    failRegression("cursor_result_count_mismatch");
+  }
   const latest = results.at(-1);
   if (!latest) return null;
   const stored = await readOntologyPipelineArtifact(
@@ -2183,7 +2230,10 @@ async function retryRegressionProviderPass(
   clock: () => Date,
 ): Promise<OntologyPipelineExecuteOutcome> {
   if (!ontologyRegressionPassCanAttempt(state, claim.stageAttempt + 1)) {
-    terminal("regression_failed");
+    failRegression(
+      "pass_attempt_ceiling",
+      regressionStateDetail(state, claim.stageAttempt + 1),
+    );
   }
   const delaySeconds = Math.max(
     PROVIDER_RETRY_DELAY_SECONDS,
@@ -2380,7 +2430,11 @@ async function createCompletedRegressionReport(input: {
     }
     const state = parseCanonicalRegressionState(stored.plaintext);
     if (!state.complete || !state.result) continue;
-    if (complete.has(state.fixture_index)) terminal("regression_failed");
+    if (complete.has(state.fixture_index)) {
+      failRegression("duplicate_fixture_result", {
+        fixture_index: state.fixture_index,
+      });
+    }
     const result: OntologyRegressionFixtureResult = {
       fixture_id: state.result.fixture_id,
       accuracy: state.result.accuracy,
@@ -2405,7 +2459,7 @@ async function createCompletedRegressionReport(input: {
     accountedInputTokens !== successfulInputTokens ||
     accountedOutputTokens !== successfulOutputTokens
   ) {
-    terminal("regression_failed");
+    failRegression("report_accounting_mismatch");
   }
   const configurationHash = await ontologyRegressionConfigurationHash(
     regressionPublisherName(input.context.configuration),
@@ -2436,7 +2490,7 @@ async function executeRegressing(
   clock: () => Date,
 ): Promise<OntologyPipelineExecuteOutcome> {
   if (!context.row.evaluation_report_hash || !context.row.candidate_hash) {
-    terminal("regression_failed");
+    failRegression("prerequisite_hash_missing");
   }
   const sourceCorpus = await readFrozenCorpus(env, context.command);
   const candidateArtifact = await loadSingleCompilingArtifact(
@@ -2458,7 +2512,9 @@ async function executeRegressing(
     ? prior.fixture_index + 1
     : prior?.fixture_index ?? 0;
   const fixture = regressionCorpus.fixtures[fixtureIndex];
-  if (!fixture) terminal("regression_failed");
+  if (!fixture) {
+    failRegression("fixture_index_out_of_range", { fixture_index: fixtureIndex });
+  }
   const baseState = prior?.complete
     ? createOntologyRegressionFixtureState(fixtureIndex, fixture)
     : prior ?? createOntologyRegressionFixtureState(fixtureIndex, fixture);
@@ -2467,7 +2523,7 @@ async function executeRegressing(
     baseState.fixture_id !== fixture.fixture_id ||
     baseState.accuracy !== fixture.effective_accuracy
   ) {
-    terminal("regression_failed");
+    failRegression("fixture_state_mismatch", { fixture_index: fixtureIndex });
   }
   const prepared = prepareOntologyRegressionPass({
     state: baseState,
@@ -2476,7 +2532,10 @@ async function executeRegressing(
     inputMaxBytes: ONTOLOGY_REGRESSION_PATTERN_PIN.input_max_bytes,
   });
   if (JSON.stringify(prepared.document) !== prepared.serialized) {
-    terminal("regression_failed");
+    failRegression("request_document_noncanonical", {
+      fixture_index: fixtureIndex,
+      pass: prepared.pass,
+    });
   }
   const request = regressionRequestDocument(
     fixtureIndex,
@@ -2540,7 +2599,10 @@ async function executeRegressing(
       return retryRegressionProviderPass(env, claim, baseState, 0, clock);
     }
     if (!ontologyRegressionPassCanAttempt(baseState, claim.stageAttempt)) {
-      terminal("regression_failed");
+      failRegression(
+        "pass_attempt_ceiling",
+        regressionStateDetail(baseState, claim.stageAttempt),
+      );
     }
     await assertRegressionProviderRunCapacity(env, claim.runId);
     await putArtifact(env, claim, "regression_request", requestBytes, clock);
@@ -2806,7 +2868,7 @@ async function buildPassedOntologyRelease(
       context.row.evaluation_report_hash ||
     regressionReport.passed !== true
   ) {
-    terminal("regression_failed");
+    failRegression("report_pin_mismatch");
   }
   const release: PatternOntologyRelease = {
     ...candidate,

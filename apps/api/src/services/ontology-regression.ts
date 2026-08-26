@@ -61,6 +61,7 @@ export {
   createCanonicalOntologyRegressionReport,
   evaluateOntologyRegressionThresholds,
   ontologyRegressionConfigurationHash,
+  type OntologyRegressionFailureReason,
   type OntologyRegressionFixtureResult,
   type OntologyRegressionHardGateFailure,
   type OntologyRegressionThresholdResult,
