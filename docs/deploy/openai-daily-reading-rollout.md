@@ -1,7 +1,16 @@
 # OpenAI daily reading publisher — production rollout
 
-**Status:** not started. Every gate below is separately authorized at execution
-time, and nothing in this file has been performed.
+**Status (reconciled 2026-08-26):** engineering and committed production
+configuration have advanced to `READING_V5_ROLLOUT=first_open`, but this file
+does not contain a complete ordered evidence record proving how that state was
+reached. The default Wrangler block remains `off`; production has no 15-minute
+reading cron and is not `hybrid`.
+
+Treat the gate text below as the original staged procedure, not as a current
+inventory. Before any further operation, re-query the deployed Worker, D1,
+secrets, provider usage, and cron bindings, then record a new baseline. Do not
+replay migration or secret steps merely because their historical checkbox is
+empty. Every new gate action still requires its own authorization.
 
 **Companion documents:** `docs/deploy/api-production.md` for the deployed Worker,
 `docs/superpowers/specs/2026-08-10-openai-daily-reading-publisher-design.md` for
@@ -26,9 +35,12 @@ npm run build
 python contracts/validate_schemas.py
 ```
 
-All exit 0, all three contract manifests valid, `contracts/m0` and
-`contracts/m3` proven unchanged. `READING_V5_ROLLOUT` is `off` in both Wrangler
-blocks and `[env.production.triggers] crons` is `[]`.
+All exit 0, all contract manifests valid, `contracts/m0` and
+`contracts/m3` proven unchanged. The original Gate 0 candidate required
+`READING_V5_ROLLOUT=off` in both Wrangler blocks and no production cron. That
+precondition is historical: committed production configuration is now
+`first_open`, and its trigger block contains ontology maintenance but no reading
+schedule.
 
 **Stop condition:** any failure. Do not proceed to a remote gate on a candidate
 that does not build locally.

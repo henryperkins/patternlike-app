@@ -2,7 +2,13 @@ import { Hono, type Context } from "hono";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 
-/** M2–M4 surfaces stubbed so OpenAPI routes resolve with honest 501s. */
+/**
+ * Legacy fallback registrations.
+ *
+ * This router is mounted after every real product router. The current
+ * check-in, context-source, export, and deletion handlers therefore match
+ * first; entries below are not a feature-status inventory.
+ */
 export const stubRoutes = new Hono<{
   Bindings: Env;
   Variables: AppVariables;
@@ -36,10 +42,9 @@ function notImplemented(c: StubContext, feature: string) {
 // compiler may pin it for repetition_control and theme_ranking only after the
 // writer has created the USR-12 source grant.
 // `/v1/pattern` and `/v1/time-travel` are served by routes/pattern.ts and
-// routes/time-travel.ts. Their stubs are gone rather than shadowed: this router
-// is mounted last, so a registration a real route already answers can never be
-// reached, and leaving one here would read as a live rollback path that does
-// not exist.
+// routes/time-travel.ts. The registrations below are likewise shadowed by
+// routes/privacy.ts. They remain only as legacy fallbacks for an older router
+// composition and must not be cited as evidence that those features are absent.
 stubRoutes.post("/v1/check-ins", (c) => notImplemented(c, "Check-ins (M4)"));
 stubRoutes.get("/v1/context-sources", (c) =>
   notImplemented(c, "Context sources (M4)"),

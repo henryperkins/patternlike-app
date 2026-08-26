@@ -1,13 +1,14 @@
 # Deploying the production API
 
-Runbook for putting `patternlike-api-production` behind `patternlike-app.fly.dev/v1`.
+Runbook for `patternlike-api-production`, which serves the PWA and API from one
+Cloudflare Worker origin.
 
-Status as of 2026-08-08:
+Repository and recorded live state, reconciled 2026-08-26:
 
 | Step | State |
 | --- | --- |
 | D1 `patternlike-ops` created (`1305a75d-0a8a-4a21-b201-d94fda0aaf93`, ENAM) | done |
-| Schema applied `--remote` (22 tables) | done |
+| Migrations through `0015` applied remotely | done — last recorded verification 2026-08-25 |
 | `database_id` wired into `[[env.production.d1_databases]]` | done |
 | Origin decided: PWA ships inside the API Worker (`[env.production.assets]`) | done, dry-run validated |
 | Auth0 tenant `dev-lqmwkyo17nm5mdjz.us.auth0.com` + SPA app `Pattern/Like Web` | done |
@@ -18,24 +19,20 @@ Status as of 2026-08-08:
 | `SERVICE_AUTH_TOKEN` (`/internal/*`) | set — the route now answers 401, not 503 |
 | `/v1/sessions` in the M0 contract | documented; amendment recorded in `SCHEMA_MANIFEST.json` |
 | `patternlike-app` on Fly (superseded PWA) | retired — scaled to 0 machines, no longer serving |
-| First real sign-in | **not done** — requires creating an Auth0 user |
-| `ROOT_KEK` recorded off-machine | **not done — see the warning below** |
+| First real sign-in | done — the 2026-08-22 Auth0 canary created a Worker session |
+| `ROOT_KEK` recorded off-machine | operator check — not re-verified by this documentation reconciliation |
 
 > **`ROOT_KEK` is unrecoverable.** Cloudflare secrets are write-only. The
-> generated values were written to the session scratchpad as
-> `patternlike-secrets.json`; move `ROOT_KEK` into a password manager and delete
-> that file. Losing it after real users exist makes every birth profile
-> permanently unreadable. Rotating it costs nothing while the database is empty.
+> original 2026-08-08 deployment notes said the generated value still needed to
+> move from an owner-only scratch file into a password manager. This document
+> does not prove that handoff happened. Confirm the off-machine record directly;
+> losing the key makes every birth profile permanently unreadable.
 
-Verified live: `/` 200 `text/html`, `/health` 200 `application/json`, `/v1/chart`
+Verified live on 2026-08-08: `/` 200 `text/html`, `/health` 200
+`application/json`, `/v1/chart`
 401 `application/json` (not a 200 of `index.html`, so `run_worker_first` is
 correct), `/v1/sessions` 401 on a malformed token and 400 on a missing one,
 and `X-User-Id` refused in production.
-| Retire `patternlike-app` on Fly | not started (superseded once the Worker serves) |
-| Sign-in UI in `apps/web` | not started (roadmap F2/F3) |
-
-The Worker has never been deployed: `wrangler deployments list --env production`
-returns `code: 10007, This Worker does not exist on your account`.
 
 ---
 
@@ -397,18 +394,21 @@ warm, which erodes the cost win.
 Recommendation: leave the calc service on Fly for M1. Revisit if the shared
 secret or the two-platform footprint becomes the thing that hurts.
 
-## 5. What still will not work
+## 5. Identity and consent follow-up
 
-A 401 is the end of this runbook, not a working product. `apps/web` contains
-**no auth code** — no sign-in, no sign-out, no 401 handling, and nothing that
-calls `POST /v1/sessions`. Acquiring the `id_token` is vendor-shaped client work
-tracked as streams F2/F3 in
-[`../superpowers/plans/2026-08-01-frontend-completion-roadmap.md`](../superpowers/plans/2026-08-01-frontend-completion-roadmap.md);
-choosing Auth0 above settles that roadmap's open decision F0.1.
+The web app uses the official Auth0 React SDK for sign-in and logout, exchanges
+the raw ID token through `POST /v1/sessions`, and treats Worker API 401 responses
+as the product-session authority. The 2026-08-22 canary exercised that path.
 
-The same roadmap records F1: local development is broken independently of any of
-this, because `x-user-id` now names a user that must already exist and a
-SQL-only seed cannot produce a valid wrapped DEK.
+Local development deliberately keeps the separate `AUTH_STUB=1` path.
+`X-User-Id` names an existing user, so after applying local D1 migrations run
+`node scripts/dev/seed-dev-user.mjs`; the script creates the user, crypto
+subject, and wrapped DEK together.
+
+One M1 consent gap remains separate from authentication: onboarding still sends
+the local `cns_local_web_0001` placeholder, and the birth route checks only that
+`consent_id` is present. Persisted `account_processing` consent and its
+grant/revoke enforcement are not implemented.
 
 ## 6. The daily reading publisher
 
@@ -422,18 +422,21 @@ deliberately. See
 
 That means two things for this runbook:
 
-- **`release_not_active` is no longer the reason production cannot generate.**
-  It is a legacy v3 code and cannot occur on the new path. Production cannot
-  generate because `READING_V5_ROLLOUT` is `off`, the `0003` migration has not
-  been applied, and `OPENAI_API_KEY` and the publisher variables are unset. The
-  empty `content_releases` table is now expected and permanent rather than a gap
-  waiting to be filled.
-- **Enabling it is its own runbook**, with its own stop conditions, its own
-  measured preflight, and its own approved spend ceiling:
-  [`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md). None of
-  its gates have been performed.
+- **Repository configuration has advanced beyond this runbook's original
+  baseline.** Migration `0003` is applied and committed production configuration
+  declares `READING_V5_ROLLOUT=first_open` with the OpenAI publisher. The
+  production trigger block still has no 15-minute reading cron, so it is not
+  `hybrid`.
+- **Configuration is not certification.** The evidence table in
+  [`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md) does not
+  record a complete ordered rollout. Re-query the deployed Worker, secrets,
+  usage, and D1 state before any further change rather than replaying that
+  runbook from its historical `off` assumptions.
+- **`release_not_active` applies only to the retained editorial paths.** M5
+  constrained-model daily readings do not use a content release. The legacy M3
+  daily-reading path and M4 editorial Pattern still require one.
 
-The content-release tables, R2 objects, signing configuration, ingestion routes,
-and historical audit records are retained and inert. They cannot influence a new
-command or a new reading. Removing them is a later migration with its own
-retention and rollback review.
+The content-release tables, R2 objects, ingestion routes, and historical audit
+records remain for legacy editorial serving. They cannot influence a new M5
+command or reading. Removing them is a later migration with its own retention
+and rollback review.

@@ -984,11 +984,12 @@ export function validateContentGraph(bundle: ContentReleaseBundle): RejectionRea
  *
  * The spec activates a release *after* smoke tests. The integrity smoke tests
  * run at ingestion (graph resolution, hashes, signature), but a bundle may also
- * declare eligibility `fixtures`, and evaluating those needs the M3 assembly
- * engine that does not exist yet. Activating anyway would claim a test result
- * nobody produced, so a fixture-bearing bundle is stored and left inactive —
+ * declare eligibility `fixtures`. The M3 evaluator exists in
+ * `packages/reading-engine`, but this ingestion path does not yet load its
+ * catalogue or call it. Activating anyway would claim a test result this route
+ * did not produce, so a fixture-bearing bundle is stored and left inactive —
  * which is precisely what the contract's `accepted_pending_tests` status is
- * for. Re-POST the same bundle once M3 can run the fixtures to activate it.
+ * for. Re-posting remains pending until that integration lands.
  */
 export function pendingFixtureIds(bundle: ContentReleaseBundle): string[] {
   return (bundle.fixtures ?? []).map((fixture) => fixture.fixture_id);
