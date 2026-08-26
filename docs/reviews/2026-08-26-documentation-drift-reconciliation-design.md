@@ -1,6 +1,6 @@
 # Documentation Drift Reconciliation Design
 
-**Date:** 2026-08-26  
+**Date:** 2026-08-26
 **Status:** Approved for planning
 
 ## Goal
@@ -71,4 +71,3 @@ Verification will include:
 - `git diff --check`; and
 - a final diff review confirming that `docs/superpowers/`, runtime behavior,
   contracts, migrations, and rollout configuration are unchanged.
-
