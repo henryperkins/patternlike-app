@@ -50,7 +50,7 @@ This table describes repository evidence, not unqueried live state.
 | Area | State / date | Evidence / next owner |
 | --- | --- | --- |
 | Shared Responses boundary, minimizing packets, prompts, correction document, OpenAI transport, publisher factories, credential modes | Complete | Adapter Tasks 1–5a |
-| Executor/provider path and queue-level integration | Deployed with rollout off | Worker `c20fa0da-273b-4d63-8fdd-7fc53d972c05`; `pattern-execute.ts`, `pattern-execute-openai.test.ts` |
+| Executor/provider path and queue-level integration | Engineering complete; prior Gate 3 deployment verified with rollout off | Worker `c20fa0da-273b-4d63-8fdd-7fc53d972c05`; `pattern-execute.ts`, `pattern-execute-openai.test.ts` |
 | Artifact-first idempotency, attempts, writer↔verifier correction, 11-call loop | Complete | `pattern-execute.ts`; exact ceiling in `pattern-execute-protocol.test.ts` |
 | Executed-pin provenance and per-stage usage | Complete | `pattern-execute.ts`; migration `0010_pattern_stage_class_usage.sql` |
 | Historical `0009` / `0010` / `0011` / `0012` | Applied to production in order | 2026-08-22 Gate 2 evidence below; integrity and shape checks clean |
@@ -58,10 +58,10 @@ This table describes repository evidence, not unqueried live state.
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
 | Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active. See the evidence ledger for individual runs. |
-| Rollout declared in `wrangler.toml` | `off` | Both default and production blocks |
-| Production publisher / credential declaration | `openai` / `worker` | Gateway ids and key alias remain empty in committed production config; development remains `synthetic` / `worker` |
+| Rollout declared in committed `wrangler.toml` | default `off`; production `internal` for one allowlisted account | This is repository configuration, not proof of the deployed binding or a successful canary |
+| Committed production publisher declaration | `codex` | The dedicated runner path is selected; development remains `synthetic`, and OpenAI gateway ids/key alias remain empty |
 | Gate 6 spend certification | Open for OpenAI and Codex | `100` Pattern and `500` ontology calls/day remain enforcement ceilings. The 2026-08-22 OpenAI approval used old 4k/8k/4k output pins and is historical evidence, not authorization for the current mixed ontology/Pattern envelope or Codex. |
-| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner is polling `/codex-provider/v1/jobs/claim` and answering `ok` |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; observed Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner was polling `/codex-provider/v1/jobs/claim` and answering `ok`. This observed state differs from current committed rollout declarations and must be re-queried before another operation. |
 
 ## What remains before the first generated Pattern
 
@@ -114,6 +114,11 @@ handler. A regression test first reproduced that upload shape, the signer added
 an empty-404 `fetch`, and the full command set passed against the corrected
 tree. The local verification itself made no provider call or remote change.
 
+The off-state requirements below are evidence conditions for that historical
+candidate. Current committed production configuration has since advanced to
+`internal`; this section does not assert otherwise and must not be used to
+revert or infer the deployed state.
+
 Run from the repository root:
 
 ```text
@@ -147,11 +152,9 @@ at `0008`. The operator explicitly approved including the unexpected but
 additive `0012_ontology_pipeline.sql`; `0009` through `0012` were then applied
 in numeric order.
 
-**Current state (2026-08-24):** a read-only audit found `0013` and `0014`
-applied in production. This branch introduces additive
-`0015_ontology_pipeline_regression_evidence`; it is not applied or deployed.
-Apply it immediately before deploying its compatible Worker in the same approved
-change window, with rollouts contained. It performs no backfill: legacy
+**Later state (2026-08-25):** `0013`, `0014`, and
+`0015_ontology_pipeline_regression_evidence` are applied in production; the
+migration list reports nothing pending. `0015` performed no backfill: legacy
 committed `0011` receipts retain NULL regression pins and fail closed for machine
 public activation. New machine receipts require the complete regression evidence
 tuple.
@@ -186,20 +189,21 @@ Apply pending migrations in numeric order with the same explicit config and
 environment. For adapter rollout, `0009` widens the artifact-class CHECK and
 `0010` adds stage-class usage counters. `0011` adds the terminal pipeline
 evidence receipt and `0012` adds the automated pipeline control-plane tables.
-`0015_ontology_pipeline_regression_evidence` is the known reviewed pending
-migration on this branch: it adds the full regression evidence tuple and
-no-delete/complete-tuple guards without backfilling legacy receipts. Apply it
-immediately before its compatible Worker, not as a standalone rollout change.
-Preserve populated artifact rows byte-for-byte through the `0009` rebuild and
-preserve populated `0011` evidence rows through `0015`.
+Those four files were the complete 2026-08-22 Gate 2 execution. During the later
+2026-08-24 follow-up, `0015_ontology_pipeline_regression_evidence` became the
+known reviewed pending migration. It added the full regression evidence tuple
+and no-delete/complete-tuple guards without backfilling legacy receipts and was
+applied on 2026-08-25 with its compatible Worker. Preserve populated artifact
+rows byte-for-byte through any future CHECK rebuild and preserve populated
+`0011` evidence rows.
 
-Afterward, record the migration list, `foreign_key_check` (zero rows),
-`quick_check` (`ok`), empty `assertion_probe`, table SQL, and pre/post row
-counts. For `0015`, additionally prove populated `0011` rows are preserved,
-legacy regression pins remain all NULL, the full regression tuple is accepted
-only when complete, and the no-delete/immutability guards are exercised.
-Record that no rollout change or provider call occurred during the migration
-step.
+After each migration window, record the migration list, `foreign_key_check`
+(zero rows), `quick_check` (`ok`), empty `assertion_probe`, table SQL, and
+pre/post row counts. The later `0015` window additionally required proof that
+populated `0011` rows were preserved, legacy regression pins remained all NULL,
+the full regression tuple was accepted only when complete, and the
+no-delete/immutability guards were exercised. Record that no rollout change or
+provider call occurred during a migration step.
 
 **Stop:** an unexpected pending migration, non-empty assertion probe, integrity
 error, row-count/hash drift, failed tuple/no-delete guard, a rollout/provider
@@ -208,8 +212,8 @@ compatible Worker candidate was ready.
 
 ## Gate 3 — deploy the compatible Worker with rollout off
 
-**Current state:** API version
-`d784b0ea-625d-4c8c-84ce-4e27f71ec9d0` (version 135) is deployed at 100%.
+**Historical Gate 3 state (2026-08-22):** API version
+`d784b0ea-625d-4c8c-84ce-4e27f71ec9d0` (version 135) was deployed at 100%.
 The compatible Gate 3 deployment and unauthenticated operational checks passed.
 A reusable production Auth0 canary now exists, and its deployed React SDK login
 created a live Worker session. The CLI loopback namespace was unavailable, so

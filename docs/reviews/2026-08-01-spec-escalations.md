@@ -1,5 +1,15 @@
 # Spec-level escalations from the 2026-08-01 code review
 
+> **Historical snapshot.** The findings below describe the repository at the
+> stated review baseline and are preserved as review evidence, not current
+> feature status. Reading revisions/cycle passes, release-signature verification,
+> source-status enforcement, life events, and audit writers subsequently landed.
+> Current unresolved contract escalations are summarized in
+> [`contracts/m3/SCHEMA_MANIFEST.json`](../../contracts/m3/SCHEMA_MANIFEST.json)
+> and [`contracts/m5/SCHEMA_MANIFEST.json`](../../contracts/m5/SCHEMA_MANIFEST.json);
+> current runtime and deployment state lives in [`CLAUDE.md`](../../CLAUDE.md)
+> and [`docs/deploy/`](../deploy/).
+
 Items here are **not** code bugs. In each case the code implements the frozen M0
 contract faithfully, so the fix has to land in the spec first — patching the
 code alone would make the implementation diverge from the contract it is

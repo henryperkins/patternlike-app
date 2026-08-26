@@ -1,12 +1,14 @@
 # Codex production provider runbook
 
-**Status (2026-08-24):** the read-only production audit found migrations `0013`
-and `0014` applied, and 124 completed Codex provider jobs, demonstrating
-historical successful execution. Current live runner health was not rechecked by
-this audit. Production ontology is `internal` / `codex` with 900000-ms pass
-timeouts; Pattern remains `off` / `openai` with 120000-ms pass timeouts. The
-existing DigitalOcean droplet is the approved runner host. Neither this status
-nor any later runbook edit authorizes a deployment, provider call, ontology
+**Status (reconciled 2026-08-26):** the last recorded production inventory
+(2026-08-25) found migrations through `0015` applied, 124 terminal Codex provider
+jobs, ontology rollout `internal` / `codex`, Pattern rollout `off`, and the runner
+polling successfully. Current committed configuration instead declares Pattern
+`internal` / `codex` and ontology rollout `off`. Re-query both deployed bindings
+and runner health before acting; repository declarations and dated live
+observations are not interchangeable. No active ontology or accepted Pattern is
+recorded, and Gate 6 spend certification remains open. Neither this status nor
+any later runbook edit authorizes a deployment, provider call, ontology
 activation, or rollout advance.
 
 This runbook operates the supported Codex CLI provider for Pattern generation

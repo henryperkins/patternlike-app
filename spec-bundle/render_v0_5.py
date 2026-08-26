@@ -2,7 +2,8 @@
 
 Checked in beside the artifacts it produces, so a later version can be
 regenerated rather than reverse-engineered. The Markdown is the source; both
-derived files are byte-reproducible from it, and the manifest records all three.
+derived files are byte-reproducible from it and the pinned renderer environment.
+The manifest records the source, outputs, and build inputs.
 
 Deliberately narrow: this reads the subset of Markdown the specification
 actually uses — setext-free ATX headings, paragraphs, `-` bullets, `1.` ordered
@@ -10,7 +11,7 @@ items, pipe tables, blockquotes, and inline `code`/`**bold**` — and nothing
 else. A general Markdown engine would be a larger dependency and a larger
 surface for the two renderings to disagree about.
 
-    pip install python-docx reportlab
+    pip install -r spec-bundle/render_v0_5.requirements.txt
     python spec-bundle/render_v0_5.py
 """
 
@@ -22,6 +23,8 @@ import json
 import os
 import re
 import sys
+import zipfile
+from functools import partial
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -30,6 +33,7 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     ListFlowable,
     ListItem,
@@ -48,11 +52,14 @@ SOURCE = os.path.join(HERE, f"{STEM}.md")
 DOCX = os.path.join(HERE, f"{STEM}.docx")
 PDF = os.path.join(HERE, f"{STEM}.pdf")
 MANIFEST = os.path.join(HERE, f"{STEM}_manifest.json")
+RENDERER = os.path.abspath(__file__)
+REQUIREMENTS = os.path.join(HERE, "render_v0_5.requirements.txt")
 
 INK = RGBColor(0x17, 0x31, 0x2A)
 INK_HEX = colors.HexColor("#17312a")
 SOFT_HEX = colors.HexColor("#4e625b")
 RULE_HEX = colors.HexColor("#cec7b8")
+DOCX_ZIP_TIMESTAMP = (2000, 1, 1, 0, 0, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +199,28 @@ def rl_markup(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def normalize_docx_archive() -> None:
+    """Remove ZIP timestamps and platform attributes from the DOCX package."""
+    with zipfile.ZipFile(DOCX, "r") as source:
+        entries = [(info.filename, source.read(info.filename)) for info in source.infolist()]
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(
+        output,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as target:
+        for filename, data in entries:
+            info = zipfile.ZipInfo(filename, date_time=DOCX_ZIP_TIMESTAMP)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100600 << 16
+            target.writestr(info, data, compresslevel=9)
+
+    io.open(DOCX, "wb").write(output.getvalue())
+
+
 def write_docx(blocks) -> None:
     document = Document()
 
@@ -263,6 +292,7 @@ def write_docx(blocks) -> None:
             run.font.size = Pt(9)
 
     document.save(DOCX)
+    normalize_docx_archive()
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +373,7 @@ def write_pdf(blocks) -> None:
         canvas.drawRightString(LETTER[0] - 0.9 * inch, 0.6 * inch, str(document.page))
         canvas.restoreState()
 
-    SimpleDocTemplate(
+    document = SimpleDocTemplate(
         PDF,
         pagesize=LETTER,
         leftMargin=0.9 * inch,
@@ -352,7 +382,14 @@ def write_pdf(blocks) -> None:
         bottomMargin=0.9 * inch,
         title="Pattern/Like Product, UX, Data, and Platform Design Specification v0.5",
         author="Pattern/Like",
-    ).build(story, onFirstPage=furniture, onLaterPages=furniture)
+        invariant=1,
+    )
+    document.build(
+        story,
+        onFirstPage=furniture,
+        onLaterPages=furniture,
+        canvasmaker=partial(Canvas, invariant=1),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -361,10 +398,11 @@ def write_pdf(blocks) -> None:
 
 
 def digest(path: str):
-    data = io.open(path, "rb").read()
+    with io.open(path, "rb") as handle:
+        data = handle.read()
     # LF-normalized for text so a checkout on any platform verifies; binaries
     # are hashed as they are.
-    if path.endswith((".md", ".json")):
+    if path.endswith((".md", ".json", ".py", ".txt")):
         data = data.replace(b"\r\n", b"\n")
     return hashlib.sha256(data).hexdigest(), len(data)
 
@@ -374,6 +412,10 @@ def write_manifest() -> None:
     for path in (SOURCE, DOCX, PDF):
         sha, size = digest(path)
         files[os.path.basename(path)] = {"sha256": sha, "bytes": size}
+    build_inputs = {}
+    for path in (RENDERER, REQUIREMENTS):
+        sha, size = digest(path)
+        build_inputs[os.path.basename(path)] = {"sha256": sha, "bytes": size}
 
     manifest = {
         "//": [
@@ -387,6 +429,7 @@ def write_manifest() -> None:
         "supersedes_scope": "sections 3, 7 daily reading generation, 10, 11, 12, 14, 15, 16",
         "source": os.path.basename(SOURCE),
         "renderer": "spec-bundle/render_v0_5.py",
+        "build_inputs": build_inputs,
         "files": files,
         "carried_forward_unchanged": {
             "pattern_like_astrology_app_product_platform_spec_v0.2.md": "sections this version does not restate remain in force as published",

@@ -17,7 +17,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Install python deps
-        run: pip install pyyaml jsonschema referencing openapi-spec-validator
+        run: pip install pyyaml jsonschema referencing openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt
       # Delegates to the root script rather than restating its steps. This job
       # used to run contracts/m0/{validate_schemas,smoke_check}.py, a subset
       # that drifted: it never validated contracts/m3 (schema_version 0.3.0)

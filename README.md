@@ -21,7 +21,7 @@ Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculatio
 ## Prerequisites
 
 - Node 20+
-- Python 3.11+ (`pip install jsonschema referencing pyyaml openapi-spec-validator`)
+- Python 3.11+ (`pip install jsonschema referencing pyyaml openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt`)
 - Wrangler 4+ (via workspace)
 
 ## Quick start
@@ -37,6 +37,7 @@ npm run calc:dev
 
 # Apply D1 schema locally (terminal 2)
 npm run db:local -w @patternlike/api
+node scripts/dev/seed-dev-user.mjs
 
 # API (terminal 2)
 npm run dev:api
@@ -48,8 +49,10 @@ npm run web:dev
 The web client opens at `http://127.0.0.1:5173` and proxies `/v1` requests to
 the local Worker at `http://127.0.0.1:8787`. Development defaults to
 `usr_local_dev_0001`; override `VITE_DEV_USER_ID`, `VITE_CONSENT_ID`, or
-`VITE_API_PROXY_TARGET` in `apps/web/.env.local` when needed. These values are
-local scaffolding only while production identity and consent APIs remain M1 work.
+`VITE_API_PROXY_TARGET` in `apps/web/.env.local` when needed. The seed command
+above creates that local user, crypto subject, and wrapped DEK idempotently.
+Production identity is implemented; `VITE_CONSENT_ID` remains local scaffolding
+because persisted `account_processing` consent is not yet implemented.
 
 ### Birth → chart (local)
 
@@ -142,15 +145,16 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Responsive web/PWA shell with birth onboarding, chart facts/evidence, uncertainty, and privacy status
 - [x] Production identity: OIDC token exchange, Worker-minted sessions, and a crypto identity decoupled from the user's public id
 - [x] Historical timezone resolution: birthplace coordinates resolve to an IANA zone (`POST /v1/timezone-lookup`), and the chart is calculated in that zone rather than the browser's current one
+- [x] Privacy center export/delete workflows, including encrypted artifacts and terminal deletion status
 - [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
-- [ ] Privacy center export/delete workflows (API stubs 501)
+- [ ] Persisted `account_processing` consent: onboarding still sends a local placeholder and the birth route checks only that an id is present
 
 ## M2 status — editorial control plane
 
 - [x] Cloudflare ingestion: `POST /internal/content-releases` verifies, stores, and activates signed bundles (see below)
 - [x] Release rollback by re-posting a stored bundle; activation and rollback are one D1 transaction with their audit row
 - [ ] WordPress.com plugin and content types — the authoring side that produces the bundles
-- [ ] Smoke-test fixtures: a bundle declaring `fixtures` is stored but held inactive until M3 can evaluate them
+- [ ] Smoke-test fixture ingestion: the M3 evaluator exists in `packages/reading-engine`, but the ingestion route does not call it, so a bundle declaring `fixtures` remains inactive
 
 ## Content release ingestion
 
@@ -181,7 +185,7 @@ every check above passes.
 Accepted bundles answer `202` with one of three statuses:
 
 - `active` — verified, stored at `r2://artifacts/content-releases/<version>.json`, pointer moved, previous release marked `superseded`.
-- `accepted_pending_tests` — stored but not live, either because `activate: false` was sent or because the bundle declares eligibility `fixtures` that need the M3 assembly engine to evaluate. Activating on tests nobody ran would be a claim, not a result.
+- `accepted_pending_tests` — stored but not live, either because `activate: false` was sent or because the bundle declares eligibility `fixtures`. The evaluator exists, but it is not wired into ingestion; activating on tests the route did not run would be a claim, not a result.
 - `duplicate` — an unchanged replay of an already stored release, whether it is
   active or still pending activation.
 
@@ -235,22 +239,22 @@ the `users` row, its `identities` row, and its wrapped DEK must land together).
 `ENVIRONMENT=test` counts as development and disables the config guard. Do not
 name a staging deployment `test`.
 
-## Deploying to Fly.io
+## Deploying the calculation service to Fly.io
 
-Two Fly apps deploy from this repo. **All commands run from the repository
-root** — the Docker build context must remain the root so the Dockerfiles can
-copy `package.json`, `package-lock.json`, `tsconfig.base.json`, and
-`packages/shared`. The API is not on Fly; it remains a Cloudflare Worker
-backed by D1.
+One active Fly app deploys from this repo. **Run the command from the repository
+root** — the Docker build context must remain the root so the Dockerfile can copy
+`package.json`, `package-lock.json`, `tsconfig.base.json`, and
+`packages/shared`. The API and PWA ship together as one Cloudflare Worker backed
+by D1.
 
 | App | Serves | Config | Deploy |
 | --- | --- | --- | --- |
 | `patternlike-calc` | Swiss Ephemeris calc service (`apps/calc-stub`) | `fly.toml` | `fly deploy` |
-| `patternlike-app` | Web PWA (`apps/web`, static nginx) | `fly.web.toml` | `fly deploy -c fly.web.toml` |
 
 > **Do not** run `fly deploy` from inside an app directory and do not pass
-> `--build-context`. Both Dockerfiles expect root-level workspace files.
-> To recreate an app from scratch: `fly apps create <name> --org personal`.
+> `--build-context`. The calc Dockerfile expects root-level workspace files.
+> `fly.web.toml` is the retired PWA deployment; using it would resurrect the
+> superseded `patternlike-app` service.
 
 ### Calc service auth
 

@@ -1,5 +1,11 @@
 # Ontology regression diagnosis — candidate 0.1.16
 
+> **Historical diagnosis.** Candidate `0.1.17` was attempted after this document
+> and also failed closed; the current candidate and gate outcome are recorded in
+> [`docs/deploy/openai-pattern-rollout.md`](../deploy/openai-pattern-rollout.md).
+> The observations below remain the evidence and remediation record for `0.1.16`
+> only.
+
 **Date:** 2026-08-24
 **Status:** Diagnosis complete. Fixes A, B and C applied and deployed (§6). Live
 verification blocked upstream in `generating` (§7); the regression fixes remain

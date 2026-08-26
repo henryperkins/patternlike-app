@@ -1,5 +1,12 @@
 # Handoff — Pattern generation on production
 
+> **Historical handoff.** Preserve the dated observations below, but do not use
+> its status paragraph as current inventory. See
+> [`openai-pattern-rollout.md`](./openai-pattern-rollout.md) for the latest
+> recorded production evidence and
+> [`codex-production-provider.md`](./codex-production-provider.md) for current
+> operations. No active ontology or accepted production Pattern is recorded.
+
 **Date:** 2026-08-23; operational state updated 2026-08-24
 **Goal as given:** generate a Pattern on production.
 **Status (updated 2026-08-24):** the original provider blocker has an approved,

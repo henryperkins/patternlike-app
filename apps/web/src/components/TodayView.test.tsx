@@ -419,6 +419,20 @@ describe("TodayView", () => {
     expect(capturedFor(TODAY).map((request) => request.method)).toEqual(["PUT", "PUT"]);
   });
 
+  it("describes locale validation without promising reviewed-copy fallback", async () => {
+    renderToday({
+      [TODAY]: {
+        status: 409,
+        body: errorBody("locale_confirmation_required", "Confirm your content locale"),
+      },
+    });
+
+    expect(
+      await screen.findByText(/the deterministic validator currently supports English only/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/reviewed copy/i)).not.toBeInTheDocument();
+  });
+
   it("asks the second preference on a blank form, not on the first one's answer", async () => {
     const user = userEvent.setup();
     const responses: Record<string, MockResponse> = {

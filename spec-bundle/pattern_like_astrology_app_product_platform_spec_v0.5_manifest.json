@@ -10,18 +10,28 @@
   "supersedes_scope": "sections 3, 7 daily reading generation, 10, 11, 12, 14, 15, 16",
   "source": "pattern_like_astrology_app_product_platform_spec_v0.5.md",
   "renderer": "spec-bundle/render_v0_5.py",
+  "build_inputs": {
+    "render_v0_5.py": {
+      "sha256": "6276e9df20b7c731a416e15acfd4dac8fa1e97067c26245a4cca389f5496e953",
+      "bytes": 16948
+    },
+    "render_v0_5.requirements.txt": {
+      "sha256": "1712ee234af9ec16d2ac9e6ddf819bba4ebd43dd33ede33c3b7ad875f67d0885",
+      "bytes": 63
+    }
+  },
   "files": {
     "pattern_like_astrology_app_product_platform_spec_v0.5.md": {
-      "sha256": "0b255ad5e6da8aeab412c851b946fb7a5271f6eb2b3b6882fb09055bfbc23948",
-      "bytes": 18540
+      "sha256": "f3aaa5081a07e7f47bf02c1b31adbaa916474ecbe673c179416d7fe1824fb368",
+      "bytes": 18638
     },
     "pattern_like_astrology_app_product_platform_spec_v0.5.docx": {
-      "sha256": "6ebf88a3fca0e9339b592cbb3614bc0160ccb6c2b02a02fbcabefe9dbac5c4ee",
-      "bytes": 43142
+      "sha256": "982323e6ab60b5855f584e64391e4980dc244511f3ffe7b512993df940c943f6",
+      "bytes": 42170
     },
     "pattern_like_astrology_app_product_platform_spec_v0.5.pdf": {
-      "sha256": "0b8a805626575f42651a32b7b70c784580a39502cc828ee914977b9e556bce9a",
-      "bytes": 19623
+      "sha256": "edb1255f4ac95e4ade57c04bfcb7899d664a7a90ab425dda63bcfcbd786104e0",
+      "bytes": 19868
     }
   },
   "carried_forward_unchanged": {
