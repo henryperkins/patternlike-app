@@ -2715,6 +2715,21 @@ def check_m8_schema_projection(registry: Registry) -> list[str]:
             M8_BASE + "account-export.schema.json#/$defs/accountExport",
             registry,
         )
+        stored_v5_probe = json.loads(json.dumps(account_fixture))
+        stored_v5_item = stored_v5_probe["readings"]["items"][0]
+        stored_v5_reading = stored_v5_item["artifact"]
+        stored_v5_evidence = stored_v5_item["evidence"]
+        if isinstance(stored_v5_reading, dict) and isinstance(stored_v5_evidence, dict):
+            stored_v5_item["artifact"] = {
+                "schema_version": "0.5.0",
+                "reading": stored_v5_reading,
+                "evidence_header": stored_v5_evidence["header"],
+                "invalidation": None,
+            }
+            if not account_validator.is_valid(stored_v5_probe):
+                errors.append(
+                    "M8 account export rejects the existing StoredReadingV5 artifact envelope"
+                )
         artifact_probe = json.loads(json.dumps(account_fixture))
         artifact = artifact_probe["readings"]["items"][0].get("artifact")
         if isinstance(artifact, dict):
