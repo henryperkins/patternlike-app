@@ -6,9 +6,15 @@ import io
 import os
 import tempfile
 import unittest
+import warnings
 from unittest import mock
 
 import render_v0_5 as renderer
+
+
+def sha256_file(path: str) -> str:
+    with io.open(path, "rb") as handle:
+        return hashlib.sha256(handle.read()).hexdigest()
 
 
 class RenderReproducibilityTest(unittest.TestCase):
@@ -30,13 +36,13 @@ class RenderReproducibilityTest(unittest.TestCase):
                     with (
                         mock.patch("time.time", return_value=wall_clock),
                         contextlib.redirect_stdout(io.StringIO()),
+                        warnings.catch_warnings(),
                     ):
+                        warnings.simplefilter("ignore", ResourceWarning)
                         self.assertEqual(renderer.main(), 0)
                     renders.append(
                         {
-                            name: hashlib.sha256(
-                                io.open(path, "rb").read()
-                            ).hexdigest()
+                            name: sha256_file(path)
                             for name, path in artifact_paths.items()
                         }
                     )
