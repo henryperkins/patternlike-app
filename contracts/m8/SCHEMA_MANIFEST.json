@@ -158,6 +158,10 @@
         "accountExport",
         "exportedDailyReading",
         "exportedPattern",
+        "m3EvidenceHeader",
+        "m3ExportedEvidence",
+        "m5EvidenceHeader",
+        "m5ExportedEvidence",
         "patternSection",
         "portableSection",
         "readingSection"

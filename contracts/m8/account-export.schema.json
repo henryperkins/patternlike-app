@@ -63,6 +63,191 @@
         }
       }
     },
+    "m3EvidenceHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "reading_id",
+        "reading_key",
+        "user_id",
+        "local_date",
+        "release_version",
+        "chart_fingerprint",
+        "contract_id",
+        "assembly_mode",
+        "assembly_id",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "validation",
+        "created_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/schema_version"
+        },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/reading_id"
+        },
+        "reading_key": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/reading_key"
+        },
+        "user_id": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/user_id"
+        },
+        "local_date": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/local_date"
+        },
+        "release_version": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/release_version"
+        },
+        "chart_fingerprint": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/chart_fingerprint"
+        },
+        "contract_id": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/contract_id"
+        },
+        "contract_version": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/contract_version"
+        },
+        "assembly_mode": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/assembly_mode"
+        },
+        "assembly_id": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/assembly_id"
+        },
+        "assembly_policy_version": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/assembly_policy_version"
+        },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/revision"
+        },
+        "revision_reason": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/revision_reason"
+        },
+        "supersedes_reading_id": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/supersedes_reading_id"
+        },
+        "primary_theme": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/primary_theme"
+        },
+        "supporting_theme": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/supporting_theme"
+        },
+        "validation": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/validation"
+        },
+        "content_hash": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/content_hash"
+        },
+        "created_at": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/created_at"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/allOf/0"
+        }
+      ]
+    },
+    "m5EvidenceHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "reading_id",
+        "revision",
+        "revision_reason",
+        "generated_at",
+        "generation_input_id",
+        "input_manifest_hash",
+        "content_hash",
+        "provider_response_hash",
+        "calculation",
+        "model",
+        "validation"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/schema_version"
+        },
+        "reading_id": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/reading_id"
+        },
+        "revision": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/revision"
+        },
+        "revision_reason": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/revision_reason"
+        },
+        "generated_at": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/generated_at"
+        },
+        "generation_input_id": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/generation_input_id"
+        },
+        "input_manifest_hash": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/input_manifest_hash"
+        },
+        "content_hash": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/content_hash"
+        },
+        "provider_response_hash": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/provider_response_hash"
+        },
+        "calculation": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/calculation"
+        },
+        "model": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/model"
+        },
+        "validation": {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/properties/validation"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/allOf/0"
+        }
+      ]
+    },
+    "m3ExportedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "header", "paragraphs"],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/schemaVersion"
+        },
+        "header": { "$ref": "#/$defs/m3EvidenceHeader" },
+        "paragraphs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/paragraphEvidence"
+          }
+        }
+      }
+    },
+    "m5ExportedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "header", "paragraphs"],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/schemaVersion"
+        },
+        "header": { "$ref": "#/$defs/m5EvidenceHeader" },
+        "paragraphs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/paragraphEvidenceV5"
+          }
+        }
+      }
+    },
     "exportedDailyReading": {
       "type": "object",
       "additionalProperties": false,
@@ -135,12 +320,55 @@
         "updated_at": {
           "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
         },
-        "artifact": { "type": ["object", "null"] },
-        "evidence": { "type": ["object", "null"] },
+        "artifact": {
+          "oneOf": [
+            {
+              "$ref": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading"
+            },
+            {
+              "$ref": "https://patternlike.app/contracts/m5/daily-reading.schema.json#/$defs/dailyReadingV5"
+            },
+            { "type": "null" }
+          ]
+        },
+        "evidence": {
+          "oneOf": [
+            { "$ref": "#/$defs/m3ExportedEvidence" },
+            { "$ref": "#/$defs/m5ExportedEvidence" },
+            { "type": "null" }
+          ]
+        },
         "saved_at": {
           "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/nullableDateTime"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "artifact": {
+              "$ref": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading"
+            },
+            "evidence": { "$ref": "#/$defs/m3ExportedEvidence" }
+          },
+          "required": ["artifact", "evidence"]
+        },
+        {
+          "properties": {
+            "artifact": {
+              "$ref": "https://patternlike.app/contracts/m5/daily-reading.schema.json#/$defs/dailyReadingV5"
+            },
+            "evidence": { "$ref": "#/$defs/m5ExportedEvidence" }
+          },
+          "required": ["artifact", "evidence"]
+        },
+        {
+          "properties": {
+            "artifact": { "type": "null" },
+            "evidence": { "type": "null" }
+          },
+          "required": ["artifact", "evidence"]
+        }
+      ]
     },
     "readingSection": {
       "type": "object",

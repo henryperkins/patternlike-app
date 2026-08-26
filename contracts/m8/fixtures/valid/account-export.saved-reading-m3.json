@@ -1,0 +1,134 @@
+{
+  "schema_version": "0.8.0",
+  "export_id": "exp_1123456789abcdef0123456789abcdef",
+  "generated_at": "2026-08-26T13:00:00Z",
+  "account": {
+    "user_id": "usr_0123456789abcdef0123456789abcdef",
+    "status": "active",
+    "locale": "en-US",
+    "timezone": "Europe/London",
+    "entitlement_tier": "free",
+    "created_at": "2026-08-01T10:00:00Z"
+  },
+  "birth_profiles": [],
+  "chart_snapshots": [],
+  "preferences": {
+    "locale": "en-US",
+    "locale_source": "user_confirmed",
+    "timezone": "Europe/London",
+    "timezone_source": "user_confirmed",
+    "timezone_revision": 2,
+    "entitlement_tier": "free",
+    "next_due_at": "2026-08-27T00:05:00Z"
+  },
+  "timezone_changes": [],
+  "consents": [],
+  "context_sources": [],
+  "context_signals": [],
+  "readings": {
+    "status": "included",
+    "items": [
+      {
+        "id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "local_date": "2026-08-25",
+        "release_version": "release-12",
+        "chart_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "contract_id": "patternlike.chart.launch",
+        "assembly_mode": "deterministic",
+        "status": "published",
+        "revision": 1,
+        "revision_reason": "initial",
+        "supersedes_reading_id": null,
+        "invalidated_at": null,
+        "created_at": "2026-08-25T06:15:00Z",
+        "updated_at": "2026-08-25T06:16:00Z",
+        "artifact": {
+          "schema_version": "0.3.0",
+          "output_schema": "daily-reading-v3",
+          "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "local_date": "2026-08-25",
+          "generated_at": "2026-08-25T06:15:00Z",
+          "assembly_mode": "deterministic",
+          "revision": 1,
+          "locale": "en-US",
+          "domain_preference": null,
+          "paragraphs": [
+            {
+              "paragraph_id": "par_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "role": "safety_fallback",
+              "order": 1,
+              "text": "A quiet day is still a day worth noticing."
+            }
+          ],
+          "fallback_used": true
+        },
+        "evidence": {
+          "schema_version": "0.3.0",
+          "header": {
+            "schema_version": "0.3.0",
+            "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "reading_key": "user:usr_0123456789abcdef0123456789abcdef:2026-08-25:release-12:r1",
+            "user_id": "usr_0123456789abcdef0123456789abcdef",
+            "local_date": "2026-08-25",
+            "release_version": "release-12",
+            "chart_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "contract_id": "patternlike.chart.launch",
+            "contract_version": "0.2.0",
+            "assembly_mode": "deterministic",
+            "assembly_id": "asm_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assembly_policy_version": "1.4.0",
+            "revision": 1,
+            "revision_reason": "initial",
+            "supersedes_reading_id": null,
+            "primary_theme": null,
+            "supporting_theme": null,
+            "validation": {
+              "passed": true,
+              "fallback_used": true,
+              "checks": [
+                {
+                  "check": "schema",
+                  "result": "pass",
+                  "detail_code": null
+                }
+              ]
+            },
+            "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "created_at": "2026-08-25T06:15:00Z"
+          },
+          "paragraphs": [
+            {
+              "paragraph_id": "par_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "role": "safety_fallback",
+              "order": 1,
+              "evidence_lane": "operational",
+              "text_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "facts": [],
+              "content": [
+                {
+                  "fragment_id": "fallback.daily.en-US",
+                  "content_version": "2",
+                  "release_version": "release-12",
+                  "content_type": "fallback_copy",
+                  "bundle_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                }
+              ],
+              "context_signals": [],
+              "ranking_factors": [],
+              "model_output": null
+            }
+          ]
+        },
+        "saved_at": "2026-08-26T12:00:00Z"
+      }
+    ]
+  },
+  "journal": {
+    "status": "omitted_by_request",
+    "items": []
+  },
+  "patterns": {
+    "status": "not_available",
+    "items": []
+  }
+}

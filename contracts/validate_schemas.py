@@ -157,7 +157,10 @@ FIXTURE_SCHEMA = {
         "account-export": M7_BASE + "account-export.schema.json#/$defs/accountExport",
     },
     "m8": {
-        "place-search": M8_BASE + "place-search.schema.json",
+        "place-search.query-too-short": M8_BASE
+        + "place-search.schema.json#/$defs/placeSearchRequest",
+        "place-search.results": M8_BASE
+        + "place-search.schema.json#/$defs/placeSearchResponse",
         "place-resolution": M8_BASE
         + "place-resolution.schema.json#/$defs/placeResolutionResponse",
         "geocoder-consent": M8_BASE
@@ -1384,7 +1387,7 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            validate(spec)
+            validate(spec, base_uri=path.as_uri())
             print(
                 f"OK  openapi       {path.name} v{spec['info']['version']} "
                 f"paths={len(spec['paths'])}"
@@ -2356,6 +2359,12 @@ M8_M3_READING_RESPONSE_REF = (
 M8_M5_READING_RESPONSE_REF = (
     M5_BASE + "daily-reading.schema.json#/$defs/dailyReadingResponseV5"
 )
+M8_M3_OPENAPI_READING_RESPONSE_REF = (
+    "../../m3/daily-reading.schema.json#/$defs/dailyReadingResponse"
+)
+M8_M5_OPENAPI_READING_RESPONSE_REF = (
+    "../../m5/daily-reading.schema.json#/$defs/dailyReadingResponseV5"
+)
 M8_PREDECESSOR_HASHES = {
     "contracts/m0": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
     "contracts/m3": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
@@ -2448,7 +2457,8 @@ def check_m8_fixture_inventory() -> list[str]:
         "birth-profile",
         "geocoder-consent",
         "place-resolution",
-        "place-search",
+        "place-search.query-too-short",
+        "place-search.results",
         "reading-history",
         "reading-save-state",
     }
@@ -2479,7 +2489,11 @@ def check_m8_fixture_inventory() -> list[str]:
 def _m8_object_closure_errors(node: object, path: tuple[str, ...] = ()) -> list[str]:
     errors: list[str] = []
     if isinstance(node, dict):
-        if node.get("type") == "object" and node.get("additionalProperties") is not False:
+        declared_type = node.get("type")
+        object_bearing = declared_type == "object" or (
+            isinstance(declared_type, list) and "object" in declared_type
+        )
+        if object_bearing and node.get("additionalProperties") is not False:
             errors.append(
                 f"{'.'.join(path) or '<root>'} is an object without additionalProperties:false"
             )
@@ -2687,6 +2701,34 @@ def check_m8_schema_projection(registry: Registry) -> list[str]:
                 errors.append(
                     "M8 account export accepts arbitrary secret-shaped evidence content"
                 )
+        m3_fixture_path = (
+            M8 / "fixtures" / "valid" / "account-export.saved-reading-m3.json"
+        )
+        if m3_fixture_path.exists():
+            m3_fixture = json.loads(m3_fixture_path.read_text(encoding="utf-8"))
+            mismatched_pair = json.loads(json.dumps(account_fixture))
+            mismatched_pair["readings"]["items"][0]["evidence"] = (
+                m3_fixture["readings"]["items"][0]["evidence"]
+            )
+            if account_validator.is_valid(mismatched_pair):
+                errors.append("M8 account export accepts an M5 artifact with M3 evidence")
+            reverse_mismatch = json.loads(json.dumps(m3_fixture))
+            reverse_mismatch["readings"]["items"][0]["evidence"] = (
+                account_fixture["readings"]["items"][0]["evidence"]
+            )
+            if account_validator.is_valid(reverse_mismatch):
+                errors.append("M8 account export accepts an M3 artifact with M5 evidence")
+            null_pair = json.loads(json.dumps(account_fixture))
+            null_pair["readings"]["items"][0]["artifact"] = None
+            null_pair["readings"]["items"][0]["evidence"] = None
+            if not account_validator.is_valid(null_pair):
+                errors.append("M8 account export rejects a paired null artifact and evidence")
+            half_null_pair = json.loads(json.dumps(null_pair))
+            half_null_pair["readings"]["items"][0]["evidence"] = (
+                account_fixture["readings"]["items"][0]["evidence"]
+            )
+            if account_validator.is_valid(half_null_pair):
+                errors.append("M8 account export accepts an unpaired null artifact")
 
     consent_defs = documents["geocoder-consent.schema.json"].get("$defs") or {}
     consent = consent_defs.get("geocoderConsentResponse") or {}
@@ -3020,8 +3062,8 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
         if isinstance(branch, dict)
     ]
     if detail_refs != [
-        M8_M3_READING_RESPONSE_REF,
-        M8_M5_READING_RESPONSE_REF,
+        M8_M3_OPENAPI_READING_RESPONSE_REF,
+        M8_M5_OPENAPI_READING_RESPONSE_REF,
     ]:
         errors.append(
             "M8 OpenAPI reading detail does not directly reference the exact frozen "
@@ -3030,6 +3072,7 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
 
     detail_schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": M8_BASE + "openapi/openapi.yaml",
         "$ref": "#/components/schemas/ReadingDetailResponse",
         "components": {"schemas": schemas},
     }
