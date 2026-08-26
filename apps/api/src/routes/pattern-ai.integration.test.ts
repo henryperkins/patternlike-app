@@ -42,6 +42,8 @@ import {
 import { assembleAccountExport } from "../services/account-export.js";
 import {
   computeOntologyBundleHash,
+  parseOntologyKeys,
+  verifyOntologySignature,
   ontologySigningPayload,
 } from "../services/pattern-ontology-verify.js";
 import { generateSigningKey, releaseKeysVar, toBase64Url } from "../../test/content-release-fixtures.js";
@@ -357,6 +359,63 @@ describe("M7 AI-generated Pattern", () => {
     expect((nextChart.body.error as { code: string }).code).toBe("pattern_not_generated");
     const nextState = await json("/v1/pattern-state");
     expect(nextState.body.state).toBe("available");
+  });
+
+  it("refuses to sign a release that is not synthetic_internal", async () => {
+    const release = {
+      ...syntheticOntologyRelease("ont-sign-machine"),
+      provenance: { origin: "machine_pipeline" as const },
+    };
+    const response = await SELF.fetch(
+      "http://api.test/internal/pattern-ontology-releases/sign",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(release),
+      },
+    );
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("ontology_origin_not_synthetic_internal");
+  });
+
+  it("signs an authored synthetic release into an ingestible bundle", async () => {
+    env.PATTERN_ONTOLOGY_KEYS = JSON.stringify({
+      [env.TEST_ONTOLOGY_SIGNER_KEY_ID]: {
+        alg: "Ed25519",
+        public_key: env.TEST_ONTOLOGY_SIGNER_PUBLIC_KEY,
+      },
+    });
+    const release = {
+      ...syntheticOntologyRelease("ont-sign-internal"),
+      // The signer refuses a non-candidate payload; activation is ingestion's job.
+      status: "candidate" as const,
+      provenance: { origin: "synthetic_internal" as const },
+    };
+    const response = await SELF.fetch(
+      "http://api.test/internal/pattern-ontology-releases/sign",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(release),
+      },
+    );
+    expect(response.status).toBe(200);
+    const signed = (await response.json()) as {
+      bundle_hash: string;
+      signature: { key_id: string; signed_payload_hash: string };
+    };
+    // The route recomputes the hash rather than trusting the caller, and the
+    // signer signs over exactly that.
+    expect(signed.signature.key_id).toBe(env.TEST_ONTOLOGY_SIGNER_KEY_ID);
+    expect(signed.signature.signed_payload_hash).toBe(signed.bundle_hash);
+    expect(
+      await verifyOntologySignature(
+        signed as never,
+        parseOntologyKeys(env.PATTERN_ONTOLOGY_KEYS),
+      ),
+    ).toBeNull();
+    env.PATTERN_ONTOLOGY_KEYS = "";
   });
 
   it("refuses unsigned ontology ingest when signing keys are configured", async () => {

@@ -1,10 +1,13 @@
 import { Hono } from "hono";
+import type { PatternOntologyRelease } from "@patternlike/shared";
 import { compileOntologyRelease } from "@patternlike/pattern-engine";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { storeOntologyRelease } from "../db/pattern-ontology.js";
 import { recallOntologyAndWithdraw } from "../services/pattern-lifecycle.js";
 import { reconcilePatternGeneration } from "../services/pattern-sweep.js";
+import { signInternalOntology } from "../services/ontology-signing-client.js";
+import { computeOntologyBundleHash } from "../services/pattern-ontology-verify.js";
 import {
   parseOntologyKeys,
   stripOntologySignature,
@@ -32,6 +35,91 @@ const ONTOLOGY_EVIDENCE_CONFIGURATION_CODES = new Set([
   "ontology_evaluation_artifact_keyring_missing",
   "ontology_evaluation_artifact_keyring_invalid",
 ]);
+
+/**
+ * Sign an authored `synthetic_internal` release through the isolated signer.
+ *
+ * The private key lives only on `patternlike-ontology-signer-production`, and
+ * until now the only caller was the machine pipeline's signing stage -- so an
+ * authored ontology could be written but never activated. This is the missing
+ * half of the internal path the rollout runbook calls the shortest supported
+ * route.
+ *
+ * It signs and returns; it does not ingest. Activation stays with
+ * `POST /internal/pattern-ontology-releases`, which is the surface that already
+ * owns immutability, recall, and the guarded pointer flip.
+ */
+internalPatternRoutes.post("/pattern-ontology-releases/sign", async (c) => {
+  const requestId = c.get("requestId");
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json(error(requestId, "invalid_json", "Request body must be valid JSON"), 400);
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return c.json(error(requestId, "ontology_release_invalid", "release_malformed"), 400);
+  }
+  const release = body as PatternOntologyRelease;
+  if (
+    (release as PatternOntologyReleaseWithRawProvenance).provenance?.origin !==
+      "synthetic_internal"
+  ) {
+    return c.json(
+      error(
+        requestId,
+        "ontology_origin_not_synthetic_internal",
+        "This route signs synthetic_internal releases only",
+      ),
+      400,
+    );
+  }
+  const compiled = compileOntologyRelease(release);
+  if (!compiled.ok) {
+    return c.json(
+      error(
+        requestId,
+        "ontology_release_invalid",
+        compiled.failures.map((f) => f.code).join(","),
+      ),
+      400,
+    );
+  }
+  const keys = [...parseOntologyKeys(c.env.PATTERN_ONTOLOGY_KEYS).keys()].sort();
+  // One key or none. A rotation with two verification keys needs an explicit
+  // operator cutover; picking one silently could ask the signer for the wrong
+  // key and produce a bundle nothing can verify.
+  if (keys.length !== 1) {
+    return c.json(
+      error(
+        requestId,
+        "ontology_keys_not_configured",
+        "Exactly one PATTERN_ONTOLOGY_KEYS entry is required to sign",
+      ),
+      503,
+    );
+  }
+  // Recomputed here, never trusted from the caller: the hash is what the
+  // signer signs over and what ingestion re-derives.
+  const withHash: PatternOntologyRelease = {
+    ...release,
+    bundle_hash: await computeOntologyBundleHash({
+      ...release,
+      bundle_hash: `sha256:${"0".repeat(64)}`,
+    }),
+  };
+  try {
+    const signature = await signInternalOntology(
+      c.env.ONTOLOGY_SIGNER,
+      withHash,
+      keys[0]!,
+    );
+    return c.json({ ...withHash, signature }, 200);
+  } catch (cause) {
+    const code = cause instanceof Error ? cause.message : "signing_failed";
+    return c.json(error(requestId, "ontology_signing_failed", code), 502);
+  }
+});
 
 internalPatternRoutes.post("/pattern-ontology-releases", async (c) => {
   const requestId = c.get("requestId");
