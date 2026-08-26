@@ -53,7 +53,12 @@ export const WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 
 export const OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
 export const OPENAI_PATTERN_PLANNER_REASONING = "high" as const;
-export const OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.0";
+/**
+ * `1.0.1` adds `PLAN_CLOSURE_RULES` -- the closure properties
+ * `validatePatternPlan` enforces -- to the planner policy. See the comment
+ * above `PLAN_CLOSURE_RULES` in `pattern-prompt.ts`.
+ */
+export const OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.1";
 export const OPENAI_PATTERN_PLANNER_TIMEOUT_MS = 120_000;
 export const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 32000;
 

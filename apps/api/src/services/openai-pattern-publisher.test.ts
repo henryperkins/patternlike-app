@@ -19,7 +19,7 @@ function pin(): PatternPublisherPin {
     publisher: "openai",
     planner_model: "gpt-5.6-sol",
     planner_reasoning: "high",
-    planner_prompt_version: "1.0.0",
+    planner_prompt_version: "1.0.1",
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",

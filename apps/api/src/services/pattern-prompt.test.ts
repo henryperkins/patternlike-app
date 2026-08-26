@@ -10,6 +10,7 @@ import {
   PATTERN_PLANNER_PROMPT_VERSION,
   PATTERN_STRICT_SCHEMA,
   PATTERN_SYSTEM_POLICY,
+  WORKERS_AI_PLANNER_POLICY,
   PATTERN_WRITER_CORRECTION_POLICY,
   PATTERN_VERIFIER_PROMPT_VERSION,
   PATTERN_WRITER_PROMPT_VERSION,
@@ -34,7 +35,7 @@ function pin(): PatternPublisherPin {
     publisher: "openai",
     planner_model: "gpt-5.6-sol",
     planner_reasoning: "high",
-    planner_prompt_version: "1.0.0",
+    planner_prompt_version: "1.0.1",
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",
@@ -304,6 +305,38 @@ describe("Pattern prompt module", () => {
     });
   });
 
+  describe("plan closure rules", () => {
+    // `validatePatternPlan` rejects a plan on these properties, and a rejected
+    // plan costs one of the planner's inclusive two calls per fixture. They
+    // were measured on Workers AI and then needed on Codex, so they belong to
+    // the shared policy rather than to one pin.
+    const STATED = [
+      "EXACTLY ONCE",
+      "mandatory_core",
+      "mandatory_any",
+      "covered_by",
+      "uncertainty-class",
+      "ontology_rule_ids",
+      "required_tension_ids",
+      "required_counter_expression_ids",
+      "required_resource_ids",
+    ];
+
+    it("states each closure property the validator enforces", () => {
+      for (const rule of STATED) {
+        expect(PATTERN_SYSTEM_POLICY.planner, `policy states ${rule}`)
+          .toContain(rule);
+      }
+    });
+
+    it("gives the Workers AI pin the same rules rather than a second copy", () => {
+      expect(WORKERS_AI_PLANNER_POLICY).toBe(PATTERN_SYSTEM_POLICY.planner);
+      expect(
+        PATTERN_SYSTEM_POLICY.planner.match(/COVERAGE IS CHECKED MECHANICALLY/g),
+      ).toHaveLength(1);
+    });
+  });
+
   describe("withheld calculation vocabulary", () => {
     // `suppressedUnitLeaks` in `ontology-regression.ts` scans chapter prose for
     // the vocabulary of these four classes, and the writer document supplies
@@ -350,7 +383,7 @@ describe("Pattern prompt module", () => {
 
   describe("prompt versions", () => {
     it("re-exports the compiled versions the configuration pins against", () => {
-      expect(PATTERN_PLANNER_PROMPT_VERSION).toBe("1.0.0");
+      expect(PATTERN_PLANNER_PROMPT_VERSION).toBe("1.0.1");
       expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.1");
       expect(PATTERN_VERIFIER_PROMPT_VERSION).toBe("1.0.0-verifier");
     });

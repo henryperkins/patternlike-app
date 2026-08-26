@@ -41,6 +41,7 @@ import {
   PATTERN_CORRECTION_SMUGGLED_PROSE,
 } from "../../test/mock-calc-service.js";
 import { findSemanticVerdictProblem } from "./pattern-semantic.js";
+import { OPENAI_PATTERN_PLANNER_PROMPT_VERSION } from "./pattern-publisher.js";
 import {
   executePatternJob,
   getArtifactAt,
@@ -168,7 +169,10 @@ describe("Pattern stage protocol", () => {
         provider: "openai",
         pass: "planner",
         model: "gpt-5.6-sol",
-        prompt_version: "1.0.0",
+        // Read the pin rather than restate it: a hardcoded literal here fails
+        // on the next prompt-version bump without saying anything about the
+        // behaviour this test is actually about.
+        prompt_version: OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
       }),
     );
   });

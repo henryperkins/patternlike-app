@@ -6,7 +6,9 @@
 present. Gate 6 is open for both provider paths: the historical OpenAI approval
 does not cover current pins, and the selected Codex path is not certified. Gate
 7B most recently failed closed for Codex candidate
-`pattern-ontology-en-us-0.1.16-fixcheck-04`; no ontology release is active.
+`pattern-ontology-en-us-0.1.17`, which compiled, passed every evaluation, and
+reached regression cursor 95 of 30 fixtures before a planner pass ceiling ended
+it; no ontology release is active.
 Gates 8–10 remain open. This file is the operational source of truth; updating
 it does not itself authorize a deployment, secret change, ontology activation,
 provider call, or rollout advance.
@@ -708,6 +710,44 @@ nothing. This changes the odds; it does not remove the gate. Fixtures 22–29
 have never been reached by any candidate, and a candidate can still fail closed
 on this or any other hard gate.
 
+#### What `0.1.17` showed, and the planner defect it exposed
+
+Candidate `pattern-ontology-en-us-0.1.17`
+(`oprun_4d24bc8b-83c8-465d-8877-05c6daffcb34`, config
+`sha256:9794799e8cf22fe5e9d6d43227594522784e835b29cf652a8fe0f99b81ca2e9e`,
+candidate `sha256:94fedb74c671dc3076307de4368791e0dd4e88fbca73b17c9ae24cd23c07c556`,
+evaluation `sha256:fac9c30ec60c498c7a3365f06c51c48d6ce1c507d4c12f6e661b9845b2b2ddfd`)
+ran against writer prompt `1.0.1` on API `e1700d61-9160-41eb-87ee-849f9232d922`.
+It compiled first try, passed all ten evaluations, and reached regression cursor
+95 — further than any prior candidate — before failing `regression_failed`.
+
+**No hard gate fired.** The `ontology_regression_hard_gate_failed` event that
+named `fixcheck-04`'s failure does not appear anywhere in this run's logs, and
+the final stage generation wrote no artifact at all. Both facts point at a pass
+ceiling refused before any provider call, which is `regression_failed` raised
+with nothing recorded.
+
+The provider-call arithmetic identifies it. The run spent 96 regression calls:
+**40 planner, 31 writer, 25 verifier**. There are only 30 fixtures and the
+planner ceiling is an inclusive two per fixture, so at least ten complete plans
+were rejected by `validatePatternPlan` — and every planner response was between
+1,527 and 3,270 bytes, so none was empty, truncated, or a refusal. The model
+returns plans; the plans do not close.
+
+That is the defect `WORKERS_AI_PLANNER_POLICY` was written against and measured
+to fix on `@cf/openai/gpt-oss-120b`, left on that pin alone so the OpenAI prompt
+stayed frozen. Its rules are now `PLAN_CLOSURE_RULES` in the shared planner
+policy under `OPENAI_PATTERN_PLANNER_PROMPT_VERSION` `1.0.1`, so the Codex pin
+gets them too.
+
+The run also exposed a fourth instance of this repository's recurring silent
+failure defect, after the blind correction loop, the silent chunk rejection, and
+the silent evaluator verdict: eleven call sites raise `regression_failed` and
+only the hard gate said anything. `failRegression` now emits a closed
+`ontology_regression_failed` event carrying the reason, the pass, and the pass
+counters — no fixture id, rule id, plan, candidate, verdict, or prose. The next
+failure of this class names itself instead of being inferred from arithmetic.
+
 **Stop:** hash/signature mismatch, recalled version, compiler/evaluator/
 regression failure, missing source authorization, wrong provenance, or an
 attempt to make Slice A public.
@@ -862,6 +902,7 @@ until its evidence exists.
 | 2026-08-23 | 7B attempt 12 | `23b9485`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.11`; none active | run `oprun_9026280d-067f-4c13-ac62-1f4e1a4b61c3`, config `sha256:24103de2e86eb7fde4d1fcbf7565cec153f35897d7094ea97f221fdd16d973bc`, candidate `sha256:d76fad38a873d86149a3f78e0a7cad7d73f689c0718d9ca7f782fdca22a6554d`, compiler `sha256:6b926310ed04ab5c98eb44339a72f9a04074e5b459d0e2c9134f8525e1326199`, evaluator `sha256:3ef00438683dbf273438f30836c586ea4ac6f10da7186c5b0850f76c8291e6f7`; all ten evaluations passed and regression produced 71 results. The final two planner requests have the same hash; the first was invalid, while the reserved second call produced no response artifact and terminaled 121.077 seconds after request creation, consistent with the fixed 120-second deadline. A third planner call was correctly refused by the unchanged inclusive two-call ceiling | failed closed as `regression_failed`; no regression report, bundle, or activation |
 | 2026-08-23 | 7B attempt 13 | `a9a45b7`; API `ca84f4f7` (`baa82c35` code); prompt `1.0.5`; command V5 | `0012` | candidate `pattern-ontology-en-us-0.1.12`; none active | run `oprun_f2013b4f-c09d-40f4-a992-f64a7639d928`, config `sha256:f6c7c04e254f1a04b22d99308e9c94218c3bb08d70bb4fa3ace0e21e9f54be37`, candidate `sha256:c46a5e1a076e4fb3247764a7c0f1f5d4aee9f6a45cbd36da9bcb07255a75442c`, compiler `sha256:f1e7dd4677cb9fd52b7c4f217d01793eead9c0c94d454404f5b39fe763f491ee`, evaluator `sha256:c7ca6052af09f9449885244e81c2c742945cdc021387ee13036c059fef2f2db1`; all ten evaluations passed and regression produced 14 results. Generation 28 persisted two identical planner requests and no response; the first exhausted its deadline and the retry also failed closed. A subsequent content-free strict-schema probe reproduced HTTP `429`, type `insufficient_quota`, code `credit_balance_exhausted`; usage reached 214/500 | failed closed as `regression_failed`; no regression report, bundle, or activation |
 | 2026-08-24 | 7B fixcheck-04 | Codex runner; trace `trc_4a69607fb3641e8e27c3c22db92bce5b` | `0013` / `0014` applied | candidate `pattern-ontology-en-us-0.1.16-fixcheck-04`; run `oprun_a342be36-0460-4644-9669-6c8a51cc9a6c`; none active | failed `2026-08-24T12:53:26.613Z` on verifier fixture index 21 `m7-unknown-02` with sole hard gate `suppressed_feature_leak`; no regression report, bundle, or pointer change | failed closed; no activation |
+| 2026-08-25 | 7B `0.1.17` | `f8d37ee`; API `e1700d61-9160-41eb-87ee-849f9232d922`; writer prompt `1.0.1` | `0015` applied `2026-08-25 00:59:51` | candidate `pattern-ontology-en-us-0.1.17`; run `oprun_4d24bc8b-83c8-465d-8877-05c6daffcb34`; none active | full gate green from one commit (1,859 API, 214 web, 19 signer, contracts, migration smoke, production dry-run). Config `sha256:9794799e8cf22fe5e9d6d43227594522784e835b29cf652a8fe0f99b81ca2e9e`, candidate `sha256:94fedb74c671dc3076307de4368791e0dd4e88fbca73b17c9ae24cd23c07c556`, compiler `sha256:53eceda56839c89d55b627bc50ba297f103f172d05fef4d3b0a98aa13d117d16`, evaluator `sha256:fac9c30ec60c498c7a3365f06c51c48d6ce1c507d4c12f6e661b9845b2b2ddfd`. Compiled first try, ten of ten evaluations passed, reached regression cursor 95 — the furthest any candidate has come. Failed `regression_failed` at `2026-08-25T19:44:39.582Z` at stage generation 110 with no artifact written and no hard-gate event: a pass ceiling refused before any provider call. 96 regression calls — 40 planner, 31 writer, 25 verifier — against 30 fixtures and an inclusive two-planner-call ceiling, with every planner response between 1,527 and 3,270 bytes, so at least ten complete plans were rejected by `validatePatternPlan`. Daily usage 107/500 | failed closed; planner closure rules and the named-failure event are the response |
 | 2026-08-22 | 9 replay engineering | `0ed87eb`, `eda31cb`, `3a47565` | `0012` | none active | signed R2-first lifecycle intents, atomic receipts, deterministic adoption, service-authenticated apply/sweep, account-deletion replay, replay bucket, and production `pattern-replay-2026-08` signing key/keyring are deployed; restore procedure recorded without claiming execution | implementation/signing complete; drill and admin identity evidence open |
 | 2026-08-22 | 7 preflight | `24804ee` | `0012` | none | full typecheck, tests (including 1,650 API, 207 web, 19 signer), build/dry-run, contracts and 12-migration smoke pass; live corpus/release/pipeline inventories empty; signing, verification, and artifact keys absent | blocked on authorized corpus, keys, and pipeline-spend approval |
 | 2026-08-22 | 8 preflight | `24804ee` | `0012` | none | four active accounts/charts and four confirmed en-US locales; zero current Pattern grants and zero eligible canary accounts; no authenticated canary session | blocked before reservation |

@@ -12,6 +12,7 @@ import type {
   OntologyCandidateSafeDetailCode,
 } from "./ontology-candidate-validation.js";
 import type {
+  OntologyRegressionFailureReason,
   OntologyRegressionHardGateFailure,
 } from "./ontology-regression.js";
 import type {
@@ -128,6 +129,25 @@ export type SafeLogEvent =
       fixture_index: number;
       pass: PatternStageClass;
       hard_gate_failures: OntologyRegressionHardGateFailure[];
+    }
+  /**
+   * Why the regressing stage failed, when no hard gate did.
+   *
+   * `regression_failed` is raised from eleven places in
+   * `ontology-pipeline-execute.ts` and only the hard gate ever said anything.
+   * A run that ends on a pass ceiling writes no artifact at its final stage
+   * generation, so without this the only evidence is provider-call arithmetic.
+   * Every field is a closed reason, a pass name, or a counter.
+   */
+  | {
+      event: "ontology_regression_failed";
+      reason: OntologyRegressionFailureReason;
+      fixture_index?: number;
+      pass?: PatternStageClass;
+      planner_calls?: number;
+      writer_calls?: number;
+      verifier_calls_for_candidate?: number;
+      delivery_attempt?: number;
     }
   /** A stage exhausted its claim ceiling and the sweep failed the job. */
   | { event: "pattern_stage_terminal_failure" }
@@ -398,6 +418,18 @@ export function safeLog(input: SafeLogEvent): string {
         fixture_index: input.fixture_index,
         pass: input.pass,
         hard_gate_failures: input.hard_gate_failures,
+      });
+      break;
+    case "ontology_regression_failed":
+      console.warn(input.event, {
+        trace_id,
+        reason: input.reason,
+        fixture_index: input.fixture_index,
+        pass: input.pass,
+        planner_calls: input.planner_calls,
+        writer_calls: input.writer_calls,
+        verifier_calls_for_candidate: input.verifier_calls_for_candidate,
+        delivery_attempt: input.delivery_attempt,
       });
       break;
     case "unhandled_error":

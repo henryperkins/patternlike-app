@@ -122,6 +122,23 @@ export const ONTOLOGY_REGRESSION_HARD_GATES = [
 export type OntologyRegressionHardGateFailure =
   (typeof ONTOLOGY_REGRESSION_HARD_GATES)[number];
 
+/**
+ * Why the regressing stage failed when no hard gate did.
+ *
+ * Closed on purpose: this is what reaches `safeLog`, so widening it to a string
+ * is how a fixture id, a rule id, or model prose would eventually travel.
+ */
+export type OntologyRegressionFailureReason =
+  | "cursor_result_count_mismatch"
+  | "duplicate_fixture_result"
+  | "fixture_index_out_of_range"
+  | "fixture_state_mismatch"
+  | "pass_attempt_ceiling"
+  | "prerequisite_hash_missing"
+  | "report_accounting_mismatch"
+  | "report_pin_mismatch"
+  | "request_document_noncanonical";
+
 export interface OntologyRegressionFixtureResult {
   fixture_id: string;
   accuracy: BirthTimeAccuracy;
