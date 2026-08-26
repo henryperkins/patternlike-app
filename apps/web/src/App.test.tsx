@@ -1,6 +1,6 @@
 import axe from "axe-core";
 import { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   initialContext,
@@ -28,6 +28,14 @@ const auth0Harness = vi.hoisted(() => ({
   current: null as Auth0ContextInterface | null,
 }));
 
+const preferenceSyncHarness = vi.hoisted(() => ({
+  sync: vi.fn<
+    (signal?: AbortSignal) => Promise<{
+      status: "settled" | "unauthorized" | "unavailable";
+    }>
+  >(),
+}));
+
 vi.mock("@auth0/auth0-react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@auth0/auth0-react")>();
   return {
@@ -38,6 +46,14 @@ vi.mock("@auth0/auth0-react", async (importOriginal) => {
     },
   };
 });
+
+vi.mock("./lib/device-preference-sync.js", () => ({
+  DevicePreferenceSynchronizer: class {
+    sync(signal?: AbortSignal) {
+      return preferenceSyncHarness.sync(signal);
+    }
+  },
+}));
 
 function setAuth0(
   overrides: Partial<Auth0ContextInterface> = {},
@@ -160,6 +176,8 @@ const chart = {
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   setAuth0();
+  preferenceSyncHarness.sync.mockReset();
+  preferenceSyncHarness.sync.mockResolvedValue({ status: "settled" });
   mockApiResponses({});
 });
 
@@ -823,6 +841,43 @@ describe("web application shell", () => {
     ).toBeInTheDocument();
     expect(capturedFor("/v1/sessions")).toHaveLength(0);
     expect(auth0.getIdTokenClaims).not.toHaveBeenCalled();
+  });
+
+  it("syncs device preferences after sign-in and whenever the page returns visible", async () => {
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await waitFor(() => expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(1);
+
+    visibility.mockReturnValue("visible");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows the signed-out surface when device preference sync finds no session", async () => {
+    preferenceSyncHarness.sync.mockResolvedValue({ status: "unauthorized" });
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
   });
 
   it("ignores an ordinary Auth0 initialization error when the Worker session is valid", async () => {
