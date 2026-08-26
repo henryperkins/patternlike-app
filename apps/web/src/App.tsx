@@ -24,6 +24,10 @@ import {
   completeSignIn,
   signOut,
 } from "./lib/auth.js";
+import {
+  DevicePreferenceSynchronizer,
+  type DevicePreferenceSyncResult,
+} from "./lib/device-preference-sync.js";
 
 type ChartState =
   | { status: "loading" }
@@ -70,9 +74,14 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     logout: auth0Logout,
   } = useAuth0();
   const callbackSession = useRef<Promise<void> | null>(null);
+  const preferenceSynchronizer = useRef<DevicePreferenceSynchronizer | null>(
+    null,
+  );
+  preferenceSynchronizer.current ??= new DevicePreferenceSynchronizer();
   const [view, setView] = useState<AppRoute>(currentView);
   const [chartState, setChartState] = useState<ChartState>({ status: "loading" });
   const [authState, setAuthState] = useState<AuthState>({ status: "checking" });
+  const [preferenceSyncRevision, setPreferenceSyncRevision] = useState(0);
   const [correctingBirth, setCorrectingBirth] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -166,6 +175,40 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     isAuth0Redirect,
     load,
   ]);
+
+  useEffect(() => {
+    if (authState.status !== "signed-in") return;
+
+    const controller = new AbortController();
+    let observed: Promise<DevicePreferenceSyncResult> | null = null;
+    const sync = () => {
+      const operation = preferenceSynchronizer.current!.sync(controller.signal);
+      if (operation === observed) return;
+      observed = operation;
+      void operation
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          if (result.status === "unauthorized") {
+            setAuthState({ status: "signed-out" });
+          } else if (result.status === "settled") {
+            setPreferenceSyncRevision((revision) => revision + 1);
+          }
+        })
+        .finally(() => {
+          if (observed === operation) observed = null;
+        });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+
+    sync();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      controller.abort();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [authState.status]);
 
   /**
    * A 401 from a view, rather than from the mount probe.
@@ -317,7 +360,12 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
       />
     );
   } else if (view === "today") {
-    content = <TodayView onUnauthorized={handleSignedOut} />;
+    content = (
+      <TodayView
+        onUnauthorized={handleSignedOut}
+        preferenceSyncRevision={preferenceSyncRevision}
+      />
+    );
   } else if (view === "timing") {
     content = <TimingView onUnauthorized={handleSignedOut} />;
   } else if (view === "travel") {

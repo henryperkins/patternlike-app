@@ -1,10 +1,9 @@
 /**
  * What this device believes about itself.
  *
- * Both values are *suggestions* to prefill a form with, never something to send
- * on the reader's behalf: `PUT /v1/preferences/{timezone,locale}` distinguishes
- * `device_derived` from `user_confirmed` precisely so a default nobody chose
- * stays distinguishable from a decision somebody made.
+ * Automatic writes mark both values `device_derived`; the preference routes
+ * keep them subordinate to `user_confirmed`, so a device suggestion cannot
+ * overwrite a choice the reader made.
  */
 export function systemTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";

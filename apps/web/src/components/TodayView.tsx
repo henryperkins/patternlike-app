@@ -55,6 +55,8 @@ interface TodayViewProps {
    * Must be referentially stable — it is one of the effect's dependencies.
    */
   onUnauthorized: () => void;
+  /** Re-run a preference-gated load after foreground device sync settles. */
+  preferenceSyncRevision: number;
 }
 
 /**
@@ -423,7 +425,10 @@ function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void
   });
 }
 
-export function TodayView({ onUnauthorized }: TodayViewProps) {
+export function TodayView({
+  onUnauthorized,
+  preferenceSyncRevision,
+}: TodayViewProps) {
   const [state, setState] = useState<TodayState>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -526,7 +531,7 @@ export function TodayView({ onUnauthorized }: TodayViewProps) {
       controller.abort();
       clearSlowPreparationTimer();
     };
-  }, [attempt, onUnauthorized]);
+  }, [attempt, onUnauthorized, preferenceSyncRevision]);
 
   switch (state.status) {
     case "ready":
