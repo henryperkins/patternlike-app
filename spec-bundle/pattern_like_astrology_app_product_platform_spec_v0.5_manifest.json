@@ -12,8 +12,8 @@
   "renderer": "spec-bundle/render_v0_5.py",
   "build_inputs": {
     "render_v0_5.py": {
-      "sha256": "141a9ef838b5904372bb6c6702d7faa0d0bba74ecc764520573dd08c7936e548",
-      "bytes": 16902
+      "sha256": "6276e9df20b7c731a416e15acfd4dac8fa1e97067c26245a4cca389f5496e953",
+      "bytes": 16948
     },
     "render_v0_5.requirements.txt": {
       "sha256": "1712ee234af9ec16d2ac9e6ddf819bba4ebd43dd33ede33c3b7ad875f67d0885",
