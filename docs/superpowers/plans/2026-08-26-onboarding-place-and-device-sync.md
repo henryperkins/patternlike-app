@@ -13,7 +13,16 @@
 - Preserve existing M3 preference routes and server lock semantics.
 - Sync only after the Worker session is known to be valid.
 - A `user_confirmed` preference always outranks `device_derived`; `409 preference_locked` is a successful no-op for foreground sync.
-- Reuse one idempotency key per `(preference kind, normalized value)` for the lifetime of the mounted app.
+- Reuse one idempotency key per `(preference kind, normalized value)` only
+  while that attempt is in flight or its outcome is unconfirmed. Conflict
+  retries and later retries after an unavailable result keep the same key and
+  body. A fully settled attempt retires its keys, so the next foreground
+  attempt mints fresh keys even when the device values are unchanged; an
+  unauthorized result clears pending keys before another account or session
+  can use them.
+- Retain succeeded automatic `web-device-*` preference jobs for 35 days, then
+  prune them through bounded privacy maintenance. Never prune manual
+  idempotency records through that lane.
 - Place queries use POST bodies, never URLs. No query/provider payload enters logs, D1, analytics, or audit detail.
 - The implementation assumes the Google Places API (New) only after Task 2 proves selected normalized coordinates may be retained for this product. If rights review fails, stop before adapter code and replace the provider decision with a cache-compatible provider or bundled gazetteer; do not weaken retention or silently violate terms.
 - Keep all provider credentials server-side.
@@ -29,7 +38,8 @@
 
 ## File Map
 
-- `apps/web/src/lib/device-preference-sync.ts`: one in-flight foreground sync with stable keys.
+- `apps/web/src/lib/device-preference-sync.ts`: one in-flight foreground sync with attempt-scoped keys.
+- `apps/api/src/services/privacy-maintenance.ts`: bounded retention for settled automatic preference jobs.
 - `apps/api/src/services/geocoder/*`: narrow provider boundary and confidence policy.
 - `apps/api/src/routes/places.ts`: authenticated search/resolve routes.
 - `apps/api/src/db/place-resolutions.ts`: encrypted selected-result cache.
@@ -50,6 +60,9 @@
 - Modify: `apps/web/src/App.test.tsx`
 - Modify: `apps/web/src/components/TodayView.tsx`
 - Modify: `apps/web/src/components/TodayView.test.tsx`
+- Modify: `apps/api/src/routes/preferences.test.ts`
+- Modify: `apps/api/src/services/privacy-maintenance.ts`
+- Modify: `apps/api/src/services/privacy-maintenance.test.ts`
 
 **Interfaces:**
 - Produces: `DevicePreferenceSynchronizer`.
@@ -60,8 +73,11 @@
 Cover:
 
 - Timezone and locale are sent with `source: "device_derived"`.
-- The same normalized values reuse the same idempotency keys.
+- A second settled attempt with the same normalized values uses fresh
+  idempotency keys.
+- An unavailable attempt retries with the same keys and bodies.
 - Changed values receive new keys.
+- `A -> B -> A` after settled attempts gives the second A a fresh key.
 - Concurrent triggers share one in-flight promise.
 - `preference_locked` is classified as settled, not failed.
 - `401` remains distinguishable so `App` can sign out.
@@ -100,6 +116,12 @@ private inFlight: Promise<DevicePreferenceSyncResult> | null = null;
 
 Canonicalize locale with `Intl.getCanonicalLocales` and use the existing device fallbacks. Call both PUTs with `Promise.allSettled`; no single preference failure suppresses the other.
 
+The map holds only unconfirmed attempt state. Retain both exact attempt keys
+after `unavailable`, including when one of the two writes succeeded. Clear only
+the exact current attempt keys after `settled`, and clear all pending keys after
+`unauthorized` so a later account/session cannot inherit them. Conflict retries
+reuse the current attempt's key and body.
+
 - [ ] **Step 4: Trigger from `App` and re-arm Today**
 
 Create one synchronizer in `useRef`. Once `authState.status === "signed-in"`:
@@ -119,16 +141,19 @@ Replace the stale “never something to send” claim in `lib/device.ts` with th
 
 ```bash
 npm exec -w @patternlike/web -- vitest run src/lib/device-preference-sync.test.ts src/App.test.tsx src/components/TodayView.test.tsx
-npm exec -w @patternlike/api -- vitest run src/routes/preferences.test.ts
+npm exec -w @patternlike/api -- vitest run src/routes/preferences.test.ts src/services/privacy-maintenance.test.ts
 npm run typecheck -w @patternlike/web
+npm run typecheck -w @patternlike/api
 ```
 
-Expected: all pass; server regression tests still prove locked/no-op semantics.
+Expected: all pass; server regression tests still prove locked/no-op semantics,
+distinct automatic keys converge `A -> B -> A`, and bounded maintenance prunes
+only eligible succeeded `web-device-*` preference jobs older than 35 days.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/web/src/lib/device-preference-sync.ts apps/web/src/lib/device-preference-sync.test.ts apps/web/src/lib/device.ts apps/web/src/App.tsx apps/web/src/App.test.tsx apps/web/src/components/TodayView.tsx apps/web/src/components/TodayView.test.tsx
+git add apps/web/src/lib/device-preference-sync.ts apps/web/src/lib/device-preference-sync.test.ts apps/web/src/lib/device.ts apps/web/src/App.tsx apps/web/src/App.test.tsx apps/web/src/components/TodayView.tsx apps/web/src/components/TodayView.test.tsx apps/api/src/routes/preferences.test.ts apps/api/src/services/privacy-maintenance.ts apps/api/src/services/privacy-maintenance.test.ts docs/superpowers/plans/2026-08-26-onboarding-place-and-device-sync.md
 git commit -m "web: sync device preferences on foreground"
 ```
 

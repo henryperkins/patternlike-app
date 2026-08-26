@@ -68,7 +68,7 @@ describe("DevicePreferenceSynchronizer", () => {
     });
   });
 
-  it("reuses keys when normalized values have not changed", async () => {
+  it("mints fresh keys after a settled attempt with unchanged normalized values", async () => {
     const synchronizer = new DevicePreferenceSynchronizer();
 
     await synchronizer.sync();
@@ -83,16 +83,19 @@ describe("DevicePreferenceSynchronizer", () => {
     );
     expect(timezoneKeys).toHaveLength(2);
     expect(localeKeys).toHaveLength(2);
-    expect(timezoneKeys[0]).toBe(timezoneKeys[1]);
-    expect(localeKeys[0]).toBe(localeKeys[1]);
+    expect(timezoneKeys[0]).not.toBe(timezoneKeys[1]);
+    expect(localeKeys[0]).not.toBe(localeKeys[1]);
   });
 
-  it("mints new keys when normalized values change", async () => {
+  it("mints fresh keys across settled A to B to A transitions", async () => {
     const synchronizer = new DevicePreferenceSynchronizer();
 
     await synchronizer.sync();
     device.timezone.mockReturnValue("Asia/Tokyo");
     device.locale.mockReturnValue("fr-fr");
+    await synchronizer.sync();
+    device.timezone.mockReturnValue("America/Chicago");
+    device.locale.mockReturnValue("en-US");
     await synchronizer.sync();
 
     const timezoneKeys = capturedFor(TIMEZONE).map((request) =>
@@ -101,8 +104,74 @@ describe("DevicePreferenceSynchronizer", () => {
     const localeKeys = capturedFor(LOCALE).map((request) =>
       request.headers.get("idempotency-key")
     );
+    expect(timezoneKeys).toHaveLength(3);
+    expect(localeKeys).toHaveLength(3);
     expect(timezoneKeys[0]).not.toBe(timezoneKeys[1]);
+    expect(timezoneKeys[0]).not.toBe(timezoneKeys[2]);
     expect(localeKeys[0]).not.toBe(localeKeys[1]);
+    expect(localeKeys[0]).not.toBe(localeKeys[2]);
+  });
+
+  it("reuses both keys after a partially unavailable attempt", async () => {
+    const responses: Record<string, MockResponse> = {
+      [TIMEZONE]: { status: 0, body: null, unreachable: true },
+      [LOCALE]: ok,
+    };
+    mockApiResponses(responses);
+    const synchronizer = new DevicePreferenceSynchronizer();
+
+    await expect(synchronizer.sync()).resolves.toEqual({
+      status: "unavailable",
+    });
+    responses[TIMEZONE] = ok;
+    await expect(synchronizer.sync()).resolves.toEqual({ status: "settled" });
+
+    const timezoneKeys = capturedFor(TIMEZONE).map((request) =>
+      request.headers.get("idempotency-key")
+    );
+    const localeKeys = capturedFor(LOCALE).map((request) =>
+      request.headers.get("idempotency-key")
+    );
+    expect(timezoneKeys).toHaveLength(2);
+    expect(localeKeys).toHaveLength(2);
+    expect(timezoneKeys[0]).toBe(timezoneKeys[1]);
+    expect(localeKeys[0]).toBe(localeKeys[1]);
+  });
+
+  it("clears all pending keys after an unauthorized result", async () => {
+    const responses: Record<string, MockResponse> = {
+      [TIMEZONE]: { status: 0, body: null, unreachable: true },
+      [LOCALE]: ok,
+    };
+    mockApiResponses(responses);
+    const synchronizer = new DevicePreferenceSynchronizer();
+
+    await expect(synchronizer.sync()).resolves.toEqual({
+      status: "unavailable",
+    });
+
+    device.timezone.mockReturnValue("Asia/Tokyo");
+    device.locale.mockReturnValue("fr-FR");
+    responses[TIMEZONE] = error(401, "unauthorized");
+    await expect(synchronizer.sync()).resolves.toEqual({
+      status: "unauthorized",
+    });
+
+    device.timezone.mockReturnValue("America/Chicago");
+    device.locale.mockReturnValue("en-US");
+    responses[TIMEZONE] = ok;
+    await expect(synchronizer.sync()).resolves.toEqual({ status: "settled" });
+
+    const timezoneKeys = capturedFor(TIMEZONE).map((request) =>
+      request.headers.get("idempotency-key")
+    );
+    const localeKeys = capturedFor(LOCALE).map((request) =>
+      request.headers.get("idempotency-key")
+    );
+    expect(timezoneKeys).toHaveLength(3);
+    expect(localeKeys).toHaveLength(3);
+    expect(timezoneKeys[0]).not.toBe(timezoneKeys[2]);
+    expect(localeKeys[0]).not.toBe(localeKeys[2]);
   });
 
   it("shares one promise and one pair of writes across concurrent triggers", async () => {

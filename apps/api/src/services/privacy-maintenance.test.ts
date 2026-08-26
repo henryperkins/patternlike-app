@@ -13,6 +13,36 @@ import { exportObjectKey } from "./export-envelope.js";
 import { runPrivacyMaintenance } from "./privacy-maintenance.js";
 
 const NOW = new Date("2026-08-12T18:00:00.000Z");
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+interface MaintenanceJob {
+  id: string;
+  jobType: string;
+  idempotencyKey: string;
+  status: string;
+  finishedAt: string | null;
+}
+
+async function seedMaintenanceJobs(jobs: MaintenanceJob[]): Promise<void> {
+  await env.DB.batch(
+    jobs.map((job) =>
+      env.DB.prepare(
+        `INSERT INTO jobs
+           (id, job_type, user_id, idempotency_key, status, attempts,
+            finished_at, created_at)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+      ).bind(
+        job.id,
+        job.jobType,
+        USER_A,
+        job.idempotencyKey,
+        job.status,
+        job.finishedAt,
+        job.finishedAt ?? NOW.toISOString(),
+      )
+    ),
+  );
+}
 
 async function seedContextRows(): Promise<void> {
   const consentId = "cns_maintenance_0001";
@@ -158,6 +188,7 @@ describe("privacy maintenance", () => {
       failedExportArtifactsCleaned: 0,
       deletionArtifactsCleaned: 0,
       deletionReceiptsExpired: 1,
+      devicePreferenceJobsPruned: 0,
       privacyJobsDispatched: 2,
     });
     expect(sent).toEqual([
@@ -201,6 +232,121 @@ describe("privacy maintenance", () => {
          FROM deletion_requests WHERE id = 'del_expired_receipt_0001'`,
       ),
     ).toEqual([{ receipt_hash: null, receipt_expires_at: null }]);
+  });
+
+  it("exports the 35-day automatic preference job retention horizon", async () => {
+    const module = await import("./privacy-maintenance.js");
+
+    expect(Reflect.get(module, "DEVICE_PREFERENCE_JOB_RETENTION_DAYS")).toBe(35);
+  });
+
+  it("prunes only eligible succeeded automatic preference jobs", async () => {
+    const cutoff = new Date(NOW.getTime() - 35 * DAY_MS);
+    const old = new Date(cutoff.getTime() - 1).toISOString();
+    const due = cutoff.toISOString();
+    const recent = new Date(cutoff.getTime() + 1).toISOString();
+    await seedMaintenanceJobs([
+      {
+        id: "job_device_zone_old",
+        jobType: "preference_timezone",
+        idempotencyKey: "web-device-timezone-old",
+        status: "succeeded",
+        finishedAt: old,
+      },
+      {
+        id: "job_device_locale_due",
+        jobType: "preference_locale",
+        idempotencyKey: "web-device-locale-due",
+        status: "succeeded",
+        finishedAt: due,
+      },
+      {
+        id: "job_device_zone_recent",
+        jobType: "preference_timezone",
+        idempotencyKey: "web-device-timezone-recent",
+        status: "succeeded",
+        finishedAt: recent,
+      },
+      {
+        id: "job_device_locale_failed",
+        jobType: "preference_locale",
+        idempotencyKey: "web-device-locale-failed",
+        status: "failed",
+        finishedAt: old,
+      },
+      {
+        id: "job_device_zone_queued",
+        jobType: "preference_timezone",
+        idempotencyKey: "web-device-timezone-queued",
+        status: "queued",
+        finishedAt: old,
+      },
+      {
+        id: "job_manual_zone_old",
+        jobType: "preference_timezone",
+        idempotencyKey: "web-timezone-manual-old",
+        status: "succeeded",
+        finishedAt: old,
+      },
+      {
+        id: "job_other_type_old",
+        jobType: "export_account",
+        idempotencyKey: "web-device-export-old",
+        status: "succeeded",
+        finishedAt: old,
+      },
+      {
+        id: "job_device_locale_unfinished",
+        jobType: "preference_locale",
+        idempotencyKey: "web-device-locale-unfinished",
+        status: "succeeded",
+        finishedAt: null,
+      },
+    ]);
+
+    const summary = await runPrivacyMaintenance(env, NOW, { batchLimit: 20 });
+
+    expect(summary.devicePreferenceJobsPruned).toBe(2);
+    expect(
+      await rows<{ id: string }>(
+        `SELECT id FROM jobs
+         WHERE id LIKE 'job_%'
+         ORDER BY id`,
+      ),
+    ).toEqual([
+      { id: "job_device_locale_failed" },
+      { id: "job_device_locale_unfinished" },
+      { id: "job_device_zone_queued" },
+      { id: "job_device_zone_recent" },
+      { id: "job_manual_zone_old" },
+      { id: "job_other_type_old" },
+    ]);
+  });
+
+  it("prunes no more than the lane batch limit per run", async () => {
+    const old = new Date(
+      NOW.getTime() - (35 * DAY_MS) - 1,
+    ).toISOString();
+    await seedMaintenanceJobs(
+      Array.from({ length: 4 }, (_, index) => ({
+        id: `job_device_batch_${index}`,
+        jobType: index % 2 === 0
+          ? "preference_timezone"
+          : "preference_locale",
+        idempotencyKey: `web-device-batch-${index}`,
+        status: "succeeded",
+        finishedAt: old,
+      })),
+    );
+
+    const summary = await runPrivacyMaintenance(env, NOW, { batchLimit: 2 });
+
+    expect(summary.devicePreferenceJobsPruned).toBe(2);
+    expect(
+      await rows(
+        "SELECT id FROM jobs WHERE id LIKE 'job_device_batch_%'",
+      ),
+    ).toHaveLength(2);
   });
 
   it("does not mark a privacy job dispatched when the queue send fails", async () => {
