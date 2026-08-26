@@ -11,11 +11,11 @@ export type DevicePreferenceSyncResult =
   | { status: "unauthorized" }
   | { status: "unavailable" };
 
-type PreferenceKind = "timezone" | "locale";
-
-interface AttemptKey {
-  identity: string;
-  key: string;
+interface PendingAttempt {
+  timezone: string;
+  locale: string;
+  timezoneKey: string;
+  localeKey: string;
 }
 
 function isLocked(error: unknown): boolean {
@@ -40,7 +40,7 @@ async function writeWithConflictRetry(
 }
 
 export class DevicePreferenceSynchronizer {
-  private readonly idempotencyKeys = new Map<string, string>();
+  private pending: PendingAttempt | null = null;
   private inFlight: Promise<DevicePreferenceSyncResult> | null = null;
 
   sync(signal?: AbortSignal): Promise<DevicePreferenceSyncResult> {
@@ -59,20 +59,27 @@ export class DevicePreferenceSynchronizer {
     return operation;
   }
 
-  private keyFor(kind: PreferenceKind, value: string): AttemptKey {
-    const identity = `${kind}:${value}`;
-    const existing = this.idempotencyKeys.get(identity);
-    if (existing) return { identity, key: existing };
-
-    const key = newIdempotencyKey(`web-device-${kind}`);
-    this.idempotencyKeys.set(identity, key);
-    return { identity, key };
+  private attemptFor(timezone: string, locale: string): PendingAttempt {
+    const pending = this.pending;
+    if (
+      pending !== null &&
+      pending.timezone === timezone &&
+      pending.locale === locale
+    ) {
+      return pending;
+    }
+    const attempt: PendingAttempt = {
+      timezone,
+      locale,
+      timezoneKey: newIdempotencyKey("web-device-timezone"),
+      localeKey: newIdempotencyKey("web-device-locale"),
+    };
+    this.pending = attempt;
+    return attempt;
   }
 
-  private retire(attempt: AttemptKey): void {
-    if (this.idempotencyKeys.get(attempt.identity) === attempt.key) {
-      this.idempotencyKeys.delete(attempt.identity);
-    }
+  private retire(attempt: PendingAttempt): void {
+    if (this.pending === attempt) this.pending = null;
   }
 
   private async performSync(
@@ -89,14 +96,17 @@ export class DevicePreferenceSynchronizer {
       return { status: "unavailable" };
     }
 
-    const timezoneAttempt = this.keyFor("timezone", timezone);
-    const localeAttempt = this.keyFor("locale", locale);
+    const attempt = this.attemptFor(timezone, locale);
     const outcomes = await Promise.allSettled([
       writeWithConflictRetry(() =>
-        setSchedulingTimezone(timezone, "device_derived", timezoneAttempt.key)
+        setSchedulingTimezone(
+          attempt.timezone,
+          "device_derived",
+          attempt.timezoneKey,
+        )
       ),
       writeWithConflictRetry(() =>
-        setContentLocale(locale, "device_derived", localeAttempt.key)
+        setContentLocale(attempt.locale, "device_derived", attempt.localeKey)
       ),
     ]);
     const failures = outcomes.flatMap((outcome) =>
@@ -104,12 +114,11 @@ export class DevicePreferenceSynchronizer {
     );
 
     if (failures.some(isUnauthorized)) {
-      this.idempotencyKeys.clear();
+      this.retire(attempt);
       return { status: "unauthorized" };
     }
     if (failures.every(isLocked)) {
-      this.retire(timezoneAttempt);
-      this.retire(localeAttempt);
+      this.retire(attempt);
       return { status: "settled" };
     }
     return { status: "unavailable" };
