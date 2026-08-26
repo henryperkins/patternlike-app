@@ -2344,6 +2344,18 @@ def check_m7_openapi_projection() -> list[str]:
 
 
 M8_SCHEMA_VERSION = "0.8.0"
+M8_PLACE_SEARCH_REQUEST_REF = (
+    M8_BASE + "place-search.schema.json#/$defs/placeSearchRequest"
+)
+M8_PLACE_SEARCH_RESPONSE_REF = (
+    M8_BASE + "place-search.schema.json#/$defs/placeSearchResponse"
+)
+M8_M3_READING_RESPONSE_REF = (
+    M3_BASE + "daily-reading.schema.json#/$defs/dailyReadingResponse"
+)
+M8_M5_READING_RESPONSE_REF = (
+    M5_BASE + "daily-reading.schema.json#/$defs/dailyReadingResponseV5"
+)
 M8_PREDECESSOR_HASHES = {
     "contracts/m0": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
     "contracts/m3": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
@@ -2354,6 +2366,7 @@ M8_PREDECESSOR_HASHES = {
 }
 M8_REQUIRED_VALID_FIXTURES = {
     "account-export.saved-reading.json",
+    "account-export.saved-reading-m3.json",
     "birth-profile.budget-exhausted.json",
     "geocoder-consent.granted.json",
     "geocoder-consent.not-granted.json",
@@ -2364,6 +2377,7 @@ M8_REQUIRED_VALID_FIXTURES = {
     "reading-save-state.saved.json",
 }
 M8_REQUIRED_INVALID_FIXTURES = {
+    "account-export.secret-shaped-content.json",
     "birth-profile.budget-exhausted-missing-reset.json",
     "geocoder-consent.extra-field.json",
     "geocoder-consent.unknown-policy.json",
@@ -2424,6 +2438,10 @@ def check_m8_fixture_inventory() -> list[str]:
         errors.append(f"M8 required valid fixture is missing: {missing}")
     for missing in sorted(M8_REQUIRED_INVALID_FIXTURES - invalid):
         errors.append(f"M8 required invalid fixture is missing: {missing}")
+    for unexpected in sorted(valid - M8_REQUIRED_VALID_FIXTURES):
+        errors.append(f"M8 unexpected valid fixture is present: {unexpected}")
+    for unexpected in sorted(invalid - M8_REQUIRED_INVALID_FIXTURES):
+        errors.append(f"M8 unexpected invalid fixture is present: {unexpected}")
 
     expected_prefixes = {
         "account-export",
@@ -2440,6 +2458,16 @@ def check_m8_fixture_inventory() -> list[str]:
             f"M8 fixture prefixes are {sorted(actual_prefixes)}, "
             f"expected {sorted(expected_prefixes)}"
         )
+    expected_place_mappings = {
+        "place-search.query-too-short.json": M8_PLACE_SEARCH_REQUEST_REF,
+        "place-search.results.json": M8_PLACE_SEARCH_RESPONSE_REF,
+    }
+    for fixture, expected_ref in expected_place_mappings.items():
+        actual_ref = match_schema_ref("m8", fixture)
+        if actual_ref != expected_ref:
+            errors.append(
+                f"M8 fixture {fixture} maps to {actual_ref!r}, expected {expected_ref!r}"
+            )
     if not errors:
         print(
             f"OK  inventory     contracts/m8 has {len(valid)} valid and "
@@ -2463,6 +2491,22 @@ def _m8_object_closure_errors(node: object, path: tuple[str, ...] = ()) -> list[
     return errors
 
 
+def check_m8_validator_regressions() -> list[str]:
+    errors: list[str] = []
+    nullable_object = {
+        "type": ["object", "null"],
+        "properties": {"secret_payload": {"type": "string"}},
+    }
+    if not _m8_object_closure_errors(nullable_object):
+        errors.append(
+            "M8 closure validator does not reject an open type:[object,null] schema"
+        )
+    pure_ref = {"$ref": M8_BASE + "common.schema.json#/$defs/nullableDateTime"}
+    if _m8_object_closure_errors(pure_ref):
+        errors.append("M8 closure validator incorrectly treats a pure $ref as an open object")
+    return errors
+
+
 def _m8_property_paths(node: object, property_name: str, path: tuple[str, ...] = ()):
     if isinstance(node, dict):
         properties = node.get("properties")
@@ -2475,7 +2519,7 @@ def _m8_property_paths(node: object, property_name: str, path: tuple[str, ...] =
             yield from _m8_property_paths(value, property_name, (*path, str(index)))
 
 
-def check_m8_schema_projection() -> list[str]:
+def check_m8_schema_projection(registry: Registry) -> list[str]:
     errors: list[str] = []
     shipped = {path.name: path for path in M8.glob("*.schema.json")} if M8.is_dir() else {}
     for missing in sorted(M8_REQUIRED_SCHEMAS - set(shipped)):
@@ -2618,6 +2662,31 @@ def check_m8_schema_projection() -> list[str]:
         != set((m7_account_export.get("properties") or {}))
     ):
         errors.append("M8 account export does not preserve the complete M7 section structure")
+    account_fixture_path = (
+        M8 / "fixtures" / "valid" / "account-export.saved-reading.json"
+    )
+    if account_fixture_path.exists():
+        account_fixture = json.loads(account_fixture_path.read_text(encoding="utf-8"))
+        account_validator = resolve_validator(
+            M8_BASE + "account-export.schema.json#/$defs/accountExport",
+            registry,
+        )
+        artifact_probe = json.loads(json.dumps(account_fixture))
+        artifact = artifact_probe["readings"]["items"][0].get("artifact")
+        if isinstance(artifact, dict):
+            artifact["provider_secret"] = "must-not-pass"
+            if account_validator.is_valid(artifact_probe):
+                errors.append(
+                    "M8 account export accepts arbitrary secret-shaped artifact content"
+                )
+        evidence_probe = json.loads(json.dumps(account_fixture))
+        evidence = evidence_probe["readings"]["items"][0].get("evidence")
+        if isinstance(evidence, dict):
+            evidence["provider_secret"] = "must-not-pass"
+            if account_validator.is_valid(evidence_probe):
+                errors.append(
+                    "M8 account export accepts arbitrary secret-shaped evidence content"
+                )
 
     consent_defs = documents["geocoder-consent.schema.json"].get("$defs") or {}
     consent = consent_defs.get("geocoderConsentResponse") or {}
@@ -2752,16 +2821,16 @@ def check_m8_manifest() -> list[str]:
         elif actual_recorded == expected:
             print(f"OK  predecessor   {package} {expected}")
 
-    supersedes = [
-        item for item in doc.get("supersedes") or []
-        if isinstance(item, dict) and item.get("family") == "account-export"
-    ]
+    supersedes = doc.get("supersedes")
     expected_document = "m7:account-export.schema.json#/$defs/accountExport"
-    if len(supersedes) != 1 or supersedes[0].get("documents") != [expected_document]:
+    if (
+        not isinstance(supersedes, list)
+        or len(supersedes) != 1
+        or not isinstance(supersedes[0], dict)
+        or supersedes[0].get("family") != "account-export"
+        or supersedes[0].get("documents") != [expected_document]
+    ):
         errors.append("M8 manifest does not supersede exactly the M7 account-export family")
-    all_superseded = json.dumps(doc.get("supersedes") or [])
-    if "m3:daily-reading" in all_superseded or "m5:daily-reading" in all_superseded:
-        errors.append("M8 incorrectly supersedes frozen M3/M5 reading artifacts")
 
     if not errors:
         print(
@@ -2771,7 +2840,7 @@ def check_m8_manifest() -> list[str]:
     return errors
 
 
-def check_m8_openapi_projection() -> list[str]:
+def check_m8_openapi_projection(registry: Registry) -> list[str]:
     try:
         import yaml
     except ImportError:
@@ -2951,18 +3020,76 @@ def check_m8_openapi_projection() -> list[str]:
         if isinstance(branch, dict)
     ]
     if detail_refs != [
-        "#/components/schemas/M3DailyReadingSuccess",
-        "#/components/schemas/M5DailyReadingSuccess",
+        M8_M3_READING_RESPONSE_REF,
+        M8_M5_READING_RESPONSE_REF,
     ]:
-        errors.append("M8 OpenAPI reading detail is not the ordered M3/M5 success oneOf")
-    if detail.get("x-normative-m3-schema") != (
-        "m3:daily-reading.schema.json#/$defs/dailyReadingResponse"
-    ):
-        errors.append("M8 OpenAPI reading detail does not name the frozen M3 success envelope")
-    if detail.get("x-normative-m5-schema") != (
-        "m5:daily-reading.schema.json#/$defs/dailyReadingResponseV5"
-    ):
-        errors.append("M8 OpenAPI reading detail does not name the frozen M5 success envelope")
+        errors.append(
+            "M8 OpenAPI reading detail does not directly reference the exact frozen "
+            "M3/M5 success schemas"
+        )
+
+    detail_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "#/components/schemas/ReadingDetailResponse",
+        "components": {"schemas": schemas},
+    }
+    detail_validator = Draft202012Validator(
+        detail_schema,
+        registry=registry,
+        format_checker=FormatChecker(),
+    )
+    m3_published = json.loads(
+        (M3 / "fixtures" / "valid" / "daily-reading.published.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    m3_fallback = json.loads(
+        (M3 / "fixtures" / "valid" / "daily-reading.fallback.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    m5_published = json.loads(
+        (M5 / "fixtures" / "valid" / "daily-reading.published.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    semantic_probes = []
+    m3_life_domain = {
+        "schema_version": "0.3.0",
+        "reading": json.loads(json.dumps(m3_published)),
+        "evidence_url": None,
+    }
+    m3_life_domain["reading"]["domain_preference"] = "not-a-life-domain"
+    semantic_probes.append(
+        ("invalid M3 life-domain value", M8_M3_READING_RESPONSE_REF, m3_life_domain)
+    )
+    m3_fallback_invariant = {
+        "schema_version": "0.3.0",
+        "reading": json.loads(json.dumps(m3_fallback)),
+        "evidence_url": None,
+    }
+    m3_fallback_invariant["reading"]["paragraphs"][0]["role"] = "primary_theme"
+    semantic_probes.append(
+        (
+            "invalid M3 fallback paragraph invariant",
+            M8_M3_READING_RESPONSE_REF,
+            m3_fallback_invariant,
+        )
+    )
+    m5_life_domain = {
+        "schema_version": "0.5.0",
+        "reading": json.loads(json.dumps(m5_published)),
+        "evidence_url": None,
+    }
+    m5_life_domain["reading"]["domain_preference"] = "not-a-life-domain"
+    semantic_probes.append(
+        ("invalid M5 life-domain value", M8_M5_READING_RESPONSE_REF, m5_life_domain)
+    )
+    for label, frozen_ref, instance in semantic_probes:
+        if resolve_validator(frozen_ref, registry).is_valid(instance):
+            errors.append(f"M8 semantic probe is not rejected by frozen schema: {label}")
+        elif detail_validator.is_valid(instance):
+            errors.append(f"M8 OpenAPI reading detail accepts {label}")
 
     birth = ((spec.get("paths") or {}).get("/v1/birth-profiles") or {}).get("post") or {}
     birth_429 = (birth.get("responses") or {}).get("429") or {}
@@ -3132,9 +3259,10 @@ def main() -> int:
     errors += validate_package(registry, "m8", M8, set())
     errors += check_openapi(M8, registry)
     errors += check_m8_fixture_inventory()
-    errors += check_m8_schema_projection()
+    errors += check_m8_validator_regressions()
+    errors += check_m8_schema_projection(registry)
     errors += check_m8_manifest()
-    errors += check_m8_openapi_projection()
+    errors += check_m8_openapi_projection(registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")
