@@ -258,7 +258,17 @@ search and selected-place resolution are not implemented.**
 The approved decision is the composite Google Places Autocomplete (New) plus
 Geocoding API v4 adapter in
 [`2026-08-26-geocoder-provider.md`](../../decisions/2026-08-26-geocoder-provider.md).
-Its durable provider id is `google_places_geocoding_v4`.
+Its durable provider id is `google_places_geocoding_v4`. The repository owner
+explicitly supplied product/privacy/legal approval in this Cursor
+implementation session on 2026-08-26; implementation remains pending.
+
+The ADR evaluates both billing-account regimes. Non-EEA Geocoding §6.3.2 and
+EEA Geocoding §6.2.2 both permit the selected, logically isolated
+account-lifetime cache; pure Places coordinates fail under the non-EEA §14.3
+and EEA §15.4 30-day limits. EEA permitted use (1) expressly permits address
+lookup and autocompletion. The operator must record the production billing
+account's `EEA`/`non-EEA` region before provisioning, but the decision passes
+under either result.
 
 **Why lower:** the UI is honest about this today ("Historical timezone lookup
 is not connected yet. Confirm this value before continuing"), and asking for
@@ -280,6 +290,15 @@ for confirmation. `birth_profiles` already has a `geocode_confidence` column
 (`0001_m0_core.sql:134`) that `routes/birth.ts` binds `NULL` — the resolver
 should populate it so a low-confidence match can be qualified in the
 uncertainty report rather than silently trusted.
+
+Reuse registry source `AST-02` for the versioned `product_source` consent; do
+not create a context-source permission or signal because geocoding writes
+directly to the encrypted birth normalization path. Land code and public legal
+surfaces with `GEOCODER_ROLLOUT = "off"` in development and production.
+Production enablement is a separate config commit only after the secret/API
+restrictions, billing region, 120/min Autocomplete and 30/min Geocoding quotas,
+USD 50 budget with 50/75/90/100% alerts, tests, attribution, exact disclosure,
+and internal canary are verified.
 
 **Done when:** a user picks "Los Angeles" and gets `America/Los_Angeles` and
 correct coordinates without typing a decimal.
@@ -315,7 +334,9 @@ Coordinates → IANA zone → historical offset, all server-side:
   and the UI must show that disclosure and obtain express, prior, revocable
   consent. Declining or revoking must leave manual entry complete. The exact
   requirement and attribution rules are frozen in the linked ADR; the existing
-  generic account-processing consent is not a substitute.
+  generic account-processing consent is not a substitute. Unknown or old
+  geocoder policies and any rollout state other than the closed `enabled`
+  value fail closed with no Google request.
 - **The uncertainty report.** Qualifiers reach the client on the lookup and the
   202, and the grade reaches D1, but nothing folds a `low` geocode into
   `uncertainty.qualified_features` yet. The calculation service builds that

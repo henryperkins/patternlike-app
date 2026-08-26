@@ -2,7 +2,9 @@
 
 - **Date:** 2026-08-26
 - **Status:** Approved; implementation pending
-- **Decision owners:** Product, privacy, and legal
+- **Approval provenance:** The repository owner explicitly supplied
+  product/privacy/legal approval in this Cursor implementation session on
+  2026-08-26
 - **Provider id:** `google_places_geocoding_v4`
 
 ## Decision
@@ -26,15 +28,23 @@ a locality, or refuses a result.
 
 ## Rights decision
 
-A pure Places Autocomplete plus Place Details design is rejected. Section 14.3
-of the current Google Maps Platform Service Specific Terms limits Places API
-latitude/longitude caching to 30 consecutive days. That cannot support an
-account-lifetime encrypted birth profile.
+The governing Service Specific Terms depend on the Google Maps Platform billing
+account address. The production operator must record the billing-account region
+as `EEA` or `non-EEA` before provisioning the project, key, quotas, or budget.
+That record selects the terms to retain with the enablement evidence; it does
+not make this approval conditional because the composite passes under either
+regime.
 
-The composite passes because its durable coordinates and address come from
-Geocoding API v4. Section 6.3.2 expressly permits indefinite caching of
-Geocoding latitude, longitude, `formatted_address`, and structured address
-values when all of the following remain true:
+| Billing-account regime | Pure Places/Place Details | Composite Places Autocomplete + Geocoding v4 | Outcome |
+|---|---|---|---|
+| Non-EEA | Service Specific Terms §14.3 limits Places latitude/longitude caching to 30 consecutive days. | Geocoding §6.3.2 permits indefinite caching of latitude, longitude, `formatted_address`, and structured address values for the initiating direct end-user functionality when logically isolated and not reused across users. | Pure Places fails; composite passes. |
+| EEA | EEA Service Specific Terms §15.4 imposes the same 30-day Places latitude/longitude limit. | EEA Geocoding §6.2.2 grants the same indefinite, direct-end-user, logically isolated caching right. EEA Places §15.2 also limits Places content to the published permitted uses; permitted use (1) expressly allows address lookup and autocompletion, which is this search flow. | Pure Places fails; composite passes. |
+
+Pattern/Like displays no map in this flow, so the EEA “No Use With any Map”
+clauses do not narrow the approved use. The composite's durable coordinates and
+address come from Geocoding API v4, never Place Details.
+
+Under both Geocoding clauses, all of the following must remain true:
 
 - the data supports the direct, end-user-facing functionality that initiated
   the request;
@@ -51,14 +61,14 @@ cache, analytics dataset, or cross-user lookup.
 
 | # | Required condition | Composite control and primary-source basis | Result |
 |---|---|---|---|
-| 1 | Send the user-entered query from the Worker | After disclosure and consent, the Worker sends the query only as Autocomplete's JSON `input`; the documented endpoint accepts this use. | Pass |
+| 1 | Send the user-entered query from the Worker | After disclosure and consent, the Worker sends the query only as Autocomplete's JSON `input`. Non-EEA terms permit the documented API use; EEA permitted use (1) expressly permits address lookup and autocompletion. | Pass |
 | 2 | Return suggestions to that user | Only narrowed place predictions are returned to the requesting user, with visible Google attribution; they are neither shared nor retained. | Pass |
-| 3 | Retain the selected normalized label and coordinates in the encrypted birth profile for the account lifetime | Selection is resolved with Geocoding API v4, not Place Details. Service Specific Terms §6.3.2 permits indefinite, direct-user, logically isolated Geocoding caching. Pure Places/Place Details fails this condition because §14.3 caps Places coordinates at 30 days. | Pass |
+| 3 | Retain the selected normalized label and coordinates in the encrypted birth profile for the account lifetime | Selection is resolved with Geocoding API v4, not Place Details. Non-EEA §6.3.2 and EEA §6.2.2 both permit indefinite, direct-user, logically isolated Geocoding caching. Pure Places/Place Details fails because non-EEA §14.3 and EEA §15.4 cap Places coordinates at 30 days. | Pass |
 | 4 | Retain no unselected query or result payload | Within Pattern/Like, query and suggestions exist only in request memory. Safe logging, analytics, D1, and audit events receive no query, candidate, or provider payload. Google's separate controller retention is disclosed below. | Pass |
 | 5 | Delete selected data with the account | The narrowed selection is encrypted under the user's DEK and is included in account deletion and crypto-shredding. Google remains an independent controller of the request data it separately collects; Pattern/Like cannot represent account deletion as deletion of Google's controller records. | Pass |
 
-**Hard-gate outcome:** `google_places_geocoding_v4` passes. Pure Places plus
-Place Details does not.
+**Hard-gate outcome under both billing-account regimes:**
+`google_places_geocoding_v4` passes. Pure Places plus Place Details does not.
 
 ## Frozen provider request shapes
 
@@ -160,6 +170,12 @@ not persisted. The plaintext provider discriminator is the closed constant
 `google_places_geocoding_v4`, and the durable public `place_id` remains an
 app-minted `plc_` id.
 
+The field mapping is exact:
+
+- durable `label = formattedAddress`;
+- durable `latitude = location.latitude`; and
+- durable `longitude = location.longitude`.
+
 The confidence policy uses the most specific accepted type found in the result
 or its address components:
 
@@ -169,6 +185,147 @@ or its address components:
 | `sublocality` or `sublocality_level_*` | `medium` | Add `approximate_match` when `granularity` is `APPROXIMATE`. |
 | `administrative_area_level_*` | `low` | Add `region_level_match`; also add `approximate_match` when applicable. |
 | No accepted type, unknown type-only result, or unknown granularity | Refuse | Do not guess or store a result. |
+
+## Frozen consent policy
+
+This consent reuses the existing data-source registry entry `AST-02`
+(`Birthplace geocoding`). It does not mint an ad hoc source.
+
+| Consent field | Frozen value |
+|---|---|
+| `kind` | `product_source` |
+| `source_id` | `AST-02` |
+| `permission_tier` | `0` |
+| `allowed_uses_json` | `["chart_fact","timezone_resolution"]` in this exact order, with no additional use |
+| `provider` | `google_places_geocoding_v4` |
+| `scopes_json` | `[]` |
+| `connector_account_id` | `NULL` |
+| `policy_version` | `google-places-geocoding-v4-2026-08-26` |
+| `ui_surface` | `onboarding` or `privacy_center`, supplied through the closed `X-Consent-UI-Surface` mutation header |
+
+The immutable server-owned disclosure for that policy version is the following
+exact text:
+
+> Google birthplace search is optional. If you enable it, Pattern/Like sends
+> the city or place text you type and your language preference (when available)
+> to Google Places Autocomplete. After you choose a suggestion, Pattern/Like
+> sends only Google's opaque Place ID to Google Geocoding. Pattern/Like does not
+> send your birth date or time, coordinates or device location, Pattern/Like
+> user, account, birth-profile, or consent identifiers, or the app-owned search
+> session token. Google receives these requests, Pattern/Like's project
+> credential, and network metadata such as the Worker IP. Google acts as an
+> independent controller and may retain and use information it receives,
+> including search terms and IP addresses, to provide and improve Google
+> products and services; the reviewed terms do not promise to exclude model
+> training. Pattern/Like does not store your query or unselected suggestions.
+> It encrypts the selected formatted address, coordinates, confidence, and
+> qualifiers under your account key and deletes that data with your
+> Pattern/Like account, but account deletion does not delete Google's separately
+> controlled records. You can decline or withdraw this permission and enter the
+> place, coordinates, and time zone manually.
+
+The server maps the policy version to that text and these immutable links; the
+client does not submit or author any disclosure content:
+
+```json
+{
+  "patternlike_terms": "/terms.html",
+  "patternlike_privacy": "/privacy.html",
+  "google_maps_terms": "https://maps.google.com/help/terms_maps/",
+  "google_privacy": "https://policies.google.com/privacy"
+}
+```
+
+`PUT /v1/consents/geocoder` accepts only the current `policy_version` and a
+closed `X-Consent-UI-Surface: onboarding|privacy_center` header. An unknown,
+old, or future version is `409 consent_policy_version_stale` and writes
+nothing. `GET` returns the current server-owned policy/disclosure and may report
+state while rollout is off, but a response is never itself authorization.
+
+The consent chain lookup tuple is exactly `(user_id, kind = 'product_source',
+source_id = 'AST-02', provider = 'google_places_geocoding_v4')`. Load the
+latest row by `version DESC, created_at DESC, id DESC`; do not look up by policy
+version because that could resurrect an older grant. The latest row authorizes
+a provider call only when all of these checks pass:
+
+1. `status = 'granted'`, `granted_at IS NOT NULL`, `revoked_at IS NULL`, and
+   `paused_at IS NULL`;
+2. it is unexpired;
+3. `policy_version` is exactly
+   `google-places-geocoding-v4-2026-08-26` and exists in the server disclosure
+   map;
+4. `permission_tier = 0`;
+5. `allowed_uses_json` parses to exactly
+   `["chart_fact","timezone_resolution"]`;
+6. `scopes_json` parses to exactly `[]`; and
+7. `connector_account_id IS NULL`.
+
+Any mismatch, including an otherwise-live grant under an unknown or old policy,
+is no grant. Search and resolve then fail closed without contacting Google.
+
+Grant, revoke, and resume are append-only. An initial grant inserts version 1
+with no predecessor. Every later state-changing grant, revoke, or resume
+inserts `version = latest.version + 1` and
+`supersedes_consent_id = latest.id`; prior consent rows are never updated or
+deleted. A current-policy grant that replaces an old-policy row is
+state-changing and appends. Revoke inserts a `revoked` row with `revoked_at`;
+resume is a new `granted` row under the current policy, never reactivation of
+an old row. A grant while the exact current grant is already active and a
+revoke while already not granted are no-op states and do not append a consent
+row.
+
+Every mutation requires an 8–128 character `Idempotency-Key`. The durable
+receipt is scoped by `(job_type, user_id, idempotency_key)`. Replaying the same
+operation, policy version, and UI surface returns the stored response and
+creates no row; reusing that scoped key with different mutation input returns
+`409 idempotency_conflict`. The latest-row assertion and receipt commit in the
+same D1 batch, so concurrent different keys have one winner and the loser
+returns `409 consent_conflict`.
+
+No `context_source_permissions` or `context_signals` row is created for this
+consent. `AST-02` writes the selected normalization directly into the
+user-encrypted birth path; it is not reading context. The implementation is
+stricter than the registry's raw-retention ceiling: raw queries and unselected
+suggestions are never persisted.
+
+## Fail-closed rollout
+
+`GEOCODER_ROLLOUT` is a non-secret, closed configuration value:
+
+- `off`
+- `enabled`
+
+Both top-level development vars and production vars are committed as `off`.
+Hermetic route tests explicitly override it to `enabled`; no other value is
+accepted.
+
+While rollout is `off`, consent grant (`PUT`), place search, and place resolve
+return the same generic `503 geocoder_unavailable` envelope and make no Google
+request. `GET /v1/consents/geocoder` may expose the current policy,
+server-owned disclosure, and fail-closed state, but cannot authorize a provider
+call. Revocation (`DELETE`) remains available so disabling rollout never traps
+a grant.
+
+`checkSecureConfig` validates the closed rollout value in every environment. It
+requires `GOOGLE_MAPS_PLATFORM_API_KEY` only when rollout is `enabled`. A
+missing key while rollout is `off` therefore does not break unrelated API
+routes; an invalid rollout value or enabled rollout without the key fails
+closed.
+
+Rollout order is mandatory:
+
+1. land provider code, consent routes, search/resolve routes, and config with
+   development and production still `off`;
+2. land public Terms, public Privacy, the exact disclosure, and complete
+   attribution while still `off`;
+3. verify tests, the API-restricted secret, recorded billing-account region,
+   project quotas, budget/alerts, and a successful internal canary in a
+   non-reader-serving Worker version or environment; then
+4. enable production only in a separate configuration commit and deploy.
+
+The production operator owns and records every gate before enablement. Existing
+grants under an unknown or old policy remain fail-closed after a policy change;
+an enablement never revives them.
 
 ## Privacy and user-facing obligations
 
@@ -215,11 +372,20 @@ Before the first query can leave the Worker:
 4. declining or revoking that consent must prevent further Google calls while
    leaving manual entry fully usable.
 
-The Google logo/required Google attribution must be visible with the
+Google attribution must be visible with sufficient contrast alongside the
 Autocomplete suggestions and beside every displayed stored selected result,
-including later onboarding review. Any provider-supplied third-party
-attribution required by current documentation must also be shown. Attribution
-must not be hidden behind interaction or removed after selection.
+including later onboarding review. Google content must be visually distinct
+from manual or other non-Google content, without implying that Google supplied
+the latter. The attribution control's required accessible name is exactly
+`Google Maps`.
+
+Use a current, locally bundled official asset without alteration and preserve
+Google's minimum size, aspect ratio, and clear-space rules. Do not hide
+attribution behind interaction, crop it, translate it, or fetch it from Google
+in the browser. If text attribution is used, render `Google Maps` with
+`translate="no"`. Display every third-party attribution Google supplies with
+the affected content; if required attribution cannot be represented, refuse
+that suggestion/result rather than silently dropping it.
 
 ## Coverage, reliability, quota, and cost controls
 
@@ -234,18 +400,26 @@ commitment, not a per-request latency guarantee. The adapter therefore keeps a
 entry.
 
 Places API (New) quotas are per method and per project. Geocoding API v4 has a
-default 25 QPS project quota. Pattern/Like will:
+default 25 QPS project quota, but Pattern/Like's initial project controls are
+deliberately lower:
 
+- Places Autocomplete (New): 120 requests per minute per project;
+- Geocoding API v4: 30 requests per minute per project;
 - keep the existing combined app limit of 30 search/resolve requests per
   authenticated user per 60 seconds;
 - debounce search by 300 ms and require at least two Unicode code points;
 - request only the frozen field masks;
 - use per-request Autocomplete billing without a Google session token;
-- set project-level method quotas as the hard spend ceiling;
-- configure quota alerts and billing-budget alerts before production; and
+- set a monthly Google Maps Platform budget of USD 50 with alerts at 50%, 75%,
+  90%, and 100%; and
 - monitor request count per completed selection because Google documents the
   Autocomplete-plus-Geocoding flow as cost-effective when selection averages
   four or fewer Autocomplete requests.
+
+Provider quotas are rate ceilings, not spend caps. Budget alerts are advisory
+and do not stop requests or guarantee a USD 50 maximum. The production operator
+owns verification of the two quota values, budget, four alert thresholds, and
+alert recipients before changing rollout to `enabled`.
 
 ## Primary sources
 
@@ -257,6 +431,12 @@ reported publication or last-update date where the reviewed page supplied one.
   consent, and location-privacy duties.
 - [Google Maps Platform Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms)
   (2026-06-10): §§6.3.1–6.3.2 Geocoding caching and §14.3 Places caching.
+- [Google Maps Platform EEA Service Specific Terms](https://cloud.google.com/terms/maps-platform/eea/maps-service-terms)
+  (accessed 2026-08-26): EEA Geocoding §6.2.2 indefinite direct-user caching,
+  Places §15.2 permitted-use restriction, and Places §15.4 30-day coordinate
+  caching.
+- [Places API permitted uses for EEA billing addresses](https://cloud.google.com/terms/maps-platform/eea-places-api-permitted-uses)
+  (accessed 2026-08-26): permitted use (1), address lookup and autocompletion.
 - [Google Controller-Controller Data Protection Terms](https://business.safety.google/controllerterms)
   (accessed 2026-08-26): independent-controller roles and cross-border transfer
   terms.
@@ -290,6 +470,8 @@ reported publication or last-update date where the reviewed page supplied one.
 ## Consequences
 
 Tasks 3–7 may implement this frozen decision without changing the app-owned
-provider interface. Implementation remains pending. Any change to endpoint,
-field mask, provider id, retention model, attribution, consent, or confidence
-mapping requires a new dated rights review before deployment.
+provider interface. Implementation remains pending and committed rollout stays
+`off` until the separate enablement gate. Any change to endpoint, field mask,
+provider id, retention model, attribution, consent, disclosure, confidence
+mapping, or governing terms requires a new dated rights review before
+deployment.

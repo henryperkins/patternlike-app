@@ -28,6 +28,12 @@
 - The approved provider and rights constraints are frozen in
   [`docs/decisions/2026-08-26-geocoder-provider.md`](../../decisions/2026-08-26-geocoder-provider.md).
   Implementation remains pending; there is no runtime provider fallback.
+- The composite passes under both billing-account regimes: non-EEA Geocoding
+  §6.3.2 and EEA Geocoding §6.2.2 permit the selected direct-user cache, while
+  non-EEA Places §14.3 and EEA Places §15.4 reject account-lifetime Places
+  coordinates. EEA permitted use (1) expressly permits address lookup and
+  autocompletion. Record `EEA` or `non-EEA` for the billing account before
+  provisioning; approval is not conditional on which regime applies.
 - Autocomplete sends the raw query only in the JSON body of `POST
   https://places.googleapis.com/v1/places:autocomplete`. Selected resolution
   uses `GET
@@ -45,15 +51,35 @@
 - Places suggestions are transient and never persisted. Only the selected
   Geocoding v4 `formattedAddress`, `location`, `granularity`, `types`, and
   address components may be read, then immediately narrowed field-by-field.
+- Map durable fields exactly: `label = formattedAddress`, `latitude =
+  location.latitude`, and `longitude = location.longitude`. Confidence and
+  qualifier mapping remains the closed mapping below.
 - Keep the Worker secret `GOOGLE_MAPS_PLATFORM_API_KEY` server-side. Send it
   only in `X-Goog-Api-Key`, never in a URL or body, and API-restrict the key to
   Places API (New) and Geocoding API.
+- Reuse consent source `AST-02` as `kind = "product_source"` with permission
+  tier 0, allowed uses exactly `["chart_fact","timezone_resolution"]`,
+  provider `google_places_geocoding_v4`, empty scopes, no connector account,
+  and policy `google-places-geocoding-v4-2026-08-26`. Do not create a
+  `context_source_permissions` or `context_signals` row.
+- `GEOCODER_ROLLOUT` is a closed non-secret `off|enabled` var committed `off`
+  in development and production. Off means grant/search/resolve return generic
+  `503 geocoder_unavailable` and make no Google call; GET may expose current
+  policy/state, and DELETE remains available for revocation.
 - Public Terms and Privacy must carry the Google flow-down and
   independent-controller disclosure in the ADR. The adjacent disclosure and
   express, prior, revocable consent gate must be complete before the first
   query; declining or revoking leaves manual entry available.
 - Show required Google attribution with live suggestions and every displayed
-  stored selected result.
+  stored selected result, with visible contrast, Google content visually
+  distinct from manual content, accessible name exactly `Google Maps`,
+  official asset size/aspect-ratio/clear-space rules, `translate="no"` on text
+  attribution, and every supplied third-party attribution.
+- Before enablement, set project quotas to 120 Places Autocomplete requests per
+  minute and 30 Geocoding v4 requests per minute, plus a monthly USD 50 Google
+  Maps budget with alerts at 50%, 75%, 90%, and 100%. Quotas are rate ceilings,
+  budget alerts are advisory rather than hard caps, and the production
+  operator owns verification.
 - Preserve manual place label, coordinates, and IANA-zone entry as a complete fallback.
 - A provider candidate id is short-lived transport identity. The durable `place_id` is an app-minted `plc_` id.
 - Persist selected place label/coordinates/provider confidence only as user-DEK ciphertext.
@@ -197,7 +223,9 @@ git commit -m "web: sync device preferences on foreground"
 
 ### Task 2: Complete the geocoder rights, privacy, and provider decision
 
-**Status:** Approved 2026-08-26. Implementation remains pending. See
+**Status:** The repository owner explicitly supplied product/privacy/legal
+approval in this Cursor implementation session on 2026-08-26. Implementation
+remains pending. See
 [`docs/decisions/2026-08-26-geocoder-provider.md`](../../decisions/2026-08-26-geocoder-provider.md).
 
 **Files:**
@@ -253,8 +281,10 @@ The document names the selected adapter, secret names, attribution, confidence m
 
 - [x] **Step 4: Review and commit the decision**
 
-Product/privacy/legal owners approved the composite
-`google_places_geocoding_v4` decision. It differs from the plan's former pure
+The approval covers both governing regimes: non-EEA Geocoding §6.3.2/Places
+§14.3 and EEA Geocoding §6.2.2/Places §15.4 plus the EEA address
+lookup/autocompletion permitted use. The composite
+`google_places_geocoding_v4` decision differs from the plan's former pure
 Places/Place Details assumption, so this decision commit replaces every
 provider-specific item in the plan: tech stack, constraints, adapter/test
 filenames, `place_resolutions.provider` CHECK, secret/config names, endpoints,
@@ -275,12 +305,18 @@ git commit -m "docs: decide birthplace geocoder provider"
 - Create: `contracts/m8/common.schema.json`
 - Create: `contracts/m8/place-search.schema.json`
 - Create: `contracts/m8/place-resolution.schema.json`
+- Create: `contracts/m8/geocoder-consent.schema.json`
 - Create: `contracts/m8/openapi/openapi.yaml`
 - Create: `contracts/m8/fixtures/valid/place-search.results.json`
 - Create: `contracts/m8/fixtures/valid/place-resolution.high-confidence.json`
 - Create: `contracts/m8/fixtures/valid/geocoder-consent.granted.json`
+- Create: `contracts/m8/fixtures/valid/geocoder-consent.not-granted.json`
 - Create: `contracts/m8/fixtures/invalid/place-search.query-too-short.json`
 - Create: `contracts/m8/fixtures/invalid/place-resolution.extra-provider-field.json`
+- Create: `contracts/m8/fixtures/invalid/geocoder-consent.wrong-source.json`
+- Create: `contracts/m8/fixtures/invalid/geocoder-consent.wrong-allowed-use.json`
+- Create: `contracts/m8/fixtures/invalid/geocoder-consent.unknown-policy.json`
+- Create: `contracts/m8/fixtures/invalid/geocoder-consent.extra-field.json`
 - Create: `contracts/m8/SCHEMA_MANIFEST.json`
 - Modify: `contracts/validate_schemas.py`
 - Create: `packages/shared/src/m8-place-types.ts`
@@ -326,12 +362,34 @@ export interface PlaceResolutionResponse {
   }>;
 }
 
+export const GEOCODER_CONSENT_POLICY_VERSION =
+  "google-places-geocoding-v4-2026-08-26" as const;
+
+export const GEOCODER_CONSENT_DISCLOSURE_TEXT =
+  "Google birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Google Places Autocomplete. After you choose a suggestion, Pattern/Like sends only Google's opaque Place ID to Google Geocoding. Pattern/Like does not send your birth date or time, coordinates or device location, Pattern/Like user, account, birth-profile, or consent identifiers, or the app-owned search session token. Google receives these requests, Pattern/Like's project credential, and network metadata such as the Worker IP. Google acts as an independent controller and may retain and use information it receives, including search terms and IP addresses, to provide and improve Google products and services; the reviewed terms do not promise to exclude model training. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected formatted address, coordinates, confidence, and qualifiers under your account key and deletes that data with your Pattern/Like account, but account deletion does not delete Google's separately controlled records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually." as const;
+
 export interface GeocoderConsentResponse {
+  schema_version: "0.8.0";
   kind: "product_source";
+  source_id: "AST-02";
+  permission_tier: 0;
+  allowed_uses: ["chart_fact", "timezone_resolution"];
   provider: "google_places_geocoding_v4";
+  scopes: [];
+  connector_account_id: null;
   status: "granted" | "not_granted";
-  policy_version: "google-places-geocoding-v4-2026-08-26";
+  policy_version: typeof GEOCODER_CONSENT_POLICY_VERSION;
   granted_at: string | null;
+  ui_surface: "onboarding" | "privacy_center" | null;
+  disclosure: {
+    text: typeof GEOCODER_CONSENT_DISCLOSURE_TEXT;
+    links: {
+      patternlike_terms: "/terms.html";
+      patternlike_privacy: "/privacy.html";
+      google_maps_terms: "https://maps.google.com/help/terms_maps/";
+      google_privacy: "https://policies.google.com/privacy";
+    };
+  };
 }
 ```
 
@@ -339,10 +397,13 @@ export interface GeocoderConsentResponse {
 /v1/places/resolve` accepts `{ candidate_id, locale?, session_token }`. The
 app-owned request shapes stay provider-neutral. `GET /v1/consents/geocoder`,
 `PUT /v1/consents/geocoder`, and `DELETE /v1/consents/geocoder` expose the
-versioned, revocable provider consent;
-`PUT` accepts only `{ policy_version }` plus `Idempotency-Key`, and `DELETE`
-has an empty body plus `Idempotency-Key`. Document `400`, `401`, `403`, `409`,
-`429`, and `503`.
+versioned, revocable provider consent. `PUT` accepts only
+`{ policy_version: "google-places-geocoding-v4-2026-08-26" }`; an old,
+unknown, or future value is `409 consent_policy_version_stale`. `PUT` and
+`DELETE` require `Idempotency-Key` and the closed
+`X-Consent-UI-Surface: onboarding|privacy_center` header; `DELETE` has an empty
+body. The client never submits disclosure text or links. Document `400`, `401`,
+`403`, `409`, `429`, and `503`.
 
 - [ ] **Step 2: Run contracts and verify RED**
 
@@ -353,6 +414,23 @@ npm run test:contracts
 - [ ] **Step 3: Add closed schemas, fixtures, shared types, and manifest**
 
 M8 records exact predecessor hashes and describes these endpoints as additive.
+`geocoder-consent.schema.json` is closed with `additionalProperties: false` at
+every object level. It pins every literal above with `const`, pins
+`allowed_uses` as a two-item ordered tuple and `scopes` as an empty tuple, and
+uses `oneOf` so `granted` requires an RFC 3339 `granted_at` and non-null
+`ui_surface`, while `not_granted` requires `granted_at: null`. Its disclosure
+text and four links are server-owned `const` values, not free-form strings.
+
+The valid fixtures are exactly `geocoder-consent.granted.json` and
+`geocoder-consent.not-granted.json`. Rejection coverage is exactly:
+
+- `geocoder-consent.wrong-source.json`: `source_id` is not `AST-02`;
+- `geocoder-consent.wrong-allowed-use.json`: the ordered two-use tuple differs;
+- `geocoder-consent.unknown-policy.json`: the policy is not the current
+  server-mapped version; and
+- `geocoder-consent.extra-field.json`: an undeclared response or nested
+  disclosure field is present.
+
 The provider name appears only on the consent response, where the user must
 know which independent controller is authorized. It does not appear on search
 or resolution responses. Provider ids beyond `candidate_id`, score, raw address
@@ -545,15 +623,23 @@ Cover:
   bias, and app/user/birth identifiers;
 - an optional locale only as Autocomplete `languageCode` in the POST body,
   never in a URL;
-- strict field-by-field mapping and no more than eight candidates;
+- strict field-by-field mapping, including `label = formattedAddress`,
+  latitude/longitude from `location`, and no more than eight candidates;
 - locality/postal-town, sublocality, and administrative-region confidence
   fixtures, plus refusal of unknown types or granularity;
 - timeout, non-JSON/upstream errors, no provider-field leakage,
   authentication, invalid bodies, the consent gate, per-user limiting, empty
   results as 200, encrypted resolve storage, and safe logs without query,
   candidate id, outbound URL, or provider payload; and
-- config refusal outside development when
-  `GOOGLE_MAPS_PLATFORM_API_KEY` is missing.
+- exact `AST-02` consent tuple, append-only grant/revoke/resume, idempotent
+  replay/conflict, concurrent latest-row conflict, and refusal of old or
+  unknown policies;
+- rollout `off` returning generic `503 geocoder_unavailable` for grant,
+  search, and resolve without invoking `fetch`, while GET still returns the
+  current server-owned policy/state and DELETE can revoke; and
+- config refusal for an invalid rollout value, or for enabled rollout without
+  `GOOGLE_MAPS_PLATFORM_API_KEY`, while off rollout with no key leaves unrelated
+  routes healthy.
 
 - [ ] **Step 3: Implement the narrow adapter**
 
@@ -606,6 +692,9 @@ Map provider objects field-by-field into the internal interfaces. Derive
 confidence from the most specific accepted value in result `types` or
 `addressComponents[].types`:
 
+- `label = formattedAddress`;
+- `latitude = location.latitude`;
+- `longitude = location.longitude`;
 - `high`: `locality` or `postal_town`;
 - `medium`: `sublocality` or `sublocality_level_*`;
 - `low`: `administrative_area_level_*`.
@@ -615,11 +704,28 @@ Add `region_level_match` for low results and `approximate_match` when
 granularity are refused, not guessed. Do not retain raw types, granularity,
 address components, Place ID, or provider response after narrowing.
 
-Add `GOOGLE_MAPS_PLATFORM_API_KEY: string` to `Env` and the hermetic test
-bindings. `checkSecureConfig` must reject a missing key outside development.
-Provision it with `wrangler secret put GOOGLE_MAPS_PLATFORM_API_KEY --env
-production`; never add a value to committed Wrangler config. Restrict the key
-to Places API (New) and Geocoding API in Google Cloud before production.
+Add `GEOCODER_ROLLOUT: "off" | "enabled"` and
+`GOOGLE_MAPS_PLATFORM_API_KEY?: string` to `Env`. Commit the non-secret var in
+both Wrangler environments:
+
+```toml
+[vars]
+GEOCODER_ROLLOUT = "off"
+
+[env.production.vars]
+GEOCODER_ROLLOUT = "off"
+```
+
+Hermetic route tests override only their binding to `enabled`.
+`checkSecureConfig` rejects any rollout value outside the closed pair and
+requires a non-placeholder `GOOGLE_MAPS_PLATFORM_API_KEY` only when rollout is
+`enabled`. It must not require that secret while off, so the merged routes
+cannot make unrelated API surfaces unavailable.
+
+Provision the secret with `wrangler secret put
+GOOGLE_MAPS_PLATFORM_API_KEY --env production`; never add a value to committed
+Wrangler config. Restrict the key to Places API (New) and Geocoding API in
+Google Cloud before production.
 
 - [ ] **Step 4: Add soft interactive rate limiting**
 
@@ -635,25 +741,38 @@ namespace_id = "17001"
   period = 60
 ```
 
-Use key `${userId}:places`; the API is intentionally a fast, permissive per-location abuse guard, not an accounting ledger. Vendor-side quotas remain the hard spend ceiling.
+Use key `${userId}:places`; the API is intentionally a fast, permissive
+per-location abuse guard, not an accounting ledger. Preserve this combined
+30-request/user/60-second guard independently of project controls.
 Reserve namespace id `17001` for this binding and verify the account has no
 other rate-limit binding using it before the first production deploy.
 
 Keep the client controls pinned at a 300 ms debounce and two Unicode-code-point
-minimum. Configure provider method quotas and billing-budget/quota alerts before
-production. Geocoding v4 defaults to 25 QPS per project; Places quotas are per
-method/project. The published 99.9% SLA is not a request-latency guarantee, so
-retain the 5-second adapter timeout.
+minimum. Before enablement, configure the initial project ceilings exactly:
+
+- Places Autocomplete (New): 120 requests/minute;
+- Geocoding API v4: 30 requests/minute; and
+- monthly Google Maps budget: USD 50, with alert thresholds at 50%, 75%, 90%,
+  and 100%.
+
+These provider quotas are rate ceilings, not spend caps. Billing-budget alerts
+are advisory and do not stop traffic or guarantee a USD 50 maximum. The
+production operator owns verification of both quotas, the budget, all four
+alert thresholds, and alert recipients. Geocoding v4's documented default 25
+QPS is context, not the configured launch ceiling. The published 99.9% SLA is
+not a request-latency guarantee, so retain the 5-second adapter timeout.
 
 - [ ] **Step 5: Implement routes**
 
 Both routes are behind existing consumer authentication/account-state middleware.
+After authentication, check rollout before parsing provider input, looking up
+consent, reserving rate limit, or calling `fetch`. Any state other than
+`enabled` returns generic `503 geocoder_unavailable`.
 
 Search:
 
-1. Strictly parse body.
-2. Require the current granted `product_source` consent for
-   `google_places_geocoding_v4`; otherwise return
+1. Require enabled rollout, then strictly parse the body.
+2. Require the exact active consent defined below; otherwise return
    `403 geocoder_consent_required` before rate-limit reservation or fetch.
 3. Limit by user.
 4. Call provider with abort timeout.
@@ -661,16 +780,65 @@ Search:
 
 Resolve:
 
-1. Strictly parse body and require the same active consent.
+1. Require enabled rollout, strictly parse the body, and require the same exact
+   active consent.
 2. Limit and resolve one candidate.
 3. Mint `plc_`, encrypt/store the normalized result for 24 hours.
 4. Return the app-owned resolution.
 
 Extend the existing consent route/helper with versioned `GET`, `PUT`, and
-`DELETE /v1/consents/geocoder`, backed by `kind = 'product_source'`,
-`provider = 'google_places_geocoding_v4'`, and the frozen consent policy
-version. Grant/revoke use idempotency keys and the existing guarded consent
-mutation pattern. Revocation blocks every later provider call.
+`DELETE /v1/consents/geocoder`. Reuse the existing registry source with this
+exact row shape:
+
+```ts
+{
+  kind: "product_source",
+  source_id: "AST-02",
+  permission_tier: 0,
+  allowed_uses: ["chart_fact", "timezone_resolution"],
+  provider: "google_places_geocoding_v4",
+  scopes: [],
+  connector_account_id: null,
+  policy_version: "google-places-geocoding-v4-2026-08-26",
+  ui_surface: "onboarding" | "privacy_center",
+}
+```
+
+The chain lookup tuple is exactly `(user_id, kind = 'product_source',
+source_id = 'AST-02', provider = 'google_places_geocoding_v4')`, ordered by
+`version DESC, created_at DESC, id DESC`. Do not include policy in the lookup:
+the latest row authorizes a provider call only if it is an unexpired,
+unpaused, unrevoked `granted` row and its policy, permission tier, ordered
+allowed uses, empty scopes, and null connector all exactly match the current
+server constants. Any unknown/old policy or tuple mismatch is no grant.
+
+Grant, revoke, and resume follow the existing append-only consent pattern.
+Initial grant is version 1 with `supersedes_consent_id = null`; each
+later state-changing grant, revoke, or resume inserts `latest.version + 1` and
+points `supersedes_consent_id` at the latest row. A current-policy grant over
+an old-policy latest row is state-changing. Never update or reactivate an old
+row. A repeated exact active grant and repeated non-granted revoke are no-op
+states with no new consent row.
+
+Use durable jobs scoped by `(job_type, user_id, idempotency_key)`. Exact replay
+of operation, current policy, and UI surface returns its stored response;
+different input under the same scoped key is `409 idempotency_conflict`. Commit
+the latest-row assertion, appended consent when needed, and encrypted
+idempotency receipt in one batch; a concurrent loser is
+`409 consent_conflict`.
+
+Read `ui_surface` only from the required, strictly parsed
+`X-Consent-UI-Surface: onboarding|privacy_center` mutation header. The PUT body
+contains only the current `policy_version`; DELETE has no body. The server maps
+that policy to the immutable disclosure text and links frozen in Task 3.
+
+`PUT` requires enabled rollout, accepts only the current policy version, and
+returns generic `503 geocoder_unavailable` while off. `GET` returns the current
+server-owned policy/disclosure and state but does not constitute
+authorization. `DELETE` remains available while off, and revocation blocks
+every later provider call. Create neither a `context_source_permissions` nor a
+`context_signals` row: `AST-02` writes only the encrypted birth normalization
+path.
 
 Safe logs carry only `place_search_completed` with outcome
 (`success|empty|rate_limited|unavailable`) and candidate count. Never interpolate
@@ -694,6 +862,12 @@ npm run typecheck -w @patternlike/api
 git add apps/api/src/services/geocoder apps/api/src/routes/places.ts apps/api/src/routes/places.integration.test.ts apps/api/src/routes/consents.ts apps/api/src/routes/consents.integration.test.ts apps/api/src/db/consents.ts apps/api/src/index.ts apps/api/src/env.ts apps/api/src/middleware/config-guard.ts apps/api/src/middleware/config-guard.test.ts apps/api/src/services/safe-log.ts apps/api/src/services/safe-log.test.ts apps/api/wrangler.toml apps/api/test/hermetic-bindings.ts apps/api/scripts/wrangler-config.test.ts
 git commit -m "api: resolve birthplace candidates"
 ```
+
+- [ ] **Step 8: Land the provider path disabled**
+
+Push/deploy this task only with committed development and production rollout
+still `off`. Do not combine this code commit with production enablement.
+Hermetic tests are the only committed configuration that sets `enabled`.
 
 ---
 
@@ -727,15 +901,21 @@ label/coordinates are edited manually.
 Also prove:
 
 - typing before consent sends no search request;
-- the disclosure names Google as an independent controller, links public Terms,
-  public Privacy, Google's additional terms, and Google's Privacy Policy, and
-  states that Google may retain search terms/network metadata to provide and
-  improve products without a contractual no-model-training promise;
+- the response and UI carry the exact policy-mapped disclosure text and four
+  immutable links frozen below, plus the exact `AST-02` source, tier, ordered
+  uses, provider, policy, scopes, and null connector;
 - consent is unchecked by default, a successful versioned grant precedes the
   first query, and revocation prevents later search/resolve calls;
+- old/unknown policy state cannot authorize calls after a policy change;
+- rollout-off grant/search/resolve shows one unavailable state and sends no
+  provider request, while consent state remains readable and revocation works;
 - declining or revoking leaves all manual fields usable;
 - Google attribution is visible with suggestions and remains beside the
-  selected stored result; and
+  selected stored result, has accessible name exactly `Google Maps`, retains
+  sufficient contrast and visual distinction, and obeys asset clear-space,
+  minimum-size, aspect-ratio, and text `translate="no"` rules;
+- any provider-supplied third-party attribution is displayed with its affected
+  content or that content is refused; and
 - the step-three ledger no longer says that no external provider received
   birthplace search data after the user enabled Google search.
 
@@ -755,14 +935,20 @@ resolvePlace(
 getGeocoderConsent(signal?: AbortSignal): Promise<GeocoderConsentResponse>;
 grantGeocoderConsent(
   policyVersion: string,
+  uiSurface: "onboarding" | "privacy_center",
   idempotencyKey: string,
   signal?: AbortSignal,
 ): Promise<GeocoderConsentResponse>;
 revokeGeocoderConsent(
+  uiSurface: "onboarding" | "privacy_center",
   idempotencyKey: string,
   signal?: AbortSignal,
 ): Promise<GeocoderConsentResponse>;
 ```
+
+The client sends `uiSurface` only as `X-Consent-UI-Surface`; it never sends
+disclosure text or links. PUT sends only `{ policy_version }`, and DELETE sends
+an empty body.
 
 Generate one app-owned session token when onboarding mounts and reuse it for
 the app's search+resolve requests in that form. It preserves the internal
@@ -777,10 +963,19 @@ changes the active option, Enter resolves it, Escape closes, and status/result
 counts use a polite live region. Do not auto-select the first result.
 
 Render the locally bundled, current Google attribution asset with the
-suggestion list and beside the selected result. Preserve the logo's documented
-aspect ratio, clear space, and minimum size; do not hide it behind a tooltip,
-menu, or disclosure expansion. Do not fetch attribution assets from Google in
-the browser.
+suggestion list and beside the selected result. Give the attribution control
+the accessible name exactly `Google Maps`. Preserve sufficient visible
+contrast and the official asset's documented aspect ratio, clear space,
+minimum size, colors, and unaltered form; do not crop, recolor, translate, or
+hide it behind a tooltip, menu, or disclosure expansion. If text attribution
+is used, render the exact text `Google Maps` with `translate="no"`. Do not fetch
+attribution assets from Google in the browser.
+
+Place Google suggestions/results in a visually distinct region from manual or
+other non-Google content and do not imply that Google supplied manual content.
+Render every third-party attribution supplied for the affected Google content.
+If the closed current wire cannot represent required supplied attribution,
+refuse that suggestion/result rather than dropping the attribution.
 
 - [ ] **Step 4: Integrate with onboarding**
 
@@ -799,14 +994,35 @@ clear `placeId` and `placeConfidence` but retain the manual fields. Include
 `place_id` in `BirthProfileRequest`.
 
 Place the external-processing disclosure and consent control directly beside
-the search field. Until the current
-`google-places-geocoding-v4-2026-08-26` grant succeeds, do not call search or
-resolve. The disclosure must state exactly what leaves Pattern/Like (query,
-optional locale, selected Google Place ID, project credential, and network
-metadata), what does not (birth date/time, coordinates/device location,
-app/user/account/birth identifiers, or app session token), Google's
-independent-controller role and improvement-use language, the absence of a
-contractual no-model-training promise, and the manual alternative.
+the search field. Render the server-owned `disclosure.text` verbatim and the
+four server-owned links; do not maintain a client-authored paraphrase. The
+policy text is exactly:
+
+> Google birthplace search is optional. If you enable it, Pattern/Like sends
+> the city or place text you type and your language preference (when available)
+> to Google Places Autocomplete. After you choose a suggestion, Pattern/Like
+> sends only Google's opaque Place ID to Google Geocoding. Pattern/Like does not
+> send your birth date or time, coordinates or device location, Pattern/Like
+> user, account, birth-profile, or consent identifiers, or the app-owned search
+> session token. Google receives these requests, Pattern/Like's project
+> credential, and network metadata such as the Worker IP. Google acts as an
+> independent controller and may retain and use information it receives,
+> including search terms and IP addresses, to provide and improve Google
+> products and services; the reviewed terms do not promise to exclude model
+> training. Pattern/Like does not store your query or unselected suggestions.
+> It encrypts the selected formatted address, coordinates, confidence, and
+> qualifiers under your account key and deletes that data with your
+> Pattern/Like account, but account deletion does not delete Google's separately
+> controlled records. You can decline or withdraw this permission and enter the
+> place, coordinates, and time zone manually.
+
+The immutable links are `/terms.html`, `/privacy.html`,
+`https://maps.google.com/help/terms_maps/`, and
+`https://policies.google.com/privacy`, under the exact response keys in Task 3.
+Until a grant under
+`google-places-geocoding-v4-2026-08-26` passes every active-row check, do not
+call search or resolve. An old or unknown policy is visibly not granted and
+cannot be revived without a new current-policy PUT.
 
 Add a revocation control to Privacy that calls the consent DELETE, aborts any
 in-flight request, clears transient suggestions, and prevents later provider
@@ -832,6 +1048,28 @@ npm run typecheck -w @patternlike/web
 git add apps/web/public/terms.html apps/web/public/privacy.html apps/web/public/google-maps-attribution.png apps/web/src/components/PlaceAutocomplete.tsx apps/web/src/components/PlaceAutocomplete.test.tsx apps/web/src/components/Onboarding.tsx apps/web/src/components/Onboarding.test.tsx apps/web/src/components/PrivacyView.tsx apps/web/src/components/PrivacyView.test.tsx apps/web/src/lib/api-client.ts apps/web/src/styles.css
 git commit -m "web: add birthplace autocomplete"
 ```
+
+- [ ] **Step 6: Enable only through a separate configuration commit**
+
+Keep development and production `GEOCODER_ROLLOUT = "off"` through the Task 5
+provider/routes commit and this Terms/Privacy/disclosure/attribution commit.
+Before a later configuration-only production enablement, the production
+operator must record:
+
+1. passing contract, API, web, type, and Wrangler-config tests;
+2. the billing-account region (`EEA` or `non-EEA`);
+3. the installed secret and API restrictions to Places API (New) plus
+   Geocoding API;
+4. project quotas of 120 Autocomplete requests/minute and 30 Geocoding
+   requests/minute;
+5. a USD 50 monthly budget with alert recipients at 50%, 75%, 90%, and 100%;
+6. deployed public Terms/Privacy, exact policy disclosure, and complete Google
+   and third-party attribution; and
+7. a successful internal canary against a non-reader-serving Worker version or
+   environment with rollout enabled.
+
+Only then make a separate config commit changing production to `enabled` and
+deploy it. Do not bundle enablement with provider or UI code.
 
 ---
 
@@ -947,7 +1185,14 @@ git commit -m "chart: qualify location uncertainty"
 - [ ] User-confirmed values remain unchanged across foreground sync.
 - [ ] Today automatically retries after the initial device sync settles.
 - [x] The geocoder decision proves storage/privacy rights before provider implementation.
-- [ ] Public Terms/Privacy, inline disclosure, versioned revocable consent, and Google attribution satisfy the approved ADR before the first provider call.
+- [ ] Public Terms/Privacy, the exact server-owned disclosure, `AST-02`
+      append-only revocable consent, and complete Google/third-party
+      attribution satisfy the approved ADR before the first provider call.
+- [ ] Provider/routes and legal/UI commits land with rollout off; production
+      enablement is a separate config commit after the recorded operator gates.
+- [ ] Project quotas are 120/min Autocomplete and 30/min Geocoding, the USD 50
+      budget has 50/75/90/100% advisory alerts, and the 30/user/min app guard
+      remains active.
 - [ ] Search/resolve routes are authenticated, bounded, rate-limited, and provider-narrowed.
 - [ ] Unselected queries/results are not persisted or logged.
 - [ ] Selected places are owner-scoped, encrypted, expiring, rotation-covered, and deletion-covered.
