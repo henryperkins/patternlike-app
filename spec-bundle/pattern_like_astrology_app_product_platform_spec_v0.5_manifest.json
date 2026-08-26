@@ -12,16 +12,16 @@
   "renderer": "spec-bundle/render_v0_5.py",
   "files": {
     "pattern_like_astrology_app_product_platform_spec_v0.5.md": {
-      "sha256": "0b255ad5e6da8aeab412c851b946fb7a5271f6eb2b3b6882fb09055bfbc23948",
-      "bytes": 18540
+      "sha256": "f3aaa5081a07e7f47bf02c1b31adbaa916474ecbe673c179416d7fe1824fb368",
+      "bytes": 18638
     },
     "pattern_like_astrology_app_product_platform_spec_v0.5.docx": {
-      "sha256": "6ebf88a3fca0e9339b592cbb3614bc0160ccb6c2b02a02fbcabefe9dbac5c4ee",
-      "bytes": 43142
+      "sha256": "f89f521b938765f67cb2530c53371935bbf4ecc23bda3eff17ef60b194184226",
+      "bytes": 44560
     },
     "pattern_like_astrology_app_product_platform_spec_v0.5.pdf": {
-      "sha256": "0b8a805626575f42651a32b7b70c784580a39502cc828ee914977b9e556bce9a",
-      "bytes": 19623
+      "sha256": "4e56a7ec160c575fbccdb8232c71dc54d44e0982427045467738af77272fd76e",
+      "bytes": 19868
     }
   },
   "carried_forward_unchanged": {

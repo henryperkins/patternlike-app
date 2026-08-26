@@ -165,7 +165,7 @@ A deployment is acceptable when all of the following hold:
 ## 16. Open decisions
 
 1. **Removal of the editorial control plane.** The content-release infrastructure is retained but inert for new readings. Whether to retire it, and on what retention terms, is undecided.
-2. **M4 context sources.** The publisher consumes every eligible source present when it runs. Journals, check-ins, and connectors remain unimplemented, and the privacy surface exposes only categories that genuinely exist. No provider-specific ingestion path will be added for them.
+2. **M4 context sources.** The publisher consumes every eligible source present when it runs. Daily check-ins are implemented as USR-06, and USR-09 life events are available to Time Travel only. Journals and external connectors remain unimplemented, and the privacy surface exposes only categories that genuinely exist. No provider-specific ingestion path will be added for them.
 3. **Provider routing.** Direct provider calls keep the initial data path small. A gateway may be evaluated later without changing the provider-neutral adapter boundary.
 4. **Reading language.** The deterministic validator's rules — the body, sign,
    aspect, phase, and house vocabularies, the month names, the safety and
