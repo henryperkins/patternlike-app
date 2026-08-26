@@ -341,4 +341,59 @@ describe("safe logging", () => {
     }
     expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
   });
+
+  it("projects only closed birth calculation outcome metadata", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const hostile = {
+      event: "birth_calc_completed",
+      outcome: "timeout",
+      latency_ms: 10_001,
+      timeout_ms: 10_000,
+      user_id: SENTINEL,
+      job_id: SENTINEL,
+      birth_date: SENTINEL,
+      upstream_message: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(info).toHaveBeenCalledOnce();
+    expect(info.mock.calls[0]![0]).toBe("birth_calc_completed");
+    const payload = info.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      outcome: "timeout",
+      latency_ms: 10_001,
+      timeout_ms: 10_000,
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+    });
+    expect(Object.keys(payload).sort()).toEqual([
+      "latency_ms",
+      "outcome",
+      "timeout_ms",
+      "trace_id",
+    ]);
+    expect(JSON.stringify(info.mock.calls)).not.toContain(SENTINEL);
+  });
+
+  it("projects only the closed birth calculation budget limit", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const hostile = {
+      event: "birth_calc_budget_exhausted",
+      daily_limit: 5,
+      user_id: SENTINEL,
+      idempotency_key: SENTINEL,
+    } as unknown as SafeLogEvent;
+
+    safeLog(hostile);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]![0]).toBe("birth_calc_budget_exhausted");
+    const payload = warn.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      daily_limit: 5,
+      trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+    });
+    expect(Object.keys(payload).sort()).toEqual(["daily_limit", "trace_id"]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
 });
