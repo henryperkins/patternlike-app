@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -48,6 +49,45 @@ class RenderReproducibilityTest(unittest.TestCase):
                     )
 
         self.assertEqual(renders[0], renders[1])
+
+    def test_committed_artifacts_match_current_source(self) -> None:
+        committed = {
+            "docx": renderer.DOCX,
+            "pdf": renderer.PDF,
+            "manifest": renderer.MANIFEST,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            rendered = {
+                name: os.path.join(directory, os.path.basename(path))
+                for name, path in committed.items()
+            }
+            with (
+                mock.patch.object(renderer, "DOCX", rendered["docx"]),
+                mock.patch.object(renderer, "PDF", rendered["pdf"]),
+                mock.patch.object(renderer, "MANIFEST", rendered["manifest"]),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(renderer.main(), 0)
+
+            for name, committed_path in committed.items():
+                self.assertEqual(sha256_file(rendered[name]), sha256_file(committed_path))
+
+    def test_manifest_records_pinned_renderer_inputs(self) -> None:
+        with io.open(renderer.MANIFEST, encoding="utf-8") as handle:
+            manifest = json.load(handle)
+
+        build_inputs = manifest["build_inputs"]
+        expected = {
+            "render_v0_5.py": os.path.join(renderer.HERE, "render_v0_5.py"),
+            "render_v0_5.requirements.txt": os.path.join(
+                renderer.HERE,
+                "render_v0_5.requirements.txt",
+            ),
+        }
+        self.assertEqual(set(build_inputs), set(expected))
+        for filename, path in expected.items():
+            self.assertEqual(build_inputs[filename]["sha256"], sha256_file(path))
+            self.assertEqual(build_inputs[filename]["bytes"], os.path.getsize(path))
 
 
 if __name__ == "__main__":
