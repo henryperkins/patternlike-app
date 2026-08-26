@@ -4,6 +4,9 @@ import { exportObjectKey } from "./export-envelope.js";
 
 const DEFAULT_BATCH_LIMIT = 50;
 const MAX_BATCH_LIMIT = 100;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export const DEVICE_PREFERENCE_JOB_RETENTION_DAYS = 35;
 
 type DispatchMessage = (
   env: Env,
@@ -22,6 +25,7 @@ export interface PrivacyMaintenanceSummary {
   failedExportArtifactsCleaned: number;
   deletionArtifactsCleaned: number;
   deletionReceiptsExpired: number;
+  devicePreferenceJobsPruned: number;
   privacyJobsDispatched: number;
 }
 
@@ -179,6 +183,31 @@ async function expireDeletionReceipts(
      )`,
   )
     .bind(nowIso, limit)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+async function pruneDevicePreferenceJobs(
+  env: Env,
+  now: Date,
+  limit: number,
+): Promise<number> {
+  const cutoff = new Date(
+    now.getTime() - DEVICE_PREFERENCE_JOB_RETENTION_DAYS * DAY_MS,
+  ).toISOString();
+  const result = await env.DB.prepare(
+    `DELETE FROM jobs
+     WHERE id IN (
+       SELECT id FROM jobs
+       WHERE status = 'succeeded'
+         AND job_type IN ('preference_timezone', 'preference_locale')
+         AND idempotency_key LIKE 'web-device-%'
+         AND finished_at IS NOT NULL AND finished_at <= ?
+       ORDER BY finished_at, id
+       LIMIT ?
+     )`,
+  )
+    .bind(cutoff, limit)
     .run();
   return result.meta.changes ?? 0;
 }
@@ -366,6 +395,11 @@ export async function runPrivacyMaintenance(
     nowIso,
     limit,
   );
+  const devicePreferenceJobsPruned = await pruneDevicePreferenceJobs(
+    env,
+    now,
+    limit,
+  );
   const privacyJobsDispatched = await recoverPrivacyJobs(
     env,
     nowIso,
@@ -380,6 +414,7 @@ export async function runPrivacyMaintenance(
     failedExportArtifactsCleaned,
     deletionArtifactsCleaned,
     deletionReceiptsExpired,
+    devicePreferenceJobsPruned,
     privacyJobsDispatched,
   };
 }

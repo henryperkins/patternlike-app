@@ -13,6 +13,11 @@ export type DevicePreferenceSyncResult =
 
 type PreferenceKind = "timezone" | "locale";
 
+interface AttemptKey {
+  identity: string;
+  key: string;
+}
+
 function isLocked(error: unknown): boolean {
   return error instanceof ApiError && error.code === "preference_locked";
 }
@@ -54,14 +59,20 @@ export class DevicePreferenceSynchronizer {
     return operation;
   }
 
-  private keyFor(kind: PreferenceKind, value: string): string {
+  private keyFor(kind: PreferenceKind, value: string): AttemptKey {
     const identity = `${kind}:${value}`;
     const existing = this.idempotencyKeys.get(identity);
-    if (existing) return existing;
+    if (existing) return { identity, key: existing };
 
     const key = newIdempotencyKey(`web-device-${kind}`);
     this.idempotencyKeys.set(identity, key);
-    return key;
+    return { identity, key };
+  }
+
+  private retire(attempt: AttemptKey): void {
+    if (this.idempotencyKeys.get(attempt.identity) === attempt.key) {
+      this.idempotencyKeys.delete(attempt.identity);
+    }
   }
 
   private async performSync(
@@ -78,22 +89,29 @@ export class DevicePreferenceSynchronizer {
       return { status: "unavailable" };
     }
 
-    const timezoneKey = this.keyFor("timezone", timezone);
-    const localeKey = this.keyFor("locale", locale);
+    const timezoneAttempt = this.keyFor("timezone", timezone);
+    const localeAttempt = this.keyFor("locale", locale);
     const outcomes = await Promise.allSettled([
       writeWithConflictRetry(() =>
-        setSchedulingTimezone(timezone, "device_derived", timezoneKey)
+        setSchedulingTimezone(timezone, "device_derived", timezoneAttempt.key)
       ),
       writeWithConflictRetry(() =>
-        setContentLocale(locale, "device_derived", localeKey)
+        setContentLocale(locale, "device_derived", localeAttempt.key)
       ),
     ]);
     const failures = outcomes.flatMap((outcome) =>
       outcome.status === "rejected" ? [outcome.reason as unknown] : []
     );
 
-    if (failures.some(isUnauthorized)) return { status: "unauthorized" };
-    if (failures.every(isLocked)) return { status: "settled" };
+    if (failures.some(isUnauthorized)) {
+      this.idempotencyKeys.clear();
+      return { status: "unauthorized" };
+    }
+    if (failures.every(isLocked)) {
+      this.retire(timezoneAttempt);
+      this.retire(localeAttempt);
+      return { status: "settled" };
+    }
     return { status: "unavailable" };
   }
 }
