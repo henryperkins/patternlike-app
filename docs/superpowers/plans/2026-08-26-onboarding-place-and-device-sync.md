@@ -13,13 +13,15 @@
 - Preserve existing M3 preference routes and server lock semantics.
 - Sync only after the Worker session is known to be valid.
 - A `user_confirmed` preference always outranks `device_derived`; `409 preference_locked` is a successful no-op for foreground sync.
-- Reuse one idempotency key per `(preference kind, normalized value)` only
-  while that attempt is in flight or its outcome is unconfirmed. Conflict
-  retries and later retries after an unavailable result keep the same key and
-  body. A fully settled attempt retires its keys, so the next foreground
+- Keep at most one pending device-preference attempt containing both normalized
+  values and both idempotency keys. Conflict retries and later retries with the
+  same normalized values after an unavailable result keep the exact keys and
+  bodies. Changed normalized values supersede the stale unconfirmed intent and
+  mint a fresh pair; the mounted synchronizer never returns to a superseded
+  pair. A fully settled attempt retires its pair, so the next foreground
   attempt mints fresh keys even when the device values are unchanged; an
-  unauthorized result clears pending keys before another account or session
-  can use them.
+  unauthorized result clears the current pending attempt before another
+  account or session can use it.
 - Retain succeeded automatic `web-device-*` preference jobs for 35 days, then
   prune them through bounded privacy maintenance. Never prune manual
   idempotency records through that lane.
@@ -38,7 +40,7 @@
 
 ## File Map
 
-- `apps/web/src/lib/device-preference-sync.ts`: one in-flight foreground sync with attempt-scoped keys.
+- `apps/web/src/lib/device-preference-sync.ts`: one in-flight foreground sync with one supersedable pending attempt.
 - `apps/api/src/services/privacy-maintenance.ts`: bounded retention for settled automatic preference jobs.
 - `apps/api/src/services/geocoder/*`: narrow provider boundary and confidence policy.
 - `apps/api/src/routes/places.ts`: authenticated search/resolve routes.
@@ -78,6 +80,8 @@ Cover:
 - An unavailable attempt retries with the same keys and bodies.
 - Changed values receive new keys.
 - `A -> B -> A` after settled attempts gives the second A a fresh key.
+- Partial/unavailable A followed by settled B supersedes A, so returning to A
+  also mints a fresh pair instead of replaying the abandoned intent.
 - Concurrent triggers share one in-flight promise.
 - `preference_locked` is classified as settled, not failed.
 - `401` remains distinguishable so `App` can sign out.
@@ -107,20 +111,26 @@ export class DevicePreferenceSynchronizer {
 }
 ```
 
-The instance owns:
+The instance owns one pending pair:
 
 ```ts
-private readonly idempotencyKeys = new Map<string, string>();
+private pending: {
+  timezone: string;
+  locale: string;
+  timezoneKey: string;
+  localeKey: string;
+} | null = null;
 private inFlight: Promise<DevicePreferenceSyncResult> | null = null;
 ```
 
 Canonicalize locale with `Intl.getCanonicalLocales` and use the existing device fallbacks. Call both PUTs with `Promise.allSettled`; no single preference failure suppresses the other.
 
-The map holds only unconfirmed attempt state. Retain both exact attempt keys
-after `unavailable`, including when one of the two writes succeeded. Clear only
-the exact current attempt keys after `settled`, and clear all pending keys after
-`unauthorized` so a later account/session cannot inherit them. Conflict retries
-reuse the current attempt's key and body.
+If sampled values match `pending`, reuse its exact keys and bodies. If either
+normalized value differs, replace `pending` with a newly keyed pair before
+writing; this supersedes the stale intent, which must never be reused by that
+mounted synchronizer. Retain the current pair after `unavailable`, including
+when one write succeeded. Clear that exact pair after `settled` or
+`unauthorized`. Conflict retries reuse the current pair's key and body.
 
 - [ ] **Step 4: Trigger from `App` and re-arm Today**
 

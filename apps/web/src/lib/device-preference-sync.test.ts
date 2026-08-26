@@ -126,16 +126,61 @@ describe("DevicePreferenceSynchronizer", () => {
     responses[TIMEZONE] = ok;
     await expect(synchronizer.sync()).resolves.toEqual({ status: "settled" });
 
-    const timezoneKeys = capturedFor(TIMEZONE).map((request) =>
+    const timezoneWrites = capturedFor(TIMEZONE);
+    const localeWrites = capturedFor(LOCALE);
+    const timezoneKeys = timezoneWrites.map((request) =>
       request.headers.get("idempotency-key")
     );
-    const localeKeys = capturedFor(LOCALE).map((request) =>
+    const localeKeys = localeWrites.map((request) =>
       request.headers.get("idempotency-key")
     );
     expect(timezoneKeys).toHaveLength(2);
     expect(localeKeys).toHaveLength(2);
     expect(timezoneKeys[0]).toBe(timezoneKeys[1]);
     expect(localeKeys[0]).toBe(localeKeys[1]);
+    expect(timezoneWrites[0]?.body).toEqual(timezoneWrites[1]?.body);
+    expect(localeWrites[0]?.body).toEqual(localeWrites[1]?.body);
+  });
+
+  it("supersedes unavailable A when B settles before returning to A", async () => {
+    const responses: Record<string, MockResponse> = {
+      [TIMEZONE]: { status: 0, body: null, unreachable: true },
+      [LOCALE]: ok,
+    };
+    mockApiResponses(responses);
+    const synchronizer = new DevicePreferenceSynchronizer();
+
+    await expect(synchronizer.sync()).resolves.toEqual({
+      status: "unavailable",
+    });
+
+    device.timezone.mockReturnValue("Asia/Tokyo");
+    device.locale.mockReturnValue("fr-fr");
+    responses[TIMEZONE] = ok;
+    await expect(synchronizer.sync()).resolves.toEqual({ status: "settled" });
+
+    device.timezone.mockReturnValue("America/Chicago");
+    device.locale.mockReturnValue("en-US");
+    await expect(synchronizer.sync()).resolves.toEqual({ status: "settled" });
+
+    const timezoneWrites = capturedFor(TIMEZONE);
+    const localeWrites = capturedFor(LOCALE);
+    expect(timezoneWrites.map((request) => request.body)).toEqual([
+      { timezone: "America/Chicago", source: "device_derived" },
+      { timezone: "Asia/Tokyo", source: "device_derived" },
+      { timezone: "America/Chicago", source: "device_derived" },
+    ]);
+    expect(localeWrites.map((request) => request.body)).toEqual([
+      { locale: "en-US", source: "device_derived" },
+      { locale: "fr-FR", source: "device_derived" },
+      { locale: "en-US", source: "device_derived" },
+    ]);
+    expect(timezoneWrites[0]?.headers.get("idempotency-key")).not.toBe(
+      timezoneWrites[2]?.headers.get("idempotency-key"),
+    );
+    expect(localeWrites[0]?.headers.get("idempotency-key")).not.toBe(
+      localeWrites[2]?.headers.get("idempotency-key"),
+    );
   });
 
   it("clears all pending keys after an unauthorized result", async () => {

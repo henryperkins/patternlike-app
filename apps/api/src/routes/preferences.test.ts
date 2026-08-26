@@ -202,25 +202,18 @@ describe("PUT /v1/preferences/timezone", () => {
       undefined,
       "web-device-timezone-a1",
     );
-    await setZone(
+    const b = await setZone(
       "Asia/Tokyo",
       "device_derived",
       undefined,
       "web-device-timezone-b1",
     );
-    const secondA = await setZone(
-      "America/Chicago",
-      "device_derived",
-      undefined,
-      "web-device-timezone-a2",
-    );
 
     expect(firstA.status).toBe(200);
-    expect(secondA.status).toBe(200);
-    expect(secondA.body).toMatchObject({
-      timezone: "America/Chicago",
+    expect(b.body).toMatchObject({
+      timezone: "Asia/Tokyo",
       source: "device_derived",
-      timezone_revision: 3,
+      timezone_revision: 2,
     });
 
     const replay = await setZone(
@@ -230,6 +223,37 @@ describe("PUT /v1/preferences/timezone", () => {
       "web-device-timezone-a1",
     );
     expect(replay).toEqual(firstA);
+    expect(await userRow()).toMatchObject({
+      timezone: "Asia/Tokyo",
+      timezone_source: "device_derived",
+      timezone_revision: 2,
+    });
+    expect(
+      await rows(
+        `SELECT id FROM jobs
+         WHERE user_id = ? AND job_type = 'preference_timezone'`,
+        USER_A,
+      ),
+    ).toHaveLength(2);
+    expect(
+      await rows(
+        "SELECT id FROM timezone_changes WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toHaveLength(2);
+
+    const secondA = await setZone(
+      "America/Chicago",
+      "device_derived",
+      undefined,
+      "web-device-timezone-a2",
+    );
+    expect(secondA.status).toBe(200);
+    expect(secondA.body).toMatchObject({
+      timezone: "America/Chicago",
+      source: "device_derived",
+      timezone_revision: 3,
+    });
     expect(await userRow()).toMatchObject({
       timezone: "America/Chicago",
       timezone_source: "device_derived",
