@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import io
 import json
 import os
@@ -13,9 +12,8 @@ from unittest import mock
 import render_v0_5 as renderer
 
 
-def sha256_file(path: str) -> str:
-    with io.open(path, "rb") as handle:
-        return hashlib.sha256(handle.read()).hexdigest()
+def artifact_sha256(path: str) -> str:
+    return renderer.digest(path)[0]
 
 
 class RenderReproducibilityTest(unittest.TestCase):
@@ -43,7 +41,7 @@ class RenderReproducibilityTest(unittest.TestCase):
                         self.assertEqual(renderer.main(), 0)
                     renders.append(
                         {
-                            name: sha256_file(path)
+                            name: artifact_sha256(path)
                             for name, path in artifact_paths.items()
                         }
                     )
@@ -72,7 +70,10 @@ class RenderReproducibilityTest(unittest.TestCase):
                 self.assertEqual(renderer.main(), 0)
 
             for name, committed_path in committed.items():
-                self.assertEqual(sha256_file(rendered[name]), sha256_file(committed_path))
+                self.assertEqual(
+                    artifact_sha256(rendered[name]),
+                    artifact_sha256(committed_path),
+                )
 
     def test_manifest_records_pinned_renderer_inputs(self) -> None:
         with io.open(renderer.MANIFEST, encoding="utf-8") as handle:
@@ -112,7 +113,7 @@ class RenderReproducibilityTest(unittest.TestCase):
                 handle.write(b'{\n  "value": true\n}\n')
             with io.open(crlf_path, "wb") as handle:
                 handle.write(b'{\r\n  "value": true\r\n}\r\n')
-            self.assertEqual(sha256_file(lf_path), sha256_file(crlf_path))
+            self.assertEqual(artifact_sha256(lf_path), artifact_sha256(crlf_path))
 
 
 if __name__ == "__main__":
