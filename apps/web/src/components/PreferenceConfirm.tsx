@@ -33,7 +33,7 @@ const COPY = {
     eyebrow: "Today / Language",
     title: "Which wording should you be shown?",
     body:
-      "Readings are assembled from reviewed copy, and that copy is written per language. Choosing one tells us which reviewed wording to draw from — if your exact language has not been published, the closest published one is used.",
+      "Your confirmed language becomes part of the reading request. The current publisher validates English only; if it cannot validate your language, the reading stays unavailable instead of substituting wording from another locale.",
     label: "Content language",
     help: "Detected from this browser. A BCP 47 tag, such as en-US or es-ES.",
     action: "Confirm language",
