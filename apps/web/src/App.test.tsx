@@ -867,6 +867,90 @@ describe("web application shell", () => {
     await waitFor(() => expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(2));
   });
 
+  it.each([
+    {
+      label: "an unreachable",
+      response: { status: 0, body: null, unreachable: true },
+    },
+    {
+      label: "a 503",
+      response: {
+        status: 503,
+        body: {
+          error: {
+            code: "configuration_error",
+            message: "The API is unavailable",
+            request_id: "req_chart_unavailable",
+          },
+        },
+      },
+    },
+  ] satisfies Array<{ label: string; response: MockResponse }>)(
+    "does not sync device preferences after $label chart probe",
+    async ({ response }) => {
+      mockApiResponses({
+        "/v1/chart": response,
+      });
+
+      render(<App />);
+
+      expect(
+        await screen.findByRole("heading", {
+          name: /calculation record is out of reach/i,
+        }),
+      ).toBeInTheDocument();
+      expect(preferenceSyncHarness.sync).not.toHaveBeenCalled();
+    },
+  );
+
+  it("retries Today after a settled device preference sync", async () => {
+    window.location.hash = "today";
+    let settleSync!: (result: { status: "settled" }) => void;
+    const pendingSync = new Promise<{ status: "settled" }>((resolve) => {
+      settleSync = resolve;
+    });
+    preferenceSyncHarness.sync.mockReturnValue(pendingSync);
+    const responses: Record<string, MockResponse> = {
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/readings/today": {
+        status: 409,
+        body: {
+          error: {
+            code: "timezone_confirmation_required",
+            message: "Confirm your scheduling time zone",
+            request_id: "req_today_preference",
+          },
+        },
+      },
+      [`GET /v1/readings/${READING_ID}/feedback`]: {
+        status: 404,
+        body: {
+          error: {
+            code: "feedback_not_found",
+            message: "No feedback recorded for this reading",
+          },
+        },
+      },
+    };
+    mockApiResponses(responses);
+
+    render(<App />);
+
+    await screen.findByLabelText("Scheduling time zone");
+    expect(capturedFor("/v1/readings/today")).toHaveLength(1);
+    responses["/v1/readings/today"] = { status: 200, body: todayResponse };
+
+    await act(async () => {
+      settleSync({ status: "settled" });
+      await pendingSync;
+    });
+
+    expect(
+      await screen.findByText(todayResponse.reading.paragraphs[0]!.text),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/readings/today")).toHaveLength(2);
+  });
+
   it("shows the signed-out surface when device preference sync finds no session", async () => {
     preferenceSyncHarness.sync.mockResolvedValue({ status: "unauthorized" });
     mockApiResponses({
