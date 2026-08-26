@@ -89,8 +89,20 @@ class RenderReproducibilityTest(unittest.TestCase):
         }
         self.assertEqual(set(build_inputs), set(expected))
         for filename, path in expected.items():
-            self.assertEqual(build_inputs[filename]["sha256"], sha256_file(path))
-            self.assertEqual(build_inputs[filename]["bytes"], os.path.getsize(path))
+            expected_sha, expected_bytes = renderer.digest(path)
+            self.assertEqual(build_inputs[filename]["sha256"], expected_sha)
+            self.assertEqual(build_inputs[filename]["bytes"], expected_bytes)
+
+    def test_text_build_input_hashes_ignore_line_endings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            for suffix in (".md", ".json", ".py", ".txt"):
+                lf_path = os.path.join(directory, f"lf{suffix}")
+                crlf_path = os.path.join(directory, f"crlf{suffix}")
+                with io.open(lf_path, "wb") as handle:
+                    handle.write(b"first\nsecond\n")
+                with io.open(crlf_path, "wb") as handle:
+                    handle.write(b"first\r\nsecond\r\n")
+                self.assertEqual(renderer.digest(lf_path), renderer.digest(crlf_path))
 
 
 if __name__ == "__main__":
