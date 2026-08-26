@@ -2,7 +2,8 @@
 
 Checked in beside the artifacts it produces, so a later version can be
 regenerated rather than reverse-engineered. The Markdown is the source; both
-derived files are byte-reproducible from it, and the manifest records all three.
+derived files are byte-reproducible from it and the pinned renderer environment.
+The manifest records the source, outputs, and build inputs.
 
 Deliberately narrow: this reads the subset of Markdown the specification
 actually uses — setext-free ATX headings, paragraphs, `-` bullets, `1.` ordered
@@ -10,7 +11,7 @@ items, pipe tables, blockquotes, and inline `code`/`**bold**` — and nothing
 else. A general Markdown engine would be a larger dependency and a larger
 surface for the two renderings to disagree about.
 
-    pip install python-docx reportlab
+    pip install -r spec-bundle/render_v0_5.requirements.txt
     python spec-bundle/render_v0_5.py
 """
 
@@ -51,6 +52,8 @@ SOURCE = os.path.join(HERE, f"{STEM}.md")
 DOCX = os.path.join(HERE, f"{STEM}.docx")
 PDF = os.path.join(HERE, f"{STEM}.pdf")
 MANIFEST = os.path.join(HERE, f"{STEM}_manifest.json")
+RENDERER = os.path.abspath(__file__)
+REQUIREMENTS = os.path.join(HERE, "render_v0_5.requirements.txt")
 
 INK = RGBColor(0x17, 0x31, 0x2A)
 INK_HEX = colors.HexColor("#17312a")
@@ -408,6 +411,10 @@ def write_manifest() -> None:
     for path in (SOURCE, DOCX, PDF):
         sha, size = digest(path)
         files[os.path.basename(path)] = {"sha256": sha, "bytes": size}
+    build_inputs = {}
+    for path in (RENDERER, REQUIREMENTS):
+        sha, size = digest(path)
+        build_inputs[os.path.basename(path)] = {"sha256": sha, "bytes": size}
 
     manifest = {
         "//": [
@@ -421,6 +428,7 @@ def write_manifest() -> None:
         "supersedes_scope": "sections 3, 7 daily reading generation, 10, 11, 12, 14, 15, 16",
         "source": os.path.basename(SOURCE),
         "renderer": "spec-bundle/render_v0_5.py",
+        "build_inputs": build_inputs,
         "files": files,
         "carried_forward_unchanged": {
             "pattern_like_astrology_app_product_platform_spec_v0.2.md": "sections this version does not restate remain in force as published",

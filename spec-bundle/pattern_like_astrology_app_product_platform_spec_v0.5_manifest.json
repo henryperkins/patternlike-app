@@ -10,6 +10,16 @@
   "supersedes_scope": "sections 3, 7 daily reading generation, 10, 11, 12, 14, 15, 16",
   "source": "pattern_like_astrology_app_product_platform_spec_v0.5.md",
   "renderer": "spec-bundle/render_v0_5.py",
+  "build_inputs": {
+    "render_v0_5.py": {
+      "sha256": "141a9ef838b5904372bb6c6702d7faa0d0bba74ecc764520573dd08c7936e548",
+      "bytes": 16902
+    },
+    "render_v0_5.requirements.txt": {
+      "sha256": "1712ee234af9ec16d2ac9e6ddf819bba4ebd43dd33ede33c3b7ad875f67d0885",
+      "bytes": 63
+    }
+  },
   "files": {
     "pattern_like_astrology_app_product_platform_spec_v0.5.md": {
       "sha256": "f3aaa5081a07e7f47bf02c1b31adbaa916474ecbe673c179416d7fe1824fb368",
