@@ -405,7 +405,7 @@ PATTERN_ONTOLOGY_KEYS = '{"ontology-machine-2026-08":{"alg":"Ed25519","public_ke
 # 2026-08-22 for the 60-fragment Gate 7B candidate. This does not admit consumer
 # Pattern generation; PATTERN_AI_ROLLOUT remains the independent product switch.
 # The artifact keyring remains a Worker secret declared above, never a var.
-ONTOLOGY_PIPELINE_ROLLOUT = "internal"
+ONTOLOGY_PIPELINE_ROLLOUT = "off"
 ONTOLOGY_PIPELINE_PUBLISHER = "codex"
 ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1"
 OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol"

@@ -120,6 +120,48 @@ function validateResponse(
  * independent evaluation. Regression fields are signed bytes but deliberately
  * are not an admission input.
  */
+/**
+ * Sign an authored `synthetic_internal` release.
+ *
+ * Deliberately a sibling of `signOntologyCandidate` rather than a relaxation of
+ * it. That function refuses anything that is not `machine_pipeline`, not
+ * `candidate`, and not already carrying an evaluation report hash, and those
+ * refusals are the machine path's contract -- widening them so one function
+ * could serve both origins is how a synthetic release would eventually be
+ * signed as a machine one.
+ *
+ * What both share is the part that matters: the payload is canonical, the
+ * bundle hash is recomputed here rather than trusted, and the isolated signer
+ * is the only holder of the key. What this one drops is the evidence chain,
+ * because the synthetic path has no pipeline run, no evaluation report, and no
+ * regression report to bind to. `ontologyOriginOf` keeps the result contained
+ * to `PATTERN_INTERNAL_ACCOUNT_IDS` at reservation.
+ */
+export async function signInternalOntology(
+  signer: OntologySignerBinding,
+  release: PatternOntologyRelease,
+  keyId: string,
+): Promise<OntologyBundleSignature> {
+  if (!KEY_ID.test(keyId)) fail("ontology_signing_key_invalid");
+  if (release.provenance?.origin !== "synthetic_internal") {
+    fail("ontology_origin_not_synthetic_internal");
+  }
+  const compiled = compileOntologyRelease(release);
+  if (!compiled.ok || release.evaluation.compiler_passed !== true) {
+    fail("ontology_compiler_failed");
+  }
+  const computedHash = await computeOntologyBundleHash(release);
+  if (!hashesEqual(computedHash, release.bundle_hash)) {
+    fail("ontology_bundle_hash_mismatch");
+  }
+  const request: OntologySigningRequest = {
+    payload: ontologySigningPayload(release),
+    payload_hash: computedHash,
+    key_id: keyId,
+  };
+  return validateResponse(await signer.signOntology(request), keyId, computedHash);
+}
+
 export async function signOntologyCandidate(
   signer: OntologySignerBinding,
   release: PatternOntologyRelease,

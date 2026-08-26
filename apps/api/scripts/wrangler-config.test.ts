@@ -42,7 +42,7 @@ test("Worker source and configuration contain no private ChatGPT transport", asy
   }
 });
 
-test("production enables the internal Codex ontology canary and keeps Pattern off", () => {
+test("production keeps the machine ontology pipeline and Pattern off", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
@@ -56,7 +56,11 @@ test("production enables the internal Codex ontology canary and keeps Pattern of
   assert.deepEqual(production.triggers.crons, [
     "7,22,37,52 * * * *",
   ]);
-  assert.equal(production.vars.ONTOLOGY_PIPELINE_ROLLOUT, "internal");
+  // The machine pipeline is parked. Its regression stage rehearsed thirty
+  // Pattern generations per candidate -- about four hours and 130 provider
+  // calls -- and never once passed in sixteen attempts. Ontologies come from
+  // the signed internal path instead.
+  assert.equal(production.vars.ONTOLOGY_PIPELINE_ROLLOUT, "off");
   assert.equal(production.vars.ONTOLOGY_PIPELINE_PUBLISHER, "codex");
   assert.equal(production.vars.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS, "900000");
   assert.equal(production.vars.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS, "900000");
