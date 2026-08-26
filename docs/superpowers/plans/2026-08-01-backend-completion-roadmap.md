@@ -252,7 +252,13 @@ hard to violate — take a `detail_class` enum, not a free-form string.
 
 ## Stream 7 — Birthplace resolution (product quality, independent)
 
-**Status: the timezone half is done; the place-search half is not.**
+**Status: the timezone half is done; the provider decision is approved; place
+search and selected-place resolution are not implemented.**
+
+The approved decision is the composite Google Places Autocomplete (New) plus
+Geocoding API v4 adapter in
+[`2026-08-26-geocoder-provider.md`](../../decisions/2026-08-26-geocoder-provider.md).
+Its durable provider id is `google_places_geocoding_v4`.
 
 **Why lower:** the UI is honest about this today ("Historical timezone lookup
 is not connected yet. Confirm this value before continuing"), and asking for
@@ -265,13 +271,15 @@ What is missing is deciding *which* zone: `timezone_hint` is passed through as
 authoritative (`routes/birth.ts:235, 270`), and the web client defaults it to
 the browser's *current* zone — which is wrong for anyone who has moved.
 
-**Tasks:** a place search returning `{label, lat, lon, tzid}`; server-side
-resolution of `place_label` → coordinates → IANA zone at the historical date;
-stop trusting `timezone_hint` when coordinates are present; surface the
-resolved zone back to the user for confirmation. `birth_profiles` already has
-a `geocode_confidence` column (`0001_m0_core.sql:134`) that `routes/birth.ts`
-binds `NULL` — a resolver should populate it so a low-confidence match can be
-qualified in the uncertainty report rather than silently trusted.
+**Tasks:** implement the approved app-owned search/resolve routes and composite
+adapter; transiently search Places, resolve only the selected Google Place ID
+through Geocoding API v4, encrypt the narrowed selected result per user, then
+feed its coordinates into the existing server-side IANA-zone and historical
+offset resolution. Surface the selected place, resolved zone, and confidence
+for confirmation. `birth_profiles` already has a `geocode_confidence` column
+(`0001_m0_core.sql:134`) that `routes/birth.ts` binds `NULL` — the resolver
+should populate it so a low-confidence match can be qualified in the
+uncertainty report rather than silently trusted.
 
 **Done when:** a user picks "Los Angeles" and gets `America/Los_Angeles` and
 correct coordinates without typing a decimal.
@@ -298,11 +306,16 @@ Coordinates → IANA zone → historical offset, all server-side:
 
 ### What is still open
 
-- **Place search.** `place_label` is still free text; the user types the
-  decimals. Every route to fixing it — a bundled gazetteer, or an external
-  geocoder — is a decision about size or about sending a birthplace to a third
-  party, which the consent ledger currently promises not to do. That is the
-  reason this half was left rather than an oversight.
+- **Place-search implementation.** `place_label` is still free text and the
+  user still types the decimals. The provider choice is no longer open, but no
+  adapter, encrypted selected-place cache, routes, consent gate, or
+  autocomplete UI has landed. Before the first Google query, public Terms must
+  flow down the Google Maps end-user terms, public Privacy must disclose
+  Google's independent-controller collection/use and cross-border processing,
+  and the UI must show that disclosure and obtain express, prior, revocable
+  consent. Declining or revoking must leave manual entry complete. The exact
+  requirement and attribution rules are frozen in the linked ADR; the existing
+  generic account-processing consent is not a substitute.
 - **The uncertainty report.** Qualifiers reach the client on the lookup and the
   202, and the grade reaches D1, but nothing folds a `low` geocode into
   `uncertainty.qualified_features` yet. The calculation service builds that
