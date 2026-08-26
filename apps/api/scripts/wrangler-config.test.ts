@@ -42,7 +42,7 @@ test("Worker source and configuration contain no private ChatGPT transport", asy
   }
 });
 
-test("production keeps the machine ontology pipeline and Pattern off", () => {
+test("production parks the machine pipeline and runs the one-account Pattern canary", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
@@ -64,8 +64,22 @@ test("production keeps the machine ontology pipeline and Pattern off", () => {
   assert.equal(production.vars.ONTOLOGY_PIPELINE_PUBLISHER, "codex");
   assert.equal(production.vars.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS, "900000");
   assert.equal(production.vars.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS, "900000");
-  assert.equal(production.vars.PATTERN_AI_ROLLOUT, "off");
-  assert.equal(production.vars.PATTERN_PUBLISHER, "openai");
+  // Gate 8. `internal` admits only the exact ids in
+  // PATTERN_INTERNAL_ACCOUNT_IDS, so the allowlist is asserted with the mode:
+  // `internal` with an empty allowlist reads as contained and admits nobody,
+  // and `internal` with a second id is a wider canary than was authorized.
+  assert.equal(production.vars.PATTERN_AI_ROLLOUT, "internal");
+  assert.equal(production.vars.PATTERN_PUBLISHER, "codex");
+  assert.equal(
+    production.vars.PATTERN_INTERNAL_ACCOUNT_IDS,
+    "usr_3ca4f7c2f2498c4eab97511fc3c6ff97",
+  );
+  // `resolvePatternPublisherConfiguration` expects CODEX_PROVIDER_TIMEOUT_MS on
+  // every pass once the publisher is codex; the OpenAI 120000 values fail the
+  // pin check rather than running long.
+  assert.equal(production.vars.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "900000");
+  assert.equal(production.vars.OPENAI_PATTERN_WRITER_TIMEOUT_MS, "900000");
+  assert.equal(production.vars.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, "900000");
 });
 
 test("production sends every API namespace through the Worker before assets", () => {
