@@ -160,10 +160,13 @@
         "exportedPattern",
         "m3EvidenceHeader",
         "m3ExportedEvidence",
+        "m3StoredReadingArtifact",
         "m5EvidenceHeader",
         "m5ExportedEvidence",
+        "m5StoredReadingArtifact",
         "patternSection",
         "portableSection",
+        "readingInvalidation",
         "readingSection"
       ]
     }

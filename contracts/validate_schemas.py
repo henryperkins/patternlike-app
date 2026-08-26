@@ -2720,6 +2720,8 @@ def check_m8_schema_projection(registry: Registry) -> list[str]:
         stored_v5_reading = stored_v5_item["artifact"]
         stored_v5_evidence = stored_v5_item["evidence"]
         if isinstance(stored_v5_reading, dict) and isinstance(stored_v5_evidence, dict):
+            if "reading" in stored_v5_reading:
+                stored_v5_reading = stored_v5_reading["reading"]
             stored_v5_item["artifact"] = {
                 "schema_version": "0.5.0",
                 "reading": stored_v5_reading,

@@ -43,43 +43,51 @@
         "created_at": "2026-08-25T06:15:00Z",
         "updated_at": "2026-08-25T06:16:00Z",
         "artifact": {
-          "schema_version": "0.3.0",
-          "output_schema": "daily-reading-v3",
-          "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-          "local_date": "2026-08-25",
-          "generated_at": "2026-08-25T06:15:00Z",
-          "assembly_mode": "deterministic",
-          "revision": 1,
-          "locale": "en-US",
-          "domain_preference": null,
-          "paragraphs": [
-            {
-              "paragraph_id": "par_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-              "role": "safety_fallback",
-              "order": 1,
-              "text": "A quiet day is still a day worth noticing."
-            }
-          ],
-          "fallback_used": true
-        },
-        "evidence": {
-          "schema_version": "0.3.0",
-          "header": {
+          "reading": {
+            "schema_version": "0.3.0",
+            "output_schema": "daily-reading-v3",
+            "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "local_date": "2026-08-25",
+            "generated_at": "2026-08-25T06:15:00Z",
+            "assembly_mode": "deterministic",
+            "revision": 1,
+            "locale": "en-US",
+            "domain_preference": null,
+            "paragraphs": [
+              {
+                "paragraph_id": "par_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "role": "safety_fallback",
+                "order": 1,
+                "text": "A quiet day is still a day worth noticing."
+              }
+            ],
+            "fallback_used": true
+          },
+          "assembly_id": "asm_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "primary_cycle_id": null,
+          "supporting_cycle_id": null,
+          "validation": {
+            "passed": true,
+            "fallback_used": true,
+            "checks": [
+              {
+                "check": "schema",
+                "result": "pass",
+                "detail_code": null
+              }
+            ]
+          },
+          "evidence_header": {
             "schema_version": "0.3.0",
             "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-            "reading_key": "user:usr_0123456789abcdef0123456789abcdef:2026-08-25:release-12:r1",
-            "user_id": "usr_0123456789abcdef0123456789abcdef",
             "local_date": "2026-08-25",
             "release_version": "release-12",
             "chart_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "contract_id": "patternlike.chart.launch",
-            "contract_version": "0.2.0",
             "assembly_mode": "deterministic",
             "assembly_id": "asm_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "assembly_policy_version": "1.4.0",
             "revision": 1,
-            "revision_reason": "initial",
-            "supersedes_reading_id": null,
             "primary_theme": null,
             "supporting_theme": null,
             "validation": {
@@ -93,7 +101,34 @@
                 }
               ]
             },
-            "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "created_at": "2026-08-25T06:15:00Z"
+          }
+        },
+        "evidence": {
+          "schema_version": "0.3.0",
+          "header": {
+            "schema_version": "0.3.0",
+            "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "local_date": "2026-08-25",
+            "release_version": "release-12",
+            "chart_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "assembly_mode": "deterministic",
+            "assembly_id": "asm_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assembly_policy_version": "1.4.0",
+            "revision": 1,
+            "primary_theme": null,
+            "supporting_theme": null,
+            "validation": {
+              "passed": true,
+              "fallback_used": true,
+              "checks": [
+                {
+                  "check": "schema",
+                  "result": "pass",
+                  "detail_code": null
+                }
+              ]
+            },
             "created_at": "2026-08-25T06:15:00Z"
           },
           "paragraphs": [

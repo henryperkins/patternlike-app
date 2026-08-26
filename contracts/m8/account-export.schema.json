@@ -69,17 +69,15 @@
       "required": [
         "schema_version",
         "reading_id",
-        "reading_key",
-        "user_id",
         "local_date",
         "release_version",
         "chart_fingerprint",
-        "contract_id",
         "assembly_mode",
         "assembly_id",
+        "assembly_policy_version",
         "revision",
-        "revision_reason",
-        "supersedes_reading_id",
+        "primary_theme",
+        "supporting_theme",
         "validation",
         "created_at"
       ],
@@ -90,12 +88,6 @@
         "reading_id": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/reading_id"
         },
-        "reading_key": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/reading_key"
-        },
-        "user_id": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/user_id"
-        },
         "local_date": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/local_date"
         },
@@ -105,14 +97,9 @@
         "chart_fingerprint": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/chart_fingerprint"
         },
-        "contract_id": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/contract_id"
-        },
-        "contract_version": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/contract_version"
-        },
         "assembly_mode": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/assembly_mode"
+          "type": "string",
+          "const": "deterministic"
         },
         "assembly_id": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/assembly_id"
@@ -123,12 +110,6 @@
         "revision": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/revision"
         },
-        "revision_reason": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/revision_reason"
-        },
-        "supersedes_reading_id": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/supersedes_reading_id"
-        },
         "primary_theme": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/primary_theme"
         },
@@ -138,18 +119,10 @@
         "validation": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/validation"
         },
-        "content_hash": {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/content_hash"
-        },
         "created_at": {
           "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/properties/created_at"
         }
-      },
-      "allOf": [
-        {
-          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/readingEvidenceGraph/allOf/0"
-        }
-      ]
+      }
     },
     "m5EvidenceHeader": {
       "type": "object",
@@ -211,6 +184,93 @@
           "$ref": "https://patternlike.app/contracts/m5/reading-evidence.schema.json#/$defs/readingEvidenceGraphV5/allOf/0"
         }
       ]
+    },
+    "m3StoredReadingArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reading",
+        "assembly_id",
+        "content_hash",
+        "primary_cycle_id",
+        "supporting_cycle_id",
+        "validation",
+        "evidence_header"
+      ],
+      "properties": {
+        "reading": {
+          "$ref": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading"
+        },
+        "assembly_id": {
+          "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/assemblyId"
+        },
+        "content_hash": {
+          "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/contentHash"
+        },
+        "primary_cycle_id": {
+          "oneOf": [
+            {
+              "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId"
+            },
+            { "type": "null" }
+          ]
+        },
+        "supporting_cycle_id": {
+          "oneOf": [
+            {
+              "$ref": "https://patternlike.app/contracts/m3/common.schema.json#/$defs/cycleId"
+            },
+            { "type": "null" }
+          ]
+        },
+        "validation": {
+          "$ref": "https://patternlike.app/contracts/m3/reading-evidence.schema.json#/$defs/validationResult"
+        },
+        "evidence_header": { "$ref": "#/$defs/m3EvidenceHeader" }
+      }
+    },
+    "readingInvalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "actor_class", "invalidated_at"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": ["chart_correction", "calculation_defect"]
+        },
+        "actor_class": {
+          "type": "string",
+          "enum": ["user_change", "operator"]
+        },
+        "invalidated_at": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
+        }
+      }
+    },
+    "m5StoredReadingArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "reading",
+        "evidence_header",
+        "invalidation"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m5/common.schema.json#/$defs/schemaVersion"
+        },
+        "reading": {
+          "$ref": "https://patternlike.app/contracts/m5/daily-reading.schema.json#/$defs/dailyReadingV5"
+        },
+        "evidence_header": { "$ref": "#/$defs/m5EvidenceHeader" },
+        "invalidation": {
+          "oneOf": [
+            { "$ref": "#/$defs/readingInvalidation" },
+            { "type": "null" }
+          ]
+        }
+      }
     },
     "m3ExportedEvidence": {
       "type": "object",
@@ -322,12 +382,8 @@
         },
         "artifact": {
           "oneOf": [
-            {
-              "$ref": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading"
-            },
-            {
-              "$ref": "https://patternlike.app/contracts/m5/daily-reading.schema.json#/$defs/dailyReadingV5"
-            },
+            { "$ref": "#/$defs/m3StoredReadingArtifact" },
+            { "$ref": "#/$defs/m5StoredReadingArtifact" },
             { "type": "null" }
           ]
         },
@@ -345,18 +401,14 @@
       "oneOf": [
         {
           "properties": {
-            "artifact": {
-              "$ref": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReading"
-            },
+            "artifact": { "$ref": "#/$defs/m3StoredReadingArtifact" },
             "evidence": { "$ref": "#/$defs/m3ExportedEvidence" }
           },
           "required": ["artifact", "evidence"]
         },
         {
           "properties": {
-            "artifact": {
-              "$ref": "https://patternlike.app/contracts/m5/daily-reading.schema.json#/$defs/dailyReadingV5"
-            },
+            "artifact": { "$ref": "#/$defs/m5StoredReadingArtifact" },
             "evidence": { "$ref": "#/$defs/m5ExportedEvidence" }
           },
           "required": ["artifact", "evidence"]
