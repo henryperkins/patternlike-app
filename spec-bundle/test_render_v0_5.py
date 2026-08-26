@@ -66,7 +66,9 @@ class RenderReproducibilityTest(unittest.TestCase):
                 mock.patch.object(renderer, "PDF", rendered["pdf"]),
                 mock.patch.object(renderer, "MANIFEST", rendered["manifest"]),
                 contextlib.redirect_stdout(io.StringIO()),
+                warnings.catch_warnings(),
             ):
+                warnings.simplefilter("ignore", ResourceWarning)
                 self.assertEqual(renderer.main(), 0)
 
             for name, committed_path in committed.items():
@@ -76,6 +78,7 @@ class RenderReproducibilityTest(unittest.TestCase):
         with io.open(renderer.MANIFEST, encoding="utf-8") as handle:
             manifest = json.load(handle)
 
+        self.assertIn("build_inputs", manifest)
         build_inputs = manifest["build_inputs"]
         expected = {
             "render_v0_5.py": os.path.join(renderer.HERE, "render_v0_5.py"),
