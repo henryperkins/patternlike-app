@@ -1408,12 +1408,16 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            validator_cls = (
-                LocalContractOpenAPIV31SpecValidator
-                if package == M8
-                else None
-            )
-            validate(spec, base_uri=path.as_uri(), cls=validator_cls)
+            if package == M8:
+                # The validate() shortcut builds SchemaPath with its own handlers
+                # before instantiating `cls`, so a custom class cannot affect
+                # retrieval there. Construct the validator from the raw mapping.
+                LocalContractOpenAPIV31SpecValidator(
+                    spec,
+                    base_uri=path.as_uri(),
+                ).validate()
+            else:
+                validate(spec, base_uri=path.as_uri())
             print(
                 f"OK  openapi       {path.name} v{spec['info']['version']} "
                 f"paths={len(spec['paths'])}"
