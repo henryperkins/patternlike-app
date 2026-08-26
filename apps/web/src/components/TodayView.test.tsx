@@ -428,7 +428,7 @@ describe("TodayView", () => {
     });
 
     expect(
-      await screen.findByText(/the current publisher validates English only/i),
+      await screen.findByText(/the deterministic validator currently supports English only/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/reviewed copy/i)).not.toBeInTheDocument();
   });
