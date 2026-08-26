@@ -46,6 +46,10 @@ export interface Env {
   AUTH_STUB: string;
   CALC_SERVICE_URL: string;
   CALC_SERVICE_AUTH_TOKEN?: string;
+  /** Per-invocation birth calculation deadline in milliseconds. */
+  CALC_FETCH_TIMEOUT_MS: string;
+  /** Per-user UTC-day ceiling for authorized birth calculation attempts. */
+  BIRTH_CALC_DAILY_LIMIT: string;
   SCHEMA_VERSION: string;
   /** Set in wrangler.toml; was previously absent from this interface. */
   SE_LICENSE_MODE: string;

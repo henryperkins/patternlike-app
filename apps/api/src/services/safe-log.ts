@@ -29,6 +29,7 @@ export type ConfigurationCode =
   | "root_kek_not_configured"
   | "identity_not_configured"
   | "check_in_retention_misconfigured"
+  | "birth_operational_config_invalid"
   | "time_travel_misconfigured"
   | "pattern_rollout_invalid"
   | "pattern_publisher_misconfigured"
@@ -61,6 +62,13 @@ export type SafeLogEvent =
   | { event: "generation_retryable_failure"; failure_class: GenerationFailureCode }
   | { event: "generation_failed"; failure_class: OperationalFailureClass }
   | { event: "generation_threw"; failure_class: "payload_undecryptable" | "execution_error" }
+  | {
+      event: "birth_calc_completed";
+      outcome: "success" | "invalid_input" | "upstream_failure" | "timeout";
+      latency_ms: number;
+      timeout_ms: number;
+    }
+  | { event: "birth_calc_budget_exhausted"; daily_limit: number }
   | { event: "calc_failed" }
   | { event: "content_release_keys_misconfigured" }
   | {
@@ -306,6 +314,17 @@ export function safeLog(input: SafeLogEvent): string {
       break;
     case "timing_cycles_unreadable":
       console.error(input.event, { trace_id, unreadable_count: input.unreadable_count });
+      break;
+    case "birth_calc_completed":
+      console.info(input.event, {
+        trace_id,
+        outcome: input.outcome,
+        latency_ms: input.latency_ms,
+        timeout_ms: input.timeout_ms,
+      });
+      break;
+    case "birth_calc_budget_exhausted":
+      console.warn(input.event, { trace_id, daily_limit: input.daily_limit });
       break;
     case "publisher_call_completed":
       console.info(input.event, {

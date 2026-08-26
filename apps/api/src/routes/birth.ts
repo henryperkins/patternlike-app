@@ -13,6 +13,7 @@ import { safeLog } from "../services/safe-log.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { invokeCalc } from "../services/calc-client.js";
+import { DEFAULT_CALC_FETCH_TIMEOUT_MS } from "../services/birth-operational-config.js";
 import { resolveTimezone } from "../services/timezone.js";
 import { reconcileCurrentFactRepair } from "../services/reading-invalidation.js";
 import { recomputeUserNextDueAt } from "../db/reading-scheduler.js";
@@ -316,7 +317,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
         ),
   ]);
 
-  const calc = await invokeCalc(c.env, {
+  const calcInvocation = await invokeCalc(c.env, {
     request_id: jobId,
     user_id: userId,
     profile_version: profileVersion,
@@ -330,7 +331,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     approximate_window_minutes: body.approximate_window_minutes ?? null,
     contract_id: CALC_CONTRACT_ID,
     contract_version: CALC_CONTRACT_VERSION,
-  });
+  }, DEFAULT_CALC_FETCH_TIMEOUT_MS);
+  const calc = calcInvocation.response;
 
   if (!calc.ok || !calc.chart) {
     const calcClass = calc.error_class ?? "calc_failed";

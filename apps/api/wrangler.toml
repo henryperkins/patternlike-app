@@ -151,6 +151,9 @@ crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 ENVIRONMENT = "development"
 AUTH_STUB = "1"
 CALC_SERVICE_URL = "http://127.0.0.1:8080"
+# Non-secret operational bounds for the synchronous birth calculation call.
+CALC_FETCH_TIMEOUT_MS = "10000"
+BIRTH_CALC_DAILY_LIMIT = "5"
 SCHEMA_VERSION = "0.2.0"
 # M0 decision: AGPL public SE — docs/legal/SWISS_EPHEMERIS_LICENSE_DECISION.md
 SE_LICENSE_MODE = "agpl"
@@ -278,6 +281,8 @@ crons = ["7,22,37,52 * * * *"]
 [env.production.vars]
 ENVIRONMENT = "production"
 CALC_SERVICE_URL = "https://patternlike-calc.fly.dev"
+CALC_FETCH_TIMEOUT_MS = "10000"
+BIRTH_CALC_DAILY_LIMIT = "5"
 SCHEMA_VERSION = "0.2.0"
 SE_LICENSE_MODE = "agpl"
 # Identity — Auth0 tenant dev-lqmwkyo17nm5mdjz, SPA app "Pattern/Like Web"
