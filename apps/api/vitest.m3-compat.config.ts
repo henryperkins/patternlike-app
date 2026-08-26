@@ -16,6 +16,9 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       main: "src/index.ts",
+      // Match the primary hermetic lane: the configured Workers AI binding
+      // must not start an authenticated remote proxy before local tests run.
+      remoteBindings: false,
       wrangler: { configPath: "./wrangler.toml" },
       miniflare: {
         bindings: {
