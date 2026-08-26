@@ -585,7 +585,7 @@ Mark timeout and rate limiting complete only after their tests pass. Keep Stream
 
 ```bash
 git diff --check
-rg -n "TBD|TODO|implement later|fill in" docs/deploy/birth-calc-slo.md
+rg -n "T[B]D|T[O]DO|implement la[t]er|fill i[n]" docs/deploy/birth-calc-slo.md
 ```
 
 Expected: clean diff and no placeholders.
