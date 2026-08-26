@@ -104,6 +104,16 @@ class RenderReproducibilityTest(unittest.TestCase):
                     handle.write(b"first\r\nsecond\r\n")
                 self.assertEqual(renderer.digest(lf_path), renderer.digest(crlf_path))
 
+    def test_freshness_hash_ignores_manifest_line_endings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            lf_path = os.path.join(directory, "lf.json")
+            crlf_path = os.path.join(directory, "crlf.json")
+            with io.open(lf_path, "wb") as handle:
+                handle.write(b'{\n  "value": true\n}\n')
+            with io.open(crlf_path, "wb") as handle:
+                handle.write(b'{\r\n  "value": true\r\n}\r\n')
+            self.assertEqual(sha256_file(lf_path), sha256_file(crlf_path))
+
 
 if __name__ == "__main__":
     unittest.main()
