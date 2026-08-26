@@ -126,7 +126,9 @@ describe("bounded calc invocation", () => {
       start(controller) {
         controller.enqueue(firstChunk);
         controller.enqueue(new Uint8Array([0x20]));
-        setTimeout(() => controller.close(), 0);
+        setTimeout(() => {
+          if (!cancelled) controller.close();
+        }, 0);
       },
       cancel() {
         cancelled = true;
