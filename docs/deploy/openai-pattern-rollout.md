@@ -189,21 +189,21 @@ Apply pending migrations in numeric order with the same explicit config and
 environment. For adapter rollout, `0009` widens the artifact-class CHECK and
 `0010` adds stage-class usage counters. `0011` adds the terminal pipeline
 evidence receipt and `0012` adds the automated pipeline control-plane tables.
-At the original Gate 2 execution,
-`0015_ontology_pipeline_regression_evidence` was the known reviewed pending
-migration. It added the full regression evidence tuple and
-no-delete/complete-tuple guards without backfilling legacy receipts and was
-subsequently applied with its compatible Worker. Preserve populated artifact
+Those four files were the complete 2026-08-22 Gate 2 execution. During the later
+2026-08-24 follow-up, `0015_ontology_pipeline_regression_evidence` became the
+known reviewed pending migration. It added the full regression evidence tuple
+and no-delete/complete-tuple guards without backfilling legacy receipts and was
+applied on 2026-08-25 with its compatible Worker. Preserve populated artifact
 rows byte-for-byte through any future CHECK rebuild and preserve populated
 `0011` evidence rows.
 
-Afterward, record the migration list, `foreign_key_check` (zero rows),
-`quick_check` (`ok`), empty `assertion_probe`, table SQL, and pre/post row
-counts. For `0015`, additionally prove populated `0011` rows are preserved,
-legacy regression pins remain all NULL, the full regression tuple is accepted
-only when complete, and the no-delete/immutability guards are exercised.
-Record that no rollout change or provider call occurred during the migration
-step.
+After each migration window, record the migration list, `foreign_key_check`
+(zero rows), `quick_check` (`ok`), empty `assertion_probe`, table SQL, and
+pre/post row counts. The later `0015` window additionally required proof that
+populated `0011` rows were preserved, legacy regression pins remained all NULL,
+the full regression tuple was accepted only when complete, and the
+no-delete/immutability guards were exercised. Record that no rollout change or
+provider call occurred during a migration step.
 
 **Stop:** an unexpected pending migration, non-empty assertion probe, integrity
 error, row-count/hash drift, failed tuple/no-delete guard, a rollout/provider

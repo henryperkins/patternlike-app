@@ -324,11 +324,13 @@ AUTH_STUB = "0"
 #              ontology maintenance, so it does not schedule readings.
 #
 # Any value other than `off` requires READING_PUBLISHER, the five pinned
-# OPENAI_READING_* and READING_* values, an operator-approved
-# READING_DAILY_PROVIDER_CALL_LIMIT, and the OPENAI_API_KEY secret.
-# checkSecureConfig refuses every request until all are set, which is the
-# intended failure: half-configured generation would reach a provider with
-# values no frozen command described.
+# OPENAI_READING_* and READING_* values, a positive
+# READING_DAILY_PROVIDER_CALL_LIMIT, and an explicit credential mode. `worker`
+# requires OPENAI_API_KEY; `gateway_stored` requires the authenticated gateway
+# token and key alias while requiring OPENAI_API_KEY to be absent.
+# checkSecureConfig refuses every request until the selected mode is complete,
+# which is the intended failure: half-configured generation would reach a
+# provider with values no frozen command described.
 READING_V5_ROLLOUT = "first_open"
 # Cloudflare AI Gateway. Empty is the shipped state: the M5 design recorded
 # direct provider calls as the launch decision and a gateway as an open one
@@ -367,10 +369,12 @@ CHECK_IN_RETENTION_MONTHS = "13"
 TIME_TRAVEL_RECEIPT_EPOCH = "1"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
 # Pattern is declared `internal` for one account in committed production
-# configuration. Generation still fails closed without an active ontology,
-# compatible deployed bindings, credentials, and approved spend. Declaring the
-# pins here means a typo fails closed on the next request rather than at
-# enablement.
+# configuration. Runtime still fails closed without an active ontology,
+# compatible deployed bindings, credentials, and a positive enforced call
+# limit. Gate 6 spend certification is an additional operational requirement;
+# runtime cannot infer whether an operator approved the configured number.
+# Declaring the pins here means a typo fails closed on the next request rather
+# than at enablement.
 # Accepted values are off | internal | first_open | enabled. Anything else fails
 # checkSecureConfig, which answers 503 on every path including POST /v1/sessions.
 # first_open admits accounts with no editorial Pattern to lose; enabled is the

@@ -298,11 +298,13 @@ curl -sI $BASE/v1/chart | grep -i content-type   # expect application/json
 ### What this supersedes
 
 `patternlike-app` on Fly (`fly.web.toml`, `apps/web/Dockerfile`,
-`apps/web/nginx.conf`) becomes a second, staler copy of the same PWA with no API
-behind it. It is still deployed and still publicly reachable. Retire it once the
-Worker is serving — `fly apps destroy patternlike-app` — or gate it with Access
-in the meantime. `apps/web/wrangler.jsonc` (the standalone `patternlike-web`
-assets Worker) is likewise redundant and was never deployed.
+`apps/web/nginx.conf`) was the second, staler copy of the PWA with no API behind
+it. It was retired on 2026-08-08 by scaling to zero machines and is no longer
+publicly serving. The Fly app and name still exist; `fly deploy -c
+fly.web.toml` would resurrect the superseded service, while `fly apps destroy
+patternlike-app` would release the name. `apps/web/wrangler.jsonc` (the
+standalone `patternlike-web` assets Worker) is likewise redundant and was never
+deployed.
 
 The calc service on Fly (`fly.toml`, `patternlike-calc`) is **unaffected** and
 stays where it is.
