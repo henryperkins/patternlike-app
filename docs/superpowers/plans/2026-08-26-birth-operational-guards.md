@@ -193,7 +193,8 @@ git commit -m "api: bound birth calculation transport"
 - Modify: `apps/api/src/services/deletion-manifest.test.ts`
 
 **Interfaces:**
-- Produces: `buildBirthCalcReservationStatements` and `readBirthCalcBudget`.
+- Produces: `allocateBirthProfileVersion`, `prepareBirthCalcAttempt`, and
+  `readBirthCalcAttempt`.
 - Consumed by: Task 3.
 
 - [ ] **Step 1: Write failing migration, budget, concurrency, and deletion tests**
