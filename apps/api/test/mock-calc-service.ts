@@ -25,6 +25,7 @@ import type {
 /** Sentinel place labels that make the mock fail in a specific way. */
 export const TRIGGER_CALC_ERROR = "TRIGGER_CALC_ERROR";
 export const TRIGGER_INVALID_PROFILE = "TRIGGER_INVALID_PROFILE";
+export const TRIGGER_CALC_TIMEOUT = "TRIGGER_CALC_TIMEOUT";
 
 /**
  * A filesystem path deliberately embedded in the upstream error message. The
@@ -1358,6 +1359,18 @@ export async function mockCalcService(request: Request): Promise<Response> {
 
   const req = (await request.json()) as CalcRequestBody;
 
+  if (req.place_label === TRIGGER_CALC_TIMEOUT) {
+    await new Promise<void>((resolve) => {
+      if (request.signal.aborted) {
+        resolve();
+        return;
+      }
+      request.signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    const error = new Error("mock calculation request aborted");
+    error.name = "AbortError";
+    throw error;
+  }
   if (req.place_label === TRIGGER_CALC_ERROR) {
     return json(
       {

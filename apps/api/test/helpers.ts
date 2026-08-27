@@ -467,13 +467,24 @@ export async function seedChart(
     latitude: 34.05,
     longitude: -118.24,
   };
+  const legacyProfile = {
+    birth_date: "1990-05-15",
+    birth_time_local: "12:34:00",
+    birthplace: {
+      label: "Los Angeles",
+      latitude: 34.05,
+      longitude: -118.24,
+    },
+    approximate_window_minutes: null,
+    consent_id: "cns_seed_birth_profile_0001",
+  };
   // Two ciphertexts, not one reused. Every payload's AAD binds
   // (subject, table.column, recordId, key_version), and the two columns differ
   // in both the field and the record id — birth_profiles is keyed by `version`
   // and chart_snapshots by `id`. Sharing a blob would produce a fixture that
   // reads fine until DEK rotation tries to decrypt it in the position it claims
   // to occupy, which is exactly the failure the AAD exists to cause.
-  const profileEnc = await encryptPayload(env, id, birth, {
+  const profileEnc = await encryptPayload(env, id, legacyProfile, {
     subject: id.cryptoSubject,
     field: "birth_profiles.payload_enc",
     recordId: String(profileVersion),

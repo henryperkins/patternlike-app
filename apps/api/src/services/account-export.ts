@@ -6,6 +6,7 @@ import {
   ExportTooLargeError,
   MAX_EXPORT_PLAINTEXT_BYTES,
 } from "./export-envelope.js";
+import { projectBirthPayloadForExport } from "./birth-command.js";
 
 export const M6_SCHEMA_VERSION = "0.6.0" as const;
 export const M7_EXPORT_SCHEMA_VERSION = "0.7.0" as const;
@@ -138,7 +139,7 @@ export async function assembleAccountExport(
     ) {
       throw new Error("birth profile payload is unavailable");
     }
-    const birth = await decryptJson<Record<string, unknown>>(
+    const storedBirth = await decryptJson<unknown>(
       {
         key_version: row.payload_key_version,
         nonce: row.payload_nonce,
@@ -151,6 +152,7 @@ export async function assembleAccountExport(
         recordId: String(row.version),
       },
     );
+    const birth = projectBirthPayloadForExport(storedBirth);
     (document.birth_profiles as unknown[]).push({
       version: row.version,
       accuracy: row.accuracy,
