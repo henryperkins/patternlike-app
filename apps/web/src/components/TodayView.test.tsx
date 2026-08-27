@@ -1124,7 +1124,7 @@ describe("the Today surface", () => {
       expect(document.body.textContent).not.toContain("gpt-5.6-sol");
 
       expect(screen.getByText(/Writing your daily reading/i)).toBeInTheDocument();
-      expect(screen.getByText("v1.0.0")).toBeInTheDocument();
+      expect(screen.getByText(`v${consentNotGranted.policy_version}`)).toBeInTheDocument();
 
       // Every category the server declared, in the server's order, and no
       // eighth invented locally.
@@ -1137,7 +1137,7 @@ describe("the Today surface", () => {
 
       expect(screen.getByText(/not consent to train a model/i)).toBeInTheDocument();
       expect(screen.getByText(/can name people and places/i)).toBeInTheDocument();
-      expect(screen.getByText(/not zero retention/i)).toBeInTheDocument();
+      expect(screen.getByText(/governed by the agreement and settings/i)).toBeInTheDocument();
       expect(screen.getByText(/withdraw this at any time/i)).toBeInTheDocument();
     });
 

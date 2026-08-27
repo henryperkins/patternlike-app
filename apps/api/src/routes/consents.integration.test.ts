@@ -517,7 +517,9 @@ describe("AI-synthesis consent routes", () => {
       firstAt,
     );
 
-    const nextDisplayedPolicy = "1.1.0";
+    // A hypothetical next version, distinct from the current one: the point is
+    // that the DISPLAYED policy moving mints a fresh row, whatever it moves to.
+    const nextDisplayedPolicy = "1.2.0";
     const nextAt = new Date("2026-08-11T10:00:00.000Z");
     const result = await grantAiSynthesisConsent(
       env,
@@ -601,6 +603,57 @@ describe("AI-synthesis consent routes", () => {
         version: 3,
         supersedes_consent_id: "cns_expired_policy",
       },
+    ]);
+  });
+
+  it("retires the 1.0.0 policy without touching the rows granted under it", async () => {
+    // The processing path and the retention promise changed materially, so a
+    // grant made against the old copy is not a grant against the new one. The
+    // old row stays in the append-only chain exactly as written -- an audit of
+    // what a reader agreed to is worthless if the record can be updated.
+    expect(AI_SYNTHESIS_POLICY_VERSION).toBe("1.1.0");
+    const now = new Date().toISOString();
+    await rows(
+      `INSERT INTO consents
+         (id, user_id, kind, status, policy_version, granted_at, expires_at,
+          version, created_at, updated_at)
+       VALUES ('cns_policy_100', ?, 'ai_synthesis', 'granted', '1.0.0', ?, NULL, 1, ?, ?)`,
+      USER_A,
+      now,
+      now,
+      now,
+    );
+
+    expect(await requestConsent("GET")).toMatchObject({
+      status: 200,
+      body: { status: "not_granted", granted_at: null, policy_version: "1.1.0" },
+    });
+    expect(
+      await requestConsent("PUT", {
+        key: "web-ai-synthesis-stale-100",
+        policyVersion: "1.0.0",
+      }),
+    ).toMatchObject({
+      status: 409,
+      body: { error: { code: "consent_policy_version_stale" } },
+    });
+
+    const granted = await requestConsent("PUT", { key: "web-ai-synthesis-110" });
+    expect(granted).toMatchObject({ status: 200, body: { status: "granted" } });
+    const revoked = await requestConsent("DELETE", { key: "web-ai-synthesis-110-off" });
+    expect(revoked.status).toBe(200);
+
+    expect(
+      await rows(
+        `SELECT id, status, policy_version, version
+         FROM consents WHERE user_id = ? AND kind = 'ai_synthesis'
+         ORDER BY version`,
+        USER_A,
+      ),
+    ).toEqual([
+      { id: "cns_policy_100", status: "granted", policy_version: "1.0.0", version: 1 },
+      expect.objectContaining({ status: "granted", policy_version: "1.1.0", version: 2 }),
+      expect.objectContaining({ status: "revoked", policy_version: "1.1.0", version: 3 }),
     ]);
   });
 

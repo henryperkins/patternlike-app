@@ -347,9 +347,12 @@ export const AI_CONSENT_CATEGORIES = [
 export const consentNotGranted: AiSynthesisConsent = {
   kind: "ai_synthesis",
   status: "not_granted",
+  // The wire field keeps its name and its value: it identifies the data
+  // PROCESSOR, which is still OpenAI. The generation service is Codex, and the
+  // consent copy names it separately.
   provider: "OpenAI",
   purpose: "daily_reading_generation",
-  policy_version: "1.0.0",
+  policy_version: "1.1.0",
   enabled_categories: AI_CONSENT_CATEGORIES,
   granted_at: null,
 };

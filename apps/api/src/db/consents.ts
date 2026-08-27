@@ -24,8 +24,17 @@ import { decryptPayload, encryptPayload, type UserIdentity } from "./users.js";
  * row: a user who agreed to seven categories has not agreed to an eighth, so
  * adding one has to be a new version and a fresh grant, and a stored list would
  * make that a data migration instead of a decision.
+ *
+ * 1.1.0 supersedes 1.0.0 because the processing path and the retention promise
+ * changed materially: the prose is now written by Codex rather than by a direct
+ * API call, and the sentence that said requests were sent with provider-side
+ * storage disabled was only ever true of that call. The categories are
+ * unchanged; what the reader is agreeing to about them is not. Only the CURRENT
+ * version is in this map, so a 1.0.0 row is no longer an active grant and every
+ * account reviews the new policy before another packet is sent. Old rows stay
+ * in the append-only chain and are never updated in place.
  */
-export const AI_SYNTHESIS_POLICY_VERSION = "1.0.0";
+export const AI_SYNTHESIS_POLICY_VERSION = "1.1.0";
 
 export const AI_SYNTHESIS_CATEGORIES_BY_POLICY: Readonly<
   Record<string, readonly AiConsentDataCategory[]>
