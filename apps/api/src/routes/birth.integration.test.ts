@@ -312,7 +312,7 @@ describe("POST /v1/birth-profiles — operational guards", () => {
       error: {
         code: "birth_calc_budget_exhausted",
         message: "The daily birth calculation limit has been reached",
-        request_id: expect.stringMatching(/^req_/),
+        request_id: expect.stringMatching(/^[A-Za-z0-9_.:-]{8,128}$/),
         details: {
           resets_at: expect.stringMatching(
             /^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/,
@@ -393,7 +393,7 @@ describe("POST /v1/birth-profiles — operational guards", () => {
     expect(completedCalcEvents(info)).toHaveLength(1);
     expect(
       await rows(
-        "SELECT version FROM birth_profile_version_counters WHERE user_id = ?",
+        "SELECT last_allocated_version FROM birth_profile_version_counters WHERE user_id = ?",
         USER_A,
       ),
     ).toHaveLength(1);
@@ -496,7 +496,7 @@ describe("POST /v1/birth-profiles — operational guards", () => {
       expect(conflict.body).toMatchObject({
         error: {
           code: "idempotency_conflict",
-          request_id: expect.stringMatching(/^req_/),
+          request_id: expect.stringMatching(/^[A-Za-z0-9_.:-]{8,128}$/),
         },
       });
       expect(JSON.stringify(conflict.body)).not.toContain(
@@ -605,7 +605,7 @@ describe("POST /v1/birth-profiles — operational guards", () => {
       error: {
         code: "internal_error",
         message: "Unexpected server error",
-        request_id: expect.stringMatching(/^req_/),
+        request_id: expect.stringMatching(/^[A-Za-z0-9_.:-]{8,128}$/),
       },
     });
     expect(await rows("SELECT * FROM birth_calc_daily_usage")).toEqual([]);
@@ -924,7 +924,7 @@ describe("POST /v1/birth-profiles — calculation failures", () => {
       error: {
         code: "calc_failed",
         message: "Calculation service could not produce a chart",
-        request_id: expect.stringMatching(/^req_/),
+        request_id: expect.stringMatching(/^[A-Za-z0-9_.:-]{8,128}$/),
       },
     });
     expect(JSON.stringify(res.body)).not.toContain("TRIGGER_CALC_TIMEOUT");
