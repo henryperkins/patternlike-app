@@ -43,8 +43,8 @@ Nothing on that path is queued. `apps/api/wrangler.toml` declares no
 only as an optimistic-concurrency token and as an input to the reservation hash,
 never as a backoff counter. The web client compensates by polling
 `GET /v1/chart` at most five times at a fixed 700 ms interval
-(`apps/web/src/App.tsx:258-291`) — roughly 2.8 s of waiting before it gives up
-with "not ready yet".
+(`apps/web/src/App.tsx:269-292`) — every iteration waits, including the last, so
+worst case is 3.5 s of waiting before it gives up with "not ready yet".
 
 Turning that into a real asynchronous workflow means a queue, a durable state
 machine, a client contract that replaces the poll, and a second place where a
@@ -60,8 +60,8 @@ times one account can pay for a calculation per UTC day.
 Two closed events, both from `apps/api/src/services/safe-log.ts`. Neither can
 carry a birth field, coordinate, place label, upstream message, URL, or stack —
 every arm of `SafeLogEvent` projects named fields and the switch never spreads
-its input. `safe-log.test.ts:345-395` proves it by feeding a hostile object and
-asserting the emitted key set exactly.
+its input. `safe-log.test.ts:345-398` proves it by feeding a hostile object and
+asserting the emitted key set exactly (`:369` and `:396`).
 
 | Event | Console level | Emitted fields |
 | --- | --- | --- |
@@ -105,8 +105,11 @@ Three things this mapping does **not** mean:
 - **`upstream_failure` is a wide bucket.** A connection reset, a DNS failure, a
   non-2xx body that will not parse, a missing body, a 1 MiB overflow, and an
   unset `CALC_SERVICE_URL` all land here. So does every calc-stub refusal that
-  is not `invalid_birth_profile` (`bad_request`, `calculation_failed`,
-  `unauthorized`, `service_auth_not_configured`).
+  is not `invalid_birth_profile`. From `/v1/calculate` those are `calc_error`
+  (the engine's catch-all, and the one an investigator is most likely to find
+  in `jobs.result_class`), `bad_request`, `unauthorized`, and
+  `service_auth_not_configured`. `calculation_failed` is **not** among them — it
+  belongs to `/v1/daily-sky` and `/v1/cycles` and cannot reach the birth path.
 
   One signature is worth recognising: **`upstream_failure` at a `latency_ms`
   near zero means `CALC_SERVICE_URL` is unset.** `configGuard` does not check
@@ -146,6 +149,10 @@ earlier and emits nothing:
   (`409 idempotency_conflict`)
 - a unique-constraint race on the commit batch, which returns the existing job
 - the losing side of a concurrent claim on one attempt coordinate
+- a charged, claim-winning request whose post-commit job re-read disagrees on
+  id, status, attempts, or profile version, which returns the existing job
+- a failed-job retry whose stored command claims `v1` but does not parse, which
+  is internal corruption and reaches the generic 500 boundary
 - budget denials, which emit `birth_calc_budget_exhausted` instead
 
 So `count(birth_calc_completed)` is exactly: **requests that were charged a
@@ -154,8 +161,9 @@ right denominator for a timeout rate and the right population for a latency
 percentile. It is **not** the request count for `POST /v1/birth-profiles`.
 
 The two events have **disjoint denominators** — charged attempts versus denied
-ones. Their sum is the number of requests that reached the reservation, not the
-number of POSTs. Never mix them into one ratio.
+ones. Their sum is neither the POST count nor the number of requests that
+reached the reservation: a concurrent claim loser reaches the reservation, is
+not charged, and emits nothing at all. Never mix the two into one ratio.
 
 ---
 
@@ -177,8 +185,9 @@ Two details that matter when reading a 503:
   validates the pair *before* the development short-circuit whenever either
   variable is present. Only the both-absent case is deferred past that
   short-circuit, which is what makes absence tolerable locally and fatal in
-  production. Setting one and leaving the other undefined therefore fails in
-  every environment.
+  production. Setting one and omitting the other is still fine in development —
+  the resolver defaults each variable independently — and fails in production,
+  where nothing is defaulted.
 - **The client never sees `birth_operational_config_invalid`.** `configGuard`
   returns `503` with code `configuration_error`, and logs
   `insecure_configuration` with `config_code: "birth_operational_config_invalid"`.
@@ -295,6 +304,11 @@ threshold is evaluated.
    lower value makes a rate valid and a raw count meaningless. Record the value
    in force.
 
+5. **The account's retention covers a 7-day window.** On a 3-day retention both
+   7-day triggers are structurally unevaluable, and the daily ledger below
+   cannot reconstruct them after the fact. Record that as the finding rather
+   than substituting a shorter window.
+
 Because observability is uploaded as Worker metadata, `npm run deploy:api`
 reasserts this block on every deploy and a dashboard-side toggle is silently
 reset. Change it in `wrangler.toml` or not at all.
@@ -341,9 +355,11 @@ percentile differently are not comparable.
 
 ### The retention constraint on a 7-day window
 
-**Workers Logs retains at most 7 days** (3 on the Workers Free plan). Two of the
-four triggers are defined over a rolling 7-day window, which sits exactly at
-that ceiling — and the p95 trigger needs three consecutive daily readings of a
+**Workers Logs retention is plan-dependent — at most 7 days on Workers Paid and
+3 on Free.** That is an external Cloudflare limit; confirm it and the account's
+plan as precondition 5 rather than taking this line's word for it. Two of the
+four triggers are defined over a rolling 7-day window, which sits exactly at the
+Paid ceiling — and the p95 trigger needs three consecutive daily readings of a
 7-day window, spanning 9 days of underlying data. **That cannot be reconstructed
 retroactively.**
 

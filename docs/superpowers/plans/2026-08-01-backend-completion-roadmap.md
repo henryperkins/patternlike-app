@@ -154,7 +154,9 @@ service produces a `502 calc_failed` within the timeout rather than hanging.
 1. **Calc authentication — deployed.** `POST /v1/calculate` requires a bearer
    token outside development, answering `503 service_auth_not_configured`
    without configuration and `401` on a bad token, while `/health` and
-   `/v1/engine` stay public. The token is set on both sides.
+   `/v1/engine` stay public. `docs/deploy/api-production.md` records the token as
+   set on both sides in its 2026-08-26 reconciliation — a ledger row, not a
+   queried inventory.
 2. **Bounding the request — implemented, not yet deployed.**
    `invokeCalc` now takes an explicit `timeoutMs`, sets
    `signal: AbortSignal.timeout(timeoutMs)`, refuses a declared or streamed body
@@ -440,7 +442,10 @@ ledger in `0016` buys:
   idempotency conflicts, and replays of a `succeeded`, `queued`, or `running`
   job.
 - Concurrent copies of one attempt coordinate consume **one** unit; the loser
-  writes nothing, calls nothing, and returns the existing job state.
+  writes no birth profile and no job row, calls nothing, and returns the
+  existing job state. It does still advance the profile-version counter, which
+  is allocated before the budget decision — see the operator notes in the SLO
+  document.
 - A failed-job retry must match the original encrypted birth command
   field-by-field and consumes one new unit.
 - A charged timeout, transport failure, invalid calc result, or duplicate
@@ -467,8 +472,9 @@ Tasks 2 and 3.
 
 **Item 1 (key rotation has no caller) is still open** and is the subject of a
 separate plan,
-[`2026-08-26-crypto-operator-control-plane.md`](2026-08-26-crypto-operator-control-plane.md),
-which is gated on `0016` landing first.
+[`2026-08-26-crypto-operator-control-plane.md`](2026-08-26-crypto-operator-control-plane.md).
+That plan owns `0017`; the umbrella plan's dependency order is what sequences
+`0016` ahead of it.
 
 ---
 
@@ -506,5 +512,6 @@ Streams 3, 8, and 9 each carry a **What landed** section above; read it before
 treating an item as outstanding. Stream 8's deferral is now conditional on the
 thresholds in [`docs/deploy/birth-calc-slo.md`](../../deploy/birth-calc-slo.md).
 
-Streams 3, 7, and 9 need no decisions and can run in parallel with the
-identity work by anyone not blocked on it.
+Streams 3, 7, and 9 needed no decisions and could run in parallel with the
+identity work. Their remaining open items — `compatibility_date`, place search,
+and key rotation — still can.
