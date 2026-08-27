@@ -1516,24 +1516,37 @@ describe("ontologyServesAccount", () => {
     expect(ontologyServesAccount(active)).toBe(false);
   });
 
-  it.each(["synthetic_internal", undefined])(
-    "refuses %s provenance even with public evidence",
-    async (origin) => {
-      // The scope comes from evidence and the origin comes from the signed
-      // bytes. Both have to say public machine pipeline.
-      await activate("ontology-serves-origin");
-      const active = await loadActiveOntology(env);
-      expect(active).not.toBeNull();
-      const substituted = {
-        ...active!,
-        release: {
-          ...active!.release,
-          provenance: origin === undefined ? undefined : { origin },
-        },
-      } as typeof active;
-      expect(ontologyServesAccount(substituted)).toBe(false);
-    },
-  );
+  async function substituteOrigin(origin: string | undefined) {
+    await activate("ontology-serves-origin");
+    const active = await loadActiveOntology(env);
+    expect(active).not.toBeNull();
+    return {
+      ...active!,
+      release: {
+        ...active!.release,
+        provenance: origin === undefined ? undefined : { origin },
+      },
+    } as typeof active;
+  }
+
+  it("serves an authored synthetic_internal release", async () => {
+    // An authored release carries no evidence chain and never earns `public`
+    // scope, so the machine branch's scope check cannot be what admits it. It is
+    // admitted on origin alone, against a licensed_excerpt corpus.
+    expect(ontologyServesAccount(await substituteOrigin("synthetic_internal")))
+      .toBe(true);
+  });
+
+  it("refuses an absent provenance even with public evidence", async () => {
+    // Origin comes from the signed bytes. A release that names no origin has
+    // made no claim about its assurance, so neither branch admits it.
+    expect(ontologyServesAccount(await substituteOrigin(undefined))).toBe(false);
+  });
+
+  it("refuses an unrecognised provenance even with public evidence", async () => {
+    expect(ontologyServesAccount(await substituteOrigin("hand_edited")))
+      .toBe(false);
+  });
 
   it("refuses a recalled release, which no longer resolves through the pointer", async () => {
     await activate("ontology-serves-recalled");

@@ -1372,9 +1372,12 @@ describe("machine ontology ingestion", () => {
     expect(release).toBeNull();
   });
 
-  it.each(["synthetic_internal", undefined] as const)(
-    "keeps %s ontology releases internal-only without requiring machine evidence",
-    async (origin) => {
+  it.each([
+    { origin: "synthetic_internal" as const, admitted: true },
+    { origin: undefined, admitted: false },
+  ])(
+    "admits an authored release and refuses an origin-less one ($origin)",
+    async ({ origin, admitted }) => {
       const release = syntheticOntologyRelease(
         `ontology-${origin ?? "legacy"}-internal`,
       );
@@ -1405,18 +1408,27 @@ describe("machine ontology ingestion", () => {
         },
       );
 
+      const state = await SELF.fetch("http://api.test/v1/pattern-state", {
+        headers: { "x-user-id": USER_A },
+      });
+      expect(state.status).toBe(200);
+      const stateBody = (await state.json()) as { state: string };
+
+      if (admitted) {
+        // An authored release has no evidence chain and never earns `public`
+        // scope, so this is the whole of the difference the origin makes.
+        expect(reservation.status).toBe(202);
+        expect(stateBody.state).not.toBe("ontology_unavailable");
+        return;
+      }
+
+      // A release naming no origin has made no claim about its assurance.
       expect(reservation.status).toBe(409);
       const body = (await reservation.json()) as {
         error: { code: string };
       };
       expect(body.error.code).toBe("ontology_unavailable");
-      const state = await SELF.fetch("http://api.test/v1/pattern-state", {
-        headers: { "x-user-id": USER_A },
-      });
-      expect(state.status).toBe(200);
-      expect(
-        ((await state.json()) as { state: string }).state,
-      ).toBe("ontology_unavailable");
+      expect(stateBody.state).toBe("ontology_unavailable");
     },
   );
 });

@@ -225,12 +225,25 @@ export interface ActiveOntology {
 }
 
 /**
- * A Pattern may be generated only from a public machine-pipeline ontology.
+ * A Pattern may be generated from a public machine-pipeline ontology, or from
+ * an authored one.
  *
  * This is a content-integrity invariant, not an admission policy: there is no
- * account it can be opened for. A Slice A or degraded-internal release serves
- * nobody, and `activationScope` is re-derived on every read from evidence and
- * receipt agreement rather than trusted from a stored flag.
+ * account either branch can be opened for, and `activationScope` is re-derived
+ * on every read from evidence and receipt agreement rather than trusted from a
+ * stored flag.
+ *
+ * The two origins carry different assurance, and the difference is the reason
+ * this function is not simply a null check. A `machine_pipeline` release earns
+ * `public` scope only by producing the whole evidence chain, and the evaluator
+ * verdict and the regression hard gates -- `suppressed_feature_leak`,
+ * `uncited_astrological_claim`, `source_dependency_failure`, `prohibited_claim`,
+ * `mandatory_feature_omission`, `private_projection_leak`, `semantic_refusal` --
+ * run nowhere else in the product. A `synthetic_internal` release skips both.
+ * What it does carry is publication rights: every record is `source_supported`
+ * against a `licensed_excerpt` corpus and cites the fragment it came from, it is
+ * signed by the isolated signer, and it compiles. That is the whole of its
+ * assurance, and serving it is a deliberate trade, not an oversight.
  *
  * Enqueue, pattern-state, `GET /v1/pattern`, and the Codex current-owner check
  * all call this, so the client can never be offered a generate action the API
@@ -240,8 +253,13 @@ export interface ActiveOntology {
 export function ontologyServesAccount(
   ontology: ActiveOntology | null,
 ): ontology is ActiveOntology {
-  return ontology?.release.provenance?.origin === "machine_pipeline" &&
-    ontology.activationScope === "public";
+  if (!ontology) return false;
+  const origin = ontology.release.provenance?.origin;
+  if (origin === "machine_pipeline") return ontology.activationScope === "public";
+  // Enumerated rather than defaulted: the contract's origin enum is closed
+  // today, and a third origin added later must fail closed here until someone
+  // decides what assurance it carries.
+  return origin === "synthetic_internal";
 }
 
 function asSignedRelease(value: unknown): SignedOntologyRelease | null {
