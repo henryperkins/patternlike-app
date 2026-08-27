@@ -152,7 +152,7 @@
     "generationInputId": {
       "type": "string",
       "pattern": "^gin_sha256_[a-f0-9]{64}$",
-      "description": "Domain-separated digest of the frozen eligible input and policy — NOT of the prose. OpenAI is nondeterministic, so two legitimate deliveries against one command may return different candidates; content_hash and provider_response_hash identify the one that won publication."
+      "description": "Domain-separated digest of the frozen eligible input and policy — NOT of the prose. The frozen external publisher is nondeterministic whichever transport carries it, so two legitimate deliveries against one command may return different candidates; content_hash and provider_response_hash identify the one that won publication."
     },
     "contextRef": {
       "type": "string",
@@ -185,7 +185,8 @@
     },
     "publisherProvider": {
       "type": "string",
-      "const": "openai"
+      "enum": ["openai", "codex"],
+      "description": "The external service that generated the prose. Widened from const 'openai' to this exact enum when Daily moved to the Codex CLI runner: published evidence is never rewritten, so a reading generated under the direct OpenAI transport must still name OpenAI after the routing changed. Deliberately not an open string \u2014 an unreviewed processor must not be able to describe itself as the author of a reader's reading. This is the generation SERVICE, not the data processor named on the consent surface."
     },
     "reasoningEffort": {
       "type": "string",

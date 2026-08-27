@@ -31,7 +31,11 @@ import {
   type GenerateDailyReadingCommandV2,
 } from "./generation-command-v2.js";
 import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
-import { OPENAI_READING_MODEL } from "./reading-publisher.js";
+import {
+  OPENAI_READING_MODEL,
+  READING_PUBLISHER_PROVIDER,
+} from "./reading-publisher.js";
+import { READING_PUBLISHER_PROVIDERS } from "@patternlike/shared";
 
 const ZONE = "America/Chicago";
 
@@ -198,7 +202,7 @@ describe("V2 command", () => {
     const built = await build();
     if (!built.ok) throw new Error(built.detail);
     expect(built.command.publisher).toMatchObject({
-      provider: "openai",
+      provider: READING_PUBLISHER_PROVIDER,
       model: OPENAI_READING_MODEL,
       reasoning_effort: "high",
       output_schema: "daily-reading-v5",
@@ -207,6 +211,18 @@ describe("V2 command", () => {
     });
     expect(built.command.publisher.selection_policy_version).toBeTruthy();
     expect(built.command.publisher.validation_policy_version).toBeTruthy();
+  });
+
+  it("freezes exactly one member of the closed publisher vocabulary", async () => {
+    const built = await build();
+    if (!built.ok) throw new Error(built.detail);
+    // Asserted against the shared vocabulary rather than a literal: a frozen
+    // command must name the publisher that will actually execute it, and the
+    // point of the closed set is that no third value can appear here at all.
+    const known: readonly string[] = READING_PUBLISHER_PROVIDERS;
+    expect(known).toEqual(["openai", "codex"]);
+    expect(known).toContain(built.command.publisher.provider);
+    expect(built.command.publisher.provider).toBe(READING_PUBLISHER_PROVIDER);
   });
 
   it("takes the target day as given rather than resolving today again", async () => {

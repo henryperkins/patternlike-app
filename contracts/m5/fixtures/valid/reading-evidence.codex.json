@@ -1,0 +1,189 @@
+{
+  "schema_version": "0.5.0",
+  "reading_id": "rdg_01JAMPLEREADING00001",
+  "revision": 1,
+  "revision_reason": "initial",
+  "generated_at": "2026-07-30T06:15:00Z",
+  "generation_input_id": "gin_sha256_339c74fc92990a9428692c15f1d293a0d4c138c4af60bba6fddb9c0634fd4ffb",
+  "input_manifest_hash": "sha256:43dd8b5f4280e07a4308b7e0fde98976edee24700f9550cbd3b06c6442924510",
+  "content_hash": "sha256:9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c",
+  "provider_response_hash": "sha256:9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d",
+  "calculation": {
+    "chart_contract_id": "patternlike.chart.launch",
+    "cycle_policy_version": "1.4.0",
+    "daily_sky_policy_version": "1.0.0",
+    "ephemeris_data_version": "se-2.10.03-1800-2399",
+    "container_digest": "sha256:7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+    "tzdb_version": "2026a",
+    "local_day_resolution_policy_version": "1.0.0"
+  },
+  "model": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "prompt_version": "1.0.1",
+    "selection_policy_version": "1.0.0",
+    "validation_policy_version": "1.0.0",
+    "provider_request_id": "thread_01JAMPLECODEXTHRD1",
+    "input_tokens": 4127,
+    "output_tokens": 612
+  },
+  "paragraphs": [
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH001",
+      "role": "primary_theme",
+      "order": 1,
+      "fact_refs": [
+        {
+          "fact_id": "cyc_abababababababababababababababab",
+          "fact_class": "cycle_instance",
+          "label": "Saturn square your Sun, building",
+          "scope": "personalized"
+        },
+        {
+          "fact_id": "dsf_30fb5019e8d3f789e29ea7a9babf94ae",
+          "fact_class": "transit_natal_contact",
+          "label": "Transiting Saturn exactly square natal Sun",
+          "scope": "personalized"
+        }
+      ],
+      "context_refs": [
+        {
+          "private_ref": "ctx_1",
+          "category": "enabled_personal_context",
+          "allowed_use": "life_domain_selection"
+        }
+      ]
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH002",
+      "role": "supporting_theme",
+      "order": 2,
+      "fact_refs": [
+        {
+          "fact_id": "cyc_abababababababababababababababab",
+          "fact_class": "cycle_instance",
+          "label": "Saturn square your Sun, building",
+          "scope": "personalized"
+        }
+      ],
+      "context_refs": [
+        {
+          "private_ref": "ctx_1",
+          "category": "enabled_personal_context",
+          "allowed_use": "life_domain_selection"
+        }
+      ]
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH003",
+      "role": "timing",
+      "order": 3,
+      "fact_refs": [
+        {
+          "fact_id": "dsf_30fb5019e8d3f789e29ea7a9babf94ae",
+          "fact_class": "transit_natal_contact",
+          "label": "Transiting Saturn exactly square natal Sun",
+          "scope": "personalized"
+        },
+        {
+          "fact_id": "cyc_abababababababababababababababab",
+          "fact_class": "cycle_instance",
+          "label": "Saturn square your Sun, building",
+          "scope": "personalized"
+        }
+      ],
+      "context_refs": []
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH004",
+      "role": "collective_context",
+      "order": 4,
+      "fact_refs": [
+        {
+          "fact_id": "dsf_dc924a24d6db1344a2656081c38afa29",
+          "fact_class": "sign_ingress",
+          "label": "Mercury enters Virgo",
+          "scope": "collective"
+        },
+        {
+          "fact_id": "dsf_b8e8e65324e38c0f4d2419b7a941ebd9",
+          "fact_class": "lunar_phase",
+          "label": "Waxing gibbous Moon",
+          "scope": "collective"
+        }
+      ],
+      "context_refs": []
+    },
+    {
+      "paragraph_id": "par_01JAMPLEPARAGRAPH005",
+      "role": "reflection",
+      "order": 5,
+      "fact_refs": [],
+      "context_refs": [
+        {
+          "private_ref": "ctx_1",
+          "category": "enabled_personal_context",
+          "allowed_use": "life_domain_selection"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "status": "passed",
+    "policy_version": "1.0.0",
+    "checks": [
+      {
+        "code": "schema",
+        "passed": true
+      },
+      {
+        "code": "echo_local_date_locale",
+        "passed": true
+      },
+      {
+        "code": "role_order_and_bounds",
+        "passed": true
+      },
+      {
+        "code": "reference_resolution",
+        "passed": true
+      },
+      {
+        "code": "lane_authorization",
+        "passed": true
+      },
+      {
+        "code": "grounding",
+        "passed": true
+      },
+      {
+        "code": "vocabulary",
+        "passed": true
+      },
+      {
+        "code": "uncertainty_constraints",
+        "passed": true
+      },
+      {
+        "code": "collective_not_personal",
+        "passed": true
+      },
+      {
+        "code": "context_not_discovery",
+        "passed": true
+      },
+      {
+        "code": "leakage",
+        "passed": true
+      },
+      {
+        "code": "safety",
+        "passed": true
+      },
+      {
+        "code": "evidence_agreement",
+        "passed": true
+      }
+    ]
+  }
+}

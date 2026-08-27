@@ -19,8 +19,10 @@ import {
   consentNotGranted,
   evidenceGraph,
   evidenceGraphV5,
+  evidenceGraphV5Codex,
   todayResponse,
   todayResponseV5,
+  todayResponseV5Codex,
 } from "../test/reading-fixture.js";
 
 const TODAY = "/v1/readings/today";
@@ -95,6 +97,31 @@ describe("publisher discrimination", () => {
   it("keys the evidence graph on the record only v5 has", () => {
     expect(isReadingEvidenceV5(evidenceGraphV5)).toBe(true);
     expect(isReadingEvidenceV5(evidenceGraph)).toBe(false);
+  });
+
+  it("reads both publisher vintages as v5 and relabels neither", async () => {
+    const path = `/v1/readings/${V5_READING_ID}/evidence`;
+    expect(isReadingEvidenceV5(evidenceGraphV5Codex)).toBe(true);
+    expect(evidenceGraphV5.model.provider).toBe("openai");
+    expect(evidenceGraphV5Codex.model.provider).toBe("codex");
+
+    mockApiResponses({ [path]: { status: 200, body: evidenceGraphV5Codex } });
+    const fetched = await getReadingEvidence(V5_READING_ID);
+    expect(isReadingEvidenceV5(fetched)).toBe(true);
+    // Verbatim. A client that normalised the provider to whatever is currently
+    // configured would be restating a stored artifact's provenance.
+    expect((fetched as typeof evidenceGraphV5Codex).model.provider).toBe("codex");
+    expect(fetched).toEqual(evidenceGraphV5Codex);
+  });
+
+  it("keeps each vintage's own disclosure sentence", () => {
+    expect(isDailyReadingV5(todayResponseV5Codex)).toBe(true);
+    expect(todayResponseV5.reading.disclosure).toBe(
+      "Generated with OpenAI from your calculated chart and enabled context.",
+    );
+    expect(todayResponseV5Codex.reading.disclosure).toBe(
+      "Generated with Codex by OpenAI from your calculated chart and enabled context.",
+    );
   });
 
   it("fetches evidence by reading id rather than by the server's own url", async () => {

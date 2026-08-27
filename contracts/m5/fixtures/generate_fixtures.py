@@ -583,6 +583,17 @@ COMMAND = {
 }
 write(V + "generation-command.v2.json", COMMAND)
 
+# The same frozen command under the Codex runner. Exactly one field differs, so
+# a command frozen before the routing change and one frozen after it are proven
+# to be the SAME shape rather than a new one that merely looks compatible.
+CODEX_COMMAND = copy.deepcopy(COMMAND)
+CODEX_COMMAND["publisher"]["provider"] = "codex"
+write(V + "generation-command.codex.json", CODEX_COMMAND)
+
+bad = copy.deepcopy(COMMAND)
+bad["publisher"]["provider"] = "anthropic"
+write(I + "generation-command.unknown-provider.json", bad)
+
 bad = copy.deepcopy(COMMAND)
 del bad["ai_consent"]
 write(I + "generation-command.missing-ai-consent.json", bad)
@@ -831,6 +842,15 @@ READING_DOC = {
 }
 write(V + "daily-reading.published.json", READING_DOC)
 
+# A published Codex reading. The disclosure names the service that actually
+# wrote the prose; the historical OpenAI sentence above is not rewritten to
+# match it, because a stored artifact is never restated after publication.
+CODEX_READING_DOC = copy.deepcopy(READING_DOC)
+CODEX_READING_DOC["disclosure"] = (
+    "Generated with Codex by OpenAI from your calculated chart and enabled context."
+)
+write(V + "daily-reading.codex.json", CODEX_READING_DOC)
+
 bad = copy.deepcopy(READING_DOC)
 bad["fallback_used"] = True
 write(I + "daily-reading.fallback.json", bad)
@@ -944,6 +964,18 @@ EVIDENCE = {
     },
 }
 write(V + "reading-evidence.daily.json", EVIDENCE)
+
+# Codex provenance. provider_request_id is the safe provider-side thread handle
+# the runner reported, never the internal Codex control-job id, lease token, or
+# encrypted artifact key.
+CODEX_EVIDENCE = copy.deepcopy(EVIDENCE)
+CODEX_EVIDENCE["model"]["provider"] = "codex"
+CODEX_EVIDENCE["model"]["provider_request_id"] = "thread_01JAMPLECODEXTHRD1"
+write(V + "reading-evidence.codex.json", CODEX_EVIDENCE)
+
+bad = copy.deepcopy(EVIDENCE)
+bad["model"]["provider"] = "anthropic"
+write(I + "reading-evidence.unknown-provider.json", bad)
 
 bad = copy.deepcopy(EVIDENCE)
 del bad["model"]

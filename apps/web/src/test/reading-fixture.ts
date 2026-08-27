@@ -306,6 +306,33 @@ export const evidenceGraphV5: ReadingEvidenceV5 = {
   },
 };
 
+/**
+ * The same reader-facing artifact published through the Codex runner.
+ *
+ * Kept beside the OpenAI vintage rather than replacing it: both are readable at
+ * once in production, and a browser that could only render one of them would be
+ * hiding half its own history.
+ */
+export const todayResponseV5Codex: DailyReadingResponseV5 = {
+  ...todayResponseV5,
+  reading: {
+    ...todayResponseV5.reading,
+    disclosure:
+      "Generated with Codex by OpenAI from your calculated chart and enabled context.",
+  },
+};
+
+export const evidenceGraphV5Codex: ReadingEvidenceV5 = {
+  ...evidenceGraphV5,
+  model: {
+    ...evidenceGraphV5.model,
+    provider: "codex",
+    // The safe provider-side thread handle the runner reported. Never the
+    // Codex control-job id, its lease token, or an artifact key.
+    provider_request_id: "thread_test_0001",
+  },
+};
+
 /** The seven server-owned categories, in the order the API returns them. */
 export const AI_CONSENT_CATEGORIES = [
   "birth_accuracy_and_uncertainty",

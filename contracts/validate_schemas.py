@@ -247,6 +247,13 @@ FORBIDDEN_IN_ASSEMBLY_REQUEST = (
 
 M5_SCHEMA_VERSION = "0.5.0"
 
+# The closed publisher vocabulary, mirroring
+# contracts/m5/common.schema.json#/$defs/publisherProvider. Both members stay
+# valid forever: published evidence names the service that actually generated
+# the prose, so a reading written before Daily moved to the Codex runner keeps
+# recording `openai` and is never restated.
+M5_PUBLISHER_PROVIDERS = frozenset({"openai", "codex"})
+
 # The closed M0 subset M5 may act on. Not a new enum: contracts/m5 references
 # the frozen M0 allowedUse and narrows it. Anything outside this set reaching an
 # M5 document means a source acquired a lane the milestone never approved.
@@ -986,7 +993,7 @@ def reading_evidence_v5_policy(doc: dict) -> list[str]:
     gin = doc.get("generation_input_id") or ""
     if not gin.startswith("gin_sha256_"):
         errs.append(f"generation_input_id {gin!r} is not domain-separated")
-    if (doc.get("model") or {}).get("provider") != "openai":
+    if (doc.get("model") or {}).get("provider") not in M5_PUBLISHER_PROVIDERS:
         errs.append("v5 evidence must record the model that published the prose")
     return errs
 
@@ -2399,9 +2406,9 @@ M8_PREDECESSOR_HASHES = {
     "contracts/m0": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
     "contracts/m3": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
     "contracts/m4": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
-    "contracts/m5": "57aadef51a6eca825866865c4cb0e75503cb29f497f998dc2a56b8971cc6674e",
-    "contracts/m6": "4ead039fd6a264555c2712f1eb950352eccfb9ca78e10a8d9f03c1e00159c148",
-    "contracts/m7": "15dda8c063d22d94bb6b9fd1000ccff9a05e90f27ece8c115a3a9ab58bf023bc",
+    "contracts/m5": "ce500231c15b4a756960b761fed445e5de8f3d0e74a16de39de3bbbfa081866a",
+    "contracts/m6": "aadedc2ae3fe298eff9a65720822811937f08490cabb8015b40db1e047b78e8d",
+    "contracts/m7": "bc2afae13b683e4d7c9b5b605f7d50106bd4c10ae05642bac66a3c9085b60c0f",
 }
 M8_REQUIRED_VALID_FIXTURES = {
     "account-export.saved-reading.json",

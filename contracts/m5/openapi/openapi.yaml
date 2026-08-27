@@ -6,7 +6,8 @@ info:
     An AMENDMENT to `contracts/m3/openapi/openapi.yaml`, not a whole-origin
     successor. Sessions, birth, chart, preferences, pattern, timing, and
     content-release ingestion are unchanged and are still described by the M3
-    document. This file describes only what the OpenAI publisher changes: the
+    document. This file describes only what the constrained-model publisher
+    changes: the
     AI-synthesis consent surface, the two Today operations, the evidence
     operation, and the internal fact-invalidation route.
 
@@ -62,11 +63,12 @@ paths:
       description: |
         Read-only. Reports the server-owned provider, purpose, policy version,
         and the ordered category list the user would be agreeing to, plus whether
-        a current grant exists. Naming the provider without pinning an exact
+        a current grant exists. Naming the processor without pinning an exact
         model is deliberate: consent is to OpenAI processing a stated set of
         categories for a stated purpose, and a model version bump is not a new
-        disclosure to re-collect. The exact model belongs in the Generation
-        record, where a reader can check what actually wrote their reading.
+        disclosure to re-collect. The generation SERVICE and the exact model
+        belong in the Generation record, where a reader can check what actually
+        wrote their reading.
       responses:
         '200':
           description: Consent state
@@ -159,9 +161,9 @@ paths:
       summary: Ensure the server-resolved current local-day reading
       description: |
         Idempotent desired-state operation. It enqueues when required and returns
-        immediately; it never waits synchronously for OpenAI. Tying Today's
-        latency and availability to one long provider request would also discard
-        the durable retry semantics the D1 outbox already provides.
+        immediately; it never waits synchronously for the external publisher.
+        Tying Today's latency and availability to one long provider request would
+        also discard the durable retry semantics the D1 outbox already provides.
 
         While a scheduler-replaceable failure still has command generations left,
         this stays `202`. After the third generation fails it becomes `424` for
@@ -231,8 +233,8 @@ paths:
         Three progressively technical layers: the calculated facts behind each
         paragraph with readable labels and a personalized/collective marker; the
         context categories and permitted lanes, never raw journal or check-in
-        text; and the generation record naming OpenAI, the exact model, and every
-        prompt, selection, validation, and calculation version.
+        text; and the generation record naming the publishing service, the exact
+        model, and every prompt, selection, validation, and calculation version.
       x-normative-schema: 'm5:reading-evidence.schema.json#/$defs/readingEvidenceGraphV5'
       parameters:
         - name: reading_id

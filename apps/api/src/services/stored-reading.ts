@@ -130,7 +130,12 @@ function isCalculationRecord(value: unknown): boolean {
 
 function isModelRecord(value: unknown): boolean {
   if (!isObject(value)) return false;
-  if (value.provider !== "openai") return false;
+  // Exactly the two known lowercase services, checked here rather than against
+  // whatever the current routing is: a stored envelope names the publisher that
+  // wrote it, and a historical OpenAI reading must stay readable after Daily
+  // moved to Codex. An open string would let an unreviewed processor claim
+  // authorship of a reader's prose.
+  if (value.provider !== "openai" && value.provider !== "codex") return false;
   if (
     !["model", "prompt_version", "selection_policy_version", "validation_policy_version", "provider_request_id"].every(
       (key) => isNonEmptyString(value[key]),

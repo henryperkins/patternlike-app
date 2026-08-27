@@ -99,7 +99,7 @@
         "input_tokens",
         "output_tokens"
       ],
-      "description": "Required, not optional. Token counts and the provider request id are safe operational values; the prompt packet, the raw response bytes, and the reasoning are not stored anywhere and are not recoverable from this record.",
+      "description": "Required, not optional. `provider` names the SERVICE that generated the prose \u2014 the historical direct-API vintage records `openai` and the Codex CLI runner records `codex`; neither is rewritten after publication, and neither is the data-processor identity the consent surface names. Token counts and the provider request id are safe operational values: the request id is the provider-side response/thread handle, never an internal job, lease, or artifact identifier. The prompt packet, the raw response bytes, and the reasoning are not stored anywhere and are not recoverable from this record.",
       "properties": {
         "provider": { "$ref": "common.schema.json#/$defs/publisherProvider" },
         "model": { "type": "string", "minLength": 1, "maxLength": 128 },

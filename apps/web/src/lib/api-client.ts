@@ -11,6 +11,7 @@ import type {
   PatternResponse,
   PatternResponseV7,
   PatternStateDocument,
+  ReadingPublisherProvider,
   TimeTravelResponse,
   TimezoneLookupRequest,
   TimezoneLookupResponse,
@@ -739,7 +740,15 @@ export interface EvidenceCalculationRecordV5 {
 }
 
 export interface EvidenceModelRecordV5 {
-  provider: string;
+  /**
+   * The shared closed vocabulary, not an open string.
+   *
+   * The drawer renders this value verbatim, so it is the one place a reader
+   * learns which service wrote their prose. Typing it as the union is what
+   * stops a future surface from relabelling a historical `openai` record as
+   * whatever is currently configured.
+   */
+  provider: ReadingPublisherProvider;
   model: string;
   prompt_version: string;
   selection_policy_version: string;

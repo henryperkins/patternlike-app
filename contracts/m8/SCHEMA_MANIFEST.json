@@ -29,21 +29,21 @@
     {
       "package": "contracts/m5",
       "schema_version": "0.5.0",
-      "manifest_sha256": "57aadef51a6eca825866865c4cb0e75503cb29f497f998dc2a56b8971cc6674e",
+      "manifest_sha256": "ce500231c15b4a756960b761fed445e5de8f3d0e74a16de39de3bbbfa081866a",
       "relationship": "constrained_model_reading_predecessor",
-      "note": "Reading detail may return the frozen M5 success envelope. M8 adds library metadata and does not supersede stored M5 reading artifacts."
+      "note": "Reading detail may return the frozen M5 success envelope. M8 adds library metadata and does not supersede stored M5 reading artifacts. RE-PINNED 2026-08-27: contracts/m5 gained the amendment recorded in its own SCHEMA_MANIFEST.json amendments array, widening publisherProvider from const \"openai\" to the exact enum [\"openai\", \"codex\"] so Codex-generated daily readings can be described truthfully while historical OpenAI evidence stays readable. The digest above is the post-amendment value; every instance that validated under the const still validates, and no $id, required field, or schema_version moved."
     },
     {
       "package": "contracts/m6",
       "schema_version": "0.6.0",
-      "manifest_sha256": "4ead039fd6a264555c2712f1eb950352eccfb9ca78e10a8d9f03c1e00159c148",
+      "manifest_sha256": "aadedc2ae3fe298eff9a65720822811937f08490cabb8015b40db1e047b78e8d",
       "relationship": "privacy_and_export_structure_predecessor",
       "note": "M8 preserves the portable account sections and privacy records carried forward through M7."
     },
     {
       "package": "contracts/m7",
       "schema_version": "0.7.0",
-      "manifest_sha256": "15dda8c063d22d94bb6b9fd1000ccff9a05e90f27ece8c115a3a9ab58bf023bc",
+      "manifest_sha256": "bc2afae13b683e4d7c9b5b605f7d50106bd4c10ae05642bac66a3c9085b60c0f",
       "relationship": "openapi_common_and_account_export_predecessor",
       "note": "M8 copies the complete M7 API/common/export families, then adds consumer place, consent, reading-library, Save, export metadata, and birth-budget amendments."
     }

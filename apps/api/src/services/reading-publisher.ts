@@ -14,7 +14,11 @@
  * assumes and the ceilings the packet compiler enforces.
  */
 
-import type { ReadingGenerationOutput, ReadingGenerationRequest } from "@patternlike/shared";
+import type {
+  ReadingGenerationOutput,
+  ReadingGenerationRequest,
+  ReadingPublisherProvider,
+} from "@patternlike/shared";
 import {
   SELECTION_POLICY_VERSION,
   VALIDATION_POLICY_VERSION,
@@ -274,7 +278,13 @@ export const READING_PROMPT_VERSION = "1.0.1";
  * prose under an identity that promises different prose.
  */
 export interface PublisherConfigPin {
-  provider: typeof READING_PUBLISHER_PROVIDER;
+  /**
+   * The frozen publisher, which is the shared closed vocabulary rather than
+   * today's configured one. A command frozen under the direct OpenAI transport
+   * must remain describable — and, crucially, distinguishable — after the live
+   * publisher became Codex; the executor refuses to run one under the other.
+   */
+  provider: ReadingPublisherProvider;
   model: string;
   reasoning_effort: "low" | "medium" | "high";
   prompt_version: string;
@@ -322,7 +332,7 @@ export type {
 } from "./openai-responses-adapter.js";
 
 export interface ProviderMetadata {
-  provider: typeof READING_PUBLISHER_PROVIDER;
+  provider: ReadingPublisherProvider;
   model: string;
   provider_request_id: string;
   input_tokens: number;

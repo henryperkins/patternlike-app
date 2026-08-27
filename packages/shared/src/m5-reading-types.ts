@@ -39,6 +39,27 @@ export type M5OutputSchema = typeof M5_OUTPUT_SCHEMA;
 export const M5_ASSEMBLY_MODE = "constrained_model" as const;
 
 /**
+ * The closed set of external publishers whose provenance M5 can describe.
+ *
+ * `openai` is the historical direct-API vintage and `codex` is the Codex CLI
+ * runner that supersedes it. Both stay in the vocabulary because published
+ * evidence is never rewritten: a reading generated in August must still name
+ * the service that actually wrote it after the routing changed underneath.
+ *
+ * Widened from a `const` to an exact enum rather than to an open string. An
+ * open string would let an unreviewed processor describe itself as the author
+ * of a reader's prose, which is precisely the claim the evidence graph exists
+ * to make checkable.
+ *
+ * `provider` here is the SERVICE that generated the prose. The consent surface
+ * separately names OpenAI as the data processor, and that field is not this one.
+ */
+export const READING_PUBLISHER_PROVIDERS = ["openai", "codex"] as const;
+
+export type ReadingPublisherProvider =
+  (typeof READING_PUBLISHER_PROVIDERS)[number];
+
+/**
  * The categories named on the AI-synthesis consent screen, in display order.
  *
  * Every personal section of a provider packet maps to exactly one of these, and
@@ -378,7 +399,7 @@ export interface CalculationRecordV5 {
  * and are not recoverable from this record.
  */
 export interface ModelRecordV5 {
-  provider: "openai";
+  provider: ReadingPublisherProvider;
   model: string;
   prompt_version: string;
   selection_policy_version: string;

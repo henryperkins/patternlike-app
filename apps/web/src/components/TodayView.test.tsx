@@ -19,10 +19,12 @@ import {
   errorBody,
   evidenceGraph,
   evidenceGraphV5,
+  evidenceGraphV5Codex,
   fallbackEvidenceGraph,
   fallbackResponse,
   todayResponse,
   todayResponseV5,
+  todayResponseV5Codex,
 } from "../test/reading-fixture.js";
 
 const TODAY = "/v1/readings/today";
@@ -970,6 +972,31 @@ describe("the Today surface", () => {
       ).toBeInTheDocument();
       expect(screen.queryByText(/not tailored to your chart/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/Reviewed standing guidance/i)).not.toBeInTheDocument();
+    });
+
+    it("renders a Codex reading's own disclosure and generation record verbatim", async () => {
+      const user = userEvent.setup();
+      renderToday({
+        [TODAY]: ok(todayResponseV5Codex),
+        [EVIDENCE_V5]: ok(evidenceGraphV5Codex),
+      });
+      await screen.findByText(todayResponseV5Codex.reading.paragraphs[0]!.text);
+
+      expect(
+        screen.getByText(
+          "Generated with Codex by OpenAI from your calculated chart and enabled context.",
+        ),
+      ).toBeInTheDocument();
+      // The historical sentence is not shown for a reading Codex wrote.
+      expect(
+        screen.queryByText(todayResponseV5.reading.disclosure),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByText("Why this reading?"));
+      await screen.findByText("Generation record");
+      // The stored provenance, not the currently configured provider.
+      expect(screen.getByText(/codex/)).toBeInTheDocument();
+      expect(screen.getByText(/gpt-5\.6-sol/)).toBeInTheDocument();
     });
 
     it("names a collective paragraph as everyone's, in the prose column and the drawer", async () => {

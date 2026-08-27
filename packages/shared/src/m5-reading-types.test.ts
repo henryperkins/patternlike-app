@@ -12,11 +12,13 @@ import {
   M5_SCHEMA_VERSION,
   M5_SUPPORTED_USES,
   PARAGRAPH_ROLES_V5,
+  READING_PUBLISHER_PROVIDERS,
   isM5SupportedUse,
   type DailyReadingV5,
   type ReadingEvidenceV5,
   type ReadingGenerationOutput,
   type ReadingGenerationRequest,
+  type ReadingPublisherProvider,
 } from "./m5-reading-types.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -96,6 +98,56 @@ test("the checked-in fixtures type-check as the exported wire shapes", () => {
   assert.equal(output.locale, request.locale);
   assert.equal(reading.assembly_mode, M5_ASSEMBLY_MODE);
   assert.equal(evidence.model.provider, "openai");
+});
+
+test("the publisher vocabulary admits historical OpenAI and new Codex, and nothing else", () => {
+  assert.deepEqual([...READING_PUBLISHER_PROVIDERS], ["openai", "codex"]);
+  const common = schema("common.schema.json");
+  // Widened from a const to an exact enum. A const would make every historical
+  // OpenAI reading unreadable the moment Codex began publishing, and an open
+  // string would let an unreviewed processor describe itself as the author.
+  assert.equal(common.$defs.publisherProvider.const, undefined);
+  assert.deepEqual(common.$defs.publisherProvider.enum, [...READING_PUBLISHER_PROVIDERS]);
+  assert.ok(
+    !(READING_PUBLISHER_PROVIDERS as readonly string[]).includes("anthropic"),
+  );
+});
+
+test("both provider vintages are describable by the same frozen shapes", () => {
+  const openaiCommand = fixture("valid/generation-command.v2.json");
+  const codexCommand = fixture("valid/generation-command.codex.json");
+  assert.equal(openaiCommand.publisher.provider, "openai");
+  assert.equal(codexCommand.publisher.provider, "codex");
+
+  const openaiEvidence: ReadingEvidenceV5 = fixture("valid/reading-evidence.daily.json");
+  const codexEvidence: ReadingEvidenceV5 = fixture("valid/reading-evidence.codex.json");
+  assert.equal(openaiEvidence.model.provider, "openai");
+  assert.equal(codexEvidence.model.provider, "codex");
+
+  const openaiReading: DailyReadingV5 = fixture("valid/daily-reading.published.json");
+  const codexReading: DailyReadingV5 = fixture("valid/daily-reading.codex.json");
+  // The disclosure names the service that actually wrote the prose. Relabelling
+  // a historical OpenAI reading as Codex would be rewriting provenance.
+  assert.equal(
+    openaiReading.disclosure,
+    "Generated with OpenAI from your calculated chart and enabled context.",
+  );
+  assert.equal(
+    codexReading.disclosure,
+    "Generated with Codex by OpenAI from your calculated chart and enabled context.",
+  );
+});
+
+test("an unknown publisher has a rejection fixture on both surfaces", () => {
+  const command = fixture("invalid/generation-command.unknown-provider.json");
+  const evidence = fixture("invalid/reading-evidence.unknown-provider.json");
+  // Exactly one mutation away from their valid twins: the schema lane in
+  // contracts/validate_schemas.py is what proves the enum actually rejects them.
+  assert.equal(command.publisher.provider, "anthropic");
+  assert.equal(evidence.model.provider, "anthropic");
+  const known: readonly ReadingPublisherProvider[] = READING_PUBLISHER_PROVIDERS;
+  assert.ok(!known.includes(command.publisher.provider));
+  assert.ok(!known.includes(evidence.model.provider));
 });
 
 test("a v5 reading carries no release pointer and no reviewed fallback", () => {

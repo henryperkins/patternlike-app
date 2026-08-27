@@ -1202,7 +1202,9 @@ describe("v5 stored readings", () => {
     contextOnlyParagraph?: boolean;
     contextCategory?: string;
     allowedUse?: string;
+    provider?: "openai" | "codex" | "anthropic";
   } = {}) {
+    const provider = options.provider ?? "openai";
     const status = options.status ?? "published";
     const localDate = today();
     const readingId = "rdg_v5_fixture_0001";
@@ -1227,7 +1229,9 @@ describe("v5 stored readings", () => {
       locale: "en-US",
       domain_preference: null,
       headline: options.headline ?? "A narrower commitment",
-      disclosure: "Generated with OpenAI from your calculated chart and enabled context.",
+      disclosure: provider === "codex"
+        ? "Generated with Codex by OpenAI from your calculated chart and enabled context."
+        : "Generated with OpenAI from your calculated chart and enabled context.",
       paragraphs: [
         {
           paragraph_id: paragraphId,
@@ -1276,12 +1280,14 @@ describe("v5 stored readings", () => {
           local_day_resolution_policy_version: "1.0.0",
         },
         model: {
-          provider: "openai" as const,
+          provider,
           model: "gpt-5.6-sol",
           prompt_version: "1.0.1",
           selection_policy_version: "1.0.0",
           validation_policy_version: "1.0.0",
-          provider_request_id: "resp_fixture_0001",
+          provider_request_id: provider === "codex"
+            ? "thread_fixture_0001"
+            : "resp_fixture_0001",
           input_tokens: 4210,
           output_tokens: 512,
         },
@@ -1451,6 +1457,39 @@ describe("v5 stored readings", () => {
     // Trusted-plane fields the v3 graph inherited from M0 and v5 never had.
     expect(body).not.toHaveProperty("user_id");
     expect(body).not.toHaveProperty("reading_key");
+  });
+
+  it("serves a Codex-authored reading and its evidence under Codex provenance", async () => {
+    const { readingId } = await seedV5Reading({ provider: "codex" });
+
+    const { status, body } = await get<Record<string, unknown>>("/v1/readings/today");
+    expect(status).toBe(200);
+    expect(validateTodayResponseV5(body)).toBe(true);
+    expect(validateTodayResponseV5.errors ?? []).toEqual([]);
+    const reading = body.reading as Record<string, unknown>;
+    expect(reading.disclosure).toBe(
+      "Generated with Codex by OpenAI from your calculated chart and enabled context.",
+    );
+
+    const evidence = await get<Record<string, unknown>>(
+      `/v1/readings/${readingId}/evidence`,
+    );
+    expect(evidence.status).toBe(200);
+    expect(validateEvidenceGraphV5(evidence.body)).toBe(true);
+    expect(validateEvidenceGraphV5.errors ?? []).toEqual([]);
+    expect((evidence.body.model as Record<string, unknown>).provider).toBe("codex");
+  });
+
+  it("refuses to read a stored envelope naming an unknown publisher", async () => {
+    // The envelope decrypts; it is the model record that fails the closed
+    // vocabulary. Failing loudly rather than answering "no reading today" is
+    // deliberate: a stored artifact whose stated author the product cannot
+    // vouch for is a defect an operator has to see, not an empty day.
+    const { localDate } = await seedV5Reading({ provider: "anthropic" });
+
+    await expect(
+      loadPublishedReadingForDate(env, IDENTITY_A, localDate),
+    ).rejects.toThrow(/daily-reading-v5/);
   });
 
   it("hides an invalidated reading from Today while keeping its ciphertext", async () => {

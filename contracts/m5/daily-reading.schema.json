@@ -93,7 +93,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "description": "The visible statement that a model wrote this prose. Required, not optional: a reader cannot consent to something the product then declines to mention."
+          "description": "The visible statement that a model wrote this prose, naming the service that actually wrote it. Required, not optional: a reader cannot consent to something the product then declines to mention. A stored disclosure is never rewritten when the routing changes, so readings published under different transports carry different sentences and both remain true."
         },
         "paragraphs": {
           "type": "array",

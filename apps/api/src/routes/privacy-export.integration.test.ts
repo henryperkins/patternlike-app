@@ -87,7 +87,9 @@ function fromB64(value: string): Uint8Array {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 }
 
-async function seedReadingWithEvidence(): Promise<{
+async function seedReadingWithEvidence(
+  provider: "openai" | "codex" = "openai",
+): Promise<{
   readingId: string;
   paragraphId: string;
 }> {
@@ -111,7 +113,9 @@ async function seedReadingWithEvidence(): Promise<{
       locale: "en-US",
       domain_preference: null,
       headline: "A smaller promise",
-      disclosure: "Generated with OpenAI from your calculated chart and enabled context.",
+      disclosure: provider === "codex"
+        ? "Generated with Codex by OpenAI from your calculated chart and enabled context."
+        : "Generated with OpenAI from your calculated chart and enabled context.",
       paragraphs: [{
         paragraph_id: paragraphId,
         role: "primary_theme",
@@ -139,12 +143,14 @@ async function seedReadingWithEvidence(): Promise<{
         local_day_resolution_policy_version: "1.0.0",
       },
       model: {
-        provider: "openai" as const,
+        provider,
         model: "gpt-5.6-sol",
         prompt_version: "1.0.1",
         selection_policy_version: "1.0.0",
         validation_policy_version: "1.0.0",
-        provider_request_id: "resp_export_fixture_0001",
+        provider_request_id: provider === "codex"
+          ? "thread_export_fixture_0001"
+          : "resp_export_fixture_0001",
         input_tokens: 200,
         output_tokens: 80,
       },
@@ -566,6 +572,42 @@ describe("account export", () => {
       },
     });
     expect(JSON.stringify(artifact)).not.toContain("evidence_enc");
+  });
+
+  it("exports a Codex-authored reading under its own provenance", async () => {
+    const { readingId } = await seedReadingWithEvidence("codex");
+    const accepted = await postExport(USER_A, "idem-export-codex-evidence", {
+      include_readings: true,
+      include_journal: false,
+    });
+    await deliver(accepted.body.job_id);
+
+    const download = await SELF.fetch(
+      `http://api.test/v1/exports/${accepted.body.resource_id}/download`,
+      { headers: { "x-user-id": USER_A } },
+    );
+    const body = await download.text();
+    expect(download.status, body).toBe(200);
+    const artifact = JSON.parse(body) as {
+      readings: { status: string; items: Array<Record<string, unknown>> };
+    };
+    expect(artifact.readings.status).toBe("included");
+    const [item] = artifact.readings.items;
+    expect(item).toMatchObject({ id: readingId });
+    const evidence = item!.evidence as {
+      header: { model: { provider: string; provider_request_id: string } };
+    };
+    // The stored provenance, carried out of the product verbatim. An export
+    // that normalised it to the currently configured publisher would hand the
+    // reader a record of a generation that never happened.
+    expect(evidence.header.model.provider).toBe("codex");
+    expect(evidence.header.model.provider_request_id).toBe(
+      "thread_export_fixture_0001",
+    );
+    const artifactDoc = item!.artifact as { reading: { disclosure: string } };
+    expect(artifactDoc.reading.disclosure).toBe(
+      "Generated with Codex by OpenAI from your calculated chart and enabled context.",
+    );
   });
 
   it("commits ready metadata and terminal job state atomically", async () => {

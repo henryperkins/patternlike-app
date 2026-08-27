@@ -169,7 +169,11 @@
     {
       "file": "daily-sky-request.schema.json",
       "id": "https://patternlike.app/contracts/m5/daily-sky-request.schema.json",
-      "defines": ["dailySkyRequest", "natalHouseCusps", "natalPositionInput"],
+      "defines": [
+        "dailySkyRequest",
+        "natalHouseCusps",
+        "natalPositionInput"
+      ],
       "note": "NEW. Additive calculation surface; POST /v1/cycles is untouched."
     },
     {
@@ -225,7 +229,11 @@
     {
       "file": "reading-generation-output.schema.json",
       "id": "https://patternlike.app/contracts/m5/reading-generation-output.schema.json",
-      "defines": ["generatedParagraph", "generatedParagraphRole", "groundedUnit"],
+      "defines": [
+        "generatedParagraph",
+        "generatedParagraphRole",
+        "groundedUnit"
+      ],
       "note": "NEW, and the only document in the repository whose ROOT is the validated object rather than a titled oneOf. OpenAI strict mode requires a self-contained root-object schema, so this file is sent verbatim as text.format.json_schema.schema and cannot hide behind a $defs pointer or reach for an external $ref."
     },
     {
@@ -332,6 +340,25 @@
         "openapi/openapi.yaml"
       ],
       "implemented_by": "apps/api/src/routes/readings.ts (the split switch arms); apps/api/src/services/safe-log.ts (`ensure_today_failed` gains the projected reason). Guarded by apps/api/src/routes/readings.integration.test.ts, which asserts the disabled rollout answers `reading_generation_disabled`, and apps/web/src/lib/reading-state.test.ts, which pins the new code as non-retryable."
+    },
+    {
+      "date": "2026-08-27",
+      "kind": "vocabulary_widening",
+      "summary": "common.schema.json#/$defs/publisherProvider widens from const \"openai\" to the exact enum [\"openai\", \"codex\"], so both the frozen publisher pin and the published model record can name the Codex CLI runner that now generates daily readings.",
+      "detail": "Daily generation moved from a synchronous direct-OpenAI call to the durable Codex runner. Published evidence is never rewritten, so both values have to be describable at once: a reading generated under the direct transport keeps naming `openai` forever, and only new commands and new readings name `codex`. This is additive and compatible in the only direction that matters -- every instance that validated before still validates, because the const was one of the two enum members. It is deliberately an exact enum rather than an open string: an open `type: string` would let an unreviewed processor describe itself as the author of a reader's prose, which is precisely the claim the evidence graph exists to make checkable. No required field, no $id, and no schema_version changed, and no existing fixture byte changed -- the OpenAI valid fixtures are retained verbatim beside new Codex twins, and two new invalid fixtures pin the rejection of an unknown provider on both surfaces. The consent surface is untouched: its `provider` field remains the literal \"OpenAI\", because that names the data processor and not the generation service, and the two are now different things.",
+      "files": [
+        "common.schema.json",
+        "generation-command.schema.json",
+        "daily-reading.schema.json",
+        "reading-evidence.schema.json",
+        "openapi/openapi.yaml",
+        "fixtures/valid/generation-command.codex.json",
+        "fixtures/valid/daily-reading.codex.json",
+        "fixtures/valid/reading-evidence.codex.json",
+        "fixtures/invalid/generation-command.unknown-provider.json",
+        "fixtures/invalid/reading-evidence.unknown-provider.json"
+      ],
+      "implemented_by": "packages/shared/src/m5-reading-types.ts (READING_PUBLISHER_PROVIDERS / ReadingPublisherProvider, used by ModelRecordV5, apps/api PublisherConfigPin and ProviderMetadata, and apps/web EvidenceModelRecordV5); the stored-envelope guard in apps/api/src/services/stored-reading.ts admits exactly the two lowercase values and rejects anything else. Normative source: docs/superpowers/specs/2026-08-27-codex-daily-pattern-design.md."
     }
   ]
 }

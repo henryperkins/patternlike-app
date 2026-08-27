@@ -1,4 +1,8 @@
-import { newId, type NatalFeatureClass } from "@patternlike/shared";
+import {
+  newId,
+  type NatalFeatureClass,
+  type ReadingPublisherProvider,
+} from "@patternlike/shared";
 import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { PublisherSafeDetailCode } from "./reading-publisher.js";
@@ -237,7 +241,7 @@ export type SafeLogEvent =
    */
   | {
       event: "publisher_call_completed";
-      provider: "openai";
+      provider: ReadingPublisherProvider;
       model: string;
       prompt_version: string;
       latency_ms: number;
@@ -247,7 +251,7 @@ export type SafeLogEvent =
     }
   | {
       event: "publisher_attempt_failed";
-      provider: "openai";
+      provider: ReadingPublisherProvider;
       model: string;
       prompt_version: string;
       latency_ms: number;
