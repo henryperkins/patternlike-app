@@ -20,7 +20,11 @@ import {
 } from "./pattern-rollout.js";
 import { ONTOLOGY_REGRESSION_PATTERN_PIN } from "./ontology-regression.js";
 import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
-import { readingProviderOwnerIsCurrent } from "./reading-current-owner.js";
+import {
+  loadCurrentDailyOwner,
+  readingProviderOwnerIsCurrent,
+} from "./reading-current-owner.js";
+import { JOB_TYPE as DAILY_JOB_TYPE } from "../db/generation.js";
 
 interface PatternOwnerRow {
   generation_id: string;
@@ -280,6 +284,68 @@ export type CodexProviderNudgeOutcome =
   | "still_owned"
   | "send_failed";
 
+/**
+ * Wake the Daily job whose Codex work just became terminal.
+ *
+ * The Daily row is parked `queued` with `dispatched_at` still set, which is
+ * what keeps the outbox sweep from re-offering it every cycle while the runner
+ * works. Clearing that marker is therefore the whole nudge: it makes the job
+ * visible again, and the ordinary opaque message carries nothing but the two
+ * ids the handler needs.
+ *
+ * `command_generation` is compared against the reservation's clear column
+ * rather than the encrypted command, so a job that has already been replaced by
+ * a later generation cannot be woken by its predecessor's provider result.
+ *
+ * If the send fails, `dispatched_at` stays NULL. That is deliberate: an
+ * undispatched marker is exactly what scheduled repair looks for, so a lost
+ * message becomes a bounded delay rather than a stranded reading.
+ */
+async function nudgeCurrentDailyOwner(
+  env: Env,
+  job: CodexProviderJob,
+  now: Date,
+): Promise<CodexProviderNudgeOutcome> {
+  const owner = await loadCurrentDailyOwner(env, job.ownerId);
+  if (!owner) return "not_current";
+  const at = now.toISOString();
+
+  const released = await env.DB.prepare(
+    `UPDATE jobs SET dispatched_at = NULL
+     WHERE id = ? AND job_type = ? AND status = 'queued' AND claim_token IS NULL
+       AND EXISTS (
+         SELECT 1 FROM daily_readings r
+         WHERE r.active_generation_job_id = jobs.id
+           AND r.user_id = jobs.user_id AND r.id = ?
+           AND r.status = 'pending'
+           AND r.assembly_mode = 'constrained_model'
+           AND r.command_generation = ?
+       )`,
+  ).bind(
+    owner.jobId,
+    DAILY_JOB_TYPE,
+    owner.readingId,
+    job.stageGeneration,
+  ).run();
+  // Zero rows means somebody else already owns the claim, or the reservation
+  // moved on. Either way this result has nowhere to go and must not be sent.
+  if (released.meta.changes !== 1) return "still_owned";
+
+  try {
+    await env.READING_QUEUE.send({
+      job_id: owner.jobId,
+      reading_id: owner.readingId,
+    });
+  } catch {
+    return "send_failed";
+  }
+  await env.DB.prepare(
+    `UPDATE jobs SET dispatched_at = ?
+     WHERE id = ? AND status = 'queued' AND dispatched_at IS NULL`,
+  ).bind(at, owner.jobId).run();
+  return "sent";
+}
+
 export async function nudgeCodexProviderOwner(
   env: Env,
   job: CodexProviderJob,
@@ -289,6 +355,10 @@ export async function nudgeCodexProviderOwner(
     return "not_current";
   }
   const at = now.toISOString();
+
+  if (job.pipeline === "reading") {
+    return nudgeCurrentDailyOwner(env, job, now);
+  }
 
   if (job.pipeline === "pattern") {
     const owner = await loadPatternJob(env, job.ownerId);

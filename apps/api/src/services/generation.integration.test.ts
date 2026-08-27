@@ -20,6 +20,11 @@ import {
   seedUser,
   READING_CODEX_PUBLISHER_VARS,
 } from "../../test/helpers.js";
+import {
+  candidateFor,
+  claimReadingJob,
+  completeReadingJob,
+} from "../../test/codex-reading-runner.js";
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
 import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
@@ -1371,6 +1376,16 @@ describe("claims", () => {
 
     const claim = await claimJob(env, enqueued.jobId);
     expect(claim?.command.command_version).toBe("v2");
+
+    // The V2 seam now waits durably: the first pass creates the Codex job and
+    // hands the lease back, the runner answers, and the second pass adopts and
+    // publishes. The V1 seam beside it is untouched by any of that.
+    const pending = await dispatchGeneration(enabledV5Env() as typeof env, claim!);
+    expect(pending).toMatchObject({ ok: false, reason: "publisher_pending" });
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
+
     expect(await dispatchGeneration(enabledV5Env() as typeof env, claim!)).toMatchObject({
       ok: true,
       readingId: enqueued.readingId,

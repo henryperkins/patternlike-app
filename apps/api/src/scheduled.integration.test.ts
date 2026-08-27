@@ -66,6 +66,12 @@ function ontologyScheduledEnv(
     ONTOLOGY_PIPELINE_FAILED_ARTIFACT_RETENTION_DAYS: "7",
     ONTOLOGY_PIPELINE_ARTIFACT_KEYRING:
       testOntologyPipelineArtifactKeyring(),
+    // The ontology pipeline's own OpenAI transport, named explicitly. It used
+    // to arrive by accident through the reading publisher's variables; Daily
+    // has no OpenAI credential any more, and one pipeline must not depend on
+    // another's configuration to resolve.
+    OPENAI_CREDENTIAL_SOURCE: "worker",
+    OPENAI_API_KEY: "sk-test-ontology",
     ...overrides,
   }) as Env;
 }

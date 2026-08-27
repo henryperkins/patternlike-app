@@ -5,7 +5,6 @@ import {
 } from "@patternlike/shared";
 import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
-import type { PublisherSafeDetailCode } from "./reading-publisher.js";
 import type { OntologyVerdictDimension } from "./ontology-publisher.js";
 import type {
   PatternPublisherFailureCode,
@@ -256,7 +255,12 @@ export type SafeLogEvent =
       prompt_version: string;
       latency_ms: number;
       failure_class: GenerationFailureCode;
-      safe_detail_code: PublisherSafeDetailCode | "schema_mismatch";
+      /**
+       * One code wider than the direct transport's. The daily ceiling is
+       * charged when the runner claims, so `daily_call_limit_reached` reaches
+       * this Worker as a reported failure rather than a local refusal.
+       */
+      safe_detail_code: CodexProviderSafeDetailCode | "schema_mismatch";
     }
   | {
       event: "pattern_publisher_call_completed";

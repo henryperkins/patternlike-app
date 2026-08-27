@@ -829,6 +829,14 @@ export class ClaimLoadError extends Error {
  * A zero-row claim does no work — that is the whole concurrency story, and it is
  * what makes at-least-once delivery safe without a lock. An expired lease is
  * reclaimable so a consumer that died mid-flight does not strand the day.
+ *
+ * `attempts` counts ACTUAL Daily attempts, which is not the same as claims. A
+ * row marked `publisher_pending` is one this consumer already worked: it built
+ * the packet, created the provider job, and handed the lease back so an
+ * external runner could take as long as it needs. Reacquiring it to look at the
+ * result is not a second attempt, and counting it as one would let a slow
+ * runner exhaust all four Daily retries without a single extra provider call
+ * having been made.
  */
 export async function claimJob(
   env: Env,
@@ -843,7 +851,11 @@ export async function claimJob(
     `UPDATE jobs
      SET status = 'running', claim_token = ?, lease_expires_at = ?,
          available_at = NULL,
-         started_at = COALESCE(started_at, ?), attempts = attempts + 1,
+         started_at = COALESCE(started_at, ?),
+         attempts = CASE
+           WHEN result_class = 'publisher_pending' THEN attempts
+           ELSE attempts + 1
+         END,
          dispatched_at = COALESCE(dispatched_at, ?)
      WHERE id = ? AND job_type = ?
        AND (available_at IS NULL OR available_at <= ?)
@@ -1017,7 +1029,15 @@ export async function loadDailyJobSnapshot(
   };
 }
 
-/** Return an owned running claim to the same immutable command after a delay. */
+/**
+ * Return an owned running claim to the same immutable command after a delay.
+ *
+ * Clears a `publisher_pending` marker on the way out. This IS a real retry — a
+ * provider result was observed and rejected, or the packet could not be built —
+ * so the next claim must count as an attempt. Leaving the marker set would
+ * freeze `attempts` and let the same failure retry forever inside a bound that
+ * never advances.
+ */
 export async function releaseClaimForRetry(
   env: Env,
   jobId: string,
@@ -1027,10 +1047,48 @@ export async function releaseClaimForRetry(
   const result = await env.DB.prepare(
     `UPDATE jobs
      SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
-         available_at = ?, dispatched_at = NULL
+         available_at = ?, dispatched_at = NULL,
+         result_class = CASE
+           WHEN result_class = 'publisher_pending' THEN NULL
+           ELSE result_class
+         END
      WHERE id = ? AND job_type = ? AND status = 'running' AND claim_token = ?`,
   )
     .bind(retryAt.toISOString(), jobId, JOB_TYPE, claimToken)
+    .run();
+  return result.meta.changes === 1;
+}
+
+/**
+ * Hand the Daily lease back while an external Codex job is still being worked.
+ *
+ * The distinction from `releaseClaimForRetry` is the whole point of the durable
+ * wait, and it shows up in three columns:
+ *
+ *  - `result_class = 'publisher_pending'` tells the next claim not to spend an
+ *    attempt, because no new provider call will be made;
+ *  - `available_at = NULL` means the row is immediately claimable, since the
+ *    thing being waited on is a nudge rather than a delay; and
+ *  - `dispatched_at` is deliberately left SET. The outbox sweep finds only
+ *    undispatched rows, so leaving the marker is what stops it re-offering this
+ *    job every cycle for the entire life of a fifteen-minute provider call. The
+ *    terminal nudge clears it exactly once, when there is something to see.
+ *
+ * Claim-fenced like every other transition: a consumer whose lease was already
+ * reclaimed cannot park a job somebody else now owns.
+ */
+export async function releaseClaimForPublisherPending(
+  env: Env,
+  jobId: string,
+  claimToken: string,
+): Promise<boolean> {
+  const result = await env.DB.prepare(
+    `UPDATE jobs
+     SET status = 'queued', result_class = 'publisher_pending',
+         claim_token = NULL, lease_expires_at = NULL, available_at = NULL
+     WHERE id = ? AND job_type = ? AND status = 'running' AND claim_token = ?`,
+  )
+    .bind(jobId, JOB_TYPE, claimToken)
     .run();
   return result.meta.changes === 1;
 }

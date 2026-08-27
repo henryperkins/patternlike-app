@@ -1,10 +1,12 @@
 /**
  * The parts of the OpenAI Responses boundary that carry no product semantics.
  *
- * Extracted from `openai-reading-publisher.ts` so the Pattern adapter can reuse
- * them without importing the reading module. Copying instead would let the two
- * drift on the one behaviour that is expensive to rediscover: a refusal part
- * accompanied by text, two text parts, reasoning items ahead of the message.
+ * Extracted from the former direct-OpenAI Daily adapter so the Pattern and
+ * ontology adapters can reuse them without importing the reading module.
+ * Copying instead would let them drift on the one behaviour that is expensive
+ * to rediscover: a refusal part accompanied by text, two text parts, reasoning
+ * items ahead of the message. Daily no longer has a direct transport at all;
+ * these helpers stay because the remaining OpenAI-routed paths do.
  *
  * Nothing here decides anything. It maps one envelope to text or to one typed
  * failure; retry class, budget, publication, and logging belong to the Worker.

@@ -13,8 +13,11 @@ import {
   claimJob,
   failClaimedJob,
   pauseQueuedV2ForRolloutOff,
+  releaseClaimForPublisherPending,
   releaseClaimForRetry,
 } from "./db/generation.js";
+import { loadCodexProviderJob } from "./db/codex-provider-jobs.js";
+import { nudgeCodexProviderOwner } from "./services/codex-provider-domain.js";
 import { dispatchGeneration } from "./services/generate-daily-reading.js";
 import {
   LEASE_RETRY_DELAY_SECONDS,
@@ -325,6 +328,53 @@ export async function queue(
 
       if (outcome.reason === "duplicate") {
         message.ack();
+        continue;
+      }
+
+      if (outcome.reason === "publisher_pending") {
+        // Durable waiting. The Codex job exists; an external runner may hold it
+        // for a quarter of an hour. Hand the Daily lease back BEFORE
+        // acknowledging: if D1 cannot prove the release, this delivery still
+        // owns a live five-minute claim, and acking would leave the job
+        // stranded until that lease expires with nothing scheduled to notice.
+        let released = false;
+        try {
+          released = await releaseClaimForPublisherPending(
+            env,
+            claim.jobId,
+            claim.claimToken,
+          );
+        } catch {
+          safeLog({ event: "generation_claim_release_failed" });
+        }
+        if (!released) {
+          message.retry({ delaySeconds: LEASE_RETRY_DELAY_SECONDS });
+          continue;
+        }
+        message.ack();
+        // Close the enqueue/release race. A fast runner can finish while this
+        // delivery still owned the claim, in which case the terminal nudge
+        // already ran and found the job unreleasable. Re-check now that it is
+        // released; scheduled maintenance repairs this too, but waiting for it
+        // would delay the reader's reading by a whole cron interval.
+        try {
+          const providerJob = await loadCodexProviderJob(
+            env,
+            outcome.providerJobId,
+          );
+          if (
+            providerJob &&
+            (providerJob.status === "completed" || providerJob.status === "failed")
+          ) {
+            await nudgeCodexProviderOwner(env, providerJob);
+          }
+        } catch {
+          safeLog({
+            event: "codex_provider_dispatch_failed",
+            job_id: outcome.providerJobId,
+            pipeline: "reading",
+          });
+        }
         continue;
       }
 

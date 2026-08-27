@@ -39,7 +39,6 @@ import {
   type Claim,
   type EvidenceRow,
 } from "../db/generation.js";
-import { consumeProviderCallBudget, utcDateFor } from "../db/provider-usage.js";
 import { encryptPayload, type UserIdentity } from "../db/users.js";
 import { buildCycleRequest, invokeCycles } from "./cycle-client.js";
 import {
@@ -56,15 +55,14 @@ import {
 } from "./generation-command-v2.js";
 import { leaseDisposition, type V5FailureCode } from "./generation-failures.js";
 import { currentAiConsentMatches } from "./reading-current-owner.js";
-import { createOpenAiReadingPublisher } from "./openai-reading-publisher.js";
+import { createCodexReadingPublisher } from "./codex-reading-publisher.js";
+import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
 import {
   OPENAI_READING_MAX_OUTPUT_TOKENS,
   OPENAI_READING_MODEL,
   OPENAI_READING_REASONING,
-  OPENAI_READING_TIMEOUT_MS,
   READING_CONTEXT_MAX_BYTES,
-  resolveAiGatewayRoute,
-  resolveProviderCredentialMode,
+  READING_PUBLISHER_PROVIDER,
 } from "./reading-publisher.js";
 import { READING_PROMPT_VERSION } from "./reading-prompt.js";
 import { safeLog } from "./safe-log.js";
@@ -74,8 +72,25 @@ const ajv = new Ajv2020({ strict: false });
 addFormats(ajv);
 const validateOutputSchema = ajv.compile(outputSchema);
 
+/**
+ * The reader-facing statement of what wrote this reading.
+ *
+ * Names Codex as the generation service and OpenAI as the operator, because
+ * both are true and the consent screen separates them the same way. Readings
+ * published before the move keep their own sentence: a stored artifact is never
+ * restated.
+ */
 const DISCLOSURE =
-  "Generated with OpenAI from your calculated chart and enabled context.";
+  "Generated with Codex by OpenAI from your calculated chart and enabled context.";
+
+/**
+ * Lease headroom this executor still needs after the packet is built.
+ *
+ * Sealing one envelope, committing one row, and either releasing or publishing.
+ * Deliberately small: the provider deadline moved outside the lease, and
+ * `leaseDisposition` adds its own sixty-second publication margin on top.
+ */
+const READING_PROVIDER_ENQUEUE_BUDGET_MS = 30_000;
 
 interface ChartRow {
   id: string;
@@ -163,7 +178,7 @@ function supportedCommand(command: GenerateDailyReadingCommandV2): boolean {
     command.daily_sky.orb_policy_version === null &&
     command.local_day_resolution_policy_version ===
       LOCAL_DAY_RESOLUTION_POLICY_VERSION &&
-    command.publisher.provider === "openai" &&
+    command.publisher.provider === READING_PUBLISHER_PROVIDER &&
     command.publisher.model === OPENAI_READING_MODEL &&
     command.publisher.reasoning_effort === OPENAI_READING_REASONING &&
     command.publisher.prompt_version === READING_PROMPT_VERSION &&
@@ -578,11 +593,17 @@ export async function generateDailyReadingV5(
     return fail("context_ineligible", "context_not_eligible");
   }
 
+  // What still has to happen inside this lease is bounded and local: seal one
+  // request envelope, commit one provider row, and either hand the lease back
+  // or validate and publish an adopted candidate. The fifteen-minute provider
+  // deadline is NOT part of it any more — the external call outlives this
+  // delivery by design — so demanding room for it here would refuse work the
+  // lease can comfortably finish.
   const remainingMs = Date.parse(claim.leaseExpiresAt) - Date.now();
   const lease = leaseDisposition(
     claim.attempts,
     remainingMs,
-    OPENAI_READING_TIMEOUT_MS,
+    READING_PROVIDER_ENQUEUE_BUDGET_MS,
   );
   if (lease === "lease_retry_305s") {
     return {
@@ -599,37 +620,43 @@ export async function generateDailyReadingV5(
   if (limit === null) {
     return fail("publisher_not_configured", "publisher_not_configured");
   }
-  // Before the budget is spent, not after: a half-configured gateway is the
-  // same class of problem as a missing call ceiling, and neither should consume
-  // a slot from the day's approved allowance to discover itself. checkSecureConfig
-  // has already refused this deployment on the HTTP path and in queue(), so
-  // reaching here at all means an operator changed a var mid-flight.
-  const gateway = resolveAiGatewayRoute(env);
-  if (!gateway.ok) {
-    return fail("publisher_not_configured", "publisher_not_configured");
-  }
-  // Same reason as the gateway check above: a credential mode that cannot be
-  // resolved is a configuration problem, and discovering it should not cost a
-  // slot from the day's approved allowance.
-  const credential = resolveProviderCredentialMode(env, gateway.route);
-  if (!credential.ok) {
-    return fail("publisher_not_configured", "publisher_not_configured");
-  }
-  const budget = await consumeProviderCallBudget(env, utcDateFor(new Date()), limit);
-  if (!budget.ok) {
-    return fail("publisher_budget_exhausted", "provider_budget_exhausted");
-  }
-
+  // No budget is consumed here, and that is deliberate. The UTC-day ceiling
+  // bounds actual model invocations, and the invocation happens when the RUNNER
+  // claims this job — long after this delivery has ended. Charging on
+  // create-or-adopt would bill a duplicate Queue delivery, a reclaimed lease,
+  // and a job nobody ever ran.
   const providerStartedAt = Date.now();
-  const publisher = await createOpenAiReadingPublisher(credential.mode, gateway.route).publish(prepared.request, {
+  const publisher = await createCodexReadingPublisher(env).publish(prepared.request, {
     requestId: newId("req"),
-    timeoutMs: OPENAI_READING_TIMEOUT_MS,
+    timeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
     configuration: command.publisher,
+    codexJob: {
+      pipeline: "reading",
+      ownerId: claim.jobId,
+      userId,
+      stageGeneration: command.command_generation,
+      // Zero-based, and derived from the ACTUAL attempt rather than from a
+      // counter of deliveries: a `publisher_pending` reacquisition returns to
+      // the same coordinate and adopts, while a genuine retry lands on the
+      // next one.
+      stageAttempt: claim.attempts - 1,
+      dailyCallLimit: limit,
+    },
   });
+  if (!publisher.ok && publisher.code === "publisher_pending") {
+    // Not a failure. The Queue handler hands the Daily lease back and stops
+    // holding a delivery open for a call that may take fifteen minutes.
+    return {
+      ok: false,
+      reason: "publisher_pending",
+      detail: "codex_provider_pending",
+      providerJobId: publisher.job_id,
+    };
+  }
   if (!publisher.ok) {
     safeLog({
       event: "publisher_attempt_failed",
-      provider: "openai",
+      provider: READING_PUBLISHER_PROVIDER,
       model: command.publisher.model,
       prompt_version: command.publisher.prompt_version,
       latency_ms: Math.max(0, Date.now() - providerStartedAt),

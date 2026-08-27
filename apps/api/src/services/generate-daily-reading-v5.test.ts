@@ -24,12 +24,27 @@ import {
   seedUser,
   READING_CODEX_PUBLISHER_VARS,
 } from "../../test/helpers.js";
+import {
+  candidateFor,
+  claimReadingJob,
+  completeReadingJob,
+  failReadingJob,
+  leaseReadingJob,
+  readingProviderJobCount,
+} from "../../test/codex-reading-runner.js";
+import type {
+  CodexProviderFailureCode,
+  CodexProviderSafeDetailCode,
+} from "../db/codex-provider-jobs.js";
 import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
 import {
   claimJob,
   pauseQueuedV2ForRolloutOff,
+  releaseClaimForPublisherPending,
   resumePausedV2ForFirstOpen,
 } from "../db/generation.js";
+import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
+import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
 import { decryptPayload } from "../db/users.js";
 import { dispatch, enqueueConstrainedReading, resolveV5TargetDate } from "./enqueue.js";
 import { dispatchGeneration } from "./generate-daily-reading.js";
@@ -172,93 +187,48 @@ async function decryptReading(readingId: string): Promise<StoredReadingV5> {
   );
 }
 
-function candidateFor(packet: ReadingGenerationRequest): ReadingGenerationOutput {
-  const personalized = packet.facts.find((fact) => fact.scope === "personalized");
-  const collective = packet.facts.find((fact) => fact.scope === "collective");
-  const lead = personalized ?? collective ?? packet.facts[0]!;
-  const paragraphs: ReadingGenerationOutput["paragraphs"] = [];
-  if (collective && packet.composition.allowed_paragraph_roles.includes("collective_context")) {
-    paragraphs.push({
-      role: "collective_context",
-      text: "The sky is doing the same thing for everyone tonight, and it is worth noticing.",
-      fact_ids: [collective.fact_id],
-      context_refs: [],
-    });
-  }
-  return {
-    schema_version: "0.5.0",
-    output_schema: "daily-reading-v5",
-    local_date: packet.local_date,
-    locale: packet.locale,
-    headline: "A narrower commitment",
-    lead: {
-      text: "The pressure is not asking for more effort, only for a smaller promise you can keep.",
-      fact_ids: [lead.fact_id],
-      context_refs: [],
-    },
-    paragraphs,
-    reflection_prompt: {
-      text: "Which promise would you keep if nobody was watching?",
-      fact_ids: [],
-      context_refs: [],
-    },
-    uncertainty_note: packet.composition.uncertainty_note_required
-      ? {
-          text: "Without a confirmed birth time this reading leaves houses out entirely.",
-          fact_ids: [],
-          context_refs: [],
-        }
-      : null,
-  };
-}
-
-function providerResponse(candidate: unknown, status = 200): Response {
-  if (status !== 200) {
-    return new Response(JSON.stringify({ error: { type: "test_failure" } }), {
-      status,
-      headers: { "content-type": "application/json" },
-    });
-  }
-  return new Response(
-    JSON.stringify({
-      id: "resp_task10_0001",
-      output: [
-        {
-          type: "message",
-          content: [
-            { type: "output_text", text: JSON.stringify(candidate), annotations: [] },
-          ],
-        },
-      ],
-      usage: { input_tokens: 4210, output_tokens: 512 },
-    }),
-    { headers: { "content-type": "application/json" } },
-  );
-}
-
+/**
+ * Run one Daily delivery all the way through the durable provider path.
+ *
+ * The executor no longer makes an HTTP call, so "the provider answered" is now
+ * a runner committing a terminal result on a durable job. The first pass
+ * creates that job and returns `publisher_pending`; the stand-in runner reads
+ * the sealed packet, produces a candidate from it, and completes; the second
+ * pass adopts and publishes.
+ *
+ * `providerCalls` counts durable jobs created, which is what the daily ceiling
+ * actually bounds: a delivery that never created one can never cost an
+ * invocation, no matter how many times it is redelivered.
+ */
 async function withProvider(
   mutate: (candidate: ReadingGenerationOutput, packet: ReadingGenerationRequest) => unknown,
   run: () => Promise<unknown>,
-) {
-  const originalFetch = globalThis.fetch;
-  let providerCalls = 0;
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request = input instanceof Request ? input : new Request(input, init);
-    if (new URL(request.url).hostname !== "api.openai.com") {
-      return originalFetch(input, init);
-    }
-    providerCalls += 1;
-    const body = (await request.json()) as {
-      input: Array<{ content: Array<{ text: string }> }>;
-    };
-    const packet = JSON.parse(body.input[0]!.content[0]!.text) as ReadingGenerationRequest;
-    return providerResponse(mutate(candidateFor(packet), packet));
-  }) as typeof fetch;
-  try {
-    return { result: await run(), providerCalls };
-  } finally {
-    globalThis.fetch = originalFetch;
+): Promise<{ result: unknown; providerCalls: number }> {
+  const first = await run();
+  const claimed = await claimReadingJob();
+  if (!claimed) {
+    return { result: first, providerCalls: await readingProviderJobCount() };
   }
+  await completeReadingJob(
+    claimed,
+    JSON.stringify(mutate(candidateFor(claimed.packet), claimed.packet)),
+  );
+  return { result: await run(), providerCalls: await readingProviderJobCount() };
+}
+
+/** The same shape, for a runner that reports one closed safe failure instead. */
+async function withProviderFailure(
+  code: CodexProviderFailureCode,
+  safeDetailCode: CodexProviderSafeDetailCode,
+  run: () => Promise<unknown>,
+): Promise<{ result: unknown; providerCalls: number }> {
+  const first = await run();
+  const claimed = await claimReadingJob();
+  if (!claimed) {
+    return { result: first, providerCalls: await readingProviderJobCount() };
+  }
+  await failReadingJob(claimed, code, safeDetailCode);
+  return { result: await run(), providerCalls: await readingProviderJobCount() };
 }
 
 async function deliver(
@@ -284,9 +254,13 @@ describe("V5 execution", () => {
   it("dispatches a frozen V2 command, validates it, and atomically publishes V5", async () => {
     const { enqueued, claim } = await claimReserved();
 
-    const outcome = await dispatchGeneration(enabledEnv(), claim);
+    const { result: outcome, providerCalls } = await withProvider(
+      (candidate) => candidate,
+      () => dispatchGeneration(enabledEnv(), claim),
+    );
 
     expect(outcome).toMatchObject({ ok: true, readingId: enqueued.readingId });
+    expect(providerCalls).toBe(1);
     const [reading] = await rows<{ status: string }>(
       "SELECT status FROM daily_readings WHERE id = ?",
       enqueued.readingId,
@@ -305,7 +279,8 @@ describe("V5 execution", () => {
       output_schema: "daily-reading-v5",
       assembly_mode: "constrained_model",
       headline: "A narrower commitment",
-      disclosure: "Generated with OpenAI from your calculated chart and enabled context.",
+      disclosure:
+        "Generated with Codex by OpenAI from your calculated chart and enabled context.",
     });
     expect(stored.reading.paragraphs[0]).toMatchObject({
       role: "primary_theme",
@@ -316,7 +291,7 @@ describe("V5 execution", () => {
       input_manifest_hash: (claim.command as GenerateDailyReadingCommandV2).input_manifest_hash,
       provider_response_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
       model: {
-        provider: "openai",
+        provider: "codex",
         model: OPENAI_READING_MODEL,
         prompt_version: "1.0.1",
         provider_request_id: expect.any(String),
@@ -380,45 +355,39 @@ describe("V5 execution", () => {
     expect(command.context.some((pin) => pin.source_id === "USR-12")).toBe(true);
     expect(command.context.some((pin) => pin.source_id === "USR-05")).toBe(true);
 
-    expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
-      ok: true,
-      readingId: enqueued.readingId,
-    });
+    const { result } = await withProvider((candidate) => candidate, () =>
+      dispatchGeneration(enabledEnv(), claim));
+    expect(result).toMatchObject({ ok: true, readingId: enqueued.readingId });
   });
 
   it("passes the frozen publisher pin when current prompt and model variables moved", async () => {
     const { claim } = await claimReserved();
     const command = claim.command as GenerateDailyReadingCommandV2;
-    const originalFetch = globalThis.fetch;
-    let sentModel = "";
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (new URL(request.url).hostname === "api.openai.com") {
-        const body = (await request.clone().json()) as { model: string };
-        sentModel = body.model;
-      }
-      return originalFetch(input, init);
-    }) as typeof fetch;
-    try {
-      const outcome = await dispatchGeneration(
-        enabledEnv({
-          OPENAI_READING_MODEL: "a-new-current-model",
-          OPENAI_READING_PROMPT_VERSION: "9.9.9",
-        }),
-        claim,
-      );
-      expect(outcome.ok).toBe(true);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-    expect(sentModel).toBe(command.publisher.model);
+
+    const outcome = await dispatchGeneration(
+      enabledEnv({
+        OPENAI_READING_MODEL: "a-new-current-model",
+        OPENAI_READING_PROMPT_VERSION: "9.9.9",
+      }),
+      claim,
+    );
+    expect(outcome).toMatchObject({ ok: false, reason: "publisher_pending" });
+
+    // The durable job carries the FROZEN pin, not the current variables. A job
+    // that recorded today's model would hand the runner an invocation the
+    // command never described.
+    const claimed = await claimReadingJob();
+    expect(claimed).not.toBeNull();
+    expect(claimed!.job.model).toBe(command.publisher.model);
+    expect(claimed!.job.promptVersion).toBe(command.publisher.prompt_version);
+    expect(claimed!.job.model).not.toBe("a-new-current-model");
     expect(command.publisher.prompt_version).toBe("1.0.1");
+    expect(claimed!.packet.prompt_version).toBe(command.publisher.prompt_version);
   });
 
   it("rechecks AI consent immediately before budget use and makes no provider call after revocation", async () => {
     const { claim } = await claimReserved();
     const originalFetch = globalThis.fetch;
-    let providerCalls = 0;
     let revoked = false;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
@@ -433,7 +402,6 @@ describe("V5 execution", () => {
           "cns_ai_synthesis_0001",
         );
       }
-      if (url.hostname === "api.openai.com") providerCalls += 1;
       return originalFetch(input, init);
     }) as typeof fetch;
     try {
@@ -444,14 +412,13 @@ describe("V5 execution", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
-    expect(providerCalls).toBe(0);
+    expect(await readingProviderJobCount()).toBe(0);
     expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
   });
 
   it("rechecks every pinned source after calculation and makes no provider call when it changes", async () => {
     const { claim } = await claimReserved({ context: true });
     const originalFetch = globalThis.fetch;
-    let providerCalls = 0;
     let changed = false;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
@@ -465,7 +432,6 @@ describe("V5 execution", () => {
           USER_A,
         );
       }
-      if (url.hostname === "api.openai.com") providerCalls += 1;
       return originalFetch(input, init);
     }) as typeof fetch;
     try {
@@ -476,7 +442,7 @@ describe("V5 execution", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
-    expect(providerCalls).toBe(0);
+    expect(await readingProviderJobCount()).toBe(0);
     expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
   });
 
@@ -494,8 +460,7 @@ describe("V5 execution", () => {
     async (_label, mutation) => {
       const { claim } = await claimReserved({ context: true });
       const originalFetch = globalThis.fetch;
-      let providerCalls = 0;
-      let changed = false;
+        let changed = false;
       globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const request = input instanceof Request ? input : new Request(input, init);
         const url = new URL(request.url);
@@ -503,7 +468,6 @@ describe("V5 execution", () => {
           changed = true;
           await rows(mutation, USER_A);
         }
-        if (url.hostname === "api.openai.com") providerCalls += 1;
         return originalFetch(input, init);
       }) as typeof fetch;
       try {
@@ -514,7 +478,7 @@ describe("V5 execution", () => {
       } finally {
         globalThis.fetch = originalFetch;
       }
-      expect(providerCalls).toBe(0);
+      expect(await readingProviderJobCount()).toBe(0);
       expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
     },
   );
@@ -637,33 +601,20 @@ describe("V5 execution", () => {
     for (const mutate of mutations) {
       const { claim } = await claimReserved();
       mutate(claim.command as GenerateDailyReadingCommandV2);
-      let providerCalls = 0;
-      const originalFetch = globalThis.fetch;
-      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const request = input instanceof Request ? input : new Request(input, init);
-        if (new URL(request.url).hostname === "api.openai.com") providerCalls += 1;
-        return originalFetch(input, init);
-      }) as typeof fetch;
-      try {
-        expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
-          ok: false,
-          reason: "policy_unsupported",
-        });
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
-      expect(providerCalls).toBe(0);
+      expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
+        ok: false,
+        reason: "policy_unsupported",
+      });
+      expect(await readingProviderJobCount()).toBe(0);
     }
   });
 
   it("maps changed canonical calculation output to input mismatch before OpenAI", async () => {
     const { claim } = await claimReserved();
     const originalFetch = globalThis.fetch;
-    let providerCalls = 0;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       const url = new URL(request.url);
-      if (url.hostname === "api.openai.com") providerCalls += 1;
       const response = await originalFetch(input, init);
       if (!url.pathname.endsWith("/v1/cycles")) return response;
       const body = (await response.json()) as Record<string, unknown>;
@@ -681,7 +632,7 @@ describe("V5 execution", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
-    expect(providerCalls).toBe(0);
+    expect(await readingProviderJobCount()).toBe(0);
   });
 
   it.each([
@@ -692,14 +643,9 @@ describe("V5 execution", () => {
     async (status, reason) => {
       const { claim } = await claimReserved();
       const originalFetch = globalThis.fetch;
-      let providerCalls = 0;
-      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const request = input instanceof Request ? input : new Request(input, init);
         const url = new URL(request.url);
-        if (url.hostname === "api.openai.com") {
-          providerCalls += 1;
-          return originalFetch(input, init);
-        }
         if (!url.pathname.endsWith("/v1/cycles")) return originalFetch(input, init);
         if (status !== 200) return new Response("unavailable", { status });
         const body = (await request.json()) as { request_id: string; schema_version: string };
@@ -722,75 +668,54 @@ describe("V5 execution", () => {
       } finally {
         globalThis.fetch = originalFetch;
       }
-      expect(providerCalls).toBe(0);
+      expect(await readingProviderJobCount()).toBe(0);
     },
   );
 
-  it("maps provider transport/status failures without making a second call", async () => {
-    for (const [status, reason] of [
-      [429, "publisher_unavailable"],
-      [503, "publisher_unavailable"],
-      [401, "publisher_auth_failed"],
-      [404, "publisher_model_unavailable"],
-    ] as const) {
+  it("maps every closed runner failure without creating a second job", async () => {
+    for (
+      const [code, detail, reason] of [
+        ["publisher_unavailable", "rate_limited", "publisher_unavailable"],
+        ["publisher_unavailable", "provider_5xx", "publisher_unavailable"],
+        ["publisher_unavailable", "request_timeout", "publisher_unavailable"],
+        ["publisher_auth_failed", "authentication_failed", "publisher_auth_failed"],
+        ["publisher_model_unavailable", "model_not_available", "publisher_model_unavailable"],
+        ["publisher_refused", "provider_refusal", "publisher_refused"],
+        ["publisher_budget_exhausted", "daily_call_limit_reached", "publisher_budget_exhausted"],
+      ] as const
+    ) {
       const { claim } = await claimReserved();
-      const originalFetch = globalThis.fetch;
-      let providerCalls = 0;
-      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const request = input instanceof Request ? input : new Request(input, init);
-        if (new URL(request.url).hostname !== "api.openai.com") {
-          return originalFetch(input, init);
-        }
-        providerCalls += 1;
-        return providerResponse({}, status);
-      }) as typeof fetch;
-      try {
-        expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
-          ok: false,
-          reason,
-        });
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
+      const { result, providerCalls } = await withProviderFailure(
+        code,
+        detail,
+        () => dispatchGeneration(enabledEnv(), claim),
+      );
+      // The classification the runner committed, carried through unchanged.
+      // Re-deriving it here would be a second opinion about an event this
+      // Worker never observed.
+      expect(result).toMatchObject({ ok: false, reason });
       expect(providerCalls).toBe(1);
     }
   });
 
-  it.each([
-    ["timeout", "publisher_unavailable"],
-    ["refusal", "publisher_refused"],
-  ] as const)("maps a provider %s after exactly one call", async (failure, reason) => {
+  it("keeps waiting rather than re-enqueuing while the runner holds the lease", async () => {
     const { claim } = await claimReserved();
-    const originalFetch = globalThis.fetch;
-    let providerCalls = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (new URL(request.url).hostname !== "api.openai.com") {
-        return originalFetch(input, init);
-      }
-      providerCalls += 1;
-      if (failure === "timeout") {
-        const aborted = new Error("PRIVATE_PROVIDER_TIMEOUT_DETAIL");
-        aborted.name = "AbortError";
-        throw aborted;
-      }
-      return new Response(
-        JSON.stringify({
-          id: "resp_task10_refusal",
-          output: [{ type: "message", content: [{ type: "refusal" }] }],
-        }),
-        { headers: { "content-type": "application/json" } },
-      );
-    }) as typeof fetch;
-    try {
-      expect(await dispatchGeneration(enabledEnv(), claim)).toMatchObject({
-        ok: false,
-        reason,
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-    expect(providerCalls).toBe(1);
+
+    const first = await dispatchGeneration(enabledEnv(), claim);
+    expect(first).toMatchObject({ ok: false, reason: "publisher_pending" });
+    const claimed = await claimReadingJob();
+    expect(claimed).not.toBeNull();
+    await leaseReadingJob(claimed!);
+
+    const second = await dispatchGeneration(enabledEnv(), claim);
+    expect(second).toMatchObject({
+      ok: false,
+      reason: "publisher_pending",
+      providerJobId: claimed!.job.id,
+    });
+    // One coordinate, one job. A redelivery during a fifteen-minute call must
+    // not become a second authorized invocation.
+    expect(await readingProviderJobCount()).toBe(1);
   });
 
   it("discards a stale nondeterministic loser without comparing its prose", async () => {
@@ -804,36 +729,40 @@ describe("V5 execution", () => {
     );
     const second = await claimJob(enabledEnv(), enqueued.jobId);
     if (!second) throw new Error("replacement claim missing");
+    // Two real Daily attempts, so two distinct provider coordinates: the
+    // reclaimed lease incremented `attempts`, and `stage_attempt` follows it.
+    expect(second.attempts).toBe(first.attempts + 1);
 
-    const originalFetch = globalThis.fetch;
-    let providerCalls = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (new URL(request.url).hostname !== "api.openai.com") {
-        return originalFetch(input, init);
-      }
-      providerCalls += 1;
-      const call = providerCalls;
-      const body = (await request.json()) as {
-        input: Array<{ content: Array<{ text: string }> }>;
-      };
-      const packet = JSON.parse(body.input[0]!.content[0]!.text) as ReadingGenerationRequest;
-      const candidate = candidateFor(packet);
-      candidate.lead.text = `The pressure suggests candidate ${call}, a smaller promise you can keep.`;
-      if (call === 1) await new Promise((resolve) => setTimeout(resolve, 20));
-      return providerResponse(candidate);
-    }) as typeof fetch;
-    let outcomes;
-    try {
-      outcomes = await Promise.all([
-        dispatchGeneration(enabledEnv(), first),
-        dispatchGeneration(enabledEnv(), second),
-      ]);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    expect(await dispatchGeneration(enabledEnv(), first)).toMatchObject({
+      ok: false,
+      reason: "publisher_pending",
+    });
+    const firstJob = await claimReadingJob();
+    if (!firstJob) throw new Error("first provider job missing");
+    const firstCandidate = candidateFor(firstJob.packet);
+    firstCandidate.lead.text =
+      "The pressure suggests candidate 1, a smaller promise you can keep.";
+    await completeReadingJob(firstJob, JSON.stringify(firstCandidate));
 
-    expect(providerCalls).toBe(2);
+    expect(await dispatchGeneration(enabledEnv(), second)).toMatchObject({
+      ok: false,
+      reason: "publisher_pending",
+    });
+    const secondJob = await claimReadingJob();
+    if (!secondJob) throw new Error("second provider job missing");
+    expect(secondJob.job.id).not.toBe(firstJob.job.id);
+    expect(secondJob.job.stageAttempt).toBe(firstJob.job.stageAttempt + 1);
+    const secondCandidate = candidateFor(secondJob.packet);
+    secondCandidate.lead.text =
+      "The pressure suggests candidate 2, a smaller promise you can keep.";
+    await completeReadingJob(secondJob, JSON.stringify(secondCandidate));
+
+    const outcomes = await Promise.all([
+      dispatchGeneration(enabledEnv(), first),
+      dispatchGeneration(enabledEnv(), second),
+    ]);
+
+    expect(await readingProviderJobCount()).toBe(2);
     expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1);
     expect(outcomes).toContainEqual(
       expect.objectContaining({ ok: false, reason: "duplicate" }),
@@ -844,7 +773,10 @@ describe("V5 execution", () => {
 
   it("retains an invalidated predecessor when a fact-repair successor commits", async () => {
     const { enqueued: predecessor, claim: predecessorClaim } = await claimReserved();
-    expect(await dispatchGeneration(enabledEnv(), predecessorClaim)).toMatchObject({ ok: true });
+    expect(
+      (await withProvider((candidate) => candidate, () =>
+        dispatchGeneration(enabledEnv(), predecessorClaim))).result,
+    ).toMatchObject({ ok: true });
     const predecessorCommand = predecessorClaim.command as GenerateDailyReadingCommandV2;
     expect(
       await invalidatePublishedReading(enabledEnv(), {
@@ -866,40 +798,281 @@ describe("V5 execution", () => {
     const successorClaim = await claimJob(enabledEnv(), successor.jobId);
     if (!successorClaim) throw new Error("successor claim missing");
 
-    expect(await dispatchGeneration(enabledEnv(), successorClaim)).toMatchObject({ ok: true });
+    expect(
+      (await withProvider((candidate) => candidate, () =>
+        dispatchGeneration(enabledEnv(), successorClaim))).result,
+    ).toMatchObject({ ok: true });
     expect(
       await rows("SELECT status FROM daily_readings WHERE id = ?", predecessor.readingId),
     ).toEqual([{ status: "invalidated" }]);
   });
 
-  it("does not call OpenAI when the atomic UTC-day budget is exhausted", async () => {
+  it("charges the UTC-day ledger nothing for creating, adopting, or publishing", async () => {
+    // The ceiling bounds actual model invocations, and the invocation happens
+    // when the RUNNER claims. Charging on create-or-adopt would bill a
+    // duplicate delivery, a reclaimed lease, and a job nobody ever ran; the
+    // reading below is generated end to end and must leave the ledger empty.
+    const { enqueued, claim } = await claimReserved();
+    const { result } = await withProvider((candidate) => candidate, () =>
+      dispatchGeneration(enabledEnv(), claim));
+
+    expect(result).toMatchObject({ ok: true, readingId: enqueued.readingId });
+    expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
+  });
+
+  it("still refuses to create provider work without an approved call ceiling", async () => {
+    // A missing ceiling is a configuration problem, and a provider job whose
+    // `daily_call_limit` came from nowhere would be a job the claim route could
+    // not bound.
     const { claim } = await claimReserved();
-    await rows(
-      `INSERT INTO reading_provider_daily_usage
-         (utc_date, used_calls, created_at, updated_at)
-       VALUES (?, 1, ?, ?)`,
-      new Date().toISOString().slice(0, 10),
-      new Date().toISOString(),
-      new Date().toISOString(),
+    expect(
+      await dispatchGeneration(
+        enabledEnv({ READING_DAILY_PROVIDER_CALL_LIMIT: "" }),
+        claim,
+      ),
+    ).toMatchObject({ ok: false, reason: "publisher_not_configured" });
+    expect(await readingProviderJobCount()).toBe(0);
+  });
+
+  it("pins the approved ceiling onto the job the runner will claim", async () => {
+    const { claim } = await claimReserved();
+    expect(
+      await dispatchGeneration(
+        enabledEnv({ READING_DAILY_PROVIDER_CALL_LIMIT: "37" }),
+        claim,
+      ),
+    ).toMatchObject({ ok: false, reason: "publisher_pending" });
+    const claimed = await claimReadingJob();
+    expect(claimed!.job.dailyCallLimit).toBe(37);
+  });
+});
+
+describe("durable waiting for Codex", () => {
+  async function jobRow(jobId: string) {
+    const [row] = await rows<{
+      status: string;
+      result_class: string | null;
+      attempts: number;
+      claim_token: string | null;
+      lease_expires_at: string | null;
+      available_at: string | null;
+      dispatched_at: string | null;
+    }>(
+      `SELECT status, result_class, attempts, claim_token, lease_expires_at,
+              available_at, dispatched_at
+       FROM jobs WHERE id = ?`,
+      jobId,
     );
-    let providerCalls = 0;
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (new URL(request.url).hostname === "api.openai.com") providerCalls += 1;
-      return originalFetch(input, init);
-    }) as typeof fetch;
-    try {
-      expect(
-        await dispatchGeneration(
-          enabledEnv({ READING_DAILY_PROVIDER_CALL_LIMIT: "1" }),
-          claim,
-        ),
-      ).toMatchObject({ ok: false, reason: "publisher_budget_exhausted" });
-    } finally {
-      globalThis.fetch = originalFetch;
+    return row!;
+  }
+
+  it("parks the job and hands the lease back without spending a second attempt", async () => {
+    const enqueued = await reserve();
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+
+    const delivered = await deliver(message, enabledEnv());
+    // Acknowledged, not retried: the Queue must not hold a delivery open for a
+    // call that may run for a quarter of an hour.
+    expect(delivered.retryMessages).toEqual([]);
+
+    const job = await jobRow(enqueued.jobId);
+    expect(job.status).toBe("queued");
+    expect(job.result_class).toBe("publisher_pending");
+    expect(job.attempts).toBe(1);
+    expect(job.claim_token).toBeNull();
+    expect(job.lease_expires_at).toBeNull();
+    // Immediately claimable, because what is being waited on is a nudge rather
+    // than a delay...
+    expect(job.available_at).toBeNull();
+    // ...and still marked dispatched, so the outbox sweep does not re-offer it
+    // every cycle for the whole life of the provider call.
+    expect(job.dispatched_at).not.toBeNull();
+    expect(await readingProviderJobCount()).toBe(1);
+  });
+
+  it("adopts the same coordinate on a duplicate delivery and spends nothing", async () => {
+    const enqueued = await reserve();
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+
+    await deliver(message, enabledEnv());
+    const created = await claimReadingJob();
+    await deliver(message, enabledEnv(), 2);
+    await deliver(message, enabledEnv(), 3);
+
+    const job = await jobRow(enqueued.jobId);
+    expect(job.attempts).toBe(1);
+    expect(job.result_class).toBe("publisher_pending");
+    expect(await readingProviderJobCount()).toBe(1);
+    const still = await claimReadingJob();
+    expect(still!.job.id).toBe(created!.job.id);
+    expect(still!.job.stageAttempt).toBe(0);
+  });
+
+  it("advances to the next attempt and a fresh coordinate on a real retry", async () => {
+    const enqueued = await reserve();
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+
+    await deliver(message, enabledEnv());
+    const first = await claimReadingJob();
+    if (!first) throw new Error("first provider job missing");
+    await failReadingJob(first, "publisher_unavailable", "provider_5xx");
+
+    // Adopting the failure is a real retry, so the pending marker is cleared
+    // and the job goes back with a delay rather than staying claimable.
+    const retried = await deliver(message, enabledEnv());
+    expect(retried.retryMessages).toHaveLength(1);
+    const afterFailure = await jobRow(enqueued.jobId);
+    expect(afterFailure.result_class).toBeNull();
+    expect(afterFailure.attempts).toBe(1);
+    expect(afterFailure.available_at).not.toBeNull();
+
+    await rows("UPDATE jobs SET available_at = ? WHERE id = ?", new Date().toISOString(), enqueued.jobId);
+    await deliver(message, enabledEnv(), 2);
+    const afterRetry = await jobRow(enqueued.jobId);
+    expect(afterRetry.attempts).toBe(2);
+    const second = await claimReadingJob();
+    expect(second!.job.id).not.toBe(first.job.id);
+    expect(second!.job.stageAttempt).toBe(1);
+    expect(await readingProviderJobCount()).toBe(2);
+  });
+
+  it("never lets the attempt counter fall to zero or below", async () => {
+    const enqueued = await reserve();
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+    for (let delivery = 1; delivery <= 4; delivery += 1) {
+      await deliver(message, enabledEnv(), delivery);
+      const job = await jobRow(enqueued.jobId);
+      expect(job.attempts).toBeGreaterThanOrEqual(1);
     }
-    expect(providerCalls).toBe(0);
+    // Four pending redeliveries, one actual attempt, one authorized invocation.
+    expect((await jobRow(enqueued.jobId)).attempts).toBe(1);
+    expect(await readingProviderJobCount()).toBe(1);
+  });
+
+  it("refuses a release from a claim that no longer owns the job", async () => {
+    const enqueued = await reserve();
+    const claim = await claimJob(enabledEnv(), enqueued.jobId);
+    if (!claim) throw new Error("claim missing");
+
+    expect(
+      await releaseClaimForPublisherPending(enabledEnv(), enqueued.jobId, "clm_not_mine"),
+    ).toBe(false);
+    expect(
+      await releaseClaimForPublisherPending(enabledEnv(), "job_not_real", claim.claimToken),
+    ).toBe(false);
+    expect((await jobRow(enqueued.jobId)).status).toBe("running");
+
+    expect(
+      await releaseClaimForPublisherPending(enabledEnv(), enqueued.jobId, claim.claimToken),
+    ).toBe(true);
+    // And not twice: the job is no longer running under that token.
+    expect(
+      await releaseClaimForPublisherPending(enabledEnv(), enqueued.jobId, claim.claimToken),
+    ).toBe(false);
+  });
+
+  it("does not nudge a job whose Daily lease is still held", async () => {
+    // The completion-before-release race. The runner finished while this
+    // delivery still owned the claim; waking the job now would race the
+    // consumer that is about to release it, so the nudge declines and the
+    // release path's own reload picks the result up.
+    const enqueued = await reserve();
+    const claim = await claimJob(enabledEnv(), enqueued.jobId);
+    if (!claim) throw new Error("claim missing");
+    await dispatchGeneration(enabledEnv(), claim);
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
+
+    const job = await loadCodexProviderJob(enabledEnv(), claimed.job.id);
+    expect(await nudgeCodexProviderOwner(enabledEnv(), job!)).toBe("still_owned");
+    expect((await jobRow(enqueued.jobId)).status).toBe("running");
+  });
+
+  it("clears the dispatch marker and sends exactly one opaque nudge", async () => {
+    const enqueued = await reserve();
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+    await deliver(message, enabledEnv());
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
+
+    const sent: unknown[] = [];
+    const nudgeEnv = {
+      ...enabledEnv(),
+      READING_QUEUE: {
+        send: async (body: unknown) => {
+          sent.push(body);
+        },
+      } as unknown as typeof env.READING_QUEUE,
+    };
+    const job = await loadCodexProviderJob(nudgeEnv, claimed.job.id);
+    expect(await nudgeCodexProviderOwner(nudgeEnv, job!)).toBe("sent");
+
+    // Exactly the two ids, and nothing about the provider job, the prompt, or
+    // the prose.
+    expect(sent).toEqual([
+      { job_id: enqueued.jobId, reading_id: enqueued.readingId },
+    ]);
+    expect(JSON.stringify(sent)).not.toContain("cpjob_");
+    // Re-marked dispatched after a successful send, so the outbox stays quiet
+    // and the marker now sits AFTER the provider's completion instant. That
+    // ordering is what scheduled repair reads to tell a nudge that landed from
+    // one that was lost; the nudge itself is deliberately not self-limiting,
+    // because a duplicate message costs nothing once the claim CAS dedupes it.
+    const dispatched = (await jobRow(enqueued.jobId)).dispatched_at;
+    expect(dispatched).not.toBeNull();
+    expect(Date.parse(dispatched!)).toBeGreaterThanOrEqual(
+      Date.parse(job!.completedAt!),
+    );
+  });
+
+  it("leaves the job undispatched when the nudge send fails", async () => {
+    const enqueued = await reserve();
+    await deliver(
+      { job_id: enqueued.jobId, reading_id: enqueued.readingId },
+      enabledEnv(),
+    );
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
+
+    const failingEnv = {
+      ...enabledEnv(),
+      READING_QUEUE: {
+        send: async () => {
+          throw new Error("queue unavailable");
+        },
+      } as unknown as typeof env.READING_QUEUE,
+    };
+    const job = await loadCodexProviderJob(failingEnv, claimed.job.id);
+    expect(await nudgeCodexProviderOwner(failingEnv, job!)).toBe("send_failed");
+    // An undispatched marker is exactly what scheduled repair looks for, so a
+    // lost message is a bounded delay rather than a stranded reading.
+    expect((await jobRow(enqueued.jobId)).dispatched_at).toBeNull();
+  });
+
+  it("publishes on the delivery that follows a terminal provider result", async () => {
+    const enqueued = await reserve();
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+    await deliver(message, enabledEnv());
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
+
+    const delivered = await deliver(message, enabledEnv(), 2);
+    expect(delivered.retryMessages).toEqual([]);
+    const job = await jobRow(enqueued.jobId);
+    expect(job.status).toBe("succeeded");
+    expect(job.result_class).toBe("published");
+    // Still one attempt and one authorized invocation.
+    expect(job.attempts).toBe(1);
+    expect(await readingProviderJobCount()).toBe(1);
+    const [reading] = await rows<{ status: string }>(
+      "SELECT status FROM daily_readings WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(reading!.status).toBe("published");
   });
 });
 
@@ -1113,16 +1286,19 @@ describe("V5 queue controls", () => {
       );
       const originalFetch = globalThis.fetch;
       const originalNow = Date.now();
-      const advancedNow = originalNow + 151_000;
-      let providerCalls = 0;
-      let clock: ReturnType<typeof vi.spyOn> | null = null;
+      // The lease is five minutes and the executor now needs about ninety
+      // seconds of it: sealing one envelope, committing one row, and handing
+      // the lease back. The fifteen-minute provider deadline is outside the
+      // lease, so the window that no longer fits is a much later one than it
+      // was under the synchronous transport.
+      const advancedNow = originalNow + 250_000;
+        let clock: ReturnType<typeof vi.spyOn> | null = null;
       globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const request = input instanceof Request ? input : new Request(input, init);
         const url = new URL(request.url);
         if (url.pathname.endsWith("/v1/daily-sky") && !clock) {
           clock = vi.spyOn(Date, "now").mockReturnValue(advancedNow);
         }
-        if (url.hostname === "api.openai.com") providerCalls += 1;
         return originalFetch(input, init);
       }) as typeof fetch;
       let result;
@@ -1143,7 +1319,7 @@ describe("V5 queue controls", () => {
       );
       expect(job!.status).toBe("queued");
       expect(Date.parse(job!.available_at)).toBe(advancedNow + 305_000);
-      expect(providerCalls).toBe(0);
+      expect(await readingProviderJobCount()).toBe(0);
     },
   );
 
@@ -1152,15 +1328,13 @@ describe("V5 queue controls", () => {
     await rows("UPDATE jobs SET attempts = 3 WHERE id = ?", enqueued.jobId);
     const originalFetch = globalThis.fetch;
     const originalNow = Date.now();
-    let providerCalls = 0;
     let clock: ReturnType<typeof vi.spyOn> | null = null;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       const url = new URL(request.url);
       if (url.pathname.endsWith("/v1/daily-sky") && !clock) {
-        clock = vi.spyOn(Date, "now").mockReturnValue(originalNow + 151_000);
+        clock = vi.spyOn(Date, "now").mockReturnValue(originalNow + 250_000);
       }
-      if (url.hostname === "api.openai.com") providerCalls += 1;
       return originalFetch(input, init);
     }) as typeof fetch;
     let result;
@@ -1176,28 +1350,32 @@ describe("V5 queue controls", () => {
     }
 
     expect(result.retryMessages).toEqual([]);
-    expect(providerCalls).toBe(0);
+    expect(await readingProviderJobCount()).toBe(0);
     expect(
       await rows("SELECT status, result_class FROM jobs WHERE id = ?", enqueued.jobId),
     ).toEqual([{ status: "failed", result_class: "calc_unavailable" }]);
   });
 
-  it("returns non-retryable 503 when the UTC provider budget is terminal", async () => {
+  it("returns non-retryable 503 when the runner reports an exhausted budget", async () => {
+    // The ceiling is charged at the runner's claim, not in this Worker, so an
+    // exhausted day arrives as a terminal provider failure rather than a local
+    // refusal. It must still be non-retryable for the reader: the day's
+    // approved allowance is not going to change on a redelivery.
     const enqueued = await reserve();
-    const now = new Date().toISOString();
-    await rows(
-      `INSERT INTO reading_provider_daily_usage
-         (utc_date, used_calls, created_at, updated_at)
-       VALUES (?, 1, ?, ?)`,
-      now.slice(0, 10),
-      now,
-      now,
+    const message = { job_id: enqueued.jobId, reading_id: enqueued.readingId };
+
+    const first = await deliver(message, enabledEnv());
+    expect(first.retryMessages).toEqual([]);
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await failReadingJob(
+      claimed,
+      "publisher_budget_exhausted",
+      "daily_call_limit_reached",
     );
-    const delivered = await deliver(
-      { job_id: enqueued.jobId, reading_id: enqueued.readingId },
-      enabledEnv({ READING_DAILY_PROVIDER_CALL_LIMIT: "1" }),
-    );
-    expect(delivered.retryMessages).toEqual([]);
+
+    const second = await deliver(message, enabledEnv());
+    expect(second.retryMessages).toEqual([]);
 
     const response = await SELF.fetch("http://api.test/v1/readings/today", {
       method: "PUT",

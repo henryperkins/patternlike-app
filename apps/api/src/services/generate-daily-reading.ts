@@ -67,7 +67,21 @@ export type ExecutionOutcome =
   | { ok: false; reason: "duplicate"; detail: string }
   | { ok: false; reason: V1FailureCode | V5FailureCode; detail: string }
   /** Internal Queue disposition; never stored as a generation failure class. */
-  | { ok: false; reason: "insufficient_lease"; detail: "execution_window_exhausted" };
+  | { ok: false; reason: "insufficient_lease"; detail: "execution_window_exhausted" }
+  /**
+   * The external Codex job exists and is still being worked.
+   *
+   * A Queue control result, not a `GenerationFailureCode`: nothing failed, and
+   * this must never reach `failReading`. It carries the provider control id so
+   * the handler can close the enqueue/completion race after it hands the Daily
+   * lease back, and nothing else — no prompt, no response, no lease token.
+   */
+  | {
+      ok: false;
+      reason: "publisher_pending";
+      detail: "codex_provider_pending";
+      providerJobId: string;
+    };
 
 export type ExecutionFailure = Exclude<V1FailureCode, "calc_unavailable" | "release_unreadable">;
 

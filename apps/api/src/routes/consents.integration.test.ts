@@ -15,7 +15,6 @@ import {
   grantAiSynthesisConsent,
 } from "../db/consents.js";
 import type { GenerationMessage } from "../env.js";
-import { OPENAI_READING_MODEL } from "../services/reading-publisher.js";
 import {
   IDENTITY_A,
   IDENTITY_B,
@@ -26,7 +25,13 @@ import {
   rows,
   seedChart,
   seedUser,
+  READING_CODEX_PUBLISHER_VARS,
 } from "../../test/helpers.js";
+import {
+  candidateFor,
+  claimReadingJob,
+  completeReadingJob,
+} from "../../test/codex-reading-runner.js";
 
 const ZONE = "America/Chicago";
 const QUEUE = "patternlike-daily-readings-dev";
@@ -55,19 +60,7 @@ function publisherEnv(
   return {
     ...env,
     READING_V5_ROLLOUT: "first_open",
-    READING_PUBLISHER: "openai",
-    OPENAI_READING_MODEL,
-    OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.1",
-    OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
-    READING_CONTEXT_MAX_BYTES: "98304",
-    READING_PREGEN_ACTIVE_DAYS: "30",
-    READING_PREGEN_LEAD_MINUTES: "30",
-    READING_PREGEN_SPREAD_MINUTES: "45",
-    READING_SCHEDULER_BATCH_LIMIT: "100",
-    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
-    OPENAI_API_KEY: "sk-test-key",
+    ...READING_CODEX_PUBLISHER_VARS,
     ...overrides,
   };
 }
@@ -725,6 +718,13 @@ describe("AI-synthesis consent routes", () => {
         )
       ).status,
     ).toBe(202);
+    // Two deliveries, because the provider call is durable: the first creates
+    // the Codex job and hands the Daily lease back, the runner answers, and
+    // the second adopts and publishes.
+    await deliver(messages[0]!, requestEnv);
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
     await deliver(messages[0]!, requestEnv);
 
     const before = await app.request(
