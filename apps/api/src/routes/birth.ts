@@ -7,7 +7,6 @@ import {
   newId,
   requireIdempotencyKey,
   type BirthProfileRequest,
-  type TimezoneQualifier,
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { safeLog } from "../services/safe-log.js";

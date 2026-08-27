@@ -164,7 +164,7 @@ function completedCalcEvents(
   info: ReturnType<typeof vi.spyOn>,
 ): Array<[unknown, ...unknown[]]> {
   return info.mock.calls.filter(
-    (call): call is [unknown, ...unknown[]] =>
+    (call: unknown[]): call is [unknown, ...unknown[]] =>
       call[0] === "birth_calc_completed",
   );
 }

@@ -310,7 +310,7 @@ function sameEffectiveSubmitted(
 
 function isBirthCalcCommandV1(
   value: Record<string, unknown>,
-): value is BirthCalcCommandV1 {
+): value is Record<string, unknown> & BirthCalcCommandV1 {
   if (!hasExactKeys(value, [
     "schema_version",
     "submitted",
@@ -361,7 +361,7 @@ function isBirthCalcCommandV1(
   ) {
     return false;
   }
-  return sameEffectiveSubmitted(value as BirthCalcCommandV1);
+  return sameEffectiveSubmitted(value);
 }
 
 function isLegacyBirthplace(
@@ -439,7 +439,7 @@ export function decodeBirthProfilePayload(
 function projectBirthplace(
   birthplace: BirthProfileRequest["birthplace"] | null,
 ): BirthProfileRequest["birthplace"] | null {
-  if (birthplace === null) return null;
+  if (birthplace === null || birthplace === undefined) return null;
   const projected: NonNullable<BirthProfileRequest["birthplace"]> = {};
   if (birthplace.place_id !== undefined) {
     projected.place_id = birthplace.place_id;
