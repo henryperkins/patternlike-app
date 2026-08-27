@@ -38,6 +38,8 @@ import {
 } from "../services/enqueue.js";
 import { runReadingScheduler } from "../services/run-reading-scheduler.js";
 import { claimJob } from "./generation.js";
+import { ensureTodayReading } from "../services/ensure-today-reading.js";
+import { dispatchGeneration } from "../services/generate-daily-reading.js";
 import type { GenerateDailyReadingCommandV2 } from "../services/generation-command-v2.js";
 import { OPENAI_READING_MODEL } from "../services/reading-publisher.js";
 import type { StoredReadingV5 } from "../services/stored-reading.js";
@@ -421,6 +423,67 @@ describe("bounded ordered repair", () => {
         reserved.readingId,
       ),
     ).toEqual([{ command_generation: 2, status: "pending" }]);
+  });
+
+  it("converges scheduled and first-open on one reservation, job, and coordinate", async () => {
+    // `hybrid` runs both entry points at once, which is the whole point of the
+    // mode: the scheduler is primary and first-open repairs a missed or late
+    // day. A reader who opens the app in the same window must not get a second
+    // reservation, a second Daily job, or a second authorized provider call.
+    const account = identity(42);
+    await seedSchedulerAccount(account, { nextDueAt: OLD });
+    const envValue = hybridEnv();
+    const localDate = resolveV5TargetDate(ZONE, SCHEDULED_AT)!;
+
+    const scheduled = await runReadingScheduler(envValue, SCHEDULED_AT);
+    expect(scheduled.due.reserved).toBe(1);
+    const [reserved] = await rows<{ id: string; active_generation_job_id: string }>(
+      `SELECT id, active_generation_job_id FROM daily_readings
+       WHERE user_id = ? AND local_date = ?`,
+      account.userId,
+      localDate,
+    );
+    expect(reserved).toBeDefined();
+
+    const firstOpen = await ensureTodayReading(envValue, account, {
+      now: SCHEDULED_AT,
+      generationMode: "v5",
+      rolloutEntry: "first_open",
+    });
+    // Still preparing, not a second reservation: the day is already reserved
+    // and the reader is waiting on the same job.
+    expect(firstOpen).toMatchObject({ ok: true, status: "preparing" });
+
+    // One reservation for the day, still pointing at the same job.
+    const readings = await rows<{ id: string; active_generation_job_id: string }>(
+      `SELECT id, active_generation_job_id FROM daily_readings
+       WHERE user_id = ? AND local_date = ?`,
+      account.userId,
+      localDate,
+    );
+    expect(readings).toHaveLength(1);
+    expect(readings[0]!.id).toBe(reserved!.id);
+    expect(readings[0]!.active_generation_job_id)
+      .toBe(reserved!.active_generation_job_id);
+    expect(
+      await rows(
+        "SELECT id FROM jobs WHERE user_id = ? AND job_type = 'generate_daily_reading'",
+        account.userId,
+      ),
+    ).toHaveLength(1);
+
+    // And when the delivery finally runs, exactly one provider coordinate.
+    const claim = await claimJob(envValue, reserved!.active_generation_job_id);
+    expect(claim).not.toBeNull();
+    expect(await dispatchGeneration(envValue, claim!)).toMatchObject({
+      ok: false,
+      reason: "publisher_pending",
+    });
+    expect(
+      await rows(
+        "SELECT id FROM codex_provider_jobs WHERE pipeline = 'reading'",
+      ),
+    ).toHaveLength(1);
   });
 
   it("replaces a superseded command once with one frozen under current configuration", async () => {

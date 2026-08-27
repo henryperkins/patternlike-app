@@ -1,10 +1,30 @@
 # OpenAI daily reading publisher — production rollout
 
-**Status (reconciled 2026-08-26):** engineering and committed production
-configuration have advanced to `READING_V5_ROLLOUT=first_open`, but this file
-does not contain a complete ordered evidence record proving how that state was
-reached. The default Wrangler block remains `off`; production has no 15-minute
-reading cron and is not `hybrid`.
+> **SUPERSEDED as a procedure, 2026-08-27.** Daily generation no longer has a
+> direct OpenAI transport: the adapter is deleted, `READING_PUBLISHER` accepts
+> only `codex`, and configuration requires no OpenAI key, credential mode, or AI
+> Gateway. Every *instruction* below describes a path that no longer exists.
+>
+> Keep this file for its dated evidence — what was observed, when, and by whom —
+> which remains the record of how the direct-API rollout actually went. Do not
+> follow its steps. The current Daily procedure is
+> [`codex-production-provider.md`](./codex-production-provider.md), and the
+> ordered enablement sequence is
+> `docs/superpowers/plans/2026-08-27-codex-reader-rollout.md`.
+>
+> What carried over unchanged: the frozen-command contract, the four-attempt
+> retry policy, the UTC-day call ceiling and its 10,000 approval, scheduler
+> eligibility and the 30-day activity window, first-open repair, and
+> `READING_V5_ROLLOUT` as the kill switch. What did not: `store: false`, the
+> gateway headers, `OPENAI_CREDENTIAL_SOURCE`, the 90-second provider timeout,
+> and the consent copy that promised provider-side storage was off.
+
+**Status (reconciled 2026-08-26, before the Codex move):** engineering and
+committed production configuration had advanced to
+`READING_V5_ROLLOUT=first_open`, but this file does not contain a complete
+ordered evidence record proving how that state was reached. Committed
+configuration is now `hybrid` with both production crons; that is a source
+declaration and not an observation of the deployed Worker.
 
 Treat the gate text below as the original staged procedure, not as a current
 inventory. Before any further operation, re-query the deployed Worker, D1,

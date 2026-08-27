@@ -53,9 +53,39 @@ test("production parks the machine pipeline and runs the one-account Pattern can
     "*/15 * * * *",
     "7,22,37,52 * * * *",
   ]);
+  // Both crons. `hybrid` makes the 15-minute lane the PRIMARY Daily entry
+  // point, so declaring the mode without the trigger would leave every
+  // scheduled reading to first-open repair -- readers who do not open the app
+  // would simply never get one. The ontology-maintenance lane is unchanged, and
+  // it also carries the Codex provider sweep.
   assert.deepEqual(production.triggers.crons, [
+    "*/15 * * * *",
     "7,22,37,52 * * * *",
   ]);
+
+  // Daily generation: scheduled first, first-open as the repair path, through
+  // the durable Codex runner. The timeout is the runner's own deadline, not
+  // what a synchronous Worker call could afford inside a five-minute lease.
+  assert.equal(production.vars.READING_V5_ROLLOUT, "hybrid");
+  assert.equal(production.vars.READING_PUBLISHER, "codex");
+  assert.equal(production.vars.OPENAI_READING_TIMEOUT_MS, "900000");
+  assert.equal(production.vars.OPENAI_READING_MODEL, "gpt-5.6-sol");
+  assert.equal(production.vars.OPENAI_READING_REASONING, "high");
+  assert.equal(production.vars.OPENAI_READING_PROMPT_VERSION, "1.0.1");
+  assert.equal(production.vars.OPENAI_READING_MAX_OUTPUT_TOKENS, "4000");
+  assert.equal(production.vars.READING_CONTEXT_MAX_BYTES, "98304");
+  assert.equal(production.vars.READING_DAILY_PROVIDER_CALL_LIMIT, "10000");
+  // No AI Gateway. Daily reaches its model through the runner, so a gateway
+  // here would describe a route Daily does not take.
+  assert.equal(production.vars.AI_GATEWAY_ACCOUNT_ID ?? "", "");
+  assert.equal(production.vars.AI_GATEWAY_ID ?? "", "");
+  // OPENAI_CREDENTIAL_SOURCE stays. It is the ontology pipeline's transport
+  // selector and is unread while that pipeline is on Codex; Daily reads
+  // neither it nor OPENAI_API_KEY, which reading-publisher.test.ts asserts
+  // directly. Removing a deployed var and deleting the key it names are
+  // separate production actions with their own verification, not a side effect
+  // of this change.
+  assert.equal(production.vars.OPENAI_CREDENTIAL_SOURCE, "worker");
   // The machine pipeline is parked. Its regression stage rehearsed thirty
   // Pattern generations per candidate -- about four hours and 130 provider
   // calls -- and never once passed in sixteen attempts. Ontologies come from

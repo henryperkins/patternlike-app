@@ -414,26 +414,37 @@ grant/revoke enforcement are not implemented.
 
 ## 6. The daily reading publisher
 
-Daily readings are no longer assembled from a signed editorial release. A
-configured OpenAI model writes them, under an explicit per-account consent, from
-calculated facts the model is never allowed to produce itself. The controls over
-calculation, consent, minimization, validation, publication, and provenance are
-unchanged or stronger; the reviewed-copy control over prose was removed
-deliberately. See
+Daily readings are no longer assembled from a signed editorial release. A model
+writes them, under an explicit per-account consent, from calculated facts the
+model is never allowed to produce itself. The controls over calculation,
+consent, minimization, validation, publication, and provenance are unchanged or
+stronger; the reviewed-copy control over prose was removed deliberately. See
 [`../../spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md`](../../spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md).
 
-That means two things for this runbook:
+Since 2026-08-27 that model is reached through the **durable Codex runner**, not
+a direct OpenAI call. The direct adapter is deleted and `READING_PUBLISHER`
+accepts only `codex`, so this Worker holds no OpenAI credential for Daily.
+Operate it from [`codex-production-provider.md`](codex-production-provider.md);
+[`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md) is
+superseded as a procedure and retained only as dated evidence.
+
+That means three things for this runbook:
 
 - **Repository configuration has advanced beyond this runbook's original
-  baseline.** Migration `0003` is applied and committed production configuration
-  declares `READING_V5_ROLLOUT=first_open` with the OpenAI publisher. The
-  production trigger block still has no 15-minute reading cron, so it is not
-  `hybrid`.
+  baseline.** Migration `0003` is applied. Committed production configuration
+  now declares `READING_V5_ROLLOUT=hybrid` with `READING_PUBLISHER=codex` and
+  both production crons (`*/15 * * * *` and `7,22,37,52 * * * *`).
+- **Migration `0017` must reach D1 before the Worker that writes reading
+  provider rows.** It rebuilds `codex_provider_jobs` to admit the
+  `reading`/`publisher` coordinate. Merging to `main` deploys, so the schema
+  step is a hard gate ahead of the merge, exactly as `0016` was.
 - **Configuration is not certification.** The evidence table in
   [`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md) does not
-  record a complete ordered rollout. Re-query the deployed Worker, secrets,
-  usage, and D1 state before any further change rather than replaying that
-  runbook from its historical `off` assumptions.
+  record a complete ordered rollout, and the `hybrid` declaration above is a
+  source statement rather than an observation of the deployed Worker. Re-query
+  the deployed Worker, secrets, usage, cron bindings, and D1 state before any
+  further change rather than replaying either runbook from its historical
+  assumptions.
 - **`release_not_active` applies only to the retained editorial paths.** M5
   constrained-model daily readings do not use a content release. The legacy M3
   daily-reading path and M4 editorial Pattern still require one.

@@ -11,11 +11,16 @@ recorded, and Gate 6 spend certification remains open. Neither this status nor
 any later runbook edit authorizes a deployment, provider call, ontology
 activation, or rollout advance.
 
-This runbook operates the supported Codex CLI provider for Pattern generation
-and the ontology pipeline. The API Worker owns durable jobs, budgets,
-validation, signing, publication, and encrypted artifacts. An approved
+This runbook operates the supported Codex CLI provider for **daily readings**,
+Pattern generation, and the ontology pipeline. The API Worker owns durable jobs,
+budgets, validation, signing, publication, and encrypted artifacts. An approved
 non-AGPL host performs inference through `codex exec` using its local ChatGPT
 login.
+
+Daily joined this control plane on 2026-08-27 and has no other transport: the
+direct-OpenAI adapter is deleted, and `READING_PUBLISHER` accepts only `codex`.
+`docs/deploy/openai-daily-reading-rollout.md` is superseded as a procedure and
+retained only as dated evidence of the direct-API rollout.
 
 The runner has no inbound port. Never copy its Codex credential store to
 Cloudflare, put a ChatGPT token in Worker configuration, or place this service
@@ -342,22 +347,71 @@ Acceptance evidence:
 
 Keep the allowlist at one account until the canary evidence is reviewed.
 
+## 9a. Daily readings on the Codex control plane
+
+Daily uses the coordinate `pipeline = 'reading'`, `pass = 'publisher'`, with the
+generic Daily `jobs.id` as `owner_id`, the frozen `command_generation` as
+`stage_generation`, and `jobs.attempts - 1` as the zero-based `stage_attempt`.
+Migration `0017` is what makes that coordinate legal, and it must be applied to
+D1 **before** the Worker that writes it is deployed.
+
+The Daily Queue message stays exactly `{job_id, reading_id}`. Provider job ids,
+prompts, responses, lease tokens, and artifact keys never enter it, and never
+enter a log.
+
+**`publisher_pending` is not a failure.** While the runner works, the Daily job
+sits `queued` with `result_class = 'publisher_pending'`, no claim token, no
+lease, `available_at` NULL, and `dispatched_at` deliberately still set — which
+is what keeps the outbox sweep from re-offering it every cycle for the life of
+a fifteen-minute call. Reacquiring such a job does **not** spend a Daily
+attempt; only a genuine new provider attempt does. A queue-age dashboard should
+read that state as *waiting*, never as *stuck*.
+
+`READING_V5_ROLLOUT` remains Daily's kill switch and is independent of the
+Pattern and ontology rollouts. `off` pauses queued work durably before any
+claim, decryption, or provider job, published readings stay readable, and it
+requires no runnable provider configuration. Set it before stopping the runner
+if Daily is what you need to stop.
+
+The runner is **concurrency one and FIFO across all three pipelines**. Daily,
+Pattern, and ontology work share one claim order; that is deliberate simplicity,
+not a capacity claim. Add fairness or concurrency only after real queue-age
+evidence and a separate capacity review.
+
+Content-free evidence to record for a Daily canary: pipeline, pass, closed
+status, model, prompt version, job age, lease age, latency, integer token
+counts, request/response hashes, the D1 coordinate, the `reading_provider_daily_usage`
+delta, and the nudge outcome. Never the prompt, the output, runner stderr, a
+user id, a chart id, a consent id, a birth value, or a word of the prose.
+
 ## 10. Budget and repair checks
 
 Use read-only D1 queries to inspect only:
 
-- status counts in `codex_provider_jobs`;
-- pass-level rows in the existing Pattern and ontology daily usage tables;
+- status counts in `codex_provider_jobs`, grouped by pipeline and pass;
+- oldest pending/leased age per pipeline;
+- pass-level rows in the Pattern and ontology daily usage tables, and the
+  date-keyed `reading_provider_daily_usage` ledger for Daily;
 - lease expiry, completion timestamps, and closed failure codes;
 - current domain stage/generation/attempt coordinates;
-- encrypted object keys, byte lengths, and hashes.
+- encrypted object keys, byte lengths, and hashes;
+- Daily jobs sitting at `result_class = 'publisher_pending'`, and how long.
+
+Budget is charged when the **runner claims**, once per lease, including a
+reclaimed one — the previous holder may have invoked before it died. Creating,
+adopting, polling, completing, validating, and publishing are all free. A
+reading ledger that moves without a corresponding claim is a defect, not spend.
 
 Scheduled maintenance cancels stale pending work, re-dispatches a terminal job
-whose completion nudge was interrupted, removes user-owned rows during account
-erasure, prunes stale Pattern-owned terminal artifacts after 30 days, and
-expires ontology-owned artifacts when a failed run reaches its seven-day
-retention deadline. It never deletes an active lease or a current pending
-coordinate.
+whose completion nudge was interrupted — including a Daily owner still parked at
+`publisher_pending`, which no other sweep can see — removes user-owned rows
+during account erasure, prunes stale Pattern-owned terminal artifacts after 30
+days, expires ontology-owned artifacts when a failed run reaches its seven-day
+retention deadline, and deletes a Daily exchange only once its owner is terminal.
+A completed provider job whose Daily owner is still waiting is nudge-eligible,
+never cleanup-eligible: deleting its response would destroy the candidate the
+reader is about to be shown. It never deletes an active lease or a current
+pending coordinate.
 
 ## 11. Credential expiry and incident response
 
@@ -383,9 +437,12 @@ deploy/restart, and verify idle polling. Never reuse an old service token.
 
 The safe rollback is:
 
-1. set both rollouts to `off` and deploy;
-2. stop and disable the runner;
-3. leave migrations `0013` and `0014` and encrypted artifacts in place;
+1. set the affected rollouts to `off` and deploy — `READING_V5_ROLLOUT` for
+   Daily, `PATTERN_AI_ROLLOUT` for Pattern, `ONTOLOGY_PIPELINE_ROLLOUT` for the
+   pipeline; they are independent switches and stopping one need not stop the
+   others;
+2. stop and disable the runner if the fault is the runner itself;
+3. leave migrations `0013`, `0014`, and `0017` and encrypted artifacts in place;
 4. investigate using only safe state, hashes, counters, and closed codes;
 5. redeploy the last known-good Worker only if its schema is compatible with
    the additive migration.
