@@ -564,6 +564,15 @@ components:
     PatternConsent:
       type: object
       additionalProperties: true
+      description: >-
+        Pattern-generation terms and grant. `provider` is the PROCESSOR of
+        record and stays `OpenAI`; the generation service it runs the passes
+        through is named separately in the reader-facing copy, because a reader
+        told only the processor cannot tell which service writes their Pattern.
+        `policy_version` is versioned independently of `schema_version`: the
+        wire shape and what the reader was told are different things, and a
+        grant stored under any version other than the current one is not an
+        active grant.
       required: [schema_version, kind, status]
       properties:
         schema_version: { type: string, const: '0.7.0' }
@@ -583,7 +592,13 @@ components:
       required: [schema_version, consent_policy_version, confirm, reason]
       properties:
         schema_version: { type: string, const: '0.7.0' }
-        consent_policy_version: { type: string }
+        consent_policy_version:
+          type: string
+          description: >-
+            The policy version the reader was shown. A request naming any
+            version other than the one currently in force is
+            `409 consent_policy_version_stale`, so a client cannot confirm
+            against copy the deployment has superseded.
         confirm: { type: string, const: 'GENERATE MY PATTERN' }
         reason: { type: string }
     PatternGenerationAccepted:

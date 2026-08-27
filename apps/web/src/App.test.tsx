@@ -101,7 +101,7 @@ function mockApiResponses(responses: Record<string, MockResponse>) {
         status: "not_granted",
         provider: "OpenAI",
         purpose: "one_pattern_per_chart",
-        policy_version: "1.0.0",
+        policy_version: "1.1.0",
         enabled_categories: [
           "calculated_natal_features",
           "accuracy_and_suppression",

@@ -27,7 +27,7 @@ import {
 import { executePatternJob, getArtifactAt } from "./pattern-execute.js";
 import { loadPatternJob } from "./pattern-stage-protocol.js";
 
-const POLICY = "1.0.0";
+const POLICY = "1.1.0";
 const ADVANCE_FAILURE_TRIGGER = "fail_pattern_advance_integration";
 const PRIVATE_TIMEOUT_ERROR = "PRIVATE_PATTERN_TIMEOUT_PROVIDER_ERROR";
 const INJECTED_DRIFT_PREFIX = "Assigned feature";

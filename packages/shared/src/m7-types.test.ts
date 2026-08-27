@@ -13,12 +13,19 @@ test("M7 schema version is 0.7.0", () => {
 });
 
 test("Pattern consent policy is independently versioned", () => {
-  assert.equal(PATTERN_GENERATION_CONSENT_POLICY_VERSION, "1.0.0");
+  // 1.1.0 is the Codex disclosure. `loadPatternGenerationGrant` returns null for
+  // any other stored version, so bumping this is what makes an old grant stop
+  // authorising generation -- the reader is asked again under the copy that
+  // describes what actually happens.
+  assert.equal(PATTERN_GENERATION_CONSENT_POLICY_VERSION, "1.1.0");
   assert.equal(PATTERN_CONSENT_CATEGORIES.length, 5);
   assert.ok(!PATTERN_CONSENT_CATEGORIES.includes("birth_accuracy_and_uncertainty" as never));
 });
 
-test("editorial_catalog is a first-open dual-path state, not a generation stage", () => {
+test("editorial_catalog stays in the wire enum although nothing emits it", () => {
+  // Account-wide Pattern has no editorial admission outcome. The value remains
+  // for clients and stored documents written while it did: a dead historical
+  // wire value is safer than a schema break nothing needed.
   assert.ok(PATTERN_STATES.includes("editorial_catalog"));
   assert.ok(PATTERN_STATES.includes("consent_required"));
   assert.ok(PATTERN_STATES.includes("ready"));

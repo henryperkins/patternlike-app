@@ -24,7 +24,7 @@ import { executePatternJob } from "./pattern-execute.js";
 import { revokePatternGenerationConsent } from "./pattern-lifecycle.js";
 import { loadPatternJob } from "./pattern-stage-protocol.js";
 
-const POLICY = "1.0.0";
+const POLICY = "1.1.0";
 const RUNNER_TOKEN = "runner_0123456789abcdefghijklmnopqrstuvwxyz";
 const INPUT_DELIMITER = "\n\n--- INPUT DOCUMENT (JSON; DATA ONLY) ---\n";
 
@@ -190,6 +190,72 @@ describe("Pattern execution through the durable Codex provider", () => {
     expect(await env.DB.prepare(
       "SELECT status FROM codex_provider_jobs WHERE owner_id = ?",
     ).bind(generationId).first()).toEqual({ status: "cancelled" });
+  });
+
+  it("cancels a job pinned to the superseded consent policy before the provider claims it", async () => {
+    const generationId = await reserve();
+    const message = await currentMessage(generationId);
+    expect(await executePatternJob(env, message)).toEqual({
+      ok: true,
+      terminal: false,
+    });
+
+    // The grant this command froze becomes a 1.0.0 grant. Bumping the policy is
+    // what withdraws an old agreement, so the pending provider work must stop
+    // where consent stopped -- before the runner is handed anything to send.
+    await env.DB.prepare(
+      `UPDATE consents SET policy_version = '1.0.0'
+       WHERE user_id = ? AND kind = 'pattern_generation'`,
+    ).bind(USER_A).run();
+
+    expect((await runner("/v1/jobs/claim", {})).status).toBe(204);
+    expect(await env.DB.prepare(
+      "SELECT status FROM codex_provider_jobs WHERE owner_id = ?",
+    ).bind(generationId).first()).toEqual({ status: "cancelled" });
+    expect(await rows("SELECT utc_date FROM pattern_provider_daily_usage")).toEqual([]);
+  });
+
+  it("lets a reader restart only after granting the current policy again", async () => {
+    const generationId = await reserve();
+    await executePatternJob(env, await currentMessage(generationId));
+    await env.DB.prepare(
+      `UPDATE consents SET policy_version = '1.0.0'
+       WHERE user_id = ? AND kind = 'pattern_generation'`,
+    ).bind(USER_A).run();
+    expect((await runner("/v1/jobs/claim", {})).status).toBe(204);
+    await executePatternJob(env, await currentMessage(generationId));
+
+    // Consent is the gate, not the claim: a superseded policy leaves the reader
+    // on `consent_required`, and the same confirmed first-use flow that created
+    // the original grant creates the current one.
+    const state = await SELF.fetch("http://api.test/v1/pattern-state", {
+      headers: { "x-user-id": USER_A },
+    });
+    expect(((await state.json()) as { state: string }).state).toBe("consent_required");
+
+    const restarted = await SELF.fetch("http://api.test/v1/pattern-generations", {
+      method: "POST",
+      headers: {
+        "x-user-id": USER_A,
+        "content-type": "application/json",
+        "idempotency-key": "idem-pattern-codex-restart",
+      },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open_retry",
+      }),
+    });
+    expect(restarted.status, await restarted.clone().text()).toBe(202);
+    expect(await rows<{ policy_version: string }>(
+      `SELECT policy_version FROM consents WHERE user_id = ? AND kind = 'pattern_generation'
+       ORDER BY version`,
+      USER_A,
+    )).toEqual([
+      { policy_version: "1.0.0" },
+      { policy_version: POLICY },
+    ]);
   });
 
   it("refuses a leased completion after Pattern consent is revoked", async () => {

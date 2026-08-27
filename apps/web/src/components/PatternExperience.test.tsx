@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { PatternConsent, PatternResponseV7, PatternStateDocument } from "@patternlike/shared";
+import { PATTERN_GENERATION_CONSENT_POLICY_VERSION } from "@patternlike/shared";
 import { capturedFor, mockApiResponses } from "../test/api-mock.js";
 import { PatternExperience } from "./PatternExperience.js";
 
@@ -15,7 +16,7 @@ const consent: PatternConsent = {
   status: "not_granted",
   provider: "OpenAI",
   purpose: "one_pattern_per_chart",
-  policy_version: "1.0.0",
+  policy_version: PATTERN_GENERATION_CONSENT_POLICY_VERSION,
   enabled_categories: [
     "calculated_natal_features",
     "accuracy_and_suppression",
@@ -134,7 +135,7 @@ describe("PatternExperience", () => {
     const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
     expect(posted?.body).toEqual({
       schema_version: "0.7.0",
-      consent_policy_version: "1.0.0",
+      consent_policy_version: PATTERN_GENERATION_CONSENT_POLICY_VERSION,
       confirm: "GENERATE MY PATTERN",
       reason: "first_open",
     });

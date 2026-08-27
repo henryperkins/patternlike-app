@@ -411,7 +411,7 @@ describe("Pattern queue admission", () => {
 
       const reserved = await enqueuePatternGeneration(env, IDENTITY_A, {
         idempotencyKey: "idem-queue-no-pause",
-        consentPolicyVersion: "1.0.0",
+        consentPolicyVersion: "1.1.0",
         reason: "first_open",
         requestId: "req-queue-no-pause",
       });

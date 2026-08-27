@@ -56,7 +56,7 @@ import {
   installPatternReplayTestKeys,
 } from "../../test/pattern-replay-fixtures.js";
 
-const POLICY = "1.0.0";
+const POLICY = "1.1.0";
 
 async function jsonAs(
   userId: string,

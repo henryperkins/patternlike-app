@@ -2408,7 +2408,7 @@ M8_PREDECESSOR_HASHES = {
     "contracts/m4": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
     "contracts/m5": "1fb5228da8488a78e9a4e3dead4e9eb175cf41442b48eee42f2271079c397757",
     "contracts/m6": "03037cdf6a3d92965bd5cc4513950c4ba92c0ff6ab24c81ec24550badab6d221",
-    "contracts/m7": "bffad4eedbf13c34b5c2b52774fc29a08b9a2619286924c1a6664873f07eb5bb",
+    "contracts/m7": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
 }
 M8_REQUIRED_VALID_FIXTURES = {
     "account-export.saved-reading.json",

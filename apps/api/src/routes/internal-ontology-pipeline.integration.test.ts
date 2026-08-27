@@ -881,7 +881,7 @@ describe("machine ontology ingestion", () => {
         },
         body: JSON.stringify({
           schema_version: "0.7.0",
-          consent_policy_version: "1.0.0",
+          consent_policy_version: "1.1.0",
           confirm: "GENERATE MY PATTERN",
           reason: "first_open",
         }),
@@ -946,7 +946,7 @@ describe("machine ontology ingestion", () => {
         },
         body: JSON.stringify({
           schema_version: "0.7.0",
-          consent_policy_version: "1.0.0",
+          consent_policy_version: "1.1.0",
           confirm: "GENERATE MY PATTERN",
           reason: "first_open",
         }),
@@ -994,7 +994,7 @@ describe("machine ontology ingestion", () => {
         },
         body: JSON.stringify({
           schema_version: "0.7.0",
-          consent_policy_version: "1.0.0",
+          consent_policy_version: "1.1.0",
           confirm: "GENERATE MY PATTERN",
           reason: "first_open",
         }),
@@ -1398,7 +1398,7 @@ describe("machine ontology ingestion", () => {
           },
           body: JSON.stringify({
             schema_version: "0.7.0",
-            consent_policy_version: "1.0.0",
+            consent_policy_version: "1.1.0",
             confirm: "GENERATE MY PATTERN",
             reason: "first_open",
           }),

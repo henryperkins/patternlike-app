@@ -62,7 +62,7 @@ import {
 } from "../db/pattern-consents.js";
 import { PATTERN_JOB_TYPE } from "./pattern-command.js";
 
-const POLICY = "1.0.0";
+const POLICY = "1.1.0";
 
 /**
  * The credential the injected stand-in speaks with. The mocked origin keys its

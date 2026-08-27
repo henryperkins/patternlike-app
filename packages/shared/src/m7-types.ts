@@ -17,7 +17,20 @@ import type { NatalFeatureClass } from "./m4-types.js";
 export const M7_SCHEMA_VERSION = "0.7.0" as const;
 export type M7SchemaVersion = typeof M7_SCHEMA_VERSION;
 
-export const PATTERN_GENERATION_CONSENT_POLICY_VERSION = "1.0.0" as const;
+/**
+ * The Pattern generation consent policy currently in force.
+ *
+ * Independently versioned from `M7_SCHEMA_VERSION`, because the wire shape and
+ * what the reader was told are different things. `loadPatternGenerationGrant`
+ * returns null for a stored grant under any other version, so bumping this is
+ * the mechanism that stops an old grant authorising generation and asks the
+ * reader again under copy that describes what actually happens.
+ *
+ * `1.1.0` is the Codex disclosure: it names the generation service, and it drops
+ * the claims that provider-side storage is off, that retention is necessarily
+ * thirty days, and that the reader's grant turns model training off.
+ */
+export const PATTERN_GENERATION_CONSENT_POLICY_VERSION = "1.1.0" as const;
 
 export const PATTERN_CONSENT_CATEGORIES = [
   "calculated_natal_features",
