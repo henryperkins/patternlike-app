@@ -21,6 +21,7 @@ import {
   seedActiveRelease,
   seedChart,
   seedUser,
+  READING_CODEX_PUBLISHER_VARS,
 } from "../../test/helpers.js";
 import {
   CYCLE_FP_EMPTY,
@@ -43,7 +44,6 @@ import {
   reconcileCurrentFactRepair,
 } from "../services/reading-invalidation.js";
 import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
-import { OPENAI_READING_MODEL } from "../services/reading-publisher.js";
 
 const QUEUE = "patternlike-daily-readings-dev";
 const ZONE = "America/Chicago";
@@ -152,19 +152,7 @@ function enabledEnv(
   return {
     ...env,
     READING_V5_ROLLOUT: "first_open",
-    READING_PUBLISHER: "openai",
-    OPENAI_READING_MODEL,
-    OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.1",
-    OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
-    READING_CONTEXT_MAX_BYTES: "98304",
-    READING_PREGEN_ACTIVE_DAYS: "30",
-    READING_PREGEN_LEAD_MINUTES: "30",
-    READING_PREGEN_SPREAD_MINUTES: "45",
-    READING_SCHEDULER_BATCH_LIMIT: "100",
-    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
-    OPENAI_API_KEY: "sk-test-key",
+    ...READING_CODEX_PUBLISHER_VARS,
     ...overrides,
   };
 }

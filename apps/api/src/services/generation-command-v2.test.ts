@@ -19,6 +19,7 @@ import {
   rows,
   seedChart,
   seedUser,
+  READING_CODEX_PUBLISHER_VARS,
 } from "../../test/helpers.js";
 import { decryptPayload } from "../db/users.js";
 import { claimJob } from "../db/generation.js";
@@ -64,19 +65,7 @@ function enabledEnv(rollout = "internal") {
   return {
     ...env,
     READING_V5_ROLLOUT: rollout,
-    READING_PUBLISHER: "openai",
-    OPENAI_READING_MODEL,
-    OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.1",
-    OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
-    READING_CONTEXT_MAX_BYTES: "98304",
-    READING_PREGEN_ACTIVE_DAYS: "30",
-    READING_PREGEN_LEAD_MINUTES: "30",
-    READING_PREGEN_SPREAD_MINUTES: "45",
-    READING_SCHEDULER_BATCH_LIMIT: "100",
-    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
-    OPENAI_API_KEY: "sk-test-key",
+    ...READING_CODEX_PUBLISHER_VARS,
   };
 }
 

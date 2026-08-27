@@ -218,12 +218,11 @@ describe("publisher configuration", () => {
     OIDC_AUDIENCE: "patternlike-web",
     OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
     READING_V5_ROLLOUT: "internal",
-    READING_PUBLISHER: "openai",
-    OPENAI_CREDENTIAL_SOURCE: "worker",
+    READING_PUBLISHER: "codex",
     OPENAI_READING_MODEL: OPENAI_READING_MODEL,
     OPENAI_READING_REASONING: "high",
     OPENAI_READING_PROMPT_VERSION: "1.0.1",
-    OPENAI_READING_TIMEOUT_MS: "90000",
+    OPENAI_READING_TIMEOUT_MS: "900000",
     OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
     READING_CONTEXT_MAX_BYTES: "98304",
     READING_PREGEN_ACTIVE_DAYS: "30",
@@ -231,7 +230,12 @@ describe("publisher configuration", () => {
     READING_PREGEN_SPREAD_MINUTES: "45",
     READING_SCHEDULER_BATCH_LIMIT: "100",
     READING_DAILY_PROVIDER_CALL_LIMIT: "250",
-    OPENAI_API_KEY: "sk-test-key",
+    CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz",
+    CODEX_PROVIDER_ARTIFACT_KEYRING: JSON.stringify({
+      version: 1,
+      keys: { "codex-test-key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc" },
+    }),
+    ARTIFACTS: {} as unknown as R2Bucket,
     TIME_TRAVEL_RECEIPT_EPOCH: "1",
     TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
     CALC_FETCH_TIMEOUT_MS: "10000",
@@ -248,9 +252,9 @@ describe("publisher configuration", () => {
     expect(resolved.config?.pin.reasoning_effort).toBe("high");
     expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
     expect(resolved.config?.pin.max_output_tokens).toBe(4000);
-    expect(resolved.config?.timeoutMs).toBe(90_000);
+    expect(resolved.config?.pin.provider).toBe("codex");
+    expect(resolved.config?.timeoutMs).toBe(900_000);
     expect(resolved.config?.dailyCallLimit).toBe(250);
-    expect(resolved.config?.credential).toEqual({ source: "worker", apiKey: "sk-test-key" });
   });
 
   it("permits every publisher value and the key to be absent while off", () => {
@@ -300,6 +304,9 @@ describe("publisher configuration", () => {
   it.each([
     ["READING_PUBLISHER", undefined],
     ["READING_PUBLISHER", "anthropic"],
+    // The transport Daily used to run on. It has no adapter behind it any more,
+    // so naming it is a configuration error rather than a rollback.
+    ["READING_PUBLISHER", "openai"],
     ["OPENAI_READING_MODEL", undefined],
     ["OPENAI_READING_MODEL", "gpt-4o"],
     ["OPENAI_READING_REASONING", "medium"],
@@ -310,7 +317,8 @@ describe("publisher configuration", () => {
     // fails every reading terminally, after the reservation is already burned.
     ["OPENAI_READING_PROMPT_VERSION", "0.9.0"],
     ["OPENAI_READING_TIMEOUT_MS", "60000"],
-    ["OPENAI_READING_TIMEOUT_MS", "90000.5"],
+    ["OPENAI_READING_TIMEOUT_MS", "90000"],
+    ["OPENAI_READING_TIMEOUT_MS", "900000.5"],
     ["OPENAI_READING_MAX_OUTPUT_TOKENS", "1800"],
     ["READING_CONTEXT_MAX_BYTES", "65536"],
     ["READING_PREGEN_ACTIVE_DAYS", "90"],
@@ -321,15 +329,17 @@ describe("publisher configuration", () => {
     ["READING_DAILY_PROVIDER_CALL_LIMIT", "-5"],
     ["READING_DAILY_PROVIDER_CALL_LIMIT", "12.5"],
     ["READING_DAILY_PROVIDER_CALL_LIMIT", undefined],
-    ["OPENAI_API_KEY", undefined],
+    ["CODEX_RUNNER_TOKEN", undefined],
+    ["CODEX_PROVIDER_ARTIFACT_KEYRING", undefined],
   ] as const)("refuses an enabled rollout when %s is %s", (key, value) => {
     const failure = checkSecureConfig({ ...enabled, [key]: value });
     expect(failure?.code).toBe("reading_publisher_misconfigured");
   });
 
   it("names no secret value in the message it returns to a caller", () => {
-    const failure = checkSecureConfig({ ...enabled, OPENAI_API_KEY: undefined });
-    expect(failure?.message ?? "").not.toContain("sk-");
+    const failure = checkSecureConfig({ ...enabled, CODEX_RUNNER_TOKEN: undefined });
+    expect(failure?.message ?? "").not.toContain("runner_0123456789");
+    expect(failure?.message ?? "").not.toContain("codex-test-key");
   });
 
   it("requires the publisher in development too once the rollout leaves off", () => {

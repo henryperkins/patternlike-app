@@ -26,8 +26,9 @@ import {
  * once could have produced; the point is not to ask a provider anything, it is
  * to pin exactly which candidates this deployment accepts and which it refuses,
  * so a policy change that quietly widens either is a failing test rather than a
- * discovery on a reader's reading. `npm run publisher:eval:live` runs the same
- * corpus against the real provider and is a separately authorized gate.
+ * discovery on a reader's reading. The live counterpart is a real generation
+ * through the production Codex runner, which is a separately authorized
+ * deployment gate rather than a script in this workspace.
  */
 
 const corpus = loadEvaluationCorpus();

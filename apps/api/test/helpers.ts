@@ -15,6 +15,42 @@ import { generateSigningKey, signedBundle, withoutFixtures } from "./content-rel
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
 import { storeOntologyRelease } from "../src/db/pattern-ontology.js";
 import { computeOntologyBundleHash } from "../src/services/pattern-ontology-verify.js";
+import {
+  OPENAI_READING_MODEL,
+  READING_PROMPT_VERSION,
+} from "../src/services/reading-publisher.js";
+
+/**
+ * The Codex posture every suite that enables Daily generation needs.
+ *
+ * One declaration rather than a copy per suite: these are the exact values
+ * `resolvePublisherConfiguration` pins, and a suite carrying its own stale copy
+ * would fail configuration for a reason unrelated to what it was testing.
+ * `ARTIFACTS` is already bound by the test Wrangler config.
+ */
+export const CODEX_TEST_RUNNER_TOKEN =
+  "runner_0123456789abcdefghijklmnopqrstuvwxyz";
+export const CODEX_TEST_ARTIFACT_KEYRING = JSON.stringify({
+  version: 1,
+  keys: { "codex-test-key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc" },
+});
+
+export const READING_CODEX_PUBLISHER_VARS = {
+  READING_PUBLISHER: "codex",
+  OPENAI_READING_MODEL,
+  OPENAI_READING_REASONING: "high",
+  OPENAI_READING_PROMPT_VERSION: READING_PROMPT_VERSION,
+  OPENAI_READING_TIMEOUT_MS: "900000",
+  OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
+  READING_CONTEXT_MAX_BYTES: "98304",
+  READING_PREGEN_ACTIVE_DAYS: "30",
+  READING_PREGEN_LEAD_MINUTES: "30",
+  READING_PREGEN_SPREAD_MINUTES: "45",
+  READING_SCHEDULER_BATCH_LIMIT: "100",
+  READING_DAILY_PROVIDER_CALL_LIMIT: "250",
+  CODEX_RUNNER_TOKEN: CODEX_TEST_RUNNER_TOKEN,
+  CODEX_PROVIDER_ARTIFACT_KEYRING: CODEX_TEST_ARTIFACT_KEYRING,
+} as const;
 
 /**
  * Tables the API writes, in foreign-key-safe delete order. Storage is not

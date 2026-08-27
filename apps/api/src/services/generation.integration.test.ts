@@ -18,6 +18,7 @@ import {
   seedActiveRelease,
   seedChart,
   seedUser,
+  READING_CODEX_PUBLISHER_VARS,
 } from "../../test/helpers.js";
 import { CYCLE_FP_EMPTY, CYCLE_FP_UNAVAILABLE } from "../../test/mock-calc-service.js";
 import { decryptPayload } from "../db/users.js";
@@ -38,7 +39,6 @@ import {
   resolveV5TargetDate,
   type GenerationMessage,
 } from "./enqueue.js";
-import { OPENAI_READING_MODEL } from "./reading-publisher.js";
 import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV1 } from "./generation-command.js";
@@ -186,19 +186,7 @@ function enabledV5Env() {
   return {
     ...env,
     READING_V5_ROLLOUT: "internal",
-    READING_PUBLISHER: "openai",
-    OPENAI_READING_MODEL,
-    OPENAI_READING_REASONING: "high",
-    OPENAI_READING_PROMPT_VERSION: "1.0.1",
-    OPENAI_READING_TIMEOUT_MS: "90000",
-    OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
-    READING_CONTEXT_MAX_BYTES: "98304",
-    READING_PREGEN_ACTIVE_DAYS: "30",
-    READING_PREGEN_LEAD_MINUTES: "30",
-    READING_PREGEN_SPREAD_MINUTES: "45",
-    READING_SCHEDULER_BATCH_LIMIT: "100",
-    READING_DAILY_PROVIDER_CALL_LIMIT: "250",
-    OPENAI_API_KEY: "sk-test-key",
+    ...READING_CODEX_PUBLISHER_VARS,
   };
 }
 

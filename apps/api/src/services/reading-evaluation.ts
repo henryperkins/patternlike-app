@@ -11,18 +11,20 @@ import corpusJson from "../../test/fixtures/reading-evaluation-corpus.json";
  * The quality gate for a model, reasoning/output configuration, prompt,
  * selection-policy, or validation-policy change.
  *
- * Two lanes read this module. The ordinary suite scores frozen candidates
- * offline, so a policy change that quietly widens or narrows what publishes is a
- * failing test. `scripts/run-openai-reading-eval.ts` sends the same synthetic
- * profiles to the real provider and scores whatever comes back. Neither lane
- * duplicates a rule: the hard gates ARE `validateReadingCandidate`, and the
- * prompts ARE `buildResponsesRequest`. A second copy of either would be a second
- * definition of what the product accepts, and the copy that drifted would be the
- * one nobody ran.
+ * The ordinary suite scores frozen candidates offline, so a policy change that
+ * quietly widens or narrows what publishes is a failing test. It duplicates no
+ * rule: the hard gates ARE `validateReadingCandidate`, and the prompts ARE
+ * `buildResponsesRequest`. A second copy of either would be a second definition
+ * of what the product accepts, and the copy that drifted would be the one
+ * nobody ran.
+ *
+ * The live half of this gate no longer has a direct-API script, because Daily
+ * no longer has a direct-API path. Its replacement is a real generation through
+ * the same packaged runner and protocol production uses, which the deployment
+ * runbook owns rather than this workspace.
  *
  * The corpus is entirely synthetic. It contains no real account, no real birth
- * data, and nothing read from D1 — which is what makes the live lane safe to
- * point at a real key.
+ * data, and nothing read from D1.
  */
 
 /**

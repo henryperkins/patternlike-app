@@ -2,9 +2,11 @@
  * Worker bindings that keep the test suite independent from a developer's
  * ignored `.dev.vars` file and process environment.
  *
- * Integration tests opt into publisher credentials or trusted signing keys by
+ * Integration tests opt into a runnable publisher or a trusted signing key by
  * mutating the in-isolate `env` binding for the duration of the test. The
- * baseline intentionally exposes neither capability.
+ * baseline intentionally exposes neither capability: every Codex value is
+ * empty, so a suite that forgets to enable one gets a configuration refusal
+ * rather than a provider job it did not mean to create.
  */
 export const HERMETIC_TEST_BINDINGS = {
   ENVIRONMENT: "development",
