@@ -66,7 +66,7 @@
 
 - [ ] Commit: `docs: establish Codex reader release gates`
 
-## Task 2: Prove or produce a public-capable active ontology
+## Task 2: Verify the active ontology against the deployed gate
 
 **Files:**
 
@@ -75,14 +75,20 @@
 
 **Interfaces:**
 
-- Consumes: Task 1's external approval, the existing ontology pipeline, and plan 2's `ontology:release:verify` command.
-- Produces: a current signed public machine ontology proof or a hard stop before candidate freeze.
+- Consumes: Task 1's external approval, the deployed `ontologyServesAccount` predicate, and plan 2's `ontology:release:verify` command.
+- Produces: a current signed ontology proof matching the deployed `ontologyServesAccount` predicate, or a hard stop before candidate freeze.
 
 - [ ] Obtain explicit authorization before starting a new paid ontology candidate or activating a release. Query current production state before relying on any dated runbook. Record only counts, opaque run/release ids, hashes, statuses, provenance, and timestamps:
 
       npx wrangler d1 execute patternlike-ops --config apps/api/wrangler.toml --env production --remote --command "SELECT p.active_version, r.status, r.object_key, r.bundle_hash, r.corpus_release_hash, r.recalled_at, e.run_id, e.activation_scope, e.run_status, e.evidence_status, e.evaluation_artifact_status, e.compiler_passed, e.evaluator_passed, e.unevaluated_fixture_count, e.corpus_license_class, e.corpus_public_capable, e.evaluation_report_hash, e.regression_report_hash, e.signing_key_id, json_extract(r.evaluation_json, '$.regression_passed') AS regression_passed, json_extract(r.evaluation_json, '$.regression_report_hash') AS release_regression_report_hash FROM pattern_ontology_pointer p LEFT JOIN pattern_ontology_releases r ON r.version = p.active_version LEFT JOIN pattern_ontology_pipeline_evidence e ON e.ontology_version = r.version AND e.bundle_hash = r.bundle_hash WHERE p.id = 1"
 
-- [ ] Do not accept the inventory query alone as proof. Run a read-only D1 query using the exact current `ONTOLOGY_ACTIVATION_SCOPE_SQL` joins and predicates from `apps/api/src/db/pattern-ontology.ts`; require the result `public`. Compare the committed evaluation receipt and evaluation/regression artifact coordinates and hashes to the selected evidence row.
+- [ ] Do not accept the inventory query alone as proof. Run a read-only D1 query using the exact current `ONTOLOGY_ACTIVATION_SCOPE_SQL` joins and predicates from `apps/api/src/db/pattern-ontology.ts`, and read the result against the branch the release's provenance selects:
+
+      machine_pipeline -> activation_scope MUST be `public`
+      synthetic_internal -> activation_scope is `internal` by construction and is not a refusal
+      any other origin, or none -> refuse
+
+      For a `machine_pipeline` release, compare the committed evaluation receipt and evaluation/regression artifact coordinates and hashes to the selected evidence row. An authored release has no evidence row to compare, which is the point of the next step.
 - [ ] Copy the exact `object_key`, version, bundle hash, and corpus hash from that query into task-scoped shell variables; download the active R2 object to the restricted directory and verify it offline with the public verification keyring stored in the restricted change system:
 
       test -d "$ROLLOUT_DIR"
@@ -92,11 +98,12 @@
       npx wrangler r2 object get "pattern-artifacts/$ONTOLOGY_OBJECT_KEY" --config apps/api/wrangler.toml --env production --remote --file "$ROLLOUT_DIR/active-ontology.json"
       npm run ontology:release:verify -w @patternlike/api -- --bundle "$ROLLOUT_DIR/active-ontology.json" --keys-file "$ONTOLOGY_KEYS_FILE" --expected-version "$ONTOLOGY_VERSION" --expected-bundle-hash "$ONTOLOGY_BUNDLE_HASH" --expected-corpus-hash "$ONTOLOGY_CORPUS_HASH"
 
-- [ ] Require the offline verifier to report the expected machine provenance, signing key id, hash matches, valid signature, and compiler pass. Delete the downloaded bundle when the restricted evidence summary is complete.
-- [ ] If no active release passes the full public predicate, stop this rollout and execute Task 11 of [`2026-08-20-automated-ontology-pipeline.md`](./2026-08-20-automated-ontology-pipeline.md) through the current Codex provider. A synthetic/internal release, a manually edited receipt, or a waived regression gate is not a substitute.
+- [ ] Require the offline verifier to report the provenance expected for the release's branch, the signing key id, hash matches, a valid signature, and a compiler pass. These four are the whole of an authored release's assurance, so none of them may be waived. Delete the downloaded bundle when the restricted evidence summary is complete.
+- [ ] An authored `synthetic_internal` release is an accepted outcome of this task, not a stop. `ontologyServesAccount` admits it on origin alone because sixteen machine candidates have failed the regressing stage and none has passed, so requiring a public machine release would close Pattern rather than open it. Record the trade in the restricted change record and the committed runbook: an authored release skips the independent evaluator and the seven regression hard gates (`suppressed_feature_leak`, `uncited_astrological_claim`, `source_dependency_failure`, `prohibited_claim`, `mandatory_feature_omission`, `private_projection_leak`, `semantic_refusal`), and those gates run nowhere else in the product. Since Pattern is account-wide there is no cohort to contain the consequence.
+- [ ] A manually edited receipt, a forged evidence row, a machine release claiming `public` without the evidence chain that earns it, and a release naming no origin all remain refusals. If you want the machine assurance instead, execute Task 11 of [`2026-08-20-automated-ontology-pipeline.md`](./2026-08-20-automated-ontology-pipeline.md) through the current Codex provider and re-run this task.
 - [ ] After any new ontology activation, repeat the production query and deployed signature/artifact verification. Record the immutable release version, bundle hash, corpus release/hash/license class, pipeline run id, report hashes, signing key id, and activation timestamp in the restricted change record without recording ontology prose.
-- [ ] Update the old Pattern rollout runbook status to say the account-wide release uses a public-capable ontology and no longer has Gates 8/10 cohort transitions; preserve the dated failed-candidate history.
-- [ ] Stop on a signature/hash mismatch, recall, internal activation, incomplete evaluation, failed regression, unauthorized corpus, or non-machine provenance.
+- [ ] Update the old Pattern rollout runbook status to say the account-wide release serves from the active authored ontology and no longer has Gates 8/10 cohort transitions; preserve the dated failed-candidate history, which is the evidence for why the machine gate was not used.
+- [ ] Stop on a signature/hash mismatch, a recall, a compile failure, an unauthorized or non-`licensed_excerpt` corpus, an absent or unrecognised provenance, or a `machine_pipeline` release whose scope does not derive `public`.
 - [ ] Commit only the resulting runbook reconciliation: `docs: record the public Pattern ontology gate`
 
 ## Task 3: Freeze and verify one immutable candidate
@@ -290,10 +297,10 @@
 
 - [ ] Use an authenticated eligible account that was not in the removed allowlist and has no consumed claim for its current chart fingerprint. Grant fresh Pattern consent policy `1.1.0` (or the later reviewed version) through the product UI.
 - [ ] Submit the exact confirmation `GENERATE MY PATTERN` through the ordinary authenticated endpoint. Do not create a grant, claim, job, or document directly in D1.
-- [ ] Prove the request pins the already-verified public machine ontology, enters the same generated flow as every other account, and runs planner/writer/verifier only through Codex.
+- [ ] Prove the request pins the exact ontology version verified in Task 2, enters the same generated flow as every other account, and runs planner/writer/verifier only through Codex.
 - [ ] Record content-free evidence tied to `CANDIDATE_SHA`: opaque generation/provider ids in the restricted record, stage generations/attempts, safe terminal states, model/prompt/schema pins, call/token integers, budget delta, ontology version/hashes, artifact cleanup, candidate/verdict hashes, published provenance, and final ready state.
 - [ ] Repeat the request and prove the accepted/consumed claim prevents a reroll. Revoke consent and verify its defined read/delete behavior without exposing the document in logs or evidence.
-- [ ] Stop on any account/cohort/allowlist decision, internal ontology, more than the bounded stage attempts/calls, OpenAI/Workers/synthetic routing, human content substitution, validation bypass, plaintext output, duplicate claim, or budget mismatch.
+- [ ] Stop on any account/cohort/allowlist decision, an ontology version other than the one verified in Task 2, more than the bounded stage attempts/calls, OpenAI/Workers/synthetic routing, human content substitution, validation bypass, plaintext output, duplicate claim, or budget mismatch.
 - [ ] Pattern has no account gate to flip off. On a Pattern product fault, stop the runner, roll the entire Worker back to the recorded last-known-good version, verify old behavior against migration `0017`, and preserve historical provenance/jobs for incident analysis.
 
 ## Task 10: Observe, close, and separately retire an unused OpenAI secret
@@ -327,7 +334,7 @@
 
 - [ ] One immutable SHA owns migration, source, local gate, build, deployment, provider, and canary evidence.
 - [ ] Contractual-use and exact-workspace data controls are approved and referenced without leaking private account details.
-- [ ] A signed, non-recalled, licensed, regression-complete public machine ontology is active.
+- [ ] A signed, non-recalled, compiling ontology from a `licensed_excerpt` corpus is active, and its provenance branch was verified against the deployed predicate with the authored-release trade recorded.
 - [ ] `0017` was backed up, rehearsed, applied, and verified before the compatible Worker reached `main`.
 - [ ] Deployed Pattern has no allowlist, cohort, rollout variable, or replacement account gate.
 - [ ] Scheduled and first-open Daily both publish through Codex and converge correctly.
