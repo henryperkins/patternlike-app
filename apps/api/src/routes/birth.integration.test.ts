@@ -950,7 +950,7 @@ describe("POST /v1/birth-profiles — operational guards", () => {
     }
   });
 
-  it("fails closed when an ignored chart insert has no exact chart or fingerprint winner", async () => {
+  it("terminalizes a charged publication conflict before returning the generic 500", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
     await env.DB.prepare(
@@ -973,24 +973,166 @@ describe("POST /v1/birth-profiles — operational guards", () => {
           message: "Unexpected server error",
         },
       });
-      expect(await rows("SELECT id FROM chart_snapshots")).toEqual([]);
+      expect(JSON.stringify(result.body)).not.toContain(
+        "chart_publication_conflict",
+      );
       expect(
-        await rows<{ status: string }>(
-          `SELECT status FROM jobs
+        await rows(
+          `SELECT id, fingerprint FROM chart_snapshots
+           WHERE user_id = ?`,
+          USER_A,
+        ),
+      ).toEqual([]);
+      expect(
+        await rows<{
+          status: string;
+          result_class: string | null;
+          finished_at: string | null;
+        }>(
+          `SELECT status, result_class, finished_at FROM jobs
            WHERE user_id = ? AND idempotency_key = ?`,
           USER_A,
           "key-ignored-chart-without-winner",
         ),
-      ).toEqual([{ status: "running" }]);
+      ).toEqual([{
+        status: "failed",
+        result_class: "chart_publication_conflict",
+        finished_at: expect.any(String),
+      }]);
       expect(
         await rows<{ status: string }>(
           `SELECT status FROM birth_profiles
            WHERE user_id = ? AND version = 1`,
           USER_A,
         ),
-      ).toEqual([{ status: "pending" }]);
+      ).toEqual([{ status: "invalid" }]);
     } finally {
       await env.DB.prepare("DROP TRIGGER ignore_birth_chart_insert").run();
+    }
+  });
+
+  it("settles a fingerprint winner that appears after the first null reread", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await seedFailedBirthAttempt(
+      "key-late-fingerprint-winner-seed",
+      retryCommand(),
+    );
+    await env.DB.prepare(
+      `UPDATE birth_profiles SET status = 'active'
+       WHERE user_id = ? AND version = 1`,
+    ).bind(USER_A).run();
+
+    const winnerId = "cht_late_fingerprint_winner_0001";
+    await env.DB.prepare(
+      `CREATE TRIGGER ignore_birth_chart_before_late_winner
+       BEFORE INSERT ON chart_snapshots
+       WHEN NEW.id != '${winnerId}'
+       BEGIN
+         SELECT RAISE(IGNORE);
+       END`,
+    ).run();
+
+    const prepare = env.DB.prepare.bind(env.DB);
+    let winnerInjected = false;
+    vi.spyOn(env.DB, "prepare").mockImplementation((query) => {
+      const statement = prepare(query);
+      if (
+        !query.includes("SELECT id FROM chart_snapshots") ||
+        !query.includes("WHERE user_id = ? AND fingerprint = ?")
+      ) {
+        return statement;
+      }
+      return new Proxy(statement, {
+        get(target, property) {
+          if (property === "bind") {
+            return (...values: unknown[]) => {
+              const bound = target.bind(...values);
+              return new Proxy(bound, {
+                get(boundTarget, boundProperty) {
+                  if (boundProperty === "first") {
+                    return async (columnName?: string) => {
+                      const result = columnName === undefined
+                        ? await boundTarget.first()
+                        : await boundTarget.first(columnName);
+                      if (!winnerInjected && result === null) {
+                        winnerInjected = true;
+                        const now = "2026-08-27T01:30:00.000Z";
+                        await prepare(
+                          `INSERT INTO chart_snapshots (
+                             id, user_id, profile_version, fingerprint,
+                             contract_id, contract_version, container_digest,
+                             tzdb_version, status, calculated_at, snapshot_json,
+                             birth_accuracy, birth_enc, birth_key_version,
+                             birth_nonce, r2_uri, uncertainty_json, created_at
+                           ) VALUES (
+                             ?, ?, 1, ?, 'patternlike.chart', '0.2.0', ?,
+                             '2026a', 'active', ?, '{}', 'exact', X'00', 1,
+                             'late-winner-nonce', NULL, '{}', ?
+                           )`,
+                        ).bind(
+                          winnerId,
+                          USER_A,
+                          values[1],
+                          `sha256:${"c".repeat(64)}`,
+                          now,
+                          now,
+                        ).run();
+                      }
+                      return result;
+                    };
+                  }
+                  const value = Reflect.get(
+                    boundTarget,
+                    boundProperty,
+                    boundTarget,
+                  ) as unknown;
+                  return typeof value === "function"
+                    ? value.bind(boundTarget)
+                    : value;
+                },
+              });
+            };
+          }
+          const value = Reflect.get(target, property, target) as unknown;
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+    });
+
+    try {
+      const result = await postBirthResponse(
+        USER_A,
+        "key-late-fingerprint-winner",
+        ALICE,
+      );
+      expect(winnerInjected).toBe(true);
+      expect(result.response.status).toBe(409);
+      expect(result.body).toMatchObject({
+        error: {
+          code: "chart_already_exists",
+          details: { chart_id: winnerId },
+        },
+      });
+      expect(
+        await rows<{ status: string; result_class: string | null }>(
+          `SELECT status, result_class FROM jobs
+           WHERE user_id = ? AND idempotency_key = ?`,
+          USER_A,
+          "key-late-fingerprint-winner",
+        ),
+      ).toEqual([{ status: "succeeded", result_class: winnerId }]);
+      expect(
+        await rows<{ status: string }>(
+          `SELECT status FROM birth_profiles
+           WHERE user_id = ? AND version = 2`,
+          USER_A,
+        ),
+      ).toEqual([{ status: "superseded" }]);
+    } finally {
+      await env.DB.prepare(
+        "DROP TRIGGER ignore_birth_chart_before_late_winner",
+      ).run();
     }
   });
 
