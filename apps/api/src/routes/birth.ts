@@ -908,7 +908,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
        )
        AND EXISTS (
          SELECT 1 FROM birth_profiles
-         WHERE user_id = ? AND version = ? AND status = 'pending'
+         WHERE user_id = ? AND version = ?
+           AND status IN ('pending', 'superseded')
        )`,
     ).bind(
       chart.id,
@@ -990,7 +991,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     ),
     c.env.DB.prepare(
       `UPDATE birth_profiles SET status = 'active', updated_at = ?
-       WHERE user_id = ? AND version = ? AND status = 'pending'
+       WHERE user_id = ? AND version = ?
+         AND status IN ('pending', 'superseded')
          AND EXISTS (
            SELECT 1 FROM birth_calc_reservations
            WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
@@ -1055,7 +1057,11 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   ]);
 
   const insertChanges = publication[0]?.meta.changes;
-  if (insertChanges !== 0 && insertChanges !== 1) {
+  if (
+    typeof insertChanges !== "number" ||
+    !Number.isInteger(insertChanges) ||
+    insertChanges < 0
+  ) {
     throw new Error("birth chart insertion result is unavailable");
   }
   const ownChart = await c.env.DB.prepare(
@@ -1068,11 +1074,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     profileVersion,
   ).first<{ id: string }>();
 
-  if (insertChanges === 1) {
-    if (!ownChart) {
-      throw new Error("inserted birth chart tuple is unavailable");
-    }
-  } else {
+  if (insertChanges === 0 || !ownChart) {
     const duplicate = await c.env.DB.prepare(
       `SELECT id FROM chart_snapshots
        WHERE user_id = ? AND fingerprint = ?`,
