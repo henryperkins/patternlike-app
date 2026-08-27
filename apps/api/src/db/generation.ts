@@ -909,6 +909,114 @@ export async function claimJob(
   }
 }
 
+export interface DailyJobSnapshot {
+  jobId: string;
+  userId: string;
+  readingId: string;
+  status: GenerationJobStatus;
+  resultClass: string | null;
+  attempts: number;
+  command: GenerateDailyReadingCommand;
+}
+
+/**
+ * Read the live Daily job, its reservation, and its frozen command WITHOUT
+ * claiming anything.
+ *
+ * This exists because provider admission has to answer "is this still the work
+ * the reader is waiting for?" from outside the Queue. It takes no lease, sets
+ * no claim token, and increments no attempt: an external runner asking whether
+ * its job is still current must never be able to consume the Daily retry the
+ * reader's reading depends on.
+ *
+ * The join is the ownership proof, not a convenience. The reservation must
+ * still name this job as its active generation, the reader must still own both
+ * rows, and the account must still be active -- a query that looked only at
+ * `jobs` would happily describe work whose reading was invalidated,
+ * superseded, or deleted underneath it.
+ *
+ * The command is decrypted under the same AAD `claimJob` uses. Nothing derived
+ * from it is copied into a clear column: the consent id and the pinned context
+ * are private values, and the whole point of the envelope is that they stay
+ * inside it.
+ */
+export async function loadDailyJobSnapshot(
+  env: Env,
+  jobId: string,
+): Promise<DailyJobSnapshot | null> {
+  const row = await env.DB.prepare(
+    `SELECT j.user_id, j.status, j.result_class, j.attempts,
+            j.payload_enc, j.payload_key_version, j.payload_nonce,
+            r.id AS reading_id, u.crypto_subject
+     FROM jobs j
+     JOIN users u ON u.id = j.user_id AND u.status = 'active'
+     JOIN daily_readings r
+       ON r.active_generation_job_id = j.id AND r.user_id = j.user_id
+     WHERE j.id = ? AND j.job_type = ?
+       AND j.status IN ('queued', 'running')
+       AND r.status = 'pending'
+       AND r.assembly_mode = 'constrained_model'
+       AND r.invalidated_at IS NULL`,
+  )
+    .bind(jobId, JOB_TYPE)
+    .first<{
+      user_id: string;
+      status: GenerationJobStatus;
+      result_class: string | null;
+      attempts: number;
+      payload_enc: ArrayBuffer | null;
+      payload_key_version: number | null;
+      payload_nonce: string | null;
+      reading_id: string;
+      crypto_subject: string;
+    }>();
+  if (
+    !row ||
+    row.payload_enc === null ||
+    row.payload_key_version === null ||
+    row.payload_nonce === null
+  ) {
+    return null;
+  }
+
+  const identity: UserIdentity = {
+    userId: row.user_id,
+    cryptoSubject: asCryptoSubject(row.crypto_subject),
+  };
+  let command: GenerateDailyReadingCommand;
+  try {
+    const { dek } = await loadUserKey(env, identity);
+    command = await decryptJson<GenerateDailyReadingCommand>(
+      {
+        key_version: row.payload_key_version,
+        nonce: row.payload_nonce,
+        ciphertext: bytesToBase64(new Uint8Array(row.payload_enc)),
+      },
+      dek,
+      {
+        subject: identity.cryptoSubject,
+        field: "jobs.payload_enc",
+        recordId: jobId,
+      },
+    );
+  } catch {
+    // An unreadable command is not an error to propagate to a provider caller:
+    // it is simply not a current owner, and the ordinary Queue path already
+    // has a failure class for it.
+    return null;
+  }
+
+  return {
+    jobId,
+    userId: row.user_id,
+    readingId: row.reading_id,
+    status: row.status,
+    resultClass: row.result_class,
+    attempts: row.attempts,
+    command,
+  };
+}
+
 /** Return an owned running claim to the same immutable command after a delay. */
 export async function releaseClaimForRetry(
   env: Env,

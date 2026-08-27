@@ -32,7 +32,7 @@ import {
 import outputSchema from "../../../../contracts/m5/reading-generation-output.schema.json";
 import type { Env } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
-import { loadAiSynthesisGrant, loadContextSourceGrants } from "../db/consents.js";
+import { loadContextSourceGrants } from "../db/consents.js";
 import { deriveCycles } from "../db/cycles.js";
 import {
   completeReading,
@@ -55,6 +55,7 @@ import {
   type GenerateDailyReadingCommandV2,
 } from "./generation-command-v2.js";
 import { leaseDisposition, type V5FailureCode } from "./generation-failures.js";
+import { currentAiConsentMatches } from "./reading-current-owner.js";
 import { createOpenAiReadingPublisher } from "./openai-reading-publisher.js";
 import {
   OPENAI_READING_MAX_OUTPUT_TOKENS,
@@ -171,21 +172,6 @@ function supportedCommand(command: GenerateDailyReadingCommandV2): boolean {
     command.publisher.validation_policy_version === VALIDATION_POLICY_VERSION &&
     command.publisher.max_output_tokens === OPENAI_READING_MAX_OUTPUT_TOKENS &&
     command.publisher.context_max_bytes === READING_CONTEXT_MAX_BYTES
-  );
-}
-
-async function currentConsentMatches(
-  env: Env,
-  userId: string,
-  command: GenerateDailyReadingCommandV2,
-): Promise<boolean> {
-  const grant = await loadAiSynthesisGrant(env, userId);
-  return (
-    grant !== null &&
-    grant.consentId === command.ai_consent.consent_id &&
-    grant.policyVersion === command.ai_consent.policy_version &&
-    grant.categories.length === command.ai_consent.categories.length &&
-    grant.categories.every((category, index) => category === command.ai_consent.categories[index])
   );
 }
 
@@ -391,7 +377,7 @@ export async function generateDailyReadingV5(
   if (!supportedCommand(command)) {
     return fail("policy_unsupported", "the frozen V2 policy tuple is not implemented");
   }
-  if (!(await currentConsentMatches(env, userId, command))) {
+  if (!(await currentAiConsentMatches(env, userId, command))) {
     return fail("ai_synthesis_consent_required", "consent_not_active");
   }
   if (!(await pinnedContextEligible(env, userId, command.context))) {
@@ -585,7 +571,7 @@ export async function generateDailyReadingV5(
 
   // The second read is intentional TOCTOU defense. Calculation calls are the
   // longest pre-provider interval and a revocation during them must win.
-  if (!(await currentConsentMatches(env, userId, command))) {
+  if (!(await currentAiConsentMatches(env, userId, command))) {
     return fail("ai_synthesis_consent_required", "consent_not_active");
   }
   if (!(await pinnedContextEligible(env, userId, command.context))) {

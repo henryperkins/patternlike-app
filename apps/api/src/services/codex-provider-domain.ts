@@ -20,6 +20,7 @@ import {
 } from "./pattern-rollout.js";
 import { ONTOLOGY_REGRESSION_PATTERN_PIN } from "./ontology-regression.js";
 import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
+import { readingProviderOwnerIsCurrent } from "./reading-current-owner.js";
 
 interface PatternOwnerRow {
   generation_id: string;
@@ -263,6 +264,12 @@ export async function codexProviderOwnerIsCurrent(
 ): Promise<boolean> {
   if (job.pipeline === "pattern") {
     return patternDomainIsCurrent(env, job, now);
+  }
+  if (job.pipeline === "reading") {
+    // The Daily predicate is read-only by construction: it never claims the
+    // generic job, so a runner asking whether its work is still wanted cannot
+    // consume the retry the reader's reading depends on.
+    return readingProviderOwnerIsCurrent(env, job, now);
   }
   return ontologyDomainIsCurrent(env, job);
 }
