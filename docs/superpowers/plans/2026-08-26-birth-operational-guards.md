@@ -376,6 +376,35 @@ git add apps/api/src/db/birth-calc-usage.ts apps/api/src/db/birth-calc-usage.tes
 git commit -m "api: prepare birth calculation budget reservations"
 ```
 
+> **Correction, 2026-08-27 — do not merge these as two PRs.** The split above
+> produces a schema-only commit that cannot be green, and this was verified by
+> building the branch and running the suite.
+>
+> `deletion-manifest.test.ts` derives its expectations from the **applied**
+> schema, not from a checked-in list: it walks `PRAGMA foreign_key_list` and
+> `PRAGMA table_info` over the live test database and fails any `users`
+> foreign-key child that is unclassified. The moment `0016` is applied by
+> `apply-migrations.ts`, three tests fail with *"A new users foreign-key child
+> must be classified for account deletion"* naming `birth_calc_daily_usage`,
+> `birth_calc_reservations`, and `birth_profile_version_counters`.
+>
+> The registration that would satisfy them cannot ship first either.
+> `deleteAccountData` runs `DELETE FROM ${table} WHERE user_id = ?` for every
+> entry in `DELETED_USER_TABLES` (`deletion-manifest.ts:204-208`), so listing a
+> table before it exists remotely breaks account deletion outright. Schema and
+> registration must land together.
+>
+> Sequence it the way this repository already does, which needs no split:
+> **apply the migration remotely from the branch checkout, ahead of the merge
+> that deploys the code reading it.** `migrations_dir = "../../db/d1"` is set in
+> both Wrangler blocks, so `wrangler d1 migrations apply` works from an unmerged
+> branch. `0015` was applied this way on 2026-08-25 and `0011` before it — see
+> CLAUDE.md § Deployment. Applying additive tables that nothing yet references is
+> safe at any time; it is deploying *code* ahead of schema that is not.
+>
+> Do the export, bookmark, and `foreign_key_check` / `quick_check` verification
+> from `docs/deploy/api-production.md` first.
+
 ---
 
 ### Task 3: Integrate budget, timeout, and telemetry into the birth route
