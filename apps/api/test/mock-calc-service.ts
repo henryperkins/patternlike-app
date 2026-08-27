@@ -26,6 +26,18 @@ import type {
 export const TRIGGER_CALC_ERROR = "TRIGGER_CALC_ERROR";
 export const TRIGGER_INVALID_PROFILE = "TRIGGER_INVALID_PROFILE";
 export const TRIGGER_CALC_TIMEOUT = "TRIGGER_CALC_TIMEOUT";
+export const TRIGGER_CALC_FINGERPRINT_RACE =
+  "TRIGGER_CALC_FINGERPRINT_RACE";
+
+const fingerprintRaceWaiters: Array<() => void> = [];
+
+async function waitForFingerprintRacePeer(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    fingerprintRaceWaiters.push(resolve);
+    if (fingerprintRaceWaiters.length !== 2) return;
+    for (const release of fingerprintRaceWaiters.splice(0)) release();
+  });
+}
 
 /**
  * A filesystem path deliberately embedded in the upstream error message. The
@@ -1359,6 +1371,9 @@ export async function mockCalcService(request: Request): Promise<Response> {
 
   const req = (await request.json()) as CalcRequestBody;
 
+  if (req.place_label === TRIGGER_CALC_FINGERPRINT_RACE) {
+    await waitForFingerprintRacePeer();
+  }
   if (req.place_label === TRIGGER_CALC_TIMEOUT) {
     await new Promise<void>((resolve) => {
       if (request.signal.aborted) {

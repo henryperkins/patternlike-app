@@ -158,11 +158,12 @@ describe("birth profile payload decoding and export projection", () => {
     });
   });
 
-  it("keeps submitted comparison separate from a frozen effective location", () => {
+  it("allows resolved effective location and timezone fields to differ from submitted input", () => {
     const resolved = {
       ...command,
       effective: {
         ...command.effective,
+        timezone: "America/New_York",
         birthplace: {
           place_id: "plc_los_angeles_0001",
           label: "Los Angeles, California",
@@ -179,6 +180,29 @@ describe("birth profile payload decoding and export projection", () => {
       command: resolved,
     });
     expect(birthCalcCommandMatchesRequest(resolved, request)).toBe(true);
+  });
+
+  it("rejects every hidden non-location mismatch in a claimed-v1 command", () => {
+    const mismatches: Array<
+      Partial<typeof command.effective>
+    > = [
+      { accuracy: "exact" },
+      { birth_date: "1991-05-15" },
+      { birth_time_local: "12:35:00" },
+      { approximate_window_minutes: 60 },
+    ];
+
+    for (const effectiveChange of mismatches) {
+      expect(
+        decodeBirthProfilePayload({
+          ...command,
+          effective: {
+            ...command.effective,
+            ...effectiveChange,
+          },
+        }),
+      ).toEqual({ kind: "malformed_v1" });
+    }
   });
 
   it("distinguishes unknown versions from malformed documents claiming v1", () => {

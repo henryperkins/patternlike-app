@@ -18,6 +18,7 @@ import {
 import {
   LEAKY_UPSTREAM_MESSAGE,
   TRIGGER_CALC_ERROR,
+  TRIGGER_CALC_FINGERPRINT_RACE,
   TRIGGER_INVALID_PROFILE,
 } from "../../test/mock-calc-service.js";
 
@@ -619,6 +620,58 @@ describe("POST /v1/birth-profiles — operational guards", () => {
     expect(completedCalcEvents(info)).toHaveLength(0);
   });
 
+  it("refuses hidden effective-input mismatches before allocation, charge, write, or calc", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const mismatches: Array<[string, Partial<ReturnType<typeof retryCommand>["effective"]>]> = [
+      ["accuracy", { accuracy: "approximate" }],
+      ["birth-date", { birth_date: "1991-05-15" }],
+      ["birth-time", { birth_time_local: "12:35:00" }],
+      ["approximate-window", { approximate_window_minutes: 30 }],
+    ];
+
+    for (const [index, [label, effectiveChange]] of mismatches.entries()) {
+      const command = retryCommand();
+      const key = `key-corrupt-effective-${label}`;
+      await seedFailedBirthAttempt(
+        key,
+        {
+          ...command,
+          effective: { ...command.effective, ...effectiveChange },
+        },
+        { version: index + 1 },
+      );
+      const result = await postBirthProfile(USER_A, key, RETRY_REQUEST);
+      expect(result.status).toBe(500);
+      expect(result.body).toMatchObject({
+        error: {
+          code: "internal_error",
+          message: "Unexpected server error",
+        },
+      });
+    }
+
+    expect(await rows("SELECT * FROM birth_calc_daily_usage")).toEqual([]);
+    expect(await rows("SELECT * FROM birth_calc_reservations")).toEqual([]);
+    expect(await rows("SELECT * FROM birth_profile_version_counters")).toEqual([]);
+    expect(
+      await rows<{ version: number }>(
+        "SELECT version FROM birth_profiles ORDER BY version",
+      ),
+    ).toEqual(mismatches.map((_, index) => ({ version: index + 1 })));
+    expect(
+      await rows<{ attempts: number; status: string }>(
+        "SELECT attempts, status FROM jobs ORDER BY id",
+      ),
+    ).toEqual(
+      Array.from({ length: mismatches.length }, () => ({
+        attempts: 1,
+        status: "failed",
+      })),
+    );
+    expect(completedCalcEvents(info)).toHaveLength(0);
+  });
+
   it("converges concurrent new requests for one key on one charge, job, profile, and calc", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const [first, second] = await Promise.all([
@@ -738,6 +791,89 @@ describe("POST /v1/birth-profiles — operational guards", () => {
         }),
       ).rejects.toThrow();
     }
+    expect(completedCalcEvents(info)).toHaveLength(2);
+  });
+
+  it("settles both distinct-key jobs when identical births race on one fingerprint", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const identical = {
+      ...ALICE,
+      birthplace: {
+        ...ALICE.birthplace,
+        label: TRIGGER_CALC_FINGERPRINT_RACE,
+      },
+    };
+    const requests = [
+      { key: "key-fingerprint-race-a", body: identical },
+      { key: "key-fingerprint-race-b", body: identical },
+    ];
+    const results = await Promise.all(
+      requests.map(async ({ key, body }) => ({
+        key,
+        ...(await postBirthResponse(USER_A, key, body)),
+      })),
+    );
+
+    expect(results.map(({ response }) => response.status).sort()).toEqual([
+      202,
+      409,
+    ]);
+    const charts = await rows<{ id: string; fingerprint: string }>(
+      `SELECT id, fingerprint FROM chart_snapshots
+       WHERE user_id = ?`,
+      USER_A,
+    );
+    expect(charts).toHaveLength(1);
+    const jobs = await rows<{
+      idempotency_key: string;
+      status: string;
+      result_class: string | null;
+      payload_json: string | null;
+    }>(
+      `SELECT idempotency_key, status, result_class, payload_json
+       FROM jobs WHERE user_id = ? ORDER BY idempotency_key`,
+      USER_A,
+    );
+    expect(jobs).toHaveLength(2);
+    expect(jobs.map(({ status }) => status)).toEqual([
+      "succeeded",
+      "succeeded",
+    ]);
+    expect(jobs.map(({ result_class }) => result_class)).toEqual([
+      charts[0]!.id,
+      charts[0]!.id,
+    ]);
+    const profiles = await rows<{ version: number; status: string }>(
+      `SELECT version, status FROM birth_profiles
+       WHERE user_id = ? ORDER BY version`,
+      USER_A,
+    );
+    expect(profiles).toHaveLength(2);
+    expect(profiles.map(({ status }) => status).sort()).toEqual([
+      "active",
+      "superseded",
+    ]);
+    const losing = results.find(({ response }) => response.status === 409);
+    expect(losing?.body).toMatchObject({
+      error: {
+        code: "chart_already_exists",
+        details: {
+          chart_id: charts[0]!.id,
+          fingerprint: charts[0]!.fingerprint,
+        },
+      },
+    });
+    const losingJob = jobs.find(
+      ({ idempotency_key }) =>
+        idempotency_key === losing?.key,
+    );
+    const losingVersion = Number(
+      JSON.parse(losingJob?.payload_json ?? "{}").profile_version,
+    );
+    expect(
+      profiles.find(({ version }) => version === losingVersion)?.status,
+    ).toBe("superseded");
     expect(completedCalcEvents(info)).toHaveLength(2);
   });
 

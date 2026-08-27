@@ -385,6 +385,10 @@ git commit -m "api: prepare birth calculation budget reservations"
 - Create: `apps/api/src/services/birth-command.test.ts`
 - Modify: `apps/api/src/routes/birth.ts`
 - Modify: `apps/api/src/routes/birth.integration.test.ts`
+- Modify: `apps/api/src/services/account-export.ts`
+- Modify: `apps/api/src/routes/privacy-export.integration.test.ts`
+- Modify: `apps/api/src/db/key-rotation.test.ts`
+- Modify: `apps/api/test/helpers.ts`
 - Modify: `apps/api/test/mock-calc-service.ts`
 - Modify: `apps/web/src/lib/api-client.ts`
 - Modify: `apps/web/src/App.test.tsx`
@@ -413,6 +417,8 @@ Drive `SELF.fetch()` and prove:
   new profile/job attempt, one budget unit, and one calc invocation.
 - Concurrent requests with one key consume one unit and converge on one job response.
 - Concurrent requests with distinct keys allocate distinct profile versions and AAD.
+- Distinct keys with identical birth data converge on one fingerprint while
+  both jobs terminate and the losing profile is superseded.
 - Two users have independent budgets.
 - `TRIGGER_CALC_TIMEOUT` returns generic `502`, marks the job failed/profile invalid, and emits no upstream text.
 - Success and `invalid_birth_profile` preserve existing behavior.
@@ -537,7 +543,7 @@ validates them without editing contract bytes.
 - [ ] **Step 6: Run focused verification**
 
 ```bash
-npm exec -w @patternlike/api -- vitest run src/services/birth-command.test.ts src/routes/birth.integration.test.ts src/routes/birth.test.ts src/services/calc-client.test.ts src/db/birth-calc-usage.test.ts
+npm exec -w @patternlike/api -- vitest run src/services/birth-command.test.ts src/routes/birth.integration.test.ts src/routes/birth.test.ts src/services/calc-client.test.ts src/db/birth-calc-usage.test.ts src/routes/privacy-export.integration.test.ts src/db/key-rotation.test.ts
 npm exec -w @patternlike/web -- vitest run src/App.test.tsx
 npm run test:contracts
 npm run typecheck
@@ -548,7 +554,7 @@ Expected: all pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/api/src/services/birth-command.ts apps/api/src/services/birth-command.test.ts apps/api/src/routes/birth.ts apps/api/src/routes/birth.integration.test.ts apps/api/test/mock-calc-service.ts apps/web/src/lib/api-client.ts apps/web/src/App.test.tsx
+git add apps/api/src/services/birth-command.ts apps/api/src/services/birth-command.test.ts apps/api/src/routes/birth.ts apps/api/src/routes/birth.integration.test.ts apps/api/src/services/account-export.ts apps/api/src/routes/privacy-export.integration.test.ts apps/api/src/db/key-rotation.test.ts apps/api/test/helpers.ts apps/api/test/mock-calc-service.ts apps/web/src/lib/api-client.ts apps/web/src/App.test.tsx
 git commit -m "api: guard birth calculation spend and latency"
 ```
 
