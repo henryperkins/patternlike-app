@@ -4,6 +4,7 @@ import { loadClaimForFingerprint, isConsumedStatus } from "../db/pattern-claims.
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { loadPreferences } from "../db/preferences.js";
 import { loadUserIdentity } from "../db/users.js";
+import { loadOntologyByVersion, ontologyServesAccount } from "../db/pattern-ontology.js";
 import { resolveOntologyPipelineConfiguration } from "../middleware/config-guard.js";
 import {
   loadPatternJob,
@@ -163,10 +164,12 @@ async function patternDomainIsCurrent(
   ) {
     return false;
   }
-  const ontology = await env.DB.prepare(
-    "SELECT status FROM pattern_ontology_releases WHERE version = ?",
-  ).bind(owner.ontology_version).first<{ status: string }>();
-  if (!ontology || ontology.status === "recalled") return false;
+  // The same predicate the reader-facing surfaces use, not a weaker status
+  // read. A release that stopped being public-capable between reservation and
+  // the runner's claim must not keep in-flight provider work alive under a
+  // scope no reader could generate from now.
+  const ontology = await loadOntologyByVersion(env, owner.ontology_version);
+  if (!ontologyServesAccount(ontology)) return false;
   const claim = await loadClaimForFingerprint(
     env,
     owner.user_id,

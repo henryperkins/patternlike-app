@@ -137,10 +137,7 @@ export async function enqueuePatternGeneration(
   }
 
   const ontology = await loadActiveOntology(env);
-  // The second argument is the former internal-account bypass; see
-  // `buildPatternState`. No caller may open it now that there is no account to
-  // distinguish.
-  if (!ontologyServesAccount(ontology, false)) {
+  if (!ontologyServesAccount(ontology)) {
     return {
       ok: false,
       status: 409,

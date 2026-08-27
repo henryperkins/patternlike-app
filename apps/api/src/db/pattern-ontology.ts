@@ -225,24 +225,23 @@ export interface ActiveOntology {
 }
 
 /**
- * External readers may generate only from a public machine-pipeline
- * ontology. Internal accounts may still use Slice A / degraded-internal
- * releases. Enqueue, pattern-state, and GET /v1/pattern must share this
- * predicate so the client never offers a generate action the API then
- * refuses.
+ * A Pattern may be generated only from a public machine-pipeline ontology.
+ *
+ * This is a content-integrity invariant, not an admission policy: there is no
+ * account it can be opened for. A Slice A or degraded-internal release serves
+ * nobody, and `activationScope` is re-derived on every read from evidence and
+ * receipt agreement rather than trusted from a stored flag.
+ *
+ * Enqueue, pattern-state, `GET /v1/pattern`, and the Codex current-owner check
+ * all call this, so the client can never be offered a generate action the API
+ * then refuses, and in-flight provider work cannot outlive the scope it was
+ * reserved under.
  */
 export function ontologyServesAccount(
   ontology: ActiveOntology | null,
-  internalAccount: boolean,
 ): ontology is ActiveOntology {
-  if (!ontology) return false;
-  if (
-    ontology.release.provenance?.origin === "machine_pipeline" &&
-    ontology.activationScope === "public"
-  ) {
-    return true;
-  }
-  return internalAccount;
+  return ontology?.release.provenance?.origin === "machine_pipeline" &&
+    ontology.activationScope === "public";
 }
 
 function asSignedRelease(value: unknown): SignedOntologyRelease | null {

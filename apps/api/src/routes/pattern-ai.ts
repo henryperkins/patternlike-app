@@ -263,7 +263,7 @@ export async function serveGeneratedPattern(
   if (!grant) {
     return Response.json(error(requestId, "pattern_generation_consent_required", "Pattern generation consent is required"), { status: 409 });
   }
-  if (!ontologyServesAccount(await loadActiveOntology(env), false)) {
+  if (!ontologyServesAccount(await loadActiveOntology(env))) {
     return Response.json(error(requestId, "ontology_unavailable", "No activated Pattern ontology is available"), { status: 409 });
   }
   return Response.json(error(requestId, "pattern_not_generated", "No accepted Pattern exists"), { status: 404 });

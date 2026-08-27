@@ -296,10 +296,7 @@ export async function buildPatternState(
     }
   }
 
-  // The second argument is the former internal-account bypass. Account-wide
-  // Pattern has no accounts to distinguish, so no caller may open it; the
-  // parameter itself goes once every surface has stopped passing it.
-  if (!ontologyServesAccount(ontology, false)) {
+  if (!ontologyServesAccount(ontology)) {
     return emptyState("ontology_unavailable", chartBlock, consent);
   }
   if (consent.status !== "granted") {

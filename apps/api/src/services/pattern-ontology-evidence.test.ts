@@ -5,7 +5,7 @@ import {
   contentHash,
   type PatternOntologyRelease,
 } from "@patternlike/shared";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "../../test/helpers.js";
 import {
   buildTestCorpusManifest,
@@ -589,7 +589,7 @@ describe("machine ontology evidence", () => {
     expect(active).toMatchObject({
       activationScope: "internal",
     });
-    expect(ontologyServesAccount(active, false)).toBe(false);
+    expect(ontologyServesAccount(active)).toBe(false);
   });
 
   it("treats a migrated all-null legacy regression tuple as internal", async () => {
@@ -638,7 +638,7 @@ describe("machine ontology evidence", () => {
     expect(active).toMatchObject({
       activationScope: "internal",
     });
-    expect(ontologyServesAccount(active, false)).toBe(false);
+    expect(ontologyServesAccount(active)).toBe(false);
     await expect(loadOntologyByVersion(env, value.ontology_version))
       .resolves.toMatchObject({ activationScope: "internal" });
   });
@@ -1453,5 +1453,116 @@ describe("machine ontology evidence", () => {
         )
         .run(),
     ).rejects.toThrow(/CHECK constraint failed/);
+  });
+});
+
+
+/**
+ * `ontologyServesAccount` is the whole admission answer for interpretation
+ * content. There is no account it can be opened for, so each of these is a
+ * refusal for every reader rather than a cohort difference.
+ */
+describe("ontologyServesAccount", () => {
+  beforeEach(async () => {
+    await resetDb();
+    env.PATTERN_ONTOLOGY_KEYS = "";
+  });
+
+  afterEach(() => {
+    env.PATTERN_ONTOLOGY_KEYS = "";
+  });
+
+  async function activate(
+    version: string,
+    options: Parameters<typeof evidenceFixture>[1] = {},
+    mutate: (value: MachineRelease) => void = () => {},
+  ): Promise<void> {
+    const value = await release(version);
+    mutate(value);
+    const { input } = await evidenceFixture(value, options);
+    await commitOntologyPipelineEvidence(env, input);
+    const verified = await verifyPatternOntologyEvidence(
+      env,
+      value,
+      input.signingKeyId,
+    );
+    await storeOntologyRelease(
+      env,
+      value,
+      `pattern-ontology/${value.ontology_version}.json`,
+      verified,
+    );
+  }
+
+  it("serves a public machine-pipeline release", async () => {
+    await activate("ontology-serves-public");
+    const active = await loadActiveOntology(env);
+    expect(active).toMatchObject({ activationScope: "public" });
+    expect(ontologyServesAccount(active)).toBe(true);
+  });
+
+  it("refuses a null release", () => {
+    expect(ontologyServesAccount(null)).toBe(false);
+  });
+
+  it("refuses an internally activated release", async () => {
+    await activate("ontology-serves-internal", {
+      activationScope: "internal",
+      corpusLicenseClass: "internal_synthetic",
+      corpusPublicCapable: false,
+    });
+    const active = await loadActiveOntology(env);
+    expect(active).toMatchObject({ activationScope: "internal" });
+    expect(ontologyServesAccount(active)).toBe(false);
+  });
+
+  it.each(["synthetic_internal", undefined])(
+    "refuses %s provenance even with public evidence",
+    async (origin) => {
+      // The scope comes from evidence and the origin comes from the signed
+      // bytes. Both have to say public machine pipeline.
+      await activate("ontology-serves-origin");
+      const active = await loadActiveOntology(env);
+      expect(active).not.toBeNull();
+      const substituted = {
+        ...active!,
+        release: {
+          ...active!.release,
+          provenance: origin === undefined ? undefined : { origin },
+        },
+      } as typeof active;
+      expect(ontologyServesAccount(substituted)).toBe(false);
+    },
+  );
+
+  it("refuses a recalled release, which no longer resolves through the pointer", async () => {
+    await activate("ontology-serves-recalled");
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_releases SET status = 'recalled', recalled_at = ?
+       WHERE version = ?`,
+    ).bind(new Date().toISOString(), "ontology-serves-recalled").run();
+    expect(ontologyServesAccount(await loadActiveOntology(env))).toBe(false);
+  });
+
+  it("refuses when the atomic evaluation receipt is missing", async () => {
+    await activate("ontology-serves-no-receipt");
+    await env.DB.prepare(
+      `DELETE FROM pattern_ontology_evaluation_runs WHERE ontology_version = ?`,
+    ).bind("ontology-serves-no-receipt").run();
+    const active = await loadActiveOntology(env);
+    expect(active).toMatchObject({ activationScope: "internal" });
+    expect(ontologyServesAccount(active)).toBe(false);
+  });
+
+  it("refuses when the regression evidence no longer agrees with the release row", async () => {
+    await activate("ontology-serves-regression-drift");
+    await env.DB.prepare(
+      `UPDATE pattern_ontology_releases
+       SET evaluation_json = json_set(evaluation_json, '$.regression_passed', 0)
+       WHERE version = ?`,
+    ).bind("ontology-serves-regression-drift").run();
+    const active = await loadActiveOntology(env);
+    expect(active).toMatchObject({ activationScope: "internal" });
+    expect(ontologyServesAccount(active)).toBe(false);
   });
 });

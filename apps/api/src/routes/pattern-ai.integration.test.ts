@@ -957,6 +957,51 @@ describe("M7 AI-generated Pattern", () => {
     expect(reserved.status, JSON.stringify(reserved.body)).toBe(202);
   });
 
+  it("serves a public release to any account and an internal release to none", async () => {
+    enablePatternAi();
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B);
+    await seedChart(IDENTITY_B);
+
+    // The release that used to serve the allowlist. It now serves nobody:
+    // activation scope is a content-integrity invariant, and there is no
+    // account it can be opened for.
+    await seedActiveOntology("ont-internal-only", { activationScope: "internal" });
+    for (const userId of [USER_A, USER_B]) {
+      const denied = await jsonAs(userId, "/v1/pattern-generations", {
+        method: "POST",
+        headers: { "idempotency-key": `idem-internal-denied-${userId}` },
+        body: JSON.stringify({
+          schema_version: "0.7.0",
+          consent_policy_version: POLICY,
+          confirm: "GENERATE MY PATTERN",
+          reason: "first_open",
+        }),
+      });
+      expect(denied.status, `${userId}: ${JSON.stringify(denied.body)}`).toBe(409);
+      expect((denied.body.error as { code: string }).code).toBe("ontology_unavailable");
+      const state = await jsonAs(userId, "/v1/pattern-state");
+      expect(state.body.state).toBe("ontology_unavailable");
+    }
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM pattern_generation_claims",
+    ).first<{ n: number }>()).toEqual({ n: 0 });
+
+    // A public machine release serves the account that was never allowlisted.
+    await seedActiveOntology("ont-public-1");
+    const accepted = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-public-accepted" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(accepted.status, JSON.stringify(accepted.body)).toBe(202);
+  });
+
   it("refuses generation for an eligible account only on the eligibility ladder", async () => {
     enablePatternAi();
     // No active ontology: the refusal is a content-integrity invariant that
