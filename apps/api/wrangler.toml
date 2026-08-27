@@ -390,17 +390,21 @@ OPENAI_GATEWAY_KEY_ALIAS = ""
 CHECK_IN_RETENTION_MONTHS = "13"
 TIME_TRAVEL_RECEIPT_EPOCH = "1"
 TIME_TRAVEL_DAILY_SCAN_LIMIT = "32"
-# Pattern is declared `internal` for one account in committed production
-# configuration. Runtime still fails closed without an active ontology,
-# compatible deployed bindings, credentials, and a positive enforced call
-# limit. Gate 6 spend certification is an additional operational requirement;
-# runtime cannot infer whether an operator approved the configured number.
-# Declaring the pins here means a typo fails closed on the next request rather
-# than at enablement.
-# Accepted values are off | internal | first_open | enabled. Anything else fails
-# checkSecureConfig, which answers 503 on every path including POST /v1/sessions.
-# first_open admits accounts with no editorial Pattern to lose; enabled is the
-# switch that moves accounts that still have one.
+# Pattern generation has no product rollout switch and no account admission
+# gate. `PATTERN_AI_ROLLOUT` and the internal-account allowlist were both
+# removed, so every authenticated account reaches the same path and there is no
+# value here that admits or withholds a cohort. `wrangler-config.test.ts`
+# asserts the variable stays absent.
+#
+# Runtime still fails closed without an active ontology, compatible deployed
+# bindings, credentials, and a positive enforced call limit. Gate 6 spend
+# certification is an additional operational requirement; runtime cannot infer
+# whether an operator approved the configured number. Declaring the pins here
+# means a typo fails closed on the next request rather than at enablement.
+#
+# Containment is therefore operational, not configuration: recall the active
+# ontology, or stop the runner. `READING_V5_ROLLOUT` governs Daily only and is
+# not a Pattern control.
 # `codex` uses the dedicated outbound-polling runner. The Worker receives only
 # CODEX_RUNNER_TOKEN and CODEX_PROVIDER_ARTIFACT_KEYRING as secrets; ChatGPT
 # authentication remains in the Codex CLI's local credential store on its host.
