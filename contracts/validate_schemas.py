@@ -23,6 +23,7 @@ Usage:
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import subprocess
@@ -43,12 +44,14 @@ M4 = ROOT / "m4"
 M5 = ROOT / "m5"
 M6 = ROOT / "m6"
 M7 = ROOT / "m7"
+M8 = ROOT / "m8"
 
 M3_BASE = "https://patternlike.app/contracts/m3/"
 M4_BASE = "https://patternlike.app/contracts/m4/"
 M5_BASE = "https://patternlike.app/contracts/m5/"
 M6_BASE = "https://patternlike.app/contracts/m6/"
 M7_BASE = "https://patternlike.app/contracts/m7/"
+M8_BASE = "https://patternlike.app/contracts/m8/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
@@ -153,6 +156,22 @@ FIXTURE_SCHEMA = {
         + "pattern-ontology-release.schema.json#/$defs/patternOntologyRelease",
         "account-export": M7_BASE + "account-export.schema.json#/$defs/accountExport",
     },
+    "m8": {
+        "place-search.query-too-short": M8_BASE
+        + "place-search.schema.json#/$defs/placeSearchRequest",
+        "place-search.results": M8_BASE
+        + "place-search.schema.json#/$defs/placeSearchResponse",
+        "place-resolution": M8_BASE
+        + "place-resolution.schema.json#/$defs/placeResolutionResponse",
+        "geocoder-consent": M8_BASE
+        + "geocoder-consent.schema.json#/$defs/geocoderConsentResponse",
+        "reading-history": M8_BASE
+        + "reading-history.schema.json#/$defs/readingHistoryResponse",
+        "reading-save-state": M8_BASE
+        + "reading-save-state.schema.json#/$defs/readingSaveState",
+        "account-export": M8_BASE + "account-export.schema.json#/$defs/accountExport",
+        "birth-profile": M8_BASE + "common.schema.json#/$defs/birthCalcBudgetExhausted",
+    },
 }
 
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
@@ -199,6 +218,9 @@ POLICY_ONLY = {
         "pattern-fact-packet.latitude-in-fact",
         "pattern-fact-packet.life-event-in-fact",
         "pattern-ontology-evaluation.unevaluated-count",
+    },
+    "m8": {
+        "reading-history.cursor-mode-mismatch",
     },
 }
 
@@ -326,7 +348,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7):
+    for package in (M0, M3, M4, M5, M6, M7, M8):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1179,6 +1201,40 @@ def _m7_policy_errors(name: str, instance: dict) -> list[str]:
     return errors
 
 
+def _m8_policy_errors(name: str, instance: dict) -> list[str]:
+    if not name.startswith("reading-history"):
+        return []
+    cursor = instance.get("next_cursor")
+    if cursor is None:
+        return []
+    if not isinstance(cursor, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", cursor):
+        return ["reading history cursor is not unpadded base64url"]
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        decoded = base64.urlsafe_b64decode(padded)
+        document = json.loads(decoded.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [f"reading history cursor is not decodable canonical JSON: {exc}"]
+    if not isinstance(document, dict):
+        return ["reading history cursor payload is not an object"]
+    canonical = json.dumps(
+        document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    rendered = base64.urlsafe_b64encode(canonical).decode("ascii").rstrip("=")
+    errors: list[str] = []
+    if rendered != cursor:
+        errors.append("reading history cursor is not the canonical base64url encoding")
+    if document.get("view") != instance.get("view"):
+        errors.append(
+            f"reading history cursor view {document.get('view')!r} "
+            f"does not match response view {instance.get('view')!r}"
+        )
+    return errors
+
+
 def validate_package(
     registry: Registry, name: str, package: Path, catalogue: set[str]
 ) -> list[str]:
@@ -1207,6 +1263,8 @@ def validate_package(
             return []
         if name == "m7":
             return _m7_policy_errors(fixture, instance)
+        if name == "m8":
+            return _m8_policy_errors(fixture, instance)
         raise ValueError(f"unregistered contract package policy: {name}")
 
     for path in sorted((package / "fixtures" / "valid").glob("*.json")):
@@ -1270,6 +1328,7 @@ PACKAGE_BASE = {
     "m5": M5_BASE,
     "m6": M6_BASE,
     "m7": M7_BASE,
+    "m8": M8_BASE,
 }
 
 
@@ -1320,15 +1379,45 @@ def check_normative_pointers(spec: dict, registry: Registry, label: str) -> list
 def check_openapi(package: Path, registry: Registry) -> list[str]:
     try:
         import yaml
+        from jsonschema_path.handlers import default_handlers
         from openapi_spec_validator import validate
+        from openapi_spec_validator.validation import OpenAPIV31SpecValidator
     except ImportError:
         print("OpenAPI SKIP (install openapi-spec-validator pyyaml to enable)")
         return []
+
+    def local_contract_handler(uri: str):
+        from urllib.parse import unquote, urlparse
+
+        parsed = urlparse(uri)
+        if parsed.netloc == "patternlike.app" and parsed.path.startswith("/contracts/"):
+            relative = Path(unquote(parsed.path.removeprefix("/contracts/")))
+            target = (ROOT / relative).resolve()
+            if target != ROOT and ROOT.resolve() not in target.parents:
+                raise ValueError(f"contract reference escapes contracts root: {uri}")
+            return json.loads(target.read_text(encoding="utf-8"))
+        return default_handlers["https"](uri)
+
+    class LocalContractOpenAPIV31SpecValidator(OpenAPIV31SpecValidator):
+        resolver_handlers = {
+            **default_handlers,
+            "https": local_contract_handler,
+        }
+
     errors: list[str] = []
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            validate(spec)
+            if package == M8:
+                # The validate() shortcut builds SchemaPath with its own handlers
+                # before instantiating `cls`, so a custom class cannot affect
+                # retrieval there. Construct the validator from the raw mapping.
+                LocalContractOpenAPIV31SpecValidator(
+                    spec,
+                    base_uri=path.as_uri(),
+                ).validate()
+            else:
+                validate(spec, base_uri=path.as_uri())
             print(
                 f"OK  openapi       {path.name} v{spec['info']['version']} "
                 f"paths={len(spec['paths'])}"
@@ -1512,6 +1601,30 @@ def check_predecessors_frozen() -> list[str]:
         )
     else:
         print("OK  frozen        contracts/m7 and contracts/m6 agree on the contracts/m5 digest")
+
+    m8_manifest = M8 / "SCHEMA_MANIFEST.json"
+    if not m8_manifest.exists():
+        errors.append(
+            "contracts/m8/SCHEMA_MANIFEST.json is missing, so M0/M3/M4/M5/M6/M7 "
+            "have no recorded freeze for the unified consumer successor"
+        )
+        return errors
+
+    m8_recorded = _recorded_predecessors(m8_manifest)
+    for package, label in (
+        (M0, "contracts/m0"),
+        (M3, "contracts/m3"),
+        (M4, "contracts/m4"),
+        (M5, "contracts/m5"),
+        (M6, "contracts/m6"),
+        (M7, "contracts/m7"),
+    ):
+        errors += check_frozen(
+            package,
+            label,
+            m8_recorded.get(label),
+            "contracts/m8/SCHEMA_MANIFEST.json",
+        )
     return errors
 
 
@@ -2263,6 +2376,851 @@ def check_m7_openapi_projection() -> list[str]:
     return errors
 
 
+M8_SCHEMA_VERSION = "0.8.0"
+M8_PLACE_SEARCH_REQUEST_REF = (
+    M8_BASE + "place-search.schema.json#/$defs/placeSearchRequest"
+)
+M8_PLACE_SEARCH_RESPONSE_REF = (
+    M8_BASE + "place-search.schema.json#/$defs/placeSearchResponse"
+)
+M8_M3_READING_RESPONSE_REF = (
+    M3_BASE + "daily-reading.schema.json#/$defs/dailyReadingResponse"
+)
+M8_M5_READING_RESPONSE_REF = (
+    M5_BASE + "daily-reading.schema.json#/$defs/dailyReadingResponseV5"
+)
+M8_M3_OPENAPI_READING_RESPONSE_REF = (
+    "../../m3/daily-reading.schema.json#/$defs/dailyReadingResponse"
+)
+M8_M5_OPENAPI_READING_RESPONSE_REF = (
+    "../../m5/daily-reading.schema.json#/$defs/dailyReadingResponseV5"
+)
+M8_PREDECESSOR_HASHES = {
+    "contracts/m0": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
+    "contracts/m3": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
+    "contracts/m4": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
+    "contracts/m5": "57aadef51a6eca825866865c4cb0e75503cb29f497f998dc2a56b8971cc6674e",
+    "contracts/m6": "4ead039fd6a264555c2712f1eb950352eccfb9ca78e10a8d9f03c1e00159c148",
+    "contracts/m7": "15dda8c063d22d94bb6b9fd1000ccff9a05e90f27ece8c115a3a9ab58bf023bc",
+}
+M8_REQUIRED_VALID_FIXTURES = {
+    "account-export.saved-reading.json",
+    "account-export.saved-reading-m3.json",
+    "birth-profile.budget-exhausted.json",
+    "geocoder-consent.granted.json",
+    "geocoder-consent.not-granted.json",
+    "place-resolution.high-confidence.json",
+    "place-search.results.json",
+    "reading-history.page.json",
+    "reading-history.saved-revision.json",
+    "reading-save-state.saved.json",
+}
+M8_REQUIRED_INVALID_FIXTURES = {
+    "account-export.secret-shaped-content.json",
+    "birth-profile.budget-exhausted-missing-reset.json",
+    "geocoder-consent.extra-field.json",
+    "geocoder-consent.unknown-policy.json",
+    "geocoder-consent.wrong-allowed-use.json",
+    "geocoder-consent.wrong-source.json",
+    "place-resolution.extra-provider-field.json",
+    "place-search.query-too-short.json",
+    "reading-history.cursor-mode-mismatch.json",
+    "reading-history.pending-status.json",
+    "reading-save-state.extra-property.json",
+    "reading-save-state.unsaved-with-timestamp.json",
+}
+M8_REQUIRED_SCHEMAS = {
+    "account-export.schema.json",
+    "common.schema.json",
+    "geocoder-consent.schema.json",
+    "place-resolution.schema.json",
+    "place-search.schema.json",
+    "reading-history.schema.json",
+    "reading-save-state.schema.json",
+}
+M8_POLICY_VERSION = "google-places-geocoding-v4-2026-08-26"
+M8_PROVIDER_ID = "google_places_geocoding_v4"
+M8_DISCLOSURE_TEXT = (
+    "Google birthplace search is optional. If you enable it, Pattern/Like sends the city "
+    "or place text you type and your language preference (when available) to Google Places "
+    "Autocomplete. After you choose a suggestion, Pattern/Like sends only Google's opaque "
+    "Place ID to Google Geocoding. Pattern/Like does not send your birth date or time, "
+    "coordinates or device location, Pattern/Like user, account, birth-profile, or consent "
+    "identifiers, or the app-owned search session token. Google receives these requests, "
+    "Pattern/Like's project credential, and network metadata such as the Worker IP. Google "
+    "acts as an independent controller and may retain and use information it receives, "
+    "including search terms and IP addresses, to provide and improve Google products and "
+    "services; the reviewed terms do not promise to exclude model training. Pattern/Like "
+    "does not store your query or unselected suggestions. It encrypts the selected formatted "
+    "address, coordinates, confidence, and qualifiers under your account key and deletes that "
+    "data with your Pattern/Like account, but account deletion does not delete Google's "
+    "separately controlled records. You can decline or withdraw this permission and enter the "
+    "place, coordinates, and time zone manually."
+)
+M8_DISCLOSURE_LINKS = {
+    "patternlike_terms": "/terms.html",
+    "patternlike_privacy": "/privacy.html",
+    "google_maps_terms": "https://maps.google.com/help/terms_maps/",
+    "google_privacy": "https://policies.google.com/privacy",
+}
+
+
+def check_m8_fixture_inventory() -> list[str]:
+    errors: list[str] = []
+    valid_dir = M8 / "fixtures" / "valid"
+    invalid_dir = M8 / "fixtures" / "invalid"
+    valid = {path.name for path in valid_dir.glob("*.json")} if valid_dir.is_dir() else set()
+    invalid = {
+        path.name for path in invalid_dir.glob("*.json")
+    } if invalid_dir.is_dir() else set()
+    for missing in sorted(M8_REQUIRED_VALID_FIXTURES - valid):
+        errors.append(f"M8 required valid fixture is missing: {missing}")
+    for missing in sorted(M8_REQUIRED_INVALID_FIXTURES - invalid):
+        errors.append(f"M8 required invalid fixture is missing: {missing}")
+    for unexpected in sorted(valid - M8_REQUIRED_VALID_FIXTURES):
+        errors.append(f"M8 unexpected valid fixture is present: {unexpected}")
+    for unexpected in sorted(invalid - M8_REQUIRED_INVALID_FIXTURES):
+        errors.append(f"M8 unexpected invalid fixture is present: {unexpected}")
+
+    expected_prefixes = {
+        "account-export",
+        "birth-profile",
+        "geocoder-consent",
+        "place-resolution",
+        "place-search.query-too-short",
+        "place-search.results",
+        "reading-history",
+        "reading-save-state",
+    }
+    actual_prefixes = set(FIXTURE_SCHEMA.get("m8") or {})
+    if actual_prefixes != expected_prefixes:
+        errors.append(
+            f"M8 fixture prefixes are {sorted(actual_prefixes)}, "
+            f"expected {sorted(expected_prefixes)}"
+        )
+    expected_place_mappings = {
+        "place-search.query-too-short.json": M8_PLACE_SEARCH_REQUEST_REF,
+        "place-search.results.json": M8_PLACE_SEARCH_RESPONSE_REF,
+    }
+    for fixture, expected_ref in expected_place_mappings.items():
+        actual_ref = match_schema_ref("m8", fixture)
+        if actual_ref != expected_ref:
+            errors.append(
+                f"M8 fixture {fixture} maps to {actual_ref!r}, expected {expected_ref!r}"
+            )
+    if not errors:
+        print(
+            f"OK  inventory     contracts/m8 has {len(valid)} valid and "
+            f"{len(invalid)} invalid required fixture(s)"
+        )
+    return errors
+
+
+def _m8_object_closure_errors(node: object, path: tuple[str, ...] = ()) -> list[str]:
+    errors: list[str] = []
+    if isinstance(node, dict):
+        declared_type = node.get("type")
+        object_bearing = declared_type == "object" or (
+            isinstance(declared_type, list) and "object" in declared_type
+        )
+        if object_bearing and node.get("additionalProperties") is not False:
+            errors.append(
+                f"{'.'.join(path) or '<root>'} is an object without additionalProperties:false"
+            )
+        for key, value in node.items():
+            errors.extend(_m8_object_closure_errors(value, (*path, str(key))))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            errors.extend(_m8_object_closure_errors(value, (*path, str(index))))
+    return errors
+
+
+def check_m8_validator_regressions() -> list[str]:
+    errors: list[str] = []
+    nullable_object = {
+        "type": ["object", "null"],
+        "properties": {"secret_payload": {"type": "string"}},
+    }
+    if not _m8_object_closure_errors(nullable_object):
+        errors.append(
+            "M8 closure validator does not reject an open type:[object,null] schema"
+        )
+    pure_ref = {"$ref": M8_BASE + "common.schema.json#/$defs/nullableDateTime"}
+    if _m8_object_closure_errors(pure_ref):
+        errors.append("M8 closure validator incorrectly treats a pure $ref as an open object")
+    return errors
+
+
+def _m8_property_paths(node: object, property_name: str, path: tuple[str, ...] = ()):
+    if isinstance(node, dict):
+        properties = node.get("properties")
+        if isinstance(properties, dict) and property_name in properties:
+            yield (*path, "properties", property_name), properties[property_name]
+        for key, value in node.items():
+            yield from _m8_property_paths(value, property_name, (*path, str(key)))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _m8_property_paths(value, property_name, (*path, str(index)))
+
+
+def check_m8_schema_projection(registry: Registry) -> list[str]:
+    errors: list[str] = []
+    shipped = {path.name: path for path in M8.glob("*.schema.json")} if M8.is_dir() else {}
+    for missing in sorted(M8_REQUIRED_SCHEMAS - set(shipped)):
+        errors.append(f"contracts/m8 does not ship required schema {missing}")
+    if errors:
+        return errors
+
+    documents = {
+        name: json.loads(path.read_text(encoding="utf-8"))
+        for name, path in shipped.items()
+        if name in M8_REQUIRED_SCHEMAS
+    }
+    for filename, document in documents.items():
+        expected_id = M8_BASE + filename
+        if document.get("$id") != expected_id:
+            errors.append(f"{filename}: $id is not {expected_id}")
+        for closure_error in _m8_object_closure_errors(document):
+            errors.append(f"{filename}: {closure_error}")
+
+    common_defs = documents["common.schema.json"].get("$defs") or {}
+    required_common = {
+        "assemblyMode",
+        "birthCalcBudgetExhausted",
+        "dateTime",
+        "localDate",
+        "nullableDateTime",
+        "placeId",
+        "readingId",
+        "readingRevision",
+        "revisionReason",
+        "schemaVersion",
+        "sessionToken",
+    }
+    missing_common = required_common - set(common_defs)
+    for name in sorted(missing_common):
+        errors.append(f"M8 common schema is missing $defs/{name}")
+    if (common_defs.get("schemaVersion") or {}).get("const") != M8_SCHEMA_VERSION:
+        errors.append("M8 common schema does not pin schemaVersion to 0.8.0")
+
+    search_defs = documents["place-search.schema.json"].get("$defs") or {}
+    query = (
+        ((search_defs.get("placeSearchRequest") or {}).get("properties") or {}).get("query")
+        or {}
+    )
+    if (
+        query.get("minLength") != 2
+        or query.get("maxLength") != 120
+        or query.get("pattern") != r"^\S(?:.*\S)?$"
+    ):
+        errors.append("place search query does not enforce trimmed 2..120 Unicode code points")
+    candidates = (
+        ((search_defs.get("placeSearchResponse") or {}).get("properties") or {}).get(
+            "candidates"
+        )
+        or {}
+    )
+    if candidates.get("maxItems") != 8:
+        errors.append("place search candidates are not bounded at eight")
+
+    session_token = common_defs.get("sessionToken") or {}
+    if (
+        session_token.get("minLength") != 8
+        or session_token.get("maxLength") != 128
+    ):
+        errors.append("M8 common sessionToken is not bounded at 8..128 characters")
+
+    resolution_defs = documents["place-resolution.schema.json"].get("$defs") or {}
+    qualifiers = (
+        ((resolution_defs.get("placeResolutionResponse") or {}).get("properties") or {}).get(
+            "qualifiers"
+        )
+        or {}
+    )
+    if qualifiers.get("maxItems") != 2:
+        errors.append("place resolution qualifiers are not bounded at two")
+
+    history_defs = documents["reading-history.schema.json"].get("$defs") or {}
+    history = history_defs.get("readingHistoryResponse") or {}
+    items = (history.get("properties") or {}).get("items") or {}
+    if items.get("maxItems") != 50:
+        errors.append("reading history items are not bounded at 50")
+    cursor = (history.get("properties") or {}).get("next_cursor") or {}
+    cursor_limits = [
+        branch.get("maxLength")
+        for branch in cursor.get("oneOf") or []
+        if isinstance(branch, dict) and branch.get("type") == "string"
+    ]
+    if cursor_limits != [2048]:
+        errors.append("reading history next_cursor is not bounded at 2048 characters")
+
+    account = documents["account-export.schema.json"]
+    saved_at_paths = list(_m8_property_paths(account, "saved_at"))
+    if len(saved_at_paths) != 1 or "exportedDailyReading" not in saved_at_paths[0][0]:
+        errors.append(
+            "M8 account export must declare saved_at exactly once, on exportedDailyReading"
+        )
+    account_defs = account.get("$defs") or {}
+    exported_reading = account_defs.get("exportedDailyReading") or {}
+    exported_reading_properties = exported_reading.get("properties") or {}
+    if (
+        (exported_reading_properties.get("saved_at") or {}).get("$ref")
+        != M8_BASE + "common.schema.json#/$defs/nullableDateTime"
+    ):
+        errors.append("M8 exported reading saved_at does not reuse common nullableDateTime")
+    expected_exported_reading_fields = {
+        "id",
+        "local_date",
+        "release_version",
+        "chart_fingerprint",
+        "contract_id",
+        "assembly_mode",
+        "status",
+        "revision",
+        "revision_reason",
+        "supersedes_reading_id",
+        "invalidated_at",
+        "created_at",
+        "updated_at",
+        "artifact",
+        "evidence",
+        "saved_at",
+    }
+    if set(exported_reading.get("required") or []) != expected_exported_reading_fields:
+        errors.append("M8 exported reading does not preserve metadata/artifact/evidence fields")
+    reading_section_items = (
+        (((account_defs.get("readingSection") or {}).get("properties") or {}).get("items") or {})
+        .get("items")
+        or {}
+    )
+    if reading_section_items.get("$ref") != "#/$defs/exportedDailyReading":
+        errors.append("M8 account export readings section does not bind exportedDailyReading")
+    m7_account = json.loads(
+        (M7 / "account-export.schema.json").read_text(encoding="utf-8")
+    )
+    m7_account_export = (m7_account.get("$defs") or {}).get("accountExport") or {}
+    m8_account_export = account_defs.get("accountExport") or {}
+    if (
+        m8_account_export.get("required") != m7_account_export.get("required")
+        or set((m8_account_export.get("properties") or {}))
+        != set((m7_account_export.get("properties") or {}))
+    ):
+        errors.append("M8 account export does not preserve the complete M7 section structure")
+    account_fixture_path = (
+        M8 / "fixtures" / "valid" / "account-export.saved-reading.json"
+    )
+    if account_fixture_path.exists():
+        account_fixture = json.loads(account_fixture_path.read_text(encoding="utf-8"))
+        account_validator = resolve_validator(
+            M8_BASE + "account-export.schema.json#/$defs/accountExport",
+            registry,
+        )
+        stored_v5_probe = json.loads(json.dumps(account_fixture))
+        stored_v5_item = stored_v5_probe["readings"]["items"][0]
+        stored_v5_reading = stored_v5_item["artifact"]
+        stored_v5_evidence = stored_v5_item["evidence"]
+        if isinstance(stored_v5_reading, dict) and isinstance(stored_v5_evidence, dict):
+            if "reading" in stored_v5_reading:
+                stored_v5_reading = stored_v5_reading["reading"]
+            stored_v5_item["artifact"] = {
+                "schema_version": "0.5.0",
+                "reading": stored_v5_reading,
+                "evidence_header": stored_v5_evidence["header"],
+                "invalidation": None,
+            }
+            if not account_validator.is_valid(stored_v5_probe):
+                errors.append(
+                    "M8 account export rejects the existing StoredReadingV5 artifact envelope"
+                )
+        artifact_probe = json.loads(json.dumps(account_fixture))
+        artifact = artifact_probe["readings"]["items"][0].get("artifact")
+        if isinstance(artifact, dict):
+            artifact["provider_secret"] = "must-not-pass"
+            if account_validator.is_valid(artifact_probe):
+                errors.append(
+                    "M8 account export accepts arbitrary secret-shaped artifact content"
+                )
+        evidence_probe = json.loads(json.dumps(account_fixture))
+        evidence = evidence_probe["readings"]["items"][0].get("evidence")
+        if isinstance(evidence, dict):
+            evidence["provider_secret"] = "must-not-pass"
+            if account_validator.is_valid(evidence_probe):
+                errors.append(
+                    "M8 account export accepts arbitrary secret-shaped evidence content"
+                )
+        m3_fixture_path = (
+            M8 / "fixtures" / "valid" / "account-export.saved-reading-m3.json"
+        )
+        if m3_fixture_path.exists():
+            m3_fixture = json.loads(m3_fixture_path.read_text(encoding="utf-8"))
+            mismatched_pair = json.loads(json.dumps(account_fixture))
+            mismatched_pair["readings"]["items"][0]["evidence"] = (
+                m3_fixture["readings"]["items"][0]["evidence"]
+            )
+            if account_validator.is_valid(mismatched_pair):
+                errors.append("M8 account export accepts an M5 artifact with M3 evidence")
+            reverse_mismatch = json.loads(json.dumps(m3_fixture))
+            reverse_mismatch["readings"]["items"][0]["evidence"] = (
+                account_fixture["readings"]["items"][0]["evidence"]
+            )
+            if account_validator.is_valid(reverse_mismatch):
+                errors.append("M8 account export accepts an M3 artifact with M5 evidence")
+            null_pair = json.loads(json.dumps(account_fixture))
+            null_pair["readings"]["items"][0]["artifact"] = None
+            null_pair["readings"]["items"][0]["evidence"] = None
+            if not account_validator.is_valid(null_pair):
+                errors.append("M8 account export rejects a paired null artifact and evidence")
+            half_null_pair = json.loads(json.dumps(null_pair))
+            half_null_pair["readings"]["items"][0]["evidence"] = (
+                account_fixture["readings"]["items"][0]["evidence"]
+            )
+            if account_validator.is_valid(half_null_pair):
+                errors.append("M8 account export accepts an unpaired null artifact")
+
+    consent_defs = documents["geocoder-consent.schema.json"].get("$defs") or {}
+    consent = consent_defs.get("geocoderConsentResponse") or {}
+    consent_props = consent.get("properties") or {}
+    expected_consts = {
+        "kind": "product_source",
+        "source_id": "AST-02",
+        "permission_tier": 0,
+        "provider": M8_PROVIDER_ID,
+        "connector_account_id": None,
+        "policy_version": M8_POLICY_VERSION,
+    }
+    for field, expected in expected_consts.items():
+        if (consent_props.get(field) or {}).get("const") != expected:
+            errors.append(f"geocoder consent does not pin {field} to {expected!r}")
+    disclosure = consent_props.get("disclosure") or {}
+    if disclosure.get("$ref") == "#/$defs/geocoderDisclosure":
+        disclosure = consent_defs.get("geocoderDisclosure") or {}
+    disclosure_props = disclosure.get("properties") or {}
+    if (disclosure_props.get("text") or {}).get("const") != M8_DISCLOSURE_TEXT:
+        errors.append("geocoder consent does not pin the immutable disclosure text")
+    links_schema = disclosure_props.get("links") or {}
+    if links_schema.get("$ref") == "#/$defs/geocoderDisclosureLinks":
+        links_schema = consent_defs.get("geocoderDisclosureLinks") or {}
+    links = links_schema.get("properties") or {}
+    for field, expected in M8_DISCLOSURE_LINKS.items():
+        if (links.get(field) or {}).get("const") != expected:
+            errors.append(f"geocoder consent does not pin disclosure link {field}")
+    allowed_uses = consent_props.get("allowed_uses") or {}
+    allowed_use_consts = [
+        item.get("const")
+        for item in allowed_uses.get("prefixItems") or []
+        if isinstance(item, dict)
+    ]
+    if (
+        allowed_use_consts != ["chart_fact", "timezone_resolution"]
+        or allowed_uses.get("minItems") != 2
+        or allowed_uses.get("maxItems") != 2
+        or allowed_uses.get("items") is not False
+    ):
+        errors.append("geocoder consent does not pin the ordered allowed-use tuple")
+    scopes = consent_props.get("scopes") or {}
+    if (
+        scopes.get("minItems") != 0
+        or scopes.get("maxItems") != 0
+        or scopes.get("items") is not False
+    ):
+        errors.append("geocoder consent does not pin scopes to the empty tuple")
+
+    for filename in ("place-search.schema.json", "place-resolution.schema.json"):
+        document = documents[filename]
+        serialized = json.dumps(document).lower()
+        if M8_PROVIDER_ID in serialized or "google" in serialized:
+            errors.append(f"{filename} leaks consumer geocoder provider identity")
+
+        def walk_keys(value: object):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    yield key
+                    yield from walk_keys(child)
+            elif isinstance(value, list):
+                for child in value:
+                    yield from walk_keys(child)
+
+        leaked_keys = {
+            key
+            for key in walk_keys(document)
+            if key in {
+                "provider",
+                "provider_id",
+                "score",
+                "raw_address_components",
+                "address_components",
+                "attributions",
+            }
+        }
+        if leaked_keys:
+            errors.append(f"{filename} leaks provider-shaped keys {sorted(leaked_keys)}")
+
+    if not errors:
+        print(
+            "OK  projection    M8 schemas close every object, bound search/history, "
+            "pin consent, and isolate provider identity"
+        )
+    return errors
+
+
+def check_m8_manifest() -> list[str]:
+    errors: list[str] = []
+    path = M8 / "SCHEMA_MANIFEST.json"
+    if not path.exists():
+        return ["contracts/m8/SCHEMA_MANIFEST.json is missing"]
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    if doc.get("package") != "contracts/m8":
+        errors.append("M8 manifest package is not contracts/m8")
+    if doc.get("schema_version") != M8_SCHEMA_VERSION:
+        errors.append("M8 manifest schema_version is not 0.8.0")
+
+    declared = {entry.get("file"): entry for entry in doc.get("schemas") or []}
+    shipped = {path.name: path for path in sorted(M8.glob("*.schema.json"))}
+    for missing in sorted(set(shipped) - set(declared)):
+        errors.append(f"M8 manifest does not declare shipped schema {missing}")
+    for extra in sorted(set(declared) - set(shipped)):
+        errors.append(f"M8 manifest declares {extra}, which the package does not ship")
+    for filename, entry in declared.items():
+        if filename not in shipped:
+            continue
+        schema = json.loads(shipped[filename].read_text(encoding="utf-8"))
+        if entry.get("id") != schema.get("$id"):
+            errors.append(f"{filename}: M8 manifest id disagrees with the document $id")
+        if sorted(entry.get("defines") or []) != sorted(schema.get("$defs") or {}):
+            errors.append(f"{filename}: M8 manifest definition inventory disagrees")
+
+    recorded = _recorded_predecessors(path)
+    if set(recorded) != set(M8_PREDECESSOR_HASHES):
+        errors.append(
+            f"M8 predecessor packages are {sorted(recorded)}, "
+            f"expected {sorted(M8_PREDECESSOR_HASHES)}"
+        )
+    for package, expected in M8_PREDECESSOR_HASHES.items():
+        actual_recorded = recorded.get(package)
+        if actual_recorded != expected:
+            errors.append(
+                f"M8 manifest records {actual_recorded!r} for {package}, expected {expected}"
+            )
+        package_path = ROOT / package.removeprefix("contracts/")
+        actual = _normalised_manifest_digest(package_path)
+        if actual != expected:
+            errors.append(
+                f"{package} manifest digest is {actual}, expected frozen hash {expected}"
+            )
+        elif actual_recorded == expected:
+            print(f"OK  predecessor   {package} {expected}")
+
+    supersedes = doc.get("supersedes")
+    expected_document = "m7:account-export.schema.json#/$defs/accountExport"
+    if (
+        not isinstance(supersedes, list)
+        or len(supersedes) != 1
+        or not isinstance(supersedes[0], dict)
+        or supersedes[0].get("family") != "account-export"
+        or supersedes[0].get("documents") != [expected_document]
+    ):
+        errors.append("M8 manifest does not supersede exactly the M7 account-export family")
+
+    if not errors:
+        print(
+            f"OK  manifest      contracts/m8 declares {len(declared)} schema(s), "
+            "pins all six predecessors, and supersedes only M7 account export"
+        )
+    return errors
+
+
+def check_m8_openapi_projection(registry: Registry) -> list[str]:
+    try:
+        import yaml
+    except ImportError:
+        return []
+
+    path = M8 / "openapi" / "openapi.yaml"
+    if not path.exists():
+        return ["contracts/m8/openapi/openapi.yaml is missing"]
+    m7_path = M7 / "openapi" / "openapi.yaml"
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    m7_spec = yaml.safe_load(m7_path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    if (spec.get("info") or {}).get("version") != M8_SCHEMA_VERSION:
+        errors.append("M8 OpenAPI info.version is not 0.8.0")
+
+    http_methods = {"get", "put", "post", "delete", "patch", "head", "options", "trace"}
+    for route, path_item in (m7_spec.get("paths") or {}).items():
+        for method in set(path_item) & http_methods:
+            retained = ((spec.get("paths") or {}).get(route) or {}).get(method)
+            if retained is None:
+                errors.append(f"M8 OpenAPI drops M7 operation {method.upper()} {route}")
+                continue
+            if retained != path_item[method]:
+                errors.append(
+                    f"M8 OpenAPI changes the frozen M7 operation {method.upper()} {route}"
+                )
+
+    for top_level in ("servers", "security"):
+        if spec.get(top_level) != m7_spec.get(top_level):
+            errors.append(f"M8 OpenAPI changes frozen M7 {top_level}")
+    m7_components = m7_spec.get("components") or {}
+    m8_components = spec.get("components") or {}
+    for section_name, old_section in m7_components.items():
+        new_section = m8_components.get(section_name) or {}
+        for component_name, old_component in old_section.items():
+            if new_section.get(component_name) != old_component:
+                errors.append(
+                    f"M8 OpenAPI changes frozen M7 component "
+                    f"{section_name}.{component_name}"
+                )
+
+    expected = {
+        ("/v1/places/search", "post"): {
+            "200", "400", "401", "403", "409", "429", "503"
+        },
+        ("/v1/places/resolve", "post"): {
+            "200", "400", "401", "403", "409", "429", "503"
+        },
+        ("/v1/consents/geocoder", "get"): {"200", "401", "503"},
+        ("/v1/consents/geocoder", "put"): {
+            "200", "400", "401", "403", "409", "429", "503"
+        },
+        ("/v1/consents/geocoder", "delete"): {
+            "200", "400", "401", "403", "409", "429", "503"
+        },
+        ("/v1/readings", "get"): {"200", "400", "401"},
+        ("/v1/readings/{reading_id}", "get"): {"200", "401", "404"},
+        ("/v1/readings/{reading_id}/save", "get"): {"200", "401", "404"},
+        ("/v1/readings/{reading_id}/save", "put"): {"200", "401", "404"},
+        ("/v1/readings/{reading_id}/save", "delete"): {"204", "401"},
+        ("/v1/birth-profiles", "post"): {"202", "400", "401", "409", "429", "503"},
+    }
+    for (route, method), statuses in expected.items():
+        operation = ((spec.get("paths") or {}).get(route) or {}).get(method)
+        if operation is None:
+            errors.append(f"M8 OpenAPI does not describe {method.upper()} {route}")
+            continue
+        actual = set(operation.get("responses") or {})
+        if actual != statuses:
+            errors.append(
+                f"M8 OpenAPI {method.upper()} {route} responses are "
+                f"{sorted(actual)}, expected {sorted(statuses)}"
+            )
+
+    components = spec.get("components") or {}
+    parameters = components.get("parameters") or {}
+    ui_surface = parameters.get("ConsentUiSurface") or {}
+    if (
+        ui_surface.get("name") != "X-Consent-UI-Surface"
+        or ui_surface.get("required") is not True
+        or (ui_surface.get("schema") or {}).get("enum") != [
+            "onboarding",
+            "privacy_center",
+        ]
+    ):
+        errors.append("M8 OpenAPI does not pin the required closed consent UI header")
+
+    consent_path = (spec.get("paths") or {}).get("/v1/consents/geocoder") or {}
+    required_parameter_refs = {
+        "#/components/parameters/IdempotencyKey",
+        "#/components/parameters/ConsentUiSurface",
+    }
+    for method in ("put", "delete"):
+        operation = consent_path.get(method) or {}
+        refs = {
+            item.get("$ref")
+            for item in operation.get("parameters") or []
+            if isinstance(item, dict)
+        }
+        if refs != required_parameter_refs:
+            errors.append(
+                f"M8 OpenAPI {method.upper()} geocoder consent does not require "
+                "exactly Idempotency-Key and X-Consent-UI-Surface"
+            )
+    if (consent_path.get("delete") or {}).get("requestBody") is not None:
+        errors.append("M8 OpenAPI DELETE geocoder consent must have an empty body")
+
+    schemas = components.get("schemas") or {}
+    consent_component = schemas.get("GeocoderConsent") or {}
+    consent_properties = consent_component.get("properties") or {}
+    for field, expected_const in {
+        "kind": "product_source",
+        "source_id": "AST-02",
+        "permission_tier": 0,
+        "provider": M8_PROVIDER_ID,
+        "policy_version": M8_POLICY_VERSION,
+    }.items():
+        if (consent_properties.get(field) or {}).get("const") != expected_const:
+            errors.append(f"M8 OpenAPI GeocoderConsent does not pin {field}")
+
+    grant_component = schemas.get("GeocoderConsentGrant") or {}
+    grant_properties = grant_component.get("properties") or {}
+    if (
+        grant_component.get("additionalProperties") is not False
+        or grant_component.get("required") != ["policy_version"]
+        or (grant_properties.get("policy_version") or {}).get("const")
+        != M8_POLICY_VERSION
+    ):
+        errors.append("M8 OpenAPI consent grant body is not the closed current policy")
+
+    list_readings = ((spec.get("paths") or {}).get("/v1/readings") or {}).get("get") or {}
+    list_parameters = {
+        item.get("name"): item
+        for item in list_readings.get("parameters") or []
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    view_parameter = list_parameters.get("view") or {}
+    if (
+        view_parameter.get("in") != "query"
+        or view_parameter.get("required") is not True
+        or (view_parameter.get("schema") or {}).get("enum") != ["history", "saved"]
+    ):
+        errors.append("M8 OpenAPI reading history does not require the closed view filter")
+    limit_schema = (list_parameters.get("limit") or {}).get("schema") or {}
+    if limit_schema.get("minimum") != 1 or limit_schema.get("maximum") != 50:
+        errors.append("M8 OpenAPI reading history limit is not bounded at 1..50")
+    cursor_schema = (list_parameters.get("cursor") or {}).get("schema") or {}
+    if (
+        cursor_schema.get("minLength") != 1
+        or cursor_schema.get("maxLength") != 2048
+        or cursor_schema.get("pattern") != "^[A-Za-z0-9_-]+$"
+    ):
+        errors.append("M8 OpenAPI reading history cursor is not bounded base64url")
+
+    def value_paths(value: object, expected: object, path: tuple[str, ...] = ()):
+        if value == expected:
+            yield path
+        if isinstance(value, dict):
+            for key, child in value.items():
+                yield from value_paths(child, expected, (*path, str(key)))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                yield from value_paths(child, expected, (*path, str(index)))
+
+    provider_paths = list(value_paths(spec, M8_PROVIDER_ID))
+    if provider_paths != [
+        ("components", "schemas", "GeocoderConsent", "properties", "provider", "const")
+    ]:
+        errors.append(
+            "M8 OpenAPI consumer provider id appears outside the geocoder consent document"
+        )
+
+    detail = schemas.get("ReadingDetailResponse") or {}
+    detail_refs = [
+        branch.get("$ref")
+        for branch in detail.get("oneOf") or []
+        if isinstance(branch, dict)
+    ]
+    if detail_refs != [
+        M8_M3_OPENAPI_READING_RESPONSE_REF,
+        M8_M5_OPENAPI_READING_RESPONSE_REF,
+    ]:
+        errors.append(
+            "M8 OpenAPI reading detail does not directly reference the exact frozen "
+            "M3/M5 success schemas"
+        )
+
+    detail_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": M8_BASE + "openapi/openapi.yaml",
+        "$ref": "#/components/schemas/ReadingDetailResponse",
+        "components": {"schemas": schemas},
+    }
+    detail_validator = Draft202012Validator(
+        detail_schema,
+        registry=registry,
+        format_checker=FormatChecker(),
+    )
+    m3_published = json.loads(
+        (M3 / "fixtures" / "valid" / "daily-reading.published.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    m3_fallback = json.loads(
+        (M3 / "fixtures" / "valid" / "daily-reading.fallback.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    m5_published = json.loads(
+        (M5 / "fixtures" / "valid" / "daily-reading.published.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    semantic_probes = []
+    m3_life_domain = {
+        "schema_version": "0.3.0",
+        "reading": json.loads(json.dumps(m3_published)),
+        "evidence_url": None,
+    }
+    m3_life_domain["reading"]["domain_preference"] = "not-a-life-domain"
+    semantic_probes.append(
+        ("invalid M3 life-domain value", M8_M3_READING_RESPONSE_REF, m3_life_domain)
+    )
+    m3_fallback_invariant = {
+        "schema_version": "0.3.0",
+        "reading": json.loads(json.dumps(m3_fallback)),
+        "evidence_url": None,
+    }
+    m3_fallback_invariant["reading"]["paragraphs"][0]["role"] = "primary_theme"
+    semantic_probes.append(
+        (
+            "invalid M3 fallback paragraph invariant",
+            M8_M3_READING_RESPONSE_REF,
+            m3_fallback_invariant,
+        )
+    )
+    m5_life_domain = {
+        "schema_version": "0.5.0",
+        "reading": json.loads(json.dumps(m5_published)),
+        "evidence_url": None,
+    }
+    m5_life_domain["reading"]["domain_preference"] = "not-a-life-domain"
+    semantic_probes.append(
+        ("invalid M5 life-domain value", M8_M5_READING_RESPONSE_REF, m5_life_domain)
+    )
+    for label, frozen_ref, instance in semantic_probes:
+        if resolve_validator(frozen_ref, registry).is_valid(instance):
+            errors.append(f"M8 semantic probe is not rejected by frozen schema: {label}")
+        elif detail_validator.is_valid(instance):
+            errors.append(f"M8 OpenAPI reading detail accepts {label}")
+
+    birth = ((spec.get("paths") or {}).get("/v1/birth-profiles") or {}).get("post") or {}
+    birth_429 = (birth.get("responses") or {}).get("429") or {}
+    birth_schema = (
+        ((birth_429.get("content") or {}).get("application/json") or {}).get("schema")
+        or {}
+    )
+    if birth_schema.get("$ref") != "#/components/schemas/BirthCalcBudgetExhausted":
+        errors.append("M8 OpenAPI birth POST 429 does not use BirthCalcBudgetExhausted")
+    birth_component = schemas.get("BirthCalcBudgetExhausted")
+    if not isinstance(birth_component, dict):
+        errors.append("M8 OpenAPI has no BirthCalcBudgetExhausted component")
+    else:
+        validator = Draft202012Validator(
+            birth_component,
+            format_checker=FormatChecker(),
+        )
+        valid_path = M8 / "fixtures" / "valid" / "birth-profile.budget-exhausted.json"
+        invalid_path = (
+            M8
+            / "fixtures"
+            / "invalid"
+            / "birth-profile.budget-exhausted-missing-reset.json"
+        )
+        if valid_path.exists() and not validator.is_valid(
+            json.loads(valid_path.read_text(encoding="utf-8"))
+        ):
+            errors.append("M8 OpenAPI birth 429 rejects its normative valid fixture")
+        if invalid_path.exists() and validator.is_valid(
+            json.loads(invalid_path.read_text(encoding="utf-8"))
+        ):
+            errors.append("M8 OpenAPI birth 429 accepts missing details.resets_at")
+
+    if not errors:
+        print(
+            "OK  projection    M8 OpenAPI retains M7, adds every consumer method, "
+            "pins geocoder consent, M3/M5 detail, and birth 429"
+        )
+    return errors
+
+
 def check_m6_openapi_projection() -> list[str]:
     """Pin the implemented privacy/context routes and their complete status sets."""
     try:
@@ -2386,6 +3344,15 @@ def main() -> int:
     errors += check_m7_manifest()
     errors += check_m7_openapi_projection()
     errors += check_m7_regression_corpus(registry)
+
+    print("\n== contracts/m8 ==")
+    errors += validate_package(registry, "m8", M8, set())
+    errors += check_openapi(M8, registry)
+    errors += check_m8_fixture_inventory()
+    errors += check_m8_validator_regressions()
+    errors += check_m8_schema_projection(registry)
+    errors += check_m8_manifest()
+    errors += check_m8_openapi_projection(registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")

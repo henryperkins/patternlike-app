@@ -73,6 +73,50 @@ curl -s http://127.0.0.1:8787/v1/chart \
 
 Idempotency keys are scoped per user, so the static `demo-birth-001` above is safe across local users. Resubmitting the same birth data under a different key returns `409 chart_already_exists` rather than a 500.
 
+### Birth calculation is bounded, and the bound applies locally too
+
+Calculation runs inline inside `POST /v1/birth-profiles`, so both guards below
+are on the request path — including in the local loop, because `[vars]` declares
+the same values `[env.production.vars]` does.
+
+| Variable | Value | Effect |
+| --- | --- | --- |
+| `CALC_FETCH_TIMEOUT_MS` | `"10000"` | The calc fetch is aborted at the deadline and answers the generic `502 calc_failed`. Range 1,000–30,000. |
+| `BIRTH_CALC_DAILY_LIMIT` | `"5"` | At most five **actual** calc invocations per user per UTC day. Range 1–50. |
+
+Both are required outside `ENVIRONMENT=development|test`. Omitting **both**
+locally falls back to the defaults above; setting either one to a malformed or
+out-of-range value is a `503 configuration_error` on every request — in
+development too, so the parse that must never be wrong is never the parse that
+went unexercised.
+
+The sixth calculating request in a UTC day returns `429`, writes no birth
+profile and no job row, and never reaches calc:
+
+```json
+{
+  "error": {
+    "code": "birth_calc_budget_exhausted",
+    "message": "The daily birth calculation limit has been reached",
+    "request_id": "req_...",
+    "details": { "resets_at": "2026-08-28T00:00:00.000Z" }
+  }
+}
+```
+
+`Retry-After` carries the seconds remaining until that UTC midnight. Only
+requests that actually invoke calc are charged — validation failures,
+idempotency conflicts, and replays of a `succeeded`, `queued`, or `running` job
+are free, and two concurrent copies of one attempt consume one unit between
+them. A retry of a *failed* job must match the original encrypted birth request
+and does consume another unit; a charged timeout or upstream failure is not
+refunded, because the upstream spend already happened.
+
+Latency and denial are recorded as the closed `birth_calc_completed` and
+`birth_calc_budget_exhausted` events. Making the workflow asynchronous is
+deliberately deferred behind measured thresholds — see
+[`docs/deploy/birth-calc-slo.md`](docs/deploy/birth-calc-slo.md).
+
 ### Historical timezone lookup
 
 When `birthplace` carries coordinates they decide the zone, and `timezone_hint`
@@ -146,6 +190,8 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Production identity: OIDC token exchange, Worker-minted sessions, and a crypto identity decoupled from the user's public id
 - [x] Historical timezone resolution: birthplace coordinates resolve to an IANA zone (`POST /v1/timezone-lookup`), and the chart is calculated in that zone rather than the browser's current one
 - [x] Privacy center export/delete workflows, including encrypted artifacts and terminal deletion status
+- [x] Bounded birth calculation: a validated fetch deadline, a 1 MiB response ceiling, and an exact per-user UTC-day invocation budget that charges only requests which actually call calc. Entry criteria for making the workflow asynchronous are recorded in [`docs/deploy/birth-calc-slo.md`](docs/deploy/birth-calc-slo.md) and none has been measured
+- [ ] Migration `0016_birth_calc_usage.sql` applied to the remote database. It is committed, and the budget guard cannot run in production until it is applied
 - [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
 - [ ] Persisted `account_processing` consent: onboarding still sends a local placeholder and the birth route checks only that an id is present
 

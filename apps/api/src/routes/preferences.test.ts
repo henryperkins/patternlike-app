@@ -195,6 +195,85 @@ describe("PUT /v1/preferences/timezone", () => {
     expect(log).toHaveLength(1);
   });
 
+  it("converges device A to B to A with distinct keys and keeps old replay inert", async () => {
+    const firstA = await setZone(
+      "America/Chicago",
+      "device_derived",
+      undefined,
+      "web-device-timezone-a1",
+    );
+    const b = await setZone(
+      "Asia/Tokyo",
+      "device_derived",
+      undefined,
+      "web-device-timezone-b1",
+    );
+
+    expect(firstA.status).toBe(200);
+    expect(b.body).toMatchObject({
+      timezone: "Asia/Tokyo",
+      source: "device_derived",
+      timezone_revision: 2,
+    });
+
+    const replay = await setZone(
+      "America/Chicago",
+      "device_derived",
+      undefined,
+      "web-device-timezone-a1",
+    );
+    expect(replay).toEqual(firstA);
+    expect(await userRow()).toMatchObject({
+      timezone: "Asia/Tokyo",
+      timezone_source: "device_derived",
+      timezone_revision: 2,
+    });
+    expect(
+      await rows(
+        `SELECT id FROM jobs
+         WHERE user_id = ? AND job_type = 'preference_timezone'`,
+        USER_A,
+      ),
+    ).toHaveLength(2);
+    expect(
+      await rows(
+        "SELECT id FROM timezone_changes WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toHaveLength(2);
+
+    const secondA = await setZone(
+      "America/Chicago",
+      "device_derived",
+      undefined,
+      "web-device-timezone-a2",
+    );
+    expect(secondA.status).toBe(200);
+    expect(secondA.body).toMatchObject({
+      timezone: "America/Chicago",
+      source: "device_derived",
+      timezone_revision: 3,
+    });
+    expect(await userRow()).toMatchObject({
+      timezone: "America/Chicago",
+      timezone_source: "device_derived",
+      timezone_revision: 3,
+    });
+    expect(
+      await rows(
+        `SELECT id FROM jobs
+         WHERE user_id = ? AND job_type = 'preference_timezone'`,
+        USER_A,
+      ),
+    ).toHaveLength(3);
+    expect(
+      await rows(
+        "SELECT id FROM timezone_changes WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toHaveLength(3);
+  });
+
   it("replays the original result without applying the preference again", async () => {
     const first = await setZone(
       "America/Chicago",

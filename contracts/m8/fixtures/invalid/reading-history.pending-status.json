@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.8.0",
+  "view": "history",
+  "items": [
+    {
+      "reading_id": "rdg_11111111111111111111111111111111",
+      "local_date": "2026-08-26",
+      "revision": 1,
+      "revision_reason": "initial",
+      "status": "pending",
+      "assembly_mode": "deterministic",
+      "headline": null,
+      "saved": false,
+      "saved_at": null,
+      "evidence_url": "/v1/readings/rdg_11111111111111111111111111111111/evidence"
+    }
+  ],
+  "next_cursor": null
+}

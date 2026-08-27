@@ -28,6 +28,8 @@ describe("secure configuration guard", () => {
         OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
         TIME_TRAVEL_RECEIPT_EPOCH: "1",
         TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+        CALC_FETCH_TIMEOUT_MS: "10000",
+        BIRTH_CALC_DAILY_LIMIT: "5",
       }),
     ).toBeNull();
   });
@@ -91,6 +93,8 @@ describe("identity configuration", () => {
     OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
     TIME_TRAVEL_RECEIPT_EPOCH: "1",
     TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+    CALC_FETCH_TIMEOUT_MS: "10000",
+    BIRTH_CALC_DAILY_LIMIT: "5",
   };
 
   it("passes when every OIDC value is present", () => {
@@ -230,6 +234,8 @@ describe("publisher configuration", () => {
     OPENAI_API_KEY: "sk-test-key",
     TIME_TRAVEL_RECEIPT_EPOCH: "1",
     TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+    CALC_FETCH_TIMEOUT_MS: "10000",
+    BIRTH_CALC_DAILY_LIMIT: "5",
   };
 
   it("accepts a complete enabled configuration", () => {
@@ -257,6 +263,8 @@ describe("publisher configuration", () => {
       READING_V5_ROLLOUT: "off",
       TIME_TRAVEL_RECEIPT_EPOCH: "1",
       TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+      CALC_FETCH_TIMEOUT_MS: "10000",
+      BIRTH_CALC_DAILY_LIMIT: "5",
     };
     expect(checkSecureConfig(off)).toBeNull();
     const resolved = resolvePublisherConfiguration(off);
@@ -358,6 +366,8 @@ describe("AI Gateway configuration", () => {
     CHECK_IN_RETENTION_MONTHS: "13",
     TIME_TRAVEL_RECEIPT_EPOCH: "1",
     TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+    CALC_FETCH_TIMEOUT_MS: "10000",
+    BIRTH_CALC_DAILY_LIMIT: "5",
   };
 
   it("treats an absent gateway as the direct route", () => {
@@ -553,6 +563,8 @@ describe("ontology pipeline configuration", () => {
     OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
     TIME_TRAVEL_RECEIPT_EPOCH: "1",
     TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+    CALC_FETCH_TIMEOUT_MS: "10000",
+    BIRTH_CALC_DAILY_LIMIT: "5",
     ONTOLOGY_PIPELINE_ROLLOUT: "internal",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
     OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/place-resolution.schema.json",
+  "title": "M8 selected-place resolution",
+  "$defs": {
+    "placeConfidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "placeQualifierCode": {
+      "type": "string",
+      "enum": ["approximate_match", "region_level_match"]
+    },
+    "placeQualifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/placeQualifierCode" },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "placeResolutionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "session_token"],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "locale": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+            }
+          ]
+        },
+        "session_token": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/sessionToken"
+        }
+      }
+    },
+    "placeResolutionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "place_id",
+        "label",
+        "latitude",
+        "longitude",
+        "geocode_confidence",
+        "qualifiers"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/schemaVersion"
+        },
+        "place_id": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/placeId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geocode_confidence": { "$ref": "#/$defs/placeConfidence" },
+        "qualifiers": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/placeQualifier" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/placeResolutionRequest" },
+    { "$ref": "#/$defs/placeResolutionResponse" }
+  ]
+}

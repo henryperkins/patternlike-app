@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "birth_calc_budget_exhausted",
+    "message": "The daily birth calculation limit has been reached",
+    "request_id": "req_0123456789abcdef0123456789abcdef",
+    "details": {
+      "resets_at": "2026-08-27T00:00:00.000Z"
+    }
+  }
+}

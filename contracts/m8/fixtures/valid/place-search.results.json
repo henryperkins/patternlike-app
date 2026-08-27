@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.8.0",
+  "candidates": [
+    {
+      "candidate_id": "ChIJdd4hrwug2EcRmSrV3Vo6llI",
+      "primary_label": "London",
+      "secondary_label": "United Kingdom"
+    },
+    {
+      "candidate_id": "ChIJOwg_06VPwokRYv534QaPC8g",
+      "primary_label": "London",
+      "secondary_label": "Ontario, Canada"
+    }
+  ]
+}

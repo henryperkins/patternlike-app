@@ -14,6 +14,7 @@ npm run typecheck          # strict tsc --noEmit across every workspace
 npm test                   # shared + calc-stub + ontology-signer + api + web, then test:contracts
 npm run test:contracts     # python: deterministic spec rendering + JSON Schema/fixture validation + D1 SQL smoke apply
 npm run build              # shared/calc/signer tsc-or-dry-run, Vite build, API production dry-run
+npm run ci:local           # the merge gate — GitHub Actions does not run; see below
 
 npm run calc:dev           # calc service      :8080
 npm run db:local -w @patternlike/api   # apply db/d1/0001_m0_core.sql to local D1
@@ -33,6 +34,22 @@ npm run calc:golden                        # Swiss Ephemeris golden fingerprints
 `@patternlike/calc-stub`'s `pretest` runs `scripts/download-ephe.mjs`, which fetches ephemeris data pinned by commit + SHA-256 in `apps/calc-stub/ephemeris.lock.json`. First test run needs network.
 
 There is no linter or formatter — `npm run typecheck` is the only mechanical style gate.
+
+**GitHub Actions is unavailable on this account** — every run fails with a
+billing lock, and that is not expected to change. `main` is not branch protected
+either, so nothing mechanical stops an unverified merge. `npm run ci:local`
+(`scripts/ci-local.sh`) is the replacement gate: it mirrors
+`.github/workflows/ci.yml` step for step on the `.nvmrc` Node and prints a
+summary to paste into the PR. It needs Node 22 via `nvm` and a repo-local
+`.venv`; see `AGENTS.md` for the one-time bootstrap, which is not a plain
+`pip install` because this host's Python is externally managed with no
+`ensurepip`. The script also covers `pattern-engine`, `codex-runner`, and
+`test:content`, three lanes `ci.yml` never listed.
+
+Cloudflare Workers Builds is a **separate** system and is unaffected by the
+billing lock, so merging to `main` still deploys. The lost CI removed the check
+on a merge, not its consequences — which is why a migration must be applied
+remotely *before* the merge that deploys the code reading it.
 
 ## Architecture
 

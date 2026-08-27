@@ -36,7 +36,10 @@ const noFeedback = (readingId: string): Record<string, MockResponse> => ({
   },
 });
 
-function renderToday(responses: Record<string, MockResponse>) {
+function renderToday(
+  responses: Record<string, MockResponse>,
+  preferenceSyncRevision = 0,
+) {
   // Defaults land on the same object the tests mutate after mount (poll
   // transitions, preference gates, consent grant). Spreading into a new table
   // would freeze the first lookup.
@@ -48,7 +51,12 @@ function renderToday(responses: Record<string, MockResponse>) {
   }
   mockApiResponses(responses);
   const onUnauthorized = vi.fn();
-  const view = render(<TodayView onUnauthorized={onUnauthorized} />);
+  const view = render(
+    <TodayView
+      onUnauthorized={onUnauthorized}
+      preferenceSyncRevision={preferenceSyncRevision}
+    />,
+  );
   return { ...view, onUnauthorized };
 }
 
@@ -417,6 +425,33 @@ describe("TodayView", () => {
     ).toBeInTheDocument();
     expect(capturedFor(TODAY)).toHaveLength(2);
     expect(capturedFor(TODAY).map((request) => request.method)).toEqual(["PUT", "PUT"]);
+  });
+
+  it("retries a preference-gated reading after device sync settles", async () => {
+    const responses: Record<string, MockResponse> = {
+      [TODAY]: {
+        status: 409,
+        body: errorBody(
+          "timezone_confirmation_required",
+          "Confirm your scheduling time zone",
+        ),
+      },
+    };
+    const { onUnauthorized, rerender } = renderToday(responses);
+    await screen.findByLabelText("Scheduling time zone");
+
+    responses[TODAY] = ok(todayResponse);
+    rerender(
+      <TodayView
+        onUnauthorized={onUnauthorized}
+        preferenceSyncRevision={1}
+      />,
+    );
+
+    expect(
+      await screen.findByText(todayResponse.reading.paragraphs[0]!.text),
+    ).toBeInTheDocument();
+    expect(capturedFor(TODAY)).toHaveLength(2);
   });
 
   it("describes locale validation without promising reviewed-copy fallback", async () => {

@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/geocoder-consent.schema.json",
+  "title": "M8 revocable geocoder consent",
+  "$defs": {
+    "geocoderConsentUiSurface": {
+      "type": "string",
+      "enum": ["onboarding", "privacy_center"]
+    },
+    "geocoderDisclosureLinks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patternlike_terms",
+        "patternlike_privacy",
+        "google_maps_terms",
+        "google_privacy"
+      ],
+      "properties": {
+        "patternlike_terms": {
+          "type": "string",
+          "const": "/terms.html"
+        },
+        "patternlike_privacy": {
+          "type": "string",
+          "const": "/privacy.html"
+        },
+        "google_maps_terms": {
+          "type": "string",
+          "const": "https://maps.google.com/help/terms_maps/"
+        },
+        "google_privacy": {
+          "type": "string",
+          "const": "https://policies.google.com/privacy"
+        }
+      }
+    },
+    "geocoderDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "links"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "const": "Google birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Google Places Autocomplete. After you choose a suggestion, Pattern/Like sends only Google's opaque Place ID to Google Geocoding. Pattern/Like does not send your birth date or time, coordinates or device location, Pattern/Like user, account, birth-profile, or consent identifiers, or the app-owned search session token. Google receives these requests, Pattern/Like's project credential, and network metadata such as the Worker IP. Google acts as an independent controller and may retain and use information it receives, including search terms and IP addresses, to provide and improve Google products and services; the reviewed terms do not promise to exclude model training. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected formatted address, coordinates, confidence, and qualifiers under your account key and deletes that data with your Pattern/Like account, but account deletion does not delete Google's separately controlled records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually."
+        },
+        "links": { "$ref": "#/$defs/geocoderDisclosureLinks" }
+      }
+    },
+    "geocoderConsentGrantRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_version"],
+      "properties": {
+        "policy_version": {
+          "type": "string",
+          "const": "google-places-geocoding-v4-2026-08-26"
+        }
+      }
+    },
+    "geocoderConsentResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "source_id",
+        "permission_tier",
+        "allowed_uses",
+        "provider",
+        "scopes",
+        "connector_account_id",
+        "status",
+        "policy_version",
+        "granted_at",
+        "ui_surface",
+        "disclosure"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/schemaVersion"
+        },
+        "kind": { "type": "string", "const": "product_source" },
+        "source_id": { "type": "string", "const": "AST-02" },
+        "permission_tier": { "type": "integer", "const": 0 },
+        "allowed_uses": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            { "type": "string", "const": "chart_fact" },
+            { "type": "string", "const": "timezone_resolution" }
+          ],
+          "items": false
+        },
+        "provider": {
+          "type": "string",
+          "const": "google_places_geocoding_v4"
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 0,
+          "items": false
+        },
+        "connector_account_id": { "type": "null", "const": null },
+        "status": {
+          "type": "string",
+          "enum": ["granted", "not_granted"]
+        },
+        "policy_version": {
+          "type": "string",
+          "const": "google-places-geocoding-v4-2026-08-26"
+        },
+        "granted_at": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/nullableDateTime"
+        },
+        "ui_surface": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/geocoderConsentUiSurface" }
+          ]
+        },
+        "disclosure": { "$ref": "#/$defs/geocoderDisclosure" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": { "const": "granted" },
+            "granted_at": {
+              "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
+            },
+            "ui_surface": { "$ref": "#/$defs/geocoderConsentUiSurface" }
+          },
+          "required": ["status", "granted_at", "ui_surface"]
+        },
+        {
+          "properties": {
+            "status": { "const": "not_granted" },
+            "granted_at": { "type": "null" },
+            "ui_surface": { "type": "null" }
+          },
+          "required": ["status", "granted_at", "ui_surface"]
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/geocoderConsentGrantRequest" },
+    { "$ref": "#/$defs/geocoderConsentResponse" }
+  ]
+}

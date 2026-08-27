@@ -1,6 +1,6 @@
 import axe from "axe-core";
 import { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   initialContext,
@@ -28,6 +28,14 @@ const auth0Harness = vi.hoisted(() => ({
   current: null as Auth0ContextInterface | null,
 }));
 
+const preferenceSyncHarness = vi.hoisted(() => ({
+  sync: vi.fn<
+    (signal?: AbortSignal) => Promise<{
+      status: "settled" | "unauthorized" | "unavailable";
+    }>
+  >(),
+}));
+
 vi.mock("@auth0/auth0-react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@auth0/auth0-react")>();
   return {
@@ -38,6 +46,14 @@ vi.mock("@auth0/auth0-react", async (importOriginal) => {
     },
   };
 });
+
+vi.mock("./lib/device-preference-sync.js", () => ({
+  DevicePreferenceSynchronizer: class {
+    sync(signal?: AbortSignal) {
+      return preferenceSyncHarness.sync(signal);
+    }
+  },
+}));
 
 function setAuth0(
   overrides: Partial<Auth0ContextInterface> = {},
@@ -160,6 +176,8 @@ const chart = {
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   setAuth0();
+  preferenceSyncHarness.sync.mockReset();
+  preferenceSyncHarness.sync.mockResolvedValue({ status: "settled" });
   mockApiResponses({});
 });
 
@@ -681,6 +699,51 @@ describe("web application shell", () => {
     expect(capturedFor("/v1/birth-profiles")).toHaveLength(1);
   });
 
+  it("maps only the birth calculation budget code to retry-tomorrow copy with its request id", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "GET /v1/consents/ai-synthesis": {
+        status: 200,
+        body: consentGranted,
+      },
+      "/v1/birth-profiles": {
+        status: 429,
+        body: {
+          error: {
+            code: "birth_calc_budget_exhausted",
+            message: "The daily birth calculation limit has been reached",
+            request_id: "req_birth_budget_0001",
+            details: {
+              resets_at: "2026-08-28T00:00:00.000Z",
+            },
+          },
+        },
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+    await user.type(screen.getByLabelText("Birth date"), "1990-05-15");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /allow Pattern\/Like to encrypt these details/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Today's birth calculation limit has been reached. Try again tomorrow. " +
+      "(Request req_birth_budget_0001)",
+    );
+    expect(capturedFor("/v1/birth-profiles")).toHaveLength(1);
+  });
+
   it("does not keep the superseded chart when GET still returns it after replace", async () => {
     const user = userEvent.setup();
     const replacement = {
@@ -823,6 +886,127 @@ describe("web application shell", () => {
     ).toBeInTheDocument();
     expect(capturedFor("/v1/sessions")).toHaveLength(0);
     expect(auth0.getIdTokenClaims).not.toHaveBeenCalled();
+  });
+
+  it("syncs device preferences after sign-in and whenever the page returns visible", async () => {
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await waitFor(() => expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(1);
+
+    visibility.mockReturnValue("visible");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(2));
+  });
+
+  it.each([
+    {
+      label: "an unreachable",
+      response: { status: 0, body: null, unreachable: true },
+    },
+    {
+      label: "a 503",
+      response: {
+        status: 503,
+        body: {
+          error: {
+            code: "configuration_error",
+            message: "The API is unavailable",
+            request_id: "req_chart_unavailable",
+          },
+        },
+      },
+    },
+  ] satisfies Array<{ label: string; response: MockResponse }>)(
+    "does not sync device preferences after $label chart probe",
+    async ({ response }) => {
+      mockApiResponses({
+        "/v1/chart": response,
+      });
+
+      render(<App />);
+
+      expect(
+        await screen.findByRole("heading", {
+          name: /calculation record is out of reach/i,
+        }),
+      ).toBeInTheDocument();
+      expect(preferenceSyncHarness.sync).not.toHaveBeenCalled();
+    },
+  );
+
+  it("retries Today after a settled device preference sync", async () => {
+    window.location.hash = "today";
+    let settleSync!: (result: { status: "settled" }) => void;
+    const pendingSync = new Promise<{ status: "settled" }>((resolve) => {
+      settleSync = resolve;
+    });
+    preferenceSyncHarness.sync.mockReturnValue(pendingSync);
+    const responses: Record<string, MockResponse> = {
+      "/v1/chart": { status: 200, body: chart },
+      "/v1/readings/today": {
+        status: 409,
+        body: {
+          error: {
+            code: "timezone_confirmation_required",
+            message: "Confirm your scheduling time zone",
+            request_id: "req_today_preference",
+          },
+        },
+      },
+      [`GET /v1/readings/${READING_ID}/feedback`]: {
+        status: 404,
+        body: {
+          error: {
+            code: "feedback_not_found",
+            message: "No feedback recorded for this reading",
+          },
+        },
+      },
+    };
+    mockApiResponses(responses);
+
+    render(<App />);
+
+    await screen.findByLabelText("Scheduling time zone");
+    expect(capturedFor("/v1/readings/today")).toHaveLength(1);
+    responses["/v1/readings/today"] = { status: 200, body: todayResponse };
+
+    await act(async () => {
+      settleSync({ status: "settled" });
+      await pendingSync;
+    });
+
+    expect(
+      await screen.findByText(todayResponse.reading.paragraphs[0]!.text),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/readings/today")).toHaveLength(2);
+  });
+
+  it("shows the signed-out surface when device preference sync finds no session", async () => {
+    preferenceSyncHarness.sync.mockResolvedValue({ status: "unauthorized" });
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /Sign in/i })).toBeInTheDocument();
+    expect(preferenceSyncHarness.sync).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
   });
 
   it("ignores an ordinary Auth0 initialization error when the Worker session is valid", async () => {

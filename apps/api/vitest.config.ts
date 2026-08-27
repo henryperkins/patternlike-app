@@ -51,6 +51,9 @@ export default defineConfig({
       // Runs in the same isolate as the tests, so `exports.default.fetch()`
       // drives the real Hono app with real bindings.
       main: "src/index.ts",
+      // Workers AI has no local simulator. Keep this hermetic suite from
+      // opening an authenticated remote proxy for the configured `AI` binding.
+      remoteBindings: false,
       wrangler: { configPath: "./wrangler.toml" },
       miniflare: {
         // The application DB proves a clean apply. The second binding is used

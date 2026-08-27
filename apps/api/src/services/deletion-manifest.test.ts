@@ -3,10 +3,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   IDENTITY_A,
+  IDENTITY_B,
   resetDb,
   seedUser,
   USER_A,
+  USER_B,
 } from "../../test/helpers.js";
+import {
+  allocateBirthProfileVersion,
+  prepareBirthCalcAttempt,
+} from "../db/birth-calc-usage.js";
 
 import {
   AUDIT_TABLE,
@@ -199,6 +205,63 @@ describe("account-deletion manifest", () => {
       expect(NON_PORTABLE_USER_TABLES).toContain(table);
       expect(PORTABLE_USER_TABLES).not.toContain(table as never);
       expect(DELETED_USER_TABLES).toContain(table);
+    }
+  });
+
+  it("classifies every birth calculation guard table as deleted and non-portable", () => {
+    for (const table of [
+      "birth_calc_reservations",
+      "birth_calc_daily_usage",
+      "birth_profile_version_counters",
+    ] as const) {
+      expect(DELETED_USER_TABLES).toContain(table);
+      expect(NON_PORTABLE_USER_TABLES).toContain(table);
+      expect(PORTABLE_USER_TABLES).not.toContain(table as never);
+    }
+  });
+
+  it("deletes one owner's birth calculation guard rows without touching another owner", async () => {
+    await seedUser(IDENTITY_A);
+    await seedUser(IDENTITY_B);
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    const first = await prepareBirthCalcAttempt(
+      env,
+      USER_A,
+      "birth-deletion-owner-a",
+      1,
+      "claim-deletion-owner-a",
+      5,
+      now,
+    );
+    const second = await prepareBirthCalcAttempt(
+      env,
+      USER_B,
+      "birth-deletion-owner-b",
+      1,
+      "claim-deletion-owner-b",
+      5,
+      now,
+    );
+    await env.DB.batch(first.statements);
+    await env.DB.batch(second.statements);
+    await allocateBirthProfileVersion(env, USER_A, now);
+    await allocateBirthProfileVersion(env, USER_B, now);
+
+    await deleteUserRows(env, USER_A, "job_deletion_fixture");
+
+    for (const table of [
+      "birth_calc_reservations",
+      "birth_calc_daily_usage",
+      "birth_profile_version_counters",
+    ]) {
+      expect(await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM ${table} WHERE user_id = ?`,
+      ).bind(USER_A).first<{ count: number }>())
+        .toEqual({ count: 0 });
+      expect(await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM ${table} WHERE user_id = ?`,
+      ).bind(USER_B).first<{ count: number }>())
+        .toEqual({ count: 1 });
     }
   });
 

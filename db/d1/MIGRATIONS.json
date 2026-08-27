@@ -1,6 +1,6 @@
 {
   "engine": "cloudflare-d1",
-  "schema_version": "0.7.0",
+  "schema_version": "0.8.0",
   "migrations": [
     {
       "id": "0001_m0_core",
@@ -76,6 +76,11 @@
       "id": "0015_ontology_pipeline_regression_evidence",
       "file": "0015_ontology_pipeline_regression_evidence.sql",
       "description": "Forward-only fail-closed regression evidence hardening for machine ontology activation. Adds an all-or-none nullable tuple pinning the canonical passed regression report and its exact create-only generic artifact coordinate, object key, envelope hash, and ciphertext hash. Existing committed receipts remain all-NULL and immutable and therefore cannot authorize machine activation; committed receipts cannot be deleted; no evidence is invented or backfilled."
+    },
+    {
+      "id": "0016_birth_calc_usage",
+      "file": "0016_birth_calc_usage.sql",
+      "description": "M8 synchronous birth-calculation operational guards. Additive owner-scoped tables record exact UTC-day spend reservations, the winning hashed invocation claim, and monotonic profile-version allocation. The reservation ledger permits committed denial without a profile or job row and supports free same-coordinate replay. No encrypted column or content is added."
     }
   ],
   "notes": [
@@ -95,7 +100,8 @@
     "2026-08-21: 0012 is forward-only and additive, ordered after the immutable 0011 terminal evidence receipt. It is NOT a crypto break and adds no D1 encrypted column: encrypted bodies remain create-only R2 objects while D1 holds only their closed class, object pointer, authenticated-envelope identity, hashes, size, and lifecycle timestamps. The corpus, run, and artifact rows are not user-owned and carry no user identifier or users foreign key. A clean-apply lane and a separately populated post-0011 lane verify exact order, live-row preservation, foreign-key integrity, assertion probes, closed constraints, and the three bounded maintenance indexes.",
     "2026-08-24: 0013 is forward-only and additive. It is NOT a D1 crypto-version break and adds no plaintext or encrypted D1 content column: Codex request/response bodies live only in create-only AES-GCM R2 envelopes. D1 carries coordinates, pins, leases, safe failures, hashes, sizes, and R2 pointers. Pattern-owned rows carry user_id only so account erasure can delete their objects and control rows; ontology work remains non-user-owned.",
     "2026-08-24: 0014 is forward-only and additive. It is NOT a crypto-version break and stores no provider content or plaintext lease: only job id, SHA-256 lease hash, create-only encrypted response object key, and timestamp. The pre-upload row is a durable cleanup/deletion inventory for attempts that lose terminal CAS after lease reclamation.",
-    "2026-08-24: 0015 is forward-only and additive. It preserves 0011 byte-for-byte and performs no backfill: pre-0015 committed receipts gain six NULL regression-evidence columns, remain immutable, cannot be deleted, and fail closed in the machine verifier. New machine receipts must populate the complete tuple with exact SHA-256 pins and the regressing/regression_report artifact coordinate; partial tuples are rejected on INSERT and UPDATE, committed rows reject DELETE, and non-NULL object keys are unique. It is not a crypto-version break and adds no encrypted D1 content."
+    "2026-08-24: 0015 is forward-only and additive. It preserves 0011 byte-for-byte and performs no backfill: pre-0015 committed receipts gain six NULL regression-evidence columns, remain immutable, cannot be deleted, and fail closed in the machine verifier. New machine receipts must populate the complete tuple with exact SHA-256 pins and the regressing/regression_report artifact coordinate; partial tuples are rejected on INSERT and UPDATE, committed rows reject DELETE, and non-NULL object keys are unique. It is not a crypto-version break and adds no encrypted D1 content.",
+    "2026-08-27: 0016 is forward-only and additive and is NOT applied by this change. It is NOT a crypto-version break: AEAD_VERSION and KEK_DERIVATION_VERSION are unchanged, existing ciphertext remains readable, and no encrypted D1 column is added. The three directly user-owned tables contain only bounded birth-calculation spend/idempotency state and a monotonic profile-version counter; they must be deleted with the account, remain non-portable, and land in D1 before any Worker code queries them."
   ],
   "apply_hint": "wrangler d1 migrations apply patternlike-ops --local   (add --env production --remote for the live database)"
 }

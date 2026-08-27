@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.8.0",
+  "view": "saved",
+  "items": [
+    {
+      "reading_id": "rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "local_date": "2026-08-20",
+      "revision": 2,
+      "revision_reason": "chart_recalculated",
+      "status": "invalidated",
+      "assembly_mode": "constrained_model",
+      "headline": "The shape of a second look",
+      "saved": true,
+      "saved_at": "2026-08-25T12:00:00Z",
+      "evidence_url": "/v1/readings/rdg_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/evidence"
+    }
+  ],
+  "next_cursor": null
+}

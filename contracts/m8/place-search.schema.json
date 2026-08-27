@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/place-search.schema.json",
+  "title": "M8 place search",
+  "$defs": {
+    "placeSearchRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "session_token"],
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "pattern": "^\\S(?:.*\\S)?$"
+        },
+        "locale": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag"
+            }
+          ]
+        },
+        "session_token": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/sessionToken"
+        }
+      }
+    },
+    "placeSearchCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "primary_label", "secondary_label"],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "primary_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "secondary_label": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 512 }
+          ]
+        }
+      }
+    },
+    "placeSearchResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "candidates"],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/schemaVersion"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/placeSearchCandidate" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/placeSearchRequest" },
+    { "$ref": "#/$defs/placeSearchResponse" }
+  ]
+}

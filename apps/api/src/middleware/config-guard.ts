@@ -14,6 +14,7 @@ import {
   type ProviderCredentialMode,
 } from "../services/reading-publisher.js";
 import { CODEX_PROVIDER_TIMEOUT_MS } from "../services/codex-provider-contract.js";
+import { resolveBirthOperationalConfig } from "../services/birth-operational-config.js";
 
 export const ONTOLOGY_PIPELINE_ROLLOUT_MODES = ["off", "internal"] as const;
 export type OntologyPipelineRollout = (typeof ONTOLOGY_PIPELINE_ROLLOUT_MODES)[number];
@@ -406,6 +407,16 @@ export interface ConfigFailure {
  */
 export const PLACEHOLDER_OIDC_HOST = "issuer.invalid";
 
+function checkBirthOperationalConfig(env: Partial<Env>): ConfigFailure | null {
+  const result = resolveBirthOperationalConfig(env);
+  if (result.ok) return null;
+  return {
+    code: result.code,
+    message:
+      "Birth calculation timeout and daily limit must be bounded integers, and both are required outside development",
+  };
+}
+
 export function checkSecureConfig(
   env: Partial<Env>,
 ): ConfigFailure | null {
@@ -429,6 +440,14 @@ export function checkSecureConfig(
       code: "check_in_retention_misconfigured",
       message: "CHECK_IN_RETENTION_MONTHS must be an integer from 1 through 13",
     };
+  }
+
+  const birthOperationalValuesPresent =
+    env.CALC_FETCH_TIMEOUT_MS !== undefined ||
+    env.BIRTH_CALC_DAILY_LIMIT !== undefined;
+  if (birthOperationalValuesPresent) {
+    const failure = checkBirthOperationalConfig(env);
+    if (failure) return failure;
   }
 
   // Before the development short-circuit, deliberately. The local canary runs
@@ -500,6 +519,10 @@ export function checkSecureConfig(
   const timeTravel = resolveTimeTravelConfiguration(env);
   if (!timeTravel.ok) {
     return { code: "time_travel_misconfigured", message: timeTravel.message };
+  }
+  if (!birthOperationalValuesPresent) {
+    const failure = checkBirthOperationalConfig(env);
+    if (failure) return failure;
   }
   return null;
 }

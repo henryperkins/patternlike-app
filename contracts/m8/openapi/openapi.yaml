@@ -1,0 +1,1110 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Astrology App API (M8 amendment)
+  version: 0.8.0
+  description: |
+    Additive M8 consumer surfaces for birthplace search, revocable geocoder
+    consent, reading History and Saved views, revision-specific Save state,
+    portable Save metadata, and the birth calculation budget. The complete M7
+    API is retained unchanged; frozen M0-M7 documents remain valid.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+  - url: http://localhost:8787
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/pattern-state:
+    get:
+      operationId: getPatternState
+      x-normative-schema: 'm7:pattern-state.schema.json#/$defs/patternStateDocument'
+      responses:
+        '200':
+          description: Closed Pattern state for the current account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternState' }
+        '401': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /v1/consents/pattern-generation:
+    get:
+      operationId: getPatternGenerationConsent
+      x-normative-schema: 'm7:pattern-consent.schema.json#/$defs/patternConsent'
+      responses:
+        '200':
+          description: Current Pattern-generation terms and grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternConsent' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: revokePatternGenerationConsent
+      x-normative-schema: 'm7:pattern-consent.schema.json#/$defs/patternConsentRevocation'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Consent revoked; whether an accepted Pattern was retained
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternConsentRevocation' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /v1/pattern-generations:
+    post:
+      operationId: startPatternGeneration
+      x-normative-schema: 'm7:pattern-generation-request.schema.json#/$defs/patternGenerationRequest'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatternGenerationRequest' }
+      responses:
+        '202':
+          description: Consent granted or observed and generation reserved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternGenerationAccepted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/pattern-generations/{generation_id}:
+    get:
+      operationId: getPatternGeneration
+      x-normative-schema: 'm7:pattern-generation-status.schema.json#/$defs/patternGenerationStatus'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+      responses:
+        '200':
+          description: Owner-scoped generation status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternGenerationStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/pattern:
+    get:
+      operationId: getGeneratedPattern
+      x-normative-schema: 'm7:pattern-response.schema.json#/$defs/patternResponse'
+      responses:
+        '200':
+          description: One immutable AI Pattern document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteGeneratedPattern
+      x-normative-schema: 'm7:pattern-delete-request.schema.json#/$defs/patternDeleteRequest'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatternDeleteRequest' }
+      responses:
+        '202':
+          description: Pattern made inaccessible; physical artifact deletion may continue
+        '204':
+          description: Pattern already erased
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /internal/pattern-ontology-releases:
+    post:
+      operationId: ingestPatternOntologyRelease
+      security:
+        - serviceToken: []
+      x-normative-schema: 'm7:pattern-ontology-release.schema.json#/$defs/patternOntologyRelease'
+      responses:
+        '201': { description: Ontology release stored }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /internal/pattern-ontology-releases/{version}/recall:
+    post:
+      operationId: recallPatternOntologyRelease
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/OntologyVersion'
+      responses:
+        '200': { description: Release recalled; accepted Patterns withdrawn }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /internal/pattern-generations/{generation_id}/reconcile:
+    post:
+      operationId: reconcilePatternGeneration
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+      responses:
+        '202': { description: Generation reconciliation accepted }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-generations/{generation_id}:
+    get:
+      operationId: adminGetPatternGeneration
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-generation.schema.json#/$defs/patternAdminGeneration'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Generation metadata; does not open exact content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminGeneration' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-generations/{generation_id}/artifacts:
+    get:
+      operationId: adminListPatternArtifacts
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-artifact-inventory.schema.json#/$defs/patternAdminArtifactInventory'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Artifact inventory; does not open exact content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminArtifactInventory' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-generations/{generation_id}/artifacts/{artifact_id}:
+    get:
+      operationId: adminGetPatternArtifact
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-artifact.schema.json#/$defs/patternAdminArtifact'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+        - $ref: '#/components/parameters/ArtifactId'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Decrypted artifact; a separate auditable action
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminArtifact' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /admin/pattern-ontology-releases/{version}:
+    get:
+      operationId: adminGetPatternOntologyRelease
+      security:
+        - adminSession: []
+      x-normative-schema: 'm7:pattern-admin-ontology-release.schema.json#/$defs/patternAdminOntologyRelease'
+      parameters:
+        - $ref: '#/components/parameters/OntologyVersion'
+        - $ref: '#/components/parameters/AdminPurpose'
+      responses:
+        '200':
+          description: Ontology release metadata; does not return record bodies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatternAdminOntologyRelease' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/places/search:
+    post:
+      tags: [places]
+      operationId: searchPlaces
+      summary: Search provider-neutral birthplace suggestions
+      x-normative-request-schema: 'm8:place-search.schema.json#/$defs/placeSearchRequest'
+      x-normative-response-schema: 'm8:place-search.schema.json#/$defs/placeSearchResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaceSearchRequest' }
+      responses:
+        '200':
+          description: At most eight provider-neutral suggestions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaceSearchResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/places/resolve:
+    post:
+      tags: [places]
+      operationId: resolvePlace
+      summary: Resolve one selected suggestion to an app-owned place
+      x-normative-request-schema: 'm8:place-resolution.schema.json#/$defs/placeResolutionRequest'
+      x-normative-response-schema: 'm8:place-resolution.schema.json#/$defs/placeResolutionResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaceResolutionRequest' }
+      responses:
+        '200':
+          description: Selected place projected without provider metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaceResolutionResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/consents/geocoder:
+    get:
+      tags: [consents]
+      operationId: getGeocoderConsent
+      x-normative-schema: 'm8:geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+      responses:
+        '200':
+          description: Current server-owned disclosure and grant state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeocoderConsent' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [consents]
+      operationId: grantGeocoderConsent
+      x-normative-request-schema: 'm8:geocoder-consent.schema.json#/$defs/geocoderConsentGrantRequest'
+      x-normative-response-schema: 'm8:geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConsentUiSurface'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GeocoderConsentGrant' }
+      responses:
+        '200':
+          description: Current policy granted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeocoderConsent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409':
+          description: consent_policy_version_stale or idempotency conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [consents]
+      operationId: revokeGeocoderConsent
+      x-normative-schema: 'm8:geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConsentUiSurface'
+      responses:
+        '200':
+          description: Consent withdrawn and current not-granted state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeocoderConsent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/readings:
+    get:
+      tags: [readings]
+      operationId: listReadingHistory
+      x-normative-schema: 'm8:reading-history.schema.json#/$defs/readingHistoryResponse'
+      parameters:
+        - name: view
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [history, saved]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '200':
+          description: One bounded History or Saved page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingHistoryResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/readings/{reading_id}:
+    get:
+      tags: [readings]
+      operationId: getReadingById
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+      responses:
+        '200':
+          description: The immutable stored revision through its frozen reader
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingDetailResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/readings/{reading_id}/save:
+    get:
+      tags: [readings]
+      operationId: getReadingSaveState
+      x-normative-schema: 'm8:reading-save-state.schema.json#/$defs/readingSaveState'
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+      responses:
+        '200':
+          description: Revision-specific Save state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingSaveState' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [readings]
+      operationId: saveReading
+      x-normative-schema: 'm8:reading-save-state.schema.json#/$defs/readingSaveState'
+      description: Empty-body idempotent desired-state operation.
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+      responses:
+        '200':
+          description: Saved, preserving the original saved_at on repetition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingSaveState' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [readings]
+      operationId: unsaveReading
+      description: Empty-body idempotent delete; unknown and foreign ids do not disclose existence.
+      parameters:
+        - $ref: '#/components/parameters/ReadingId'
+      responses:
+        '204': { description: Save state absent }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/birth-profiles:
+    post:
+      tags: [birth]
+      operationId: createOrUpdateBirthProfile
+      summary: Create/update a birth profile and start calculation
+      x-normative-budget-schema: 'm8:common.schema.json#/$defs/birthCalcBudgetExhausted'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BirthProfileRequest' }
+      responses:
+        '202':
+          description: Profile accepted; calculation workflow started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthProfileAccepted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429':
+          description: Per-user UTC-day birth calculation budget exhausted
+          headers:
+            Retry-After:
+              description: Seconds until the next UTC day
+              schema: { type: integer, minimum: 0 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthCalcBudgetExhausted' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+    serviceToken:
+      type: http
+      scheme: bearer
+    adminToken:
+      type: http
+      scheme: bearer
+      description: >
+        Deprecated transitional shared secret. Slice C deletes this scheme
+        together with PATTERN_ADMIN_TOKEN. New admin paths use adminSession.
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: pl_admin_session
+      description: >
+        Specified administrator session. HttpOnly, Secure, SameSite=Strict,
+        Path=/admin. Minted by Cloudflare Access or a separate administrator
+        OIDC tenant; the operator has not chosen which.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    GenerationId:
+      name: generation_id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^part_[0-9a-f]{32}$' }
+    OntologyVersion:
+      name: version
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    AdminPurpose:
+      name: purpose
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [quality_review, safety_investigation, incident_response, retention_audit]
+    ConsentUiSurface:
+      name: X-Consent-UI-Surface
+      in: header
+      required: true
+      schema:
+        type: string
+        enum: [onboarding, privacy_center]
+    ReadingId:
+      name: reading_id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: '^[A-Za-z0-9_.:-]+$'
+  responses:
+    Error:
+      description: Existing request-id error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: true
+          required: [code, message, request_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+    PatternState:
+      type: object
+      additionalProperties: true
+      required: [schema_version, state]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        state: { type: string }
+    PatternConsent:
+      type: object
+      additionalProperties: true
+      required: [schema_version, kind, status]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        kind: { type: string, const: 'pattern_generation' }
+        status: { type: string }
+    PatternConsentRevocation:
+      type: object
+      additionalProperties: false
+      required: [schema_version, consent, existing_pattern_retained]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        consent: { $ref: '#/components/schemas/PatternConsent' }
+        existing_pattern_retained: { type: boolean }
+    PatternGenerationRequest:
+      type: object
+      additionalProperties: false
+      required: [schema_version, consent_policy_version, confirm, reason]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        consent_policy_version: { type: string }
+        confirm: { type: string, const: 'GENERATE MY PATTERN' }
+        reason: { type: string }
+    PatternGenerationAccepted:
+      type: object
+      additionalProperties: true
+      required: [schema_version, consent, generation]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+    PatternGenerationStatus:
+      type: object
+      additionalProperties: true
+      required: [schema_version, generation_id, stage]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+    PatternResponse:
+      type: object
+      additionalProperties: true
+      required: [schema_version, pattern_id, core_chapters]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+    PatternDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm]
+      properties:
+        confirm: { type: string, const: 'DELETE PATTERN' }
+    PatternAdminGeneration:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generation_id, stage, created_at, ontology_version, artifact_count, exact_artifacts_retained]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        generation_id: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+        stage:
+          type: string
+          enum:
+            - reserved
+            - planning
+            - plan_validating
+            - writing
+            - candidate_validating
+            - semantic_verifying
+            - publishing
+            - succeeded
+            - failed
+            - cancelled
+        created_at: { type: string, format: date-time }
+        ontology_version: { type: string, minLength: 1 }
+        plan_hash:
+          type: [string, 'null']
+          pattern: '^sha256:[0-9a-f]{64}$'
+        candidate_hash:
+          type: [string, 'null']
+          pattern: '^sha256:[0-9a-f]{64}$'
+        artifact_count: { type: integer, minimum: 0 }
+        exact_artifacts_retained: { type: boolean }
+    PatternAdminArtifactInventory:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generation_id, artifacts]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        generation_id: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+        artifacts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [artifact_id, artifact_class, created_at, expires_at, deleted_at]
+            properties:
+              artifact_id: { type: string, pattern: '^part_[0-9a-f]{32}$' }
+              artifact_class:
+                type: string
+                enum:
+                  - fact_packet
+                  - planner_request
+                  - planner_response
+                  - validated_plan
+                  - writer_request
+                  - writer_response
+                  - rejected_candidate
+                  - candidate_validation
+                  - verifier_request
+                  - verifier_response
+                  - semantic_verdict
+                  - accepted_internal_document
+              created_at: { type: string, format: date-time }
+              expires_at: { type: string, format: date-time }
+              deleted_at: { type: [string, 'null'], format: date-time }
+    PatternAdminArtifact:
+      type: object
+      additionalProperties: false
+      required: [schema_version, generation_id, artifact_id, artifact_class, created_at, expires_at, content]
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        generation_id: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+        artifact_id: { type: string, pattern: '^part_[0-9a-f]{32}$' }
+        artifact_class:
+          type: string
+          enum:
+            - fact_packet
+            - planner_request
+            - planner_response
+            - validated_plan
+            - writer_request
+            - writer_response
+            - rejected_candidate
+            - candidate_validation
+            - verifier_request
+            - verifier_response
+            - semantic_verdict
+            - accepted_internal_document
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        content: { type: object }
+    PatternAdminOntologyRelease:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - ontology_version
+        - status
+        - bundle_hash
+        - corpus_release_hash
+        - locale
+        - provenance_origin
+        - record_count
+        - evaluation
+      properties:
+        schema_version: { type: string, const: '0.7.0' }
+        ontology_version: { type: string, minLength: 1 }
+        status: { type: string, enum: [candidate, active, superseded, recalled] }
+        bundle_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+        corpus_release_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+        locale:
+          type: string
+          minLength: 2
+          maxLength: 35
+          pattern: '^[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$'
+        provenance_origin:
+          type: string
+          enum: [synthetic_internal, machine_pipeline, absent]
+        record_count: { type: integer, minimum: 0 }
+        evaluation:
+          type: object
+          additionalProperties: false
+          required:
+            - schema_version
+            - ontology_version
+            - verdict
+            - compiler_passed
+            - evaluator_passed
+            - regression_passed
+            - unevaluated_fixture_count
+          properties:
+            schema_version: { type: string, const: '0.7.0' }
+            ontology_version: { type: string, minLength: 1 }
+            verdict: { type: string, enum: [pass, reject] }
+            compiler_passed: { type: boolean }
+            evaluator_passed: { type: boolean }
+            regression_passed: { type: boolean }
+            unevaluated_fixture_count: { type: integer, minimum: 0 }
+            evaluation_report_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+            regression_report_hash: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+    PlaceSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [query, session_token]
+      properties:
+        query:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:.*\S)?$'
+        locale:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 35
+          pattern: '^[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$'
+        session_token:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._~-]+$'
+    PlaceSearchCandidate:
+      type: object
+      additionalProperties: false
+      required: [candidate_id, primary_label, secondary_label]
+      properties:
+        candidate_id: { type: string, minLength: 1, maxLength: 512 }
+        primary_label: { type: string, minLength: 1, maxLength: 512 }
+        secondary_label:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 512
+    PlaceSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, candidates]
+      properties:
+        schema_version: { type: string, const: '0.8.0' }
+        candidates:
+          type: array
+          minItems: 0
+          maxItems: 8
+          items: { $ref: '#/components/schemas/PlaceSearchCandidate' }
+    PlaceResolutionRequest:
+      type: object
+      additionalProperties: false
+      required: [candidate_id, session_token]
+      properties:
+        candidate_id: { type: string, minLength: 1, maxLength: 512 }
+        locale:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 35
+          pattern: '^[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$'
+        session_token:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._~-]+$'
+    PlaceQualifier:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [approximate_match, region_level_match]
+        message: { type: string, minLength: 1, maxLength: 500 }
+    PlaceResolutionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        [schema_version, place_id, label, latitude, longitude,
+         geocode_confidence, qualifiers]
+      properties:
+        schema_version: { type: string, const: '0.8.0' }
+        place_id: { type: string, pattern: '^plc_[0-9a-f]{32}$' }
+        label: { type: string, minLength: 1, maxLength: 512 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        geocode_confidence: { type: string, enum: [high, medium, low] }
+        qualifiers:
+          type: array
+          minItems: 0
+          maxItems: 2
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/PlaceQualifier' }
+    GeocoderConsentGrant:
+      type: object
+      additionalProperties: false
+      required: [policy_version]
+      properties:
+        policy_version:
+          type: string
+          const: google-places-geocoding-v4-2026-08-26
+    GeocoderConsent:
+      type: object
+      additionalProperties: false
+      required:
+        [schema_version, kind, source_id, permission_tier, allowed_uses,
+         provider, scopes, connector_account_id, status, policy_version,
+         granted_at, ui_surface, disclosure]
+      properties:
+        schema_version: { type: string, const: '0.8.0' }
+        kind: { type: string, const: product_source }
+        source_id: { type: string, const: AST-02 }
+        permission_tier: { type: integer, const: 0 }
+        allowed_uses:
+          type: array
+          minItems: 2
+          maxItems: 2
+          prefixItems:
+            - { type: string, const: chart_fact }
+            - { type: string, const: timezone_resolution }
+          items: false
+        provider: { type: string, const: google_places_geocoding_v4 }
+        scopes:
+          type: array
+          minItems: 0
+          maxItems: 0
+          items: false
+        connector_account_id: { type: 'null', const: null }
+        status: { type: string, enum: [granted, not_granted] }
+        policy_version:
+          type: string
+          const: google-places-geocoding-v4-2026-08-26
+        granted_at: { type: [string, 'null'], format: date-time }
+        ui_surface:
+          type: [string, 'null']
+          enum: [onboarding, privacy_center, null]
+        disclosure:
+          type: object
+          additionalProperties: false
+          required: [text, links]
+          properties:
+            text:
+              type: string
+              const: "Google birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Google Places Autocomplete. After you choose a suggestion, Pattern/Like sends only Google's opaque Place ID to Google Geocoding. Pattern/Like does not send your birth date or time, coordinates or device location, Pattern/Like user, account, birth-profile, or consent identifiers, or the app-owned search session token. Google receives these requests, Pattern/Like's project credential, and network metadata such as the Worker IP. Google acts as an independent controller and may retain and use information it receives, including search terms and IP addresses, to provide and improve Google products and services; the reviewed terms do not promise to exclude model training. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected formatted address, coordinates, confidence, and qualifiers under your account key and deletes that data with your Pattern/Like account, but account deletion does not delete Google's separately controlled records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually."
+            links:
+              type: object
+              additionalProperties: false
+              required:
+                [patternlike_terms, patternlike_privacy, google_maps_terms,
+                 google_privacy]
+              properties:
+                patternlike_terms: { type: string, const: /terms.html }
+                patternlike_privacy: { type: string, const: /privacy.html }
+                google_maps_terms:
+                  type: string
+                  const: 'https://maps.google.com/help/terms_maps/'
+                google_privacy:
+                  type: string
+                  const: 'https://policies.google.com/privacy'
+      oneOf:
+        - properties:
+            status: { const: granted }
+            granted_at: { type: string, format: date-time }
+            ui_surface: { type: string, enum: [onboarding, privacy_center] }
+          required: [status, granted_at, ui_surface]
+        - properties:
+            status: { const: not_granted }
+            granted_at: { type: 'null' }
+            ui_surface: { type: 'null' }
+          required: [status, granted_at, ui_surface]
+    ReadingHistoryItem:
+      type: object
+      additionalProperties: false
+      required:
+        [reading_id, local_date, revision, revision_reason, status,
+         assembly_mode, headline, saved, saved_at, evidence_url]
+      properties:
+        reading_id:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_.:-]+$'
+        local_date: { type: string, format: date }
+        revision: { type: integer, minimum: 1 }
+        revision_reason:
+          type: string
+          enum:
+            [initial, chart_recalculated, consent_revoked, safety_correction,
+             defect_repair]
+        status: { type: string, enum: [published, superseded, invalidated] }
+        assembly_mode: { type: string, enum: [deterministic, constrained_model] }
+        headline: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        saved: { type: boolean }
+        saved_at: { type: [string, 'null'], format: date-time }
+        evidence_url:
+          type: string
+          minLength: 1
+          maxLength: 512
+          format: uri-reference
+          pattern: '^/v1/readings/[A-Za-z0-9_.:-]+/evidence$'
+      oneOf:
+        - properties:
+            saved: { const: true }
+            saved_at: { type: string, format: date-time }
+          required: [saved, saved_at]
+        - properties:
+            saved: { const: false }
+            saved_at: { type: 'null' }
+          required: [saved, saved_at]
+    ReadingHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [schema_version, view, items, next_cursor]
+      properties:
+        schema_version: { type: string, const: '0.8.0' }
+        view: { type: string, enum: [history, saved] }
+        items:
+          type: array
+          minItems: 0
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ReadingHistoryItem' }
+        next_cursor:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 2048
+          pattern: '^[A-Za-z0-9_-]+$'
+      allOf:
+        - if:
+            properties: { view: { const: saved } }
+            required: [view]
+          then:
+            properties:
+              items:
+                items:
+                  properties:
+                    saved: { const: true }
+                    saved_at: { type: string, format: date-time }
+                  required: [saved, saved_at]
+    ReadingSaveState:
+      type: object
+      additionalProperties: false
+      required: [schema_version, reading_id, saved, saved_at]
+      properties:
+        schema_version: { type: string, const: '0.8.0' }
+        reading_id:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_.:-]+$'
+        saved: { type: boolean }
+        saved_at: { type: [string, 'null'], format: date-time }
+      oneOf:
+        - properties:
+            saved: { const: true }
+            saved_at: { type: string, format: date-time }
+          required: [saved, saved_at]
+        - properties:
+            saved: { const: false }
+            saved_at: { type: 'null' }
+          required: [saved, saved_at]
+    ReadingDetailResponse:
+      oneOf:
+        - { $ref: '../../m3/daily-reading.schema.json#/$defs/dailyReadingResponse' }
+        - { $ref: '../../m5/daily-reading.schema.json#/$defs/dailyReadingResponseV5' }
+      x-normative-m3-schema: 'm3:daily-reading.schema.json#/$defs/dailyReadingResponse'
+      x-normative-m5-schema: 'm5:daily-reading.schema.json#/$defs/dailyReadingResponseV5'
+    TimezoneQualifier:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - pre_1970_zone_boundary
+            - near_zone_boundary
+            - hint_replaced
+            - no_coordinates
+            - nautical_zone
+            - local_time_ambiguous
+            - local_time_nonexistent
+        message: { type: string }
+    BirthProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [accuracy, consent_id]
+      properties:
+        accuracy: { type: string, enum: [exact, approximate, unknown] }
+        birth_date: { type: string, format: date }
+        birth_time_local: { type: [string, 'null'] }
+        approximate_window_minutes:
+          type: [integer, 'null']
+          minimum: 1
+        birthplace:
+          type: object
+          additionalProperties: false
+          properties:
+            label: { type: string }
+            place_id: { type: [string, 'null'] }
+            latitude: { type: [number, 'null'] }
+            longitude: { type: [number, 'null'] }
+        timezone_hint: { type: [string, 'null'] }
+        consent_id: { type: string, minLength: 8 }
+    BirthProfileAccepted:
+      type: object
+      additionalProperties: false
+      required: [schema_version, workflow, status, idempotency_key]
+      properties:
+        schema_version: { type: string, const: '0.2.0' }
+        workflow:
+          type: string
+          enum:
+            [NormalizeBirthAndCalculateChart, GenerateDailyReading,
+             PublishContentRelease, ExportAccount, DeleteAccount,
+             RefreshConnector]
+        status: { type: string, enum: [queued, running, succeeded, duplicate] }
+        idempotency_key: { type: string }
+        job_id: { type: [string, 'null'] }
+        resource_id: { type: [string, 'null'] }
+        timezone:
+          type: object
+          additionalProperties: false
+          required: [resolved, source, confidence, qualifiers]
+          properties:
+            resolved: { type: string }
+            source: { type: string, enum: [coordinates, hint, default] }
+            confidence: { type: string, enum: [high, medium, low, none] }
+            hint_overridden: { type: [string, 'null'] }
+            qualifiers:
+              type: array
+              items: { $ref: '#/components/schemas/TimezoneQualifier' }
+        chart:
+          type: object
+          additionalProperties: true
+          properties:
+            id: { type: string }
+            fingerprint: { type: string }
+            contract_id: { type: string }
+            status: { type: string, enum: [active, superseded, invalid] }
+            uncertainty:
+              type: object
+              additionalProperties: true
+    BirthCalcBudgetExhausted:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id, details]
+          properties:
+            code: { type: string, const: birth_calc_budget_exhausted }
+            message:
+              type: string
+              const: The daily birth calculation limit has been reached
+            request_id:
+              type: string
+              minLength: 8
+              maxLength: 128
+              pattern: '^[A-Za-z0-9_.:-]+$'
+            details:
+              type: object
+              additionalProperties: false
+              required: [resets_at]
+              properties:
+                resets_at: { type: string, format: date-time }

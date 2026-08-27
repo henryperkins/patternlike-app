@@ -59,11 +59,16 @@ export class ApiError extends Error {
   readonly retryable: boolean | null;
 
   constructor(status: number, body: ErrorBody) {
-    super(body.error.message);
+    const requestId = body.error.request_id ?? null;
+    const message = body.error.code === "birth_calc_budget_exhausted"
+      ? "Today's birth calculation limit has been reached. Try again tomorrow." +
+        (requestId ? ` (Request ${requestId})` : "")
+      : body.error.message;
+    super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = body.error.code;
-    this.requestId = body.error.request_id ?? null;
+    this.requestId = requestId;
     this.details = body.error.details ?? null;
     const retryable = (body.error as { retryable?: unknown }).retryable;
     this.retryable = typeof retryable === "boolean" ? retryable : null;

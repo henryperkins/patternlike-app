@@ -202,6 +202,90 @@ def expect_integrity_error(fn, what: str) -> None:
     raise SystemExit(f"FAILED: {what} was allowed")
 
 
+def assert_birth_calc_schema(con: sqlite3.Connection, lane: str) -> None:
+    expected_columns = {
+        "birth_calc_daily_usage": [
+            ("user_id", "TEXT", 1, None, 1),
+            ("utc_date", "TEXT", 1, None, 2),
+            ("reserved_calc_count", "INTEGER", 1, None, 0),
+            ("last_reservation_hash", "TEXT", 1, None, 0),
+            ("created_at", "TEXT", 1, None, 0),
+            ("updated_at", "TEXT", 1, None, 0),
+        ],
+        "birth_calc_reservations": [
+            ("user_id", "TEXT", 1, None, 1),
+            ("reservation_hash", "TEXT", 1, None, 2),
+            ("utc_date", "TEXT", 1, None, 0),
+            ("claim_token_hash", "TEXT", 1, None, 0),
+            ("status", "TEXT", 1, None, 0),
+            ("created_at", "TEXT", 1, None, 0),
+            ("charged_at", "TEXT", 0, None, 0),
+        ],
+        "birth_profile_version_counters": [
+            ("user_id", "TEXT", 1, None, 1),
+            ("last_allocated_version", "INTEGER", 1, None, 0),
+            ("updated_at", "TEXT", 1, None, 0),
+        ],
+    }
+    for table, expected in expected_columns.items():
+        actual = [
+            (row[1], row[2], row[3], row[4], row[5])
+            for row in con.execute(f"PRAGMA table_info({table})")
+        ]
+        if actual != expected:
+            raise SystemExit(
+                f"0016 {lane} has wrong {table} columns/PK: {actual}"
+            )
+        foreign_keys = con.execute(f"PRAGMA foreign_key_list({table})").fetchall()
+        expected_fk = [
+            (0, 0, "users", "user_id", "id", "NO ACTION", "NO ACTION", "NONE")
+        ]
+        if foreign_keys != expected_fk:
+            raise SystemExit(
+                f"0016 {lane} has wrong {table} users foreign key: {foreign_keys}"
+            )
+
+    index_columns = con.execute(
+        "PRAGMA index_info(idx_birth_calc_reservations_user_date)"
+    ).fetchall()
+    if index_columns != [(0, 0, "user_id"), (1, 2, "utc_date")]:
+        raise SystemExit(
+            f"0016 {lane} has wrong reservation date index: {index_columns}"
+        )
+
+    required_checks = {
+        "birth_calc_daily_usage": [
+            "CHECK (reserved_calc_count BETWEEN 0 AND 50)",
+            "CHECK (last_reservation_hash GLOB 'sha256:[0-9a-f]*' "
+            "AND length(last_reservation_hash) = 71)",
+        ],
+        "birth_calc_reservations": [
+            "CHECK (reservation_hash GLOB 'sha256:[0-9a-f]*' "
+            "AND length(reservation_hash) = 71)",
+            "CHECK (claim_token_hash GLOB 'sha256:[0-9a-f]*' "
+            "AND length(claim_token_hash) = 71)",
+            "CHECK (status IN ('pending', 'charged', 'denied'))",
+            "(status = 'pending' AND charged_at IS NULL)",
+            "(status = 'charged' AND charged_at IS NOT NULL)",
+            "(status = 'denied' AND charged_at IS NULL)",
+        ],
+        "birth_profile_version_counters": [
+            "CHECK (last_allocated_version >= 0)",
+        ],
+    }
+    for table, snippets in required_checks.items():
+        row = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()
+        normalized = " ".join((row[0] if row else "").split())
+        for snippet in snippets:
+            if snippet not in normalized:
+                raise SystemExit(
+                    f"0016 {lane} is missing {table} constraint {snippet}"
+                )
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -218,11 +302,15 @@ def check_fresh_schema() -> None:
         "natal_feature_sets", "cycle_scan_receipts",
         "time_travel_daily_usage",
         "pattern_erasure_replay_events",
+        "birth_calc_daily_usage", "birth_calc_reservations",
+        "birth_profile_version_counters",
     }
     missing = expected - tables
     if missing:
         raise SystemExit(f"Missing tables after latest migration: {sorted(missing)}")
     print(f"D1 OK  fresh apply of {len(migration_files())} migration(s), {len(tables)} tables")
+    assert_birth_calc_schema(con, "clean apply")
+    print("D1 OK  0016 clean apply has exact columns, PK/FK, CHECKs, and index")
 
     indexes = {
         r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='index'")
@@ -261,6 +349,9 @@ def check_fresh_schema() -> None:
         "uq_context_signals_usr09_current",
         "uq_context_signals_usr09_revision",
         "idx_pattern_erasure_replay_occurred",
+        # 0016. Owner-scoped reservation pruning must not scan every user's
+        # invocation ledger.
+        "idx_birth_calc_reservations_user_date",
     ):
         if name not in indexes:
             raise SystemExit(f"Missing index {name}")
@@ -324,6 +415,8 @@ def check_fresh_schema() -> None:
         raise SystemExit("foreign_key_check reported violations on a fresh database")
     if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
         raise SystemExit("quick_check failed on a fresh database")
+    if con.execute("SELECT * FROM assertion_probe").fetchall():
+        raise SystemExit("assertion_probe was armed on a fresh database")
     print("D1 OK  foreign_key_check clean, quick_check ok")
 
 
@@ -1094,6 +1187,82 @@ def check_0008_replay_ledger() -> None:
     print("D1 OK  0008 creates a constrained erasure replay ledger")
 
 
+def check_0016_over_populated_0015() -> None:
+    con = fresh(upto=15)
+    seed_user(con, USER_A, SUBJ_A)
+    seed_user(con, USER_B, SUBJ_B)
+    profiles_before = [
+        (USER_A, 7, "unknown", "invalid", NOW, NOW),
+        (USER_B, 41, "unknown", "invalid", NOW, NOW),
+    ]
+    con.executemany(
+        "INSERT INTO birth_profiles "
+        "(user_id, version, accuracy, status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        profiles_before,
+    )
+    con.commit()
+
+    apply_migrations(con, start=16)
+
+    assert_birth_calc_schema(con, "populated apply")
+    profiles_after = con.execute(
+        "SELECT user_id, version, accuracy, status, created_at, updated_at "
+        "FROM birth_profiles ORDER BY user_id"
+    ).fetchall()
+    if profiles_after != profiles_before:
+        raise SystemExit(
+            f"0016 changed populated birth profiles: {profiles_after}"
+        )
+    for table in (
+        "birth_calc_daily_usage",
+        "birth_calc_reservations",
+        "birth_profile_version_counters",
+    ):
+        if con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] != 0:
+            raise SystemExit(f"0016 invented rows in {table}")
+
+    digest = "sha256:" + ("a" * 64)
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO birth_calc_daily_usage "
+            "(user_id, utc_date, reserved_calc_count, last_reservation_hash, "
+            "created_at, updated_at) VALUES (?, '2026-08-27', 51, ?, ?, ?)",
+            (USER_A, digest, NOW, NOW),
+        ),
+        "0016 caps a user's daily birth calculation reservations at 50",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO birth_calc_reservations "
+            "(user_id, reservation_hash, utc_date, claim_token_hash, status, "
+            "created_at, charged_at) "
+            "VALUES (?, ?, '2026-08-27', ?, 'charged', ?, NULL)",
+            (USER_A, digest, digest, NOW),
+        ),
+        "0016 charged reservations require charged_at",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO birth_profile_version_counters "
+            "(user_id, last_allocated_version, updated_at) VALUES (?, -1, ?)",
+            (USER_A, NOW),
+        ),
+        "0016 rejects a negative profile version counter",
+    )
+
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("0016 populated apply left foreign-key violations")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("0016 populated apply failed quick_check")
+    if con.execute("SELECT * FROM assertion_probe").fetchall():
+        raise SystemExit("0016 populated apply left assertion_probe armed")
+    print(
+        "D1 OK  0016 populated apply preserves profiles, enforces constraints, "
+        "and leaves integrity clean"
+    )
+
+
 def main() -> int:
     check_fresh_schema()
     check_0004_over_populated_m5()
@@ -1106,6 +1275,7 @@ def main() -> int:
     check_0007_pattern_tables()
     check_0007_over_consent_references()
     check_0008_replay_ledger()
+    check_0016_over_populated_0015()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()
