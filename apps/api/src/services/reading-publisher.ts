@@ -24,6 +24,10 @@ import {
   VALIDATION_POLICY_VERSION,
 } from "@patternlike/reading-engine";
 import type { Env } from "../env.js";
+import type {
+  CodexProviderFailureCode,
+  CodexProviderSafeDetailCode,
+} from "../db/codex-provider-jobs.js";
 import { readReadingV5Rollout, type ReadingV5Rollout } from "./reading-rollout.js";
 
 // ---------------------------------------------------------------------------
@@ -381,18 +385,83 @@ export type PublisherResult =
       retry_after_seconds: number | null;
     };
 
+/**
+ * Where a Daily provider job lives on the durable Codex control plane.
+ *
+ * Passed in by the executor, never derived from request content. The packet
+ * that crosses the provider boundary deliberately carries no reading key, job
+ * id, or reader identity, so the coordinate cannot be recovered from it — and
+ * a coordinate inferred from content would be a coordinate an attacker-shaped
+ * input could steer.
+ */
+export interface ReadingCodexCoordinate {
+  pipeline: "reading";
+  /** The generic Daily `jobs.id`. */
+  ownerId: string;
+  userId: string;
+  /** The frozen `command.command_generation`. */
+  stageGeneration: number;
+  /** Zero-based provider attempt, derived as `jobs.attempts - 1`. */
+  stageAttempt: number;
+  dailyCallLimit: number;
+}
+
 export interface PublishOptions {
   /** The Worker's own correlation id. Never sent to the provider. */
   requestId: string;
   timeoutMs: number;
   configuration: PublisherConfigPin;
+  /** Required by the Codex adapter; absent means there is nothing to execute. */
+  codexJob?: ReadingCodexCoordinate;
 }
+
+/**
+ * The durable-wait result.
+ *
+ * Not a failure and not a `GenerationFailureCode`: it says the provider job
+ * exists and is still being worked, and carries only the opaque control id the
+ * executor needs to re-check the enqueue/completion race. No prompt, no
+ * response, no lease token, and nothing that reaches a Queue message or a log.
+ */
+export interface ReadingPublisherPending {
+  ok: false;
+  code: "publisher_pending";
+  job_id: string;
+}
+
+/**
+ * The Codex failure arm, which is one code wider than the direct-transport one.
+ *
+ * `publisher_budget_exhausted` is reachable here and was not before: the daily
+ * ceiling is charged when the RUNNER claims the job, which happens after this
+ * Worker has already returned. The vocabulary is imported rather than restated
+ * so the closed set D1 enforces, the runner reports, and the executor maps
+ * stays exactly one set.
+ */
+export interface CodexPublisherFailure {
+  ok: false;
+  code: CodexProviderFailureCode;
+  safe_detail_code: CodexProviderSafeDetailCode;
+  retry_after_seconds: number | null;
+}
+
+export type CodexPublisherResult =
+  | Extract<PublisherResult, { ok: true }>
+  | CodexPublisherFailure
+  | ReadingPublisherPending;
 
 export interface ReadingPublisher {
   publish(
     request: ReadingGenerationRequest,
     options: PublishOptions,
   ): Promise<PublisherResult>;
+}
+
+export interface CodexReadingPublisher {
+  publish(
+    request: ReadingGenerationRequest,
+    options: PublishOptions,
+  ): Promise<CodexPublisherResult>;
 }
 
 // ---------------------------------------------------------------------------

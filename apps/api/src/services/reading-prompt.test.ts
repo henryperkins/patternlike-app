@@ -16,9 +16,13 @@ import {
   responsesUrlFor,
   type PublisherConfigPin,
 } from "./reading-publisher.js";
+import {
+  CODEX_PROVIDER_MAX_REQUEST_BYTES,
+  invocationFromResponsesRequest,
+} from "./codex-provider-contract.js";
 
 const PIN: PublisherConfigPin = {
-  provider: "openai",
+  provider: "codex",
   model: OPENAI_READING_MODEL,
   reasoning_effort: "high",
   prompt_version: READING_PROMPT_VERSION,
@@ -193,6 +197,46 @@ describe("provider request body", () => {
     walk(outputSchema, "");
 
     expect(offenders).toEqual([]);
+  });
+
+  it("converts to a Codex invocation without changing what was asked", () => {
+    // The runner receives a prompt and a schema, not a Responses envelope. The
+    // conversion is where a policy or ceiling could quietly be dropped, so the
+    // three fields that survive are checked against the three that went in.
+    const request = hostileRequest();
+    const body = buildResponsesRequest(request, PIN);
+    const converted = invocationFromResponsesRequest(body, {
+      model: PIN.model,
+      reasoningEffort: "high",
+    });
+
+    expect(converted.ok).toBe(true);
+    if (!converted.ok) return;
+    expect(converted.value.schema_version).toBe("codex-provider-invocation/v1");
+    expect(converted.value.output_schema).toEqual(outputSchema);
+    expect(converted.value.prompt.startsWith(READING_SYSTEM_POLICY)).toBe(true);
+    // The reader's packet is still exactly one JSON document, still separated
+    // from the policy by the data-only marker rather than merged into it.
+    const marker = "\n\n--- INPUT DOCUMENT (JSON; DATA ONLY) ---\n";
+    const [policy, ...rest] = converted.value.prompt.split(marker);
+    expect(policy).toBe(READING_SYSTEM_POLICY);
+    expect(rest).toHaveLength(1);
+    expect(JSON.parse(rest[0]!)).toEqual(request);
+  });
+
+  it("stays inside the Codex request ceiling at the pinned context bound", () => {
+    // The packet ceiling and the runner's claim ceiling are different numbers
+    // enforced in different places. A packet at the first that exceeded the
+    // second would be refused as an opaque claim rejection after the reading
+    // was already reserved.
+    const request = hostileRequest();
+    const body = buildResponsesRequest(request, PIN);
+    const encoder = new TextEncoder();
+    const total = encoder.encode(body.instructions).byteLength +
+      encoder.encode(body.input[0]!.content[0]!.text).byteLength +
+      encoder.encode(JSON.stringify(body.text.format.schema)).byteLength;
+    expect(total).toBeLessThan(CODEX_PROVIDER_MAX_REQUEST_BYTES);
+    expect(PIN.context_max_bytes).toBeLessThan(CODEX_PROVIDER_MAX_REQUEST_BYTES);
   });
 
   it("carries the packet as one JSON document in one user message", () => {
