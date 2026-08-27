@@ -1677,3 +1677,248 @@ describe("M7 rollout, revocation, and export boundaries", () => {
     expect(omitted.patterns.items).toEqual([]);
   });
 });
+
+/**
+ * The whole product path for an account that was never on any allowlist.
+ *
+ * Every other suite here drives USER_A, which used to be the designated
+ * internal account. This one exists so the account-wide claim is proved by an
+ * account that could not have been admitted before, walking the same ladder a
+ * real reader walks.
+ */
+describe("account-wide Pattern for an account that was never allowlisted", () => {
+  async function providerFootprint(): Promise<{ jobs: number; usage: number }> {
+    const jobs = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM codex_provider_jobs",
+    ).first<{ n: number }>();
+    const usage = await env.DB.prepare(
+      "SELECT COALESCE(SUM(used_calls), 0) AS n FROM pattern_provider_daily_usage",
+    ).first<{ n: number }>();
+    return { jobs: jobs?.n ?? 0, usage: usage?.n ?? 0 };
+  }
+
+  beforeEach(async () => {
+    await resetDb();
+    await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
+    disablePatternAi();
+    await seedUser(IDENTITY_B);
+    await seedChart(IDENTITY_B);
+  });
+
+  afterEach(() => {
+    disablePatternAi();
+    env.PATTERN_ONTOLOGY_KEYS = "";
+  });
+
+  it("walks chart, locale, consent, exact confirmation, generation, and a ready Pattern", async () => {
+    enablePatternAi();
+
+    // Locale is not confirmed yet: the ladder stops here and says so.
+    expect((await jsonAs(USER_B, "/v1/pattern-state")).body.state)
+      .toBe("locale_confirmation_required");
+    await confirmPreferences(USER_B);
+
+    // No public ontology yet.
+    expect((await jsonAs(USER_B, "/v1/pattern-state")).body.state)
+      .toBe("ontology_unavailable");
+    await seedActiveOntology();
+
+    // Now the consent surface, with no grant yet.
+    const beforeConsent = await jsonAs(USER_B, "/v1/pattern-state");
+    expect(beforeConsent.body.state).toBe("consent_required");
+    expect((beforeConsent.body.consent as { status: string }).status).toBe("not_granted");
+    expect((beforeConsent.body.consent as { policy_version: string }).policy_version)
+      .toBe(POLICY);
+    expect(await providerFootprint()).toEqual({ jobs: 0, usage: 0 });
+
+    const accepted = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-account-wide-walk" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(accepted.status, JSON.stringify(accepted.body)).toBe(202);
+    // Granting is what mints the claim: the consent row and the reservation
+    // commit together, so an accepted generation IS a recorded opt-in.
+    expect((accepted.body.consent as { status: string }).status).toBe("granted");
+    const generationId = (accepted.body.generation as { generation_id: string }).generation_id;
+
+    expect(await drain(generationId)).toBe("succeeded");
+
+    const state = await jsonAs(USER_B, "/v1/pattern-state");
+    expect(state.body.state, JSON.stringify(state.body)).toBe("ready");
+    const document = await jsonAs(USER_B, "/v1/pattern");
+    expect(document.status).toBe(200);
+    expect((document.body.provenance as { provider: string }).provider).toBe("Codex");
+    expect(document.body.core_chapters).toEqual(expect.any(Array));
+  });
+
+  it("refuses a missing or wrong confirmation as 400 and creates nothing", async () => {
+    enablePatternAi();
+    await confirmPreferences(USER_B);
+    await seedActiveOntology();
+
+    for (const [label, confirm] of [
+      ["missing", undefined],
+      ["lowercase", "generate my pattern"],
+      ["padded", " GENERATE MY PATTERN "],
+      ["another phrase", "GENERATE PATTERN"],
+    ] as const) {
+      const refused = await jsonAs(USER_B, "/v1/pattern-generations", {
+        method: "POST",
+        headers: { "idempotency-key": `idem-confirm-${label.replace(/ /g, "-")}` },
+        body: JSON.stringify({
+          schema_version: "0.7.0",
+          consent_policy_version: POLICY,
+          ...(confirm === undefined ? {} : { confirm }),
+          reason: "first_open",
+        }),
+      });
+      expect(refused.status, label).toBe(400);
+      expect((refused.body.error as { code: string }).code).toBe("invalid_request");
+    }
+
+    // No grant, no claim, no job, no provider work: the exact phrase is what
+    // separates reading the terms from agreeing to them.
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM consents WHERE user_id = ? AND kind = 'pattern_generation'",
+    ).bind(USER_B).first<{ n: number }>()).toEqual({ n: 0 });
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM pattern_generation_claims WHERE user_id = ?",
+    ).bind(USER_B).first<{ n: number }>()).toEqual({ n: 0 });
+    expect(await providerFootprint()).toEqual({ jobs: 0, usage: 0 });
+  });
+
+  it("spends nothing while the ladder is incomplete", async () => {
+    enablePatternAi();
+
+    // Locale unconfirmed.
+    const noLocale = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-ladder-locale" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(noLocale.status).toBe(409);
+    expect((noLocale.body.error as { code: string }).code)
+      .toBe("locale_confirmation_required");
+
+    // Locale confirmed, no public ontology.
+    await confirmPreferences(USER_B);
+    const noOntology = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-ladder-ontology" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(noOntology.status).toBe(409);
+    expect((noOntology.body.error as { code: string }).code).toBe("ontology_unavailable");
+
+    // Reading before any grant is the consent refusal, not a catalogue page.
+    const read = await jsonAs(USER_B, "/v1/pattern");
+    expect(read.status).toBe(409);
+    expect((read.body.error as { code: string }).code)
+      .toBe("pattern_generation_consent_required");
+
+    // Chart-correction auto-reserve is the one entry point that needs a prior
+    // grant, because it does not come from a reader confirming anything.
+    await seedActiveOntology();
+    const correction = await enqueuePatternGeneration(env, IDENTITY_B, {
+      idempotencyKey: "idem-ladder-correction",
+      consentPolicyVersion: POLICY,
+      reason: "chart_correction",
+      requestId: "req-ladder-correction",
+    });
+    expect(correction.ok).toBe(false);
+    if (!correction.ok) {
+      expect(correction.code).toBe("pattern_generation_consent_required");
+    }
+
+    expect(await providerFootprint()).toEqual({ jobs: 0, usage: 0 });
+  });
+
+  it("keeps the one-Pattern rules for this account too", async () => {
+    enablePatternAi();
+    await confirmPreferences(USER_B);
+    await seedActiveOntology();
+    const body = JSON.stringify({
+      schema_version: "0.7.0",
+      consent_policy_version: POLICY,
+      confirm: "GENERATE MY PATTERN",
+      reason: "first_open",
+    });
+
+    const first = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-one-pattern" },
+      body,
+    });
+    expect(first.status).toBe(202);
+    const generationId = (first.body.generation as { generation_id: string }).generation_id;
+
+    // Exact idempotency replay: the same key answers 200 with the same id.
+    const replay = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-one-pattern" },
+      body,
+    });
+    expect(replay.status).toBe(200);
+    expect((replay.body.generation as { generation_id: string }).generation_id)
+      .toBe(generationId);
+
+    // A different key while the claim is reserved replays the reservation
+    // rather than opening a second one.
+    const reserved = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-one-pattern-other-key" },
+      body,
+    });
+    expect(reserved.status).toBe(200);
+    expect((reserved.body.generation as { generation_id: string }).generation_id)
+      .toBe(generationId);
+
+    expect(await drain(generationId)).toBe("succeeded");
+
+    // Accepted: no reroll, whatever key is used.
+    const reroll = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-one-pattern-reroll" },
+      body,
+    });
+    expect(reroll.status).toBe(409);
+    expect((reroll.body.error as { code: string }).code).toBe("pattern_already_consumed");
+
+    // Deleted: still no reroll. The claim is consumed, not returned.
+    const deleted = await SELF.fetch("http://api.test/v1/pattern", {
+      method: "DELETE",
+      headers: {
+        "x-user-id": USER_B,
+        "content-type": "application/json",
+        "idempotency-key": "idem-one-pattern-delete",
+      },
+      body: JSON.stringify({ confirm: "DELETE PATTERN" }),
+    });
+    expect([202, 204]).toContain(deleted.status);
+    const afterDelete = await jsonAs(USER_B, "/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-one-pattern-after-delete" },
+      body,
+    });
+    expect(afterDelete.status).toBe(409);
+    expect((afterDelete.body.error as { code: string }).code)
+      .toBe("pattern_already_consumed");
+  });
+});

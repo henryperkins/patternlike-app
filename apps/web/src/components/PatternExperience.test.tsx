@@ -72,44 +72,22 @@ const generated: PatternResponseV7 = {
 const noop = () => undefined;
 
 describe("PatternExperience", () => {
-  it("keeps the editorial catalog when the account is not in the AI cohort", async () => {
+  it("renders the generated flow for a state document, never an editorial catalogue", async () => {
+    // `editorial_catalog` survives in the wire enum for clients and documents
+    // written while it was emitted. Nothing emits it now, and the client has no
+    // editorial branch left to route it to: an account-wide reader gets the
+    // generated flow's own answer for whatever state it is in.
     mockApiResponses({
-      [`GET ${STATE}`]: { status: 200, body: stateDoc({ state: "editorial_catalog", consent: null, chart: null }) },
-      [PATTERN]: {
+      [`GET ${STATE}`]: {
         status: 200,
-        body: {
-          schema_version: "0.4.0",
-          generated_at: "2026-08-13T18:00:00.000Z",
-          chart_id: "cht_pattern_test_0001",
-          chart_fingerprint: `sha256:${"a".repeat(64)}`,
-          effective_accuracy: "exact",
-          feature_policy_version: "1.0.0",
-          feature_set_hash: `sha256:${"b".repeat(64)}`,
-          release_version: "release-24",
-          bundle_hash: `sha256:${"c".repeat(64)}`,
-          locale: "en-US",
-          items: [
-            {
-              content_id: "pattern.one",
-              content_version: "1.0.0",
-              title: "Holding a line under pressure",
-              summary: "A short mechanical summary of the pattern.",
-              body: "The longer reviewed description.",
-              resources: [],
-              tensions: [],
-              counter_expression: "The same configuration can read as patience.",
-              evidence: [{ feature_id: "nft_1", feature_class: "aspect", label: "mars square saturn" }],
-            },
-          ],
-          next_cursor: null,
-          omissions: { accuracy: 0, houses_or_angles: 0, locale: 0, predicate_mismatch: 0 },
-        },
+        body: stateDoc({ state: "editorial_catalog", consent: null, chart: null }),
       },
     });
 
     render(<PatternExperience onUnauthorized={noop} />);
-    expect(await screen.findByText("Holding a line under pressure")).toBeInTheDocument();
-    expect(screen.getByText("Why this?")).toBeInTheDocument();
+    expect(await screen.findByText("Your Pattern is not ready.")).toBeInTheDocument();
+    expect(screen.queryByText("Why this?")).toBeNull();
+    expect(screen.queryByText("Holding a line under pressure")).toBeNull();
   });
 
   it("treats first visit as the consent surface and posts grant plus reservation together", async () => {
@@ -174,5 +152,114 @@ describe("PatternExperience", () => {
     await userEvent.click(screen.getByRole("button", { name: /Confirm deletion/i }));
     const deleted = capturedFor(PATTERN).find((request) => request.method === "DELETE");
     expect(deleted?.body).toEqual({ confirm: "DELETE PATTERN" });
+  });
+
+  it.each([
+    ["chart_required", "Add a birth chart before a Pattern can be written."],
+    ["locale_confirmation_required", "Confirm your content language to generate a Pattern."],
+    ["ontology_unavailable", "Pattern generation is not available right now."],
+    ["deleted", "This Pattern was deleted and cannot be regenerated for this chart."],
+    ["withdrawn", "The interpretation basis for this Pattern was withdrawn."],
+  ] as const)("names the %s state in a heading a screen reader reaches", async (state, title) => {
+    mockApiResponses({
+      [`GET ${STATE}`]: { status: 200, body: stateDoc({ state, consent: null }) },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("heading", { name: title })).toBeInTheDocument();
+    // None of these states can generate, so none of them offers the action.
+    expect(screen.queryByRole("button", { name: /Generate my Pattern/i })).toBeNull();
+  });
+
+  it.each(["organizing_evidence", "writing", "checking_claims"] as const)(
+    "announces %s as busy progress rather than a silent wait",
+    async (state) => {
+      mockApiResponses({
+        [`GET ${STATE}`]: {
+          status: 200,
+          body: stateDoc({
+            state,
+            generation: {
+              generation_id: "pgen_progress_0001",
+              stage: state,
+              status_updated_at: "2026-08-27T12:00:00.000Z",
+              started_at: "2026-08-27T11:59:00.000Z",
+              retryable: false,
+              request_id: null,
+            },
+          }),
+        },
+      });
+
+      render(<PatternExperience onUnauthorized={noop} />);
+
+      const status = await screen.findByRole("status");
+      expect(status).toBeInTheDocument();
+      expect(status.textContent).toBeTruthy();
+    },
+  );
+
+  it("never generates without the reader activating the reviewed action", async () => {
+    mockApiResponses({
+      [`GET ${STATE}`]: { status: 200, body: stateDoc() },
+      [`POST ${GENERATIONS}`]: {
+        status: 202,
+        body: {
+          schema_version: "0.7.0",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-27T12:00:00.000Z" },
+          generation: { generation_id: "pgen_test_0002", stage: "organizing_evidence" },
+        },
+      },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+    await screen.findByRole("button", { name: /Generate my Pattern/i });
+
+    // Reaching the consent surface is not agreeing to it. Account-wide
+    // admission changed who sees this screen, not what it takes to leave it.
+    expect(capturedFor(GENERATIONS).filter((request) => request.method === "POST"))
+      .toEqual([]);
+  });
+
+  it("offers a retry on a failed attempt and keeps the request shape exact", async () => {
+    mockApiResponses({
+      [`GET ${STATE}`]: {
+        status: 200,
+        body: stateDoc({
+          state: "failed",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-27T12:00:00.000Z" },
+          generation: {
+            generation_id: "pgen_failed_0001",
+            stage: "writing",
+            status_updated_at: "2026-08-27T12:00:00.000Z",
+            started_at: "2026-08-27T11:59:00.000Z",
+            retryable: true,
+            request_id: null,
+          },
+        }),
+      },
+      [`POST ${GENERATIONS}`]: {
+        status: 202,
+        body: {
+          schema_version: "0.7.0",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-27T12:00:00.000Z" },
+          generation: { generation_id: "pgen_failed_retry", stage: "organizing_evidence" },
+        },
+      },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Generate my Pattern/i }),
+    );
+
+    const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
+    expect(posted?.body).toEqual({
+      schema_version: "0.7.0",
+      consent_policy_version: PATTERN_GENERATION_CONSENT_POLICY_VERSION,
+      confirm: "GENERATE MY PATTERN",
+      reason: "failed_attempt_retry",
+    });
   });
 });

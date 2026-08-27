@@ -15,7 +15,6 @@ import {
   startPatternGeneration,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
-import { PatternChapters } from "./PatternChapters.js";
 import { PatternConsentTerms } from "./PatternConsent.js";
 
 interface PatternExperienceProps {
@@ -296,10 +295,6 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
       setBusy(false);
     }
   };
-
-  if (state?.state === "editorial_catalog") {
-    return <PatternChapters onUnauthorized={onUnauthorized} />;
-  }
 
   const heading = (
     <div className="panel-heading">

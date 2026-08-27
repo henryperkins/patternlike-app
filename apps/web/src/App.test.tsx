@@ -121,7 +121,10 @@ function mockApiResponses(responses: Record<string, MockResponse>) {
       status: 200,
       body: {
         schema_version: "0.7.0",
-        state: "editorial_catalog",
+        // The default for suites that are not about Pattern. Every
+        // authenticated account is in the generated flow now, and an account
+        // with no chart waits on one.
+        state: "chart_required",
         chart: null,
         consent: null,
         generation: null,
