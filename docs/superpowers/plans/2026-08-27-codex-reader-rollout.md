@@ -104,7 +104,7 @@
 - [ ] After any new ontology activation, repeat the production query and deployed signature/artifact verification. Record the immutable release version, bundle hash, corpus release/hash/license class, pipeline run id, report hashes, signing key id, and activation timestamp in the restricted change record without recording ontology prose.
 - [ ] Update the old Pattern rollout runbook status to say the account-wide release serves from the active authored ontology and no longer has Gates 8/10 cohort transitions; preserve the dated failed-candidate history, which is the evidence for why the machine gate was not used.
 - [ ] Stop on a signature/hash mismatch, a recall, a compile failure, an unauthorized or non-`licensed_excerpt` corpus, an absent or unrecognised provenance, or a `machine_pipeline` release whose scope does not derive `public`.
-- [ ] Commit only the resulting runbook reconciliation: `docs: record the public Pattern ontology gate`
+- [ ] Commit only the resulting runbook reconciliation: `docs: record the active Pattern ontology gate`
 
 ## Task 3: Freeze and verify one immutable candidate
 

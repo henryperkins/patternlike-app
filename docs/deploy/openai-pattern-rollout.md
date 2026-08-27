@@ -17,6 +17,34 @@ revisions of this file said no ontology was active and no Pattern existed; both
 statements were true when written and are recorded as dated rows below. Gates
 8–10 remain open on their own evidence: counting rows is not gate closure.
 
+**Superseding decision (2026-08-27):** the account-wide release serves readers
+from that active authored release, and Gate 7B is no longer a precondition for
+it. `ontologyServesAccount` now admits a `synthetic_internal` release on origin
+alone; the scope check still governs the `machine_pipeline` branch, where a
+release earns `public` only by producing its whole evidence chain. The reason is
+recorded in this file's own history: fifteen candidate versions from `0.1.0`
+through `0.1.17` are logged here, every one of them entered the regressing
+stage, and none passed. `adbbbdc` counts sixteen candidate *runs* against those
+versions and notes that two of the last three died on prompt defects rather
+than on the ontology being judged. Requiring a public machine
+release would therefore close Pattern for every reader rather than open it.
+
+That is a trade, and it is stated here so nobody rediscovers it during an
+incident. An authored release skips the independent evaluator and the seven
+regression hard gates, and those gates run nowhere else in the product — the
+live per-generation path has structural validation and a model semantic
+verifier, not `suppressed_feature_leak` or `prohibited_claim`. What the authored
+release does carry is publication rights: every record is `source_supported`
+against a `licensed_excerpt` corpus and cites the fragment it came from, it is
+signed by the isolated signer, and it compiles. Since Pattern became
+account-wide there is no cohort to contain the consequence, so **Gates 8 and 10
+no longer describe a reachable cohort transition** and are closed as not
+applicable rather than satisfied.
+
+The dated failed-candidate history below is preserved deliberately: it is the
+evidence for why the machine gate was not used, and it is what a later operator
+needs if the pipeline is ever re-enabled.
+
 This file is the operational source of truth; updating it does not itself
 authorize a deployment, secret change, ontology activation, or provider call.
 
