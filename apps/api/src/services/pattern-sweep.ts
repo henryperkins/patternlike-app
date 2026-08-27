@@ -95,19 +95,32 @@ export async function reconcilePatternGeneration(
  * checkSecureConfig.
  */
 /**
- * Compatibility repair for Pattern jobs parked by the removed rollout switch.
+ * Bounded compatibility repair for Pattern jobs parked by the removed rollout.
  *
- * No new row can acquire `result_class = 'rollout_paused'`; these are the rows
- * a prior deployment left behind. The outbox lane skips that class forever, so
- * clearing it returns the row to the ordinary undispatched query.
+ * These rows are historical: nothing can create a new `rollout_paused` Pattern
+ * job now that there is no rollout to pause for. The repair is unconditional
+ * because the condition it used to have -- "the rollout is back on" -- no
+ * longer exists, and a replacement condition would be the flag again under
+ * another name.
  *
- * A job parked mid-flight is parked while `status = 'running'`, so resuming
- * only `'queued'` rows left it in the running lane. Those rows come back to
- * `'queued'` here, and only once their lease has lapsed, so a consumer still
- * working the stage is never robbed of its claim.
+ * It decides nothing about the reader. Consent, ontology, account state, and
+ * claim state are re-checked by the ordinary current-owner and eligibility
+ * paths after redelivery, which is what turns a recovered row into either a
+ * continued generation or a cancellation. All this does is return the row to
+ * the outbox lane the pause removed it from.
+ *
+ * Bounded, and never a theft: `LIMIT` keeps one tick's repair proportional to a
+ * tick, and a row whose lease is still live is left to the consumer that holds
+ * it. A job parked mid-flight was parked while `status = 'running'`, so
+ * repairing only `'queued'` rows would leave it in the running lane for the
+ * expired-lease sweep to re-send on every tick forever.
+ *
+ * `dispatched_at` stays NULL on purpose. The outbox is what sends it, so a
+ * repair that also claimed to have dispatched would strand the row again.
  */
-export async function resumePausedPatternJobsAfterRollout(
+export async function recoverLegacyPausedPatternJobs(
   env: Env,
+  limit = 50,
   now = new Date(),
 ): Promise<number> {
   const nowIso = now.toISOString();
@@ -115,13 +128,18 @@ export async function resumePausedPatternJobsAfterRollout(
     `UPDATE jobs
      SET available_at = ?, result_class = NULL, status = 'queued',
          claim_token = NULL, lease_expires_at = NULL
-     WHERE job_type = ? AND result_class = 'rollout_paused'
-       AND (
-         status = 'queued'
-         OR (status = 'running' AND (lease_expires_at IS NULL OR lease_expires_at < ?))
-       )`,
+     WHERE id IN (
+       SELECT id FROM jobs
+       WHERE job_type = ? AND result_class = 'rollout_paused'
+         AND (
+           status = 'queued'
+           OR (status = 'running' AND (lease_expires_at IS NULL OR lease_expires_at < ?))
+         )
+       ORDER BY created_at, id
+       LIMIT ?
+     )`,
   )
-    .bind(nowIso, PATTERN_JOB_TYPE, nowIso)
+    .bind(nowIso, PATTERN_JOB_TYPE, nowIso, Math.max(0, limit))
     .run();
   return updated.meta.changes ?? 0;
 }
@@ -267,7 +285,10 @@ async function prunePatternJobRetention(env: Env, nowIso: string): Promise<void>
 }
 
 export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void> {
-  await resumePausedPatternJobsAfterRollout(env, now);
+  // Every maintenance tick, and cheap when there is nothing left to repair:
+  // it spends no provider budget by itself, and converges because a repaired
+  // row no longer matches the class it selects on.
+  await recoverLegacyPausedPatternJobs(env, 50, now);
   const nowIso = now.toISOString();
   const { results: undispatched } = await env.DB.prepare(
     `SELECT j.id AS job_id, p.generation_id, p.stage_generation

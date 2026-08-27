@@ -10,6 +10,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildTestCorpusManifest,
 } from "../test/ontology-pipeline-fixtures.js";
+import {
+  IDENTITY_A,
+  USER_A,
+  confirmPreferences,
+  enablePatternAi,
+  disablePatternAi,
+  resetDb,
+  seedActiveOntology,
+  seedChart,
+  seedUser,
+} from "../test/helpers.js";
+import { enqueuePatternGeneration } from "./services/pattern-enqueue.js";
+import { loadPatternJob } from "./services/pattern-stage-protocol.js";
 import type {
   Env,
   OntologyPipelineMessage,
@@ -376,5 +389,54 @@ describe("ontology queue admission", () => {
       dispatched_at: recoveredAt.toISOString(),
     });
     expect(send).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Pattern queue admission", () => {
+  const PATTERN_QUEUE = "patternlike-pattern-generation-dev";
+
+  it("never parks a Pattern delivery as rollout_paused", async () => {
+    // The class exists only as historical data. There is no rollout left to
+    // pause for, so a delivery either does its stage's work or fails/cancels on
+    // an ordinary check — it must never re-create the state the compatibility
+    // repair exists to clear.
+    await resetDb();
+    disablePatternAi();
+    try {
+      await seedUser(IDENTITY_A);
+      await confirmPreferences(USER_A);
+      await seedChart(IDENTITY_A);
+      await seedActiveOntology();
+      enablePatternAi();
+
+      const reserved = await enqueuePatternGeneration(env, IDENTITY_A, {
+        idempotencyKey: "idem-queue-no-pause",
+        consentPolicyVersion: "1.0.0",
+        reason: "first_open",
+        requestId: "req-queue-no-pause",
+      });
+      expect(reserved.ok, JSON.stringify(reserved)).toBe(true);
+      if (!reserved.ok) return;
+      const generationId = reserved.body.generation.generation_id;
+      const job = await loadPatternJob(env, generationId);
+
+      const result = await deliver(
+        PATTERN_QUEUE,
+        [{
+          kind: "pattern_generation",
+          job_id: job!.job_id,
+          generation_id: generationId,
+          stage_generation: job!.stage_generation,
+        }],
+        env,
+      );
+      expect(result.retryMessages).toEqual([]);
+
+      expect(await env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM jobs WHERE result_class = 'rollout_paused'`,
+      ).first<{ n: number }>()).toEqual({ n: 0 });
+    } finally {
+      disablePatternAi();
+    }
   });
 });

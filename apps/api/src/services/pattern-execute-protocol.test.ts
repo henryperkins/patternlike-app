@@ -52,6 +52,15 @@ import {
   loadPatternJob,
   patternArtifactId,
 } from "./pattern-stage-protocol.js";
+import {
+  recoverLegacyPausedPatternJobs,
+  sweepPatternJobs,
+} from "./pattern-sweep.js";
+import {
+  insertPatternConsentGrant,
+  loadLatestPatternConsent,
+} from "../db/pattern-consents.js";
+import { PATTERN_JOB_TYPE } from "./pattern-command.js";
 
 const POLICY = "1.0.0";
 
@@ -1068,5 +1077,246 @@ describe("semantic verdict validation", () => {
         }),
       ).toBe("verdict_shape_invalid");
     }
+  });
+});
+
+/**
+ * `result_class = 'rollout_paused'` is historical data.
+ *
+ * Nothing creates one now: the rollout that parked these rows is gone, and the
+ * transition that set the class went with it. What remains is a bounded,
+ * unconditional repair — unconditional because the condition it used to have
+ * ("the rollout is back on") no longer exists, and any replacement condition
+ * would be the flag again under another name.
+ */
+describe("legacy paused Pattern jobs", () => {
+  const PAUSED_LEASE = "claim-token-legacy-pause";
+
+  beforeEach(async () => {
+    await resetDb();
+    await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
+    installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
+    disablePatternAi();
+    standInKey = "sk-test";
+    await seedUser(IDENTITY_A);
+    await confirmPreferences(USER_A);
+    await seedChart(IDENTITY_A);
+  });
+
+  afterEach(() => {
+    disablePatternAi();
+    vi.restoreAllMocks();
+  });
+
+  interface JobRow {
+    status: string;
+    result_class: string | null;
+    available_at: string | null;
+    dispatched_at: string | null;
+    claim_token: string | null;
+    lease_expires_at: string | null;
+  }
+
+  async function jobRow(id: string): Promise<JobRow | null> {
+    return env.DB.prepare(
+      `SELECT status, result_class, available_at, dispatched_at, claim_token,
+              lease_expires_at
+       FROM jobs WHERE id = ?`,
+    ).bind(id).first<JobRow>();
+  }
+
+  /** A row a prior deployment parked. No new code path can produce one. */
+  async function seedLegacyPause(
+    id: string,
+    options: {
+      status?: "queued" | "running";
+      leaseExpiresAt?: string | null;
+      createdAt?: string;
+    } = {},
+  ): Promise<void> {
+    const status = options.status ?? "queued";
+    const createdAt = options.createdAt ?? new Date(0).toISOString();
+    await env.DB.prepare(
+      `INSERT INTO jobs (
+         id, job_type, user_id, idempotency_key, status, result_class, attempts,
+         available_at, dispatched_at, claim_token, lease_expires_at, created_at
+       ) VALUES (?, ?, ?, ?, ?, 'rollout_paused', 0, ?, NULL, ?, ?, ?)`,
+    ).bind(
+      id,
+      PATTERN_JOB_TYPE,
+      USER_A,
+      `idem-${id}`,
+      status,
+      createdAt,
+      status === "running" ? PAUSED_LEASE : null,
+      status === "running" ? (options.leaseExpiresAt ?? new Date(0).toISOString()) : null,
+      createdAt,
+    ).run();
+  }
+
+  /** Park a real reserved generation exactly as the removed transition did. */
+  async function pauseReserved(generationId: string): Promise<string> {
+    const job = await loadPatternJob(env, generationId);
+    if (!job) throw new Error("pattern job missing");
+    await env.DB.prepare(
+      `UPDATE jobs SET result_class = 'rollout_paused', status = 'queued',
+                       dispatched_at = NULL, available_at = NULL
+       WHERE id = ?`,
+    ).bind(job.job_id).run();
+    return job.job_id;
+  }
+
+  it("returns a queued legacy pause to the outbox lane", async () => {
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    await seedLegacyPause("job_legacy_queued");
+
+    expect(await recoverLegacyPausedPatternJobs(env, 50, now)).toBe(1);
+
+    expect(await jobRow("job_legacy_queued")).toEqual({
+      status: "queued",
+      result_class: null,
+      available_at: now.toISOString(),
+      // The outbox is what sends it. A repair that also claimed to have
+      // dispatched would strand the row a second time.
+      dispatched_at: null,
+      claim_token: null,
+      lease_expires_at: null,
+    });
+  });
+
+  it("returns a running legacy pause whose lease has lapsed, clearing its claim", async () => {
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    await seedLegacyPause("job_legacy_expired", {
+      status: "running",
+      leaseExpiresAt: "2026-08-27T11:00:00.000Z",
+    });
+
+    expect(await recoverLegacyPausedPatternJobs(env, 50, now)).toBe(1);
+
+    expect(await jobRow("job_legacy_expired")).toMatchObject({
+      status: "queued",
+      result_class: null,
+      claim_token: null,
+      lease_expires_at: null,
+    });
+  });
+
+  it("leaves a live running lease to the consumer that holds it", async () => {
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    await seedLegacyPause("job_legacy_live", {
+      status: "running",
+      leaseExpiresAt: "2026-08-27T12:05:00.000Z",
+    });
+
+    expect(await recoverLegacyPausedPatternJobs(env, 50, now)).toBe(0);
+
+    expect(await jobRow("job_legacy_live")).toMatchObject({
+      status: "running",
+      result_class: "rollout_paused",
+      claim_token: PAUSED_LEASE,
+    });
+  });
+
+  it("repairs one bounded batch per call and leaves the rest paused and undispatched", async () => {
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    for (let index = 0; index < 5; index += 1) {
+      await seedLegacyPause(`job_legacy_batch_${index}`, {
+        createdAt: new Date(1000 * (index + 1)).toISOString(),
+      });
+    }
+
+    expect(await recoverLegacyPausedPatternJobs(env, 2, now)).toBe(2);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM jobs WHERE result_class = 'rollout_paused'`,
+    ).first<{ n: number }>()).toEqual({ n: 3 });
+
+    // The outbox exclusion has to stay while compatibility rows can exist, or
+    // the rows beyond the batch would be dispatched without ever being
+    // repaired — which is the pause the class was recording.
+    await env.DB.prepare(
+      `UPDATE jobs SET result_class = 'rollout_paused' WHERE id LIKE 'job_legacy_batch_%'`,
+    ).run();
+    await sweepPatternJobs(env, now);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM jobs
+       WHERE result_class = 'rollout_paused' AND dispatched_at IS NOT NULL`,
+    ).first<{ n: number }>()).toEqual({ n: 0 });
+  });
+
+  it("converges: a repeated sweep repairs nothing and spends no provider budget", async () => {
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    await seedLegacyPause("job_legacy_converge");
+
+    await sweepPatternJobs(env, now);
+    expect(await recoverLegacyPausedPatternJobs(env, 50, now)).toBe(0);
+    await sweepPatternJobs(env, now);
+
+    expect(await jobRow("job_legacy_converge")).toMatchObject({ result_class: null });
+    expect(await providerCalls()).toBe(0);
+  });
+
+  it("decides nothing about consent: recovery redelivers, and the delivery cancels", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-legacy-consent");
+    const jobId = await pauseReserved(generationId);
+    // The grant the command froze is superseded while the row is parked. The
+    // repair must not read consent at all; the delivery is what cancels.
+    const nowIso = new Date().toISOString();
+    const latest = await loadLatestPatternConsent(env, USER_A);
+    await env.DB.batch([
+      insertPatternConsentGrant(
+        env,
+        USER_A,
+        "cns_legacy_superseding",
+        (latest?.version ?? 1) + 1,
+        latest?.id ?? null,
+        nowIso,
+      ),
+    ]);
+
+    expect(await recoverLegacyPausedPatternJobs(env, 50, new Date())).toBe(1);
+    expect(await jobRow(jobId)).toMatchObject({ result_class: null, status: "queued" });
+
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: true });
+    expect(await stageOf(generationId)).toBe("cancelled");
+    expect(await providerCalls()).toBe(0);
+  });
+
+  it("decides nothing about the chart: a corrected chart cancels on redelivery", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-legacy-stale-chart");
+    const jobId = await pauseReserved(generationId);
+    // A chart correction while the row is parked. Again: the repair returns the
+    // row to the lane, and the ordinary eligibility check decides.
+    await env.DB.prepare(
+      `UPDATE chart_snapshots SET status = 'superseded' WHERE user_id = ?`,
+    ).bind(USER_A).run();
+
+    expect(await recoverLegacyPausedPatternJobs(env, 50, new Date())).toBe(1);
+    expect(await jobRow(jobId)).toMatchObject({ result_class: null });
+
+    expect(await deliver(generationId)).toEqual({ ok: true, terminal: true });
+    expect(await stageOf(generationId)).toBe("cancelled");
+    expect(await providerCalls()).toBe(0);
+  });
+
+  it("recovers a row whose domain stage is already terminal without reviving it", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-legacy-terminal");
+    const jobId = await pauseReserved(generationId);
+    await env.DB.prepare(
+      `UPDATE pattern_generation_jobs SET stage = 'cancelled' WHERE generation_id = ?`,
+    ).bind(generationId).run();
+
+    expect(await recoverLegacyPausedPatternJobs(env, 50, new Date())).toBe(1);
+    expect(await jobRow(jobId)).toMatchObject({ result_class: null });
+
+    const outcome = await deliver(generationId);
+    expect(outcome.ok).toBe(false);
+    expect(await stageOf(generationId)).toBe("cancelled");
+    expect(await providerCalls()).toBe(0);
   });
 });

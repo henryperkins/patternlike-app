@@ -222,6 +222,35 @@ describe("scheduled Worker entry point", () => {
     expect(prepare).not.toHaveBeenCalled();
   });
 
+  it("recovers a legacy paused Pattern job on the ordinary maintenance tick", async () => {
+    // `result_class = 'rollout_paused'` is historical: nothing creates one now.
+    // The repair has to ride the tick every deployment already runs, or the
+    // rows a prior deployment parked would need an operator to find them.
+    await seedUser(IDENTITY_A);
+    await rows(
+      `INSERT INTO jobs
+         (id, job_type, user_id, idempotency_key, status, result_class, attempts,
+          available_at, dispatched_at, created_at)
+       VALUES ('job_scheduled_legacy_pause', 'generate_pattern', ?,
+               'idem-scheduled-legacy-pause', 'queued', 'rollout_paused', 0,
+               NULL, NULL, '2031-01-01T00:00:00.000Z')`,
+      USER_A,
+    );
+    const controller = createScheduledController({
+      scheduledTime: Date.parse("2031-01-02T12:00:00.000Z"),
+      cron: "*/15 * * * *",
+    });
+    const ctx = createExecutionContext();
+
+    await worker.scheduled(controller, hybridEnv(), ctx);
+    await waitOnExecutionContext(ctx);
+
+    const [row] = await rows<{ status: string; result_class: string | null }>(
+      "SELECT status, result_class FROM jobs WHERE id = 'job_scheduled_legacy_pause'",
+    );
+    expect(row).toEqual({ status: "queued", result_class: null });
+  });
+
   it("redrives an undispatched privacy outbox job on the scheduled clock", async () => {
     await seedUser(IDENTITY_A);
     await rows("UPDATE users SET status = 'frozen' WHERE id = ?", USER_A);
