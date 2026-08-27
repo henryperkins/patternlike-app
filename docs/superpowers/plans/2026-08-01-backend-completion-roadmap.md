@@ -149,6 +149,38 @@ dev-server proxy in the path.
 **Done when:** calc rejects an unauthenticated request; an unresponsive calc
 service produces a `502 calc_failed` within the timeout rather than hanging.
 
+### What landed
+
+1. **Calc authentication — deployed.** `POST /v1/calculate` requires a bearer
+   token outside development, answering `503 service_auth_not_configured`
+   without configuration and `401` on a bad token, while `/health` and
+   `/v1/engine` stay public. The token is set on both sides.
+2. **Bounding the request — implemented, not yet deployed.**
+   `invokeCalc` now takes an explicit `timeoutMs`, sets
+   `signal: AbortSignal.timeout(timeoutMs)`, refuses a declared or streamed body
+   over 1 MiB before parsing, and returns a `CalcInvocation` carrying
+   `latencyMs` and `timedOut`. `timedOut` is read from the signal's own state
+   rather than matched against exception text, so a dropped connection is not
+   miscounted as a deadline. The deadline is
+   `CALC_FETCH_TIMEOUT_MS` (`"10000"` in both Wrangler var blocks, accepted
+   range 1,000–30,000, required outside development and fail-closed through
+   `configGuard`). A timeout still returns the generic `502 calc_failed` — no
+   upstream message, path, or URL reaches the caller.
+3. **Production database id — done.** `[[env.production.d1_databases]]` carries
+   the real `patternlike-ops` id. The top-level placeholder is the development
+   block and is intentionally left alone.
+
+Timeout behaviour is covered by `apps/api/src/services/calc-client.test.ts` and
+by the `TRIGGER_CALC_TIMEOUT` sentinel in
+`apps/api/src/routes/birth.integration.test.ts`. Detailed plan:
+[`2026-08-26-birth-operational-guards.md`](2026-08-26-birth-operational-guards.md)
+Task 1.
+
+### What is still open
+
+- **`compatibility_date` is still `2025-05-01`** in `apps/api/wrangler.toml`.
+  Item 4 of this stream has not been done.
+
 ---
 
 ## Stream 4 — Consent enforcement (completes an M1 privacy claim)
@@ -359,6 +391,24 @@ because of the 202 shape.
 does: Cloudflare Queues or Workflows, with the job row becoming the real
 state machine. Doing it now adds moving parts to a path that currently works.
 
+**Still deferred.** "Actually force it" is now a measured condition rather than
+a judgement call. The entry criteria, the telemetry they are computed from, and
+the query procedure are recorded in
+[`docs/deploy/birth-calc-slo.md`](../../deploy/birth-calc-slo.md):
+
+| Signal | Window | Trigger |
+| --- | --- | --- |
+| Successful calc p95 latency | rolling 7 days | `>= 8,000 ms` for 3 consecutive UTC days |
+| Calc timeout rate | rolling 24 hours, at least 100 attempts | `>= 1%` |
+| Successful calc p99 latency | rolling 7 days | `>= 9,000 ms` |
+| Worker termination correlated with the birth route | any | one confirmed production event |
+
+Crossing any row opens the design; none has been measured, because the
+telemetry that would measure it is not deployed. A high `429` rate is
+explicitly **not** a trigger — it is a product and abuse question about
+`BIRTH_CALC_DAILY_LIMIT`, and a queue would not reduce the spend that limit
+exists to bound.
+
 ---
 
 ## Stream 9 — Operational hardening (small, do when convenient)
@@ -372,6 +422,53 @@ state machine. Doing it now adds moving parts to a path that currently works.
    per-row record of which secret wrapped which key.
 2. **Rate limiting.** Nothing throttles `POST /v1/birth-profiles`, which is the
    route that costs a calc invocation.
+
+### What landed
+
+**Item 2 — implemented, not yet merged or deployed.** `POST /v1/birth-profiles`
+now authorizes at most `BIRTH_CALC_DAILY_LIMIT` (`"5"`, accepted range 1–50)
+actual `/v1/calculate` invocations per user per UTC day. The sixth returns
+`429 birth_calc_budget_exhausted` with `Retry-After` in seconds and
+`details.resets_at` at the next UTC midnight, writes no birth profile and no
+job row, and never reaches calc. The `429` is recorded in the additive M8
+OpenAPI document with valid and invalid fixtures.
+
+The ceiling is exact rather than approximate, which is what the reservation
+ledger in `0016` buys:
+
+- Requests that perform no calculation are free — validation failures,
+  idempotency conflicts, and replays of a `succeeded`, `queued`, or `running`
+  job.
+- Concurrent copies of one attempt coordinate consume **one** unit; the loser
+  writes nothing, calls nothing, and returns the existing job state.
+- A failed-job retry must match the original encrypted birth command
+  field-by-field and consumes one new unit.
+- A charged timeout, transport failure, invalid calc result, or duplicate
+  fingerprint is **not** refunded. The bound is on calculation spend, not on
+  success.
+
+Budgets are per user and independent. All three tables are deleted with the
+account and classified non-portable in `services/deletion-manifest.ts`.
+Retention is a 35-UTC-day window inclusive of today, held in TypeScript rather
+than in the migration, and the prune rides the same batch that writes a new
+reservation — so it is **lazy and per user**: an account that stops submitting
+birth profiles is never pruned, because no cron or queue consumer touches these
+tables.
+
+Detailed plan:
+[`2026-08-26-birth-operational-guards.md`](2026-08-26-birth-operational-guards.md)
+Tasks 2 and 3.
+
+> **`db/d1/0016_birth_calc_usage.sql` is committed and not applied remotely.**
+> The runtime code above queries those tables. It must not deploy until the
+> migration-only commit is merged and applied with a backup, a bookmark, and
+> the integrity checks in `docs/deploy/api-production.md`. Workers Builds
+> deploys merged Worker code automatically and does not wait for D1.
+
+**Item 1 (key rotation has no caller) is still open** and is the subject of a
+separate plan,
+[`2026-08-26-crypto-operator-control-plane.md`](2026-08-26-crypto-operator-control-plane.md),
+which is gated on `0016` landing first.
 
 ---
 
@@ -399,11 +496,15 @@ active release to draw approved fragments from.
                    └──► 2. Reachability                       │
                                        └──► 6. Audit ─────────┘
 
-3. Calc hardening    ── independent, start any time
-7. Birthplace        ── independent, product quality
-8. Async workflow    ── deferred
-9. Ops hardening     ── independent, small
+3. Calc hardening    ── landed except compatibility_date
+7. Birthplace        ── zone resolution landed; place search open
+8. Async workflow    ── deferred behind measured entry criteria
+9. Ops hardening     ── rate limiting landed; key rotation open
 ```
+
+Streams 3, 8, and 9 each carry a **What landed** section above; read it before
+treating an item as outstanding. Stream 8's deferral is now conditional on the
+thresholds in [`docs/deploy/birth-calc-slo.md`](../../deploy/birth-calc-slo.md).
 
 Streams 3, 7, and 9 need no decisions and can run in parallel with the
 identity work by anyone not blocked on it.
