@@ -46,6 +46,8 @@ curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python -
 
 `.venv/` is already gitignored and `scripts/ci-local.sh` picks it up automatically.
 
+**Per worktree, and a real directory.** `ci-local.sh` tests `[ -x "$REPO/.venv/bin/python" ]` against the checkout it runs in, so a second `git worktree` has no `.venv` and aborts with exit `2` before any lane runs. Symlinking one from another worktree looks like it works and then bites: `.gitignore` line 30 is `.venv/`, and a trailing slash matches a directory only — a symlink shows up as untracked, which silently dirties `git status --short`, the thing a release freeze requires to be empty. Copy the directory or repeat the bootstrap.
+
 **Merging still deploys.** Cloudflare Workers Builds is a separate system from GitHub Actions and is unaffected by the billing lock, so a merge to `main` still triggers a production build and deploy. Losing CI removed the check on merges, not their consequences.
 
 ## Security, Contracts, and Licensing
