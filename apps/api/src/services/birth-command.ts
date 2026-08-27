@@ -292,28 +292,6 @@ function isSubmitted(value: unknown): value is BirthCalcSubmitted {
   );
 }
 
-function sameEffectiveSubmitted(
-  submitted: BirthCalcSubmitted,
-  effective: Pick<
-    BirthCalcCommandV1["effective"],
-    | "accuracy"
-    | "birth_date"
-    | "birth_time_local"
-    | "approximate_window_minutes"
-    | "birthplace"
-  >,
-): boolean {
-  const submittedBirthplace = submitted.birthplace ?? emptyBirthplace();
-  return (
-    effective.accuracy === submitted.accuracy &&
-    effective.birth_date === submitted.birth_date &&
-    effective.birth_time_local === submitted.birth_time_local &&
-    effective.approximate_window_minutes ===
-      submitted.approximate_window_minutes &&
-    sameBirthplace(effective.birthplace, submittedBirthplace)
-  );
-}
-
 function isBirthCalcCommandV1(
   value: Record<string, unknown>,
 ): value is Record<string, unknown> & BirthCalcCommandV1 {
@@ -367,13 +345,7 @@ function isBirthCalcCommandV1(
   ) {
     return false;
   }
-  return sameEffectiveSubmitted(value.submitted, {
-    accuracy: effective.accuracy,
-    birth_date: effective.birth_date,
-    birth_time_local: effective.birth_time_local,
-    approximate_window_minutes: effective.approximate_window_minutes,
-    birthplace: effective.birthplace,
-  });
+  return true;
 }
 
 function isLegacyBirthplace(
