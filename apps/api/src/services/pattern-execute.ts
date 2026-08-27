@@ -74,7 +74,6 @@ import {
   type PatternCorrectionDocument,
   type PatternPacketLimits,
 } from "./pattern-packet.js";
-import { readPatternAiRollout } from "./pattern-rollout.js";
 import { findSemanticVerdictProblem, resolveSemanticForceReject } from "./pattern-semantic.js";
 import {
   artifactAad,
@@ -887,17 +886,6 @@ export async function executePatternJob(
   message: PatternGenerationMessage,
   now = new Date(),
 ): Promise<PatternExecuteOutcome> {
-  const rollout = readPatternAiRollout(env);
-  if (rollout === "off") {
-    await env.DB.prepare(
-      `UPDATE jobs SET available_at = ?, dispatched_at = NULL, result_class = 'rollout_paused'
-       WHERE id = ? AND job_type = ? AND status IN ('queued', 'running')`,
-    )
-      .bind(new Date(now.getTime() + 3600_000).toISOString(), message.job_id, PATTERN_JOB_TYPE)
-      .run();
-    return { ok: true, terminal: false };
-  }
-
   const claim = await claimStage(env, message, now);
   if (claim.status === "retry") {
     return { ok: false, reason: "retry", failureClass: "claim_failed" };

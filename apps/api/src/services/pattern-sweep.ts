@@ -9,7 +9,6 @@ import {
 import { markDispatched } from "../db/generation.js";
 import type { Env } from "../env.js";
 import { safeLog } from "./safe-log.js";
-import { readPatternAiRollout } from "./pattern-rollout.js";
 
 /**
  * Claims one job may take across every stage before the sweep stops re-arming
@@ -96,23 +95,21 @@ export async function reconcilePatternGeneration(
  * checkSecureConfig.
  */
 /**
- * Pattern copied daily-reading's pause (`result_class = 'rollout_paused'`) but
- * not its resume. The outbox lane skips that class forever, so a job parked
- * while `PATTERN_AI_ROLLOUT=off` would never be nudged again. Clearing the
- * class returns the row to the ordinary undispatched query.
+ * Compatibility repair for Pattern jobs parked by the removed rollout switch.
+ *
+ * No new row can acquire `result_class = 'rollout_paused'`; these are the rows
+ * a prior deployment left behind. The outbox lane skips that class forever, so
+ * clearing it returns the row to the ordinary undispatched query.
  *
  * A job parked mid-flight is parked while `status = 'running'`, so resuming
- * only `'queued'` rows left it in the running lane: the expired-lease sweep
- * re-sent it on every tick for as long as the rollout stayed off. Those rows
- * come back to `'queued'` here, and only once their lease has lapsed, so a
- * consumer still working the stage is never robbed of its claim.
+ * only `'queued'` rows left it in the running lane. Those rows come back to
+ * `'queued'` here, and only once their lease has lapsed, so a consumer still
+ * working the stage is never robbed of its claim.
  */
 export async function resumePausedPatternJobsAfterRollout(
   env: Env,
   now = new Date(),
 ): Promise<number> {
-  const rollout = readPatternAiRollout(env);
-  if (!rollout || rollout === "off") return 0;
   const nowIso = now.toISOString();
   const updated = await env.DB.prepare(
     `UPDATE jobs

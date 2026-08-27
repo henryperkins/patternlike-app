@@ -14,10 +14,6 @@ import {
   resolvePatternPublisherConfiguration,
   type PatternStageClass,
 } from "./pattern-publisher.js";
-import {
-  consumerAdmissionEntry,
-  patternRolloutAllows,
-} from "./pattern-rollout.js";
 import { ONTOLOGY_REGRESSION_PATTERN_PIN } from "./ontology-regression.js";
 import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
 import {
@@ -98,7 +94,6 @@ async function loadOntologyOwner(
 function patternConfigurationIsCurrent(
   env: Env,
   job: CodexProviderJob,
-  owner: PatternOwnerRow,
 ): boolean {
   if (
     job.userId === null ||
@@ -112,11 +107,7 @@ function patternConfigurationIsCurrent(
   if (
     !resolved.ok ||
     !resolved.config ||
-    resolved.config.pin.publisher !== PATTERN_PUBLISHER_CODEX ||
-    !patternRolloutAllows(
-      resolved.rollout,
-      consumerAdmissionEntry(env, owner.user_id, owner.reservation_reason),
-    )
+    resolved.config.pin.publisher !== PATTERN_PUBLISHER_CODEX
   ) {
     return false;
   }
@@ -146,7 +137,7 @@ async function patternDomainIsCurrent(
       job.pass ||
     owner.stage_generation !== job.stageGeneration ||
     attempt !== job.stageAttempt ||
-    !patternConfigurationIsCurrent(env, job, owner)
+    !patternConfigurationIsCurrent(env, job)
   ) {
     return false;
   }

@@ -800,7 +800,10 @@ describe("machine ontology ingestion", () => {
     installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
     env.PATTERN_ONTOLOGY_KEYS = "";
-    await seedActiveOntology("ontology-prior-active");
+    // A release that predates committed pipeline evidence: this suite is about
+    // what machine ingestion does, so the prior pointer must not already carry
+    // its own evaluation receipt.
+    await seedActiveOntology("ontology-prior-active", { activationScope: "internal" });
     key = await generateSigningKey("ontology-pipeline-key");
     env.PATTERN_ONTOLOGY_KEYS = releaseKeysVar([key]);
     env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
@@ -867,7 +870,6 @@ describe("machine ontology ingestion", () => {
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A);
     enablePatternAi();
-    env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
     const reservation = await SELF.fetch(
       "http://api.test/v1/pattern-generations",
       {
@@ -932,7 +934,6 @@ describe("machine ontology ingestion", () => {
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A);
     enablePatternAi();
-    env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
 
     const reservation = await SELF.fetch(
       "http://api.test/v1/pattern-generations",
@@ -981,7 +982,6 @@ describe("machine ontology ingestion", () => {
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A);
     enablePatternAi();
-    env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
 
     const reservation = await SELF.fetch(
       "http://api.test/v1/pattern-generations",
@@ -1331,7 +1331,7 @@ describe("machine ontology ingestion", () => {
     );
     expect(recall.status).toBe(200);
     env.PATTERN_ONTOLOGY_KEYS = "";
-    await seedActiveOntology("ontology-after-recall");
+    await seedActiveOntology("ontology-after-recall", { activationScope: "internal" });
     env.PATTERN_ONTOLOGY_KEYS = releaseKeysVar([key]);
 
     const response = await postRelease(prepared.signed);
@@ -1387,7 +1387,6 @@ describe("machine ontology ingestion", () => {
       await confirmPreferences(USER_A);
       await seedChart(IDENTITY_A);
       enablePatternAi();
-      env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
       const reservation = await SELF.fetch(
         "http://api.test/v1/pattern-generations",
         {

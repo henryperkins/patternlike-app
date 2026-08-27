@@ -25,7 +25,6 @@ import { checkSecureConfig } from "../middleware/config-guard.js";
 function env(overrides: Record<string, string | undefined> = {}) {
   return {
     ENVIRONMENT: "production",
-    PATTERN_AI_ROLLOUT: "internal",
     PATTERN_PUBLISHER: "openai",
     PATTERN_DAILY_PROVIDER_CALL_LIMIT: "100",
     PATTERN_INPUT_MAX_BYTES: "98304",

@@ -39,12 +39,6 @@ import {
 import {
   resolvePatternPublisherConfiguration,
 } from "./pattern-publisher.js";
-import {
-  consumerAdmissionEntry,
-  isInternalPatternAccount,
-  patternRolloutAllows,
-  readPatternAiRollout,
-} from "./pattern-rollout.js";
 import { markDispatched } from "../db/generation.js";
 import { safeLog } from "./safe-log.js";
 import { randomKey, wrapContentKey } from "./pattern-crypto.js";
@@ -93,27 +87,10 @@ export async function enqueuePatternGeneration(
   },
   now = new Date(),
 ): Promise<PatternEnqueueFailure> {
-  const rollout = readPatternAiRollout(env);
-  if (!rollout) {
-    return { ok: false, status: 503, code: "configuration_error", message: "Pattern rollout is misconfigured" };
-  }
-  const publisher = resolvePatternPublisherConfiguration(env);
-  if (!publisher.ok || !publisher.config) {
-    return {
-      ok: false,
-      status: 503,
-      code: "pattern_generation_unavailable",
-      message: "Pattern generation is not enabled",
-    };
-  }
-  if (!patternRolloutAllows(rollout, consumerAdmissionEntry(env, identity.userId, input.reason))) {
-    return {
-      ok: false,
-      status: 503,
-      code: "pattern_generation_unavailable",
-      message: "Pattern generation is not enabled for this surface",
-    };
-  }
+  // Admission is the eligibility ladder below and nothing else: an active
+  // chart, a user-confirmed locale, the reader's own current consent, a
+  // public-capable active ontology, and an unused chart-fingerprint claim.
+  // No account, cohort, allowlist, or product switch takes part.
   if (input.consentPolicyVersion !== PATTERN_GENERATION_CONSENT_POLICY_VERSION) {
     return {
       ok: false,
@@ -160,12 +137,10 @@ export async function enqueuePatternGeneration(
   }
 
   const ontology = await loadActiveOntology(env);
-  if (
-    !ontologyServesAccount(
-      ontology,
-      isInternalPatternAccount(env, identity.userId),
-    )
-  ) {
+  // The second argument is the former internal-account bypass; see
+  // `buildPatternState`. No caller may open it now that there is no account to
+  // distinguish.
+  if (!ontologyServesAccount(ontology, false)) {
     return {
       ok: false,
       status: 409,
@@ -221,6 +196,20 @@ export async function enqueuePatternGeneration(
         message: "A failed attempt is required before retrying",
       };
     }
+  }
+
+  // Last, and only once the reader is otherwise eligible: the deployment's own
+  // provider configuration. It is a spend and transport control, never an
+  // admission decision, so it must not shadow `chart_required` or any other
+  // refusal the reader can act on.
+  const publisher = resolvePatternPublisherConfiguration(env);
+  if (!publisher.ok || !publisher.config) {
+    return {
+      ok: false,
+      status: 503,
+      code: "pattern_generation_unavailable",
+      message: "Pattern generation is not configured",
+    };
   }
 
   let grant = await loadPatternGenerationGrant(env, identity.userId, now);

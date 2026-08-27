@@ -12,7 +12,6 @@ import { isOntologyRecalled, loadActiveOntology, ontologyServesAccount } from ".
 import { enqueuePatternGeneration } from "../services/pattern-enqueue.js";
 import {
   buildPatternState,
-  isPatternAiCohort,
   loadActiveChart,
   loadActivePatternDocument,
   projectPatternResponse,
@@ -29,9 +28,8 @@ import {
   publicStageFor,
   type PatternDomainStage,
 } from "../services/pattern-stage-protocol.js";
-import { hashChartFingerprint, loadAnyClaim, loadClaimForFingerprint } from "../db/pattern-claims.js";
+import { hashChartFingerprint, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { loadPreferences } from "../db/preferences.js";
-import { isInternalPatternAccount } from "../services/pattern-rollout.js";
 
 export const patternAiRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -178,16 +176,20 @@ patternAiRoutes.delete("/v1/pattern", async (c) => {
   return result === "gone" ? c.body(null, 204) : c.body(null, 202);
 });
 
-export async function tryServeAiPattern(
+/**
+ * `GET /v1/pattern` for every authenticated account.
+ *
+ * There is no cohort escape and no editorial fallthrough: this function always
+ * answers. The M4 catalogue's data is preserved and still exported; it is no
+ * longer a product path an account can be routed onto.
+ */
+export async function serveGeneratedPattern(
   env: Env,
   userId: string,
   cryptoSubject: import("../crypto.js").CryptoSubject,
   requestId: string,
   url: string,
-): Promise<Response | null> {
-  const anyClaim = await loadAnyClaim(env, userId);
-  if (!(await isPatternAiCohort(env, userId, !!anyClaim))) return null;
-
+): Promise<Response> {
   const params = new URL(url).searchParams;
   if ([...params.keys()].length > 0) {
     return Response.json(error(requestId, "invalid_pattern_query", "AI Pattern accepts no query parameters"), { status: 400 });
@@ -261,12 +263,7 @@ export async function tryServeAiPattern(
   if (!grant) {
     return Response.json(error(requestId, "pattern_generation_consent_required", "Pattern generation consent is required"), { status: 409 });
   }
-  if (
-    !ontologyServesAccount(
-      await loadActiveOntology(env),
-      isInternalPatternAccount(env, userId),
-    )
-  ) {
+  if (!ontologyServesAccount(await loadActiveOntology(env), false)) {
     return Response.json(error(requestId, "ontology_unavailable", "No activated Pattern ontology is available"), { status: 409 });
   }
   return Response.json(error(requestId, "pattern_not_generated", "No accepted Pattern exists"), { status: 404 });

@@ -3109,7 +3109,9 @@ describe("ontology pipeline execution", () => {
 
   it("runs all 30 fixtures one provider pass per delivery, signs, and activates", async () => {
     const sliceAVersion = `ontology-slice-a-${crypto.randomUUID()}`;
-    await seedActiveOntology(sliceAVersion);
+    // Pre-evidence legacy release: this run is what produces the first
+    // machine evaluation receipt, so the prior pointer must not carry one.
+    await seedActiveOntology(sliceAVersion, { activationScope: "internal" });
     const { fixture, publisher } = await driveActivationToRegression();
     const frozen = await env.DB.prepare(
       `SELECT configuration_json

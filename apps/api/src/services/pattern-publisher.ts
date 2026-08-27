@@ -9,7 +9,6 @@
 
 import type { Env } from "../env.js";
 import { isDevEnvironment } from "../crypto.js";
-import { readPatternAiRollout, type PatternAiRollout } from "./pattern-rollout.js";
 import {
   resolveAiGatewayRoute,
   resolveProviderCredentialMode,
@@ -201,8 +200,8 @@ export interface PatternPublisherConfig {
 }
 
 export type PatternPublisherConfigOutcome =
-  | { ok: true; rollout: PatternAiRollout; config: PatternPublisherConfig | null }
-  | { ok: false; code: "pattern_rollout_invalid" | "pattern_publisher_misconfigured"; message: string };
+  | { ok: true; config: PatternPublisherConfig | null }
+  | { ok: false; code: "pattern_publisher_misconfigured"; message: string };
 
 function misconfigured(message: string): PatternPublisherConfigOutcome {
   return { ok: false, code: "pattern_publisher_misconfigured", message };
@@ -233,15 +232,6 @@ function checkPinnedString(raw: string | undefined, expected: string, key: strin
 export function resolvePatternPublisherConfiguration(
   env: Partial<Env>,
 ): PatternPublisherConfigOutcome {
-  const rollout = readPatternAiRollout(env);
-  if (rollout === null) {
-    return {
-      ok: false,
-      code: "pattern_rollout_invalid",
-      message: "PATTERN_AI_ROLLOUT must be one of off, internal, or first_open",
-    };
-  }
-
   const configuredPublisher = env.PATTERN_PUBLISHER?.trim();
   const expectedTimeout = configuredPublisher === PATTERN_PUBLISHER_CODEX
     ? CODEX_PROVIDER_TIMEOUT_MS
@@ -306,11 +296,16 @@ export function resolvePatternPublisherConfiguration(
     }
   }
 
-  if (rollout === "off") return { ok: true, rollout, config: null };
+  // A deployment that names no publisher has no runnable Pattern generation.
+  // Nothing about an account decides this; it is the absence of configuration.
+  if (!publisher) return { ok: true, config: null };
 
-  const publisherName = publisher as PatternPublisherName | undefined;
-  if (!publisherName) return misconfigured("PATTERN_PUBLISHER is required when Pattern rollout is enabled");
-  if (!callLimit) return misconfigured("PATTERN_DAILY_PROVIDER_CALL_LIMIT is required when Pattern rollout is enabled");
+  const publisherName = publisher as PatternPublisherName;
+  if (!callLimit) {
+    return misconfigured(
+      "PATTERN_DAILY_PROVIDER_CALL_LIMIT is required when a Pattern publisher is configured",
+    );
+  }
 
   if (
     publisherName === PATTERN_PUBLISHER_OPENAI ||
@@ -452,7 +447,6 @@ export function resolvePatternPublisherConfiguration(
 
   return {
     ok: true,
-    rollout,
     config: {
       pin,
       plannerTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX

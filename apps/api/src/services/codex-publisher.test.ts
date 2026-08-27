@@ -8,7 +8,6 @@ import type { PatternPublisherPin } from "./pattern-publisher.js";
 function env(overrides: Record<string, unknown> = {}) {
   return {
     ENVIRONMENT: "production",
-    PATTERN_AI_ROLLOUT: "internal",
     PATTERN_PUBLISHER: "codex",
     PATTERN_DAILY_PROVIDER_CALL_LIMIT: "100",
     PATTERN_INPUT_MAX_BYTES: "98304",

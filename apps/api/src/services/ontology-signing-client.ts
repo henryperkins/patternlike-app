@@ -134,8 +134,9 @@ function validateResponse(
  * bundle hash is recomputed here rather than trusted, and the isolated signer
  * is the only holder of the key. What this one drops is the evidence chain,
  * because the synthetic path has no pipeline run, no evaluation report, and no
- * regression report to bind to. `ontologyOriginOf` keeps the result contained
- * to `PATTERN_INTERNAL_ACCOUNT_IDS` at reservation.
+ * regression report to bind to. A release signed this way is never
+ * public-capable, so `ontologyServesAccount` keeps it out of every reader's
+ * generation at reservation.
  */
 export async function signInternalOntology(
   signer: OntologySignerBinding,

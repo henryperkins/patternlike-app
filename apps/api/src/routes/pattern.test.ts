@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { SELF } from "cloudflare:test";
-import type { PatternContentObject, PatternResponse } from "@patternlike/shared";
+import { SELF, env } from "cloudflare:test";
+import type { PatternContentObject } from "@patternlike/shared";
 import {
   IDENTITY_A,
   USER_A,
   confirmPreferences,
+  disablePatternAi,
+  enablePatternAi,
   resetDb,
+  seedActiveOntology,
   seedActiveRelease,
   seedChart,
   seedUser,
@@ -52,12 +55,26 @@ async function get(path = "/v1/pattern") {
   const response = await SELF.fetch(`http://api.test${path}`, {
     headers: { "x-user-id": USER_A },
   });
-  return { response, body: await response.json() as PatternResponse & { error?: { code: string } } };
+  const text = await response.text();
+  return {
+    response,
+    body: (text ? JSON.parse(text) : {}) as {
+      items?: unknown[];
+      error?: { code: string };
+    },
+  };
 }
 
+/**
+ * `GET /v1/pattern` is the generated Pattern reader for every authenticated
+ * account. The M4 editorial catalogue is preserved data — releases still ingest
+ * and still export — but it is no longer a product path this route can select,
+ * so a matching approved chapter must never reach a reader from here.
+ */
 describe("GET /v1/pattern", () => {
   beforeEach(async () => {
     await resetDb();
+    disablePatternAi();
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A, {
@@ -65,104 +82,71 @@ describe("GET /v1/pattern", () => {
     });
   });
 
-  it("drains every eligible chapter in stable editorial order with a bound cursor", async () => {
-    const release = await seedM4([
+  it("never serves an eligible editorial chapter, even with a matching M4 release", async () => {
+    await seedM4([
       pattern("pattern.third", 30, 1),
       pattern("pattern.first", 10, 1),
       pattern("pattern.second", 20, 1),
-      pattern("pattern.not-matched", 5, 2),
     ]);
 
-    const first = await get("/v1/pattern?limit=2");
-    expect(first.response.status).toBe(200);
-    expect(first.body.schema_version).toBe("0.4.0");
-    expect(first.body.bundle_hash).toBe(release.bundleHash);
-    expect(first.body.items.map((item) => item.content_id))
-      .toEqual(["pattern.first", "pattern.second"]);
-    expect(first.body.items[0]!.evidence[0]!.feature_id).toMatch(/^nft_[0-9a-f]{32}$/);
-    expect(first.body.next_cursor).toEqual(expect.any(String));
-    expect(first.body.omissions.predicate_mismatch).toBe(1);
-
-    const second = await get(`/v1/pattern?limit=2&cursor=${first.body.next_cursor}`);
-    expect(second.response.status).toBe(200);
-    expect(second.body.items.map((item) => item.content_id)).toEqual(["pattern.third"]);
-    expect(second.body.next_cursor).toBeNull();
+    const result = await get();
+    expect(result.body.items).toBeUndefined();
+    expect(result.response.status).toBe(409);
+    expect(result.body.error?.code).toBe("pattern_generation_consent_required");
   });
 
   it.each([
     "/v1/pattern?other=1",
     "/v1/pattern?limit=0",
-    "/v1/pattern?limit=51",
+    "/v1/pattern?limit=2",
     "/v1/pattern?limit=2&limit=3",
-    "/v1/pattern?cursor=not-base64url",
-  ])("rejects the closed query shape: %s", async (path) => {
+    "/v1/pattern?cursor=anything",
+  ])("accepts no query parameter at all: %s", async (path) => {
     await seedM4([pattern("pattern.one", 1, 1)]);
     const result = await get(path);
     expect(result.response.status).toBe(400);
     expect(result.body.error?.code).toBe("invalid_pattern_query");
   });
 
-  it("rejects a cursor after the active release changes", async () => {
-    await seedM4([pattern("pattern.one", 1, 1), pattern("pattern.two", 2, 1)]);
-    const first = await get("/v1/pattern?limit=1");
-    expect(first.body.next_cursor).toEqual(expect.any(String));
-    await seedActiveRelease("release-m4-next", (bundle) => {
-      bundle.schema_version = "0.4.0";
-      bundle.objects.patterns = [pattern("pattern.next", 1, 1)];
-    });
-
-    const stale = await get(`/v1/pattern?cursor=${first.body.next_cursor}`);
-    expect(stale.response.status).toBe(409);
-    expect(stale.body.error?.code).toBe("pattern_cursor_stale");
-  });
-
-  it("projects only reader-facing chapter fields and never the release internals", async () => {
+  it("answers the ontology gate rather than an editorial page once consent exists", async () => {
+    enablePatternAi();
     await seedM4([pattern("pattern.one", 1, 1)]);
-    const result = await get();
-    expect(result.response.status).toBe(200);
-    expect(result.body.items).toHaveLength(1);
+    await seedActiveOntology();
 
-    // The reader gets prose and its evidence. Match rules, object hashes,
-    // review status, signature bytes, and unmatched objects stay server-side.
-    expect(Object.keys(result.body.items[0]!).sort()).toEqual([
-      "body",
-      "content_id",
-      "content_version",
-      "counter_expression",
-      "evidence",
-      "resources",
-      "summary",
-      "tensions",
-      "title",
-    ]);
-    // Key names rather than substrings: `predicate_mismatch` is a legitimate
-    // omission counter, and a substring ban on "match" would call it a leak.
-    const keys = new Set<string>();
-    const collect = (value: unknown) => {
-      if (Array.isArray(value)) {
-        value.forEach(collect);
-        return;
-      }
-      if (!value || typeof value !== "object") return;
-      for (const [key, nested] of Object.entries(value)) {
-        keys.add(key);
-        collect(nested);
-      }
-    };
-    collect(result.body);
-    for (const internal of [
-      "object_hash", "match", "all_of", "any_of", "none_of", "prohibited_claims",
-      "signature", "status", "requires_houses", "minimum_accuracy",
-      "required_bodies", "required_aspects", "tags", "reviewer_notes",
-    ]) {
-      expect([...keys], `${internal} reached the client`).not.toContain(internal);
-    }
+    const reserved = await SELF.fetch("http://api.test/v1/pattern-generations", {
+      method: "POST",
+      headers: {
+        "x-user-id": USER_A,
+        "content-type": "application/json",
+        "idempotency-key": "idem-pattern-route-generated",
+      },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: "1.0.0",
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(reserved.status).toBe(202);
+
+    const result = await get();
+    expect(result.body.items).toBeUndefined();
+    expect(result.response.status).toBe(409);
+    expect(result.body.error?.code).toBe("pattern_generation_in_progress");
   });
 
-  it("keeps an intentional M3 rollback honest instead of serving draft fallback", async () => {
+  it("keeps an M3 rollback out of the generated reader's answer", async () => {
     await seedActiveRelease("release-m3-rollback");
     const result = await get();
-    expect(result.response.status).toBe(503);
-    expect(result.body.error?.code).toBe("pattern_release_not_active");
+    expect(result.response.status).toBe(409);
+    expect(result.body.error?.code).toBe("pattern_generation_consent_required");
+  });
+
+  it("leaves the ingested editorial release readable in D1", async () => {
+    const release = await seedM4([pattern("pattern.one", 1, 1)]);
+    const row = await env.DB.prepare(
+      `SELECT bundle_hash FROM content_releases WHERE version = 'release-m4-pattern'`,
+    ).first<{ bundle_hash: string }>();
+    expect(row?.bundle_hash).toBe(release.bundleHash);
   });
 });

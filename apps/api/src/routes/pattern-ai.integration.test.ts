@@ -3,7 +3,9 @@ import { env, SELF } from "cloudflare:test";
 import {
   ALICE,
   IDENTITY_A,
+  IDENTITY_B,
   USER_A,
+  USER_B,
   confirmPreferences,
   disablePatternAi,
   enablePatternAi,
@@ -55,14 +57,15 @@ import {
 
 const POLICY = "1.0.0";
 
-async function json(
+async function jsonAs(
+  userId: string,
   path: string,
   init: RequestInit = {},
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const response = await SELF.fetch(`http://api.test${path}`, {
     ...init,
     headers: {
-      "x-user-id": USER_A,
+      "x-user-id": userId,
       ...(init.body ? { "content-type": "application/json" } : {}),
       ...init.headers,
     },
@@ -72,6 +75,13 @@ async function json(
     status: response.status,
     body: text ? (JSON.parse(text) as Record<string, unknown>) : {},
   };
+}
+
+async function json(
+  path: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  return jsonAs(USER_A, path, init);
 }
 
 async function drain(generationId: string): Promise<string> {
@@ -112,10 +122,45 @@ describe("M7 AI-generated Pattern", () => {
     env.PATTERN_ONTOLOGY_KEYS = "";
   });
 
-  it("keeps the editorial catalog when rollout is off and no claim exists", async () => {
+  it("admits every authenticated account to the generated flow, never the catalogue", async () => {
+    // No ontology is active in this fixture, so the generated flow reports the
+    // ontology gate. What it must never report is an account-admission outcome.
     const state = await json("/v1/pattern-state");
     expect(state.status).toBe(200);
-    expect(state.body.state).toBe("editorial_catalog");
+    expect(state.body.state).not.toBe("editorial_catalog");
+    expect(state.body.state).toBe("ontology_unavailable");
+  });
+
+  it("gives two identically eligible accounts the same generated state", async () => {
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B);
+    await seedChart(IDENTITY_B);
+    // An active editorial release is preserved data, not an admission decision.
+    await seedActiveRelease();
+    await seedActiveOntology();
+    enablePatternAi();
+
+    const alice = await json("/v1/pattern-state");
+    const bob = await jsonAs(USER_B, "/v1/pattern-state");
+    expect(alice.body.state, JSON.stringify(alice.body)).toBe("consent_required");
+    expect(bob.body.state, JSON.stringify(bob.body)).toBe("consent_required");
+  });
+
+  it("answers GET /v1/pattern on the generated contract even with an editorial release", async () => {
+    await seedActiveRelease();
+    await seedActiveOntology();
+    enablePatternAi();
+
+    // The generated reader rejects every query parameter; the M4 catalogue
+    // accepted `limit`. The code is what proves which contract answered.
+    const response = await json("/v1/pattern?limit=5");
+    expect(response.status).toBe(400);
+    expect((response.body.error as { code?: string }).code).toBe("invalid_pattern_query");
+
+    const bare = await json("/v1/pattern");
+    expect(bare.status).toBe(409);
+    expect((bare.body.error as { code?: string }).code)
+      .toBe("pattern_generation_consent_required");
   });
 
   it("grants consent and publishes one Pattern without falling back to M4", async () => {
@@ -892,16 +937,15 @@ describe("M7 AI-generated Pattern", () => {
     expect(domain?.stage).toBe("cancelled");
   });
 
-  it("lets an allowlisted internal account start a first generation", async () => {
-    env.PATTERN_AI_ROLLOUT = "internal";
-    env.PATTERN_PUBLISHER = "synthetic";
-    env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100";
-    env.PATTERN_ARTIFACT_RETENTION_DAYS = "30";
-    env.PATTERN_INTERNAL_ACCOUNT_IDS = USER_A;
+  it("accepts a first generation from an account that was never allowlisted", async () => {
+    enablePatternAi();
+    await seedUser(IDENTITY_B);
+    await confirmPreferences(USER_B);
+    await seedChart(IDENTITY_B);
     await seedActiveOntology();
-    const reserved = await json("/v1/pattern-generations", {
+    const reserved = await jsonAs(USER_B, "/v1/pattern-generations", {
       method: "POST",
-      headers: { "idempotency-key": "idem-pattern-internal-allow" },
+      headers: { "idempotency-key": "idem-pattern-not-allowlisted" },
       body: JSON.stringify({
         schema_version: "0.7.0",
         consent_policy_version: POLICY,
@@ -912,14 +956,13 @@ describe("M7 AI-generated Pattern", () => {
     expect(reserved.status, JSON.stringify(reserved.body)).toBe(202);
   });
 
-  it("refuses first_open when rollout is internal and the account is not allowlisted", async () => {
+  it("refuses generation for an eligible account only on the eligibility ladder", async () => {
     enablePatternAi();
-    env.PATTERN_AI_ROLLOUT = "internal";
-    env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
-    await seedActiveOntology();
+    // No active ontology: the refusal is a content-integrity invariant that
+    // applies to every account, not an admission decision about this one.
     const reserved = await json("/v1/pattern-generations", {
       method: "POST",
-      headers: { "idempotency-key": "idem-pattern-internal-deny" },
+      headers: { "idempotency-key": "idem-pattern-ontology-gate" },
       body: JSON.stringify({
         schema_version: "0.7.0",
         consent_policy_version: POLICY,
@@ -927,8 +970,8 @@ describe("M7 AI-generated Pattern", () => {
         reason: "first_open",
       }),
     });
-    expect(reserved.status).toBe(503);
-    expect((reserved.body.error as { code: string }).code).toBe("pattern_generation_unavailable");
+    expect(reserved.status).toBe(409);
+    expect((reserved.body.error as { code: string }).code).toBe("ontology_unavailable");
   });
 
   it("refuses chart-correction auto-reserve without a prior grant", async () => {
@@ -1252,56 +1295,6 @@ describe("M7 AI-generated Pattern", () => {
     expect((await json("/v1/pattern")).status).toBe(410);
   });
 
-  it("re-nudges a rollout_paused Pattern job after rollout leaves off", async () => {
-    enablePatternAi();
-    await seedActiveOntology();
-    const reserved = await json("/v1/pattern-generations", {
-      method: "POST",
-      headers: { "idempotency-key": "idem-pattern-rollout-resume" },
-      body: JSON.stringify({
-        schema_version: "0.7.0",
-        consent_policy_version: POLICY,
-        confirm: "GENERATE MY PATTERN",
-        reason: "first_open",
-      }),
-    });
-    const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
-    const jobId = (await env.DB.prepare(
-      `SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?`,
-    )
-      .bind(generationId)
-      .first<{ job_id: string }>())!.job_id;
-    env.PATTERN_AI_ROLLOUT = "off";
-    await executePatternJob(env, {
-      kind: "pattern_generation",
-      job_id: jobId,
-      generation_id: generationId,
-      stage_generation: 0,
-    });
-    const paused = await env.DB.prepare(
-      `SELECT result_class, dispatched_at FROM jobs WHERE id = ?`,
-    )
-      .bind(jobId)
-      .first<{ result_class: string | null; dispatched_at: string | null }>();
-    expect(paused).toEqual({ result_class: "rollout_paused", dispatched_at: null });
-    await sweepPatternJobs(env);
-    const stillPaused = await env.DB.prepare(
-      `SELECT result_class, dispatched_at FROM jobs WHERE id = ?`,
-    )
-      .bind(jobId)
-      .first<{ result_class: string | null; dispatched_at: string | null }>();
-    expect(stillPaused).toEqual({ result_class: "rollout_paused", dispatched_at: null });
-    env.PATTERN_AI_ROLLOUT = "first_open";
-    await sweepPatternJobs(env);
-    const resumed = await env.DB.prepare(
-      `SELECT result_class, dispatched_at FROM jobs WHERE id = ?`,
-    )
-      .bind(jobId)
-      .first<{ result_class: string | null; dispatched_at: string | null }>();
-    expect(resumed?.result_class).toBeNull();
-    expect(resumed?.dispatched_at).toBeTruthy();
-  });
-
   it("maps leftover GET /v1/pattern statuses the same way as pattern-state", async () => {
     enablePatternAi();
     await seedActiveOntology();
@@ -1473,29 +1466,24 @@ describe("M7 rollout, revocation, and export boundaries", () => {
     env.PATTERN_ONTOLOGY_KEYS = "";
   });
 
-  it("holds an editorial account on the catalogue at first_open and moves it only at enabled", async () => {
+  it("moves an account holding an editorial Pattern into the generated flow", async () => {
     await seedActiveRelease();
     await seedActiveOntology();
     enablePatternAi();
 
-    const held = await json("/v1/pattern-state");
-    expect(held.body.state, JSON.stringify(held.body)).toBe("editorial_catalog");
-
-    env.PATTERN_AI_ROLLOUT = "enabled";
-    const moved = await json("/v1/pattern-state");
-    expect(moved.body.state, JSON.stringify(moved.body)).toBe("consent_required");
+    const state = await json("/v1/pattern-state");
+    expect(state.body.state, JSON.stringify(state.body)).toBe("consent_required");
   });
 
-  it("keeps GET /v1/pattern on the editorial contract for an account with no claim", async () => {
+  it("keeps GET /v1/pattern on the generated contract for an account with no claim", async () => {
     await seedActiveRelease();
     enablePatternAi();
 
-    // The AI path rejects every query parameter with invalid_pattern_query,
-    // while the M4 path accepts limit. Anything other than that code proves the
-    // request was answered on the editorial contract.
+    // The generated reader rejects every query parameter; the retired M4
+    // catalogue accepted `limit`. The code proves which contract answered.
     const response = await json("/v1/pattern?limit=5");
     const code = (response.body.error as { code?: string } | undefined)?.code;
-    expect(code, JSON.stringify(response.body)).not.toBe("invalid_pattern_query");
+    expect(code, JSON.stringify(response.body)).toBe("invalid_pattern_query");
   });
 
   it("revokes a consent whose stored policy version has been superseded", async () => {

@@ -231,18 +231,6 @@ export interface Env {
   // -------------------------------------------------------------------------
 
   /**
-   * Staged rollout: `off` | `internal` | `first_open`.
-   *
-   * Named PATTERN_AI_ROLLOUT in the M7 spec. Default `off` in every wrangler
-   * block. There is no scheduler hybrid at launch — Pattern is first-open.
-   */
-  PATTERN_AI_ROLLOUT?: string;
-  /**
-   * Designated internal accounts for `PATTERN_AI_ROLLOUT=internal`. JSON array
-   * or comma-separated user ids. Missing or malformed is an empty allowlist.
-   */
-  PATTERN_INTERNAL_ACCOUNT_IDS?: string;
-  /**
    * Test-only semantic reject hook. Honored only when AUTH_STUB=1 so a
    * production deploy cannot accidentally refuse every Pattern.
    */

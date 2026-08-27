@@ -3,9 +3,11 @@ import {
   CALC_CONTRACT_ID,
   CALC_CONTRACT_VERSION,
   canonicalJson,
+  sha256Hex,
   type BirthProfileRequest,
   type BirthTimeAccuracy,
   type LongitudePosition,
+  type PatternOntologyRelease,
 } from "@patternlike/shared";
 import { asCryptoSubject } from "../src/crypto.js";
 import { buildUserKeyInsert, encryptPayload, type UserIdentity } from "../src/db/users.js";
@@ -641,31 +643,306 @@ export async function seedTimingReceipt(
     .run();
 }
 
-/** Activate the synthetic ontology used by Pattern generation tests. */
-export async function seedActiveOntology(version = "ont-test-1"): Promise<void> {
-  const release = syntheticOntologyRelease(version);
-  const bundleHash = await computeOntologyBundleHash(release);
-  await storeOntologyRelease(
-    env,
-    { ...release, bundle_hash: bundleHash },
-    `pattern-ontology/${version}.json`,
-  );
+/**
+ * Demote an ontology's pipeline evidence so it reads as a pre-evidence legacy
+ * release, without unwinding a Pattern already generated from it.
+ *
+ * A release can no longer be activated without committed evidence, so a fixture
+ * that needs the legacy shape AND a Pattern based on it has to reach that state
+ * in this order. Committed evidence is immutable and undeletable in production;
+ * this suspends exactly those two triggers and restores them.
+ */
+export async function stripOntologyPipelineEvidence(version: string): Promise<void> {
+  await env.DB.prepare(
+    "DROP TRIGGER IF EXISTS pattern_ontology_pipeline_evidence_no_delete",
+  ).run();
+  try {
+    await env.DB.prepare(
+      "DELETE FROM pattern_ontology_pipeline_evidence WHERE ontology_version = ?",
+    ).bind(version).run();
+  } finally {
+    const trigger = ONTOLOGY_PIPELINE_NO_DELETE_TRIGGERS.find(
+      (candidate) => candidate.name === "pattern_ontology_pipeline_evidence_no_delete",
+    )!;
+    await env.DB.prepare(trigger.create).run();
+  }
+}
+
+export interface SeedOntologyOptions {
+  /**
+   * `public` writes the whole machine-pipeline evidence chain, so
+   * `ONTOLOGY_ACTIVATION_SCOPE_SQL` re-derives `public` on every read. This is
+   * the default because it is the only scope a reader-serving deployment can
+   * generate from: an internal release is not a fixture most suites want.
+   */
+  activationScope?: "internal" | "public";
+}
+
+/** 64 lower-case hex characters, stable per seed. */
+async function testDigest(seed: string): Promise<string> {
+  return `sha256:${await sha256Hex(seed)}`;
 }
 
 /**
- * Turn on first-open Pattern generation with the development synthetic publisher.
- * Callers must restore the hermetic defaults afterwards — env mutations persist
- * across tests in this pool.
+ * Activate the ontology used by Pattern generation tests.
+ *
+ * The public path writes the evidence the activation-scope SQL actually reads —
+ * a corpus release, a pipeline run, the regression artifact row, the committed
+ * evidence receipt, and the atomic evaluation receipt whose summary must agree
+ * with all of it — rather than a flag. A fixture that skipped any one of them
+ * would activate an ontology production would refuse.
+ */
+export async function seedActiveOntology(
+  version = "ont-test-1",
+  options: SeedOntologyOptions = {},
+): Promise<void> {
+  if ((options.activationScope ?? "public") === "internal") {
+    const internal = syntheticOntologyRelease(version);
+    const internalHash = await computeOntologyBundleHash(internal);
+    await storeOntologyRelease(
+      env,
+      { ...internal, bundle_hash: internalHash },
+      `pattern-ontology/${version}.json`,
+    );
+    return;
+  }
+
+  const runId = `oprun_${version}`;
+  const corpusReleaseId = `corpus-${version}`;
+  const signingKeyId = "ontology-test-signing-key";
+  const evaluationReportHash = await testDigest(`evaluation:${version}`);
+  const regressionReportHash = await testDigest(`regression:${version}`);
+  const evaluationEnvelopeHash = await testDigest(`evaluation-envelope:${version}`);
+  const evaluationCiphertextHash = await testDigest(`evaluation-ciphertext:${version}`);
+  const regressionEnvelopeHash = await testDigest(`regression-envelope:${version}`);
+  const regressionCiphertextHash = await testDigest(`regression-ciphertext:${version}`);
+  const evaluationArtifactObjectKey =
+    `pattern-ontology/pipeline/${runId}/evaluation-report.enc`;
+  const regressionArtifactObjectKey =
+    `pattern-ontology/pipeline/${runId}/regression-report.enc`;
+  const regressionStageGeneration = 5;
+  const regressionStageAttempt = 0;
+
+  const release = syntheticOntologyRelease(version) as PatternOntologyRelease & {
+    provenance?: { origin: string };
+  };
+  release.provenance = { origin: "machine_pipeline" };
+  release.status = "candidate";
+  release.evaluation = {
+    ...release.evaluation,
+    evaluation_report_hash: evaluationReportHash,
+    regression_report_hash: regressionReportHash,
+  };
+  const bundleHash = await computeOntologyBundleHash(release);
+  const stored = { ...release, bundle_hash: bundleHash };
+  await env.ARTIFACTS!.put(
+    `pattern-ontology/${version}.json`,
+    canonicalJson(stored),
+    { httpMetadata: { contentType: "application/json" } },
+  );
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const earlierIso = new Date(now.getTime() - 1_000).toISOString();
+  const configuration = canonicalJson({ candidate_ontology_version: version });
+  const evaluationSummary = {
+    run_id: runId,
+    ontology_version: version,
+    activation_scope: "public",
+    bundle_hash: bundleHash,
+    corpus_release_id: corpusReleaseId,
+    corpus_release_hash: release.corpus_release_hash,
+    corpus_license_class: "licensed_excerpt",
+    corpus_public_capable: 1,
+    evaluation_report_hash: evaluationReportHash,
+    evaluation_artifact_object_key: evaluationArtifactObjectKey,
+    evaluation_artifact_envelope_hash: evaluationEnvelopeHash,
+    evaluation_artifact_ciphertext_hash: evaluationCiphertextHash,
+    regression_passed: 1,
+    regression_report_hash: regressionReportHash,
+    regression_artifact_object_key: regressionArtifactObjectKey,
+    regression_artifact_envelope_hash: regressionEnvelopeHash,
+    regression_artifact_ciphertext_hash: regressionCiphertextHash,
+    regression_artifact_stage_generation: regressionStageGeneration,
+    regression_artifact_stage_attempt: regressionStageAttempt,
+    signing_key_id: signingKeyId,
+    compiler_passed: 1,
+    evaluator_passed: 1,
+    unevaluated_fixture_count: 0,
+  };
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE pattern_ontology_releases SET status = 'superseded' WHERE status = 'active'`,
+    ),
+    env.DB.prepare(
+      `INSERT INTO pattern_source_corpus_releases (
+         corpus_release_id, corpus_hash, locale, object_key, fragment_count,
+         license_class, public_capable, created_at, registered_at
+       ) VALUES (?, ?, ?, ?, 12, 'licensed_excerpt', 1, ?, ?)`,
+    ).bind(
+      corpusReleaseId,
+      release.corpus_release_hash,
+      release.locale,
+      `pattern-corpus/${corpusReleaseId}.json`,
+      earlierIso,
+      earlierIso,
+    ),
+    // A run may only be inserted `reserved` at generation 0 and may only walk
+    // its stages one at a time, so the fixture takes the same path the pipeline
+    // does. The artifact row below is refused unless its owner is standing at
+    // exactly `regressing` / generation 5 / attempt 0.
+    env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_runs (
+         run_id, idempotency_key, corpus_release_id, corpus_hash,
+         candidate_ontology_version, configuration_json, configuration_hash,
+         stage, stage_generation, stage_cursor, stage_attempt, available_at,
+         created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', 0, 0, 0, ?, ?, ?)`,
+    ).bind(
+      runId,
+      `seed-${runId}`,
+      corpusReleaseId,
+      release.corpus_release_hash,
+      version,
+      configuration,
+      await testDigest(`configuration:${version}`),
+      earlierIso,
+      earlierIso,
+      earlierIso,
+    ),
+    // One stage at a time, each carrying the hash the next stage's CHECK
+    // requires. Skipping a stage or a hash is refused by the same constraints
+    // the real pipeline runs under.
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'corpus_reading', stage_generation = 1, stage_cursor = 0,
+           stage_attempt = 0, updated_at = ? WHERE run_id = ?`,
+    ).bind(earlierIso, runId),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'generating', stage_generation = 2, stage_cursor = 0,
+           stage_attempt = 0, updated_at = ? WHERE run_id = ?`,
+    ).bind(earlierIso, runId),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'compiling', stage_generation = 3, stage_cursor = 0,
+           stage_attempt = 0, candidate_hash = ?, updated_at = ? WHERE run_id = ?`,
+    ).bind(await testDigest(`candidate:${version}`), earlierIso, runId),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'evaluating', stage_generation = 4, stage_cursor = 0,
+           stage_attempt = 0, compilation_report_hash = ?, updated_at = ?
+       WHERE run_id = ?`,
+    ).bind(await testDigest(`compilation:${version}`), earlierIso, runId),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pipeline_runs
+       SET stage = 'regressing', stage_generation = 5, stage_cursor = 0,
+           stage_attempt = 0, evaluation_report_hash = ?, updated_at = ?
+       WHERE run_id = ?`,
+    ).bind(evaluationReportHash, earlierIso, runId),
+    env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_artifacts (
+         id, run_id, stage, stage_generation, stage_attempt, artifact_class,
+         object_key, plaintext_sha256, envelope_sha256, ciphertext_sha256,
+         envelope_key_id, envelope_nonce, byte_length, created_at,
+         expires_at, deleted_at
+       ) VALUES (?, ?, 'regressing', ?, ?, 'regression_report', ?, ?, ?, ?,
+         'codex-test-key', ?, 1024, ?, NULL, NULL)`,
+    ).bind(
+      `opart_regression_${version}`,
+      runId,
+      regressionStageGeneration,
+      regressionStageAttempt,
+      regressionArtifactObjectKey,
+      regressionReportHash,
+      regressionEnvelopeHash,
+      regressionCiphertextHash,
+      `nonce-regression-${version}-000000`,
+      earlierIso,
+    ),
+    env.DB.prepare(
+      `INSERT INTO pattern_ontology_releases (
+         version, bundle_hash, corpus_release_hash, locale, status, object_key,
+         evaluation_json, created_at, recalled_at
+       ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, NULL)`,
+    ).bind(
+      version,
+      bundleHash,
+      release.corpus_release_hash,
+      release.locale,
+      `pattern-ontology/${version}.json`,
+      JSON.stringify({
+        evaluation_report_hash: evaluationReportHash,
+        regression_passed: 1,
+        regression_report_hash: regressionReportHash,
+        compiler_passed: 1,
+        evaluator_passed: 1,
+        unevaluated_fixture_count: 0,
+      }),
+      nowIso,
+    ),
+    env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_evidence (
+         run_id, ontology_version, corpus_release_id, corpus_release_hash,
+         corpus_license_class, corpus_public_capable, activation_scope,
+         bundle_hash, evaluation_report_hash, evaluation_artifact_object_key,
+         evaluation_artifact_envelope_hash, evaluation_artifact_ciphertext_hash,
+         evaluation_artifact_status, signing_key_id, run_status, evidence_status,
+         compiler_passed, evaluator_passed, unevaluated_fixture_count,
+         regression_report_hash, regression_artifact_object_key,
+         regression_artifact_envelope_hash, regression_artifact_ciphertext_hash,
+         regression_artifact_stage_generation, regression_artifact_stage_attempt,
+         created_at, committed_at
+       ) VALUES (?, ?, ?, ?, 'licensed_excerpt', 1, 'public', ?, ?, ?, ?, ?,
+         'committed', ?, 'succeeded', 'committed', 1, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      runId,
+      version,
+      corpusReleaseId,
+      release.corpus_release_hash,
+      bundleHash,
+      evaluationReportHash,
+      evaluationArtifactObjectKey,
+      evaluationEnvelopeHash,
+      evaluationCiphertextHash,
+      signingKeyId,
+      regressionReportHash,
+      regressionArtifactObjectKey,
+      regressionEnvelopeHash,
+      regressionCiphertextHash,
+      regressionStageGeneration,
+      regressionStageAttempt,
+      earlierIso,
+      nowIso,
+    ),
+    env.DB.prepare(
+      `INSERT INTO pattern_ontology_evaluation_runs (id, ontology_version, verdict, summary_json, created_at)
+       VALUES (?, ?, 'pass', ?, ?)`,
+    ).bind(
+      `poer_${version}`,
+      version,
+      JSON.stringify(evaluationSummary),
+      nowIso,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_ontology_pointer SET active_version = ?, updated_at = ? WHERE id = 1`,
+    ).bind(version, nowIso),
+  ]);
+}
+
+/**
+ * Configure a runnable Pattern publisher on the in-isolate binding.
+ *
+ * There is no rollout or allowlist to turn on any more: every authenticated
+ * account is in the generated flow, and what this helper supplies is the
+ * deployment's provider configuration. Callers must restore the hermetic
+ * defaults afterwards — env mutations persist across tests in this pool.
  */
 export function enablePatternAi(): void {
-  env.PATTERN_AI_ROLLOUT = "first_open";
   env.PATTERN_PUBLISHER = "synthetic";
   env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100";
   env.PATTERN_ARTIFACT_RETENTION_DAYS = "30";
-  // The general Pattern fixtures seed an unmarked ontology, which is
-  // deliberately internal-only. Keep USER_A on the test allowlist unless a
-  // containment test explicitly clears it.
-  env.PATTERN_INTERNAL_ACCOUNT_IDS = USER_A;
 }
 
 /**
@@ -761,12 +1038,10 @@ export function disableReadingCodex(): void {
 }
 
 export function disablePatternAi(): void {
-  env.PATTERN_AI_ROLLOUT = "off";
   env.PATTERN_PUBLISHER = "";
   env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "";
   env.PATTERN_ARTIFACT_RETENTION_DAYS = "";
   env.PATTERN_SEMANTIC_FORCE_REJECT = "";
-  env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
   // The provider credentials too. `OPENAI_API_KEY` is shared with the daily
   // reading publisher, so a Pattern suite that left it set would hand a
   // capability to every suite that ran after it.

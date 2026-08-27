@@ -10,7 +10,6 @@ import { b64 } from "../crypto.js";
 import type { UserIdentity } from "../db/users.js";
 import { loadPreferences } from "../db/preferences.js";
 import {
-  loadAnyClaim,
   loadClaimForFingerprint,
   hashChartFingerprint,
   type PatternClaimRow,
@@ -26,11 +25,6 @@ import {
   publicStageFor,
   type PatternDomainStage,
 } from "./pattern-stage-protocol.js";
-import {
-  isInternalPatternAccount,
-  readPatternAiRollout,
-} from "./pattern-rollout.js";
-import { getActiveRelease } from "../db/content-releases.js";
 import type { PatternDocumentInternal } from "@patternlike/shared";
 
 interface DocumentRow {
@@ -130,35 +124,14 @@ export async function projectPatternResponse(
 
 /**
  * Which Pattern a reader is shown. Shared by GET /v1/pattern-state and
- * GET /v1/pattern so the two surfaces can never disagree: the client renders
- * the M4 catalogue only for `editorial_catalog`, so a state document that
- * moves ahead of the read route makes published chapters vanish from the UI
- * while the route would still serve them.
+ * GET /v1/pattern so the two surfaces can never disagree.
  *
- * Design spec 19.6 dispatches on the durable claim, and 25.5 says `first_open`
- * leaves existing editorial-cohort accounts editorial until they opt in while
- * `enabled` gives every eligible account the AI first-open state. Granting is
- * what mints the claim -- pattern-enqueue writes the consent row and the
- * reservation in one batch -- so a claim IS the record of an explicit opt-in.
- *
- * `first_open` therefore admits only accounts with no editorial Pattern to
- * lose. Reading it as "everyone" collapsed the mode that admits new readers
- * into the mode that switches the whole product over, and moved every existing
- * account out of the reviewed M4 chapters on the request after the flag moved.
+ * There is no account-admission decision left to make: every authenticated
+ * identity enters the generated flow, and what a reader sees is decided by
+ * chart, confirmed locale, the durable claim, the active ontology, and their
+ * own explicit consent. `editorial_catalog` remains in the wire enum for
+ * compatibility with clients and stored documents; nothing emits it.
  */
-export async function isPatternAiCohort(
-  env: Env,
-  userId: string,
-  anyClaim: boolean,
-): Promise<boolean> {
-  if (anyClaim) return true;
-  const rollout = readPatternAiRollout(env) ?? "off";
-  if (rollout === "off") return false;
-  if (rollout === "internal") return isInternalPatternAccount(env, userId);
-  if (rollout === "enabled") return true;
-  return !(await getActiveRelease(env));
-}
-
 export async function buildPatternState(
   env: Env,
   identity: UserIdentity,
@@ -166,26 +139,6 @@ export async function buildPatternState(
 ): Promise<PatternStateDocument> {
   const consent = patternConsentDocument(await loadPatternGenerationGrant(env, identity.userId, now));
   const chart = await loadActiveChart(env, identity.userId);
-
-  const anyClaim = await loadAnyClaim(env, identity.userId);
-  const aiCohort = await isPatternAiCohort(env, identity.userId, !!anyClaim);
-
-  if (!aiCohort) {
-    return {
-      schema_version: M7_SCHEMA_VERSION,
-      state: "editorial_catalog",
-      chart: chart
-        ? {
-            chart_id: chart.id,
-            effective_accuracy: chart.birth_accuracy,
-            feature_policy_version: NATAL_FEATURE_POLICY_VERSION,
-          }
-        : null,
-      consent,
-      generation: null,
-      pattern: null,
-    };
-  }
 
   if (!chart) {
     return {
@@ -343,12 +296,10 @@ export async function buildPatternState(
     }
   }
 
-  if (
-    !ontologyServesAccount(
-      ontology,
-      isInternalPatternAccount(env, identity.userId),
-    )
-  ) {
+  // The second argument is the former internal-account bypass. Account-wide
+  // Pattern has no accounts to distinguish, so no caller may open it; the
+  // parameter itself goes once every surface has stopped passing it.
+  if (!ontologyServesAccount(ontology, false)) {
     return emptyState("ontology_unavailable", chartBlock, consent);
   }
   if (consent.status !== "granted") {

@@ -9,6 +9,7 @@ import {
   enablePatternAi,
   resetDb,
   seedActiveOntology,
+  stripOntologyPipelineEvidence,
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
@@ -163,6 +164,11 @@ describe("machine ontology activation lifecycle", () => {
 
   it("recalls a superseded Slice A release and withdraws every Pattern based on it", async () => {
     const generationId = await reserveAndPublishSliceAPattern();
+    // Slice A is the pre-evidence release this reconcile exists for. A Pattern
+    // can only be generated from a public, evidence-backed ontology now, so the
+    // fixture publishes first and then strips the receipt rather than trying to
+    // generate from a release the API would refuse.
+    await stripOntologyPipelineEvidence(SLICE_A_VERSION);
     await seedCommittedMachineActivation();
 
     expect(await reconcileMachineOntologyActivation(env, MACHINE_VERSION)).toBe(1);

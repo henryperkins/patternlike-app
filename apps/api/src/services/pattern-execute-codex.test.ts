@@ -174,15 +174,17 @@ describe("Pattern execution through the durable Codex provider", () => {
     )).toEqual([{ count: 1 }]);
   });
 
-  it("cancels pending provider work when an internal account leaves the allowlist", async () => {
-    env.PATTERN_AI_ROLLOUT = "internal";
+  it("cancels pending provider work when the frozen configuration drifts", async () => {
     const generationId = await reserve();
     const message = await currentMessage(generationId);
     expect(await executePatternJob(env, message)).toEqual({
       ok: true,
       terminal: false,
     });
-    env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
+    // The job carries the ceiling it was created under. Moving the deployment's
+    // ceiling makes this provider job no longer the current owner's work — the
+    // check is on the frozen configuration, never on who the account is.
+    env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "99";
 
     expect((await runner("/v1/jobs/claim", {})).status).toBe(204);
     expect(await env.DB.prepare(

@@ -713,7 +713,6 @@ async function publishReaderPattern(): Promise<{
   await confirmPreferences(USER_A);
   await seedChart(IDENTITY_A);
   enablePatternAi();
-  env.PATTERN_INTERNAL_ACCOUNT_IDS = "";
   const reservation = await SELF.fetch(
     "http://api.test/v1/pattern-generations",
     {
