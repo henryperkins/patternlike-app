@@ -62,6 +62,40 @@ describe("Codex provider invocation contract", () => {
     });
   });
 
+  it("carries no pipeline, pass, owner, or reader identity to the runner", () => {
+    const parsed = invocationFromResponsesRequest(responsesRequest(), {
+      model: "gpt-5.6-sol",
+      reasoningEffort: "high",
+    });
+    if (!parsed.ok) throw new Error("the fixture request must convert");
+
+    // The runner executes an already-authorized invocation. It is deliberately
+    // told nothing about which product surface asked for it: a Daily reading, a
+    // Pattern pass, and an ontology run are the same three fields on the wire,
+    // so an extracted claim reveals no reader, no chart, and no domain state.
+    expect(Object.keys(parsed.value).sort()).toEqual([
+      "output_schema",
+      "prompt",
+      "schema_version",
+    ]);
+    const serialized = JSON.stringify(parsed.value);
+    for (const token of [
+      "pipeline",
+      "\"pass\"",
+      "owner_id",
+      "user_id",
+      "reading_id",
+      "job_id",
+      "consent_id",
+      "generation_id",
+      "usr_",
+      "rdg_",
+      "cpjob_",
+    ]) {
+      expect(serialized).not.toContain(token);
+    }
+  });
+
   it("reads back only the exact persisted invocation envelope", () => {
     const value = {
       schema_version: "codex-provider-invocation/v1" as const,

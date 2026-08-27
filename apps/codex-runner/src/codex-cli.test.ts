@@ -8,8 +8,9 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildCodexChildEnvironment,
@@ -17,6 +18,11 @@ import {
   runCodexInvocation,
 } from "./codex-cli.js";
 import type { CodexProviderClaim } from "./protocol.js";
+
+const SENTINEL = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../probes/sentinel-output.schema.json",
+);
 
 const PROMPT = "private prompt that must only use stdin";
 const OUTPUT = '{"answer":"private output"}';
@@ -95,7 +101,9 @@ const modes = {
   output: (await stat(outputPath)).mode & 0o777,
 };
 await writeFile(join(recordRoot, "modes.json"), JSON.stringify(modes));
-JSON.parse(await readFile(schemaPath, "utf8"));
+const schemaText = await readFile(schemaPath, "utf8");
+JSON.parse(schemaText);
+await writeFile(join(recordRoot, "schema.txt"), schemaText);
 if (mode === "hang") {
   await new Promise(() => setInterval(() => undefined, 1_000));
 }
@@ -212,6 +220,40 @@ test("rejects output over the provider response ceiling and cleans up", async ()
       safeDetailCode: "schema_mismatch",
       fatal: false,
     });
+    assert.deepEqual(await readdir(f.tempRoot), []);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("runs the packaged content-free preflight through the real argument surface", async () => {
+  // The production liveness check: a real `codex exec` that proves claim auth,
+  // the CLI binary, and the pinned model without a reader packet anywhere near
+  // the host. The schema is the checked-in asset, handed to the child byte for
+  // byte, so a widened or malformed one fails here rather than on the runner.
+  const sentinel = await readFile(SENTINEL, "utf8");
+  const f = await fixture();
+  try {
+    await runCodexInvocation({
+      claim: claim({
+        invocation: {
+          schema_version: "codex-provider-invocation/v1",
+          prompt: 'Reply with exactly {"status":"ok"}.',
+          output_schema: JSON.parse(sentinel),
+        },
+      }),
+      codexBin: f.executable,
+      tempRoot: f.tempRoot,
+      env: f.childEnv,
+    });
+    assert.deepEqual(
+      JSON.parse(await readFile(join(f.recordRoot, "schema.txt"), "utf8")),
+      JSON.parse(sentinel),
+    );
+    assert.equal(
+      await readFile(join(f.recordRoot, "stdin.txt"), "utf8"),
+      'Reply with exactly {"status":"ok"}.',
+    );
     assert.deepEqual(await readdir(f.tempRoot), []);
   } finally {
     await f.cleanup();

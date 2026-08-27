@@ -203,6 +203,15 @@ function logTerminalFailure(
   });
 }
 
+/**
+ * Charge the ledger that owns this pipeline, or refuse.
+ *
+ * Every branch is explicit and the fallthrough is a refusal. A pipeline with no
+ * ledger wired to it must not borrow another pipeline's allowance: the ceiling
+ * an operator approved for ontology work is not an approval to spend it on a
+ * reader's daily reading, and a silent cross-charge is invisible in exactly the
+ * dashboard that exists to make spend visible.
+ */
 async function consumeBudget(
   env: Env,
   job: CodexProviderJob,
@@ -210,8 +219,7 @@ async function consumeBudget(
 ): Promise<boolean> {
   if (job.pipeline === "pattern") {
     if (
-      job.pass === "generator" ||
-      job.pass === "evaluator"
+      job.pass !== "planner" && job.pass !== "writer" && job.pass !== "verifier"
     ) {
       return false;
     }
@@ -222,16 +230,20 @@ async function consumeBudget(
       job.pass,
     )).ok;
   }
-  const stage =
-    job.pass === "generator" || job.pass === "evaluator"
-      ? job.pass
-      : "regression";
-  return (await consumeOntologyProviderCallBudget(
-    env,
-    utcDateForOntologyProviderUsage(now),
-    job.dailyCallLimit,
-    stage,
-  )).ok;
+  if (job.pipeline === "ontology") {
+    if (job.pass === "publisher") return false;
+    const stage =
+      job.pass === "generator" || job.pass === "evaluator"
+        ? job.pass
+        : "regression";
+    return (await consumeOntologyProviderCallBudget(
+      env,
+      utcDateForOntologyProviderUsage(now),
+      job.dailyCallLimit,
+      stage,
+    )).ok;
+  }
+  return false;
 }
 
 codexProviderRoutes.post("/v1/jobs/claim", async (c) => {

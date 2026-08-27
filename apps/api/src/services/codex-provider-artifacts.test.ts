@@ -104,6 +104,91 @@ describe("Codex provider encrypted artifacts", () => {
     ))).toBe('{"answer":"second"}');
   });
 
+  it("binds a reading envelope to its pipeline, owner, pass, generation, and attempt", async () => {
+    const reading: CodexProviderArtifactCoordinate = {
+      jobId: `cpjob_${"ef".repeat(16)}`,
+      pipeline: "reading",
+      ownerId: "job_reading_artifact_fixture",
+      pass: "publisher",
+      stageGeneration: 3,
+      stageAttempt: 1,
+      role: "request",
+    };
+    const plaintext = textEncoder.encode(
+      '{"schema_version":"codex-provider-invocation/v1","prompt":"private reading packet","output_schema":{"type":"object"}}',
+    );
+    const written = await putCodexProviderArtifact(env, reading, plaintext);
+    expect(written.artifact.objectKey).toBe(
+      `codex-provider-jobs/${reading.jobId}/request.json.enc`,
+    );
+    expect(textDecoder.decode(
+      await readCodexProviderArtifact(env, reading, written.artifact),
+    )).toBe(textDecoder.decode(plaintext));
+
+    // The reader's packet is authenticated to exactly one coordinate. Moving
+    // the ciphertext to another owner, another attempt, or another pipeline
+    // fails authentication rather than decrypting into the wrong reading.
+    for (const drift of [
+      { ...reading, ownerId: "job_reading_artifact_other" },
+      { ...reading, stageGeneration: 4 },
+      { ...reading, stageAttempt: 0 },
+      { ...reading, pipeline: "pattern" as const, pass: "writer" as const },
+      { ...reading, role: "response" as const },
+    ]) {
+      await expect(
+        readCodexProviderArtifact(env, drift, written.artifact),
+      ).rejects.toMatchObject({
+        code: "codex_provider_artifact_integrity_failed",
+      });
+    }
+  });
+
+  it("round-trips a reading response through its lease-fenced key", async () => {
+    const reading: CodexProviderArtifactCoordinate = {
+      jobId: `cpjob_${"1a".repeat(16)}`,
+      pipeline: "reading",
+      ownerId: "job_reading_artifact_fixture",
+      pass: "publisher",
+      stageGeneration: 1,
+      stageAttempt: 0,
+      role: "response",
+      storageDiscriminator: "3".repeat(64),
+    };
+    const written = await putCodexProviderArtifact(
+      env,
+      reading,
+      textEncoder.encode('{"headline":"private prose"}'),
+    );
+    expect(written.artifact.objectKey).toBe(
+      `codex-provider-jobs/${reading.jobId}/responses/${"3".repeat(64)}.json.enc`,
+    );
+    const stored = await env.ARTIFACTS!.get(written.artifact.objectKey);
+    expect(await stored!.text()).not.toContain("private prose");
+    expect(textDecoder.decode(await readCodexProviderArtifact(
+      env,
+      { ...reading, storageDiscriminator: undefined },
+      written.artifact,
+    ))).toBe('{"headline":"private prose"}');
+  });
+
+  it("refuses an illegal coordinate before it touches R2", async () => {
+    const illegal: CodexProviderArtifactCoordinate[] = [
+      { ...coordinate, pipeline: "reading", pass: "planner" },
+      { ...coordinate, pipeline: "reading", pass: "generator" },
+      { ...coordinate, pipeline: "pattern", pass: "publisher" },
+      { ...coordinate, pipeline: "ontology", pass: "publisher" },
+    ];
+    for (const value of illegal) {
+      await expect(
+        putCodexProviderArtifact(env, value, textEncoder.encode("{}")),
+      ).rejects.toMatchObject({ code: "codex_provider_artifact_invalid" });
+    }
+    const listing = await env.ARTIFACTS!.list({
+      prefix: `codex-provider-jobs/${coordinate.jobId}/`,
+    });
+    expect(listing.objects).toEqual([]);
+  });
+
   it("fails closed on tampering and an unavailable keyring", async () => {
     const written = await putCodexProviderArtifact(
       env,

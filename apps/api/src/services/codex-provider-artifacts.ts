@@ -1,10 +1,11 @@
 import { canonicalJson } from "@patternlike/shared";
 
 import type { Env } from "../env.js";
-import type {
-  CodexProviderArtifactPointer,
-  CodexProviderPass,
-  CodexProviderPipeline,
+import {
+  validCodexProviderCoordinate,
+  type CodexProviderArtifactPointer,
+  type CodexProviderPass,
+  type CodexProviderPipeline,
 } from "../db/codex-provider-jobs.js";
 import {
   decodeOntologyArtifactBase64Url,
@@ -110,20 +111,14 @@ function hasExactFields(
 }
 
 function coordinateIsValid(value: CodexProviderArtifactCoordinate): boolean {
-  const passValid = [
-    "planner",
-    "writer",
-    "verifier",
-    "generator",
-    "evaluator",
-  ].includes(value.pass);
+  // One shared predicate rather than a second hand-written pass list. The
+  // duplicate this replaces had already drifted into expressing the same rule
+  // two different ways, and the version that decides whether an encrypted
+  // object gets written is the one that must not be the stale copy.
   return JOB_ID.test(value.jobId) &&
-    (value.pipeline === "pattern" || value.pipeline === "ontology") &&
+    validCodexProviderCoordinate(value.pipeline, value.pass) &&
     value.ownerId.length >= 1 &&
     value.ownerId.length <= 200 &&
-    passValid &&
-    (value.pipeline === "ontology" ||
-      (value.pass !== "generator" && value.pass !== "evaluator")) &&
     Number.isSafeInteger(value.stageGeneration) &&
     value.stageGeneration >= 0 &&
     Number.isSafeInteger(value.stageAttempt) &&

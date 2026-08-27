@@ -98,7 +98,8 @@ function patternConfigurationIsCurrent(
   if (
     job.userId === null ||
     job.pass === "generator" ||
-    job.pass === "evaluator"
+    job.pass === "evaluator" ||
+    job.pass === "publisher"
   ) {
     return false;
   }
@@ -209,6 +210,14 @@ function ontologyConfigurationIsCurrent(
     return job.model === expected.model &&
       job.promptVersion === expected.promptVersion &&
       job.timeoutMs === expected.timeoutMs;
+  }
+  // The regression lane reuses the Pattern passes. `publisher` belongs to the
+  // reading pipeline and has no ontology stage, so it is refused here rather
+  // than indexed into a pin that does not describe it.
+  if (
+    job.pass !== "planner" && job.pass !== "writer" && job.pass !== "verifier"
+  ) {
+    return false;
   }
   return job.model === ONTOLOGY_REGRESSION_PATTERN_PIN[`${job.pass}_model`] &&
     job.promptVersion ===

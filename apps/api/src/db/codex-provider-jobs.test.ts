@@ -1,13 +1,18 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { resetDb, rows } from "../../test/helpers.js";
+import { resetDb, rows, seedUser, IDENTITY_A, USER_A } from "../../test/helpers.js";
 import {
   claimCodexProviderJob,
+  codexProviderJobId,
   completeCodexProviderJob,
   enqueueCodexProviderJob,
   failCodexProviderJob,
   reserveCodexProviderResponseUpload,
+  validCodexProviderCoordinate,
+  validCodexProviderOwnership,
+  type CodexProviderPass,
+  type CodexProviderPipeline,
 } from "./codex-provider-jobs.js";
 
 const REQUEST_HASH = `sha256:${"11".repeat(32)}`;
@@ -53,6 +58,131 @@ function enqueueInput(requestHash = REQUEST_HASH) {
     dailyCallLimit: 500,
   };
 }
+
+function readingEnqueueInput(overrides: Record<string, unknown> = {}) {
+  return {
+    pipeline: "reading" as CodexProviderPipeline,
+    ownerId: "job_reading_codex_fixture",
+    userId: USER_A as string | null,
+    pass: "publisher" as CodexProviderPass,
+    stageGeneration: 1,
+    stageAttempt: 0,
+    request: requestArtifact(),
+    model: "gpt-5.6-sol",
+    reasoningEffort: "high" as const,
+    promptVersion: "1.0.1",
+    timeoutMs: 900_000,
+    dailyCallLimit: 10_000,
+    ...overrides,
+  };
+}
+
+describe("the closed Codex provider coordinate", () => {
+  it("admits exactly the pipeline passes that have an owner behind them", () => {
+    const legal: Array<[CodexProviderPipeline, CodexProviderPass]> = [
+      ["pattern", "planner"],
+      ["pattern", "writer"],
+      ["pattern", "verifier"],
+      ["ontology", "planner"],
+      ["ontology", "writer"],
+      ["ontology", "verifier"],
+      ["ontology", "generator"],
+      ["ontology", "evaluator"],
+      ["reading", "publisher"],
+    ];
+    for (const [pipeline, pass] of legal) {
+      expect(validCodexProviderCoordinate(pipeline, pass)).toBe(true);
+    }
+    const illegal: Array<[CodexProviderPipeline, CodexProviderPass]> = [
+      ["reading", "planner"],
+      ["reading", "writer"],
+      ["reading", "verifier"],
+      ["reading", "generator"],
+      ["reading", "evaluator"],
+      ["pattern", "publisher"],
+      ["pattern", "generator"],
+      ["pattern", "evaluator"],
+      ["ontology", "publisher"],
+    ];
+    for (const [pipeline, pass] of illegal) {
+      expect(validCodexProviderCoordinate(pipeline, pass)).toBe(false);
+    }
+  });
+
+  it("requires an owner on user work and refuses one on ontology work", () => {
+    expect(validCodexProviderOwnership("reading", USER_A)).toBe(true);
+    expect(validCodexProviderOwnership("pattern", USER_A)).toBe(true);
+    expect(validCodexProviderOwnership("ontology", null)).toBe(true);
+    expect(validCodexProviderOwnership("reading", null)).toBe(false);
+    expect(validCodexProviderOwnership("pattern", null)).toBe(false);
+    expect(validCodexProviderOwnership("ontology", USER_A)).toBe(false);
+  });
+});
+
+describe("Codex provider reading jobs", () => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedUser(IDENTITY_A);
+  });
+
+  it("derives one deterministic id from the coordinate and the request bytes", async () => {
+    const base = {
+      pipeline: "reading" as const,
+      ownerId: "job_reading_codex_fixture",
+      pass: "publisher" as const,
+      stageGeneration: 1,
+      stageAttempt: 0,
+      requestHash: REQUEST_HASH,
+    };
+    const id = await codexProviderJobId(base);
+    expect(id).toMatch(/^cpjob_[a-f0-9]{32}$/);
+    expect(await codexProviderJobId(base)).toBe(id);
+    // Every member of the preimage moves the identity, which is what makes a
+    // duplicate delivery adopt and a genuine retry create.
+    for (const drift of [
+      { ...base, ownerId: "job_reading_codex_other" },
+      { ...base, stageGeneration: 2 },
+      { ...base, stageAttempt: 1 },
+      { ...base, requestHash: RESPONSE_HASH },
+      { ...base, pipeline: "pattern" as const, pass: "writer" as const },
+    ]) {
+      expect(await codexProviderJobId(drift)).not.toBe(id);
+    }
+  });
+
+  it("creates once and adopts the identical reading coordinate", async () => {
+    const now = new Date("2026-08-27T00:00:00.000Z");
+    const first = await enqueueCodexProviderJob(env, readingEnqueueInput(), now);
+    const second = await enqueueCodexProviderJob(env, readingEnqueueInput(), now);
+
+    expect(first.status).toBe("created");
+    expect(second).toEqual({ status: "adopted", job: first.job });
+    expect(first.job.pipeline).toBe("reading");
+    expect(first.job.pass).toBe("publisher");
+    expect(first.job.userId).toBe(USER_A);
+    expect(first.job.status).toBe("pending");
+    expect(await rows("SELECT COUNT(*) AS count FROM codex_provider_jobs"))
+      .toEqual([{ count: 1 }]);
+  });
+
+  it("refuses an illegal coordinate before any row is written", async () => {
+    const now = new Date("2026-08-27T00:00:00.000Z");
+    const illegal = [
+      readingEnqueueInput({ pass: "planner" }),
+      readingEnqueueInput({ pipeline: "pattern", pass: "publisher" }),
+      readingEnqueueInput({ pipeline: "ontology", pass: "publisher", userId: null }),
+      readingEnqueueInput({ userId: null }),
+      readingEnqueueInput({ pipeline: "ontology", pass: "generator" }),
+    ];
+    for (const input of illegal) {
+      await expect(enqueueCodexProviderJob(env, input, now)).rejects.toThrow();
+    }
+    // Nothing reached D1. The same guard runs before the encrypted request
+    // object is written, so nothing reached R2 either.
+    expect(await rows("SELECT COUNT(*) AS count FROM codex_provider_jobs"))
+      .toEqual([{ count: 0 }]);
+  });
+});
 
 describe("Codex provider durable jobs", () => {
   beforeEach(async () => {

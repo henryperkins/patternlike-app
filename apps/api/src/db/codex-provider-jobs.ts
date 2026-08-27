@@ -11,13 +11,55 @@ import type {
   PublisherSafeDetailCode,
 } from "../services/openai-responses-adapter.js";
 
-export type CodexProviderPipeline = "pattern" | "ontology";
+export type CodexProviderPipeline = "pattern" | "ontology" | "reading";
 export type CodexProviderPass =
   | "planner"
   | "writer"
   | "verifier"
   | "generator"
-  | "evaluator";
+  | "evaluator"
+  | "publisher";
+
+/**
+ * The one legal-pair predicate, shared by enqueue and by the artifact layer.
+ *
+ * The two unions above are independent, so their product contains combinations
+ * that name nothing: `reading`/`planner` has no owner loader, `ontology`/
+ * `publisher` has no budget ledger, `pattern`/`publisher` has no stage. D1's
+ * 0017 CHECK is the authority, but a row that only fails there has already had
+ * an encrypted request object written to R2 with no job to reference it. This
+ * runs first, before any R2 or D1 write, so an illegal coordinate costs
+ * nothing and leaves nothing behind.
+ */
+export function validCodexProviderCoordinate(
+  pipeline: CodexProviderPipeline,
+  pass: CodexProviderPass,
+): boolean {
+  if (pipeline === "pattern") {
+    return pass === "planner" || pass === "writer" || pass === "verifier";
+  }
+  if (pipeline === "ontology") {
+    return pass === "planner" || pass === "writer" || pass === "verifier" ||
+      pass === "generator" || pass === "evaluator";
+  }
+  return pipeline === "reading" && pass === "publisher";
+}
+
+/**
+ * The second pre-write guard: who owns the work.
+ *
+ * Pattern and reading are user-owned so account erasure can find and delete
+ * their encrypted exchange artifacts; ontology work is not user-owned and must
+ * not acquire an owner by accident. Artifact coordinates carry no user
+ * identity at all -- the encrypted envelope must not name a reader -- so the
+ * artifact layer calls only the pair guard above.
+ */
+export function validCodexProviderOwnership(
+  pipeline: CodexProviderPipeline,
+  userId: string | null,
+): boolean {
+  return pipeline === "ontology" ? userId === null : userId !== null;
+}
 export type CodexProviderJobStatus =
   | "pending"
   | "leased"
@@ -312,6 +354,12 @@ export async function enqueueCodexProviderJob(
   input: EnqueueCodexProviderJobInput,
   now: Date,
 ): Promise<{ status: "created" | "adopted"; job: CodexProviderJob }> {
+  if (!validCodexProviderCoordinate(input.pipeline, input.pass)) {
+    throw new Error("codex provider coordinate names no pipeline pass");
+  }
+  if (!validCodexProviderOwnership(input.pipeline, input.userId)) {
+    throw new Error("codex provider ownership is illegal for this pipeline");
+  }
   const nowIso = now.toISOString();
   const id = await codexProviderJobId({
     pipeline: input.pipeline,
