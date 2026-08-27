@@ -3,12 +3,12 @@
 Runbook for `patternlike-api-production`, which serves the PWA and API from one
 Cloudflare Worker origin.
 
-Repository and recorded live state, reconciled 2026-08-26:
+Repository and recorded live state, reconciled 2026-08-27:
 
 | Step | State |
 | --- | --- |
 | D1 `patternlike-ops` created (`1305a75d-0a8a-4a21-b201-d94fda0aaf93`, ENAM) | done |
-| Migrations through `0015` applied remotely | done — last recorded verification 2026-08-25 |
+| Migrations through `0017` applied remotely | done — `0017` verified around 17:32 UTC on 2026-08-27; Worker version `287bce63-dece-4911-96db-dd212c2cec33` remains the recorded 0016 birth-guard deployment |
 | `database_id` wired into `[[env.production.d1_databases]]` | done |
 | Origin decided: PWA ships inside the API Worker (`[env.production.assets]`) | done, dry-run validated |
 | Auth0 tenant `dev-lqmwkyo17nm5mdjz.us.auth0.com` + SPA app `Pattern/Like Web` | done |
@@ -434,10 +434,12 @@ That means three things for this runbook:
   baseline.** Migration `0003` is applied. Committed production configuration
   now declares `READING_V5_ROLLOUT=hybrid` with `READING_PUBLISHER=codex` and
   both production crons (`*/15 * * * *` and `7,22,37,52 * * * *`).
-- **Migration `0017` must reach D1 before the Worker that writes reading
-  provider rows.** It rebuilds `codex_provider_jobs` to admit the
-  `reading`/`publisher` coordinate. Merging to `main` deploys, so the schema
-  step is a hard gate ahead of the merge, exactly as `0016` was.
+- **Migration `0017` reached D1 before any compatible Worker can write reading
+  provider rows.** It rebuilt `codex_provider_jobs` to admit the
+  `reading`/`publisher` coordinate and was verified applied around 17:32 UTC on
+  2026-08-27. The schema is necessary but not Daily certification: the Codex
+  runner was stopped before the export and remains stopped pending a compatible
+  Worker deployment.
 - **Configuration is not certification.** The evidence table in
   [`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md) does not
   record a complete ordered rollout, and the `hybrid` declaration above is a

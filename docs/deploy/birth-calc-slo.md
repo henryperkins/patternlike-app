@@ -5,12 +5,11 @@
 **Status:** Thresholds and the measurement procedure below are decided. **No
 measurement has been taken.** The guards they measure — the bounded calc
 transport, the per-user UTC-day invocation budget, and the two telemetry events
-— exist in this repository and are **not deployed** to
-`patternlike-api-production`. Migration `0016_birth_calc_usage.sql` is committed
-and **not applied to the remote database**, so the budget guard cannot function
-in production yet. This file records what would justify building the
-asynchronous birth workflow. It does not authorize a deploy, a migration, a
-configuration change, or the asynchronous implementation itself.
+— are deployed on `patternlike-api-production` as Worker version
+`287bce63-dece-4911-96db-dd212c2cec33` (2026-08-27T06:36:13Z). Migration
+`0016_birth_calc_usage.sql` is applied to the remote database. This file records
+what would justify building the asynchronous birth workflow. It does not
+authorize a configuration change or the asynchronous implementation itself.
 
 Everything below that describes configuration or telemetry describes
 **repository evidence, not unqueried live state.** Where a claim is about the
@@ -396,8 +395,8 @@ is indistinguishable from an unmeasured one.
 | UTC date | worker version | timeout_ms | sampling | n | success | invalid_input | upstream_failure | timeout | timeout rate | p95 (7d) | p99 (7d) | 429s | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-*No rows. The guards are not deployed and migration `0016` is not applied
-remotely, so no production birth calculation has been measured under them.*
+*No rows. The guards are deployed and migration `0016` is applied remotely, but
+no production birth calculation has been measured under them yet.*
 
 ---
 

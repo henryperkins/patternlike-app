@@ -157,7 +157,8 @@ service produces a `502 calc_failed` within the timeout rather than hanging.
    `/v1/engine` stay public. `docs/deploy/api-production.md` records the token as
    set on both sides in its 2026-08-26 reconciliation — a ledger row, not a
    queried inventory.
-2. **Bounding the request — implemented, not yet deployed.**
+2. **Bounding the request — deployed as Worker version
+   `287bce63-dece-4911-96db-dd212c2cec33`.**
    `invokeCalc` now takes an explicit `timeoutMs`, sets
    `signal: AbortSignal.timeout(timeoutMs)`, refuses a declared or streamed body
    over 1 MiB before parsing, and returns a `CalcInvocation` carrying
@@ -405,8 +406,9 @@ the query procedure are recorded in
 | Successful calc p99 latency | rolling 7 days | `>= 9,000 ms` |
 | Worker termination correlated with the birth route | any | one confirmed production event |
 
-Crossing any row opens the design; none has been measured, because the
-telemetry that would measure it is not deployed. A high `429` rate is
+Crossing any row opens the design; none has been measured. The telemetry is
+deployed as of Worker version `287bce63-dece-4911-96db-dd212c2cec33`; the
+review ledger in `docs/deploy/birth-calc-slo.md` is still empty. A high `429` rate is
 explicitly **not** a trigger — it is a product and abuse question about
 `BIRTH_CALC_DAILY_LIMIT`, and a queue would not reduce the spend that limit
 exists to bound.
@@ -427,7 +429,7 @@ exists to bound.
 
 ### What landed
 
-**Item 2 — implemented, not yet merged or deployed.** `POST /v1/birth-profiles`
+**Item 2 — deployed telemetry with an empty review ledger.** `POST /v1/birth-profiles`
 now authorizes at most `BIRTH_CALC_DAILY_LIMIT` (`"5"`, accepted range 1–50)
 actual `/v1/calculate` invocations per user per UTC day. The sixth returns
 `429 birth_calc_budget_exhausted` with `Retry-After` in seconds and
@@ -464,17 +466,18 @@ Detailed plan:
 [`2026-08-26-birth-operational-guards.md`](2026-08-26-birth-operational-guards.md)
 Tasks 2 and 3.
 
-> **`db/d1/0016_birth_calc_usage.sql` is committed and not applied remotely.**
-> The runtime code above queries those tables. It must not deploy until the
-> migration-only commit is merged and applied with a backup, a bookmark, and
-> the integrity checks in `docs/deploy/api-production.md`. Workers Builds
-> deploys merged Worker code automatically and does not wait for D1.
+> **`db/d1/0016_birth_calc_usage.sql` is applied remotely** (2026-08-27 ~06:35 UTC).
+> Workers Builds had already deployed the PR #35 Worker about a minute after
+> merge, ahead of the schema; `npm run deploy:api` then uploaded version
+> `287bce63-dece-4911-96db-dd212c2cec33` once 0016 was applied.
 
 **Item 1 (key rotation has no caller) is still open** and is the subject of a
 separate plan,
 [`2026-08-26-crypto-operator-control-plane.md`](2026-08-26-crypto-operator-control-plane.md).
-That plan owns `0017`; the umbrella plan's dependency order is what sequences
-`0016` ahead of it.
+That plan leaves key rotation open. It does not own migration `0017`: that
+number is the applied Codex reading-provider migration. Its
+`0017_crypto_operations.sql` references are stale and must be renumbered with
+downstream reservations before execution.
 
 ---
 

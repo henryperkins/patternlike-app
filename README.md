@@ -191,7 +191,7 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Historical timezone resolution: birthplace coordinates resolve to an IANA zone (`POST /v1/timezone-lookup`), and the chart is calculated in that zone rather than the browser's current one
 - [x] Privacy center export/delete workflows, including encrypted artifacts and terminal deletion status
 - [x] Bounded birth calculation: a validated fetch deadline, a 1 MiB response ceiling, and an exact per-user UTC-day invocation budget that charges only requests which actually call calc. Entry criteria for making the workflow asynchronous are recorded in [`docs/deploy/birth-calc-slo.md`](docs/deploy/birth-calc-slo.md) and none has been measured
-- [ ] Migration `0016_birth_calc_usage.sql` applied to the remote database. It is committed, and the budget guard cannot run in production until it is applied
+- [x] Migration `0016_birth_calc_usage.sql` applied to the remote database 2026-08-27. Worker version `287bce63-dece-4911-96db-dd212c2cec33` serves the budget guard.
 - [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
 - [ ] Persisted `account_processing` consent: onboarding still sends a local placeholder and the birth route checks only that an id is present
 
