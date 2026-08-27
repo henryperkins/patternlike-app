@@ -345,7 +345,14 @@ function isBirthCalcCommandV1(
   ) {
     return false;
   }
-  return true;
+  const submitted = value.submitted;
+  return (
+    effective.accuracy === submitted.accuracy &&
+    effective.birth_date === submitted.birth_date &&
+    effective.birth_time_local === submitted.birth_time_local &&
+    effective.approximate_window_minutes ===
+      submitted.approximate_window_minutes
+  );
 }
 
 function isLegacyBirthplace(
