@@ -37,6 +37,8 @@ import {
   resolveV5TargetDate,
 } from "../services/enqueue.js";
 import { runReadingScheduler } from "../services/run-reading-scheduler.js";
+import { claimJob } from "./generation.js";
+import type { GenerateDailyReadingCommandV2 } from "../services/generation-command-v2.js";
 import { OPENAI_READING_MODEL } from "../services/reading-publisher.js";
 import type { StoredReadingV5 } from "../services/stored-reading.js";
 import type { Env } from "../env.js";
@@ -419,6 +421,61 @@ describe("bounded ordered repair", () => {
         reserved.readingId,
       ),
     ).toEqual([{ command_generation: 2, status: "pending" }]);
+  });
+
+  it("replaces a superseded command once with one frozen under current configuration", async () => {
+    const account = identity(41);
+    await seedSchedulerAccount(account, { nextDueAt: FUTURE });
+    const envValue = hybridEnv();
+    const currentLocalDate = resolveV5TargetDate(ZONE, SCHEDULED_AT)!;
+    const reserved = await enqueueConstrainedReading(envValue, account.userId, {
+      entry: "scheduled",
+      reservationReason: "scheduled",
+      targetLocalDate: currentLocalDate,
+      now: SCHEDULED_AT,
+    });
+    expect(reserved.ok).toBe(true);
+    if (!reserved.ok) return;
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE daily_readings SET status = 'failed', updated_at = ? WHERE id = ?",
+      ).bind("2026-08-11T08:00:00.000Z", reserved.readingId),
+      env.DB.prepare(
+        `UPDATE jobs SET status = 'failed', result_class = 'publisher_superseded',
+                         finished_at = ? WHERE id = ?`,
+      ).bind("2026-08-11T08:00:00.000Z", reserved.jobId),
+    ]);
+
+    const summary = await runReadingScheduler(envValue, SCHEDULED_AT);
+    expect(summary.repair.failedReplacements).toBe(1);
+    const [reading] = await rows<{
+      command_generation: number;
+      status: string;
+      active_generation_job_id: string;
+    }>(
+      `SELECT command_generation, status, active_generation_job_id
+       FROM daily_readings WHERE id = ?`,
+      reserved.readingId,
+    );
+    expect(reading).toMatchObject({ command_generation: 2, status: "pending" });
+    // The predecessor command is untouched. Replacement freezes a new one; it
+    // never edits the encrypted command whose pin named the old transport.
+    expect(reading!.active_generation_job_id).not.toBe(reserved.jobId);
+    const [predecessor] = await rows<{ status: string; result_class: string }>(
+      "SELECT status, result_class FROM jobs WHERE id = ?",
+      reserved.jobId,
+    );
+    expect(predecessor).toEqual({
+      status: "failed",
+      result_class: "publisher_superseded",
+    });
+
+    const replacement = await claimJob(envValue, reading!.active_generation_job_id);
+    expect(replacement).not.toBeNull();
+    const command = replacement!.command as GenerateDailyReadingCommandV2;
+    expect(command.publisher.provider).toBe("codex");
+    expect(command.command_replacement_reason).toBe("publisher_superseded");
+    expect(command.command_generation).toBe(2);
   });
 
   it("does not let an older nonreplaceable failure hide a later replaceable failure", async () => {

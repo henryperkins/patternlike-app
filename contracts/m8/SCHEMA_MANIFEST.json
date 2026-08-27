@@ -29,21 +29,21 @@
     {
       "package": "contracts/m5",
       "schema_version": "0.5.0",
-      "manifest_sha256": "ce500231c15b4a756960b761fed445e5de8f3d0e74a16de39de3bbbfa081866a",
+      "manifest_sha256": "1fb5228da8488a78e9a4e3dead4e9eb175cf41442b48eee42f2271079c397757",
       "relationship": "constrained_model_reading_predecessor",
       "note": "Reading detail may return the frozen M5 success envelope. M8 adds library metadata and does not supersede stored M5 reading artifacts. RE-PINNED 2026-08-27: contracts/m5 gained the amendment recorded in its own SCHEMA_MANIFEST.json amendments array, widening publisherProvider from const \"openai\" to the exact enum [\"openai\", \"codex\"] so Codex-generated daily readings can be described truthfully while historical OpenAI evidence stays readable. The digest above is the post-amendment value; every instance that validated under the const still validates, and no $id, required field, or schema_version moved."
     },
     {
       "package": "contracts/m6",
       "schema_version": "0.6.0",
-      "manifest_sha256": "aadedc2ae3fe298eff9a65720822811937f08490cabb8015b40db1e047b78e8d",
+      "manifest_sha256": "03037cdf6a3d92965bd5cc4513950c4ba92c0ff6ab24c81ec24550badab6d221",
       "relationship": "privacy_and_export_structure_predecessor",
       "note": "M8 preserves the portable account sections and privacy records carried forward through M7."
     },
     {
       "package": "contracts/m7",
       "schema_version": "0.7.0",
-      "manifest_sha256": "bc2afae13b683e4d7c9b5b605f7d50106bd4c10ae05642bac66a3c9085b60c0f",
+      "manifest_sha256": "bffad4eedbf13c34b5c2b52774fc29a08b9a2619286924c1a6664873f07eb5bb",
       "relationship": "openapi_common_and_account_export_predecessor",
       "note": "M8 copies the complete M7 API/common/export families, then adds consumer place, consent, reading-library, Save, export metadata, and birth-budget amendments."
     }

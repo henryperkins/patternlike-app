@@ -359,6 +359,16 @@
         "fixtures/invalid/reading-evidence.unknown-provider.json"
       ],
       "implemented_by": "packages/shared/src/m5-reading-types.ts (READING_PUBLISHER_PROVIDERS / ReadingPublisherProvider, used by ModelRecordV5, apps/api PublisherConfigPin and ProviderMetadata, and apps/web EvidenceModelRecordV5); the stored-envelope guard in apps/api/src/services/stored-reading.ts admits exactly the two lowercase values and rejects anything else. Normative source: docs/superpowers/specs/2026-08-27-codex-daily-pattern-design.md."
+    },
+    {
+      "date": "2026-08-27",
+      "kind": "vocabulary_widening",
+      "summary": "common.schema.json#/$defs/commandReplacementReasonV2 gains `publisher_superseded`, the reason a frozen command whose publisher pin names a transport the deployment no longer routes to is replaced rather than executed.",
+      "detail": "Companion to the publisherProvider widening in the amendment above. Once Daily generation moved to the Codex runner, unpublished commands frozen under the direct OpenAI transport still existed: they are honest and simply cannot be executed, because running one through a different service would publish prose whose own pin says something else wrote it. The Worker terminalizes such a command with the internal failure class `publisher_superseded` and the existing bounded automatic-replacement path freezes a new command under current configuration; the frozen command is never edited in place, and published OpenAI readings and their evidence are untouched. Additive: every instance that validated before still validates, no required field, $id, or schema_version moved, and no existing fixture byte changed.",
+      "files": [
+        "common.schema.json"
+      ],
+      "implemented_by": "apps/api/src/services/generation-failures.ts adds the code to V5FailureCode, V5ReplacementReason, V5_FAILURE_CODES, V5_REPLACEMENT_REASONS, and V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES, and deliberately leaves it out of queueDisposition's retry branches; apps/api/src/services/generate-daily-reading-v5.ts detects the stale pin before packet construction, calculation replay, or any R2 access."
     }
   ]
 }

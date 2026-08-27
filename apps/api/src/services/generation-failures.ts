@@ -28,6 +28,16 @@ export type V5FailureCode =
   | "publisher_not_configured"
   | "publisher_auth_failed"
   | "publisher_model_unavailable"
+  /**
+   * The frozen command names a publisher this deployment no longer routes to.
+   *
+   * Not an error and not a retry: the command is honest and simply cannot be
+   * executed, because running it through a different service would publish
+   * prose whose own pin says something else wrote it. It terminalizes so the
+   * existing bounded replacement path can freeze a new command under current
+   * configuration.
+   */
+  | "publisher_superseded"
   | "ai_synthesis_consent_required"
   | "context_ineligible"
   | "generation_input_id_mismatch"
@@ -52,6 +62,7 @@ export type V5ReplacementReason =
   | "publisher_unavailable"
   | "publisher_output_invalid"
   | "publisher_refused"
+  | "publisher_superseded"
   | "consent_regranted";
 
 export type CommandReplacementReason =
@@ -87,6 +98,7 @@ const V5_FAILURE_CODES: ReadonlySet<V5FailureCode> = new Set([
   "publisher_not_configured",
   "publisher_auth_failed",
   "publisher_model_unavailable",
+  "publisher_superseded",
   "ai_synthesis_consent_required",
   "context_ineligible",
   "generation_input_id_mismatch",
@@ -107,6 +119,7 @@ const V5_REPLACEMENT_REASONS: ReadonlySet<V5ReplacementReason> = new Set([
   "publisher_unavailable",
   "publisher_output_invalid",
   "publisher_refused",
+  "publisher_superseded",
   "consent_regranted",
 ]);
 
@@ -121,6 +134,11 @@ export const V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES = [
   "publisher_unavailable",
   "publisher_output_invalid",
   "publisher_refused",
+  // A superseded command is replaceable BY THE SCHEDULER but never retried in
+  // place: nothing about waiting makes an OpenAI-pinned command executable
+  // under Codex. It is deliberately absent from `queueDisposition`'s retry
+  // branches for exactly that reason.
+  "publisher_superseded",
 ] as const satisfies readonly V5FailureCode[];
 
 const V1_AUTOMATIC_REPLACEMENT_FAILURES: ReadonlySet<V1FailureCode> = new Set(

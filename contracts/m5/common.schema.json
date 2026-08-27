@@ -167,9 +167,10 @@
         "publisher_unavailable",
         "publisher_output_invalid",
         "publisher_refused",
+        "publisher_superseded",
         "consent_regranted"
       ],
-      "description": "Why a terminally failed V2 command was replaced by the next generation. Distinct from M3's set: release_unreadable is impossible on the v5 path, and consent_regranted is operator- or user-initiated rather than automatic."
+      "description": "Why a terminally failed V2 command was replaced by the next generation. Distinct from M3's set: release_unreadable is impossible on the v5 path, and consent_regranted is operator- or user-initiated rather than automatic. publisher_superseded records a command whose frozen publisher pin names a transport the deployment no longer routes to \u2014 it is replaced rather than retried, because nothing about waiting makes it executable, and it is never executed through a different service, which would publish prose that falsifies its own provenance."
     },
     "reservationReason": {
       "type": "string",

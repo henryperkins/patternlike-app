@@ -389,6 +389,23 @@ export async function generateDailyReadingV5(
     detail,
   });
 
+  // Before the packet, before any calculation replay, and before R2 is touched.
+  // Narrowed to the one known previous transport rather than "anything that is
+  // not current": an unrecognised provider is a policy problem for
+  // `supportedCommand` below, and calling it superseded would invite the
+  // scheduler to replace a command nobody can explain.
+  // A command whose own pin names the direct OpenAI transport is honest and
+  // simply cannot be executed here: running it through Codex would publish
+  // prose that falsifies its own provenance, and the reader would be told a
+  // different service wrote it than actually did. Terminalize with a safe class
+  // so the scheduler's existing bounded replacement path can freeze a new
+  // command under current configuration. The frozen command is never edited.
+  if (
+    command.publisher.provider !== READING_PUBLISHER_PROVIDER &&
+    command.publisher.provider === "openai"
+  ) {
+    return fail("publisher_superseded", "publisher_not_configured");
+  }
   if (!supportedCommand(command)) {
     return fail("policy_unsupported", "the frozen V2 policy tuple is not implemented");
   }

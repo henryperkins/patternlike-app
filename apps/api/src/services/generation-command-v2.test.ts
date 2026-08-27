@@ -214,6 +214,30 @@ describe("V2 command", () => {
     expect(built.command.publisher.provider).toBe(READING_PUBLISHER_PROVIDER);
   });
 
+  it("accepts publisher_superseded as a replacement reason and freezes Codex", async () => {
+    const built = await buildGenerationCommandV2(enabledEnv() as typeof env, IDENTITY_A, {
+      readingId: "rdg_v2_superseded_0001",
+      revision: 1,
+      revisionReason: "initial",
+      supersedesReadingId: null,
+      reservationReason: "automatic_replacement",
+      commandGeneration: 2,
+      replacesJobId: "job_v2_superseded_0001",
+      commandReplacementReason: "publisher_superseded",
+      targetLocalDate: today(),
+      now: new Date(),
+    });
+    if (!built.ok) throw new Error(built.detail);
+    expect(built.command.command_replacement_reason).toBe("publisher_superseded");
+    expect(built.command.command_generation).toBe(2);
+    // The replacement is frozen under CURRENT configuration, which is the
+    // entire point: the command it replaces named a transport that no longer
+    // exists here.
+    expect(built.command.publisher.provider).toBe(READING_PUBLISHER_PROVIDER);
+    expect(validateCommandV2(built.command)).toBe(true);
+    expect(validateCommandV2.errors ?? []).toEqual([]);
+  });
+
   it("takes the target day as given rather than resolving today again", async () => {
     // The scheduler reserves tomorrow's edition before its local day starts.
     const tomorrow = new Date(Date.parse(`${today()}T12:00:00Z`) + 86_400_000)

@@ -46,6 +46,7 @@ import {
 } from "../db/generation.js";
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
+import { loadCurrentDailyOwner } from "./reading-current-owner.js";
 import { decryptPayload } from "../db/users.js";
 import { dispatch, enqueueConstrainedReading, resolveV5TargetDate } from "./enqueue.js";
 import { dispatchGeneration } from "./generate-daily-reading.js";
@@ -815,6 +816,27 @@ describe("V5 execution", () => {
     expect(
       await rows("SELECT status FROM daily_readings WHERE id = ?", predecessor.readingId),
     ).toEqual([{ status: "invalidated" }]);
+  });
+
+  it("supersedes an unpublished OpenAI command instead of running it through Codex", async () => {
+    const { enqueued, claim } = await claimReserved();
+    const command = claim.command as GenerateDailyReadingCommandV2;
+    // A command frozen before the routing changed. It is honest and simply
+    // cannot be executed here: publishing its prose under Codex would falsify
+    // the pin the reader's evidence will carry.
+    command.publisher.provider = "openai" as typeof command.publisher.provider;
+
+    const outcome = await dispatchGeneration(enabledEnv(), claim);
+    expect(outcome).toMatchObject({ ok: false, reason: "publisher_superseded" });
+    // Refused before the packet, the calculation replay, and any R2 access, so
+    // no provider work exists to cancel or clean up.
+    expect(await readingProviderJobCount()).toBe(0);
+    expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
+    // And the frozen command in D1 is untouched: the mutation above lived only
+    // in this claim's decrypted copy, and replacement freezes a NEW command
+    // rather than editing the sealed one.
+    const owner = await loadCurrentDailyOwner(enabledEnv(), enqueued.jobId);
+    expect(owner!.command.publisher.provider).toBe("codex");
   });
 
   it("charges the UTC-day ledger nothing for creating, adopting, or publishing", async () => {
