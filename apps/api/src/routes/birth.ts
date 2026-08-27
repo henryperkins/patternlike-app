@@ -848,88 +848,10 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
 
   const chart = calc.chart;
 
-  // Identical birth data under a new key reproduces the fingerprint. OpenAPI
-  // declares 409 for this; the previous code let UNIQUE(user_id, fingerprint)
-  // throw a bare 500 after the profile and job rows were already committed,
-  // leaving the job stuck 'running' forever.
-  //
-  // Different birth data under a new key is the correction path: it increments
-  // profile_version, activates the new snapshot, and supersedes the previous
-  // chart. 409 is only this fingerprint, not "the user already has a chart".
-  const duplicate = await c.env.DB.prepare(
-    `SELECT id FROM chart_snapshots WHERE user_id = ? AND fingerprint = ?`,
-  )
-    .bind(userId, chart.fingerprint)
-    .first<{ id: string }>();
-
-  if (duplicate) {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `UPDATE jobs
-         SET status = 'succeeded', result_class = ?, finished_at = ?
-         WHERE id = ? AND job_type = ? AND user_id = ?
-           AND idempotency_key = ? AND status = 'running'
-           AND attempts = ? AND payload_json = ?
-           AND EXISTS (
-             SELECT 1 FROM birth_calc_reservations
-             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
-               AND status = 'charged'
-           )`,
-      ).bind(
-        duplicate.id,
-        nowIso,
-        jobId,
-        BIRTH_JOB_TYPE,
-        userId,
-        idem,
-        attempt,
-        profileMetadata,
-        userId,
-        prepared.reservationHash,
-        prepared.claimTokenHash,
-      ),
-      c.env.DB.prepare(
-        `UPDATE birth_profiles SET status = 'superseded', updated_at = ?
-         WHERE user_id = ? AND version = ? AND status = 'pending'
-           AND EXISTS (
-             SELECT 1 FROM birth_calc_reservations
-             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
-               AND status = 'charged'
-           )
-           AND EXISTS (
-             SELECT 1 FROM jobs
-             WHERE id = ? AND job_type = ? AND user_id = ?
-               AND idempotency_key = ? AND status = 'succeeded'
-               AND attempts = ? AND payload_json = ? AND result_class = ?
-           )`,
-      ).bind(
-        nowIso,
-        userId,
-        profileVersion,
-        userId,
-        prepared.reservationHash,
-        prepared.claimTokenHash,
-        jobId,
-        BIRTH_JOB_TYPE,
-        userId,
-        idem,
-        attempt,
-        profileMetadata,
-        duplicate.id,
-      ),
-    ]);
-    return c.json(
-      {
-        error: {
-          code: "chart_already_exists",
-          message: "This birth data already has a chart",
-          request_id: requestId,
-          details: { chart_id: duplicate.id, fingerprint: chart.fingerprint },
-        },
-      },
-      409,
-    );
-  }
+  // Fingerprint uniqueness is decided by the guarded insertion below, never by
+  // a read-before-write check. Two distinct keys can finish the same
+  // calculation concurrently; the database chooses one chart and the loser
+  // converges its durable job/profile after observing that winner.
 
   // Non-PII snapshot for query; birth PII encrypted separately
   const publicSnapshot = {
@@ -964,9 +886,9 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   // previous profile versions, activate this profile, close the job. Previously
   // only charts were superseded, so failed calculations left several profile
   // rows at status='active' simultaneously for one user.
-  await c.env.DB.batch([
+  const publication = await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO chart_snapshots (
+      `INSERT OR IGNORE INTO chart_snapshots (
         id, user_id, profile_version, fingerprint, contract_id, contract_version,
         container_digest, tzdb_version, status, calculated_at, snapshot_json,
         birth_accuracy, birth_enc, birth_key_version, birth_nonce,
@@ -1027,8 +949,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
          )
          AND EXISTS (
            SELECT 1 FROM chart_snapshots
-           WHERE id = ? AND user_id = ? AND profile_version = ?
-             AND status = 'active'
+           WHERE id = ? AND user_id = ? AND fingerprint = ?
+             AND profile_version = ? AND status = 'active'
          )`,
     ).bind(
       userId,
@@ -1038,6 +960,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       prepared.claimTokenHash,
       chart.id,
       userId,
+      chart.fingerprint,
       profileVersion,
     ),
     c.env.DB.prepare(
@@ -1050,8 +973,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
          )
          AND EXISTS (
            SELECT 1 FROM chart_snapshots
-           WHERE id = ? AND user_id = ? AND profile_version = ?
-             AND status = 'active'
+           WHERE id = ? AND user_id = ? AND fingerprint = ?
+             AND profile_version = ? AND status = 'active'
          )`,
     ).bind(
       nowIso,
@@ -1062,6 +985,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       prepared.claimTokenHash,
       chart.id,
       userId,
+      chart.fingerprint,
       profileVersion,
     ),
     c.env.DB.prepare(
@@ -1074,8 +998,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
          )
          AND EXISTS (
            SELECT 1 FROM chart_snapshots
-           WHERE id = ? AND user_id = ? AND profile_version = ?
-             AND status = 'active'
+           WHERE id = ? AND user_id = ? AND fingerprint = ?
+             AND profile_version = ? AND status = 'active'
          )`,
     ).bind(
       nowIso,
@@ -1086,6 +1010,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       prepared.claimTokenHash,
       chart.id,
       userId,
+      chart.fingerprint,
       profileVersion,
     ),
     c.env.DB.prepare(
@@ -1101,8 +1026,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
          )
          AND EXISTS (
            SELECT 1 FROM chart_snapshots
-           WHERE id = ? AND user_id = ? AND profile_version = ?
-             AND status = 'active'
+           WHERE id = ? AND user_id = ? AND fingerprint = ?
+             AND profile_version = ? AND status = 'active'
          )
          AND EXISTS (
            SELECT 1 FROM birth_profiles
@@ -1122,11 +1047,198 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       prepared.claimTokenHash,
       chart.id,
       userId,
+      chart.fingerprint,
       profileVersion,
       userId,
       profileVersion,
     ),
   ]);
+
+  const insertChanges = publication[0]?.meta.changes;
+  if (insertChanges !== 0 && insertChanges !== 1) {
+    throw new Error("birth chart insertion result is unavailable");
+  }
+  const ownChart = await c.env.DB.prepare(
+    `SELECT id FROM chart_snapshots
+     WHERE id = ? AND user_id = ? AND fingerprint = ? AND profile_version = ?`,
+  ).bind(
+    chart.id,
+    userId,
+    chart.fingerprint,
+    profileVersion,
+  ).first<{ id: string }>();
+
+  if (insertChanges === 1) {
+    if (!ownChart) {
+      throw new Error("inserted birth chart tuple is unavailable");
+    }
+  } else {
+    const duplicate = await c.env.DB.prepare(
+      `SELECT id FROM chart_snapshots
+       WHERE user_id = ? AND fingerprint = ?`,
+    ).bind(userId, chart.fingerprint).first<{ id: string }>();
+    if (!duplicate) {
+      throw new Error("birth chart publication did not converge");
+    }
+
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'birth fingerprint winner settlement precondition failed'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM birth_calc_reservations
+           WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+             AND status = 'charged'
+         )
+         OR NOT EXISTS (
+           SELECT 1 FROM chart_snapshots
+           WHERE id = ? AND user_id = ? AND fingerprint = ?
+         )
+         OR NOT EXISTS (
+           SELECT 1 FROM jobs
+           WHERE id = ? AND job_type = ? AND user_id = ?
+             AND idempotency_key = ? AND status = 'running'
+             AND attempts = ? AND payload_json = ?
+         )
+         OR NOT EXISTS (
+           SELECT 1 FROM birth_profiles
+           WHERE user_id = ? AND version = ?
+             AND status IN ('pending', 'superseded')
+         )`,
+      ).bind(
+        userId,
+        prepared.reservationHash,
+        prepared.claimTokenHash,
+        duplicate.id,
+        userId,
+        chart.fingerprint,
+        jobId,
+        BIRTH_JOB_TYPE,
+        userId,
+        idem,
+        attempt,
+        profileMetadata,
+        userId,
+        profileVersion,
+      ),
+      c.env.DB.prepare(
+        `UPDATE jobs
+         SET status = 'succeeded', result_class = ?, finished_at = ?
+         WHERE id = ? AND job_type = ? AND user_id = ?
+           AND idempotency_key = ? AND status = 'running'
+           AND attempts = ? AND payload_json = ?
+           AND EXISTS (
+             SELECT 1 FROM birth_calc_reservations
+             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+               AND status = 'charged'
+           )
+           AND EXISTS (
+             SELECT 1 FROM chart_snapshots
+             WHERE id = ? AND user_id = ? AND fingerprint = ?
+           )
+           AND EXISTS (
+             SELECT 1 FROM birth_profiles
+             WHERE user_id = ? AND version = ?
+               AND status IN ('pending', 'superseded')
+           )`,
+      ).bind(
+        duplicate.id,
+        nowIso,
+        jobId,
+        BIRTH_JOB_TYPE,
+        userId,
+        idem,
+        attempt,
+        profileMetadata,
+        userId,
+        prepared.reservationHash,
+        prepared.claimTokenHash,
+        duplicate.id,
+        userId,
+        chart.fingerprint,
+        userId,
+        profileVersion,
+      ),
+      c.env.DB.prepare(
+        `UPDATE birth_profiles SET status = 'superseded', updated_at = ?
+         WHERE user_id = ? AND version = ? AND status = 'pending'
+           AND EXISTS (
+             SELECT 1 FROM birth_calc_reservations
+             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+               AND status = 'charged'
+           )
+           AND EXISTS (
+             SELECT 1 FROM chart_snapshots
+             WHERE id = ? AND user_id = ? AND fingerprint = ?
+           )
+           AND EXISTS (
+             SELECT 1 FROM jobs
+             WHERE id = ? AND job_type = ? AND user_id = ?
+               AND idempotency_key = ? AND status = 'succeeded'
+               AND attempts = ? AND payload_json = ? AND result_class = ?
+           )`,
+      ).bind(
+        nowIso,
+        userId,
+        profileVersion,
+        userId,
+        prepared.reservationHash,
+        prepared.claimTokenHash,
+        duplicate.id,
+        userId,
+        chart.fingerprint,
+        jobId,
+        BIRTH_JOB_TYPE,
+        userId,
+        idem,
+        attempt,
+        profileMetadata,
+        duplicate.id,
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'birth fingerprint winner settlement did not converge'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM chart_snapshots
+           WHERE id = ? AND user_id = ? AND fingerprint = ?
+         )
+         OR NOT EXISTS (
+           SELECT 1 FROM jobs
+           WHERE id = ? AND job_type = ? AND user_id = ?
+             AND idempotency_key = ? AND status = 'succeeded'
+             AND attempts = ? AND payload_json = ? AND result_class = ?
+         )
+         OR NOT EXISTS (
+           SELECT 1 FROM birth_profiles
+           WHERE user_id = ? AND version = ? AND status = 'superseded'
+         )`,
+      ).bind(
+        duplicate.id,
+        userId,
+        chart.fingerprint,
+        jobId,
+        BIRTH_JOB_TYPE,
+        userId,
+        idem,
+        attempt,
+        profileMetadata,
+        duplicate.id,
+        userId,
+        profileVersion,
+      ),
+    ]);
+    return c.json(
+      {
+        error: {
+          code: "chart_already_exists",
+          message: "This birth data already has a chart",
+          request_id: requestId,
+          details: { chart_id: duplicate.id, fingerprint: chart.fingerprint },
+        },
+      },
+      409,
+    );
+  }
 
   // The chart commit above is authoritative. Pattern's deterministic cache is
   // awaited for the eager path, but its failure must not roll back a valid
