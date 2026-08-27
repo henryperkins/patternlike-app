@@ -20,6 +20,7 @@ import type {
 } from "./ontology-regression.js";
 import type {
   CodexProviderFailureCode,
+  CodexProviderJobStatus,
   CodexProviderPass,
   CodexProviderPipeline,
   CodexProviderSafeDetailCode,
@@ -226,6 +227,28 @@ export type SafeLogEvent =
       job_id: string;
       operation: "claim" | "complete" | "fail";
     }
+  /**
+   * One content-free operational line per pipeline, pass, and status.
+   *
+   * A count, an age, and a closed status. Deliberately nothing else: the whole
+   * point of a metric is to summarise work whose contents must not be recorded,
+   * and an operator watching queue depth has no business seeing a prompt, an
+   * output, a reader, or a chart. `oldest_age_seconds` is null for terminal
+   * statuses, where "how long has this been waiting" is not a question.
+   */
+  | {
+      event: "codex_provider_pipeline_observed";
+      pipeline: CodexProviderPipeline;
+      pass: CodexProviderPass;
+      status: CodexProviderJobStatus;
+      count: number;
+      oldest_age_seconds: number | null;
+    }
+  | {
+      event: "codex_provider_nudge_observed";
+      pipeline: CodexProviderPipeline;
+      outcome: "sent" | "not_current" | "still_owned" | "send_failed";
+    }
   | {
       event: "codex_provider_dispatch_failed";
       job_id: string;
@@ -407,6 +430,23 @@ export function safeLog(input: SafeLogEvent): string {
         trace_id,
         job_id: input.job_id,
         operation: input.operation,
+      });
+      break;
+    case "codex_provider_pipeline_observed":
+      console.log(input.event, {
+        trace_id,
+        pipeline: input.pipeline,
+        pass: input.pass,
+        status: input.status,
+        count: input.count,
+        oldest_age_seconds: input.oldest_age_seconds,
+      });
+      break;
+    case "codex_provider_nudge_observed":
+      console.log(input.event, {
+        trace_id,
+        pipeline: input.pipeline,
+        outcome: input.outcome,
       });
       break;
     case "codex_provider_dispatch_failed":

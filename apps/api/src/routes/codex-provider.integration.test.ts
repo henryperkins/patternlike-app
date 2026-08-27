@@ -2,7 +2,25 @@ import { canonicalJson, contentHash } from "@patternlike/shared";
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetDb, rows } from "../../test/helpers.js";
+import {
+  IDENTITY_A,
+  USER_A,
+  SILENT_READING_QUEUE,
+  confirmPreferences,
+  disableReadingCodex,
+  enableReadingCodex,
+  resetDb,
+  rows,
+  seedChart,
+  seedUser,
+} from "../../test/helpers.js";
+import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
+import { claimJob, releaseClaimForPublisherPending } from "../db/generation.js";
+import {
+  enqueueConstrainedReading,
+  resolveV5TargetDate,
+} from "../services/enqueue.js";
+import { dispatchGeneration } from "../services/generate-daily-reading.js";
 import {
   claimOntologyPipelineRun,
   failOntologyPipelineRun,
@@ -231,6 +249,67 @@ async function fail(
   );
 }
 
+/**
+ * A Daily reading parked on a real durable provider job.
+ *
+ * Built through the executor rather than by inserting a row, because the claim
+ * route's admission runs the encrypted current-owner check: a hand-made
+ * coordinate with no live command behind it would be cancelled rather than
+ * leased, and the budget assertions would pass for the wrong reason.
+ */
+async function parkedReadingFixture(): Promise<{
+  jobId: string;
+  providerJobId: string;
+}> {
+  // On the binding, not a per-call object: the claim route runs inside the
+  // Worker and reads `c.env`, so a reading job admitted through a local copy
+  // would be cancelled as stale the moment the runner asked for it.
+  enableReadingCodex();
+  const readingEnv = env;
+  await seedUser(IDENTITY_A);
+  await confirmPreferences(USER_A, "America/Chicago");
+  await seedChart(IDENTITY_A);
+  const at = "2026-08-27T00:00:00.000Z";
+  await rows(
+    `INSERT INTO consents (id, user_id, kind, status, policy_version,
+       allowed_uses_json, scopes_json, version, granted_at, created_at, updated_at)
+     VALUES ('cns_codex_route_ai_0001', ?, 'ai_synthesis', 'granted', ?, '[]', '[]', 1, ?, ?, ?)`,
+    USER_A,
+    AI_SYNTHESIS_POLICY_VERSION,
+    at,
+    at,
+    at,
+  );
+  const targetLocalDate = resolveV5TargetDate("America/Chicago", new Date());
+  if (!targetLocalDate) throw new Error("test date did not resolve");
+  const enqueued = await enqueueConstrainedReading(
+    { ...readingEnv, READING_QUEUE: SILENT_READING_QUEUE } as typeof env,
+    USER_A,
+    {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate,
+    },
+  );
+  if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+  const jobClaim = await claimJob(readingEnv, enqueued.jobId);
+  if (!jobClaim) throw new Error("claim missing");
+  const outcome = await dispatchGeneration(readingEnv, jobClaim);
+  if (outcome.ok || outcome.reason !== "publisher_pending") {
+    throw new Error("expected a durable wait");
+  }
+  if (
+    !await releaseClaimForPublisherPending(
+      readingEnv,
+      jobClaim.jobId,
+      jobClaim.claimToken,
+    )
+  ) {
+    throw new Error("release did not commit");
+  }
+  return { jobId: enqueued.jobId, providerJobId: outcome.providerJobId };
+}
+
 describe("Codex provider runner routes", () => {
   beforeEach(async () => {
     await resetDb();
@@ -242,6 +321,7 @@ describe("Codex provider runner routes", () => {
       },
     });
     enableOntologyCodex();
+    disableReadingCodex();
   });
 
   it("leases one encrypted invocation and charges its existing budget", async () => {
@@ -749,6 +829,93 @@ describe("Codex provider runner routes", () => {
     expect(await env.DB.prepare(
       "SELECT status FROM codex_provider_jobs WHERE id = ?",
     ).bind(jobId).first()).toEqual({ status: "cancelled" });
+  });
+
+  it("charges the reading ledger once per runner lease, and never before", async () => {
+    const parked = await parkedReadingFixture();
+
+    // Creating and adopting the durable job cost nothing: the ledger is empty
+    // until the runner is actually handed a plaintext invocation.
+    expect(await rows("SELECT utc_date FROM reading_provider_daily_usage")).toEqual([]);
+
+    const response = await claim();
+    expect(response.status).toBe(200);
+    const body = await response.json<Record<string, unknown>>();
+    expect(body.job_id).toBe(parked.providerJobId);
+    // Nothing about the reader crosses to the runner.
+    expect(body).not.toHaveProperty("owner_id");
+    expect(body).not.toHaveProperty("user_id");
+    expect(JSON.stringify(body)).not.toContain(USER_A);
+
+    expect(
+      await rows<{ used_calls: number }>(
+        "SELECT used_calls FROM reading_provider_daily_usage",
+      ),
+    ).toEqual([{ used_calls: 1 }]);
+    // The Pattern and ontology ledgers are untouched: one pipeline must never
+    // spend another's approved allowance.
+    expect(await rows("SELECT utc_date FROM pattern_provider_daily_usage")).toEqual([]);
+    expect(
+      await rows("SELECT utc_date FROM pattern_ontology_provider_daily_usage"),
+    ).toEqual([]);
+  });
+
+  it("charges again when a runner lease is reclaimed", async () => {
+    const parked = await parkedReadingFixture();
+    expect((await claim()).status).toBe(200);
+
+    // The previous holder may have invoked the model before it died, so the
+    // ceiling has to bound spend rather than successes.
+    await rows(
+      "UPDATE codex_provider_jobs SET lease_expires_at = ? WHERE id = ?",
+      "2000-01-01T00:00:00.000Z",
+      parked.providerJobId,
+    );
+    expect((await claim()).status).toBe(200);
+    expect(
+      await rows<{ used_calls: number }>(
+        "SELECT used_calls FROM reading_provider_daily_usage",
+      ),
+    ).toEqual([{ used_calls: 2 }]);
+  });
+
+  it("terminalizes a reading claim that would exceed the approved ceiling", async () => {
+    const parked = await parkedReadingFixture();
+    // The day is already spent up to the ceiling the job was frozen under.
+    // Lowering `daily_call_limit` on the row instead would make the job stale
+    // rather than over budget: the frozen pin is compared to current
+    // configuration, and a job naming a different ceiling is cancelled.
+    await rows(
+      `INSERT INTO reading_provider_daily_usage
+         (utc_date, used_calls, created_at, updated_at)
+       VALUES (?, 250, ?, ?)`,
+      new Date().toISOString().slice(0, 10),
+      new Date().toISOString(),
+      new Date().toISOString(),
+    );
+
+    expect((await claim()).status).toBe(204);
+    const [row] = await rows<{
+      status: string;
+      failure_code: string;
+      safe_detail_code: string;
+    }>(
+      `SELECT status, failure_code, safe_detail_code
+       FROM codex_provider_jobs WHERE id = ?`,
+      parked.providerJobId,
+    );
+    expect(row).toEqual({
+      status: "failed",
+      failure_code: "publisher_budget_exhausted",
+      safe_detail_code: "daily_call_limit_reached",
+    });
+    // The refusal is durable and safe, so the owner can map it terminally
+    // instead of waiting for a call that will never be made.
+    expect(
+      await rows<{ used_calls: number }>(
+        "SELECT used_calls FROM reading_provider_daily_usage",
+      ),
+    ).toEqual([{ used_calls: 250 }]);
   });
 
   it("records exhausted daily budget as a closed terminal result", async () => {

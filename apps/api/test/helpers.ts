@@ -711,6 +711,55 @@ export function enablePatternCodex(): void {
   env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "900000";
 }
 
+/**
+ * Turn on Codex Daily generation on the in-isolate binding.
+ *
+ * Needed by any suite that drives the Worker through `SELF.fetch` or `queue()`:
+ * those read the real binding rather than a per-call env object, and the
+ * hermetic baseline deliberately leaves every publisher value empty. Callers
+ * must restore the baseline with `disableReadingCodex` — env mutations persist
+ * across tests in this pool.
+ */
+/**
+ * A `READING_QUEUE` that swallows sends.
+ *
+ * Miniflare simulates queues for real, and its consumer runs CONCURRENTLY with
+ * the test body. A fixture that reserves a reading and then drives the executor
+ * itself does not want the extra delivery: it races `resetDb`, and a claim that
+ * commits either side of that boundary leaves a provider job whose owner no
+ * longer exists — which the next test then picks up as the oldest claimable
+ * work and cancels, for reasons that have nothing to do with what it was
+ * testing.
+ */
+export const SILENT_READING_QUEUE = {
+  send: async () => {},
+  sendBatch: async () => {},
+} as unknown as typeof env.READING_QUEUE;
+
+export function enableReadingCodex(rollout = "hybrid"): void {
+  env.READING_V5_ROLLOUT = rollout;
+  for (const [key, value] of Object.entries(READING_CODEX_PUBLISHER_VARS)) {
+    (env as unknown as Record<string, string>)[key] = value;
+  }
+}
+
+/**
+ * Restore the hermetic baseline for Daily only.
+ *
+ * `CODEX_RUNNER_TOKEN` and `CODEX_PROVIDER_ARTIFACT_KEYRING` are shared with
+ * Pattern and the ontology pipeline, so clearing them here would silently
+ * disarm whichever of those a suite had already enabled.
+ */
+export function disableReadingCodex(): void {
+  env.READING_V5_ROLLOUT = "off";
+  for (const key of Object.keys(READING_CODEX_PUBLISHER_VARS)) {
+    if (key === "CODEX_RUNNER_TOKEN" || key === "CODEX_PROVIDER_ARTIFACT_KEYRING") {
+      continue;
+    }
+    (env as unknown as Record<string, string>)[key] = "";
+  }
+}
+
 export function disablePatternAi(): void {
   env.PATTERN_AI_ROLLOUT = "off";
   env.PATTERN_PUBLISHER = "";

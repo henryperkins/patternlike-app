@@ -23,6 +23,7 @@ import {
   seedChart,
   seedUser,
   READING_CODEX_PUBLISHER_VARS,
+  SILENT_READING_QUEUE,
 } from "../../test/helpers.js";
 import {
   candidateFor,
@@ -143,11 +144,20 @@ async function reserve(options: { context?: boolean; accuracy?: "exact" | "unkno
   if (options.context) await seedEligibleContext();
   const targetLocalDate = resolveV5TargetDate(ZONE, new Date());
   if (!targetLocalDate) throw new Error("test date did not resolve");
-  const enqueued = await enqueueConstrainedReading(enabledEnv(), USER_A, {
-    entry: "internal",
-    reservationReason: "internal",
-    targetLocalDate,
-  });
+  // Reserved without producing a real Queue message. Miniflare's queue
+  // simulator delivers concurrently with the test body, and a delivery that
+  // lands across a `resetDb` boundary leaves a provider job whose owner is
+  // gone — which the next suite then picks up as the oldest claimable work.
+  // Every test here drives the executor or `worker.queue` explicitly.
+  const enqueued = await enqueueConstrainedReading(
+    enabledEnv({ READING_QUEUE: SILENT_READING_QUEUE }),
+    USER_A,
+    {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate,
+    },
+  );
   if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason} / ${enqueued.detail}`);
   return enqueued;
 }

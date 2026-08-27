@@ -200,6 +200,79 @@ describe("account-deletion manifest", () => {
     ).bind(jobId).first()).toBeNull();
   });
 
+  it("collects a reading exchange, its committed response, and a stale upload", async () => {
+    // Daily provider work is user-owned for exactly this reason: the encrypted
+    // request and every response object have to leave with the account. The
+    // stale upload is the one a lease lost terminal CAS on -- it has no
+    // pointer on the job row, so only the inventory table can find it.
+    await seedUser(IDENTITY_A);
+    const jobId = `cpjob_${"cd".repeat(16)}`;
+    const requestKey = `codex-provider-jobs/${jobId}/request.json.enc`;
+    const responseKey =
+      `codex-provider-jobs/${jobId}/responses/${"1".repeat(64)}.json.enc`;
+    const staleKey =
+      `codex-provider-jobs/${jobId}/responses/${"2".repeat(64)}.json.enc`;
+    const at = "2026-08-27T00:00:00.000Z";
+    const hash = (byte: string) => `sha256:${byte.repeat(64)}`;
+    await env.DB.prepare(
+      `INSERT INTO codex_provider_jobs (
+         id, pipeline, owner_id, user_id, pass, stage_generation, stage_attempt,
+         request_hash, request_object_key, request_envelope_hash,
+         request_ciphertext_hash, request_key_id, request_nonce,
+         request_byte_length, response_hash, response_object_key,
+         response_envelope_hash, response_ciphertext_hash, response_key_id,
+         response_nonce, response_byte_length, model, reasoning_effort,
+         prompt_version, timeout_ms, daily_call_limit, status,
+         lease_token_hash, lease_expires_at, provider_request_id,
+         input_tokens, output_tokens, available_at, created_at, updated_at,
+         completed_at
+       ) VALUES (
+         ?, 'reading', 'job_reading_deletion_fixture', ?, 'publisher', 1, 0,
+         ?, ?, ?, ?, 'key', 'AAAAAAAAAAAAAAAA', 10,
+         ?, ?, ?, ?, 'key', 'BBBBBBBBBBBBBBBB', 8,
+         'gpt-5.6-sol', 'high', '1.0.1', 900000, 250, 'completed',
+         ?, '2026-08-27T00:20:00.000Z', 'thread_reading_deletion', 3, 2,
+         ?, ?, ?, ?
+       )`,
+    ).bind(
+      jobId,
+      USER_A,
+      hash("3"),
+      requestKey,
+      hash("4"),
+      hash("5"),
+      hash("6"),
+      responseKey,
+      hash("7"),
+      hash("8"),
+      hash("1"),
+      at,
+      at,
+      at,
+      at,
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO codex_provider_response_uploads (
+         job_id, lease_token_hash, object_key, created_at
+       ) VALUES (?, ?, ?, ?)`,
+    ).bind(jobId, hash("2"), staleKey, at).run();
+
+    expect(await collectDeletionArtifactKeys(env, USER_A)).toEqual([
+      requestKey,
+      responseKey,
+      staleKey,
+    ]);
+    await deleteUserRows(env, USER_A, "job_reading_deletion_fixture");
+    expect(await env.DB.prepare(
+      "SELECT id FROM codex_provider_jobs WHERE id = ?",
+    ).bind(jobId).first()).toBeNull();
+    // The cascade takes the inventory row with it, so nothing is left pointing
+    // at an object the account no longer owns.
+    expect(await env.DB.prepare(
+      "SELECT job_id FROM codex_provider_response_uploads WHERE job_id = ?",
+    ).bind(jobId).first()).toBeNull();
+  });
+
   it("keeps the M4 derived caches non-portable and deleted with the account", () => {
     for (const table of ["natal_feature_sets", "cycle_scan_receipts", "time_travel_daily_usage"] as const) {
       expect(NON_PORTABLE_USER_TABLES).toContain(table);

@@ -2,19 +2,36 @@ import {
   createExecutionContext,
   createScheduledController,
   env,
+  waitOnExecutionContext,
 } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import worker from "./index.js";
-import type { Env } from "./env.js";
+import type { Env, GenerationMessage } from "./env.js";
 import {
   IDENTITY_A,
   READING_CODEX_PUBLISHER_VARS,
+  SILENT_READING_QUEUE,
   USER_A,
+  confirmPreferences,
+  enableReadingCodex,
   resetDb,
   rows,
+  seedChart,
   seedUser,
 } from "../test/helpers.js";
+import {
+  candidateFor,
+  claimReadingJob,
+  completeReadingJob,
+} from "../test/codex-reading-runner.js";
+import { AI_SYNTHESIS_POLICY_VERSION } from "./db/consents.js";
+import { claimJob, releaseClaimForPublisherPending } from "./db/generation.js";
+import {
+  enqueueConstrainedReading,
+  resolveV5TargetDate,
+} from "./services/enqueue.js";
+import { dispatchGeneration } from "./services/generate-daily-reading.js";
 import {
   buildTestCorpusManifest,
   testOntologyPipelineArtifactKeyring,
@@ -74,6 +91,56 @@ function ontologyScheduledEnv(
     OPENAI_API_KEY: "sk-test-ontology",
     ...overrides,
   }) as Env;
+}
+
+/** A Daily reading parked on a real durable Codex job, waiting for a nudge. */
+async function parkedReadingFixture(): Promise<{
+  jobId: string;
+  readingId: string;
+}> {
+  enableReadingCodex();
+  await seedUser(IDENTITY_A);
+  await confirmPreferences(USER_A, "America/Chicago");
+  await seedChart(IDENTITY_A);
+  const at = "2026-08-27T00:00:00.000Z";
+  await rows(
+    `INSERT INTO consents (id, user_id, kind, status, policy_version,
+       allowed_uses_json, scopes_json, version, granted_at, created_at, updated_at)
+     VALUES ('cns_scheduled_ai_0001', ?, 'ai_synthesis', 'granted', ?, '[]', '[]', 1, ?, ?, ?)`,
+    USER_A,
+    AI_SYNTHESIS_POLICY_VERSION,
+    at,
+    at,
+    at,
+  );
+  const targetLocalDate = resolveV5TargetDate("America/Chicago", new Date());
+  if (!targetLocalDate) throw new Error("test date did not resolve");
+  const enqueued = await enqueueConstrainedReading(
+    { ...hybridEnv(), READING_QUEUE: SILENT_READING_QUEUE } as Env,
+    USER_A,
+    {
+      entry: "internal",
+      reservationReason: "internal",
+      targetLocalDate,
+    },
+  );
+  if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+  const claim = await claimJob(hybridEnv(), enqueued.jobId);
+  if (!claim) throw new Error("claim missing");
+  const outcome = await dispatchGeneration(hybridEnv(), claim);
+  if (outcome.ok || outcome.reason !== "publisher_pending") {
+    throw new Error("expected a durable wait");
+  }
+  if (
+    !await releaseClaimForPublisherPending(
+      hybridEnv(),
+      claim.jobId,
+      claim.claimToken,
+    )
+  ) {
+    throw new Error("release did not commit");
+  }
+  return { jobId: enqueued.jobId, readingId: enqueued.readingId };
 }
 
 async function reserveOntologyRun(
@@ -230,6 +297,47 @@ describe("scheduled Worker entry point", () => {
       job_id: "job_scheduled_after_failure",
       job_type: "export_account",
     });
+  });
+
+  it("repairs a lost Daily nudge on the incumbent cron", async () => {
+    // The state this recovers is invisible to every other sweep: the Daily job
+    // is queued, unclaimed, and still marked dispatched, so the outbox query
+    // skips it and the expired-lease query cannot see it. Without this pass a
+    // lost nudge is a reader who never gets a reading.
+    const parked = await parkedReadingFixture();
+    const claimed = await claimReadingJob();
+    if (!claimed) throw new Error("provider job missing");
+    await completeReadingJob(claimed, JSON.stringify(candidateFor(claimed.packet)));
+    await rows("UPDATE jobs SET dispatched_at = ? WHERE id = ?", "2020-01-01T00:00:00.000Z", parked.jobId);
+
+    const sent: GenerationMessage[] = [];
+    const cronEnv = {
+      ...hybridEnv(),
+      READING_QUEUE: {
+        send: async (message: GenerationMessage) => {
+          sent.push(message);
+        },
+      } as unknown as typeof env.READING_QUEUE,
+    } as Env;
+    const ctx = createExecutionContext();
+    await worker.scheduled(
+      createScheduledController({
+        scheduledTime: Date.now(),
+        cron: "*/15 * * * *",
+      }),
+      cronEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+
+    expect(sent).toEqual([
+      { job_id: parked.jobId, reading_id: parked.readingId },
+    ]);
+    const [job] = await rows<{ dispatched_at: string | null }>(
+      "SELECT dispatched_at FROM jobs WHERE id = ?",
+      parked.jobId,
+    );
+    expect(job!.dispatched_at).not.toBe("2020-01-01T00:00:00.000Z");
   });
 
   it("recovers an ontology send failure only after rollout is re-enabled", async () => {

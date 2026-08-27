@@ -22,6 +22,10 @@ import {
   utcDateForOntologyProviderUsage,
 } from "../db/ontology-provider-usage.js";
 import {
+  consumeProviderCallBudget as consumeReadingProviderCallBudget,
+  utcDateFor as utcDateForReadingProviderUsage,
+} from "../db/provider-usage.js";
+import {
   putCodexProviderArtifact,
   readCodexProviderArtifact,
 } from "../services/codex-provider-artifacts.js";
@@ -228,6 +232,19 @@ async function consumeBudget(
       utcDateFor(now),
       job.dailyCallLimit,
       job.pass,
+    )).ok;
+  }
+  if (job.pipeline === "reading") {
+    // Charged HERE and nowhere else. This is the moment the runner is handed a
+    // plaintext invocation, which is the only moment a model call becomes
+    // possible; creating, adopting, polling, completing, and publishing are all
+    // free. A reclaimed lease charges again on purpose: the previous holder may
+    // have invoked before it died, and the ceiling bounds spend rather than
+    // successes.
+    return (await consumeReadingProviderCallBudget(
+      env,
+      utcDateForReadingProviderUsage(now),
+      job.dailyCallLimit,
     )).ok;
   }
   if (job.pipeline === "ontology") {
