@@ -8,13 +8,7 @@
  */
 
 import type { Env } from "../env.js";
-import { isDevEnvironment } from "../crypto.js";
-import {
-  resolveAiGatewayRoute,
-  resolveProviderCredentialMode,
-  type AiGatewayRoute,
-  type ProviderCredentialMode,
-} from "./reading-publisher.js";
+import { resolveAiGatewayRoute } from "./reading-publisher.js";
 import type {
   PatternPlan,
   PatternSemanticVerdict,
@@ -38,17 +32,13 @@ export const PATTERN_PUBLISHER_SYNTHETIC = "synthetic" as const;
  */
 export const PATTERN_PUBLISHER_CODEX = "codex" as const;
 /**
- * Experimental Cloudflare Workers AI publisher, reached through the `AI`
- * binding. It remains development-only until its model contract and rollout
- * are independently reviewed; production configuration refuses it below.
+ * The retired Cloudflare Workers AI publisher.
+ *
+ * Kept as a name only. No adapter, no binding, and no configuration can select
+ * it, but `patternProviderDisplayName` still has to label provenance stored
+ * while it existed.
  */
 export const PATTERN_PUBLISHER_WORKERS_AI = "workers_ai" as const;
-
-export const WORKERS_AI_PATTERN_PLANNER_MODEL = "@cf/openai/gpt-oss-120b";
-export const WORKERS_AI_PATTERN_WRITER_MODEL = "@cf/openai/gpt-oss-120b";
-export const WORKERS_AI_PATTERN_VERIFIER_MODEL = "@cf/deepseek-ai/deepseek-v4-pro-0813";
-export const WORKERS_AI_PATTERN_PROMPT_VERSION = "1.0.0";
-export const WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 
 export const OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
 export const OPENAI_PATTERN_PLANNER_REASONING = "high" as const;
@@ -167,40 +157,33 @@ export interface PatternPublisherPin {
   validation_policy_version: "1.0.0";
 }
 
+/**
+ * The one deployable Pattern publisher configuration.
+ *
+ * There is no credential, key, or gateway route here on purpose: Pattern
+ * reaches its model through the durable Codex runner, and this Worker holds no
+ * provider credential for it. A field for one would be a place for a deployment
+ * to grow a second transport.
+ */
 export interface PatternPublisherConfig {
-  pin: PatternPublisherPin;
-  plannerTimeoutMs: number;
-  writerTimeoutMs: number;
-  verifierTimeoutMs: number;
+  pin: PatternPublisherPin & { publisher: typeof PATTERN_PUBLISHER_CODEX };
+  plannerTimeoutMs: typeof CODEX_PROVIDER_TIMEOUT_MS;
+  writerTimeoutMs: typeof CODEX_PROVIDER_TIMEOUT_MS;
+  verifierTimeoutMs: typeof CODEX_PROVIDER_TIMEOUT_MS;
   dailyCallLimit: number;
-  artifactRetentionDays: number;
-  apiKey: string | null;
-  /**
-   * The gateway the Pattern passes travel through, or `null` for the direct
-   * origin.
-   *
-   * Carried here rather than resolved at the call site so the adapter is handed
-   * a route explicitly instead of defaulting to one. A half-configured pair is
-   * refused above, never quietly downgraded to the direct origin -- an operator
-   * who set one of the two ids meant to route through a gateway, and billing the
-   * passes directly instead looks like a working deployment with an empty
-   * dashboard.
-   */
-  gatewayRoute: AiGatewayRoute | null;
-  /**
-   * How this deployment authenticates to OpenAI, or `null` under the synthetic
-   * pin, which authenticates to nothing.
-   *
-   * Resolved from `OPENAI_CREDENTIAL_SOURCE` rather than inferred from whether
-   * `OPENAI_API_KEY` happens to be set: inference cannot tell "the gateway holds
-   * the key" from "the worker key was forgotten", and those two need opposite
-   * outcomes.
-   */
-  credential: ProviderCredentialMode | null;
+  artifactRetentionDays: typeof PATTERN_ARTIFACT_RETENTION_DAYS;
 }
 
+/**
+ * Complete, or a refusal. There is no third state.
+ *
+ * A configuration that names no publisher is not "Pattern is off for now" --
+ * that was the rollout, and the rollout is gone. It is a deployment that cannot
+ * run the product, which `checkSecureConfig` turns into a refusal on every
+ * request rather than into a silent per-account outcome.
+ */
 export type PatternPublisherConfigOutcome =
-  | { ok: true; config: PatternPublisherConfig | null }
+  | { ok: true; config: PatternPublisherConfig }
   | { ok: false; code: "pattern_publisher_misconfigured"; message: string };
 
 function misconfigured(message: string): PatternPublisherConfigOutcome {
@@ -215,39 +198,73 @@ function readInteger(value: string | undefined): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-function checkPinnedInteger(raw: string | undefined, expected: number, key: string): string | null {
-  if (raw === undefined || raw.trim() === "") return null;
-  const parsed = readInteger(raw);
+function requiredInteger(
+  raw: string | undefined,
+  expected: number,
+  key: string,
+): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return `${key} is required`;
+  const parsed = readInteger(trimmed);
   if (parsed === null) return `${key} must be an integer`;
   if (parsed !== expected) return `${key} must be exactly ${expected}`;
   return null;
 }
 
-function checkPinnedString(raw: string | undefined, expected: string, key: string): string | null {
-  if (raw === undefined || raw.trim() === "") return null;
-  if (raw.trim() !== expected) return `${key} must be ${expected}`;
+function requiredString(
+  raw: string | undefined,
+  expected: string,
+  key: string,
+): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return `${key} is required`;
+  if (trimmed !== expected) return `${key} must be ${expected}`;
   return null;
 }
 
-export function resolvePatternPublisherConfiguration(
+/**
+ * Validate every operator-set Pattern value, and nothing else.
+ *
+ * Separate from `resolvePatternPublisherConfiguration` because a BINDING is not
+ * a value. `checkSecureConfig` runs this on every request and inside `queue()`,
+ * where reading `env.ARTIFACTS` would be an access rather than a check — an
+ * ontology delivery paused before R2 must stay paused before R2. Whether the
+ * bucket is bound is settled where the publisher is actually built.
+ *
+ * Every value is compared for EQUALITY against its compiled constant and every
+ * value is required, because a frozen command records the configuration it was
+ * built under: a deployed variable that drifts from the code would reach the
+ * runner describing something no command actually pinned, and an absent one
+ * would let a default stand in for an operator decision.
+ */
+export function checkPatternPublisherValues(
+  env: Partial<Env>,
+): { code: "pattern_publisher_misconfigured"; message: string } | null {
+  const outcome = resolvePatternPublisherValues(env);
+  return outcome.ok ? null : { code: outcome.code, message: outcome.message };
+}
+
+function resolvePatternPublisherValues(
   env: Partial<Env>,
 ): PatternPublisherConfigOutcome {
-  const configuredPublisher = env.PATTERN_PUBLISHER?.trim();
-  const expectedTimeout = configuredPublisher === PATTERN_PUBLISHER_CODEX
-    ? CODEX_PROVIDER_TIMEOUT_MS
-    : OPENAI_PATTERN_PLANNER_TIMEOUT_MS;
-  const pins: Array<[string | undefined, number, string]> = [
-    [env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, expectedTimeout, "OPENAI_PATTERN_PLANNER_TIMEOUT_MS"],
+  if (env.PATTERN_PUBLISHER?.trim() !== PATTERN_PUBLISHER_CODEX) {
+    return misconfigured(
+      "PATTERN_PUBLISHER must be codex; Pattern generation has no other deployable publisher",
+    );
+  }
+
+  const integerPins: Array<[string | undefined, number, string]> = [
+    [env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, CODEX_PROVIDER_TIMEOUT_MS, "OPENAI_PATTERN_PLANNER_TIMEOUT_MS"],
     [env.OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS, OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS, "OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS"],
-    [env.OPENAI_PATTERN_WRITER_TIMEOUT_MS, expectedTimeout, "OPENAI_PATTERN_WRITER_TIMEOUT_MS"],
+    [env.OPENAI_PATTERN_WRITER_TIMEOUT_MS, CODEX_PROVIDER_TIMEOUT_MS, "OPENAI_PATTERN_WRITER_TIMEOUT_MS"],
     [env.OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS, OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS, "OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS"],
-    [env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, expectedTimeout, "OPENAI_PATTERN_VERIFIER_TIMEOUT_MS"],
+    [env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, CODEX_PROVIDER_TIMEOUT_MS, "OPENAI_PATTERN_VERIFIER_TIMEOUT_MS"],
     [env.OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS, OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS, "OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS"],
     [env.PATTERN_INPUT_MAX_BYTES, PATTERN_INPUT_MAX_BYTES, "PATTERN_INPUT_MAX_BYTES"],
     [env.PATTERN_ARTIFACT_RETENTION_DAYS, PATTERN_ARTIFACT_RETENTION_DAYS, "PATTERN_ARTIFACT_RETENTION_DAYS"],
   ];
-  for (const [raw, expected, key] of pins) {
-    const problem = checkPinnedInteger(raw, expected, key);
+  for (const [raw, expected, key] of integerPins) {
+    const problem = requiredInteger(raw, expected, key);
     if (problem) return misconfigured(problem);
   }
 
@@ -263,208 +280,93 @@ export function resolvePatternPublisherConfiguration(
     [env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION, OPENAI_PATTERN_VERIFIER_PROMPT_VERSION, "OPENAI_PATTERN_VERIFIER_PROMPT_VERSION"],
   ];
   for (const [raw, expected, key] of stringPins) {
-    const problem = checkPinnedString(raw, expected, key);
+    const problem = requiredString(raw, expected, key);
     if (problem) return misconfigured(problem);
   }
 
-  const publisher = configuredPublisher;
-  if (
-    publisher !== undefined &&
-    publisher !== "" &&
-    publisher !== PATTERN_PUBLISHER_OPENAI &&
-    publisher !== PATTERN_PUBLISHER_SYNTHETIC &&
-    publisher !== PATTERN_PUBLISHER_CODEX &&
-    publisher !== PATTERN_PUBLISHER_WORKERS_AI
-  ) {
-    return misconfigured(
-      "PATTERN_PUBLISHER must be openai, codex, workers_ai, or synthetic",
-    );
+  const callLimit = readInteger(env.PATTERN_DAILY_PROVIDER_CALL_LIMIT?.trim() ?? "");
+  if (callLimit === null || callLimit < 1) {
+    return misconfigured("PATTERN_DAILY_PROVIDER_CALL_LIMIT must be a positive integer");
   }
-  if (publisher === PATTERN_PUBLISHER_SYNTHETIC && !isDevEnvironment(env.ENVIRONMENT)) {
-    return misconfigured("PATTERN_PUBLISHER=synthetic is refused outside development");
-  }
-  if (publisher === PATTERN_PUBLISHER_WORKERS_AI && !isDevEnvironment(env.ENVIRONMENT)) {
-    return misconfigured("PATTERN_PUBLISHER=workers_ai is refused outside development");
-  }
-
-  const callLimitRaw = env.PATTERN_DAILY_PROVIDER_CALL_LIMIT?.trim();
-  let callLimit: number | null = null;
-  if (callLimitRaw) {
-    callLimit = readInteger(callLimitRaw);
-    if (callLimit === null || callLimit < 1) {
-      return misconfigured("PATTERN_DAILY_PROVIDER_CALL_LIMIT must be a positive integer");
-    }
-  }
-
-  // A deployment that names no publisher has no runnable Pattern generation.
-  // Nothing about an account decides this; it is the absence of configuration.
-  if (!publisher) return { ok: true, config: null };
-
-  const publisherName = publisher as PatternPublisherName;
-  if (!callLimit) {
-    return misconfigured(
-      "PATTERN_DAILY_PROVIDER_CALL_LIMIT is required when a Pattern publisher is configured",
-    );
-  }
-
-  if (
-    publisherName === PATTERN_PUBLISHER_OPENAI ||
-    publisherName === PATTERN_PUBLISHER_CODEX
-  ) {
-    // `OPENAI_API_KEY` is deliberately NOT in this list. Under
-    // `OPENAI_CREDENTIAL_SOURCE=gateway_stored` the key must be ABSENT -- a key
-    // on the request wins over the gateway-stored one -- so requiring it here
-    // made BYOK, the approved credential model, unreachable for Pattern.
-    // `resolveProviderCredentialMode` below owns the whole question.
-    const required = [
-      env.OPENAI_PATTERN_PLANNER_MODEL,
-      env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
-      env.OPENAI_PATTERN_WRITER_MODEL,
-      env.OPENAI_PATTERN_WRITER_PROMPT_VERSION,
-      env.OPENAI_PATTERN_VERIFIER_MODEL,
-      env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
-    ];
-    if (required.some((value) => !value?.trim())) {
-      return misconfigured("The Pattern model publisher is enabled but not fully configured");
-    }
-  }
-
-  let gatewayRoute: AiGatewayRoute | null = null;
-  let credential: ProviderCredentialMode | null = null;
 
   // Section 14.2: the verifier configuration must not be identical to the
   // writer's, and at minimum (provider, model, prompt_version) must differ.
-  // Today only the prompt version separates them, and nothing checked that it
-  // stayed separate -- so one model configuration could become sole author and
-  // judge of the same prose through a one-character edit. Now the deployment
-  // refuses instead.
-  if (publisherName === PATTERN_PUBLISHER_OPENAI) {
-    const independence = verifierIndependenceProblem(
-      OPENAI_PATTERN_WRITER_MODEL,
-      OPENAI_PATTERN_WRITER_PROMPT_VERSION,
-      OPENAI_PATTERN_VERIFIER_MODEL,
-      OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
-    );
-    if (independence) return misconfigured(independence);
+  // Checked against the compiled constants, because the environment values are
+  // already pinned to them: what this guards is a source edit making the two
+  // literals equal, after which one model configuration is sole author and
+  // judge of the same prose with every pin check still passing.
+  const independence = verifierIndependenceProblem(
+    OPENAI_PATTERN_WRITER_MODEL,
+    OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+    OPENAI_PATTERN_VERIFIER_MODEL,
+    OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
+  );
+  if (independence) return misconfigured(independence);
 
-    // A half-configured gateway pair is a refusal, never a quiet fall back to
-    // the direct origin: an operator who set one of the two ids meant to route
-    // through a gateway, and billing and logging the Pattern passes directly
-    // instead would look like a working deployment with an empty dashboard.
-    const gateway = resolveAiGatewayRoute(env);
-    if (!gateway.ok) return misconfigured(gateway.message);
-    gatewayRoute = gateway.route;
-
-    const resolved = resolveProviderCredentialMode(env, gatewayRoute);
-    if (!resolved.ok) return misconfigured(resolved.message);
-    credential = resolved.mode;
+  const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
+  if (!/^[A-Za-z0-9._-]{32,512}$/.test(runnerToken)) {
+    return misconfigured("CODEX_RUNNER_TOKEN is required when PATTERN_PUBLISHER=codex");
   }
-
-  if (publisherName === PATTERN_PUBLISHER_CODEX) {
-    // The same section 14.2 separation applies: Codex runs the identical three
-    // passes, so writer and verifier must still differ in model or prompt
-    // version. Skipping the check for a second provider would reintroduce
-    // exactly the "sole author and judge" defect it was added to close.
-    const independence = verifierIndependenceProblem(
-      OPENAI_PATTERN_WRITER_MODEL,
-      OPENAI_PATTERN_WRITER_PROMPT_VERSION,
-      OPENAI_PATTERN_VERIFIER_MODEL,
-      OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
+  if ((env.CODEX_PROVIDER_ARTIFACT_KEYRING?.trim() ?? "") === "") {
+    return misconfigured(
+      "CODEX_PROVIDER_ARTIFACT_KEYRING is required when PATTERN_PUBLISHER=codex",
     );
-    if (independence) return misconfigured(independence);
-
-    const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
-    const keyring = env.CODEX_PROVIDER_ARTIFACT_KEYRING?.trim() ?? "";
-    if (!/^[A-Za-z0-9._-]{32,512}$/.test(runnerToken)) {
-      return misconfigured("CODEX_RUNNER_TOKEN is required when PATTERN_PUBLISHER=codex");
-    }
-    if (keyring === "" || !env.ARTIFACTS) {
-      return misconfigured(
-        "CODEX_PROVIDER_ARTIFACT_KEYRING and ARTIFACTS are required when PATTERN_PUBLISHER=codex",
-      );
-    }
-    // AI Gateway config belongs to the OpenAI transport. Refuse the ambiguous
-    // combination instead of implying the outbound runner uses that route.
-    const gateway = resolveAiGatewayRoute(env);
-    if (!gateway.ok) return misconfigured(gateway.message);
-    if (gateway.route !== null) {
-      return misconfigured("PATTERN_PUBLISHER=codex cannot be routed through AI Gateway");
-    }
   }
-
-  if (publisherName === PATTERN_PUBLISHER_WORKERS_AI) {
-    // No credential to resolve: the `AI` binding authenticates itself, and its
-    // absence is caught at execute time where the binding is actually in hand.
-    // The same 14.2 separation still has to hold, and here it is carried by two
-    // genuinely different models rather than by the prompt version alone.
-    const independence = verifierIndependenceProblem(
-      WORKERS_AI_PATTERN_WRITER_MODEL,
-      WORKERS_AI_PATTERN_PROMPT_VERSION,
-      WORKERS_AI_PATTERN_VERIFIER_MODEL,
-      WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION,
-    );
-    if (independence) return misconfigured(independence);
-    const gateway = resolveAiGatewayRoute(env);
-    if (!gateway.ok) return misconfigured(gateway.message);
-    if (gateway.route !== null) {
-      return misconfigured(
-        "PATTERN_PUBLISHER=workers_ai cannot be routed through AI Gateway",
-      );
-    }
+  // AI Gateway config names the OpenAI transport. Refuse the ambiguous
+  // combination instead of implying the outbound runner uses that route.
+  const gateway = resolveAiGatewayRoute(env);
+  if (!gateway.ok) return misconfigured(gateway.message);
+  if (gateway.route !== null) {
+    return misconfigured("PATTERN_PUBLISHER=codex cannot be routed through AI Gateway");
   }
-
-  const workersAi = publisherName === PATTERN_PUBLISHER_WORKERS_AI;
-  const pin: PatternPublisherPin = {
-    publisher: publisherName,
-    planner_model: workersAi
-      ? WORKERS_AI_PATTERN_PLANNER_MODEL
-      : OPENAI_PATTERN_PLANNER_MODEL,
-    planner_reasoning: OPENAI_PATTERN_PLANNER_REASONING,
-    planner_prompt_version: workersAi
-      ? WORKERS_AI_PATTERN_PROMPT_VERSION
-      : OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
-    planner_max_output_tokens: OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS,
-    writer_model: workersAi
-      ? WORKERS_AI_PATTERN_WRITER_MODEL
-      : OPENAI_PATTERN_WRITER_MODEL,
-    writer_reasoning: OPENAI_PATTERN_WRITER_REASONING,
-    writer_prompt_version: workersAi
-      ? WORKERS_AI_PATTERN_PROMPT_VERSION
-      : OPENAI_PATTERN_WRITER_PROMPT_VERSION,
-    writer_max_output_tokens: OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS,
-    verifier_model: workersAi
-      ? WORKERS_AI_PATTERN_VERIFIER_MODEL
-      : OPENAI_PATTERN_VERIFIER_MODEL,
-    verifier_reasoning: OPENAI_PATTERN_VERIFIER_REASONING,
-    verifier_prompt_version: workersAi
-      ? WORKERS_AI_PATTERN_VERIFIER_PROMPT_VERSION
-      : OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
-    verifier_max_output_tokens: OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS,
-    input_max_bytes: PATTERN_INPUT_MAX_BYTES,
-    selection_policy_version: "1.0.0",
-    validation_policy_version: "1.0.0",
-  };
 
   return {
     ok: true,
     config: {
-      pin,
-      plannerTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX
-        ? CODEX_PROVIDER_TIMEOUT_MS
-        : OPENAI_PATTERN_PLANNER_TIMEOUT_MS,
-      writerTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX
-        ? CODEX_PROVIDER_TIMEOUT_MS
-        : OPENAI_PATTERN_WRITER_TIMEOUT_MS,
-      verifierTimeoutMs: publisherName === PATTERN_PUBLISHER_CODEX
-        ? CODEX_PROVIDER_TIMEOUT_MS
-        : OPENAI_PATTERN_VERIFIER_TIMEOUT_MS,
+      pin: {
+        publisher: PATTERN_PUBLISHER_CODEX,
+        planner_model: OPENAI_PATTERN_PLANNER_MODEL,
+        planner_reasoning: OPENAI_PATTERN_PLANNER_REASONING,
+        planner_prompt_version: OPENAI_PATTERN_PLANNER_PROMPT_VERSION,
+        planner_max_output_tokens: OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS,
+        writer_model: OPENAI_PATTERN_WRITER_MODEL,
+        writer_reasoning: OPENAI_PATTERN_WRITER_REASONING,
+        writer_prompt_version: OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+        writer_max_output_tokens: OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS,
+        verifier_model: OPENAI_PATTERN_VERIFIER_MODEL,
+        verifier_reasoning: OPENAI_PATTERN_VERIFIER_REASONING,
+        verifier_prompt_version: OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
+        verifier_max_output_tokens: OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS,
+        input_max_bytes: PATTERN_INPUT_MAX_BYTES,
+        selection_policy_version: "1.0.0",
+        validation_policy_version: "1.0.0",
+      },
+      plannerTimeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
+      writerTimeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
+      verifierTimeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
       dailyCallLimit: callLimit,
       artifactRetentionDays: PATTERN_ARTIFACT_RETENTION_DAYS,
-      apiKey: env.OPENAI_API_KEY?.trim() || null,
-      gatewayRoute,
-      credential,
     },
   };
+}
+
+/**
+ * The complete deployable configuration, values and bindings.
+ *
+ * Used where a publisher is about to be built or a provider job owned. An
+ * unbound `ARTIFACTS` refuses here rather than in `checkSecureConfig`, so a
+ * Worker whose bucket is missing still serves every surface that does not need
+ * one — which is how `object_storage_not_configured` already behaves.
+ */
+export function resolvePatternPublisherConfiguration(
+  env: Partial<Env>,
+): PatternPublisherConfigOutcome {
+  const values = resolvePatternPublisherValues(env);
+  if (!values.ok) return values;
+  if (!env.ARTIFACTS) {
+    return misconfigured("ARTIFACTS is required when PATTERN_PUBLISHER=codex");
+  }
+  return values;
 }
 
 // ---------------------------------------------------------------------------

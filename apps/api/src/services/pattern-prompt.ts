@@ -357,8 +357,8 @@ export const PATTERN_WRITER_CORRECTION_POLICY = [
  * against a real 40-alias packet, where omissions cited a `covered_by` chapter
  * key that did not exist and mandatory aliases were recorded as omissions --
  * are now `PLAN_CLOSURE_RULES` in the shared policy, because the Codex pin
- * turned out to need them too. `workers-ai-pattern-publisher.ts` still selects
- * by name, and the name still rides `WORKERS_AI_PATTERN_PROMPT_VERSION`.
+ * turned out to need them too. The adapter that selected by this name is gone;
+ * the alias remains so the measurement it records is not lost with it.
  */
 export const WORKERS_AI_PLANNER_POLICY = PLANNER_POLICY;
 

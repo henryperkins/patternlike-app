@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { env, SELF } from "cloudflare:test";
 import {
   ALICE,
+  DETERMINISTIC_PATTERN_PUBLISHER,
   IDENTITY_A,
   IDENTITY_B,
   USER_A,
@@ -101,7 +102,7 @@ async function drain(generationId: string): Promise<string> {
       job_id: row.job_id,
       generation_id: row.generation_id,
       stage_generation: row.stage_generation,
-    });
+    }, new Date(), DETERMINISTIC_PATTERN_PUBLISHER);
   }
   throw new Error("pattern generation did not finish");
 }
@@ -1360,7 +1361,7 @@ describe("M7 AI-generated Pattern", () => {
       job_id: row!.job_id,
       generation_id: generationId,
       stage_generation: row!.stage_generation,
-    });
+    }, new Date(), DETERMINISTIC_PATTERN_PUBLISHER);
     const afterPlan = await env.DB.prepare(
       `SELECT stage FROM pattern_generation_jobs WHERE generation_id = ?`,
     )

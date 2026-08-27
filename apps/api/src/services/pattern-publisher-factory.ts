@@ -34,6 +34,7 @@ import {
   type PatternPassOptions,
   type PatternPassOutcome,
   type PatternPublisher,
+  type PatternPublisherName,
   type PatternStageClass,
 } from "./pattern-publisher.js";
 
@@ -124,39 +125,49 @@ export function createOpenAiPatternPublisher(
 }
 
 /**
- * The deterministic stand-ins, behind the same interface.
+ * The deterministic stand-in, behind the same interface.
  *
- * Q3 recorded: a document these author carries `assembly_mode:
+ * Q3 recorded: a document this authors carries `assembly_mode:
  * "constrained_model"`, which is a `const` in both
  * `pattern-document-internal.schema.json` and `pattern-response.schema.json`.
  * Adding a `deterministic_stand_in` value would turn that `const` into an
  * `enum` and bump `schema_version` across every 0.7.0 literal in the package.
  *
- * That is not needed, because the defect cannot reach a reader:
- * `resolvePatternPublisherConfiguration` refuses `PATTERN_PUBLISHER=synthetic`
- * outside development, and `checkSecureConfig` runs it on every product request
- * and inside `queue()`. A synthetic-authored document is structurally
- * impossible in any environment serving real readers. Revisit only if the
- * synthetic publisher is ever proposed for a non-development environment --
- * which would itself be the defect.
+ * That is not needed, because the defect cannot reach a reader: no
+ * configuration selects this. `resolvePatternPublisherConfiguration` resolves
+ * exactly one deployable publisher, and it is Codex; the only way in is the
+ * `overrides.publisher` parameter of `executePatternJob`, which is a parameter
+ * rather than a variable and which nothing in a deployment passes.
+ *
+ * `publisher` labels the provenance this stand-in reports. It defaults to
+ * `synthetic`, the honest answer; a suite standing in for the frozen pin passes
+ * that pin's publisher instead, because `runPublisherPass` compares executed
+ * provenance against the command and a stand-in that answered under a different
+ * name would fail that comparison rather than exercise it.
  */
 export function createSyntheticPatternPublisher(options: {
   forceReject: boolean;
   packet: unknown;
   ontology: unknown;
+  publisher?: PatternPublisherName;
+  /**
+   * Report token counts and a response hash rather than nulls. Required when
+   * standing in for a measured provider, whose provenance must be complete.
+   */
+  measured?: boolean;
 }): PatternPublisher {
   const provenance = (pass: PatternStageClass, pin: PatternPassOptions["pin"]) => ({
-    provider: PATTERN_PUBLISHER_SYNTHETIC,
+    provider: options.publisher ?? PATTERN_PUBLISHER_SYNTHETIC,
     pass,
     model: pin[`${pass}_model`],
     prompt_version: pin[`${pass}_prompt_version`],
     // No provider spoke, so there is no request id, no token count, and no
     // response to hash. Null rather than a zero or an empty string: a reader of
     // this record must be able to tell "not applicable" from "measured as none".
-    provider_request_id: null,
-    input_tokens: null,
-    output_tokens: null,
-    provider_response_hash: null,
+    provider_request_id: options.measured ? "stand-in" : null,
+    input_tokens: options.measured ? 0 : null,
+    output_tokens: options.measured ? 0 : null,
+    provider_response_hash: options.measured ? `sha256:${"0".repeat(64)}` : null,
   });
 
   return {

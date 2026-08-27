@@ -8,7 +8,7 @@ import {
   USER_A,
   confirmPreferences,
   disablePatternAi,
-  enablePatternCodex,
+  enablePatternAi,
   resetDb,
   rows,
   seedActiveOntology,
@@ -83,7 +83,7 @@ describe("Pattern execution through the durable Codex provider", () => {
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A);
     await seedActiveOntology();
-    enablePatternCodex();
+    enablePatternAi();
   });
 
   afterEach(() => {

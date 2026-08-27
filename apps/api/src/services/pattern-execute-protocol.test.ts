@@ -17,16 +17,17 @@ import { contentHash } from "@patternlike/shared";
 import type { Env } from "../env.js";
 
 import {
+  DETERMINISTIC_PATTERN_PUBLISHER,
   IDENTITY_A,
   USER_A,
   confirmPreferences,
   disablePatternAi,
   enablePatternAi,
-  enablePatternOpenAi,
   resetDb,
   seedActiveOntology,
   seedChart,
   seedUser,
+  transportPatternPublisher,
 } from "../../test/helpers.js";
 import {
   clearPatternReplayObjects,
@@ -53,6 +54,13 @@ import {
 } from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
+
+/**
+ * The credential the injected stand-in speaks with. The mocked origin keys its
+ * scripted behaviours off it, so this is how a case asks for an invalid plan or
+ * a rejection loop. It is a parameter of the stand-in, never a Worker binding.
+ */
+let standInKey = "sk-test";
 
 async function json(
   path: string,
@@ -86,8 +94,20 @@ async function reserve(key: string): Promise<string> {
   return (response.body.generation as { generation_id: string }).generation_id;
 }
 
-/** Deliver the message the durable row currently names. */
-async function deliver(generationId: string, executionEnv: Env = env) {
+/**
+ * Deliver the message the durable row currently names.
+ *
+ * The publisher is injected rather than configured: `PATTERN_PUBLISHER` selects
+ * Codex and nothing else, and Codex answers `publisher_pending` instead of an
+ * answer this suite can assert on. The default stand-in speaks the real
+ * Responses transport to the mocked origin, which is what the provider-answer
+ * cases here are about.
+ */
+async function deliver(
+  generationId: string,
+  executionEnv: Env = env,
+  overrides = transportPatternPublisher({ source: "worker", apiKey: standInKey }),
+) {
   const job = await loadPatternJob(executionEnv, generationId);
   if (!job) throw new Error("pattern job missing");
   return executePatternJob(executionEnv, {
@@ -95,7 +115,7 @@ async function deliver(generationId: string, executionEnv: Env = env) {
     job_id: job.job_id,
     generation_id: generationId,
     stage_generation: job.stage_generation,
-  });
+  }, new Date(), overrides);
 }
 
 async function providerCalls(): Promise<number> {
@@ -128,6 +148,7 @@ describe("Pattern stage protocol", () => {
     await clearPatternReplayObjects(env.PATTERN_REPLAY_LEDGER!);
     installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
+    standInKey = "sk-test";
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A);
@@ -138,17 +159,17 @@ describe("Pattern stage protocol", () => {
     vi.restoreAllMocks();
   });
 
-  it("reaches the OpenAI adapter instead of failing closed on a non-synthetic pin", async () => {
-    enablePatternOpenAi();
+  it("runs the transport and logs the frozen pin's provenance for the pass", async () => {
+    enablePatternAi();
     await seedActiveOntology();
-    const generationId = await reserve("idem-protocol-openai-reached");
+    const generationId = await reserve("idem-protocol-transport-reached");
     const job = await loadPatternJob(env, generationId);
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
 
     const outcome = await deliver(generationId);
 
-    // Before Task 6 an `openai` pin failed `publisher_unavailable` before a
-    // request was ever built. Three independent traces show the adapter ran.
+    // Three independent traces show a pass actually ran: the stage advanced,
+    // the ledger was charged, and the request bytes were committed first.
     expect(outcome).toEqual({ ok: true, terminal: false });
     expect(await stageOf(generationId)).toBe("writing");
     // Charged immediately before the fetch, so this counts the fetch.
@@ -166,7 +187,10 @@ describe("Pattern stage protocol", () => {
     expect(info).toHaveBeenCalledWith(
       "pattern_publisher_call_completed",
       expect.objectContaining({
-        provider: "openai",
+        // The frozen pin, which is what `runPublisherPass` checks the executed
+        // provenance against. A stand-in answers under it rather than under its
+        // own name, or it would fail that check instead of exercising it.
+        provider: "codex",
         pass: "planner",
         model: "gpt-5.6-sol",
         // Read the pin rather than restate it: a hardcoded literal here fails
@@ -177,9 +201,9 @@ describe("Pattern stage protocol", () => {
     );
   });
 
-  it("fails closed when OpenAI returns a schema-valid plan the packet cannot support", async () => {
-    enablePatternOpenAi();
-    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY;
+  it("fails closed when the publisher returns a schema-valid plan the packet cannot support", async () => {
+    enablePatternAi();
+    standInKey = OPENAI_MOCK_PATTERN_PLAN_INVALID_KEY;
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-openai-plan-invalid");
 
@@ -199,7 +223,7 @@ describe("Pattern stage protocol", () => {
   });
 
   it("logs a closed failed-attempt event with its pass and durable attempt", async () => {
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-openai-budget-log");
     const now = new Date().toISOString();
@@ -219,7 +243,7 @@ describe("Pattern stage protocol", () => {
     expect(warn).toHaveBeenCalledWith(
       "pattern_publisher_attempt_failed",
       expect.objectContaining({
-        provider: "openai",
+        provider: "codex",
         pass: "planner",
         attempt: 0,
         failure_class: "publisher_budget_exhausted",
@@ -228,12 +252,13 @@ describe("Pattern stage protocol", () => {
     );
   });
 
-  it("still produces the deterministic document under a synthetic pin", async () => {
+  it("still produces the deterministic document from an injected stand-in", async () => {
     enablePatternAi();
     await seedActiveOntology();
-    const generationId = await reserve("idem-protocol-synthetic");
+    const generationId = await reserve("idem-protocol-deterministic");
 
-    expect(await deliver(generationId)).toEqual({ ok: true, terminal: false });
+    expect(await deliver(generationId, env, DETERMINISTIC_PATTERN_PUBLISHER))
+      .toEqual({ ok: true, terminal: false });
     expect(await stageOf(generationId)).toBe("writing");
     // The ledger counts provider calls, and a stand-in is not a provider.
     expect(await providerCalls()).toBe(0);
@@ -366,38 +391,10 @@ describe("Pattern stage protocol", () => {
     ).bind(generationId).first<{ n: number }>()).toEqual({ n: 1 });
   });
 
-  it("keeps the frozen synthetic author and stores honest provenance after a live pin change", async () => {
+  it("stores the frozen pin's provenance for the passes that ran", async () => {
     enablePatternAi();
     await seedActiveOntology();
-    const generationId = await reserve("idem-protocol-frozen-synthetic-provenance");
-
-    // The command froze the synthetic publisher. Changing live configuration
-    // while the job is in flight must not silently replace its author.
-    enablePatternOpenAi();
-    for (const expectedStage of ["writing", "semantic_verifying", "succeeded"]) {
-      expect(await deliver(generationId)).toEqual({ ok: true, terminal: expectedStage === "succeeded" });
-      expect(await stageOf(generationId)).toBe(expectedStage);
-    }
-
-    const stored = await env.DB.prepare(
-      `SELECT compact_provenance_json FROM pattern_documents WHERE generation_id = ?`,
-    )
-      .bind(generationId)
-      .first<{ compact_provenance_json: string }>();
-    expect(stored).not.toBeNull();
-    expect(JSON.parse(stored!.compact_provenance_json)).toEqual(
-      expect.objectContaining({
-        provider: "synthetic",
-        model_family: "synthetic",
-      }),
-    );
-    expect(await providerCalls()).toBe(0);
-  });
-
-  it("stores OpenAI writer provenance from the frozen pin that ran", async () => {
-    enablePatternOpenAi();
-    await seedActiveOntology();
-    const generationId = await reserve("idem-protocol-openai-provenance");
+    const generationId = await reserve("idem-protocol-frozen-provenance");
 
     for (const expectedStage of ["writing", "semantic_verifying", "succeeded"]) {
       expect(await deliver(generationId)).toEqual({ ok: true, terminal: expectedStage === "succeeded" });
@@ -412,7 +409,7 @@ describe("Pattern stage protocol", () => {
     expect(stored).not.toBeNull();
     expect(JSON.parse(stored!.compact_provenance_json)).toEqual(
       expect.objectContaining({
-        provider: "OpenAI",
+        provider: "Codex",
         model_family: "gpt",
       }),
     );
@@ -434,15 +431,15 @@ describe("Pattern stage protocol", () => {
     });
   });
 
-  it("does not replace a frozen OpenAI author with the live synthetic publisher", async () => {
-    enablePatternOpenAi();
-    await seedActiveOntology();
-    const generationId = await reserve("idem-protocol-frozen-openai-author");
-
-    // The live synthetic configuration has no provider credential. The frozen
-    // OpenAI command must therefore fail closed rather than publish stand-in
-    // prose under OpenAI provenance.
+  it("fails closed rather than publishing under a configuration it cannot run", async () => {
     enablePatternAi();
+    await seedActiveOntology();
+    const generationId = await reserve("idem-protocol-configuration-lost");
+
+    // The command froze a complete Codex configuration. A deployment that can
+    // no longer resolve one must fail the job closed rather than publish prose
+    // under provenance the frozen command never described.
+    env.PATTERN_PUBLISHER = "openai";
     expect(await deliver(generationId)).toEqual({
       ok: false,
       reason: "terminal",
@@ -459,7 +456,7 @@ describe("Pattern stage protocol", () => {
   });
 
   it("spends no budget on a delivery whose ontology recheck fails", async () => {
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-ontology-recheck");
 
@@ -482,7 +479,7 @@ describe("Pattern stage protocol", () => {
     // publisher must rebuild that request; adoption leaves it absent. This
     // keeps the assertion meaningful now that the frozen command pin wins over
     // a live publisher change.
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-adoption");
 
@@ -627,8 +624,8 @@ describe("Pattern stage protocol", () => {
   });
 
   it("retries a deterministic candidate rejection in place with a closed correction", async () => {
-    enablePatternOpenAi();
-    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY;
+    enablePatternAi();
+    standInKey = OPENAI_MOCK_PATTERN_CANDIDATE_INVALID_ONCE_KEY;
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-candidate-correction");
 
@@ -675,8 +672,8 @@ describe("Pattern stage protocol", () => {
   });
 
   it("runs all three candidates with two verifier calls each and stops at exactly 11 fetches", async () => {
-    enablePatternOpenAi();
-    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY;
+    enablePatternAi();
+    standInKey = OPENAI_MOCK_PATTERN_FULL_REJECTION_LOOP_KEY;
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-full-rejection-loop");
 
@@ -847,7 +844,7 @@ describe("Pattern stage protocol", () => {
   });
 
   it("fails terminally without a provider call when the pass attempt index is spent", async () => {
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-protocol-attempts-exhausted");
 
@@ -885,7 +882,7 @@ describe("Pattern stage protocol", () => {
   ] as const)(
     "fails terminally before another $pass fetch when its next-attempt index is spent",
     async ({ pass, column, maximum, setupCalls, publicStage }) => {
-      enablePatternOpenAi();
+      enablePatternAi();
       await seedActiveOntology();
       const generationId = await reserve(`idem-protocol-${pass}-attempts-exhausted`);
 

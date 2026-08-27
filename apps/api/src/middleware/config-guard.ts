@@ -5,7 +5,7 @@ import { DEV_ROOT_KEK, isDevEnvironment } from "../crypto.js";
 import { resolvePublisherConfiguration } from "../services/reading-publisher.js";
 import { resolveCheckInRetentionMonths } from "../services/check-in-retention.js";
 import { safeLog, type ConfigurationCode } from "../services/safe-log.js";
-import { resolvePatternPublisherConfiguration } from "../services/pattern-publisher.js";
+import { checkPatternPublisherValues } from "../services/pattern-publisher.js";
 import { resolveTimeTravelConfiguration } from "../services/time-travel-config.js";
 import {
   resolveAiGatewayRoute,
@@ -460,10 +460,8 @@ export function checkSecureConfig(
     return { code: publisher.code, message: publisher.message };
   }
 
-  const patternPublisher = resolvePatternPublisherConfiguration(env);
-  if (!patternPublisher.ok) {
-    return { code: patternPublisher.code, message: patternPublisher.message };
-  }
+  const patternPublisher = checkPatternPublisherValues(env);
+  if (patternPublisher) return patternPublisher;
 
   const ontologyPipeline = resolveOntologyPipelineConfiguration(env);
   if (!ontologyPipeline.ok) {

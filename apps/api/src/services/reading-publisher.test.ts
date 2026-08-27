@@ -31,7 +31,37 @@ const KEYRING = JSON.stringify({
 // any particular object is in it.
 const ARTIFACTS = {} as unknown as R2Bucket;
 
+/**
+ * Pattern's own configuration, which every deployment carries.
+ *
+ * Pattern has no rollout and exactly one deployable publisher, so an incomplete
+ * Pattern block is a refusal on every path. These cases are about Daily, so
+ * they spread this in to keep their refusals about Daily.
+ */
+const PATTERN: Partial<Env> = {
+  PATTERN_PUBLISHER: "codex",
+  PATTERN_DAILY_PROVIDER_CALL_LIMIT: "100",
+  PATTERN_INPUT_MAX_BYTES: "98304",
+  PATTERN_ARTIFACT_RETENTION_DAYS: "30",
+  OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_PLANNER_REASONING: "high",
+  OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
+  OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
+  OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_WRITER_REASONING: "high",
+  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.1",
+  OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
+  OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_VERIFIER_REASONING: "high",
+  OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
+  OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
+};
+
 const enabled: Partial<Env> = {
+  ...PATTERN,
   ENVIRONMENT: "production",
   ROOT_KEK: STRONG_KEK,
   OIDC_ISSUER: "https://issuer.example.com",
@@ -149,11 +179,15 @@ describe("Codex-only Daily publisher configuration", () => {
     }
   });
 
-  it("needs no runnable provider at all while the rollout is off", () => {
-    // The kill switch has to be a real state. Turning Daily off in an incident
-    // must not require an operator to also produce a runner token to make the
-    // deployment serve its other surfaces.
+  it("needs no runnable Daily provider at all while the rollout is off", () => {
+    // The kill switch has to be a real state: turning Daily off in an incident
+    // must leave every Daily publisher value absent and still resolve. The
+    // Codex posture in this fixture belongs to Pattern, which has no off state
+    // and therefore requires it whatever Daily is doing.
     const off: Partial<Env> = {
+      ...PATTERN,
+      CODEX_RUNNER_TOKEN: RUNNER_TOKEN,
+      CODEX_PROVIDER_ARTIFACT_KEYRING: KEYRING,
       ENVIRONMENT: "production",
       ROOT_KEK: STRONG_KEK,
       OIDC_ISSUER: "https://issuer.example.com",

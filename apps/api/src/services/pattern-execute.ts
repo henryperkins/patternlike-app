@@ -20,7 +20,6 @@ import { ensureNatalFeatureSet } from "../db/natal-features.js";
 import { loadActiveOntology, loadOntologyByVersion } from "../db/pattern-ontology.js";
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { isConsumedStatus, loadClaimForFingerprint } from "../db/pattern-claims.js";
-import { consumePatternProviderCallBudget, utcDateFor } from "../db/pattern-provider-usage.js";
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import {
   PATTERN_JOB_TYPE,
@@ -46,9 +45,6 @@ import { hashesEqual } from "./content-release.js";
 import {
   OPENAI_PATTERN_WRITER_MODEL,
   PATTERN_PUBLISHER_CODEX,
-  PATTERN_PUBLISHER_OPENAI,
-  PATTERN_PUBLISHER_WORKERS_AI,
-  WORKERS_AI_PATTERN_WRITER_MODEL,
   patternProviderDisplayName,
   resolvePatternPublisherConfiguration,
   type PatternPassOutcome,
@@ -58,11 +54,6 @@ import {
   type PatternPublisherPin,
   type PatternStageClass,
 } from "./pattern-publisher.js";
-import {
-  createOpenAiPatternPublisher,
-  createSyntheticPatternPublisher,
-} from "./pattern-publisher-factory.js";
-import { createWorkersAiPatternPublisher } from "./workers-ai-pattern-publisher.js";
 import { createCodexPatternPublisher } from "./codex-pattern-publisher.js";
 import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
 import {
@@ -74,7 +65,7 @@ import {
   type PatternCorrectionDocument,
   type PatternPacketLimits,
 } from "./pattern-packet.js";
-import { findSemanticVerdictProblem, resolveSemanticForceReject } from "./pattern-semantic.js";
+import { findSemanticVerdictProblem } from "./pattern-semantic.js";
 import {
   artifactAad,
   decryptUnderContentKey,
@@ -101,37 +92,20 @@ const CLAIM_LEASE_MS = 5 * 60 * 1000;
  */
 const MODEL_FAMILY_BY_WRITER_MODEL: Readonly<Record<string, string>> = {
   [OPENAI_PATTERN_WRITER_MODEL]: "gpt",
-  [WORKERS_AI_PATTERN_WRITER_MODEL]: "gpt-oss",
 };
 
 function provenanceFromExecutedPin(pin: PatternPublisherPin): {
   provider: string;
   model_family: string;
 } {
-  if (pin.publisher === PATTERN_PUBLISHER_WORKERS_AI) {
-    const family = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
-    if (!family) throw new Error("unsupported Pattern writer model family");
-    return {
-      provider: patternProviderDisplayName(pin.publisher),
-      model_family: family,
-    };
-  }
-  if (
-    pin.publisher !== PATTERN_PUBLISHER_OPENAI &&
-    pin.publisher !== PATTERN_PUBLISHER_CODEX
-  ) {
-    return {
-      provider: patternProviderDisplayName(pin.publisher),
-      model_family: "synthetic",
-    };
+  // The document says who actually wrote it, and only a publisher this build
+  // can still execute may reach a reader. A stored document keeps whatever its
+  // own generation froze; this is the map for the one a new command names.
+  if (pin.publisher !== PATTERN_PUBLISHER_CODEX) {
+    throw new Error("unsupported Pattern publisher for a new document");
   }
   const modelFamily = MODEL_FAMILY_BY_WRITER_MODEL[pin.writer_model];
   if (!modelFamily) throw new Error("unsupported Pattern writer model family");
-  // The document says who actually wrote it. Reporting "OpenAI" for a Codex
-  // pass would put a false provenance record in front of a reader, which is the
-  // exact failure the executed-pin check and the closed model-family allowlist
-  // exist to prevent -- the reader-facing `provider` is a plain string in the
-  // frozen contract precisely so a second honest value costs no schema bump.
   return {
     provider: patternProviderDisplayName(pin.publisher),
     model_family: modelFamily,
@@ -150,18 +124,14 @@ async function runPublisherPass<T>(
   attempt: number,
   invoke: () => Promise<PatternPassOutcome<T>>,
 ): Promise<PatternPassOutcome<T>> {
+  // A job whose frozen pin this build cannot execute is failed before any pass
+  // runs, so another publisher here is a defect rather than a deployment state.
+  if (pin.publisher !== PATTERN_PUBLISHER_CODEX) {
+    throw new Error("Pattern pass ran under a publisher this build cannot execute");
+  }
   const startedAt = Date.now();
   const outcome = await invoke();
   if (!outcome.ok && outcome.code === "publisher_pending") return outcome;
-  // Both real providers are measured and provenance-checked. Only the
-  // deterministic stand-in is exempt, because it never spoke to anyone.
-  if (
-    pin.publisher !== PATTERN_PUBLISHER_OPENAI &&
-    pin.publisher !== PATTERN_PUBLISHER_CODEX &&
-    pin.publisher !== PATTERN_PUBLISHER_WORKERS_AI
-  ) {
-    return outcome;
-  }
 
   const latencyMs = Math.max(0, Date.now() - startedAt);
   if (!outcome.ok) {
@@ -881,10 +851,27 @@ async function awaitPatternProvider(
 // pattern-stage-protocol.ts is the sole owner of domain-stage legality,
 // attempt arithmetic, stage-generation effects, hash effects, public-stage
 // mapping, and guarded job transition statements.
+/**
+ * The one seam a deterministic publisher may enter through.
+ *
+ * `PATTERN_PUBLISHER` no longer selects an implementation -- a deployable
+ * configuration is Codex and nothing else -- so a suite that needs prose it can
+ * predict hands one in here. Nothing in a deployment can reach this: it is a
+ * parameter, not a variable, and `queue()` and the sweep both omit it.
+ */
+export interface PatternExecuteOverrides {
+  publisher?: (context: {
+    pin: PatternPublisherPin;
+    packet: unknown;
+    ontology: unknown;
+  }) => PatternPublisher;
+}
+
 export async function executePatternJob(
   env: Env,
   message: PatternGenerationMessage,
   now = new Date(),
+  overrides: PatternExecuteOverrides = {},
 ): Promise<PatternExecuteOutcome> {
   const claim = await claimStage(env, message, now);
   if (claim.status === "retry") {
@@ -935,9 +922,9 @@ export async function executePatternJob(
   // Pattern opportunity held by a job that can neither finish nor fail.
   try {
     const resolved = resolvePatternPublisherConfiguration(env);
-    if (!resolved.ok || !resolved.config) {
-      // A half-configured gateway, a missing credential, or a pin that does not
-      // match its compiled constant. None of the three improves on a retry.
+    if (!resolved.ok) {
+      // A missing runner posture, or a pin that does not match its compiled
+      // constant. Neither improves on a retry.
       await commitPatternTransition(env, claimed.job, claimed.token, {
         kind: "fail",
         failureClass: "publisher_not_configured",
@@ -993,22 +980,9 @@ export async function executePatternJob(
       bounds: PATTERN_PACKET_LIMITS_DEFAULT.bounds,
     };
 
-    const workersAi = pin.publisher === PATTERN_PUBLISHER_WORKERS_AI;
-    const remoteProvider =
-      pin.publisher === PATTERN_PUBLISHER_OPENAI ||
-      pin.publisher === PATTERN_PUBLISHER_CODEX ||
-      workersAi;
-    // Workers AI carries no credential; its binding is the thing that must
-    // exist, and a deployment naming it without one fails the same way.
-    if (workersAi && !env.AI) {
-      await commitPatternTransition(env, claimed.job, claimed.token, {
-        kind: "fail",
-        failureClass: "publisher_not_configured",
-        publicStage: publicStageFor(stage) ?? "organizing_evidence",
-      });
-      return { ok: false, reason: "terminal", failureClass: "publisher_not_configured" };
-    }
-    if (pin.publisher === PATTERN_PUBLISHER_OPENAI && !config.credential) {
+    // The command pin is the author frozen at reservation, and a deployment
+    // that can no longer run it must not silently substitute the one it can.
+    if (pin.publisher !== PATTERN_PUBLISHER_CODEX) {
       await commitPatternTransition(env, claimed.job, claimed.token, {
         kind: "fail",
         failureClass: "publisher_not_configured",
@@ -1017,42 +991,16 @@ export async function executePatternJob(
       return { ok: false, reason: "terminal", failureClass: "publisher_not_configured" };
     }
 
-    // Section 25.3's "consumed immediately before each provider call".
-    //
-    // Handed to the publisher rather than called here: the fetch is inside the
-    // adapter, and a unit consumed at stage entry is spent by a delivery that
-    // may never reach a provider -- a `plan_missing` delivery makes no call and
-    // used to charge for one anyway. Failed, timed-out and refused calls each
-    // consume a unit, and nothing is refunded: the bound is on spend, not on
-    // success. A synthetic pass gets a reserve that never charges, because the
-    // ledger counts provider calls and there is no provider.
-    const reserve = remoteProvider && pin.publisher !== PATTERN_PUBLISHER_CODEX
-      ? async (stageClass: PatternStageClass) => {
-          const budget = await consumePatternProviderCallBudget(
-            env,
-            utcDateFor(now),
-            config.dailyCallLimit,
-            stageClass,
-          );
-          return { ok: budget.ok };
-        }
-      : async (_stageClass: PatternStageClass) => ({ ok: true });
+    // Section 25.3's "consumed immediately before each provider call" is
+    // charged where the plaintext invocation is actually handed out -- the
+    // runner's claim in routes/codex-provider.ts -- because that is the only
+    // moment a model call becomes possible. Creating, adopting, polling, and
+    // publishing are free, so nothing is charged here.
+    const reserve = async (_stageClass: PatternStageClass) => ({ ok: true });
 
-    // One transport serves both remote providers: the credential it is handed
-    // selects the endpoint, the header set, and the request shape. A second
-    // near-identical publisher would be a second place for the pass ceilings
-    // and the provenance metadata to drift.
-    const publisherImpl: PatternPublisher = workersAi
-      ? createWorkersAiPatternPublisher(env.AI as never)
-      : pin.publisher === PATTERN_PUBLISHER_CODEX
-      ? createCodexPatternPublisher(env)
-      : remoteProvider
-      ? createOpenAiPatternPublisher(config.credential!, config.gatewayRoute)
-      : createSyntheticPatternPublisher({
-          forceReject: resolveSemanticForceReject(env),
-          packet: selected.packet,
-          ontology: records,
-        });
+    const publisherImpl: PatternPublisher = overrides.publisher
+      ? overrides.publisher({ pin, packet: selected.packet, ontology: records })
+      : createCodexPatternPublisher(env);
 
     const passTimeoutMs: Record<PatternStageClass, number> = {
       planner: config.plannerTimeoutMs,
@@ -1065,18 +1013,14 @@ export async function executePatternJob(
       timeoutMs: passTimeoutMs[pass],
       pin,
       reserve,
-      ...(pin.publisher === PATTERN_PUBLISHER_CODEX
-        ? {
-            codexJob: {
-              pipeline: "pattern" as const,
-              ownerId: command.generation_id,
-              userId: identity.userId,
-              stageGeneration: claimed.job.stage_generation,
-              stageAttempt: claimed.job[patternPassProtocol(pass).attemptColumn],
-              dailyCallLimit: config.dailyCallLimit,
-            },
-          }
-        : {}),
+      codexJob: {
+        pipeline: "pattern" as const,
+        ownerId: command.generation_id,
+        userId: identity.userId,
+        stageGeneration: claimed.job.stage_generation,
+        stageAttempt: claimed.job[patternPassProtocol(pass).attemptColumn],
+        dailyCallLimit: config.dailyCallLimit,
+      },
     });
 
     // Step 6: the exact bytes sent, written before the call that sends them, so

@@ -9,6 +9,7 @@ import {
   OPENAI_PATTERN_VERIFIER_PROMPT_VERSION,
   OPENAI_PATTERN_WRITER_MODEL,
   OPENAI_PATTERN_WRITER_PROMPT_VERSION,
+  PATTERN_ARTIFACT_RETENTION_DAYS,
   PATTERN_PUBLISHER_CODEX,
   PATTERN_PUBLISHER_OPENAI,
   PATTERN_PUBLISHER_SYNTHETIC,
@@ -19,32 +20,45 @@ import {
   type PatternPassOptions,
   type PatternPublisherPin,
 } from "./pattern-publisher.js";
+import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
 import { checkSecureConfig } from "../middleware/config-guard.js";
 
-/** A fully configured OpenAI Pattern environment, for mutation in each case. */
-function env(overrides: Record<string, string | undefined> = {}) {
+export const CODEX_PATTERN_RUNNER_TOKEN =
+  "runner_0123456789abcdefghijklmnopqrstuvwxyz";
+export const CODEX_PATTERN_ARTIFACT_KEYRING =
+  '{"version":1,"keys":{"k":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"}}';
+
+/**
+ * A complete, deployable Pattern environment.
+ *
+ * There is one: Codex, with every pin matching its compiled constant and the
+ * runner posture present. Each case mutates exactly the value under test, so a
+ * refusal names that value rather than an incidental omission.
+ */
+function env(overrides: Record<string, unknown> = {}) {
   return {
     ENVIRONMENT: "production",
-    PATTERN_PUBLISHER: "openai",
+    PATTERN_PUBLISHER: "codex",
     PATTERN_DAILY_PROVIDER_CALL_LIMIT: "100",
     PATTERN_INPUT_MAX_BYTES: "98304",
     PATTERN_ARTIFACT_RETENTION_DAYS: "30",
-    OPENAI_API_KEY: "sk-test",
-    OPENAI_CREDENTIAL_SOURCE: "worker",
+    CODEX_RUNNER_TOKEN: CODEX_PATTERN_RUNNER_TOKEN,
+    CODEX_PROVIDER_ARTIFACT_KEYRING: CODEX_PATTERN_ARTIFACT_KEYRING,
+    ARTIFACTS: {},
     OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_PLANNER_REASONING: "high",
     OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
-    OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "120000",
+    OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_WRITER_REASONING: "high",
     OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.1",
-    OPENAI_PATTERN_WRITER_TIMEOUT_MS: "120000",
+    OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_VERIFIER_REASONING: "high",
     OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
-    OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "120000",
+    OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
     ...overrides,
   } as never;
@@ -124,22 +138,159 @@ function options(reserveOk = true): PatternPassOptions {
 }
 
 describe("Pattern publisher configuration", () => {
-  it("accepts a fully configured OpenAI deployment", () => {
+  it("accepts a complete Codex deployment and pins every frozen value", () => {
     const outcome = resolvePatternPublisherConfiguration(env());
-    expect(outcome.ok).toBe(true);
+    expect(outcome.ok, JSON.stringify(outcome)).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.config?.pin.publisher).toBe("openai");
+    expect(outcome.config.pin.publisher).toBe(PATTERN_PUBLISHER_CODEX);
+    expect(outcome.config.pin.planner_model).toBe("gpt-5.6-sol");
+    expect(outcome.config.pin.planner_reasoning).toBe("high");
+    expect(outcome.config.pin.planner_prompt_version).toBe("1.0.1");
+    expect(outcome.config.pin.writer_prompt_version).toBe("1.0.1");
+    expect(outcome.config.pin.verifier_prompt_version).toBe("1.0.0-verifier");
+    expect(outcome.config.pin.planner_max_output_tokens).toBe(32000);
+    expect(outcome.config.pin.input_max_bytes).toBe(98_304);
+    expect(outcome.config.plannerTimeoutMs).toBe(CODEX_PROVIDER_TIMEOUT_MS);
+    expect(outcome.config.writerTimeoutMs).toBe(CODEX_PROVIDER_TIMEOUT_MS);
+    expect(outcome.config.verifierTimeoutMs).toBe(CODEX_PROVIDER_TIMEOUT_MS);
+    expect(outcome.config.dailyCallLimit).toBe(100);
+    expect(outcome.config.artifactRetentionDays).toBe(PATTERN_ARTIFACT_RETENTION_DAYS);
   });
 
-  it("refuses the experimental Workers AI publisher outside development", () => {
+  it("carries no OpenAI credential, key, or gateway route at all", () => {
     const outcome = resolvePatternPublisherConfiguration(
-      env({ PATTERN_PUBLISHER: "workers_ai" }),
+      env({ OPENAI_API_KEY: "sk-test", OPENAI_CREDENTIAL_SOURCE: "worker" }),
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    // The Worker holds no provider credential for Pattern. A key that happens
+    // to be set for the ontology pipeline must not become Pattern's transport.
+    expect(Object.keys(outcome.config).sort()).toEqual([
+      "artifactRetentionDays",
+      "dailyCallLimit",
+      "pin",
+      "plannerTimeoutMs",
+      "verifierTimeoutMs",
+      "writerTimeoutMs",
+    ]);
+  });
+
+  it.each([
+    ["openai", "openai"],
+    ["workers_ai", "workers_ai"],
+    ["synthetic", "synthetic"],
+    ["an empty publisher", ""],
+  ])("refuses %s as a deployable Pattern publisher", (_label, publisher) => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ PATTERN_PUBLISHER: publisher }),
     );
     expect(outcome).toEqual({
       ok: false,
       code: "pattern_publisher_misconfigured",
-      message: "PATTERN_PUBLISHER=workers_ai is refused outside development",
+      message: expect.stringContaining("PATTERN_PUBLISHER must be codex"),
     });
+  });
+
+  it("refuses an absent publisher, in development as well as production", () => {
+    for (const environment of ["production", "development"]) {
+      const outcome = resolvePatternPublisherConfiguration(
+        env({ ENVIRONMENT: environment, PATTERN_PUBLISHER: undefined }),
+      );
+      expect(outcome.ok, environment).toBe(false);
+    }
+  });
+
+  it("refuses synthetic even in development, so no environment can select it", () => {
+    // The deterministic stand-in is a test double handed to `executePatternJob`
+    // directly. Leaving it selectable by configuration is what made a
+    // stand-in-authored document reachable from a deployment at all.
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ ENVIRONMENT: "development", PATTERN_PUBLISHER: "synthetic" }),
+    );
+    expect(outcome.ok).toBe(false);
+  });
+
+  it("refuses a missing Codex runner token", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ CODEX_RUNNER_TOKEN: undefined }),
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("CODEX_RUNNER_TOKEN");
+  });
+
+  it("refuses a missing artifact keyring", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ CODEX_PROVIDER_ARTIFACT_KEYRING: undefined }),
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("CODEX_PROVIDER_ARTIFACT_KEYRING");
+  });
+
+  it("refuses an unbound R2 where the publisher is about to be built", () => {
+    const outcome = resolvePatternPublisherConfiguration(env({ ARTIFACTS: undefined }));
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("ARTIFACTS");
+  });
+
+  it("refuses a missing daily provider call limit", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ PATTERN_DAILY_PROVIDER_CALL_LIMIT: undefined }),
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("PATTERN_DAILY_PROVIDER_CALL_LIMIT");
+  });
+
+  it.each([
+    "OPENAI_PATTERN_PLANNER_TIMEOUT_MS",
+    "OPENAI_PATTERN_WRITER_TIMEOUT_MS",
+    "OPENAI_PATTERN_VERIFIER_TIMEOUT_MS",
+  ])("refuses any %s other than 900000", (key) => {
+    for (const value of ["120000", "899999", "0"]) {
+      const outcome = resolvePatternPublisherConfiguration(env({ [key]: value }));
+      expect(outcome.ok, `${key}=${value}`).toBe(false);
+      if (outcome.ok) return;
+      expect(outcome.message).toContain(key);
+    }
+  });
+
+  it.each([
+    "OPENAI_PATTERN_PLANNER_MODEL",
+    "OPENAI_PATTERN_WRITER_PROMPT_VERSION",
+    "OPENAI_PATTERN_VERIFIER_PROMPT_VERSION",
+    "PATTERN_INPUT_MAX_BYTES",
+    "PATTERN_ARTIFACT_RETENTION_DAYS",
+  ])("requires %s rather than defaulting it", (key) => {
+    const outcome = resolvePatternPublisherConfiguration(env({ [key]: undefined }));
+    expect(outcome.ok, key).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain(key);
+  });
+
+  it("refuses an AI Gateway route, which names the OpenAI transport", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ AI_GATEWAY_ACCOUNT_ID: "a".repeat(32), AI_GATEWAY_ID: "patternlike" }),
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("cannot be routed through AI Gateway");
+  });
+
+  it("is reached by checkSecureConfig, so an incomplete deployment refuses every request", () => {
+    const failure = checkSecureConfig(
+      env({
+        PATTERN_PUBLISHER: "openai",
+        AUTH_STUB: "0",
+        ROOT_KEK: "x".repeat(48),
+        OIDC_ISSUER: "https://real.example.com/",
+        OIDC_AUDIENCE: "aud",
+        OIDC_JWKS_URL: "https://real.example.com/.well-known/jwks.json",
+      }),
+    );
+    expect(failure?.code).toBe("pattern_publisher_misconfigured");
   });
 
   describe("verifier independence (section 14.2)", () => {
@@ -170,140 +321,6 @@ describe("Pattern publisher configuration", () => {
         ),
       ).toBeNull();
       expect(resolvePatternPublisherConfiguration(env()).ok).toBe(true);
-    });
-  });
-
-  describe("gateway configuration", () => {
-    it("refuses a half-configured gateway pair rather than falling back to the direct origin", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ AI_GATEWAY_ACCOUNT_ID: "a".repeat(32) }),
-      );
-      expect(outcome.ok).toBe(false);
-      if (outcome.ok) return;
-      expect(outcome.message).toContain("must be set together");
-    });
-
-    it("refuses a malformed account id", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ AI_GATEWAY_ACCOUNT_ID: "NOT-HEX", AI_GATEWAY_ID: "patternlike" }),
-      );
-      expect(outcome.ok).toBe(false);
-      if (outcome.ok) return;
-      expect(outcome.message).toContain("32 lowercase hexadecimal");
-    });
-
-    it("accepts a complete pair", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ AI_GATEWAY_ACCOUNT_ID: "a".repeat(32), AI_GATEWAY_ID: "patternlike" }),
-      );
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) return;
-      // Carried on the config, not re-resolved at the call site: the adapter is
-      // handed a route explicitly rather than defaulting to the direct origin.
-      expect(outcome.config?.gatewayRoute).toEqual({
-        accountId: "a".repeat(32),
-        gatewayId: "patternlike",
-        token: null,
-      });
-    });
-  });
-
-  describe("provider credential mode", () => {
-    it("refuses an openai pin with no credential source rather than inferring one", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ OPENAI_CREDENTIAL_SOURCE: undefined }),
-      );
-      expect(outcome.ok).toBe(false);
-      if (outcome.ok) return;
-      expect(outcome.message).toContain("OPENAI_CREDENTIAL_SOURCE is required");
-    });
-
-    it("carries the worker credential on the config", () => {
-      const outcome = resolvePatternPublisherConfiguration(env());
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) return;
-      expect(outcome.config?.credential).toEqual({ source: "worker", apiKey: "sk-test" });
-    });
-
-    it("resolves gateway_stored, which requires the key to be ABSENT", () => {
-      // The regression this pins: requiring OPENAI_API_KEY for the openai pin
-      // made BYOK unreachable, because a key on the request wins over the
-      // gateway-stored one and `resolveProviderCredentialMode` refuses both.
-      const outcome = resolvePatternPublisherConfiguration(
-        env({
-          OPENAI_CREDENTIAL_SOURCE: "gateway_stored",
-          OPENAI_API_KEY: undefined,
-          OPENAI_GATEWAY_KEY_ALIAS: "pattern-key",
-          AI_GATEWAY_ACCOUNT_ID: "a".repeat(32),
-          AI_GATEWAY_ID: "patternlike",
-          AI_GATEWAY_TOKEN: "aig-token",
-        }),
-      );
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) return;
-      expect(outcome.config?.credential).toEqual({
-        source: "gateway_stored",
-        alias: "pattern-key",
-      });
-    });
-
-    it("refuses gateway_stored while a worker key is still set", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({
-          OPENAI_CREDENTIAL_SOURCE: "gateway_stored",
-          OPENAI_GATEWAY_KEY_ALIAS: "pattern-key",
-          AI_GATEWAY_ACCOUNT_ID: "a".repeat(32),
-          AI_GATEWAY_ID: "patternlike",
-          AI_GATEWAY_TOKEN: "aig-token",
-        }),
-      );
-      expect(outcome.ok).toBe(false);
-      if (outcome.ok) return;
-      expect(outcome.message).toContain("OPENAI_API_KEY must not be set");
-    });
-
-    it("leaves the synthetic pin with no credential at all", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ ENVIRONMENT: "development", PATTERN_PUBLISHER: "synthetic" }),
-      );
-      expect(outcome.ok).toBe(true);
-      if (!outcome.ok) return;
-      expect(outcome.config?.credential).toBeNull();
-      expect(outcome.config?.gatewayRoute).toBeNull();
-    });
-  });
-
-  describe("Q3: the synthetic publisher cannot serve a reader", () => {
-    it("refuses PATTERN_PUBLISHER=synthetic outside development", () => {
-      // The enforcement boundary that makes the assembly_mode const safe: a
-      // stand-in-authored document is structurally impossible where readers are.
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ PATTERN_PUBLISHER: "synthetic" }),
-      );
-      expect(outcome.ok).toBe(false);
-      if (outcome.ok) return;
-      expect(outcome.message).toContain("refused outside development");
-    });
-
-    it("is reached by checkSecureConfig, so every request refuses", () => {
-      const failure = checkSecureConfig(
-        env({
-          PATTERN_PUBLISHER: "synthetic",
-          AUTH_STUB: "0",
-          ROOT_KEK: "x".repeat(48),
-          OIDC_ISSUER: "https://real.example.com/",
-          OIDC_AUDIENCE: "aud",
-          OIDC_JWKS_URL: "https://real.example.com/.well-known/jwks.json",
-        }),
-      );
-      expect(failure).not.toBeNull();
-    });
-
-    it("allows it in development", () => {
-      const outcome = resolvePatternPublisherConfiguration(
-        env({ PATTERN_PUBLISHER: "synthetic", ENVIRONMENT: "development" }),
-      );
-      expect(outcome.ok).toBe(true);
     });
   });
 });

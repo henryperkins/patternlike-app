@@ -107,8 +107,6 @@ export interface Env {
    * deliberately distinct from SERVICE_AUTH_TOKEN and PATTERN_ADMIN_TOKEN.
    */
   CODEX_RUNNER_TOKEN?: string;
-  /** Development-only experimental Workers AI publisher binding. */
-  AI?: Ai;
   /** Staged machine-ontology pipeline rollout: `off` | `internal`. */
   ONTOLOGY_PIPELINE_ROLLOUT?: string;
   /** `openai` (default) or `codex`. Selects the frozen provider transport. */

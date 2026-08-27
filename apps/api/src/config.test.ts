@@ -13,14 +13,53 @@ import {
 
 const STRONG_KEK = "a-real-root-kek-with-enough-entropy-32+";
 
+/**
+ * The complete Codex Pattern posture every deployment carries.
+ *
+ * Pattern has no rollout and exactly one deployable publisher, so an incomplete
+ * Pattern block is a refusal on every path. Cases about an unrelated rule spread
+ * this in so their refusal names the rule they are actually about.
+ */
+const PATTERN_CODEX_VARS = {
+  PATTERN_PUBLISHER: "codex",
+  PATTERN_DAILY_PROVIDER_CALL_LIMIT: "100",
+  PATTERN_INPUT_MAX_BYTES: "98304",
+  PATTERN_ARTIFACT_RETENTION_DAYS: "30",
+  CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz",
+  CODEX_PROVIDER_ARTIFACT_KEYRING:
+    '{"version":1,"keys":{"k":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"}}',
+  ARTIFACTS: {} as never,
+  OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_PLANNER_REASONING: "high",
+  OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
+  OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
+  OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_WRITER_REASONING: "high",
+  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.1",
+  OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
+  OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_VERIFIER_REASONING: "high",
+  OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
+  OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
+};
+
+/** `checkSecureConfig` over a deployment whose Pattern block is complete. */
+function guard(environment: Record<string, unknown>) {
+  return checkSecureConfig({ ...PATTERN_CODEX_VARS, ...environment } as never);
+}
+
+
 describe("secure configuration guard", () => {
   it("passes in development with no secrets set", () => {
-    expect(checkSecureConfig({ ENVIRONMENT: "development", AUTH_STUB: "1" })).toBeNull();
+    expect(guard({ ENVIRONMENT: "development", AUTH_STUB: "1" })).toBeNull();
   });
 
   it("accepts a fully configured production environment", () => {
     expect(
-      checkSecureConfig({
+      guard({
         ENVIRONMENT: "production",
         ROOT_KEK: STRONG_KEK,
         OIDC_ISSUER: "https://issuer.example.com",
@@ -35,17 +74,17 @@ describe("secure configuration guard", () => {
   });
 
   it("refuses production without ROOT_KEK", () => {
-    const err = checkSecureConfig({ ENVIRONMENT: "production" });
+    const err = guard({ ENVIRONMENT: "production" });
     expect(err?.code).toBe("root_kek_not_configured");
   });
 
   it("refuses production with the development placeholder as ROOT_KEK", () => {
-    const err = checkSecureConfig({ ENVIRONMENT: "production", ROOT_KEK: DEV_ROOT_KEK });
+    const err = guard({ ENVIRONMENT: "production", ROOT_KEK: DEV_ROOT_KEK });
     expect(err?.code).toBe("root_kek_not_configured");
   });
 
   it("refuses production with AUTH_STUB enabled", () => {
-    const err = checkSecureConfig({
+    const err = guard({
       ENVIRONMENT: "production",
       AUTH_STUB: "1",
       ROOT_KEK: STRONG_KEK,
@@ -54,14 +93,14 @@ describe("secure configuration guard", () => {
   });
 
   it("treats an unset ENVIRONMENT as non-development", () => {
-    expect(checkSecureConfig({})?.code).toBe("root_kek_not_configured");
+    expect(guard({})?.code).toBe("root_kek_not_configured");
   });
 
   it.each(["0", "14", "1.5", "not-a-number"])(
     "refuses an invalid check-in retention value %s in every environment",
     (value) => {
       expect(
-        checkSecureConfig({
+        guard({
           ENVIRONMENT: "development",
           AUTH_STUB: "1",
           CHECK_IN_RETENTION_MONTHS: value,
@@ -74,7 +113,7 @@ describe("secure configuration guard", () => {
     "accepts a bounded or defaulted check-in retention value %s",
     (value) => {
       expect(
-        checkSecureConfig({
+        guard({
           ENVIRONMENT: "development",
           AUTH_STUB: "1",
           CHECK_IN_RETENTION_MONTHS: value,
@@ -82,6 +121,61 @@ describe("secure configuration guard", () => {
       ).toBeNull();
     },
   );
+});
+
+describe("Pattern publisher configuration guard", () => {
+  const production = {
+    ENVIRONMENT: "production",
+    AUTH_STUB: "0",
+    ROOT_KEK: STRONG_KEK,
+    OIDC_ISSUER: "https://issuer.example.com",
+    OIDC_AUDIENCE: "patternlike-web",
+    OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
+    TIME_TRAVEL_RECEIPT_EPOCH: "1",
+    TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
+    CALC_FETCH_TIMEOUT_MS: "10000",
+    BIRTH_CALC_DAILY_LIMIT: "5",
+  };
+
+  it("accepts a complete Codex Pattern deployment", () => {
+    expect(guard(production)).toBeNull();
+  });
+
+  it.each([
+    ["an absent publisher", { PATTERN_PUBLISHER: undefined }],
+    ["an empty publisher", { PATTERN_PUBLISHER: "" }],
+    ["openai", { PATTERN_PUBLISHER: "openai" }],
+    ["workers_ai", { PATTERN_PUBLISHER: "workers_ai" }],
+    ["synthetic", { PATTERN_PUBLISHER: "synthetic" }],
+    ["a missing runner token", { CODEX_RUNNER_TOKEN: undefined }],
+    ["a missing artifact keyring", { CODEX_PROVIDER_ARTIFACT_KEYRING: undefined }],
+    ["a 120s planner timeout", { OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "120000" }],
+    ["a 120s writer timeout", { OPENAI_PATTERN_WRITER_TIMEOUT_MS: "120000" }],
+    ["a 120s verifier timeout", { OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "120000" }],
+  ])("refuses every request on %s", (_label, override) => {
+    // There is no "Pattern is off for now" any more. A deployment that cannot
+    // run the product refuses, rather than deciding it per account.
+    expect(guard({ ...production, ...override })?.code)
+      .toBe("pattern_publisher_misconfigured");
+  });
+
+  it("leaves an unbound R2 to the surface that needs it", () => {
+    // `object_storage_not_configured` is an audited, feature-level refusal.
+    // Turning a missing binding into a refusal on every path would delete that
+    // behaviour, so the guard checks operator VALUES and the publisher check
+    // where a bucket is actually about to be used owns the binding.
+    expect(guard({ ...production, ARTIFACTS: undefined })).toBeNull();
+  });
+
+  it("refuses an incomplete Pattern block in development too", () => {
+    expect(
+      guard({
+        ENVIRONMENT: "development",
+        AUTH_STUB: "1",
+        PATTERN_PUBLISHER: "synthetic",
+      })?.code,
+    ).toBe("pattern_publisher_misconfigured");
+  });
 });
 
 describe("identity configuration", () => {
@@ -98,13 +192,13 @@ describe("identity configuration", () => {
   };
 
   it("passes when every OIDC value is present", () => {
-    expect(checkSecureConfig(configured)).toBeNull();
+    expect(guard(configured)).toBeNull();
   });
 
   it.each(["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"] as const)(
     "refuses to serve when %s is missing",
     (key) => {
-      const failure = checkSecureConfig({ ...configured, [key]: undefined });
+      const failure = guard({ ...configured, [key]: undefined });
       expect(failure?.code).toBe("identity_not_configured");
     },
   );
@@ -112,7 +206,7 @@ describe("identity configuration", () => {
   it.each(["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"] as const)(
     "refuses to serve when %s is blank",
     (key) => {
-      const failure = checkSecureConfig({ ...configured, [key]: "   " });
+      const failure = guard({ ...configured, [key]: "   " });
       expect(failure?.code).toBe("identity_not_configured");
     },
   );
@@ -124,7 +218,7 @@ describe("identity configuration", () => {
       // issuer.invalid so the Env interface is satisfied locally; a deploy that
       // never replaced it would otherwise pass the guard and then fail per
       // request inside the verifier as an opaque 401.
-      const failure = checkSecureConfig({
+      const failure = guard({
         ...configured,
         [key]: key === "OIDC_ISSUER"
           ? "https://issuer.invalid"
@@ -136,12 +230,12 @@ describe("identity configuration", () => {
 
   it("does not require OIDC configuration in development", () => {
     expect(
-      checkSecureConfig({ ENVIRONMENT: "development", AUTH_STUB: "1" }),
+      guard({ ENVIRONMENT: "development", AUTH_STUB: "1" }),
     ).toBeNull();
   });
 
   it("does not require OIDC configuration under ENVIRONMENT=test", () => {
-    expect(checkSecureConfig({ ENVIRONMENT: "test" })).toBeNull();
+    expect(guard({ ENVIRONMENT: "test" })).toBeNull();
   });
 });
 
@@ -243,7 +337,7 @@ describe("publisher configuration", () => {
   };
 
   it("accepts a complete enabled configuration", () => {
-    expect(checkSecureConfig(enabled)).toBeNull();
+    expect(guard(enabled)).toBeNull();
     const resolved = resolvePublisherConfiguration(enabled);
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) return;
@@ -270,7 +364,7 @@ describe("publisher configuration", () => {
       CALC_FETCH_TIMEOUT_MS: "10000",
       BIRTH_CALC_DAILY_LIMIT: "5",
     };
-    expect(checkSecureConfig(off)).toBeNull();
+    expect(guard(off)).toBeNull();
     const resolved = resolvePublisherConfiguration(off);
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) return;
@@ -289,14 +383,14 @@ describe("publisher configuration", () => {
       READING_V5_ROLLOUT: "off",
       OPENAI_READING_TIMEOUT_MS: "not-a-number",
     };
-    expect(checkSecureConfig(off)?.code).toBe("reading_publisher_misconfigured");
+    expect(guard(off)?.code).toBe("reading_publisher_misconfigured");
   });
 
   it("rejects an unknown rollout mode in every environment", () => {
-    expect(checkSecureConfig({ ENVIRONMENT: "development", READING_V5_ROLLOUT: "on" })?.code).toBe(
+    expect(guard({ ENVIRONMENT: "development", READING_V5_ROLLOUT: "on" })?.code).toBe(
       "reading_rollout_invalid",
     );
-    expect(checkSecureConfig({ ...enabled, READING_V5_ROLLOUT: "of" })?.code).toBe(
+    expect(guard({ ...enabled, READING_V5_ROLLOUT: "of" })?.code).toBe(
       "reading_rollout_invalid",
     );
   });
@@ -332,12 +426,12 @@ describe("publisher configuration", () => {
     ["CODEX_RUNNER_TOKEN", undefined],
     ["CODEX_PROVIDER_ARTIFACT_KEYRING", undefined],
   ] as const)("refuses an enabled rollout when %s is %s", (key, value) => {
-    const failure = checkSecureConfig({ ...enabled, [key]: value });
+    const failure = guard({ ...enabled, [key]: value });
     expect(failure?.code).toBe("reading_publisher_misconfigured");
   });
 
   it("names no secret value in the message it returns to a caller", () => {
-    const failure = checkSecureConfig({ ...enabled, CODEX_RUNNER_TOKEN: undefined });
+    const failure = guard({ ...enabled, CODEX_RUNNER_TOKEN: undefined });
     expect(failure?.message ?? "").not.toContain("runner_0123456789");
     expect(failure?.message ?? "").not.toContain("codex-test-key");
   });
@@ -347,7 +441,7 @@ describe("publisher configuration", () => {
     // short-circuit this one: the local canary runs with ENVIRONMENT=development
     // and a real key, and a half-configured local run would reach a provider
     // with values the frozen command never described.
-    const failure = checkSecureConfig({
+    const failure = guard({
       ENVIRONMENT: "development",
       AUTH_STUB: "1",
       READING_V5_ROLLOUT: "internal",
@@ -381,7 +475,7 @@ describe("AI Gateway configuration", () => {
   };
 
   it("treats an absent gateway as the direct route", () => {
-    expect(checkSecureConfig(base)).toBeNull();
+    expect(guard(base)).toBeNull();
     const resolved = resolveAiGatewayRoute(base);
     expect(resolved.ok && resolved.route).toBeNull();
   });
@@ -420,14 +514,14 @@ describe("AI Gateway configuration", () => {
       { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID },
       { AI_GATEWAY_ID: "patternlike" },
     ]) {
-      const failure = checkSecureConfig({ ...base, ...half });
+      const failure = guard({ ...base, ...half });
       expect(failure?.code).toBe("reading_publisher_misconfigured");
       expect(failure?.message).toContain("must be set together");
     }
   });
 
   it("refuses a token with nowhere to send it", () => {
-    const failure = checkSecureConfig({ ...base, AI_GATEWAY_TOKEN: "cf-aig-token" });
+    const failure = guard({ ...base, AI_GATEWAY_TOKEN: "cf-aig-token" });
     expect(failure?.code).toBe("reading_publisher_misconfigured");
     expect(failure?.message ?? "").not.toContain("cf-aig-token");
   });
@@ -443,7 +537,7 @@ describe("AI Gateway configuration", () => {
       { AI_GATEWAY_ACCOUNT_ID: ACCOUNT_ID, AI_GATEWAY_ID: "Patternlike" },
     ];
     for (const vars of malformed) {
-      const failure = checkSecureConfig({ ...base, ...vars });
+      const failure = guard({ ...base, ...vars });
       expect(failure?.code, JSON.stringify(vars)).toBe("reading_publisher_misconfigured");
     }
   });
@@ -451,7 +545,7 @@ describe("AI Gateway configuration", () => {
   it("validates the gateway while the rollout is off", () => {
     // Same argument as every pinned publisher value: a typo must not lie
     // dormant until the day someone enables generation.
-    const failure = checkSecureConfig({
+    const failure = guard({
       ...base,
       READING_V5_ROLLOUT: "off",
       AI_GATEWAY_ACCOUNT_ID: "not-hex",
@@ -595,7 +689,7 @@ describe("ontology pipeline configuration", () => {
   };
 
   it("freezes equal acknowledged model pins to the 100% regression threshold", () => {
-    expect(checkSecureConfig(enabled)).toBeNull();
+    expect(guard(enabled)).toBeNull();
     const resolved = resolveOntologyPipelineConfiguration(enabled);
     expect(resolved.ok).toBe(true);
     if (!resolved.ok || !resolved.config) return;
@@ -613,16 +707,16 @@ describe("ontology pipeline configuration", () => {
       }
     }
     off.ONTOLOGY_PIPELINE_ROLLOUT = "off";
-    expect(checkSecureConfig(off)).toBeNull();
+    expect(guard(off)).toBeNull();
     const resolved = resolveOntologyPipelineConfiguration(off);
     expect(resolved.ok && resolved.config).toBeNull();
   });
 
   it("refuses an unknown pipeline rollout in every environment", () => {
     expect(
-      checkSecureConfig({ ENVIRONMENT: "development", ONTOLOGY_PIPELINE_ROLLOUT: "enabled" })?.code,
+      guard({ ENVIRONMENT: "development", ONTOLOGY_PIPELINE_ROLLOUT: "enabled" })?.code,
     ).toBe("ontology_pipeline_rollout_invalid");
-    expect(checkSecureConfig({ ...enabled, ONTOLOGY_PIPELINE_ROLLOUT: "external" })?.code).toBe(
+    expect(guard({ ...enabled, ONTOLOGY_PIPELINE_ROLLOUT: "external" })?.code).toBe(
       "ontology_pipeline_rollout_invalid",
     );
   });
@@ -657,14 +751,14 @@ describe("ontology pipeline configuration", () => {
     ["OPENAI_CREDENTIAL_SOURCE", undefined],
     ["OPENAI_API_KEY", undefined],
   ] as const)("refuses an enabled pipeline when %s is %s", (key, value) => {
-    expect(checkSecureConfig({ ...enabled, [key]: value })?.code).toBe(
+    expect(guard({ ...enabled, [key]: value })?.code).toBe(
       "ontology_pipeline_misconfigured",
     );
   });
 
   it("refuses a matching prompt pair before it can make one configuration author and judge", () => {
     expect(
-      checkSecureConfig({
+      guard({
         ...enabled,
         OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION: "1.0.0",
       })?.code,
@@ -675,7 +769,7 @@ describe("ontology pipeline configuration", () => {
     "refuses equal model pins without the explicit acknowledgement %s",
     (acknowledgement) => {
       expect(
-        checkSecureConfig({
+        guard({
           ...enabled,
           ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: acknowledgement,
         })?.code,
@@ -685,7 +779,7 @@ describe("ontology pipeline configuration", () => {
 
   it("validates a present pipeline pin while off", () => {
     expect(
-      checkSecureConfig({
+      guard({
         ...enabled,
         ONTOLOGY_PIPELINE_ROLLOUT: "off",
         ONTOLOGY_PIPELINE_INPUT_MAX_BYTES: "not-a-number",

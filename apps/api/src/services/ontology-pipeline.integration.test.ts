@@ -20,6 +20,7 @@ import {
   IDENTITY_A,
   USER_A,
   confirmPreferences,
+  DETERMINISTIC_PATTERN_PUBLISHER,
   disablePatternAi,
   enablePatternAi,
   resetDb,
@@ -753,7 +754,7 @@ async function publishReaderPattern(): Promise<{
       job_id: row.job_id,
       generation_id: generationId,
       stage_generation: row.stage_generation,
-    });
+    }, new Date(), DETERMINISTIC_PATTERN_PUBLISHER);
   }
   return { generationId, response: reservation };
 }

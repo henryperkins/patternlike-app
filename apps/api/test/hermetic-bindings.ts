@@ -2,11 +2,15 @@
  * Worker bindings that keep the test suite independent from a developer's
  * ignored `.dev.vars` file and process environment.
  *
- * Integration tests opt into a runnable publisher or a trusted signing key by
- * mutating the in-isolate `env` binding for the duration of the test. The
- * baseline intentionally exposes neither capability: every Codex value is
- * empty, so a suite that forgets to enable one gets a configuration refusal
- * rather than a provider job it did not mean to create.
+ * Daily and the ontology pipeline stay off: a suite that forgets to enable one
+ * gets a configuration refusal rather than a provider job it did not mean to
+ * create. Pattern cannot work that way any more. It has no rollout and exactly
+ * one deployable publisher, so an incomplete Pattern configuration is a
+ * `checkSecureConfig` refusal on every request rather than a dormant state --
+ * which means the baseline has to be the complete Codex posture a real
+ * deployment carries. What keeps a suite from creating provider work it did not
+ * intend is the eligibility ladder (chart, locale, consent, public ontology,
+ * unused claim), not an absent variable.
  */
 export const HERMETIC_TEST_BINDINGS = {
   ENVIRONMENT: "development",
@@ -41,30 +45,33 @@ export const HERMETIC_TEST_BINDINGS = {
   TIME_TRAVEL_RECEIPT_EPOCH: "1",
   TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
   PATTERN_SEMANTIC_FORCE_REJECT: "",
-  PATTERN_PUBLISHER: "",
-  OPENAI_PATTERN_PLANNER_MODEL: "",
-  OPENAI_PATTERN_PLANNER_REASONING: "",
-  OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "",
-  OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "",
-  OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "",
-  OPENAI_PATTERN_WRITER_MODEL: "",
-  OPENAI_PATTERN_WRITER_REASONING: "",
-  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "",
-  OPENAI_PATTERN_WRITER_TIMEOUT_MS: "",
-  OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "",
-  OPENAI_PATTERN_VERIFIER_MODEL: "",
-  OPENAI_PATTERN_VERIFIER_REASONING: "",
-  OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "",
-  OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "",
-  OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "",
-  PATTERN_INPUT_MAX_BYTES: "",
-  PATTERN_DAILY_PROVIDER_CALL_LIMIT: "",
-  PATTERN_ARTIFACT_RETENTION_DAYS: "",
+  PATTERN_PUBLISHER: "codex",
+  OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_PLANNER_REASONING: "high",
+  OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
+  OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
+  OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_WRITER_REASONING: "high",
+  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.1",
+  OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
+  OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
+  OPENAI_PATTERN_VERIFIER_REASONING: "high",
+  OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
+  OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
+  OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
+  PATTERN_INPUT_MAX_BYTES: "98304",
+  PATTERN_DAILY_PROVIDER_CALL_LIMIT: "100",
+  PATTERN_ARTIFACT_RETENTION_DAYS: "30",
   PATTERN_ONTOLOGY_KEYS: "",
   PATTERN_REPLAY_LEDGER_SIGNING_KEY: "",
   PATTERN_REPLAY_LEDGER_KEYS: "",
   ONTOLOGY_PIPELINE_ARTIFACT_KEYRING: "",
-  CODEX_PROVIDER_ARTIFACT_KEYRING: "",
-  CODEX_RUNNER_TOKEN: "",
+  // Shared by Pattern, Daily, and the ontology pipeline. Pattern's baseline
+  // needs them present; the other two select their own publisher separately.
+  CODEX_PROVIDER_ARTIFACT_KEYRING:
+    '{"version":1,"keys":{"codex-test-key":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"}}',
+  CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz",
   PATTERN_ADMIN_TOKEN: "",
 } as const;

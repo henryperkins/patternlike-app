@@ -1,25 +1,19 @@
-import {
-  createExecutionContext,
-  createMessageBatch,
-  env,
-  getQueueResult,
-  SELF,
-} from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PatternPlan, PatternWriterOutput } from "@patternlike/shared";
 
 import type { PatternGenerationMessage } from "../env.js";
-import worker from "../index.js";
 import {
   IDENTITY_A,
   USER_A,
   confirmPreferences,
   disablePatternAi,
-  enablePatternOpenAi,
+  enablePatternAi,
   resetDb,
   seedActiveOntology,
   seedChart,
   seedUser,
+  transportPatternPublisher,
 } from "../../test/helpers.js";
 import {
   OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY,
@@ -30,11 +24,10 @@ import {
   generatePatternReplayTestKeys,
   installPatternReplayTestKeys,
 } from "../../test/pattern-replay-fixtures.js";
-import { getArtifactAt } from "./pattern-execute.js";
+import { executePatternJob, getArtifactAt } from "./pattern-execute.js";
 import { loadPatternJob } from "./pattern-stage-protocol.js";
 
 const POLICY = "1.0.0";
-const QUEUE = "patternlike-pattern-generation-dev";
 const ADVANCE_FAILURE_TRIGGER = "fail_pattern_advance_integration";
 const PRIVATE_TIMEOUT_ERROR = "PRIVATE_PATTERN_TIMEOUT_PROVIDER_ERROR";
 const INJECTED_DRIFT_PREFIX = "Assigned feature";
@@ -53,7 +46,15 @@ interface FailureRow {
   claim_status: string;
 }
 
-let messageSequence = 0;
+/**
+ * The credential the injected stand-in speaks with.
+ *
+ * The mocked origin keys its scripted behaviours off it, so this is how a case
+ * asks for a timeout, a refusal, or injected drift. It is a parameter of the
+ * stand-in, never a Worker binding: no Pattern environment configures a
+ * provider credential any more.
+ */
+let standInKey = "sk-test";
 
 async function json(path: string, init: RequestInit = {}): Promise<JsonResponse> {
   const response = await SELF.fetch(`http://api.test${path}`, {
@@ -97,20 +98,29 @@ async function currentMessage(generationId: string): Promise<PatternGenerationMe
   };
 }
 
-/** Drive the exported Worker queue boundary exactly as workerd does. */
-async function deliver(message: PatternGenerationMessage, attempts = 1) {
-  messageSequence += 1;
-  const batch = createMessageBatch<PatternGenerationMessage>(QUEUE, [
-    {
-      id: `msg-pattern-openai-${messageSequence}`,
-      timestamp: new Date(0),
-      attempts,
-      body: message,
-    },
-  ]);
-  const context = createExecutionContext();
-  await worker.queue(batch, env);
-  return getQueueResult(batch, context);
+/**
+ * One delivery, with the publisher handed in.
+ *
+ * `queue()` constructs the Codex publisher, which parks the pass on a durable
+ * provider job and answers `publisher_pending`. Every case here is about what a
+ * delivery does with a provider ANSWER, so the stand-in speaks the real
+ * Responses transport to the mocked origin instead.
+ *
+ * `retryMessages` mirrors what the queue boundary would have done with the
+ * outcome — ack unless the delivery asked to be retried — so these assertions
+ * stay about deliveries rather than about the shim.
+ */
+async function deliver(message: PatternGenerationMessage) {
+  const outcome = await executePatternJob(
+    env,
+    message,
+    new Date(),
+    transportPatternPublisher({ source: "worker", apiKey: standInKey }),
+  );
+  return {
+    outcome,
+    retryMessages: outcome.ok || outcome.reason !== "retry" ? [] : [message],
+  };
 }
 
 async function clearBackoff(generationId: string): Promise<void> {
@@ -210,13 +220,13 @@ async function assertPublicFailure(
   }
 }
 
-describe("OpenAI Pattern queue integration", () => {
+describe("Pattern deliveries with an injected publisher", () => {
   beforeEach(async () => {
     await env.DB.prepare(`DROP TRIGGER IF EXISTS ${ADVANCE_FAILURE_TRIGGER}`).run();
     await resetDb();
     installPatternReplayTestKeys(env, await generatePatternReplayTestKeys());
     disablePatternAi();
-    messageSequence = 0;
+    standInKey = "sk-test";
     await seedUser(IDENTITY_A);
     await confirmPreferences(USER_A);
     await seedChart(IDENTITY_A);
@@ -230,7 +240,7 @@ describe("OpenAI Pattern queue integration", () => {
   });
 
   it("publishes once across duplicate delivery, an expired lease, and a failed D1 advance", async () => {
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-openai-pattern-idempotent-publication");
     const initial = await currentMessage(generationId);
@@ -360,8 +370,8 @@ describe("OpenAI Pattern queue integration", () => {
   });
 
   it("rejects a genuinely drifted candidate because the verifier receives the full frozen plan", async () => {
-    enablePatternOpenAi();
-    env.OPENAI_API_KEY = OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY;
+    enablePatternAi();
+    standInKey = OPENAI_MOCK_PATTERN_INJECTED_DRIFT_KEY;
     await seedActiveOntology();
     const generationId = await reserve("idem-openai-pattern-injected-drift");
 
@@ -487,8 +497,8 @@ describe("OpenAI Pattern queue integration", () => {
   });
 
   it("fails closed after bounded planner timeouts without exposing provider prose", async () => {
-    enablePatternOpenAi();
-    env.OPENAI_API_KEY = OPENAI_MOCK_TIMEOUT;
+    enablePatternAi();
+    standInKey = OPENAI_MOCK_TIMEOUT;
     await seedActiveOntology();
     const generationId = await reserve("idem-openai-pattern-timeout");
     const logs = [
@@ -527,8 +537,8 @@ describe("OpenAI Pattern queue integration", () => {
   });
 
   it("fails closed on a provider refusal without exposing refusal prose", async () => {
-    enablePatternOpenAi();
-    env.OPENAI_API_KEY = OPENAI_MOCK_REFUSAL;
+    enablePatternAi();
+    standInKey = OPENAI_MOCK_REFUSAL;
     await seedActiveOntology();
     const generationId = await reserve("idem-openai-pattern-refusal");
     const logs = [
@@ -607,7 +617,7 @@ describe("OpenAI Pattern queue integration", () => {
   });
 
   it("fails closed without a provider call when the UTC-day budget is exhausted", async () => {
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-openai-pattern-daily-budget");
     const now = new Date().toISOString();
@@ -687,7 +697,7 @@ describe("OpenAI Pattern queue integration", () => {
   });
 
   it("fails at checking claims without another call when verifier attempts are exhausted", async () => {
-    enablePatternOpenAi();
+    enablePatternAi();
     await seedActiveOntology();
     const generationId = await reserve("idem-openai-pattern-verifier-attempts");
 

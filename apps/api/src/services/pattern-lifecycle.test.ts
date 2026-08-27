@@ -5,6 +5,7 @@ import {
   IDENTITY_A,
   USER_A,
   confirmPreferences,
+  DETERMINISTIC_PATTERN_PUBLISHER,
   disablePatternAi,
   enablePatternAi,
   resetDb,
@@ -73,7 +74,7 @@ async function reserveAndPublishSliceAPattern(): Promise<string> {
       job_id: row.job_id,
       generation_id: generationId,
       stage_generation: row.stage_generation,
-    });
+    }, new Date(), DETERMINISTIC_PATTERN_PUBLISHER);
   }
   throw new Error("Pattern generation did not succeed");
 }

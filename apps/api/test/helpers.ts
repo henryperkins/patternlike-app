@@ -15,6 +15,22 @@ import { activateRelease } from "../src/db/content-releases.js";
 import type { ContentReleaseBundle } from "../src/services/content-release.js";
 import { generateSigningKey, signedBundle, withoutFixtures } from "./content-release-fixtures.js";
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
+import { HERMETIC_TEST_BINDINGS } from "./hermetic-bindings.js";
+import {
+  createOpenAiPatternPublisher,
+  createSyntheticPatternPublisher,
+} from "../src/services/pattern-publisher-factory.js";
+import { resolveSemanticForceReject } from "../src/services/pattern-semantic.js";
+import {
+  consumePatternProviderCallBudget,
+  utcDateFor,
+} from "../src/db/pattern-provider-usage.js";
+import type { PatternExecuteOverrides } from "../src/services/pattern-execute.js";
+import type {
+  PatternPassOptions,
+  PatternPassOutcome,
+  PatternStageClass,
+} from "../src/services/pattern-publisher.js";
 import { storeOntologyRelease } from "../src/db/pattern-ontology.js";
 import { computeOntologyBundleHash } from "../src/services/pattern-ontology-verify.js";
 import {
@@ -30,6 +46,32 @@ import {
  * would fail configuration for a reason unrelated to what it was testing.
  * `ARTIFACTS` is already bound by the test Wrangler config.
  */
+/** Every Pattern binding the hermetic baseline owns, for restoring it verbatim. */
+const PATTERN_HERMETIC_KEYS = [
+  "PATTERN_PUBLISHER",
+  "PATTERN_DAILY_PROVIDER_CALL_LIMIT",
+  "PATTERN_ARTIFACT_RETENTION_DAYS",
+  "PATTERN_SEMANTIC_FORCE_REJECT",
+  "PATTERN_INPUT_MAX_BYTES",
+  "OPENAI_PATTERN_PLANNER_MODEL",
+  "OPENAI_PATTERN_PLANNER_REASONING",
+  "OPENAI_PATTERN_PLANNER_PROMPT_VERSION",
+  "OPENAI_PATTERN_PLANNER_TIMEOUT_MS",
+  "OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS",
+  "OPENAI_PATTERN_WRITER_MODEL",
+  "OPENAI_PATTERN_WRITER_REASONING",
+  "OPENAI_PATTERN_WRITER_PROMPT_VERSION",
+  "OPENAI_PATTERN_WRITER_TIMEOUT_MS",
+  "OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS",
+  "OPENAI_PATTERN_VERIFIER_MODEL",
+  "OPENAI_PATTERN_VERIFIER_REASONING",
+  "OPENAI_PATTERN_VERIFIER_PROMPT_VERSION",
+  "OPENAI_PATTERN_VERIFIER_TIMEOUT_MS",
+  "OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS",
+  "CODEX_RUNNER_TOKEN",
+  "CODEX_PROVIDER_ARTIFACT_KEYRING",
+] as const satisfies ReadonlyArray<keyof typeof HERMETIC_TEST_BINDINGS>;
+
 export const CODEX_TEST_RUNNER_TOKEN =
   "runner_0123456789abcdefghijklmnopqrstuvwxyz";
 export const CODEX_TEST_ARTIFACT_KEYRING = JSON.stringify({
@@ -932,60 +974,102 @@ export async function seedActiveOntology(
 }
 
 /**
- * Configure a runnable Pattern publisher on the in-isolate binding.
+ * The deterministic publisher, handed to `executePatternJob` directly.
  *
- * There is no rollout or allowlist to turn on any more: every authenticated
- * account is in the generated flow, and what this helper supplies is the
- * deployment's provider configuration. Callers must restore the hermetic
- * defaults afterwards — env mutations persist across tests in this pool.
+ * `PATTERN_PUBLISHER` selects one thing and it is Codex, so a suite that needs
+ * prose it can predict injects a stand-in instead of naming one. It answers
+ * under the frozen pin's publisher and with measured provenance because
+ * `runPublisherPass` compares what answered against what the command froze.
  */
-export function enablePatternAi(): void {
-  env.PATTERN_PUBLISHER = "synthetic";
-  env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "100";
-  env.PATTERN_ARTIFACT_RETENTION_DAYS = "30";
+export const DETERMINISTIC_PATTERN_PUBLISHER: PatternExecuteOverrides = {
+  publisher: ({ pin, packet, ontology }) =>
+    createSyntheticPatternPublisher({
+      forceReject: resolveSemanticForceReject(env),
+      packet,
+      ontology,
+      publisher: pin.publisher,
+      measured: true,
+    }),
+};
+
+/**
+ * A stand-in built on the real Responses transport, aimed at the mocked origin.
+ *
+ * Codex hands its request to a durable job and answers `publisher_pending`,
+ * which is the wrong shape for a suite whose subject is what a delivery does
+ * with a provider ANSWER — a timeout, a refusal, malformed JSON, a drifted
+ * candidate. This keeps that transport reachable from a test and from nowhere
+ * else: it is a parameter, and no deployable configuration selects it.
+ *
+ * Two things it has to do that the transport does not:
+ *
+ * - report the frozen pin's publisher, because `runPublisherPass` compares
+ *   executed provenance against the command and a stand-in answering under its
+ *   own name would fail that comparison rather than exercise it; and
+ * - charge the UTC-day ledger itself. Under Codex the charge happens where the
+ *   plaintext invocation is handed out — the runner's claim — so the executor
+ *   passes a reserve that never charges. `pattern_provider_daily_usage` is what
+ *   these suites measure provider calls with, so the stand-in keeps writing it.
+ */
+export function transportPatternPublisher(
+  credential: { source: "worker"; apiKey: string } = { source: "worker", apiKey: "sk-test" },
+): PatternExecuteOverrides {
+  return {
+    publisher: ({ pin }) => {
+      const transport = createOpenAiPatternPublisher(credential, null);
+      const run = async <T>(
+        pass: PatternStageClass,
+        invoke: () => Promise<PatternPassOutcome<T>>,
+        options: PatternPassOptions,
+      ): Promise<PatternPassOutcome<T>> => {
+        const limit = options.codexJob?.dailyCallLimit ?? 0;
+        const budget = await consumePatternProviderCallBudget(
+          env,
+          utcDateFor(new Date()),
+          limit,
+          pass,
+        );
+        if (!budget.ok) {
+          return {
+            ok: false,
+            code: "publisher_budget_exhausted",
+            safe_detail_code: "daily_call_limit_reached",
+            retry_after_seconds: null,
+            origin_layer: "none",
+          };
+        }
+        const outcome = await invoke();
+        return outcome.ok
+          ? { ...outcome, metadata: { ...outcome.metadata, provider: pin.publisher } }
+          : outcome;
+      };
+      return {
+        plan: (input, options) =>
+          run("planner", () => transport.plan(input, options), options),
+        write: (input, options) =>
+          run("writer", () => transport.write(input, options), options),
+        verify: (input, options) =>
+          run("verifier", () => transport.verify(input, options), options),
+      };
+    },
+  };
 }
 
 /**
- * The same rollout, pinned to the live OpenAI publisher.
+ * Restore the complete Codex Pattern posture on the in-isolate binding.
  *
- * Every pin `resolvePatternPublisherConfiguration` requires for the `openai`
- * name has to be set explicitly: the hermetic baseline leaves all of them empty
- * on purpose, so no suite reaches a provider by forgetting something.
- * `mockCalcService` intercepts the request, so this exercises the adapter
- * without leaving the isolate.
+ * There is no rollout, allowlist, or publisher choice to turn on any more, and
+ * the hermetic baseline already carries this posture. The helper stays because
+ * a suite that mutated one of these values has to put it back — env mutations
+ * persist across tests in this pool — and because its call sites document which
+ * suites depend on Pattern being configured at all.
  */
-export function enablePatternOpenAi(): void {
-  enablePatternAi();
-  env.PATTERN_PUBLISHER = "openai";
-  env.OPENAI_CREDENTIAL_SOURCE = "worker";
-  env.OPENAI_API_KEY = "sk-test-pattern";
-  env.OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.1";
-  env.OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.1";
-  env.OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
-}
-
-export function enablePatternCodex(): void {
-  enablePatternAi();
-  env.PATTERN_PUBLISHER = "codex";
-  env.CODEX_RUNNER_TOKEN = "runner_0123456789abcdefghijklmnopqrstuvwxyz";
-  env.CODEX_PROVIDER_ARTIFACT_KEYRING = JSON.stringify({
-    version: 1,
-    keys: {
-      "codex-test-key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
-    },
-  });
-  env.OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "1.0.1";
-  env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "900000";
-  env.OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.1";
-  env.OPENAI_PATTERN_WRITER_TIMEOUT_MS = "900000";
-  env.OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
-  env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
-  env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "900000";
+export function enablePatternAi(): void {
+  env.PATTERN_PUBLISHER = HERMETIC_TEST_BINDINGS.PATTERN_PUBLISHER;
+  env.PATTERN_DAILY_PROVIDER_CALL_LIMIT =
+    HERMETIC_TEST_BINDINGS.PATTERN_DAILY_PROVIDER_CALL_LIMIT;
+  env.PATTERN_ARTIFACT_RETENTION_DAYS =
+    HERMETIC_TEST_BINDINGS.PATTERN_ARTIFACT_RETENTION_DAYS;
 }
 
 /**
@@ -1037,25 +1121,20 @@ export function disableReadingCodex(): void {
   }
 }
 
+/**
+ * Put the Pattern configuration back exactly as the pool started it.
+ *
+ * Not "turn Pattern off": there is no off. An empty Pattern publisher is a
+ * `checkSecureConfig` refusal on every path, so a suite that cleared these
+ * values would take the whole API down for the suites after it.
+ */
 export function disablePatternAi(): void {
-  env.PATTERN_PUBLISHER = "";
-  env.PATTERN_DAILY_PROVIDER_CALL_LIMIT = "";
-  env.PATTERN_ARTIFACT_RETENTION_DAYS = "";
-  env.PATTERN_SEMANTIC_FORCE_REJECT = "";
-  // The provider credentials too. `OPENAI_API_KEY` is shared with the daily
-  // reading publisher, so a Pattern suite that left it set would hand a
-  // capability to every suite that ran after it.
+  for (const key of PATTERN_HERMETIC_KEYS) {
+    (env as unknown as Record<string, string>)[key] = HERMETIC_TEST_BINDINGS[key];
+  }
+  // `OPENAI_API_KEY` is shared with the ontology pipeline's OpenAI transport,
+  // so a Pattern suite that left it set would hand a capability to every suite
+  // that ran after it. Pattern itself no longer reads either value.
   env.OPENAI_CREDENTIAL_SOURCE = "";
   env.OPENAI_API_KEY = "";
-  env.OPENAI_PATTERN_PLANNER_MODEL = "";
-  env.OPENAI_PATTERN_PLANNER_PROMPT_VERSION = "";
-  env.OPENAI_PATTERN_WRITER_MODEL = "";
-  env.OPENAI_PATTERN_WRITER_PROMPT_VERSION = "";
-  env.OPENAI_PATTERN_VERIFIER_MODEL = "";
-  env.OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "";
-  env.OPENAI_PATTERN_PLANNER_TIMEOUT_MS = "";
-  env.OPENAI_PATTERN_WRITER_TIMEOUT_MS = "";
-  env.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = "";
-  env.CODEX_RUNNER_TOKEN = "";
-  env.CODEX_PROVIDER_ARTIFACT_KEYRING = "";
 }

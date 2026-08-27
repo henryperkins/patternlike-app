@@ -40,11 +40,15 @@ describe("Codex runner authentication", () => {
   });
 
   it("fails closed when the dedicated secret is absent", async () => {
+    // Two layers refuse, and the outer one now answers first: Pattern has no
+    // publisher other than Codex, so a deployment missing the runner token is
+    // an incomplete configuration rather than a runner-authority state. What
+    // must never happen either way is a 204 and a claimed job.
     env.CODEX_RUNNER_TOKEN = "";
     const response = await claim(`Bearer ${RUNNER_TOKEN}`);
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
-      error: { code: "codex_runner_auth_not_configured" },
+      error: { code: "configuration_error" },
     });
   });
 
