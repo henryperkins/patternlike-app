@@ -101,6 +101,9 @@ export const DELETED_USER_TABLES = [
   "pattern_documents",
   "pattern_generation_jobs",
   "pattern_generation_claims",
+  "birth_calc_reservations",
+  "birth_calc_daily_usage",
+  "birth_profile_version_counters",
   "chart_snapshots",
   "birth_profiles",
   "context_signals",
@@ -169,6 +172,10 @@ export const NON_PORTABLE_USER_TABLES = [
   "cycle_scan_receipts",
   /** M4: operational spend ledger; no selected date or natal fact. */
   "time_travel_daily_usage",
+  /** M8: birth-calc spend, invocation idempotency, and version-allocation state. */
+  "birth_calc_reservations",
+  "birth_calc_daily_usage",
+  "birth_profile_version_counters",
   /** Credentials, transport, and delivery state — not reader content. */
   "connector_accounts",
   "device_tokens",

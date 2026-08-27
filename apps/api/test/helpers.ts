@@ -60,6 +60,11 @@ const TABLES = [
   "pattern_ontology_releases",
   "pattern_provider_daily_usage",
   "pattern_ontology_provider_daily_usage",
+  // 0016 owner-scoped operational state. All three point directly at users,
+  // so they must be cleared before the user fixture is removed.
+  "birth_calc_reservations",
+  "birth_calc_daily_usage",
+  "birth_profile_version_counters",
   "chart_snapshots",
   "birth_profiles",
   "context_signals",
