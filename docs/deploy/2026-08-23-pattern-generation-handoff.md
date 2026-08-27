@@ -9,7 +9,16 @@
 > [`openai-pattern-rollout.md`](./openai-pattern-rollout.md) for the latest
 > recorded production evidence and
 > [`codex-production-provider.md`](./codex-production-provider.md) for current
-> operations. No active ontology or accepted production Pattern is recorded.
+> operations.
+>
+> **Superseded status line.** This file previously ended this note with "No
+> active ontology or accepted production Pattern is recorded." That is no longer
+> true. A production query on 2026-08-27 found ontology
+> `pattern-ontology-en-us-internal-0.1.0` active and one accepted Pattern
+> document, generated 2026-08-26. See the 2026-08-27 row in
+> [`openai-pattern-rollout.md`](./openai-pattern-rollout.md) for the full
+> observation and for why that release will stop serving anyone once the
+> account-wide change deploys.
 
 **Date:** 2026-08-23; operational state updated 2026-08-24
 **Goal as given:** generate a Pattern on production.

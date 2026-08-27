@@ -8,10 +8,17 @@ does not cover current pins, and the selected Codex path is not certified. Gate
 7B most recently failed closed for Codex candidate
 `pattern-ontology-en-us-0.1.17`, which compiled, passed every evaluation, and
 reached regression cursor 95 of 30 fixtures before a planner pass ceiling ended
-it; no ontology release is active.
-Gates 8–10 remain open. This file is the operational source of truth; updating
-it does not itself authorize a deployment, secret change, ontology activation,
-or provider call.
+it, so **no public-capable machine release has ever been active**.
+
+An *internal* release is. A 2026-08-27 production query found
+`pattern-ontology-en-us-internal-0.1.0` active with one accepted Pattern
+document generated 2026-08-26 — the Gate 7A internal path, executed. Earlier
+revisions of this file said no ontology was active and no Pattern existed; both
+statements were true when written and are recorded as dated rows below. Gates
+8–10 remain open on their own evidence: counting rows is not gate closure.
+
+This file is the operational source of truth; updating it does not itself
+authorize a deployment, secret change, ontology activation, or provider call.
 
 **Pattern has no rollout variable.** `PATTERN_AI_ROLLOUT` and
 `PATTERN_INTERNAL_ACCOUNT_IDS` were removed from source and from both Wrangler
@@ -66,12 +73,73 @@ This table describes repository evidence, not unqueried live state.
 | Historical `0009` / `0010` / `0011` / `0012` | Applied to production in order | 2026-08-22 Gate 2 evidence below; integrity and shape checks clean |
 | Current migration inventory (2026-08-25 query) | Production ledger is at `0015`; `wrangler d1 migrations list` reports nothing pending | `0015_ontology_pipeline_regression_evidence.sql` applied `2026-08-25 00:59:51`, ahead of the Worker that reads it. `0013` / `0014` remain applied. |
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
-| Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
+| Internal synthetic ontology content and canary | Executed on production 2026-08-26 | `pattern-ontology-en-us-internal-0.1.0` active; one failed generation (`semantic_verification_failed`) then one succeeded and accepted. It reached a provider through the internal-account bypass this repository has since removed. This records that it happened; it does not record Gate 8's acceptance evidence. |
 | Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active. See the evidence ledger for individual runs. |
 | Pattern admission declared in committed `wrangler.toml` | none — `PATTERN_AI_ROLLOUT` and `PATTERN_INTERNAL_ACCOUNT_IDS` are absent from both blocks | Admission is the reader's eligibility ladder. The operator-controlled gate is which ontology is active. |
 | Committed publisher declaration | `codex` in both blocks | The dedicated runner path is the only one configuration accepts; OpenAI gateway ids and key alias remain empty |
 | Gate 6 spend certification | Open for OpenAI and Codex | `100` Pattern and `500` ontology calls/day remain enforcement ceilings. The 2026-08-22 OpenAI approval used old 4k/8k/4k output pins and is historical evidence, not authorization for the current mixed ontology/Pattern envelope or Codex. |
-| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; observed Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner was polling `/codex-provider/v1/jobs/claim` and answering `ok`. This observed state differs from current committed rollout declarations and must be re-queried before another operation. |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-27 — see the observation below | API `287bce63-dece-4911-96db-dd212c2cec33` (deployed `2026-08-27T06:36:15Z`); active ontology `pattern-ontology-en-us-internal-0.1.0` with zero pipeline-evidence rows, so its activation scope derives `internal`; one accepted Pattern document. |
+| Production DB, secrets, active ontology pointer, deployed Worker version | Superseded — queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; observed Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner was polling `/codex-provider/v1/jobs/claim` and answering `ok`. This observed state differs from current committed rollout declarations and must be re-queried before another operation. |
+
+## Production observation — 2026-08-27
+
+Read-only queries against `patternlike-api-production` and the `patternlike-ops`
+D1 database. Nothing was applied, deployed, activated, or invoked. This is an
+observation of state, not evidence for any gate.
+
+**Deployed version** `287bce63-dece-4911-96db-dd212c2cec33`, deployed
+`2026-08-27T06:36:15Z`. `/health` returns 200 with `environment=production`;
+unauthenticated `/v1/pattern-state` returns 401.
+
+**Secrets present (9):** `ROOT_KEK`, `SERVICE_AUTH_TOKEN`,
+`CALC_SERVICE_AUTH_TOKEN`, `CODEX_RUNNER_TOKEN`,
+`CODEX_PROVIDER_ARTIFACT_KEYRING`, `ONTOLOGY_PIPELINE_ARTIFACT_KEYRING`,
+`OPENAI_API_KEY`, `PATTERN_REPLAY_LEDGER_KEYS`,
+`PATTERN_REPLAY_LEDGER_SIGNING_KEY`. No value was read or printed. The
+account-wide change adds no secret: the Codex posture it requires is the posture
+the deployed Worker already resolves on every request.
+
+**D1 aggregate counts:** `users` 4, `content_releases` 0, `daily_readings` 13,
+`pattern_ontology_releases` 1, `pattern_documents` 1,
+`pattern_generation_jobs` 2, `pattern_generation_claims` 1 (`accepted`),
+`pattern_generation` consents 1, `pattern_provider_daily_usage` 12 calls total,
+`codex_provider_jobs` 377 all terminal, `pattern_erasure_replay_events` 1,
+unerased `pattern_generation_artifact_keys` 2, and **zero** jobs carrying
+`result_class = 'rollout_paused'`.
+
+**Active ontology:** `pattern-ontology-en-us-internal-0.1.0`, status `active`,
+`recalled_at` null, with **zero** `pattern_ontology_pipeline_evidence` rows and
+**zero** `pattern_ontology_evaluation_runs` receipts.
+
+**Pattern generations:** `pgen_daa2831078efcb3457a463116190fd46` failed
+`semantic_verification_failed` (created `2026-08-26T09:16:04.818Z`), then
+`pgen_a68cbf227f54b7c273d1acffe3b88893` succeeded (created
+`2026-08-26T09:42:07.464Z`). No generation is in flight.
+
+### What this means for the account-wide deploy
+
+The active release has no pipeline evidence, so
+`ONTOLOGY_ACTIVATION_SCOPE_SQL` derives `internal` for it. It served a Pattern on
+2026-08-26 only because the two-argument `ontologyServesAccount` admitted an
+internal release for an allowlisted account. That bypass is gone.
+
+**Deploying the account-wide change therefore closes Pattern generation rather
+than opening it.** Every account — including the one that generated on
+2026-08-26 — will read `ontology_unavailable` from `GET /v1/pattern-state` and
+receive `409 ontology_unavailable` on reservation, until a public-capable
+machine release is activated. That is the intended invariant and the safe
+direction, but it is the opposite of what "removing the allowlist" sounds like,
+so plan the deploy as a closure and the ontology activation as the opening.
+
+The accepted document is unaffected: both `GET /v1/pattern` and
+`GET /v1/pattern-state` answer from the stored document before reaching the
+ontology check, and the release is not recalled. The zero `rollout_paused` rows
+mean the compatibility repair in `pattern-sweep.ts` has nothing to find here.
+
+**What this observation does not establish:** that Gate 8's acceptance evidence
+was recorded, what the accepted document contains, which model and prompt pins
+actually executed, or that word-count and semantic validation passed under the
+current pins. Only row counts and identities were read.
 
 ## What remains before the first generated Pattern
 
