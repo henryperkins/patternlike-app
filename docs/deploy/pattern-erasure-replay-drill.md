@@ -8,8 +8,14 @@ must be restored and replayed.
 
 This drill proves that restoring D1 to a point before a Pattern lifecycle
 erasure cannot resurrect readable Pattern content or make its fingerprint
-eligible for another generation. Keep `PATTERN_AI_ROLLOUT=off` throughout the
-drill and route no production traffic to the disposable restore environment.
+eligible for another generation.
+
+There is no product switch to hold off for the duration. Pattern admission is
+the reader's own eligibility ladder, so containment during the drill comes from
+the environment instead: stop the Codex runner, or hold production on the
+known-good Worker version, so no new generation can reach a provider while the
+restore is in progress. Route no production traffic to the disposable restore
+environment.
 
 ## Evidence boundaries
 

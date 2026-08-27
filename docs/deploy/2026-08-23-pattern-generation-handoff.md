@@ -1,7 +1,11 @@
 # Handoff — Pattern generation on production
 
 > **Historical handoff.** Preserve the dated observations below, but do not use
-> its status paragraph as current inventory. See
+> its status paragraph as current inventory. Every `PATTERN_AI_ROLLOUT` and
+> `PATTERN_INTERNAL_ACCOUNT_IDS` reading recorded here is a dated observation of
+> variables that no longer exist: Pattern admission is the reader's own
+> eligibility ladder, and the variables were removed from both Wrangler blocks.
+> Read those lines as history, never as a step. See
 > [`openai-pattern-rollout.md`](./openai-pattern-rollout.md) for the latest
 > recorded production evidence and
 > [`codex-production-provider.md`](./codex-production-provider.md) for current
@@ -324,13 +328,18 @@ indiscriminately. Widening the grammar is a contract change.
    `internal` and the maintenance cron (`7,22,37,52 * * * *`) is live.
 3. Expect the no-response failures to be gone. The content hard-gate rejections
    at cursors 2/45/68 are real and may still need candidate iteration.
-4. On activation, deploy with `PATTERN_AI_ROLLOUT="internal"` and
-   `PATTERN_INTERNAL_ACCOUNT_IDS="usr_3ca4f7c2f2498c4eab97511fc3c6ff97"`.
-5. Canary signs in, grants first-use consent, `POST /v1/pattern-generations`.
-6. If a provider retry backs off it will **not** self-recover: production runs
-   only the ontology cron, so `sweepPatternJobs` never fires. Use
-   `POST /internal/pattern-generations/:generation_id/reconcile` after
-   `available_at`.
+4. On activation, no further deployment admits anyone: activating a
+   public-capable ontology is what opens Pattern generation, and it opens it for
+   every eligible account at once. Plan the first generation as an observation,
+   not as a per-account change. See §9 of
+   [`codex-production-provider.md`](./codex-production-provider.md).
+5. The canary account signs in, grants first-use consent, and
+   `POST /v1/pattern-generations`.
+6. `sweepPatternJobs` runs on the 15-minute cron, which production now declares,
+   so a provider backoff self-recovers on the next tick. The
+   service-authenticated
+   `POST /internal/pattern-generations/:generation_id/reconcile` route remains
+   available to nudge one job after its `available_at` rather than waiting.
 
 **If you want to finish Workers AI instead**, in rough order of expected value:
 

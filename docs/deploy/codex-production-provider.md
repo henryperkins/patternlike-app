@@ -141,14 +141,21 @@ npx wrangler secret put CODEX_PROVIDER_ARTIFACT_KEYRING --config apps/api/wrangl
 Do not print either value to verify it. Confirm only that both secret names are
 present in the deployment's secret inventory.
 
-## 5. Deploy with both rollouts off
+## 5. Deploy with the machine pipeline off
 
 Before deploying, confirm the production variables contain:
 
 ```toml
-PATTERN_AI_ROLLOUT = "off"
 ONTOLOGY_PIPELINE_ROLLOUT = "off"
 ```
+
+Pattern has no rollout variable to check. What decides whether any Pattern can
+be generated is the reader's own eligibility ladder — an active chart, a
+confirmed locale, their current consent, an unused claim — plus one thing an
+operator does control: whether a public-capable ontology is active. Until one
+is, `GET /v1/pattern-state` answers `ontology_unavailable` for every account and
+no reservation is accepted. Confirm the active ontology pointer is null before
+this deploy if you intend no Pattern generation to be possible.
 
 Deploy through the normal root command:
 
@@ -310,19 +317,30 @@ On a hard-gate or terminal provider failure, set the ontology rollout back to
 
 ## 9. Pattern canary
 
-After ontology activation, deploy these production changes together:
+**Activating a public-capable ontology is what opens Pattern generation.** There
+is no account-scoped canary any more: the same activation that lets the canary
+account generate lets every eligible account generate. Plan the canary as the
+first generation after activation, observed closely — not as a change that
+admits one account and excludes the rest.
 
-- `PATTERN_PUBLISHER="codex"`;
-- planner, writer, and verifier timeouts `900000`;
-- `PATTERN_AI_ROLLOUT="internal"`;
-- `PATTERN_INTERNAL_ACCOUNT_IDS` containing only the approved canary account;
+The publisher configuration is already deployed and asserted by
+`npm run test:wrangler-config -w @patternlike/api`:
+
+- `PATTERN_PUBLISHER="codex"`, the only value configuration accepts;
+- planner, writer, and verifier timeouts all `900000`;
 - all existing model, prompt, output, input, attempt, retention, and daily-call
   pins unchanged.
 
 For `codex`, planner, writer, and verifier passes are all fixed at 900000 ms,
 with the same 1200000-ms provider-job lease and five-minute terminal-upload
-margin. The Pattern canary changes the publisher and all three timeout pins
-together; it does not inherit the production OpenAI 120000-ms values.
+margin. There are no OpenAI 120000-ms values left to inherit: a deployment
+carrying them fails `checkSecureConfig` on every request rather than running
+long.
+
+Containment during the canary is the runner and the deployed version, not an
+account list. `PATTERN_DAILY_PROVIDER_CALL_LIMIT` bounds the day's spend, and
+stopping the runner stops every outbound pass; neither is advertised as a
+product switch, and neither denies one account while serving another.
 
 Use the normal authenticated, confirmed first-use flow. It creates the current
 Pattern-generation grant and reservation atomically; only chart-correction
@@ -438,10 +456,14 @@ deploy/restart, and verify idle polling. Never reuse an old service token.
 The safe rollback is:
 
 1. set the affected rollouts to `off` and deploy — `READING_V5_ROLLOUT` for
-   Daily, `PATTERN_AI_ROLLOUT` for Pattern, `ONTOLOGY_PIPELINE_ROLLOUT` for the
-   pipeline; they are independent switches and stopping one need not stop the
-   others;
-2. stop and disable the runner if the fault is the runner itself;
+   Daily and `ONTOLOGY_PIPELINE_ROLLOUT` for the pipeline; they are independent
+   switches and stopping one need not stop the other. **Pattern has no such
+   switch.** Roll the Worker back to the last known-good version and, if
+   generation itself must stop, stop the runner: in-flight provider work is
+   then cancelled by the ordinary current-owner checks at claim time rather
+   than by an account gate. Do not reintroduce one;
+2. stop and disable the runner if the fault is the runner itself, or if Pattern
+   generation must stop while the Worker version stands;
 3. leave migrations `0013`, `0014`, and `0017` and encrypted artifacts in place;
 4. investigate using only safe state, hashes, counters, and closed codes;
 5. redeploy the last known-good Worker only if its schema is compatible with

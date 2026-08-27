@@ -42,7 +42,7 @@ test("Worker source and configuration contain no private ChatGPT transport", asy
   }
 });
 
-test("production parks the machine pipeline and runs the one-account Pattern canary", () => {
+test("production parks the machine pipeline and configures Pattern for every account", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({
     config: configPath,
@@ -94,22 +94,29 @@ test("production parks the machine pipeline and runs the one-account Pattern can
   assert.equal(production.vars.ONTOLOGY_PIPELINE_PUBLISHER, "codex");
   assert.equal(production.vars.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS, "900000");
   assert.equal(production.vars.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS, "900000");
-  // Gate 8. `internal` admits only the exact ids in
-  // PATTERN_INTERNAL_ACCOUNT_IDS, so the allowlist is asserted with the mode:
-  // `internal` with an empty allowlist reads as contained and admits nobody,
-  // and `internal` with a second id is a wider canary than was authorized.
-  assert.equal(production.vars.PATTERN_AI_ROLLOUT, "internal");
-  assert.equal(production.vars.PATTERN_PUBLISHER, "codex");
-  assert.equal(
-    production.vars.PATTERN_INTERNAL_ACCOUNT_IDS,
-    "usr_3ca4f7c2f2498c4eab97511fc3c6ff97",
-  );
-  // `resolvePatternPublisherConfiguration` expects CODEX_PROVIDER_TIMEOUT_MS on
-  // every pass once the publisher is codex; the OpenAI 120000 values fail the
-  // pin check rather than running long.
-  assert.equal(production.vars.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "900000");
-  assert.equal(production.vars.OPENAI_PATTERN_WRITER_TIMEOUT_MS, "900000");
-  assert.equal(production.vars.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, "900000");
+  // Pattern admission is not a variable. Absence is the contract: neither name
+  // may come back, in either block, under any value -- an empty string would be
+  // a switch someone could set.
+  for (const block of [development, production]) {
+    assert.equal("PATTERN_AI_ROLLOUT" in block.vars, false);
+    assert.equal("PATTERN_INTERNAL_ACCOUNT_IDS" in block.vars, false);
+  }
+
+  // Both deployable blocks name the one deployable publisher.
+  // `resolvePatternPublisherConfiguration` refuses anything else, and it
+  // expects CODEX_PROVIDER_TIMEOUT_MS on every pass: the OpenAI 120000 values
+  // fail the pin check rather than running long.
+  for (const block of [development, production]) {
+    assert.equal(block.vars.PATTERN_PUBLISHER, "codex");
+    assert.equal(block.vars.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "900000");
+    assert.equal(block.vars.OPENAI_PATTERN_WRITER_TIMEOUT_MS, "900000");
+    assert.equal(block.vars.OPENAI_PATTERN_VERIFIER_TIMEOUT_MS, "900000");
+  }
+
+  // The Workers AI binding went with its adapter. A binding declared for a
+  // publisher no code can select is a capability nothing accounts for.
+  assert.equal(development.ai?.binding ?? null, null);
+  assert.equal(production.ai?.binding ?? null, null);
 });
 
 test("production sends every API namespace through the Worker before assets", () => {

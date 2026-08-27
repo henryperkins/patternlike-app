@@ -11,7 +11,17 @@ reached regression cursor 95 of 30 fixtures before a planner pass ceiling ended
 it; no ontology release is active.
 Gates 8–10 remain open. This file is the operational source of truth; updating
 it does not itself authorize a deployment, secret change, ontology activation,
-provider call, or rollout advance.
+or provider call.
+
+**Pattern has no rollout variable.** `PATTERN_AI_ROLLOUT` and
+`PATTERN_INTERNAL_ACCOUNT_IDS` were removed from source and from both Wrangler
+blocks: every authenticated account with an active chart, a confirmed locale,
+its own current consent, a public-capable active ontology, and an unused
+chart-fingerprint claim is in the generated flow. The gate that remains under an
+operator's control is **which ontology is active**, and activating a
+public-capable one opens generation for every eligible account at once. Dated
+observations of the old variables are kept below as evidence; none of them is a
+step.
 
 **Companion artifacts:**
 
@@ -58,8 +68,8 @@ This table describes repository evidence, not unqueried live state.
 | Pattern model/strict-schema verification command | Fresh live pass recorded | `gpt-5.6-sol` lookup and strict `pattern` response passed at `2026-08-22T12:32:49.920Z` |
 | Internal synthetic ontology content and canary | **Not executed** | Internal ontology plan remains the shortest optional internal-content path |
 | Public-capable machine ontology pipeline | Engineering complete; Gate 7B production evidence failed closed | Authorized corpus registered; multiple immutable candidates failed closed at existing validation/regression/configuration boundaries; no machine release is active. See the evidence ledger for individual runs. |
-| Rollout declared in committed `wrangler.toml` | default `off`; production `internal` for one allowlisted account | This is repository configuration, not proof of the deployed binding or a successful canary |
-| Committed production publisher declaration | `codex` | The dedicated runner path is selected; development remains `synthetic`, and OpenAI gateway ids/key alias remain empty |
+| Pattern admission declared in committed `wrangler.toml` | none — `PATTERN_AI_ROLLOUT` and `PATTERN_INTERNAL_ACCOUNT_IDS` are absent from both blocks | Admission is the reader's eligibility ladder. The operator-controlled gate is which ontology is active. |
+| Committed publisher declaration | `codex` in both blocks | The dedicated runner path is the only one configuration accepts; OpenAI gateway ids and key alias remain empty |
 | Gate 6 spend certification | Open for OpenAI and Codex | `100` Pattern and `500` ontology calls/day remain enforcement ceilings. The 2026-08-22 OpenAI approval used old 4k/8k/4k output pins and is historical evidence, not authorization for the current mixed ontology/Pattern envelope or Codex. |
 | Production DB, secrets, active ontology pointer, deployed Worker version | Re-queried 2026-08-25 | API `097f2646-71c5-4623-b0da-88c1a64fc641` (deployed `2026-08-25T01:00:12Z`); `users` 4, `pattern_ontology_releases` 0, `pattern_generation_jobs` 0, `pattern_documents` 0, `content_releases` 0, `codex_provider_jobs` 124 all terminal; corpus `pattern-ontology-source-manual-en-us-0.1.0` registered `licensed_excerpt`; active ontology pointer is null; observed Pattern rollout `off`, ontology rollout `internal` / `codex`; the Codex runner was polling `/codex-provider/v1/jobs/claim` and answering `ok`. This observed state differs from current committed rollout declarations and must be re-queried before another operation. |
 
@@ -79,30 +89,40 @@ first, then choose exactly one ontology branch:
    job. Reserve exactly one authorized immutable candidate, co-execute its
    generator-schema Gate 4 evidence with that ordinary job, and activate only
    if every machine gate passes;
-4. after an active ontology exists, prepare the one-account internal Pattern
-   canary with an active chart, confirmed `en-US` locale, current first-use
-   confirmation, and an unconsumed chart fingerprint. The Codex Pattern
-   strict-schema Gate 4 evidence closes on that ordinary Gate 8 planner job;
-5. set exactly the canary account in `PATTERN_INTERNAL_ACCOUNT_IDS`, move only
-   to `internal`, reserve once, and let the machine pipeline reach `ready` or an
-   honest terminal failure.
+4. prepare the account that will perform the first observed generation with an
+   active chart, confirmed `en-US` locale, current first-use confirmation, and
+   an unconsumed chart fingerprint. The Codex Pattern strict-schema Gate 4
+   evidence closes on that ordinary Gate 8 planner job;
+5. activate the public-capable ontology. That is the step that opens generation,
+   and it opens it for every eligible account — there is no account list to set
+   and no mode to move. Reserve once from the prepared account and let the
+   machine pipeline reach `ready` or an honest terminal failure, containing by
+   the runner or the deployed version if it must be stopped.
 
 Adapter Tasks 1–9, including the credential model and queue/idempotency suite,
 are complete. Task 10 supplies the reproducible preflight and this handoff;
 neither substitutes for a live Gate 4 run. Administrator OIDC and the replay
-restore drill are not required to obtain the first internal Pattern; they remain
-public-rollout gates below.
+restore drill remain gates below. They now precede the first generated Pattern
+rather than a later public advance, because the activation that produces one is
+already public.
 
 ## Paths after the common engineering gates
 
-| Path | Ontology accepted | Account scope | Endpoint state reached | Additional blockers |
-| --- | --- | --- | --- | --- |
-| Internal canary — shortest | signed `synthetic_internal` or `machine_pipeline` | exact allowlist only | `PATTERN_AI_ROLLOUT=internal` | Gate 1, one activated ontology path, and Gates 2–8 |
-| Public `first_open` | signed `machine_pipeline` only, backed by authorized `licensed_excerpt` corpus | first-open cohort | `PATTERN_AI_ROLLOUT=first_open` | Automated ontology Task 11 evidence, Gate 9 certification, admin role boundary, replay runtime/drill, sustained metrics |
-| Public `enabled` | active `machine_pipeline` release | remaining eligible cohort | `PATTERN_AI_ROLLOUT=enabled` | Separate product authorization after successful first-open observation |
+There is one path, and its only operator-controlled step is ontology activation.
+
+| Step | Ontology accepted | Who can generate | Additional blockers |
+| --- | --- | --- | --- |
+| No active ontology | — | nobody; every account reads `ontology_unavailable` | — |
+| Internal activation | signed `synthetic_internal`, or a machine release whose evidence does not re-derive `public` | still nobody | An internal release serves no reader: `ontologyServesAccount` requires machine-pipeline provenance AND a `public` activation scope. It remains useful only for control-plane work. |
+| Public activation | signed `machine_pipeline`, backed by an authorized `licensed_excerpt` corpus, with committed evaluation and regression evidence | every eligible account | Automated ontology Task 11 evidence, Gate 9 certification, admin role boundary, replay runtime/drill, sustained metrics, and the privacy/legal review of consent policy `1.1.0` |
 
 The internal release is never promoted into a public release. The first machine
 release recalls it and triggers withdrawal for documents based on it.
+
+Because activation is account-independent, there is no "canary cohort" to
+configure. The first generation after activation is a canary by observation:
+watch it closely, and contain it by stopping the runner or rolling the Worker
+back rather than by admitting one account.
 
 ---
 
@@ -139,11 +159,14 @@ Required evidence:
   failures without making a provider request;
 - `contracts/m0` through `contracts/m6` are unchanged;
 - M7 changes are only recorded additive amendments and fixtures;
-- both Wrangler blocks still declare `PATTERN_AI_ROLLOUT="off"`; and
+- neither Wrangler block declares `PATTERN_AI_ROLLOUT` or
+  `PATTERN_INTERNAL_ACCOUNT_IDS`, both declare `PATTERN_PUBLISHER="codex"` with
+  all three timeouts at `900000`, and
+  `npm run test:wrangler-config -w @patternlike/api` asserts it; and
 - no production secret or remote resource changed during this gate.
 
 **Stop:** any failure, unresolved adapter requirement, unrecorded contract
-drift, or non-`off` committed rollout.
+drift, or a committed configuration that admits a publisher other than Codex.
 
 ## Gate 2 — inventory production and apply forward-only migrations
 
@@ -230,8 +253,10 @@ Recorded evidence:
   `signOntology` handlers, and its signing secret is deliberately still absent;
 - `/health` returned 200 with `environment=production`; unauthenticated
   `/v1/pattern` and `/v1/pattern-state` remained 401;
-- the deployed binding reports `PATTERN_AI_ROLLOUT=off`, publisher `openai`,
-  queue `patternlike-pattern-generation`, and the expected signer service;
+- the deployed binding reported `PATTERN_AI_ROLLOUT=off`, publisher `openai`,
+  queue `patternlike-pattern-generation`, and the expected signer service. Both
+  Pattern variables have since been removed and the publisher is `codex`; this
+  line records what was observed on that date, not a state to restore;
 - the Pattern consumer reports DLQ `patternlike-pattern-generation-dlq`, batch
   size 1, three retries, five-second wait, and bounded concurrency 2; and
 - after health/auth smoke, `pattern_provider_daily_usage` still contained zero
@@ -253,8 +278,10 @@ Record the Worker version id and prove:
 - authenticated Pattern state/read behavior is unchanged;
 - the Pattern queue and DLQ names, `max_batch_size=1`, and bounded concurrency
   match committed configuration;
-- `PATTERN_AI_ROLLOUT=off` in the deployed version; and
-- no Pattern queue delivery decrypts a command or calls a provider while off.
+- the deployed binding declares no `PATTERN_AI_ROLLOUT` and no
+  `PATTERN_INTERNAL_ACCOUNT_IDS`; and
+- with no public-capable ontology active, no Pattern queue delivery decrypts a
+  command or calls a provider, and every account reads `ontology_unavailable`.
 
 Production currently runs only the separately routed ontology-pipeline
 maintenance cron. The incumbent reading/privacy/Pattern scheduler remains off,
@@ -661,12 +688,16 @@ does not establish which upstream component introduced the condition.
 
 Execute `docs/superpowers/plans/2026-08-20-internal-ontology-activation.md`.
 Required evidence: signed `synthetic_internal` bundle hash, compiler pass,
-signature/key id, active pointer, allowlisted reservation success, and an
-unallowlisted authenticated account receiving the normal
-`503 pattern_generation_unavailable` containment response while
-`PATTERN_AI_ROLLOUT=internal`. The denied request must leave zero claim,
-consent, generation-job, provider-budget, or artifact side effects.
-`evaluator_passed` and `regression_passed` remain honestly false.
+signature/key id, and active pointer — followed by proof that the release serves
+**nobody**. An internal activation scope is a content-integrity refusal, not a
+cohort: every authenticated account, including the operator's own, must receive
+`409 ontology_unavailable` on reservation and `ontology_unavailable` from
+`GET /v1/pattern-state`. Each denied request must leave zero claim, consent,
+generation-job, provider-budget, or artifact side effects. `evaluator_passed`
+and `regression_passed` remain honestly false.
+
+This path can therefore no longer produce a generated Pattern. It remains the
+shortest way to exercise signing, ingestion, activation, and recall.
 
 ### Gate 7B — public-capable path
 
@@ -770,22 +801,22 @@ active ontology and separate authorization and deployment of the exact internal
 allowlist/rollout change. This is the first point a generated Pattern may exist
 outside hermetic tests.
 
-For a Codex canary, deploy one atomic production change that sets
-`PATTERN_PUBLISHER=codex`, all of
-`OPENAI_PATTERN_PLANNER_TIMEOUT_MS`, `OPENAI_PATTERN_WRITER_TIMEOUT_MS`, and
-`OPENAI_PATTERN_VERIFIER_TIMEOUT_MS` to `900000`, one exact
-`PATTERN_INTERNAL_ACCOUNT_IDS` entry, and `PATTERN_AI_ROLLOUT=internal`.
-Follow the Codex publisher and lease procedure in
-[`codex-production-provider.md`](./codex-production-provider.md); do not leave
-the Pattern path on its production `openai` / `120000` pins. The account must
-have:
+The Codex publisher configuration is already committed and asserted:
+`PATTERN_PUBLISHER=codex` with `OPENAI_PATTERN_PLANNER_TIMEOUT_MS`,
+`OPENAI_PATTERN_WRITER_TIMEOUT_MS`, and `OPENAI_PATTERN_VERIFIER_TIMEOUT_MS` all
+`900000`. There is no separate canary deployment: the change that makes a
+generation possible is the ontology activation above, and it applies to every
+eligible account. Follow the Codex publisher and lease procedure in
+[`codex-production-provider.md`](./codex-production-provider.md). The account
+performing the first observed generation must have:
 
 - active account and chart;
 - confirmed `en-US` content locale matching the active ontology;
 - submission of the current consent-policy version and confirmation through the
   normal authenticated first-use flow, which creates the current grant;
 - no consumed claim for the chart fingerprint; and
-- a reservation reason admitted by the internal rollout.
+- a reservation reason the endpoint accepts (`first_open`,
+  `first_open_retry`, or `failed_attempt_retry`).
 
 Reserve once. Record opaque generation id, provider request hashes, per-pass
 call/token counts, stage timings, ontology version/hash, executed model/prompt
@@ -852,20 +883,31 @@ internal observations within the approved bounds for provider success,
 deterministic validation, semantic rejection, queue age, attempts, token use,
 and spend.
 
-Set only `PATTERN_AI_ROLLOUT=first_open`, deploy one version, and record the
-cohort rule and version. Monitor the closed operational metrics; never inspect
-reader prose to decide whether to publish it. Return to `off` on threshold
-breach.
+There is no cohort advance to deploy. Public availability arrived with the
+public ontology activation, so what this gate authorizes is the decision to
+*leave it active* after a sustained observation interval, and to record the
+Worker version and ontology identity that interval covers. Monitor the closed
+operational metrics; never inspect reader prose to decide whether to publish it.
 
-`enabled` is a later, separately authorized product transition. It is not an
-automatic consequence of a successful first-open interval.
+On a threshold breach, contain with the actions in Rollback below: recall the
+ontology, roll the Worker back, or stop the runner. Do not reintroduce an
+account gate.
 
 ---
 
 ## Rollback
 
-- Set `PATTERN_AI_ROLLOUT=off` to prevent queued or in-flight work from entering
-  another provider stage. Do not delete queue rows or undo migrations.
+- Roll the Worker back to the last schema-compatible known-good version, and
+  stop the Codex runner if outbound provider work must stop immediately.
+  Queued and in-flight work is then contained by the ordinary current-owner
+  checks, which cancel a provider job whose owner, consent, chart, locale,
+  configuration, or ontology no longer matches what the command froze. Do not
+  delete queue rows or undo migrations, and do not reintroduce an account gate.
+- Recalling the active ontology is the one operator action that stops new
+  generation for every account at once, and it is permanent for that version.
+- `PATTERN_DAILY_PROVIDER_CALL_LIMIT` bounds the day's spend and is not a
+  product switch: exhausting it is a fail-closed refusal, not a supported way to
+  turn the feature off.
 - Recall an unsafe ontology version. Recall is permanent for that version and
   invokes the existing withdrawal path; never reactivate the same identity.
 - Roll back the Worker to the last schema-compatible version. Forward-only D1
