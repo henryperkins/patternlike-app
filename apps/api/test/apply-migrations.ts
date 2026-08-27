@@ -10,6 +10,7 @@ const expectedTail = [
   "0014_codex_provider_response_uploads.sql",
   "0015_ontology_pipeline_regression_evidence.sql",
   "0016_birth_calc_usage.sql",
+  "0017_codex_reading_provider.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -28,6 +29,7 @@ const codexProviderMigrationIndex = migrationNames.indexOf(expectedTail[4]);
 const codexResponseUploadMigrationIndex = migrationNames.indexOf(expectedTail[5]);
 const regressionEvidenceMigrationIndex = migrationNames.indexOf(expectedTail[6]);
 const birthCalcUsageMigrationIndex = migrationNames.indexOf(expectedTail[7]);
+const codexReadingProviderMigrationIndex = migrationNames.indexOf(expectedTail[8]);
 
 interface SchemaColumn {
   name: string;
@@ -176,16 +178,16 @@ async function assertBirthCalcSchema(db: D1Database, lane: string): Promise<void
 async function assertDatabaseHealthy(db: D1Database, lane: string): Promise<void> {
   const foreignKeys = await db.prepare("PRAGMA foreign_key_check").all();
   if (foreignKeys.results.length !== 0) {
-    throw new Error(`0016 ${lane} left foreign-key violations`);
+    throw new Error(`${lane} left foreign-key violations`);
   }
   const quickCheck = await db.prepare("PRAGMA quick_check")
     .first<{ quick_check: string }>();
   if (quickCheck?.quick_check !== "ok") {
-    throw new Error(`0016 ${lane} failed quick_check`);
+    throw new Error(`${lane} failed quick_check`);
   }
   const assertionRows = await db.prepare("SELECT * FROM assertion_probe").all();
   if (assertionRows.results.length !== 0) {
-    throw new Error(`0016 ${lane} left an assertion probe armed`);
+    throw new Error(`${lane} left an assertion probe armed`);
   }
 }
 
@@ -193,7 +195,7 @@ async function assertDatabaseHealthy(db: D1Database, lane: string): Promise<void
 // This is the fresh-database lane; individual tests then exercise the schema.
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 await assertBirthCalcSchema(env.DB, "clean apply");
-await assertDatabaseHealthy(env.DB, "clean apply");
+await assertDatabaseHealthy(env.DB, "0016 clean apply");
 
 // The isolated upgrade binding stops before 0009, carries live rows through the
 // adapter rebuild/additive migrations and 0011, and only then applies 0012.
@@ -605,7 +607,10 @@ await upgradeDb.prepare(
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(birthCalcUsageMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    birthCalcUsageMigrationIndex,
+    codexReadingProviderMigrationIndex,
+  ),
 );
 await assertBirthCalcSchema(upgradeDb, "populated apply");
 
@@ -624,4 +629,303 @@ for (const table of Object.keys(birthCalcColumns)) {
     throw new Error(`0016 populated apply invented rows in ${table}`);
   }
 }
-await assertDatabaseHealthy(upgradeDb, "populated apply");
+await assertDatabaseHealthy(upgradeDb, "0016 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0017: the Codex provider `reading`/`publisher` coordinate.
+// ---------------------------------------------------------------------------
+// 0017 rebuilds `codex_provider_jobs` and its response-upload child while
+// foreign keys are live. The only way to prove a rebuild preserved live work is
+// to seed live work first, so this lane fills every lifecycle, both existing
+// pipelines, every nullable terminal field, and two child rows before the
+// migration runs, snapshots them with stable ordering, and hands the snapshot
+// to src/db/codex-provider-schema.test.ts for deep comparison.
+
+const codexProviderColumns = [
+  "id", "pipeline", "owner_id", "user_id", "pass", "stage_generation",
+  "stage_attempt", "request_hash", "request_object_key",
+  "request_envelope_hash", "request_ciphertext_hash", "request_key_id",
+  "request_nonce", "request_byte_length", "response_hash",
+  "response_object_key", "response_envelope_hash", "response_ciphertext_hash",
+  "response_key_id", "response_nonce", "response_byte_length", "model",
+  "reasoning_effort", "prompt_version", "timeout_ms", "daily_call_limit",
+  "status", "lease_token_hash", "lease_expires_at", "provider_request_id",
+  "input_tokens", "output_tokens", "failure_code", "safe_detail_code",
+  "available_at", "created_at", "updated_at", "completed_at",
+] as const;
+
+const hex64 = (seed: string): string => seed.repeat(64).slice(0, 64);
+const leaseHash = (seed: string): string => `sha256:${hex64(seed)}`;
+
+interface ProviderJobFixture {
+  id: string;
+  pipeline: "pattern" | "ontology";
+  owner_id: string;
+  user_id: string | null;
+  pass: string;
+  stage_generation: number;
+  stage_attempt: number;
+  status: "pending" | "leased" | "completed" | "failed" | "cancelled";
+}
+
+function codexProviderRow(fixture: ProviderJobFixture) {
+  const discriminator = fixture.id.slice("cpjob_".length);
+  const terminal = "2026-08-26T12:34:56.000Z";
+  const completed = fixture.status === "completed";
+  const failed = fixture.status === "failed";
+  const leased = fixture.status === "leased";
+  return {
+    id: fixture.id,
+    pipeline: fixture.pipeline,
+    owner_id: fixture.owner_id,
+    user_id: fixture.user_id,
+    pass: fixture.pass,
+    stage_generation: fixture.stage_generation,
+    stage_attempt: fixture.stage_attempt,
+    request_hash: leaseHash(discriminator.slice(0, 2)),
+    request_object_key: `codex-provider-jobs/${fixture.id}/request.json.enc`,
+    request_envelope_hash: leaseHash(discriminator.slice(2, 4)),
+    request_ciphertext_hash: leaseHash(discriminator.slice(4, 6)),
+    request_key_id: `codex-key-${discriminator.slice(0, 8)}`,
+    request_nonce: `nonce-request-${discriminator.slice(0, 12)}`,
+    request_byte_length: 1024,
+    response_hash: completed ? leaseHash(discriminator.slice(6, 8)) : null,
+    response_object_key: completed
+      ? `codex-provider-jobs/${fixture.id}/responses/${hex64("f")}.json.enc`
+      : null,
+    response_envelope_hash: completed ? leaseHash(discriminator.slice(8, 10)) : null,
+    response_ciphertext_hash: completed ? leaseHash(discriminator.slice(10, 12)) : null,
+    response_key_id: completed ? `codex-key-${discriminator.slice(8, 16)}` : null,
+    response_nonce: completed ? `nonce-response-${discriminator.slice(0, 12)}` : null,
+    response_byte_length: completed ? 2048 : null,
+    model: "gpt-5.6-sol",
+    reasoning_effort: "high",
+    prompt_version: "1.0.5",
+    timeout_ms: 900000,
+    daily_call_limit: 250,
+    status: fixture.status,
+    lease_token_hash: leased || completed || failed
+      ? leaseHash(discriminator.slice(12, 14))
+      : null,
+    lease_expires_at: leased || completed || failed
+      ? "2026-08-26T13:00:00.000Z"
+      : null,
+    provider_request_id: completed ? `thread_${discriminator.slice(0, 16)}` : null,
+    input_tokens: completed ? 4127 : null,
+    output_tokens: completed ? 612 : null,
+    failure_code: failed ? "publisher_unavailable" : null,
+    safe_detail_code: failed ? "request_timeout" : null,
+    available_at: "2026-08-26T12:00:00.000Z",
+    created_at: "2026-08-26T12:00:00.000Z",
+    updated_at: "2026-08-26T12:30:00.000Z",
+    completed_at: completed || failed || fixture.status === "cancelled"
+      ? terminal
+      : null,
+  };
+}
+
+const providerFixtures: ProviderJobFixture[] = [
+  {
+    id: `cpjob_${"1".repeat(32)}`,
+    pipeline: "pattern",
+    owner_id: "pgen_populated_0017_planner",
+    user_id: migrationUserId,
+    pass: "planner",
+    stage_generation: 1,
+    stage_attempt: 0,
+    status: "pending",
+  },
+  {
+    id: `cpjob_${"2".repeat(32)}`,
+    pipeline: "pattern",
+    owner_id: "pgen_populated_0017_writer",
+    user_id: migrationUserId,
+    pass: "writer",
+    stage_generation: 1,
+    stage_attempt: 1,
+    status: "leased",
+  },
+  {
+    id: `cpjob_${"3".repeat(32)}`,
+    pipeline: "pattern",
+    owner_id: "pgen_populated_0017_verifier",
+    user_id: migrationUserId,
+    pass: "verifier",
+    stage_generation: 2,
+    stage_attempt: 0,
+    status: "completed",
+  },
+  {
+    id: `cpjob_${"4".repeat(32)}`,
+    pipeline: "ontology",
+    owner_id: "oprun_populated_0017_generator",
+    user_id: null,
+    pass: "generator",
+    stage_generation: 0,
+    stage_attempt: 2,
+    status: "failed",
+  },
+  {
+    id: `cpjob_${"5".repeat(32)}`,
+    pipeline: "ontology",
+    owner_id: "oprun_populated_0017_evaluator",
+    user_id: null,
+    pass: "evaluator",
+    stage_generation: 3,
+    stage_attempt: 0,
+    status: "cancelled",
+  },
+];
+
+for (const fixture of providerFixtures) {
+  const row = codexProviderRow(fixture);
+  await upgradeDb.prepare(
+    `INSERT INTO codex_provider_jobs (${codexProviderColumns.join(", ")})
+     VALUES (${codexProviderColumns.map(() => "?").join(", ")})`,
+  )
+    .bind(...codexProviderColumns.map((column) => row[column]))
+    .run();
+}
+
+// One committed upload beside a completed job, and one orphaned upload from a
+// lease that lost terminal CAS. The second is exactly the row maintenance and
+// account deletion exist to find, so a rebuild that silently dropped it would
+// leave an encrypted object with no inventory pointing at it.
+const uploadFixtures = [
+  {
+    job_id: `cpjob_${"3".repeat(32)}`,
+    lease_token_hash: leaseHash("aa"),
+    object_key:
+      `codex-provider-jobs/cpjob_${"3".repeat(32)}/responses/${hex64("f")}.json.enc`,
+    created_at: "2026-08-26T12:35:00.000Z",
+  },
+  {
+    job_id: `cpjob_${"2".repeat(32)}`,
+    lease_token_hash: leaseHash("bb"),
+    object_key:
+      `codex-provider-jobs/cpjob_${"2".repeat(32)}/responses/${hex64("e")}.json.enc`,
+    created_at: "2026-08-26T12:36:00.000Z",
+  },
+];
+for (const upload of uploadFixtures) {
+  await upgradeDb.prepare(
+    `INSERT INTO codex_provider_response_uploads (
+       job_id, lease_token_hash, object_key, created_at
+     ) VALUES (?, ?, ?, ?)`,
+  )
+    .bind(
+      upload.job_id,
+      upload.lease_token_hash,
+      upload.object_key,
+      upload.created_at,
+    )
+    .run();
+}
+
+const providerJobsBefore = await upgradeDb.prepare(
+  `SELECT ${codexProviderColumns.join(", ")}
+   FROM codex_provider_jobs ORDER BY id`,
+).all();
+const providerUploadsBefore = await upgradeDb.prepare(
+  `SELECT job_id, lease_token_hash, object_key, created_at
+   FROM codex_provider_response_uploads ORDER BY job_id, lease_token_hash`,
+).all();
+if (providerJobsBefore.results.length !== providerFixtures.length) {
+  throw new Error("0017 populated lane did not seed every provider fixture");
+}
+if (providerUploadsBefore.results.length !== uploadFixtures.length) {
+  throw new Error("0017 populated lane did not seed every response upload");
+}
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(codexReadingProviderMigrationIndex),
+);
+
+const providerJobsAfter = await upgradeDb.prepare(
+  `SELECT ${codexProviderColumns.join(", ")}
+   FROM codex_provider_jobs ORDER BY id`,
+).all();
+if (
+  JSON.stringify(providerJobsAfter.results) !==
+  JSON.stringify(providerJobsBefore.results)
+) {
+  throw new Error("0017 did not preserve every populated provider job byte-for-byte");
+}
+
+const providerUploadsAfter = await upgradeDb.prepare(
+  `SELECT job_id, lease_token_hash, object_key, created_at
+   FROM codex_provider_response_uploads ORDER BY job_id, lease_token_hash`,
+).all();
+if (
+  JSON.stringify(providerUploadsAfter.results) !==
+  JSON.stringify(providerUploadsBefore.results)
+) {
+  throw new Error("0017 did not preserve every populated response upload byte-for-byte");
+}
+
+// Handed to src/db/codex-provider-schema.test.ts, which cannot observe the
+// pre-migration state itself.
+await upgradeDb.prepare(
+  `CREATE TABLE IF NOT EXISTS migration_upgrade_snapshot (
+     name TEXT PRIMARY KEY NOT NULL,
+     payload TEXT NOT NULL
+   )`,
+).run();
+await upgradeDb.prepare(
+  `INSERT OR REPLACE INTO migration_upgrade_snapshot (name, payload)
+   VALUES (?, ?)`,
+).bind(
+  "codex_provider_jobs",
+  JSON.stringify(providerJobsBefore.results),
+).run();
+await upgradeDb.prepare(
+  `INSERT OR REPLACE INTO migration_upgrade_snapshot (name, payload)
+   VALUES (?, ?)`,
+).bind(
+  "codex_provider_response_uploads",
+  JSON.stringify(providerUploadsBefore.results),
+).run();
+
+const stagingLeftBehind = await upgradeDb.prepare(
+  `SELECT name FROM sqlite_master
+   WHERE type = 'table' AND name LIKE 'codex_provider_%staging%'`,
+).all();
+if (stagingLeftBehind.results.length !== 0) {
+  throw new Error("0017 left its staging table behind");
+}
+
+let illegalReadingPassRejected = false;
+try {
+  const row = codexProviderRow({
+    id: `cpjob_${"6".repeat(32)}`,
+    pipeline: "pattern",
+    owner_id: "populated_0017_illegal",
+    user_id: migrationUserId,
+    pass: "planner",
+    stage_generation: 9,
+    stage_attempt: 0,
+    status: "pending",
+  });
+  await upgradeDb.prepare(
+    `INSERT INTO codex_provider_jobs (${codexProviderColumns.join(", ")})
+     VALUES (${codexProviderColumns.map(() => "?").join(", ")})`,
+  )
+    .bind(
+      ...codexProviderColumns.map((column) =>
+        column === "pipeline"
+          ? "reading"
+          : column === "pass"
+            ? "planner"
+            : row[column]
+      ),
+    )
+    .run();
+} catch {
+  illegalReadingPassRejected = true;
+}
+if (!illegalReadingPassRejected) {
+  throw new Error("0017 populated apply admitted reading/planner");
+}
+
+await assertDatabaseHealthy(upgradeDb, "0017 populated apply");
