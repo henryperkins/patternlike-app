@@ -293,10 +293,16 @@ function isSubmitted(value: unknown): value is BirthCalcSubmitted {
 }
 
 function sameEffectiveSubmitted(
-  command: BirthCalcCommandV1,
+  submitted: BirthCalcSubmitted,
+  effective: Pick<
+    BirthCalcCommandV1["effective"],
+    | "accuracy"
+    | "birth_date"
+    | "birth_time_local"
+    | "approximate_window_minutes"
+    | "birthplace"
+  >,
 ): boolean {
-  const effective = command.effective;
-  const submitted = command.submitted;
   const submittedBirthplace = submitted.birthplace ?? emptyBirthplace();
   return (
     effective.accuracy === submitted.accuracy &&
@@ -361,7 +367,13 @@ function isBirthCalcCommandV1(
   ) {
     return false;
   }
-  return sameEffectiveSubmitted(value);
+  return sameEffectiveSubmitted(value.submitted, {
+    accuracy: effective.accuracy,
+    birth_date: effective.birth_date,
+    birth_time_local: effective.birth_time_local,
+    approximate_window_minutes: effective.approximate_window_minutes,
+    birthplace: effective.birthplace,
+  });
 }
 
 function isLegacyBirthplace(
