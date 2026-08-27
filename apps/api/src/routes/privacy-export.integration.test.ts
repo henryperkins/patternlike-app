@@ -20,10 +20,12 @@ import { openExport, sealExport } from "../services/export-envelope.js";
 import { processExportMessage } from "../services/privacy-jobs.js";
 import { runPrivacyMaintenance } from "../services/privacy-maintenance.js";
 import {
+  ALICE,
   IDENTITY_A,
   IDENTITY_B,
   USER_A,
   USER_B,
+  postBirthProfile,
   resetDb,
   rows,
   seedChart,
@@ -426,6 +428,112 @@ describe("account export", () => {
     expect(artifact.birth_profiles).toHaveLength(1);
     expect(artifact.chart_snapshots).toHaveLength(1);
     expect(JSON.stringify(artifact)).not.toContain(IDENTITY_A.cryptoSubject);
+  });
+
+  it("exports a v1 birth command as the submitted birth shape without its envelope or effective input", async () => {
+    const created = await postBirthProfile(
+      USER_A,
+      "key-export-birth-command-v1",
+      ALICE,
+    );
+    expect(created.status).toBe(202);
+    const accepted = await postExport(
+      USER_A,
+      "idem-export-birth-command-v1",
+    );
+    await deliver(accepted.body.job_id);
+
+    const download = await SELF.fetch(
+      `http://api.test/v1/exports/${accepted.body.resource_id}/download`,
+      { headers: { "x-user-id": USER_A } },
+    );
+    const downloadText = await download.text();
+    expect(download.status, downloadText).toBe(200);
+    const artifact = JSON.parse(downloadText) as {
+      birth_profiles: Array<{ birth: Record<string, unknown> }>;
+    };
+    expect(artifact.birth_profiles).toHaveLength(1);
+    const birth = artifact.birth_profiles[0]!.birth;
+    expect(birth).toEqual({
+      accuracy: "exact",
+      consent_id: "cns_alice_0001",
+      birth_date: "1990-05-15",
+      birth_time_local: "12:34:00",
+      approximate_window_minutes: null,
+      timezone_hint: "America/Los_Angeles",
+      birthplace: {
+        place_id: null,
+        label: "Los Angeles",
+        latitude: 34.05,
+        longitude: -118.24,
+      },
+    });
+    expect(birth).not.toHaveProperty("schema_version");
+    expect(birth).not.toHaveProperty("submitted");
+    expect(birth).not.toHaveProperty("effective");
+    expect(JSON.stringify(birth)).not.toContain("location_confidence");
+    expect(JSON.stringify(birth)).not.toContain(
+      "location_qualifier_codes",
+    );
+    expect(JSON.stringify(birth)).not.toContain("birth-calc-command/v1");
+  });
+
+  it("keeps a legacy submitted birth payload exportable without inventing a command envelope", async () => {
+    const legacy = {
+      birth_date: "1985-11-02",
+      birth_time_local: "03:15:00",
+      birthplace: {
+        place_id: "plc_legacy_new_york_0001",
+        label: "New York",
+        latitude: 40.71,
+        longitude: -74.01,
+      },
+      approximate_window_minutes: null,
+      consent_id: "cns_legacy_birth_export_0001",
+    };
+    const sealed = await encryptPayload(env, IDENTITY_A, legacy, {
+      subject: IDENTITY_A.cryptoSubject,
+      field: "birth_profiles.payload_enc",
+      recordId: "1",
+    });
+    const now = "2026-08-26T12:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO birth_profiles (
+         user_id, version, accuracy, status, timezone, payload_enc,
+         payload_key_version, payload_nonce, geocode_confidence,
+         created_at, updated_at
+       ) VALUES (?, 1, 'exact', 'active', 'America/New_York', ?, ?, ?,
+                 'high', ?, ?)`,
+    ).bind(
+      USER_A,
+      fromB64(sealed.ciphertext),
+      sealed.keyVersion,
+      sealed.nonce,
+      now,
+      now,
+    ).run();
+    const accepted = await postExport(
+      USER_A,
+      "idem-export-legacy-birth-payload",
+    );
+    await deliver(accepted.body.job_id);
+
+    const download = await SELF.fetch(
+      `http://api.test/v1/exports/${accepted.body.resource_id}/download`,
+      { headers: { "x-user-id": USER_A } },
+    );
+    const downloadText = await download.text();
+    expect(download.status, downloadText).toBe(200);
+    const artifact = JSON.parse(downloadText) as {
+      birth_profiles: Array<{ birth: Record<string, unknown> }>;
+    };
+    expect(artifact.birth_profiles).toEqual([
+      expect.objectContaining({ birth: legacy }),
+    ]);
+    expect(artifact.birth_profiles[0]!.birth).not.toHaveProperty(
+      "schema_version",
+    );
+    expect(artifact.birth_profiles[0]!.birth).not.toHaveProperty("effective");
   });
 
   it("includes saved readings and their decrypted evidence when requested", async () => {

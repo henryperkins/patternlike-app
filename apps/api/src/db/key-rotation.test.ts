@@ -135,7 +135,10 @@ describe("DEK rotation", () => {
       USER_A,
     );
     const r = row[0]!;
-    const out = await decryptPayload<{ birth_date: string }>(
+    const out = await decryptPayload<{
+      schema_version: string;
+      submitted: { birth_date: string };
+    }>(
       env,
       IDENTITY_A,
       {
@@ -149,7 +152,8 @@ describe("DEK rotation", () => {
         recordId: String(r.version),
       },
     );
-    expect(out.birth_date).toBe("1990-05-15");
+    expect(out.schema_version).toBe("birth-calc-command/v1");
+    expect(out.submitted.birth_date).toBe("1990-05-15");
   });
 
   it("bumps payload_key_version on every re-encrypted row", async () => {

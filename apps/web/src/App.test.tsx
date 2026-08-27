@@ -699,6 +699,51 @@ describe("web application shell", () => {
     expect(capturedFor("/v1/birth-profiles")).toHaveLength(1);
   });
 
+  it("maps only the birth calculation budget code to retry-tomorrow copy with its request id", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      "GET /v1/consents/ai-synthesis": {
+        status: 200,
+        body: consentGranted,
+      },
+      "/v1/birth-profiles": {
+        status: 429,
+        body: {
+          error: {
+            code: "birth_calc_budget_exhausted",
+            message: "The daily birth calculation limit has been reached",
+            request_id: "req_birth_budget_0001",
+            details: {
+              resets_at: "2026-08-28T00:00:00.000Z",
+            },
+          },
+        },
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]);
+    await user.click(screen.getByRole("button", { name: /Correct/i }));
+    await user.type(screen.getByLabelText("Birth date"), "1990-05-15");
+    await user.type(screen.getByLabelText("Local time"), "12:34:00");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /allow Pattern\/Like to encrypt these details/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Replace my chart/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Today's birth calculation limit has been reached. Try again tomorrow. " +
+      "(Request req_birth_budget_0001)",
+    );
+    expect(capturedFor("/v1/birth-profiles")).toHaveLength(1);
+  });
+
   it("does not keep the superseded chart when GET still returns it after replace", async () => {
     const user = userEvent.setup();
     const replacement = {
