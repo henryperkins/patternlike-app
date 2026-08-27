@@ -877,6 +877,123 @@ describe("POST /v1/birth-profiles — operational guards", () => {
     expect(completedCalcEvents(info)).toHaveLength(2);
   });
 
+  it("settles an insert-time fingerprint winner without stranding the losing job", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await seedFailedBirthAttempt(
+      "key-fingerprint-winner-seed",
+      retryCommand(),
+    );
+    await env.DB.prepare(
+      `UPDATE birth_profiles SET status = 'active'
+       WHERE user_id = ? AND version = 1`,
+    ).bind(USER_A).run();
+    const winnerId = "cht_injected_fingerprint_winner_0001";
+    await env.DB.prepare(
+      `CREATE TRIGGER inject_birth_fingerprint_winner
+       BEFORE INSERT ON chart_snapshots
+       WHEN NEW.id != '${winnerId}'
+       BEGIN
+         INSERT INTO chart_snapshots (
+           id, user_id, profile_version, fingerprint, contract_id,
+           contract_version, container_digest, tzdb_version, status,
+           calculated_at, snapshot_json, birth_accuracy, birth_enc,
+           birth_key_version, birth_nonce, r2_uri, uncertainty_json, created_at
+         ) VALUES (
+           '${winnerId}', NEW.user_id, 1, NEW.fingerprint, NEW.contract_id,
+           NEW.contract_version, NEW.container_digest, NEW.tzdb_version,
+           'active', NEW.calculated_at, NEW.snapshot_json, NEW.birth_accuracy,
+           NEW.birth_enc, NEW.birth_key_version, NEW.birth_nonce, NEW.r2_uri,
+           NEW.uncertainty_json, NEW.created_at
+         );
+         SELECT RAISE(IGNORE);
+       END`,
+    ).run();
+    try {
+      const result = await postBirthResponse(
+        USER_A,
+        "key-insert-time-fingerprint-winner",
+        ALICE,
+      );
+      expect(result.response.status).toBe(409);
+      expect(result.body).toMatchObject({
+        error: {
+          code: "chart_already_exists",
+          details: { chart_id: winnerId },
+        },
+      });
+      expect(
+        await rows<{ id: string }>(
+          "SELECT id FROM chart_snapshots WHERE user_id = ?",
+          USER_A,
+        ),
+      ).toEqual([{ id: winnerId }]);
+      expect(
+        await rows<{ status: string; result_class: string | null }>(
+          `SELECT status, result_class FROM jobs
+           WHERE user_id = ? AND idempotency_key = ?`,
+          USER_A,
+          "key-insert-time-fingerprint-winner",
+        ),
+      ).toEqual([{ status: "succeeded", result_class: winnerId }]);
+      expect(
+        await rows<{ status: string }>(
+          `SELECT status FROM birth_profiles
+           WHERE user_id = ? AND version = 2`,
+          USER_A,
+        ),
+      ).toEqual([{ status: "superseded" }]);
+    } finally {
+      await env.DB.prepare(
+        "DROP TRIGGER inject_birth_fingerprint_winner",
+      ).run();
+    }
+  });
+
+  it("fails closed when an ignored chart insert has no exact chart or fingerprint winner", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await env.DB.prepare(
+      `CREATE TRIGGER ignore_birth_chart_insert
+       BEFORE INSERT ON chart_snapshots
+       BEGIN
+         SELECT RAISE(IGNORE);
+       END`,
+    ).run();
+    try {
+      const result = await postBirthResponse(
+        USER_A,
+        "key-ignored-chart-without-winner",
+        ALICE,
+      );
+      expect(result.response.status).toBe(500);
+      expect(result.body).toMatchObject({
+        error: {
+          code: "internal_error",
+          message: "Unexpected server error",
+        },
+      });
+      expect(await rows("SELECT id FROM chart_snapshots")).toEqual([]);
+      expect(
+        await rows<{ status: string }>(
+          `SELECT status FROM jobs
+           WHERE user_id = ? AND idempotency_key = ?`,
+          USER_A,
+          "key-ignored-chart-without-winner",
+        ),
+      ).toEqual([{ status: "running" }]);
+      expect(
+        await rows<{ status: string }>(
+          `SELECT status FROM birth_profiles
+           WHERE user_id = ? AND version = 1`,
+          USER_A,
+        ),
+      ).toEqual([{ status: "pending" }]);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER ignore_birth_chart_insert").run();
+    }
+  });
+
   it("uses one captured wall-clock instant across reservation, profile, job, and completion writes", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const result = await postBirthProfile(USER_A, "key-one-now", ALICE);
