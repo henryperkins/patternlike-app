@@ -9,13 +9,14 @@ const expectedTail = [
   "0013_codex_provider_jobs.sql",
   "0014_codex_provider_response_uploads.sql",
   "0015_ontology_pipeline_regression_evidence.sql",
+  "0016_birth_calc_usage.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
   JSON.stringify(expectedTail)
 ) {
   throw new Error(
-    `ontology migration tail is missing or out of order: ${JSON.stringify(migrationNames.slice(-expectedTail.length))}`,
+    `migration tail is missing or out of order: ${JSON.stringify(migrationNames.slice(-expectedTail.length))}`,
   );
 }
 
@@ -26,10 +27,173 @@ const pipelineMigrationIndex = migrationNames.indexOf(expectedTail[3]);
 const codexProviderMigrationIndex = migrationNames.indexOf(expectedTail[4]);
 const codexResponseUploadMigrationIndex = migrationNames.indexOf(expectedTail[5]);
 const regressionEvidenceMigrationIndex = migrationNames.indexOf(expectedTail[6]);
+const birthCalcUsageMigrationIndex = migrationNames.indexOf(expectedTail[7]);
+
+interface SchemaColumn {
+  name: string;
+  type: string;
+  notnull: number;
+  dflt_value: string | null;
+  pk: number;
+}
+
+const birthCalcColumns: Record<string, SchemaColumn[]> = {
+  birth_calc_daily_usage: [
+    { name: "user_id", type: "TEXT", notnull: 1, dflt_value: null, pk: 1 },
+    { name: "utc_date", type: "TEXT", notnull: 1, dflt_value: null, pk: 2 },
+    {
+      name: "reserved_calc_count",
+      type: "INTEGER",
+      notnull: 1,
+      dflt_value: null,
+      pk: 0,
+    },
+    {
+      name: "last_reservation_hash",
+      type: "TEXT",
+      notnull: 1,
+      dflt_value: null,
+      pk: 0,
+    },
+    { name: "created_at", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+    { name: "updated_at", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+  ],
+  birth_calc_reservations: [
+    { name: "user_id", type: "TEXT", notnull: 1, dflt_value: null, pk: 1 },
+    { name: "reservation_hash", type: "TEXT", notnull: 1, dflt_value: null, pk: 2 },
+    { name: "utc_date", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+    { name: "claim_token_hash", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+    { name: "status", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+    { name: "created_at", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+    { name: "charged_at", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
+  ],
+  birth_profile_version_counters: [
+    { name: "user_id", type: "TEXT", notnull: 1, dflt_value: null, pk: 1 },
+    {
+      name: "last_allocated_version",
+      type: "INTEGER",
+      notnull: 1,
+      dflt_value: null,
+      pk: 0,
+    },
+    { name: "updated_at", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+  ],
+};
+
+async function assertBirthCalcSchema(db: D1Database, lane: string): Promise<void> {
+  for (const [table, expected] of Object.entries(birthCalcColumns)) {
+    const { results } = await db.prepare(`PRAGMA table_info(${table})`)
+      .all<SchemaColumn>();
+    const actual = results.map(({ name, type, notnull, dflt_value, pk }) => ({
+      name,
+      type,
+      notnull,
+      dflt_value,
+      pk,
+    }));
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(
+        `0016 ${lane} has wrong ${table} columns: ${JSON.stringify(actual)}`,
+      );
+    }
+
+    const foreignKeys = await db.prepare(`PRAGMA foreign_key_list(${table})`)
+      .all<{
+        id: number;
+        seq: number;
+        table: string;
+        from: string;
+        to: string;
+        on_update: string;
+        on_delete: string;
+        match: string;
+      }>();
+    const expectedForeignKeys = [{
+      id: 0,
+      seq: 0,
+      table: "users",
+      from: "user_id",
+      to: "id",
+      on_update: "NO ACTION",
+      on_delete: "NO ACTION",
+      match: "NONE",
+    }];
+    if (
+      JSON.stringify(foreignKeys.results) !==
+      JSON.stringify(expectedForeignKeys)
+    ) {
+      throw new Error(
+        `0016 ${lane} has wrong ${table} users foreign key`,
+      );
+    }
+  }
+
+  const index = await db.prepare(
+    "PRAGMA index_info(idx_birth_calc_reservations_user_date)",
+  ).all<{ seqno: number; cid: number; name: string }>();
+  if (
+    JSON.stringify(index.results) !==
+    JSON.stringify([
+      { seqno: 0, cid: 0, name: "user_id" },
+      { seqno: 1, cid: 2, name: "utc_date" },
+    ])
+  ) {
+    throw new Error(`0016 ${lane} has wrong reservation date index`);
+  }
+
+  const requiredChecks: Record<string, string[]> = {
+    birth_calc_daily_usage: [
+      "CHECK (reserved_calc_count BETWEEN 0 AND 50)",
+      "CHECK (last_reservation_hash GLOB 'sha256:[0-9a-f]*' " +
+      "AND length(last_reservation_hash) = 71)",
+    ],
+    birth_calc_reservations: [
+      "CHECK (reservation_hash GLOB 'sha256:[0-9a-f]*' " +
+      "AND length(reservation_hash) = 71)",
+      "CHECK (claim_token_hash GLOB 'sha256:[0-9a-f]*' " +
+      "AND length(claim_token_hash) = 71)",
+      "CHECK (status IN ('pending', 'charged', 'denied'))",
+      "(status = 'charged' AND charged_at IS NOT NULL)",
+      "(status = 'denied' AND charged_at IS NULL)",
+    ],
+    birth_profile_version_counters: [
+      "CHECK (last_allocated_version >= 0)",
+    ],
+  };
+  for (const [table, snippets] of Object.entries(requiredChecks)) {
+    const source = await db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+    ).bind(table).first<{ sql: string }>();
+    const normalized = source?.sql.replace(/\s+/g, " ") ?? "";
+    for (const snippet of snippets) {
+      if (!normalized.includes(snippet)) {
+        throw new Error(`0016 ${lane} is missing ${table} constraint ${snippet}`);
+      }
+    }
+  }
+}
+
+async function assertDatabaseHealthy(db: D1Database, lane: string): Promise<void> {
+  const foreignKeys = await db.prepare("PRAGMA foreign_key_check").all();
+  if (foreignKeys.results.length !== 0) {
+    throw new Error(`0016 ${lane} left foreign-key violations`);
+  }
+  const quickCheck = await db.prepare("PRAGMA quick_check")
+    .first<{ quick_check: string }>();
+  if (quickCheck?.quick_check !== "ok") {
+    throw new Error(`0016 ${lane} failed quick_check`);
+  }
+  const assertionRows = await db.prepare("SELECT * FROM assertion_probe").all();
+  if (assertionRows.results.length !== 0) {
+    throw new Error(`0016 ${lane} left an assertion probe armed`);
+  }
+}
 
 // Main-test storage starts empty and receives the exact ordered migration set.
 // This is the fresh-database lane; individual tests then exercise the schema.
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+await assertBirthCalcSchema(env.DB, "clean apply");
+await assertDatabaseHealthy(env.DB, "clean apply");
 
 // The isolated upgrade binding stops before 0009, carries live rows through the
 // adapter rebuild/additive migrations and 0011, and only then applies 0012.
@@ -317,7 +481,10 @@ if (!codexResponseUploadTable) {
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(regressionEvidenceMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    regressionEvidenceMigrationIndex,
+    birthCalcUsageMigrationIndex,
+  ),
 );
 
 const upgradedEvidence = await upgradeDb.prepare(
@@ -421,3 +588,40 @@ const assertionRows = await upgradeDb.prepare("SELECT * FROM assertion_probe").a
 if (assertionRows.results.length !== 0) {
   throw new Error("0015 left an assertion probe armed");
 }
+
+const birthProfileBefore = {
+  user_id: migrationUserId,
+  version: 27,
+  accuracy: "unknown",
+  status: "invalid",
+  created_at: artifactBefore.created_at,
+  updated_at: artifactBefore.created_at,
+};
+await upgradeDb.prepare(
+  `INSERT INTO birth_profiles (
+     user_id, version, accuracy, status, created_at, updated_at
+   ) VALUES (?, ?, ?, ?, ?, ?)`,
+).bind(...Object.values(birthProfileBefore)).run();
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(birthCalcUsageMigrationIndex),
+);
+await assertBirthCalcSchema(upgradeDb, "populated apply");
+
+const birthProfileAfter = await upgradeDb.prepare(
+  `SELECT user_id, version, accuracy, status, created_at, updated_at
+   FROM birth_profiles WHERE user_id = ? AND version = ?`,
+).bind(migrationUserId, birthProfileBefore.version).first();
+if (JSON.stringify(birthProfileAfter) !== JSON.stringify(birthProfileBefore)) {
+  throw new Error("0016 did not preserve a populated birth profile byte-for-byte");
+}
+for (const table of Object.keys(birthCalcColumns)) {
+  const row = await upgradeDb.prepare(
+    `SELECT COUNT(*) AS count FROM ${table}`,
+  ).first<{ count: number }>();
+  if (row?.count !== 0) {
+    throw new Error(`0016 populated apply invented rows in ${table}`);
+  }
+}
+await assertDatabaseHealthy(upgradeDb, "populated apply");
