@@ -158,6 +158,29 @@ describe("birth profile payload decoding and export projection", () => {
     });
   });
 
+  it("keeps submitted comparison separate from a frozen effective location", () => {
+    const resolved = {
+      ...command,
+      effective: {
+        ...command.effective,
+        birthplace: {
+          place_id: "plc_los_angeles_0001",
+          label: "Los Angeles, California",
+          latitude: 34.05223,
+          longitude: -118.24368,
+        },
+        location_confidence: "high" as const,
+        location_qualifier_codes: ["approximate_match" as const],
+      },
+    };
+
+    expect(decodeBirthProfilePayload(resolved)).toEqual({
+      kind: "v1",
+      command: resolved,
+    });
+    expect(birthCalcCommandMatchesRequest(resolved, request)).toBe(true);
+  });
+
   it("distinguishes unknown versions from malformed documents claiming v1", () => {
     expect(
       decodeBirthProfilePayload({
