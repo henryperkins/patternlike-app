@@ -51,6 +51,7 @@ export const birthRoutes = new Hono<{
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_RE = /^\d{2}:\d{2}(?::\d{2})?$/;
 const ACCURACIES = new Set(["exact", "approximate", "unknown"]);
+const CHART_PUBLICATION_CONFLICT = "chart_publication_conflict";
 
 export interface ValidationFailure {
   code: "invalid_body";
@@ -1075,12 +1076,180 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   ).first<{ id: string }>();
 
   if (insertChanges === 0 || !ownChart) {
-    const duplicate = await c.env.DB.prepare(
-      `SELECT id FROM chart_snapshots
-       WHERE user_id = ? AND fingerprint = ?`,
-    ).bind(userId, chart.fingerprint).first<{ id: string }>();
+    const readFingerprintWinner = () =>
+      c.env.DB.prepare(
+        `SELECT id FROM chart_snapshots
+         WHERE user_id = ? AND fingerprint = ?`,
+      ).bind(userId, chart.fingerprint).first<{ id: string }>();
+    let duplicate = await readFingerprintWinner();
     if (!duplicate) {
-      throw new Error("birth chart publication did not converge");
+      try {
+        await c.env.DB.batch([
+          c.env.DB.prepare(
+            `INSERT INTO assertion_probe (id, reason)
+             SELECT 1, 'birth chart publication conflict precondition failed'
+             WHERE EXISTS (
+               SELECT 1 FROM chart_snapshots
+               WHERE user_id = ? AND fingerprint = ?
+             )
+             OR NOT EXISTS (
+               SELECT 1 FROM birth_calc_reservations
+               WHERE user_id = ? AND reservation_hash = ?
+                 AND claim_token_hash = ? AND status = 'charged'
+             )
+             OR NOT EXISTS (
+               SELECT 1 FROM jobs
+               WHERE id = ? AND job_type = ? AND user_id = ?
+                 AND idempotency_key = ? AND status = 'running'
+                 AND attempts = ? AND payload_json = ?
+                 AND finished_at IS NULL
+             )
+             OR NOT EXISTS (
+               SELECT 1 FROM birth_profiles
+               WHERE user_id = ? AND version = ?
+                 AND status IN ('pending', 'superseded')
+             )`,
+          ).bind(
+            userId,
+            chart.fingerprint,
+            userId,
+            prepared.reservationHash,
+            prepared.claimTokenHash,
+            jobId,
+            BIRTH_JOB_TYPE,
+            userId,
+            idem,
+            attempt,
+            profileMetadata,
+            userId,
+            profileVersion,
+          ),
+          c.env.DB.prepare(
+            `UPDATE jobs
+             SET status = 'failed', result_class = ?, finished_at = ?
+             WHERE id = ? AND job_type = ? AND user_id = ?
+               AND idempotency_key = ? AND status = 'running'
+               AND attempts = ? AND payload_json = ? AND finished_at IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM birth_calc_reservations
+                 WHERE user_id = ? AND reservation_hash = ?
+                   AND claim_token_hash = ? AND status = 'charged'
+               )
+               AND EXISTS (
+                 SELECT 1 FROM birth_profiles
+                 WHERE user_id = ? AND version = ?
+                   AND status IN ('pending', 'superseded')
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM chart_snapshots
+                 WHERE user_id = ? AND fingerprint = ?
+               )`,
+          ).bind(
+            CHART_PUBLICATION_CONFLICT,
+            nowIso,
+            jobId,
+            BIRTH_JOB_TYPE,
+            userId,
+            idem,
+            attempt,
+            profileMetadata,
+            userId,
+            prepared.reservationHash,
+            prepared.claimTokenHash,
+            userId,
+            profileVersion,
+            userId,
+            chart.fingerprint,
+          ),
+          c.env.DB.prepare(
+            `UPDATE birth_profiles
+             SET status = 'invalid', updated_at = ?
+             WHERE user_id = ? AND version = ? AND status = 'pending'
+               AND EXISTS (
+                 SELECT 1 FROM birth_calc_reservations
+                 WHERE user_id = ? AND reservation_hash = ?
+                   AND claim_token_hash = ? AND status = 'charged'
+               )
+               AND EXISTS (
+                 SELECT 1 FROM jobs
+                 WHERE id = ? AND job_type = ? AND user_id = ?
+                   AND idempotency_key = ? AND status = 'failed'
+                   AND attempts = ? AND payload_json = ? AND result_class = ?
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM chart_snapshots
+                 WHERE user_id = ? AND fingerprint = ?
+               )`,
+          ).bind(
+            nowIso,
+            userId,
+            profileVersion,
+            userId,
+            prepared.reservationHash,
+            prepared.claimTokenHash,
+            jobId,
+            BIRTH_JOB_TYPE,
+            userId,
+            idem,
+            attempt,
+            profileMetadata,
+            CHART_PUBLICATION_CONFLICT,
+            userId,
+            chart.fingerprint,
+          ),
+          c.env.DB.prepare(
+            `INSERT INTO assertion_probe (id, reason)
+             SELECT 1, 'birth chart publication conflict did not converge'
+             WHERE EXISTS (
+               SELECT 1 FROM chart_snapshots
+               WHERE user_id = ? AND fingerprint = ?
+             )
+             OR NOT EXISTS (
+               SELECT 1 FROM birth_calc_reservations
+               WHERE user_id = ? AND reservation_hash = ?
+                 AND claim_token_hash = ? AND status = 'charged'
+             )
+             OR NOT EXISTS (
+               SELECT 1 FROM jobs
+               WHERE id = ? AND job_type = ? AND user_id = ?
+                 AND idempotency_key = ? AND status = 'failed'
+                 AND attempts = ? AND payload_json = ? AND result_class = ?
+                 AND finished_at = ?
+             )
+             OR NOT EXISTS (
+               SELECT 1 FROM birth_profiles
+               WHERE user_id = ? AND version = ?
+                 AND (
+                   (status = 'invalid' AND updated_at = ?)
+                   OR status = 'superseded'
+                 )
+             )`,
+          ).bind(
+            userId,
+            chart.fingerprint,
+            userId,
+            prepared.reservationHash,
+            prepared.claimTokenHash,
+            jobId,
+            BIRTH_JOB_TYPE,
+            userId,
+            idem,
+            attempt,
+            profileMetadata,
+            CHART_PUBLICATION_CONFLICT,
+            nowIso,
+            userId,
+            profileVersion,
+            nowIso,
+          ),
+        ]);
+      } catch (error) {
+        duplicate = await readFingerprintWinner();
+        if (!duplicate) throw error;
+      }
+      if (!duplicate) {
+        throw new Error(CHART_PUBLICATION_CONFLICT);
+      }
     }
 
     await c.env.DB.batch([
