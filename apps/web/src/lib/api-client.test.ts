@@ -303,33 +303,6 @@ describe("account-processing consent", () => {
     expect(request.headers.get("x-consent-ui-surface")).toBe("onboarding");
   });
 
-  it("echoes a newer policy version returned by the server instead of hardcoding launch", async () => {
-    const currentServerPolicy: string = "account-processing-v2-2026-09-01";
-    mockApiResponses({
-      [`PUT ${ACCOUNT_PROCESSING_CONSENT}`]: {
-        status: 200,
-        body: {
-          ...accountProcessingGranted,
-          policy_version: currentServerPolicy,
-          disclosure: {
-            ...accountProcessingGranted.disclosure,
-            text: "Updated current account-processing disclosure.",
-          },
-        },
-      },
-    });
-
-    await grantAccountProcessingConsent(
-      currentServerPolicy,
-      "web-account-processing-grant-0002",
-      "onboarding",
-    );
-
-    expect(capturedFor(ACCOUNT_PROCESSING_CONSENT)[0]!.body).toEqual({
-      policy_version: currentServerPolicy,
-    });
-  });
-
   it("revokes with an empty body under the privacy-center intent", async () => {
     mockApiResponses({
       [`DELETE ${ACCOUNT_PROCESSING_CONSENT}`]: {

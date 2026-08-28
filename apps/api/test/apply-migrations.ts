@@ -12,6 +12,7 @@ const expectedTail = [
   "0016_birth_calc_usage.sql",
   "0017_codex_reading_provider.sql",
   "0018_account_processing_consent.sql",
+  "0019_pattern_claim_transition_guards.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -32,6 +33,7 @@ const regressionEvidenceMigrationIndex = migrationNames.indexOf(expectedTail[6])
 const birthCalcUsageMigrationIndex = migrationNames.indexOf(expectedTail[7]);
 const codexReadingProviderMigrationIndex = migrationNames.indexOf(expectedTail[8]);
 const accountProcessingConsentMigrationIndex = migrationNames.indexOf(expectedTail[9]);
+const patternClaimTransitionMigrationIndex = migrationNames.indexOf(expectedTail[10]);
 
 interface SchemaColumn {
   name: string;
@@ -979,7 +981,10 @@ await assertDatabaseHealthy(upgradeDb, "0017 populated apply");
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(accountProcessingConsentMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    accountProcessingConsentMigrationIndex,
+    patternClaimTransitionMigrationIndex,
+  ),
 );
 await assertAccountProcessingConsentSchema(upgradeDb, "populated apply");
 
@@ -1039,3 +1044,101 @@ if (!missingConsentRejected) {
   throw new Error("0018 admitted a profile linked to a missing consent");
 }
 await assertDatabaseHealthy(upgradeDb, "0018 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0019: monotonic Pattern claim transition guard.
+// ---------------------------------------------------------------------------
+
+const populatedClaimBefore = {
+  id: "pgc_populated_0019",
+  user_id: migrationUserId,
+  chart_fingerprint_hash: `sha256:${"19".repeat(32)}`,
+  last_chart_id: null,
+  status: "available",
+  active_generation_id: null,
+  consumed_at: null,
+  accepted_at: null,
+  deleted_at: null,
+  superseded_at: null,
+  withdrawn_at: null,
+  created_at: artifactBefore.created_at,
+  updated_at: artifactBefore.created_at,
+};
+await upgradeDb.prepare(
+  `INSERT INTO pattern_generation_claims (
+     id, user_id, chart_fingerprint_hash, last_chart_id, status,
+     active_generation_id, consumed_at, accepted_at, deleted_at,
+     superseded_at, withdrawn_at, created_at, updated_at
+   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+).bind(...Object.values(populatedClaimBefore)).run();
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(patternClaimTransitionMigrationIndex),
+);
+
+const populatedClaimAfter = await upgradeDb.prepare(
+  `SELECT ${Object.keys(populatedClaimBefore).join(", ")}
+   FROM pattern_generation_claims WHERE id = ?`,
+).bind(populatedClaimBefore.id).first();
+if (JSON.stringify(populatedClaimAfter) !== JSON.stringify(populatedClaimBefore)) {
+  throw new Error("0019 changed a populated Pattern claim");
+}
+
+let illegalClaimShortcutRejected = false;
+try {
+  await upgradeDb.prepare(
+    `UPDATE pattern_generation_claims
+     SET status = 'accepted', consumed_at = ?, accepted_at = ?, updated_at = ?
+     WHERE id = ?`,
+  ).bind(
+    artifactBefore.created_at,
+    artifactBefore.created_at,
+    artifactBefore.created_at,
+    populatedClaimBefore.id,
+  ).run();
+} catch {
+  illegalClaimShortcutRejected = true;
+}
+if (!illegalClaimShortcutRejected) {
+  throw new Error("0019 admitted available -> accepted");
+}
+
+await upgradeDb.prepare(
+  `UPDATE pattern_generation_claims
+   SET status = 'reserved', active_generation_id = 'pgen_populated_0019',
+       updated_at = ? WHERE id = ?`,
+).bind(artifactBefore.created_at, populatedClaimBefore.id).run();
+await upgradeDb.prepare(
+  `UPDATE pattern_generation_claims
+   SET status = 'accepted', active_generation_id = NULL,
+       consumed_at = ?, accepted_at = ?, updated_at = ? WHERE id = ?`,
+).bind(
+  artifactBefore.created_at,
+  artifactBefore.created_at,
+  artifactBefore.created_at,
+  populatedClaimBefore.id,
+).run();
+await upgradeDb.prepare(
+  `UPDATE pattern_generation_claims
+   SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?`,
+).bind(
+  artifactBefore.created_at,
+  artifactBefore.created_at,
+  populatedClaimBefore.id,
+).run();
+
+let terminalClaimReopenRejected = false;
+try {
+  await upgradeDb.prepare(
+    `UPDATE pattern_generation_claims
+     SET status = 'available', consumed_at = NULL, deleted_at = NULL,
+         updated_at = ? WHERE id = ?`,
+  ).bind(artifactBefore.created_at, populatedClaimBefore.id).run();
+} catch {
+  terminalClaimReopenRejected = true;
+}
+if (!terminalClaimReopenRejected) {
+  throw new Error("0019 reopened a terminal Pattern claim");
+}
+await assertDatabaseHealthy(upgradeDb, "0019 populated apply");

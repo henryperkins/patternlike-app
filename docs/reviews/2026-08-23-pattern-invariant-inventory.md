@@ -374,6 +374,13 @@ event order.
 
 ## Current provider boundary snapshot
 
+Implementation amendment (2026-08-28): the forbidden-key, private opaque-id,
+and calculated-longitude-exception bytes now have one versioned source at
+`contracts/policies/pattern-provider-boundary-v1.json`. The explicit TypeScript
+allowlist construction and post-serialization walk remain the runtime owner;
+`contracts/validate_schemas.py` consumes the same deny policy for frozen M7
+fixtures.
+
 ### Explicit forbidden whole keys
 
 The TypeScript runtime currently rejects these explicit keys:

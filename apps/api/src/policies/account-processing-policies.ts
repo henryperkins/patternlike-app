@@ -10,7 +10,7 @@ export const ACCOUNT_PROCESSING_ALLOWED_USES = Object.freeze([
 export type AccountProcessingUiSurface = "onboarding" | "privacy_center";
 
 export interface AccountProcessingPolicy {
-  readonly version: typeof ACCOUNT_PROCESSING_POLICY_VERSION;
+  readonly version: string;
   readonly kind: "account_processing";
   readonly sourceId: "AST-01";
   readonly permissionTier: 0;
@@ -47,20 +47,21 @@ const launchPolicy: AccountProcessingPolicy = Object.freeze({
 });
 
 /** Append-only registry: issued policy entries are never edited or repointed. */
-export const ACCOUNT_PROCESSING_POLICIES: Readonly<
-  Record<typeof ACCOUNT_PROCESSING_POLICY_VERSION, AccountProcessingPolicy>
-> = Object.freeze({
-  [ACCOUNT_PROCESSING_POLICY_VERSION]: launchPolicy,
-});
+export const ACCOUNT_PROCESSING_POLICIES: Readonly<Record<string, AccountProcessingPolicy>> =
+  Object.freeze({
+    [ACCOUNT_PROCESSING_POLICY_VERSION]: launchPolicy,
+  });
 
-export const CURRENT_ACCOUNT_PROCESSING_POLICY = launchPolicy;
+export const CURRENT_ACCOUNT_PROCESSING_POLICY_VERSION =
+  ACCOUNT_PROCESSING_POLICY_VERSION;
+
+export const CURRENT_ACCOUNT_PROCESSING_POLICY =
+  ACCOUNT_PROCESSING_POLICIES[CURRENT_ACCOUNT_PROCESSING_POLICY_VERSION]!;
 
 export function accountProcessingPolicy(
   version: string,
 ): AccountProcessingPolicy | null {
   return (
-    ACCOUNT_PROCESSING_POLICIES[
-      version as typeof ACCOUNT_PROCESSING_POLICY_VERSION
-    ] ?? null
+    ACCOUNT_PROCESSING_POLICIES[version] ?? null
   );
 }

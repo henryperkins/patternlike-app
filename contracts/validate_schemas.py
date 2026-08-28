@@ -45,6 +45,12 @@ M5 = ROOT / "m5"
 M6 = ROOT / "m6"
 M7 = ROOT / "m7"
 M8 = ROOT / "m8"
+PATTERN_PROVIDER_BOUNDARY_POLICY_PATH = (
+    ROOT / "policies" / "pattern-provider-boundary-v1.json"
+)
+PATTERN_PROVIDER_BOUNDARY_POLICY = json.loads(
+    PATTERN_PROVIDER_BOUNDARY_POLICY_PATH.read_text(encoding="utf-8")
+)
 
 M3_BASE = "https://patternlike.app/contracts/m3/"
 M4_BASE = "https://patternlike.app/contracts/m4/"
@@ -1143,38 +1149,49 @@ def _m5_policy_errors(name: str, instance: dict) -> list[str]:
     return m5_allowed_use_policy(instance)
 
 
-# Identity, birth coordinates, and personal-context keys are forbidden
-# anywhere in a Pattern fact packet. Calculated planetary/angle/house
-# `longitude` is allowed only under features[].fact.
-FORBIDDEN_IN_PATTERN_PACKET_KEYS = (
-    "user_id",
-    "chart_id",
-    "chart_fingerprint",
-    "fingerprint",
-    "birth_date",
-    "birth_time",
-    "birthplace",
-    "consent_id",
-    "check_in",
-    "check_ins",
-    "journal",
-    "life_event",
-    "life_events",
-    "reading",
-    "readings",
-    "daily_reading",
-    "latitude",
+# TypeScript's post-serialization walk and this frozen-fixture validator consume
+# the same reviewed policy bytes. The allowlist construction remains local to
+# the TypeScript packet builder; this file owns only the shared deny policy.
+FORBIDDEN_IN_PATTERN_PACKET_KEYS = tuple(
+    PATTERN_PROVIDER_BOUNDARY_POLICY.get("forbidden_keys", ())
+)
+PATTERN_OPAQUE_ID_RULES = tuple(
+    PATTERN_PROVIDER_BOUNDARY_POLICY.get("opaque_id_rules", ())
+)
+ALLOWED_CALCULATED_LONGITUDE_SUFFIXES = tuple(
+    tuple(suffix)
+    for suffix in PATTERN_PROVIDER_BOUNDARY_POLICY.get(
+        "allowed_calculated_longitude_suffixes", ()
+    )
 )
 
 
 def _is_allowed_planetary_longitude(path: tuple) -> bool:
-    return (
-        len(path) == 4
-        and path[0] == "features"
-        and isinstance(path[1], int)
-        and path[2] == "fact"
-        and path[3] == "longitude"
-    )
+    for suffix in ALLOWED_CALCULATED_LONGITUDE_SUFFIXES:
+        if len(path) < len(suffix):
+            continue
+        actual = path[-len(suffix) :]
+        if all(
+            isinstance(segment, int) if expected == "*" else segment == expected
+            for segment, expected in zip(actual, suffix, strict=True)
+        ):
+            return True
+    return False
+
+
+def _private_opaque_id_prefix(value: str) -> str | None:
+    for rule in PATTERN_OPAQUE_ID_RULES:
+        prefix = rule.get("prefix")
+        match = rule.get("match")
+        if not isinstance(prefix, str):
+            continue
+        if match == "substring" and prefix in value:
+            return prefix
+        if match == "hex32" and re.search(
+            re.escape(prefix) + r"[0-9a-fA-F]{32}", value
+        ):
+            return prefix
+    return None
 
 
 def _pattern_packet_key_errors(obj: object, path: tuple = ()) -> list[str]:
@@ -1191,6 +1208,75 @@ def _pattern_packet_key_errors(obj: object, path: tuple = ()) -> list[str]:
     elif isinstance(obj, list):
         for index, item in enumerate(obj):
             errors.extend(_pattern_packet_key_errors(item, (*path, index)))
+    elif isinstance(obj, str):
+        prefix = _private_opaque_id_prefix(obj)
+        if prefix is not None:
+            errors.append(f"provider packet contains private opaque id {prefix}")
+    return errors
+
+
+def check_pattern_provider_boundary_policy() -> list[str]:
+    errors: list[str] = []
+    policy = PATTERN_PROVIDER_BOUNDARY_POLICY
+    if policy.get("policy_id") != "pattern-provider-boundary":
+        errors.append("Pattern provider-boundary policy_id is not canonical")
+    if policy.get("version") != "1.0.0":
+        errors.append("Pattern provider-boundary policy version is not 1.0.0")
+
+    forbidden = policy.get("forbidden_keys")
+    if not isinstance(forbidden, list) or not all(
+        isinstance(key, str) and key for key in forbidden
+    ):
+        errors.append("Pattern provider-boundary forbidden_keys is not a string array")
+    elif len(forbidden) != len(set(forbidden)):
+        errors.append("Pattern provider-boundary forbidden_keys contains duplicates")
+    elif "chart_fingerprint_hash" not in forbidden:
+        errors.append("Pattern provider-boundary does not forbid chart_fingerprint_hash")
+
+    rules = policy.get("opaque_id_rules")
+    if not isinstance(rules, list) or not rules:
+        errors.append("Pattern provider-boundary opaque_id_rules is empty")
+    else:
+        seen_rules: set[tuple[str, str]] = set()
+        for rule in rules:
+            if not isinstance(rule, dict):
+                errors.append("Pattern provider-boundary opaque-id rule is not an object")
+                continue
+            prefix = rule.get("prefix")
+            match = rule.get("match")
+            if not isinstance(prefix, str) or not prefix or match not in {
+                "substring",
+                "hex32",
+            }:
+                errors.append("Pattern provider-boundary opaque-id rule is malformed")
+                continue
+            identity = (prefix, match)
+            if identity in seen_rules:
+                errors.append(
+                    f"Pattern provider-boundary duplicates opaque-id rule {prefix}/{match}"
+                )
+            seen_rules.add(identity)
+
+    expected_suffixes = {
+        ("features", "*", "fact", "longitude"),
+        ("facts", "*", "fact", "longitude"),
+    }
+    if set(ALLOWED_CALCULATED_LONGITUDE_SUFFIXES) != expected_suffixes:
+        errors.append("Pattern provider-boundary longitude exceptions are not canonical")
+
+    if not _pattern_packet_key_errors({"chart_fingerprint_hash": "sha256:test"}):
+        errors.append("Pattern provider-boundary probe accepted chart_fingerprint_hash")
+    if not _pattern_packet_key_errors({"features": [{"alias": "usr_private"}]}):
+        errors.append("Pattern provider-boundary probe accepted a private opaque id")
+    if _pattern_packet_key_errors({"features": [{"fact": {"longitude": 12.5}}]}):
+        errors.append("Pattern provider-boundary rejected approved feature longitude")
+    if not _pattern_packet_key_errors({"longitude": 12.5}):
+        errors.append("Pattern provider-boundary accepted an unscoped longitude")
+
+    if not errors:
+        print(
+            "OK  policy        Pattern provider boundary uses one shared deny policy"
+        )
     return errors
 
 
@@ -2935,6 +3021,8 @@ def check_m8_schema_projection(registry: Registry) -> list[str]:
         errors.append("account-processing consent does not reuse its closed account status")
     if (account_props.get("regrant_will_restore_access") or {}).get("type") != "boolean":
         errors.append("account-processing consent does not expose recovery truth as boolean")
+    if (account_props.get("has_active_chart") or {}).get("type") != "boolean":
+        errors.append("account-processing consent does not expose active-chart truth as boolean")
     account_variants = account_consent.get("oneOf") or []
     if len(account_variants) != 2:
         errors.append("account-processing consent does not close granted and not-granted variants")
@@ -3086,7 +3174,7 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
                 )
 
     expected = {
-        ("/v1/consents/account-processing", "get"): {"200", "401", "503"},
+        ("/v1/consents/account-processing", "get"): {"200", "401", "403", "503"},
         ("/v1/consents/account-processing", "put"): {
             "200", "400", "401", "403", "409", "429", "503"
         },
@@ -3531,6 +3619,7 @@ def main() -> int:
     errors += check_m6_openapi_projection()
 
     print("\n== contracts/m7 ==")
+    errors += check_pattern_provider_boundary_policy()
     errors += validate_package(registry, "m7", M7, set())
     errors += check_openapi(M7, registry)
     errors += check_m7_manifest()

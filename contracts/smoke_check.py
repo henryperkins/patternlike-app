@@ -1303,7 +1303,7 @@ def check_0018_over_populated_0017() -> None:
     )
     con.commit()
 
-    apply_migrations(con, start=18)
+    apply_migrations(con, upto=18, start=18)
 
     columns = {row[1]: row for row in con.execute("PRAGMA table_info(birth_profiles)")}
     consent_column = columns.get("consent_id")
@@ -1353,6 +1353,89 @@ def check_0018_over_populated_0017() -> None:
     )
 
 
+def check_0019_over_populated_0018() -> None:
+    """0019 preserves rows and rejects every backward claim transition."""
+    con = fresh(upto=18)
+    seed_user(con, USER_A, SUBJ_A)
+    fingerprint = "sha256:" + ("19" * 32)
+    claim_before = (
+        "pgc_populated_0019",
+        USER_A,
+        fingerprint,
+        None,
+        "available",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        NOW,
+        NOW,
+    )
+    con.execute(
+        "INSERT INTO pattern_generation_claims "
+        "(id, user_id, chart_fingerprint_hash, last_chart_id, status, "
+        "active_generation_id, consumed_at, accepted_at, deleted_at, "
+        "superseded_at, withdrawn_at, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        claim_before,
+    )
+    con.commit()
+
+    apply_migrations(con, start=19)
+    claim_after = con.execute(
+        "SELECT id, user_id, chart_fingerprint_hash, last_chart_id, status, "
+        "active_generation_id, consumed_at, accepted_at, deleted_at, "
+        "superseded_at, withdrawn_at, created_at, updated_at "
+        "FROM pattern_generation_claims WHERE id = ?",
+        (claim_before[0],),
+    ).fetchone()
+    if claim_after != claim_before:
+        raise SystemExit(f"0019 changed a populated Pattern claim: {claim_after}")
+
+    expect_integrity_error(
+        lambda: con.execute(
+            "UPDATE pattern_generation_claims SET status = 'accepted', "
+            "consumed_at = ?, accepted_at = ?, updated_at = ? WHERE id = ?",
+            (NOW, NOW, NOW, claim_before[0]),
+        ),
+        "0019 rejects available to accepted",
+    )
+    con.execute(
+        "UPDATE pattern_generation_claims SET status = 'reserved', "
+        "active_generation_id = 'pgen_populated_0019', updated_at = ? "
+        "WHERE id = ?",
+        (NOW, claim_before[0]),
+    )
+    con.execute(
+        "UPDATE pattern_generation_claims SET status = 'accepted', "
+        "active_generation_id = NULL, consumed_at = ?, accepted_at = ?, "
+        "updated_at = ? WHERE id = ?",
+        (NOW, NOW, NOW, claim_before[0]),
+    )
+    con.execute(
+        "UPDATE pattern_generation_claims SET status = 'deleted', "
+        "deleted_at = ?, updated_at = ? WHERE id = ?",
+        (NOW, NOW, claim_before[0]),
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "UPDATE pattern_generation_claims SET status = 'available', "
+            "consumed_at = NULL, deleted_at = NULL, updated_at = ? WHERE id = ?",
+            (NOW, claim_before[0]),
+        ),
+        "0019 rejects terminal claim reopening",
+    )
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("0019 populated apply left foreign-key violations")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("0019 populated apply failed quick_check")
+    print(
+        "D1 OK  0019 preserves populated claims and enforces monotonic transitions"
+    )
+
+
 def main() -> int:
     check_migration_manifest()
     check_fresh_schema()
@@ -1368,6 +1451,7 @@ def main() -> int:
     check_0008_replay_ledger()
     check_0016_over_populated_0015()
     check_0018_over_populated_0017()
+    check_0019_over_populated_0018()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

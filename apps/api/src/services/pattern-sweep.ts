@@ -8,6 +8,7 @@ import {
 } from "./pattern-stage-protocol.js";
 import { markDispatched } from "../db/generation.js";
 import type { Env } from "../env.js";
+import { releaseUnconsumedPatternClaim } from "../db/pattern-claim-transitions.js";
 import { safeLog } from "./safe-log.js";
 
 /**
@@ -216,12 +217,12 @@ async function failExhaustedPatternJob(
       )
     : null;
 
-  const releaseClaim = env.DB.prepare(
-    `UPDATE pattern_generation_claims
-     SET status = 'available', active_generation_id = NULL, updated_at = ?
-     WHERE id = ? AND user_id = ? AND status = 'reserved' AND consumed_at IS NULL
-       AND active_generation_id = ?`,
-  ).bind(nowIso, row.claim_id, row.user_id, row.generation_id);
+  const releaseClaim = releaseUnconsumedPatternClaim(env, {
+    claimId: row.claim_id,
+    userId: row.user_id,
+    generationId: row.generation_id,
+    now: nowIso,
+  });
 
   try {
     await env.DB.batch(

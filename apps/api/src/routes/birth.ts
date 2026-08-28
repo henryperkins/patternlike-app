@@ -89,7 +89,11 @@ export function validateBirthProfileRequest(
   if (!body.accuracy || !ACCURACIES.has(body.accuracy)) {
     return fail("accuracy must be one of exact, approximate, unknown");
   }
-  if (!body.consent_id) {
+  if (
+    typeof body.consent_id !== "string" ||
+    body.consent_id.length < 8 ||
+    body.consent_id.length > 128
+  ) {
     return fail("accuracy and consent_id are required");
   }
 
@@ -880,61 +884,90 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
 
   if (!calc.ok || !calc.chart) {
     const calcClass = calc.error_class ?? "calc_failed";
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `UPDATE jobs
-         SET status = 'failed', result_class = ?, finished_at = ?
-         WHERE id = ? AND job_type = ? AND user_id = ?
-           AND idempotency_key = ? AND status = 'running'
-           AND attempts = ? AND payload_json = ?
-           AND EXISTS (
-             SELECT 1 FROM birth_calc_reservations
-             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
-               AND status = 'charged'
-           )`,
-      ).bind(
-        calcClass,
-        nowIso,
-        jobId,
-        BIRTH_JOB_TYPE,
-        userId,
-        idem,
-        attempt,
-        profileMetadata,
-        userId,
-        prepared.reservationHash,
-        prepared.claimTokenHash,
-      ),
-      c.env.DB.prepare(
-        `UPDATE birth_profiles SET status = 'invalid', updated_at = ?
-         WHERE user_id = ? AND version = ? AND status = 'pending'
-           AND EXISTS (
-             SELECT 1 FROM birth_calc_reservations
-             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
-               AND status = 'charged'
-           )
-           AND EXISTS (
-             SELECT 1 FROM jobs
-             WHERE id = ? AND job_type = ? AND user_id = ?
-               AND idempotency_key = ? AND status = 'failed'
-               AND attempts = ? AND payload_json = ? AND result_class = ?
-           )`,
-      ).bind(
-        nowIso,
-        userId,
-        profileVersion,
-        userId,
-        prepared.reservationHash,
-        prepared.claimTokenHash,
-        jobId,
-        BIRTH_JOB_TYPE,
-        userId,
-        idem,
-        attempt,
-        profileMetadata,
-        calcClass,
-      ),
-    ]);
+    const consentAfterCalculation = await loadExactCurrentAccountProcessingGrant(
+      c.env,
+      userId,
+      command.submitted.consent_id,
+    );
+    if (!consentAfterCalculation) {
+      await settleConsentInvalidAttempt();
+      return consentInvalidResponse();
+    }
+
+    try {
+      await c.env.DB.batch([
+        assertExactCurrentAccountProcessingGrant(
+          c.env,
+          userId,
+          command.submitted.consent_id,
+        ),
+        c.env.DB.prepare(
+          `UPDATE jobs
+           SET status = 'failed', result_class = ?, finished_at = ?
+           WHERE id = ? AND job_type = ? AND user_id = ?
+             AND idempotency_key = ? AND status = 'running'
+             AND attempts = ? AND payload_json = ?
+             AND EXISTS (
+               SELECT 1 FROM birth_calc_reservations
+               WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+                 AND status = 'charged'
+             )`,
+        ).bind(
+          calcClass,
+          nowIso,
+          jobId,
+          BIRTH_JOB_TYPE,
+          userId,
+          idem,
+          attempt,
+          profileMetadata,
+          userId,
+          prepared.reservationHash,
+          prepared.claimTokenHash,
+        ),
+        c.env.DB.prepare(
+          `UPDATE birth_profiles SET status = 'invalid', updated_at = ?
+           WHERE user_id = ? AND version = ? AND status = 'pending'
+             AND EXISTS (
+               SELECT 1 FROM birth_calc_reservations
+               WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+                 AND status = 'charged'
+             )
+             AND EXISTS (
+               SELECT 1 FROM jobs
+               WHERE id = ? AND job_type = ? AND user_id = ?
+                 AND idempotency_key = ? AND status = 'failed'
+                 AND attempts = ? AND payload_json = ? AND result_class = ?
+             )`,
+        ).bind(
+          nowIso,
+          userId,
+          profileVersion,
+          userId,
+          prepared.reservationHash,
+          prepared.claimTokenHash,
+          jobId,
+          BIRTH_JOB_TYPE,
+          userId,
+          idem,
+          attempt,
+          profileMetadata,
+          calcClass,
+        ),
+      ]);
+    } catch (error) {
+      const consentAfterSettlementRace =
+        await loadExactCurrentAccountProcessingGrant(
+          c.env,
+          userId,
+          command.submitted.consent_id,
+        );
+      if (!consentAfterSettlementRace) {
+        await settleConsentInvalidAttempt();
+        return consentInvalidResponse();
+      }
+      throw error;
+    }
 
     // Bad input is the caller's problem and is safe to echo back. Anything else
     // is an upstream fault whose message has previously carried the calculation

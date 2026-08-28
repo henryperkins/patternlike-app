@@ -80,6 +80,15 @@ describe("birth profile request validation", () => {
     ).toBe("invalid_body");
   });
 
+  it("rejects a non-string consent_id before binding it to D1", () => {
+    expect(
+      validateBirthProfileRequest({
+        ...base,
+        consent_id: { malformed: true } as unknown as string,
+      })?.code,
+    ).toBe("invalid_body");
+  });
+
   it("rejects an unrecognised accuracy value", () => {
     expect(
       validateBirthProfileRequest({ ...base, accuracy: "precise" as never })?.code,

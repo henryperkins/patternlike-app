@@ -27,6 +27,16 @@ describe("account-processing response guard", () => {
     { ...accountProcessingGranted, consent_id: null },
     { ...accountProcessingNotGranted, consent_id: "cns_impossible" },
     { ...accountProcessingNotGranted, disclosure: null },
+    { ...accountProcessingNotGranted, policy_version: "future-policy" },
+    { ...accountProcessingNotGranted, unexpected: true },
+    {
+      ...accountProcessingGranted,
+      granted_at: "August 28, 2026",
+    },
+    {
+      ...accountProcessingGranted,
+      regrant_will_restore_access: true,
+    },
   ])("rejects a malformed or internally inconsistent success body", (response) => {
     expect(isAccountProcessingConsentResponse(response)).toBe(false);
   });

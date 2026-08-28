@@ -8,7 +8,7 @@ import {
   revokeAccountProcessingConsent,
 } from "../db/account-processing-consents.js";
 import {
-  ACCOUNT_PROCESSING_POLICY_VERSION,
+  CURRENT_ACCOUNT_PROCESSING_POLICY,
   type AccountProcessingUiSurface,
 } from "../policies/account-processing-policies.js";
 
@@ -70,7 +70,7 @@ accountProcessingConsentRoutes.put("/v1/consents/account-processing", async (c) 
     return c.json(errorBody(requestId, "invalid_body", "Request body must contain only policy_version"), 400);
   }
   const policyVersion = (body as { policy_version: string }).policy_version;
-  if (policyVersion !== ACCOUNT_PROCESSING_POLICY_VERSION) {
+  if (policyVersion !== CURRENT_ACCOUNT_PROCESSING_POLICY.version) {
     return c.json(errorBody(requestId, "consent_policy_version_stale", "Re-read the current account-processing policy and grant again"), 409);
   }
   const result = await grantAccountProcessingConsent(

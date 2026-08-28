@@ -3,6 +3,13 @@ import type { Env } from "../env.js";
 import type { UserIdentity } from "../db/users.js";
 import { loadPatternGenerationGrant, insertPatternConsentRevoke, loadLatestPatternConsent } from "../db/pattern-consents.js";
 import { hashChartFingerprint, loadClaimForFingerprint, loadAnyClaim } from "../db/pattern-claims.js";
+import {
+  deleteAcceptedPatternClaim,
+  releaseUnconsumedPatternClaim,
+  releaseUserPatternClaims,
+  supersedeAcceptedPatternClaim,
+  withdrawAcceptedPatternClaim,
+} from "../db/pattern-claim-transitions.js";
 import { loadActiveChart, loadActivePatternDocument, loadAnyPatternDocument } from "./pattern-state.js";
 import { enqueuePatternGeneration } from "./pattern-enqueue.js";
 import { PATTERN_JOB_TYPE } from "./pattern-command.js";
@@ -51,11 +58,7 @@ export async function revokePatternGenerationConsent(
                 finished_at = ?, result_class = 'consent_revoked'
          WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')`,
       ).bind(nowIso, identity.userId, PATTERN_JOB_TYPE),
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'available', active_generation_id = NULL, updated_at = ?
-         WHERE user_id = ? AND status = 'reserved' AND consumed_at IS NULL`,
-      ).bind(nowIso, identity.userId),
+      releaseUserPatternClaims(env, { userId: identity.userId, now: nowIso }),
     ]);
   }
   const chart = await loadActiveChart(env, identity.userId);
@@ -110,14 +113,11 @@ export async function deleteCurrentPattern(
        SET wrapped_key_enc = NULL, wrapped_key_version = NULL, wrapped_key_nonce = NULL, erased_at = ?
        WHERE user_id = ? AND erased_at IS NULL`,
     ).bind(nowIso, identity.userId),
-    env.DB.prepare(
-      `UPDATE pattern_generation_claims
-       SET status = 'deleted', consumed_at = COALESCE(consumed_at, ?), deleted_at = ?,
-           active_generation_id = NULL, updated_at = ?
-       WHERE user_id = ? AND id = (
-         SELECT claim_id FROM pattern_generation_jobs WHERE generation_id = ?
-       )`,
-    ).bind(nowIso, nowIso, nowIso, identity.userId, document.generation_id),
+    deleteAcceptedPatternClaim(env, {
+      claimId: document.claim_id,
+      userId: identity.userId,
+      now: nowIso,
+    }),
     env.DB.prepare(
       `UPDATE jobs SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
        WHERE user_id = ? AND job_type = ?`,
@@ -185,17 +185,12 @@ export async function reconcilePatternAfterChartCorrection(
        WHERE user_id = ? AND erased_at IS NULL`,
     ).bind(nowIso, identity.userId),
     document
-      ? env.DB.prepare(
-          `UPDATE pattern_generation_claims
-           SET status = 'superseded', consumed_at = COALESCE(consumed_at, ?), superseded_at = ?,
-               active_generation_id = NULL, updated_at = ?
-           WHERE user_id = ? AND chart_fingerprint_hash = ?`,
-        ).bind(nowIso, nowIso, nowIso, identity.userId, document.chart_fingerprint_hash)
-      : env.DB.prepare(
-          `UPDATE pattern_generation_claims
-           SET status = 'available', active_generation_id = NULL, updated_at = ?
-           WHERE user_id = ? AND status = 'reserved' AND consumed_at IS NULL`,
-        ).bind(nowIso, identity.userId),
+      ? supersedeAcceptedPatternClaim(env, {
+          claimId: document.claim_id,
+          userId: identity.userId,
+          now: nowIso,
+        })
+      : releaseUserPatternClaims(env, { userId: identity.userId, now: nowIso }),
   ]);
 
   for (const row of generations) {
@@ -338,18 +333,17 @@ export async function recallOntologyAndWithdraw(
          WHERE id = (SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?)`,
       ).bind(row.generation_id),
       withdrawal
-        ? env.DB.prepare(
-            `UPDATE pattern_generation_claims
-             SET status = 'withdrawn', consumed_at = COALESCE(consumed_at, ?), withdrawn_at = ?,
-                 active_generation_id = NULL, updated_at = ?
-             WHERE user_id = ? AND id = ? AND status = 'accepted'`,
-          ).bind(now, now, now, row.user_id, row.claim_id)
-        : env.DB.prepare(
-            `UPDATE pattern_generation_claims
-             SET status = 'available', active_generation_id = NULL, updated_at = ?
-             WHERE user_id = ? AND id = ? AND status = 'reserved'
-               AND consumed_at IS NULL AND active_generation_id = ?`,
-          ).bind(now, row.user_id, row.claim_id, row.generation_id),
+        ? withdrawAcceptedPatternClaim(env, {
+            claimId: row.claim_id,
+            userId: row.user_id,
+            now,
+          })
+        : releaseUnconsumedPatternClaim(env, {
+            claimId: row.claim_id,
+            userId: row.user_id,
+            generationId: row.generation_id,
+            now,
+          }),
       env.DB.prepare(
         `UPDATE pattern_generation_artifact_keys
          SET wrapped_key_enc = NULL, wrapped_key_version = NULL, wrapped_key_nonce = NULL, erased_at = ?

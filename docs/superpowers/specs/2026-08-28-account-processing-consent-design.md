@@ -157,6 +157,7 @@ document:
   "status": "granted",
   "consent_id": "cns_01JAMPLEACCOUNTCONSENT01",
   "account_status": "active",
+  "has_active_chart": false,
   "regrant_will_restore_access": false,
   "policy_version": "account-processing-v1-2026-08-28",
   "granted_at": "2026-08-28T00:00:00.000Z",
@@ -174,6 +175,9 @@ document:
 The `not_granted` variant has `consent_id`, `granted_at`, and `ui_surface` set
 to `null`. Every successful response reports the state at response time and
 the post-operation `account_status` as `active` or `frozen`.
+`has_active_chart` is a safe routing discriminator: it reports only whether an
+active calculated chart exists, so a gated chart read can distinguish first
+onboarding from current-policy recovery without granting early.
 `regrant_will_restore_access` is true only for a frozen account whose latest
 row proves an account-processing revocation; it is false for active accounts
 and unexplained freezes. The document still returns the current server policy
@@ -317,6 +321,11 @@ the external call; the pending profile becomes `invalid`, the job becomes
 remains charged. The reservation transaction is the budget boundary, so a
 later state change never refunds it.
 
+Every post-calculation terminal settlement reasserts the predicate too. A
+calculation failure that returns after revocation settles as `cancelled` /
+`consent_invalid`, not as a retryable calculation failure under a consent that
+no longer authorizes processing.
+
 Because an external call cannot be one transaction with D1, the
 chart-publication batch reasserts the predicate a final time. If revocation wins
 while calculation is running, no active chart or profile is published; the same
@@ -374,14 +383,17 @@ final submission; the checkbox never stands in for a persisted grant.
 
 On final confirmation the form:
 
-1. holds one grant idempotency key for the visible intent;
+1. holds one grant idempotency key until that mutation receives a response;
 2. PUTs the displayed policy with UI surface `onboarding`;
 3. requires the returned state to be `granted` with a non-null consent ID; and
 4. submits that exact ID in the birth request.
 
 The grant happens only at final submit, so abandoning steps 1 through 3 creates
 no consent row. If birth subsequently fails, the explicit grant remains. A
-retry reuses or observes the current grant rather than minting another row.
+retry observes the current grant rather than minting another row. Every valid
+mutation `200` is authoritative and consumes its idempotency key; if it reports
+`not_granted`, the form updates to that state, clears the checkbox, and requires
+a fresh confirmation and key rather than replaying a spent intent forever.
 Chart correction uses the same sequence and normally receives the existing
 grant without a ledger append.
 
@@ -416,8 +428,9 @@ resource. A response with `account_status: "frozen"` and
 with that flag false offers export, deletion, and sign out without claiming
 that regrant can clear the hold. If the consent read is also rejected, the
 account is pending deletion, deleted, or otherwise unavailable; the UI does
-not call it a consent freeze. An active `not_granted` response opens onboarding
-or current-policy reconfirmation rather than calling the account frozen.
+not call it a consent freeze. An active `not_granted` response with no active
+chart opens onboarding; the same response with a retained active chart opens
+current-policy reconfirmation rather than calling the account frozen.
 
 Successful regrant reloads the chart and returns to the ordinary app. Existing
 retained data becomes visible again; regrant does not recalculate or rewrite

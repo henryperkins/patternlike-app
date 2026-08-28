@@ -20,6 +20,7 @@ import { ensureNatalFeatureSet } from "../db/natal-features.js";
 import { loadActiveOntology, loadOntologyByVersion } from "../db/pattern-ontology.js";
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { isConsumedStatus, loadClaimForFingerprint } from "../db/pattern-claims.js";
+import { acceptPatternClaim } from "../db/pattern-claim-transitions.js";
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import {
   PATTERN_JOB_TYPE,
@@ -80,6 +81,11 @@ import {
   PatternReplayLedgerError,
   writePatternReplayIntent,
 } from "./pattern-replay-ledger.js";
+import {
+  buildPatternPublicationProof,
+  patternPublicationAuthorizationGuard,
+  type PatternPublicationBundle,
+} from "./pattern-publication-proof.js";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
@@ -1430,18 +1436,18 @@ export async function executePatternJob(
         });
       }
 
-      const verdictHash = adopted
-        ? adopted.plaintextHash
-        : await putArtifact(
-            env,
-            identity,
-            claimed.job,
-            coordinate.responseArtifactClass,
-            verdict,
-            expiresAt,
-            coordinate.attempt,
-            coordinate.stageGeneration,
-          );
+      if (!adopted) {
+        await putArtifact(
+          env,
+          identity,
+          claimed.job,
+          coordinate.responseArtifactClass,
+          verdict,
+          expiresAt,
+          coordinate.attempt,
+          coordinate.stageGeneration,
+        );
+      }
       // The verdict of record, under the class an operator and the retention
       // sweep look for. The same bytes as the response artifact; a different
       // role, and the response coordinate is what the artifact-first probe needs.
@@ -1490,16 +1496,18 @@ export async function executePatternJob(
         });
         return { ok: false, reason: "terminal", failureClass: "semantic_verification_failed" };
       }
+      const publicationProof = await buildPatternPublicationProof({
+        command,
+        job: claimed.job,
+        executedWriterPin: pin,
+        readArtifact: (artifactClass) =>
+          getArtifact(env, identity, command.generation_id, artifactClass),
+      });
       const publication = await publishPattern(
         env,
         identity,
-        command,
-        pin,
         claimed,
-        writer,
-        plan,
-        candidateHash,
-        verdictHash,
+        publicationProof,
         now,
       );
       if (publication.status === "retry") {
@@ -1536,50 +1544,50 @@ export async function executePatternJob(
 async function publishPattern(
   env: Env,
   identity: UserIdentity,
-  command: GeneratePatternCommandV1,
-  executedPin: PatternPublisherPin,
   claimed: { token: string; job: PatternJobRow },
-  writer: PatternWriterOutput,
-  plan: PatternPlan,
-  candidateHash: string,
-  verdictHash: string,
+  publication: PatternPublicationBundle,
   now: Date,
 ): Promise<
   | { status: "published" }
   | { status: "retry"; failureClass: string }
 > {
+  const { proof, writer } = publication;
   const patternId = `pat_${(await sha256Hex(
-    `pattern-document-v1:${command.generation_id}`,
+    `pattern-document-v1:${proof.generationId}`,
   )).slice(0, 32)}`;
   const generatedAt = now.toISOString();
   const documentKey = randomKey();
   const nonce = randomNonce();
-  const publisherProvenance = provenanceFromExecutedPin(executedPin);
+  const publisherProvenance = provenanceFromExecutedPin(proof.executedWriterPin);
   const internal = {
     schema_version: "0.7.0" as const,
     pattern_id: patternId,
-    generation_id: command.generation_id,
-    locale: command.locale,
+    generation_id: proof.generationId,
+    locale: proof.locale,
     effective_accuracy: (await env.DB.prepare(
-      `SELECT birth_accuracy FROM chart_snapshots WHERE id = ? AND user_id = ?`,
+      `SELECT chart.birth_accuracy
+       FROM pattern_generation_jobs generation
+       JOIN chart_snapshots chart
+         ON chart.id = generation.chart_id AND chart.user_id = generation.user_id
+       WHERE generation.generation_id = ? AND generation.user_id = ?`,
     )
-      .bind(command.chart_id, identity.userId)
+      .bind(proof.generationId, identity.userId)
       .first<{ birth_accuracy: "exact" | "approximate" | "unknown" }>())?.birth_accuracy ?? "exact",
-    plan_hash: plan.plan_hash,
-    candidate_hash: candidateHash,
-    semantic_verdict_hash: verdictHash,
+    plan_hash: proof.planHash,
+    candidate_hash: proof.candidateHash,
+    semantic_verdict_hash: proof.semanticVerdictHash,
     artifact: writer,
     compact_provenance: {
       assembly_mode: "constrained_model" as const,
       provider: publisherProvenance.provider,
       model_family: publisherProvenance.model_family,
       raw_birth_details_sent: false as const,
-      ontology_version: command.ontology_version,
-      selection_policy_version: command.selection_policy_version,
+      ontology_version: proof.ontologyVersion,
+      selection_policy_version: proof.executedWriterPin.selection_policy_version,
     },
   };
   const aad = new TextEncoder().encode(
-    JSON.stringify(["patternlike.pattern-document", 1, patternId, command.generation_id]),
+    JSON.stringify(["patternlike.pattern-document", 1, patternId, proof.generationId]),
   );
   const documentEnc = await encryptUnderContentKey(internal, documentKey, nonce, aad);
   const wrapped = await wrapContentKey(
@@ -1588,7 +1596,7 @@ async function publishPattern(
     patternId,
     "pattern_documents.wrapped_document_key_enc",
     documentKey,
-    { claim_id: command.claim_id, generation_id: command.generation_id },
+    { claim_id: proof.claimId, generation_id: proof.generationId },
   );
   const content = await contentHash(JSON.stringify(internal));
   const accuracy = internal.effective_accuracy;
@@ -1596,13 +1604,13 @@ async function publishPattern(
   try {
     replay = await writePatternReplayIntent(env, {
       eventClass: "claim_consumed",
-      semanticOperationKey: command.generation_id,
+      semanticOperationKey: proof.generationId,
       targetUserId: identity.userId,
-      chartFingerprintHash: command.chart_fingerprint_hash,
-      claimId: command.claim_id,
-      generationId: command.generation_id,
+      chartFingerprintHash: proof.chartFingerprintHash,
+      claimId: proof.claimId,
+      generationId: proof.generationId,
       patternId,
-      ontologyVersion: command.ontology_version,
+      ontologyVersion: proof.ontologyVersion,
       priorClaimStatus: "reserved",
       nextClaimStatus: "accepted",
     }, now);
@@ -1621,25 +1629,18 @@ async function publishPattern(
       claimed.token,
       {
         kind: "publish",
-        candidateHash,
-        semanticVerdictHash: verdictHash,
+        candidateHash: proof.candidateHash,
+        semanticVerdictHash: proof.semanticVerdictHash,
       },
       now,
     );
     await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO assertion_probe (id, reason)
-         SELECT 1, 'pattern claim no longer reserved'
-         WHERE NOT EXISTS (
-           SELECT 1 FROM pattern_generation_claims
-           WHERE id = ? AND status = 'reserved' AND active_generation_id = ? AND consumed_at IS NULL
-         )`,
-      ).bind(command.claim_id, command.generation_id),
+      patternPublicationAuthorizationGuard(env, proof, now),
       ...publicationTransition.guards,
       ...replay.receiptStatements(env),
       env.DB.prepare(
         `DELETE FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash != ?`,
-      ).bind(identity.userId, command.chart_fingerprint_hash),
+      ).bind(identity.userId, proof.chartFingerprintHash),
       env.DB.prepare(
         `INSERT INTO pattern_documents (
            id, user_id, claim_id, generation_id, chart_fingerprint_hash, ontology_version,
@@ -1650,12 +1651,12 @@ async function publishPattern(
       ).bind(
         patternId,
         identity.userId,
-        command.claim_id,
-        command.generation_id,
-        command.chart_fingerprint_hash,
-        command.ontology_version,
-        command.ontology_bundle_hash,
-        command.locale,
+        proof.claimId,
+        proof.generationId,
+        proof.chartFingerprintHash,
+        proof.ontologyVersion,
+        proof.ontologyBundleHash,
+        proof.locale,
         accuracy,
         documentEnc,
         b64(nonce),
@@ -1667,11 +1668,12 @@ async function publishPattern(
         generatedAt,
         generatedAt,
       ),
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'accepted', active_generation_id = NULL, consumed_at = ?, accepted_at = ?, updated_at = ?
-         WHERE id = ? AND status = 'reserved'`,
-      ).bind(generatedAt, generatedAt, generatedAt, command.claim_id),
+      acceptPatternClaim(env, {
+        claimId: proof.claimId,
+        userId: identity.userId,
+        generationId: proof.generationId,
+        now: generatedAt,
+      }),
       ...publicationTransition.mutations,
       env.DB.prepare(
         `INSERT INTO audit_events

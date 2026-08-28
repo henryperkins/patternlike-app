@@ -64,6 +64,48 @@ describe("account access recovery", () => {
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 
+  it("uses a fresh key after a valid replay still reports not granted", async () => {
+    const user = userEvent.setup();
+    const onRestored = vi.fn();
+    let grants = 0;
+    const restored = {
+      ...accountProcessingGranted,
+      account_status: "active" as const,
+      regrant_will_restore_access: false as const,
+      ui_surface: "privacy_center" as const,
+    };
+    const responses: Parameters<typeof mockApiResponses>[0] = {};
+    Object.defineProperty(responses, `PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
+      enumerable: true,
+      get: () => ({
+        status: 200,
+        body: grants++ === 0 ? accountProcessingRevokedFreeze : restored,
+      }),
+    });
+    mockApiResponses(responses);
+
+    render(
+      <AccountAccessRecovery
+        consent={accountProcessingRevokedFreeze}
+        onRestored={onRestored}
+        onSignOut={vi.fn()}
+        onDeletionAccepted={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Restore access/i }));
+    expect(await screen.findByRole("status", { name: /Account recovery status/i }))
+      .toHaveTextContent(/not active yet/i);
+    await user.click(screen.getByRole("button", { name: /Restore access/i }));
+    await waitFor(() => expect(onRestored).toHaveBeenCalledOnce());
+
+    const keys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
+      .filter((request) => request.method === "PUT")
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it("does not claim regrant can clear an unexplained freeze", () => {
     mockApiResponses({});
     render(

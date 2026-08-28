@@ -5,6 +5,7 @@ import type {
   PatternPlan,
   PatternWriterOutput,
 } from "@patternlike/shared";
+import providerBoundaryPolicy from "../../../../contracts/policies/pattern-provider-boundary-v1.json";
 
 import {
   PATTERN_PACKET_LIMITS_DEFAULT,
@@ -15,6 +16,7 @@ import {
   buildWriterInput,
   type PatternPacketLimits,
 } from "./pattern-packet.js";
+import { PRIVATE_OPAQUE_ID_RULES } from "./private-opaque-identifiers.js";
 
 /**
  * Every private value in these fixtures is a recognizable sentinel, so a deep
@@ -165,6 +167,22 @@ function deepScan(value: unknown): string {
 }
 
 describe("Pattern provider packet builders", () => {
+  describe("shared deny policy", () => {
+    it("uses the same opaque-id rules as the versioned contract policy", () => {
+      expect(PRIVATE_OPAQUE_ID_RULES).toEqual(providerBoundaryPolicy.opaque_id_rules);
+    });
+
+    it("forbids chart_fingerprint_hash by whole key", () => {
+      expect(providerBoundaryPolicy.forbidden_keys).toContain("chart_fingerprint_hash");
+      expect(
+        findPatternInputViolation({ chart_fingerprint_hash: `sha256:${"a".repeat(64)}` }),
+      ).toEqual({
+        code: "pattern_input_forbidden_key",
+        key: "chart_fingerprint_hash",
+      });
+    });
+  });
+
   describe("minimization", () => {
     it("emits no forbidden identifier from any of the three documents", () => {
       const p = packet();

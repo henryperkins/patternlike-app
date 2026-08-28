@@ -35,6 +35,11 @@ import {
 import { sweepPatternJobs } from "../services/pattern-sweep.js";
 import { enqueuePatternGeneration } from "../services/pattern-enqueue.js";
 import { hashChartFingerprint } from "../db/pattern-claims.js";
+import {
+  releaseUnconsumedPatternClaim,
+  reservePatternClaim,
+  supersedeAcceptedPatternClaim,
+} from "../db/pattern-claim-transitions.js";
 import { loadActiveOntology } from "../db/pattern-ontology.js";
 import { insertPatternConsentGrant } from "../db/pattern-consents.js";
 import { decryptPayload, rotateUserDek } from "../db/users.js";
@@ -1213,13 +1218,21 @@ describe("M7 AI-generated Pattern", () => {
     )
       .bind("clm_stale_loser", winner!.job_id)
       .run();
-    await env.DB.prepare(
-      `UPDATE pattern_generation_claims
-       SET status = 'reserved', active_generation_id = ?
-       WHERE user_id = ?`,
-    )
-      .bind("pgen_winner_other_generation", USER_A)
-      .run();
+    await releaseUnconsumedPatternClaim(env, {
+      claimId: winner!.claim_id,
+      userId: USER_A,
+      generationId: winnerId,
+      now: nowIso,
+    }).run();
+    await reservePatternClaim(env, {
+      claimId: winner!.claim_id,
+      userId: USER_A,
+      chartFingerprintHash: fingerprintHash,
+      chartId: `cht_seed_${USER_A.slice(-8)}`,
+      generationId: "pgen_winner_other_generation",
+      now: nowIso,
+      existing: true,
+    }).run();
     expect(await commitPatternTransition(env, winner!, "clm_stale_loser", {
       kind: "fail",
       failureClass: "stale_loser",
@@ -1235,13 +1248,12 @@ describe("M7 AI-generated Pattern", () => {
       active_generation_id: "pgen_winner_other_generation",
     });
 
-    await env.DB.prepare(
-      `UPDATE pattern_generation_claims
-       SET status = 'available', active_generation_id = NULL
-       WHERE user_id = ?`,
-    )
-      .bind(USER_A)
-      .run();
+    await releaseUnconsumedPatternClaim(env, {
+      claimId: winner!.claim_id,
+      userId: USER_A,
+      generationId: "pgen_winner_other_generation",
+      now: nowIso,
+    }).run();
     const retry = await enqueuePatternGeneration(env, IDENTITY_A, {
       idempotencyKey: "idem-pattern-concurrent-cancel",
       consentPolicyVersion: POLICY,
@@ -1257,13 +1269,21 @@ describe("M7 AI-generated Pattern", () => {
     )
       .bind("clm_stale_cancel", cancelTarget!.job_id)
       .run();
-    await env.DB.prepare(
-      `UPDATE pattern_generation_claims
-       SET status = 'reserved', active_generation_id = ?
-       WHERE user_id = ?`,
-    )
-      .bind("pgen_winner_after_retry", USER_A)
-      .run();
+    await releaseUnconsumedPatternClaim(env, {
+      claimId: cancelTarget!.claim_id,
+      userId: USER_A,
+      generationId: cancelTarget!.generation_id,
+      now: nowIso,
+    }).run();
+    await reservePatternClaim(env, {
+      claimId: cancelTarget!.claim_id,
+      userId: USER_A,
+      chartFingerprintHash: fingerprintHash,
+      chartId: `cht_seed_${USER_A.slice(-8)}`,
+      generationId: "pgen_winner_after_retry",
+      now: nowIso,
+      existing: true,
+    }).run();
     expect(await commitPatternTransition(env, cancelTarget!, "clm_stale_cancel", {
       kind: "cancel",
       reason: "cancel_stale",
@@ -1370,11 +1390,14 @@ describe("M7 AI-generated Pattern", () => {
     const acceptedWithoutDoc = await json("/v1/pattern");
     expect(acceptedWithoutDoc.status).toBe(404);
     expect((acceptedWithoutDoc.body.error as { code: string }).code).toBe("pattern_not_generated");
-    await env.DB.prepare(
-      `UPDATE pattern_generation_claims SET status = 'superseded' WHERE user_id = ?`,
-    )
-      .bind(USER_A)
-      .run();
+    const acceptedClaim = await env.DB.prepare(
+      `SELECT id FROM pattern_generation_claims WHERE user_id = ? AND status = 'accepted'`,
+    ).bind(USER_A).first<{ id: string }>();
+    await supersedeAcceptedPatternClaim(env, {
+      claimId: acceptedClaim!.id,
+      userId: USER_A,
+      now: new Date().toISOString(),
+    }).run();
     const superseded = await json("/v1/pattern");
     expect(superseded.status).toBe(410);
     expect((superseded.body.error as { code: string }).code).toBe("pattern_deleted");

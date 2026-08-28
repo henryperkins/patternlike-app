@@ -58,6 +58,7 @@
         "status",
         "consent_id",
         "account_status",
+        "has_active_chart",
         "regrant_will_restore_access",
         "policy_version",
         "granted_at",
@@ -98,6 +99,7 @@
           ]
         },
         "account_status": { "$ref": "#/$defs/accountProcessingAccountStatus" },
+        "has_active_chart": { "type": "boolean" },
         "regrant_will_restore_access": { "type": "boolean" },
         "policy_version": {
           "type": "string",
@@ -134,6 +136,31 @@
             "ui_surface": { "type": "null" }
           },
           "required": ["status", "consent_id", "granted_at", "ui_surface"]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "regrant_will_restore_access": { "const": true } },
+            "required": ["regrant_will_restore_access"]
+          },
+          "then": {
+            "properties": {
+              "account_status": { "const": "frozen" },
+              "status": { "const": "not_granted" }
+            },
+            "required": ["account_status", "status"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "granted" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "regrant_will_restore_access": { "const": false } },
+            "required": ["regrant_will_restore_access"]
+          }
         }
       ]
     }

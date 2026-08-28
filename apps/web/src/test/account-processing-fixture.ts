@@ -19,6 +19,7 @@ export const accountProcessingNotGranted = {
   status: "not_granted",
   consent_id: null,
   account_status: "active",
+  has_active_chart: false,
   regrant_will_restore_access: false,
   policy_version: ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION,
   granted_at: null,
@@ -43,11 +44,13 @@ export const accountProcessingGranted = {
 export const accountProcessingRevokedFreeze = {
   ...accountProcessingNotGranted,
   account_status: "frozen",
+  has_active_chart: true,
   regrant_will_restore_access: true,
 } satisfies AccountProcessingConsentResponse;
 
 export const accountProcessingUnexplainedFreeze = {
   ...accountProcessingNotGranted,
   account_status: "frozen",
+  has_active_chart: true,
   regrant_will_restore_access: false,
 } satisfies AccountProcessingConsentResponse;

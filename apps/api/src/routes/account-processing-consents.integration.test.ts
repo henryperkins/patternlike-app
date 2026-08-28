@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { env, SELF } from "cloudflare:test";
 import {
   assertExactCurrentAccountProcessingGrant,
@@ -27,6 +27,7 @@ interface AccountProcessingDocument {
   status: "granted" | "not_granted";
   consent_id: string | null;
   account_status: "active" | "frozen";
+  has_active_chart: boolean;
   regrant_will_restore_access: boolean;
   policy_version: string;
   granted_at: string | null;
@@ -101,6 +102,7 @@ describe("account-processing consent resource", () => {
       status: "not_granted",
       consent_id: null,
       account_status: "active",
+      has_active_chart: false,
       regrant_will_restore_access: false,
       policy_version: POLICY_VERSION,
       granted_at: null,
@@ -181,6 +183,36 @@ describe("account-processing consent resource", () => {
         resource_id: consentId,
       },
     ]);
+  });
+
+  it("aborts a grant when account deletion changes lifecycle state before its batch", async () => {
+    const batch = env.DB.batch.bind(env.DB);
+    let injected = false;
+    const batchSpy = vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
+      if (!injected) {
+        injected = true;
+        await env.DB.prepare(
+          "UPDATE users SET status = 'pending_deletion' WHERE id = ? AND status = 'active'",
+        ).bind(USER_A).run();
+      }
+      return batch(statements);
+    });
+
+    try {
+      const response = await requestAccountProcessing("PUT", {
+        key: "account-processing-deletion-race",
+        surface: "onboarding",
+      });
+      expect(response).toMatchObject({
+        status: 409,
+        body: { error: { code: "account_state_conflict" } },
+      });
+      expect(await rows("SELECT * FROM consents WHERE user_id = ?", USER_A)).toEqual([]);
+      expect(await rows("SELECT * FROM jobs WHERE user_id = ?", USER_A)).toEqual([]);
+      expect(await rows("SELECT * FROM audit_events WHERE actor_id = ?", USER_A)).toEqual([]);
+    } finally {
+      batchSpy.mockRestore();
+    }
   });
 
   it("freezes on revoke and reactivates only by superseding that revocation", async () => {
@@ -362,6 +394,29 @@ describe("account-processing consent resource", () => {
         env.DB.prepare("UPDATE users SET locale = 'fr-CA' WHERE id = ?").bind(USER_A),
       ]),
     ).rejects.toThrow();
+  });
+
+  it("rejects parseable but noncanonical grant timestamps in reads and assertions", async () => {
+    const grant = await requestAccountProcessing("PUT", {
+      key: "account-processing-grant-noncanonical-time",
+      surface: "onboarding",
+    });
+    const consentId = (grant.body as AccountProcessingDocument).consent_id!;
+    await env.DB.prepare(
+      "UPDATE consents SET granted_at = 'August 28, 2026' WHERE id = ?",
+    ).bind(consentId).run();
+
+    expect(await requestAccountProcessing("GET")).toMatchObject({
+      status: 200,
+      body: { status: "not_granted", consent_id: null },
+    });
+    await expect(
+      loadExactCurrentAccountProcessingGrant(env, USER_A, consentId),
+    ).resolves.toBeNull();
+    await expect(env.DB.batch([
+      assertExactCurrentAccountProcessingGrant(env, USER_A, consentId),
+      env.DB.prepare("UPDATE users SET locale = 'fr-CA' WHERE id = ?").bind(USER_A),
+    ])).rejects.toThrow();
   });
 
   it("gates active product requests but leaves only named recovery routes available", async () => {

@@ -595,7 +595,6 @@ async function existingReplicaPutAt(
 function claimReplayStatements(
   env: Pick<Env, "DB">,
   event: PatternErasureReplayEvent,
-  includeAccepted: boolean,
 ): D1PreparedStatement[] {
   const acceptedAt = terminalClaimTimestamp(
     event.next_claim_status,
@@ -617,6 +616,7 @@ function claimReplayStatements(
     "withdrawn",
     event.occurred_at,
   );
+  const replayGenerationId = event.generation_id ?? `replay:${event.event_id}`;
   return [
     env.DB.prepare(
       `INSERT OR IGNORE INTO pattern_generation_claims (
@@ -640,31 +640,57 @@ function claimReplayStatements(
       event.occurred_at,
       event.target_user_id,
     ),
+    // Replay is the documented exception to live repository ownership, not to
+    // monotonicity. An existing available row converges through the same legal
+    // forward edges as a live row rather than jumping straight to a consumed
+    // state and bypassing the D1 transition guard.
     env.DB.prepare(
       `UPDATE pattern_generation_claims
-       SET status = ?, active_generation_id = NULL,
-           consumed_at = COALESCE(consumed_at, ?),
-           accepted_at = COALESCE(accepted_at, ?),
-           deleted_at = COALESCE(deleted_at, ?),
-           superseded_at = COALESCE(superseded_at, ?),
-           withdrawn_at = COALESCE(withdrawn_at, ?),
-           updated_at = ?
+       SET status = 'reserved', active_generation_id = ?, updated_at = ?
        WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
-         AND status IN (${includeAccepted
-    ? "'available', 'reserved', 'accepted'"
-    : "'available', 'reserved'"})`,
+         AND status = 'available' AND consumed_at IS NULL`,
     ).bind(
-      event.next_claim_status,
-      event.occurred_at,
-      acceptedAt,
-      deletedAt,
-      supersededAt,
-      withdrawnAt,
+      replayGenerationId,
       event.occurred_at,
       event.claim_id,
       event.target_user_id,
       event.chart_fingerprint_hash,
     ),
+    env.DB.prepare(
+      `UPDATE pattern_generation_claims
+       SET status = 'accepted', active_generation_id = NULL,
+           consumed_at = ?, accepted_at = ?, updated_at = ?
+       WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
+         AND status = 'reserved' AND consumed_at IS NULL`,
+    ).bind(
+      event.occurred_at,
+      event.occurred_at,
+      event.occurred_at,
+      event.claim_id,
+      event.target_user_id,
+      event.chart_fingerprint_hash,
+    ),
+    ...(event.next_claim_status === "accepted"
+      ? []
+      : [env.DB.prepare(
+          `UPDATE pattern_generation_claims
+           SET status = ?,
+               deleted_at = COALESCE(deleted_at, ?),
+               superseded_at = COALESCE(superseded_at, ?),
+               withdrawn_at = COALESCE(withdrawn_at, ?),
+               updated_at = ?
+           WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
+             AND status = 'accepted'`,
+        ).bind(
+          event.next_claim_status,
+          deletedAt,
+          supersededAt,
+          withdrawnAt,
+          event.occurred_at,
+          event.claim_id,
+          event.target_user_id,
+          event.chart_fingerprint_hash,
+        )]),
   ];
 }
 
@@ -1037,7 +1063,7 @@ export async function applyPatternReplayEvent(
       verified.next_claim_status,
     ),
     ...(erasure ? erasureReplayStatements(env, verified) : []),
-    ...claimReplayStatements(env, verified, erasure),
+    ...claimReplayStatements(env, verified),
     ...receipt.receiptStatements(env),
     ...finalAssertions,
   ]);

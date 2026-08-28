@@ -27,6 +27,7 @@ import type {
   PatternPlan,
   PatternWriterOutput,
 } from "@patternlike/shared";
+import providerBoundaryPolicy from "../../../../contracts/policies/pattern-provider-boundary-v1.json";
 import { findPrivateOpaqueIdPrefix } from "./private-opaque-identifiers.js";
 
 /**
@@ -40,30 +41,9 @@ import { findPrivateOpaqueIdPrefix } from "./private-opaque-identifiers.js";
  * `GeneratePatternCommandV1.chart_fingerprint_hash` is a real field one refactor
  * away from a packet.
  */
-const FORBIDDEN_KEYS: ReadonlySet<string> = new Set([
-  "user_id",
-  "chart_id",
-  "chart_fingerprint",
-  "chart_fingerprint_hash",
-  "fingerprint",
-  "birth_date",
-  "birth_time",
-  "birthplace",
-  "consent_id",
-  "check_in",
-  "check_ins",
-  "journal",
-  "life_event",
-  "life_events",
-  "reading",
-  "readings",
-  "daily_reading",
-  "latitude",
-  // Not in the Python list because a fact packet has no alias map; forbidden
-  // here because these builders are handed objects that do.
-  "aliasMap",
-  "alias_map",
-]);
+const FORBIDDEN_KEYS: ReadonlySet<string> = new Set(
+  providerBoundaryPolicy.forbidden_keys,
+);
 
 /**
  * Every key legal at any depth of any of the three documents.
@@ -566,21 +546,20 @@ function normalizedFacts(
 /**
  * Whether a `longitude` key is the one calculated longitude that may travel.
  *
- * The normative rule in `contracts/validate_schemas.py` is written for a bare
- * fact packet, where the exempt path is exactly `features[i].fact.longitude` —
- * four segments. These documents WRAP the packet, so a literal port of the
- * length check would reject every position, angle, and house_cusp feature and
- * fail the whole planner document. The rule is therefore expressed as a suffix,
- * anchored on the packet root wherever it sits.
+ * The approved suffixes come from the shared provider-boundary policy. These
+ * documents wrap the packet, so suffix matching keeps the exception anchored
+ * on the packet shape wherever the packet sits in planner/writer/verifier input.
  */
 function isAllowedLongitude(path: readonly (string | number)[]): boolean {
-  const n = path.length;
-  if (n < 4) return false;
-  return (
-    path[n - 1] === "longitude" &&
-    path[n - 2] === "fact" &&
-    typeof path[n - 3] === "number" &&
-    (path[n - 4] === "features" || path[n - 4] === "facts")
+  return providerBoundaryPolicy.allowed_calculated_longitude_suffixes.some(
+    (suffix) => {
+      if (path.length < suffix.length) return false;
+      const offset = path.length - suffix.length;
+      return suffix.every((segment, index) => {
+        const actual = path[offset + index];
+        return segment === "*" ? typeof actual === "number" : actual === segment;
+      });
+    },
   );
 }
 

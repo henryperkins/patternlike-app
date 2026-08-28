@@ -270,11 +270,16 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
         intentKeys.current.grant,
         "onboarding",
       );
-      if (
-        !isAccountProcessingConsentResponse(granted) ||
-        granted.status !== "granted" ||
-        !granted.consent_id
-      ) {
+      if (!isAccountProcessingConsentResponse(granted)) {
+        throw new Error(
+          "The calculation permission response could not be verified. Review it and try again.",
+        );
+      }
+      intentKeys.current.grant = null;
+      setProcessingPolicy({ status: "ready", consent: granted });
+      if (granted.status !== "granted" || !granted.consent_id) {
+        intentKeys.current.birth = null;
+        setConsent(false);
         throw new Error(
           "The calculation permission was not granted. Review it and try again.",
         );

@@ -18,6 +18,7 @@ import {
 import {
   LEAKY_UPSTREAM_MESSAGE,
   TRIGGER_CALC_ERROR,
+  TRIGGER_CALC_ERROR_RACE,
   TRIGGER_CALC_FINGERPRINT_RACE,
   TRIGGER_INVALID_PROFILE,
 } from "../../test/mock-calc-service.js";
@@ -513,6 +514,69 @@ describe("POST /v1/birth-profiles — exact account-processing authority", () =>
         USER_A,
       ),
     ).toEqual([{ status: "charged" }]);
+  });
+
+  it("cancels instead of recording a retryable calc failure when revocation wins", async () => {
+    const firstPromise = postBirthProfile(
+      USER_A,
+      "key-consent-failed-calc-race",
+      {
+        ...ALICE,
+        birthplace: {
+          ...ALICE.birthplace!,
+          label: TRIGGER_CALC_ERROR_RACE,
+        },
+      },
+    );
+    await waitForBirthJob(USER_A, "key-consent-failed-calc-race", "running");
+
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO consents (
+           id, user_id, kind, status, source_id, permission_tier,
+           allowed_uses_json, scopes_json, provider, connector_account_id,
+           policy_version, ui_surface, granted_at, revoked_at, version,
+           supersedes_consent_id, created_at, updated_at
+         ) VALUES (
+           'cns_failed_calc_race_revoke', ?, 'account_processing', 'revoked',
+           'AST-01', 0,
+           '["chart_fact","cycle_detection","uncertainty_model"]', '[]',
+           NULL, NULL, 'account-processing-v1-2026-08-28', 'privacy_center',
+           NULL, '2026-08-28T00:00:04.000Z', 2, 'cns_alice_0001',
+           '2026-08-28T00:00:04.000Z', '2026-08-28T00:00:04.000Z'
+         )`,
+      ).bind(USER_A),
+      env.DB.prepare(
+        "UPDATE users SET status = 'frozen' WHERE id = ? AND status = 'active'",
+      ).bind(USER_A),
+    ]);
+
+    const peerPromise = postBirthProfile(
+      USER_B,
+      "key-consent-failed-calc-peer",
+      {
+        ...BOB,
+        birthplace: {
+          ...BOB.birthplace!,
+          label: TRIGGER_CALC_ERROR_RACE,
+        },
+      },
+    );
+    const [first, peer] = await Promise.all([firstPromise, peerPromise]);
+
+    expect(first).toMatchObject({
+      status: 403,
+      body: { error: { code: "consent_invalid" } },
+    });
+    expect(peer.status).toBe(502);
+    expect(
+      await rows<{ status: string; result_class: string }>(
+        `SELECT status, result_class FROM jobs
+         WHERE user_id = ? AND idempotency_key = ?`,
+        USER_A,
+        "key-consent-failed-calc-race",
+      ),
+    ).toEqual([{ status: "cancelled", result_class: "consent_invalid" }]);
   });
 
   it("does not resume a failed command after revoke and regrant", async () => {

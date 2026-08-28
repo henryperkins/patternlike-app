@@ -129,7 +129,7 @@ export interface AccountProcessingConsentGrantRequest {
   policy_version: typeof ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION;
 }
 
-export interface AccountProcessingConsentResponse {
+interface AccountProcessingConsentResponseBase {
   schema_version: M8SchemaVersion;
   kind: "account_processing";
   source_id: "AST-01";
@@ -138,13 +138,8 @@ export interface AccountProcessingConsentResponse {
   provider: null;
   scopes: [];
   connector_account_id: null;
-  status: "granted" | "not_granted";
-  consent_id: string | null;
-  account_status: AccountProcessingAccountStatus;
-  regrant_will_restore_access: boolean;
+  has_active_chart: boolean;
   policy_version: typeof ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION;
-  granted_at: string | null;
-  ui_surface: AccountProcessingConsentUiSurface | null;
   disclosure: {
     text: typeof ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_TEXT;
     links: {
@@ -153,6 +148,34 @@ export interface AccountProcessingConsentResponse {
     };
   };
 }
+
+export type AccountProcessingConsentResponse =
+  AccountProcessingConsentResponseBase & (
+    | {
+      status: "granted";
+      consent_id: string;
+      account_status: AccountProcessingAccountStatus;
+      regrant_will_restore_access: false;
+      granted_at: string;
+      ui_surface: AccountProcessingConsentUiSurface;
+    }
+    | {
+      status: "not_granted";
+      consent_id: null;
+      account_status: "active";
+      regrant_will_restore_access: false;
+      granted_at: null;
+      ui_surface: null;
+    }
+    | {
+      status: "not_granted";
+      consent_id: null;
+      account_status: "frozen";
+      regrant_will_restore_access: boolean;
+      granted_at: null;
+      ui_surface: null;
+    }
+  );
 
 export interface BirthCalcBudgetExhausted {
   error: {

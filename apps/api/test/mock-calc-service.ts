@@ -24,6 +24,7 @@ import type {
 
 /** Sentinel place labels that make the mock fail in a specific way. */
 export const TRIGGER_CALC_ERROR = "TRIGGER_CALC_ERROR";
+export const TRIGGER_CALC_ERROR_RACE = "TRIGGER_CALC_ERROR_RACE";
 export const TRIGGER_INVALID_PROFILE = "TRIGGER_INVALID_PROFILE";
 export const TRIGGER_CALC_TIMEOUT = "TRIGGER_CALC_TIMEOUT";
 export const TRIGGER_CALC_FINGERPRINT_RACE =
@@ -1371,7 +1372,10 @@ export async function mockCalcService(request: Request): Promise<Response> {
 
   const req = (await request.json()) as CalcRequestBody;
 
-  if (req.place_label === TRIGGER_CALC_FINGERPRINT_RACE) {
+  if (
+    req.place_label === TRIGGER_CALC_FINGERPRINT_RACE ||
+    req.place_label === TRIGGER_CALC_ERROR_RACE
+  ) {
     await waitForFingerprintRacePeer();
   }
   if (req.place_label === TRIGGER_CALC_TIMEOUT) {
@@ -1386,7 +1390,10 @@ export async function mockCalcService(request: Request): Promise<Response> {
     error.name = "AbortError";
     throw error;
   }
-  if (req.place_label === TRIGGER_CALC_ERROR) {
+  if (
+    req.place_label === TRIGGER_CALC_ERROR ||
+    req.place_label === TRIGGER_CALC_ERROR_RACE
+  ) {
     return json(
       {
         ok: false,

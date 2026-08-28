@@ -132,8 +132,17 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
               requestId: error.requestId,
             });
           } else if (
+            consent.account_status === "active" &&
+            consent.status === "not_granted" &&
+            !consent.has_active_chart
+          ) {
+            setHasValidatedSession(true);
+            setChartState({ status: "missing" });
+          } else if (
             consent.account_status === "frozen" ||
-            (consent.account_status === "active" && consent.status === "not_granted")
+            (consent.account_status === "active" &&
+              consent.status === "not_granted" &&
+              consent.has_active_chart)
           ) {
             setChartState({ status: "access-recovery", consent });
           } else {
@@ -146,6 +155,11 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
           }
         } catch (consentError) {
           if (signal?.aborted) return;
+          if (consentError instanceof ApiError && consentError.status === 401) {
+            setHasValidatedSession(false);
+            setAuthState({ status: "signed-out" });
+            return;
+          }
           setChartState({
             status: "access-unavailable",
             message:

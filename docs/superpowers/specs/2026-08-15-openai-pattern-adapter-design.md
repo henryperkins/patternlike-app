@@ -1,5 +1,10 @@
 # OpenAI Pattern Adapter Design
 
+> Implementation amendment (2026-08-28): the approved provider deny list is
+> versioned at `contracts/policies/pattern-provider-boundary-v1.json` and is
+> consumed by both TypeScript and Python. This centralizes the policy bytes; it
+> does not relax this design's explicit allowlist or post-serialization checks.
+
 **Date:** 2026-08-15
 
 **Status:** Draft for implementation planning; Q1–Q6 and the human-free

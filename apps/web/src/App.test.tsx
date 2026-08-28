@@ -275,6 +275,7 @@ describe("web application shell", () => {
     expect(
       await screen.findByRole("heading", { name: /account is frozen/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveFocus();
     expect(screen.getByRole("button", { name: /Restore access/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /Request export/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /Delete account/i })).toBeEnabled();
@@ -360,7 +361,7 @@ describe("web application shell", () => {
       },
       [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
         status: 200,
-        body: accountProcessingNotGranted,
+        body: { ...accountProcessingNotGranted, has_active_chart: true },
       },
     });
 
@@ -373,6 +374,33 @@ describe("web application shell", () => {
     expect(
       screen.getByRole("button", { name: /Grant permission and continue/i }),
     ).toBeEnabled();
+  });
+
+  it("routes a fresh account to onboarding without granting before final submit", async () => {
+    mockApiResponses({
+      "/v1/chart": {
+        status: 403,
+        body: {
+          error: {
+            code: "account_processing_required",
+            message: "Current account-processing permission is required",
+          },
+        },
+      },
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingNotGranted,
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /Begin with what you know/i }),
+    ).toBeInTheDocument();
+    const consentRequests = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH);
+    expect(consentRequests.length).toBeGreaterThan(0);
+    expect(consentRequests.every((request) => request.method === "GET")).toBe(true);
   });
 
   it("reloads the retained chart after a successful regrant", async () => {

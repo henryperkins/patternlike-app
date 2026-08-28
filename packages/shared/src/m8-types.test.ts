@@ -54,6 +54,7 @@ test("account-processing consent exports the current immutable recovery contract
     status: "not_granted",
     consent_id: null,
     account_status: "frozen",
+    has_active_chart: true,
     regrant_will_restore_access: true,
     policy_version: "account-processing-v1-2026-08-28",
     granted_at: null,

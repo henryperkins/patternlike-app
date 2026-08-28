@@ -253,6 +253,9 @@ Required evidence:
 - the hermetic Pattern-model verification lane proves the live command's model
   lookup, strict `pattern` request, incomplete-output refusal, and prose-free
   failures without making a provider request;
+- `contracts/policies/pattern-provider-boundary-v1.json` is the single
+  machine-readable deny policy consumed by both the TypeScript provider walk
+  and the Python M7 contract validator;
 - `contracts/m0` through `contracts/m6` are unchanged;
 - M7 changes are only recorded additive amendments and fixtures;
 - neither Wrangler block declares `PATTERN_AI_ROLLOUT` or
@@ -277,6 +280,13 @@ migration list reports nothing pending. `0015` performed no backfill: legacy
 committed `0011` receipts retain NULL regression pins and fail closed for machine
 public activation. New machine receipts require the complete regression evidence
 tuple.
+
+**Repository amendment (2026-08-28):** that observed migration list is
+historical, not current authority. The repository now continues through
+`0019_pattern_claim_transition_guards.sql`; `0019` adds monotonic update guards
+for populated Pattern claims and must precede a compatible Worker. It has not
+been applied by this implementation work. Re-query the remote ledger and treat
+any `0016`–`0019` state as unknown until fresh evidence is recorded.
 
 Recorded evidence:
 

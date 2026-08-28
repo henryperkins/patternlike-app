@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   getAccountProcessingConsent,
@@ -26,6 +26,11 @@ export function AccountAccessRecovery({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const grantKey = useRef<string | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.focus();
+  }, []);
 
   const recoverableFreeze =
     current.account_status === "frozen" && current.regrant_will_restore_access;
@@ -47,6 +52,7 @@ export function AccountAccessRecovery({
       if (!isAccountProcessingConsentResponse(next)) {
         throw new Error("The updated calculation permission could not be read.");
       }
+      grantKey.current = null;
       setCurrent(next);
       if (
         next.status !== "granted" ||
@@ -58,7 +64,6 @@ export function AccountAccessRecovery({
         );
         return;
       }
-      grantKey.current = null;
       onRestored();
     } catch (error) {
       if (
@@ -98,7 +103,12 @@ export function AccountAccessRecovery({
   };
 
   return (
-    <main className="privacy-page page-enter" id="main-content">
+    <main
+      className="privacy-page page-enter"
+      id="main-content"
+      ref={mainRef}
+      tabIndex={-1}
+    >
       <header className="page-header privacy-page__header">
         <div>
           <p className="eyebrow">Account access</p>

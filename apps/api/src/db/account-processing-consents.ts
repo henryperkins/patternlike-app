@@ -2,7 +2,6 @@ import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import {
   ACCOUNT_PROCESSING_ALLOWED_USES,
-  ACCOUNT_PROCESSING_POLICY_VERSION,
   CURRENT_ACCOUNT_PROCESSING_POLICY,
   accountProcessingPolicy,
   type AccountProcessingUiSurface,
@@ -11,7 +10,47 @@ import { decryptPayload, encryptPayload, type AccountStatus, type UserIdentity }
 
 const GRANT_JOB_TYPE = "account_processing_consent_grant";
 const REVOKE_JOB_TYPE = "account_processing_consent_revoke";
-const ALLOWED_USES_JSON = JSON.stringify(ACCOUNT_PROCESSING_ALLOWED_USES);
+const ALLOWED_USES_JSON = JSON.stringify(
+  CURRENT_ACCOUNT_PROCESSING_POLICY.allowedUses,
+);
+
+/**
+ * One SQL predicate owns current account-processing authority. Every read and
+ * transaction-time assertion below interpolates these immutable fragments and
+ * binds `(now, current policy, allowed uses)` in that order.
+ */
+const CURRENT_GRANT_PREDICATE_SQL = `
+  consents.kind = 'account_processing'
+  AND consents.status = 'granted'
+  AND consents.granted_at IS NOT NULL
+  AND length(consents.granted_at) = 24
+  AND strftime('%Y-%m-%dT%H:%M:%fZ', consents.granted_at) = consents.granted_at
+  AND (
+    consents.expires_at IS NULL OR (
+      length(consents.expires_at) = 24
+      AND strftime('%Y-%m-%dT%H:%M:%fZ', consents.expires_at) = consents.expires_at
+      AND julianday(consents.expires_at) > julianday(?)
+    )
+  )
+  AND consents.policy_version = ?
+  AND consents.source_id = 'AST-01'
+  AND consents.permission_tier = 0
+  AND consents.allowed_uses_json = ?
+  AND consents.provider IS NULL
+  AND consents.connector_account_id IS NULL
+  AND consents.scopes_json = '[]'`;
+
+const CURRENT_GRANT_IS_HEAD_SQL = `
+  NOT EXISTS (
+    SELECT 1 FROM consents newer
+    WHERE newer.user_id = consents.user_id
+      AND newer.kind = consents.kind
+      AND (
+        newer.version > consents.version OR
+        (newer.version = consents.version AND newer.created_at > consents.created_at) OR
+        (newer.version = consents.version AND newer.created_at = consents.created_at AND newer.id > consents.id)
+      )
+  )`;
 
 interface ConsentRow {
   id: string;
@@ -68,6 +107,7 @@ export interface AccountProcessingConsentDocument {
   status: "granted" | "not_granted";
   consent_id: string | null;
   account_status: "active" | "frozen";
+  has_active_chart: boolean;
   regrant_will_restore_access: boolean;
   policy_version: string;
   granted_at: string | null;
@@ -128,6 +168,25 @@ async function loadAccountStatus(env: Env, userId: string): Promise<AccountStatu
   return row?.status ?? null;
 }
 
+async function loadAccountState(
+  env: Env,
+  userId: string,
+): Promise<{ status: AccountStatus; hasActiveChart: boolean } | null> {
+  const row = await env.DB.prepare(
+    `SELECT users.status,
+            EXISTS (
+              SELECT 1 FROM chart_snapshots
+              WHERE chart_snapshots.user_id = users.id
+                AND chart_snapshots.status = 'active'
+            ) AS has_active_chart
+     FROM users
+     WHERE users.id = ?`,
+  ).bind(userId).first<{ status: AccountStatus; has_active_chart: number }>();
+  return row
+    ? { status: row.status, hasActiveChart: row.has_active_chart === 1 }
+    : null;
+}
+
 function rowHasServerOwnedFields(row: ConsentRow): boolean {
   const policy = accountProcessingPolicy(row.policy_version);
   return !!policy &&
@@ -146,24 +205,29 @@ function isProvenConsentFreeze(row: ConsentRow | null): boolean {
     rowHasServerOwnedFields(row);
 }
 
-function liveGrant(row: ConsentRow | null, now = new Date()): ConsentRow | null {
-  const grantedAt = row?.granted_at === null || row?.granted_at === undefined
-    ? Number.NaN
-    : Date.parse(row.granted_at);
-  const expiresAt = row?.expires_at === null || row?.expires_at === undefined
-    ? null
-    : Date.parse(row.expires_at);
-  if (
-    !row ||
-    row.status !== "granted" ||
-    !Number.isFinite(grantedAt) ||
-    (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= now.getTime())) ||
-    row.policy_version !== ACCOUNT_PROCESSING_POLICY_VERSION ||
-    !rowHasServerOwnedFields(row)
-  ) {
-    return null;
-  }
-  return row;
+async function loadCurrentGrantRow(
+  env: Env,
+  userId: string,
+  now = new Date(),
+): Promise<ConsentRow | null> {
+  return env.DB.prepare(
+    `SELECT consents.id, consents.status, consents.source_id,
+            consents.permission_tier, consents.allowed_uses_json,
+            consents.provider, consents.connector_account_id,
+            consents.scopes_json, consents.policy_version,
+            consents.granted_at, consents.expires_at, consents.ui_surface,
+            consents.revoked_at, consents.version, consents.created_at
+     FROM consents
+     WHERE consents.user_id = ?
+       AND ${CURRENT_GRANT_PREDICATE_SQL}
+       AND ${CURRENT_GRANT_IS_HEAD_SQL}
+     LIMIT 1`,
+  ).bind(
+    userId,
+    now.toISOString(),
+    CURRENT_ACCOUNT_PROCESSING_POLICY.version,
+    ALLOWED_USES_JSON,
+  ).first<ConsentRow>();
 }
 
 /** The live gate and birth reservation share this exact current-grant decision. */
@@ -172,7 +236,7 @@ export async function loadLiveAccountProcessingGrant(
   userId: string,
   now = new Date(),
 ): Promise<{ consentId: string; grantedAt: string } | null> {
-  const row = liveGrant(await loadLatest(env, userId), now);
+  const row = await loadCurrentGrantRow(env, userId, now);
   return row ? { consentId: row.id, grantedAt: row.granted_at! } : null;
 }
 
@@ -187,12 +251,23 @@ export async function loadExactCurrentAccountProcessingGrant(
   consentId: string,
   now = new Date(),
 ): Promise<{ consentId: string; grantedAt: string } | null> {
-  const [accountStatus, latest] = await Promise.all([
-    loadAccountStatus(env, userId),
-    loadLatest(env, userId),
-  ]);
-  const grant = liveGrant(latest, now);
-  if (accountStatus !== "active" || grant?.id !== consentId) return null;
+  const grant = await env.DB.prepare(
+    `SELECT consents.id, consents.granted_at
+     FROM consents
+     JOIN users ON users.id = consents.user_id
+     WHERE users.id = ?
+       AND users.status = 'active'
+       AND consents.id = ?
+       AND ${CURRENT_GRANT_PREDICATE_SQL}
+       AND ${CURRENT_GRANT_IS_HEAD_SQL}`,
+  ).bind(
+    userId,
+    consentId,
+    now.toISOString(),
+    CURRENT_ACCOUNT_PROCESSING_POLICY.version,
+    ALLOWED_USES_JSON,
+  ).first<{ id: string; granted_at: string }>();
+  if (!grant) return null;
   return { consentId: grant.id, grantedAt: grant.granted_at! };
 }
 
@@ -217,39 +292,14 @@ export function assertExactCurrentAccountProcessingGrant(
        WHERE users.id = ?
          AND users.status = 'active'
          AND consents.id = ?
-         AND consents.kind = 'account_processing'
-         AND consents.status = 'granted'
-         AND consents.granted_at IS NOT NULL
-         AND julianday(consents.granted_at) IS NOT NULL
-         AND (
-           consents.expires_at IS NULL OR (
-             julianday(consents.expires_at) IS NOT NULL
-             AND julianday(consents.expires_at) > julianday(?)
-           )
-         )
-         AND consents.policy_version = ?
-         AND consents.source_id = 'AST-01'
-         AND consents.permission_tier = 0
-         AND consents.allowed_uses_json = ?
-         AND consents.provider IS NULL
-         AND consents.connector_account_id IS NULL
-         AND consents.scopes_json = '[]'
-         AND NOT EXISTS (
-           SELECT 1 FROM consents newer
-           WHERE newer.user_id = consents.user_id
-             AND newer.kind = 'account_processing'
-             AND (
-               newer.version > consents.version OR
-               (newer.version = consents.version AND newer.created_at > consents.created_at) OR
-               (newer.version = consents.version AND newer.created_at = consents.created_at AND newer.id > consents.id)
-             )
-         )
+         AND ${CURRENT_GRANT_PREDICATE_SQL}
+         AND ${CURRENT_GRANT_IS_HEAD_SQL}
      )`,
   ).bind(
     userId,
     consentId,
     now.toISOString(),
-    ACCOUNT_PROCESSING_POLICY_VERSION,
+    CURRENT_ACCOUNT_PROCESSING_POLICY.version,
     ALLOWED_USES_JSON,
   );
 }
@@ -259,14 +309,18 @@ export async function loadAccountProcessingConsentDocument(
   userId: string,
   now = new Date(),
 ): Promise<AccountProcessingConsentDocument> {
-  const [latest, accountStatus] = await Promise.all([
+  const [latest, accountState, grant] = await Promise.all([
     loadLatest(env, userId),
-    loadAccountStatus(env, userId),
+    loadAccountState(env, userId),
+    loadCurrentGrantRow(env, userId, now),
   ]);
-  if (accountStatus !== "active" && accountStatus !== "frozen") {
+  const accountStatus = accountState?.status ?? null;
+  if (
+    !accountState ||
+    (accountStatus !== "active" && accountStatus !== "frozen")
+  ) {
     throw new Error("account-processing state is unavailable");
   }
-  const grant = liveGrant(latest, now);
   const regrantWillRestoreAccess =
     accountStatus === "frozen" && isProvenConsentFreeze(latest);
   return {
@@ -281,6 +335,7 @@ export async function loadAccountProcessingConsentDocument(
     status: grant ? "granted" : "not_granted",
     consent_id: grant?.id ?? null,
     account_status: accountStatus,
+    has_active_chart: accountState.hasActiveChart,
     regrant_will_restore_access: regrantWillRestoreAccess,
     policy_version: CURRENT_ACCOUNT_PROCESSING_POLICY.version,
     granted_at: grant?.granted_at ?? null,
@@ -414,6 +469,14 @@ function accountStatusAssertion(
   ).bind(userId, expected);
 }
 
+function sameConsentHead(
+  before: ConsentRow | null,
+  after: ConsentRow | null,
+): boolean {
+  if (!before || !after) return before === after;
+  return before.id === after.id && before.version === after.version;
+}
+
 async function mutate(
   env: Env,
   identity: UserIdentity,
@@ -439,15 +502,15 @@ async function mutate(
     return { ok: true, changed: false };
   }
 
-  const [latest, accountStatus] = await Promise.all([
+  const [latest, accountStatus, currentGrant] = await Promise.all([
     loadLatest(env, identity.userId),
     loadAccountStatus(env, identity.userId),
+    loadCurrentGrantRow(env, identity.userId, input.now),
   ]);
   if (accountStatus !== "active" && accountStatus !== "frozen") {
     return { ok: false, reason: "account_state_conflict" };
   }
   const now = input.now.toISOString();
-  const currentGrant = liveGrant(latest, input.now);
   const changing = input.operation === "grant"
     ? currentGrant === null
     : currentGrant !== null;
@@ -467,7 +530,10 @@ async function mutate(
     consentId: nextConsentId,
     cursorRefresh: { required: changing, mutationAt: now },
   };
-  const statements: D1PreparedStatement[] = [latestAssertion(env, identity.userId, latest)];
+  const statements: D1PreparedStatement[] = [
+    latestAssertion(env, identity.userId, latest),
+    accountStatusAssertion(env, identity.userId, accountStatus),
+  ];
 
   if (changing && nextConsentId) {
     statements.push(
@@ -476,8 +542,11 @@ async function mutate(
            (id, user_id, kind, status, source_id, permission_tier, allowed_uses_json,
             scopes_json, provider, connector_account_id, policy_version, ui_surface,
             granted_at, revoked_at, version, supersedes_consent_id, created_at, updated_at)
-         VALUES (?, ?, 'account_processing', ?, 'AST-01', 0, ?, '[]', NULL, NULL,
-                 ?, ?, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, 'account_processing', ?, 'AST-01', 0, ?, '[]', NULL, NULL,
+                ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE EXISTS (
+           SELECT 1 FROM users WHERE id = ? AND status = ?
+         )`,
       ).bind(
         nextConsentId,
         identity.userId,
@@ -491,11 +560,12 @@ async function mutate(
         latest?.id ?? null,
         now,
         now,
+        identity.userId,
+        accountStatus,
       ),
     );
   }
   if (changing && input.operation === "revoke") {
-    statements.push(accountStatusAssertion(env, identity.userId, "active"));
     statements.push(
       env.DB.prepare("UPDATE users SET status = 'frozen', updated_at = ? WHERE id = ? AND status = 'active'")
         .bind(now, identity.userId),
@@ -509,7 +579,6 @@ async function mutate(
     );
   }
   if (changing && input.operation === "grant" && accountStatus === "frozen") {
-    statements.push(accountStatusAssertion(env, identity.userId, "frozen"));
     statements.push(
       env.DB.prepare("UPDATE users SET status = 'active', updated_at = ? WHERE id = ? AND status = 'frozen'")
         .bind(now, identity.userId),
@@ -541,7 +610,7 @@ async function mutate(
 
   try {
     await env.DB.batch(statements);
-  } catch {
+  } catch (error) {
     const raced = await loadStoredMutation(env, identity, jobType, input.idempotencyKey);
     if (raced) {
       if (
@@ -554,7 +623,17 @@ async function mutate(
       await finishStoredCursorRefresh(env, identity, raced);
       return { ok: true, changed: false };
     }
-    return { ok: false, reason: "consent_conflict" };
+    const [currentLatest, currentAccountStatus] = await Promise.all([
+      loadLatest(env, identity.userId),
+      loadAccountStatus(env, identity.userId),
+    ]);
+    if (currentAccountStatus !== accountStatus) {
+      return { ok: false, reason: "account_state_conflict" };
+    }
+    if (!sameConsentHead(latest, currentLatest)) {
+      return { ok: false, reason: "consent_conflict" };
+    }
+    throw error;
   }
   if (changing) {
     const inserted = await loadStoredMutation(env, identity, jobType, input.idempotencyKey);
@@ -590,7 +669,7 @@ export async function revokeAccountProcessingConsent(
 ): Promise<AccountProcessingMutationOutcome> {
   return mutate(env, identity, {
     operation: "revoke",
-    policyVersion: ACCOUNT_PROCESSING_POLICY_VERSION,
+    policyVersion: CURRENT_ACCOUNT_PROCESSING_POLICY.version,
     uiSurface,
     idempotencyKey,
     now,

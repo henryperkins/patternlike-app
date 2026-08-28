@@ -232,7 +232,51 @@ describe("birth onboarding", () => {
     );
   });
 
-  it("holds the grant and birth keys while the same visible intent is retried", async () => {
+  it("treats a valid not-granted replay as authoritative and uses a fresh key", async () => {
+    const user = userEvent.setup();
+    let grants = 0;
+    const responses: Parameters<typeof mockApiResponses>[0] = {
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingNotGranted,
+      },
+    };
+    Object.defineProperty(responses, `PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
+      enumerable: true,
+      get: () => ({
+        status: 200,
+        body: grants++ === 0
+          ? accountProcessingNotGranted
+          : accountProcessingGranted,
+      }),
+    });
+    mockApiResponses(responses);
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+    const confirmation = screen.getByRole("checkbox", {
+      name: /allow Pattern\/Like to encrypt these details/i,
+    });
+    await user.click(confirmation);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/was not granted/i);
+    expect(confirmation).not.toBeChecked();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await user.click(confirmation);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+
+    const keys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
+      .filter((request) => request.method === "PUT")
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it("rotates a spent grant key but holds the birth key while birth is retried", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn()
       .mockRejectedValueOnce(new Error("The calculation service could not be reached."))
@@ -254,7 +298,7 @@ describe("birth onboarding", () => {
       .filter((request) => request.method === "PUT")
       .map((request) => request.headers.get("idempotency-key"));
     expect(grantKeys).toHaveLength(2);
-    expect(grantKeys[0]).toBe(grantKeys[1]);
+    expect(grantKeys[0]).not.toBe(grantKeys[1]);
     expect(onSubmit.mock.calls[0]![1]).toBe(onSubmit.mock.calls[1]![1]);
   });
 
@@ -288,21 +332,18 @@ describe("birth onboarding", () => {
     const grantKeys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
       .filter((request) => request.method === "PUT")
       .map((request) => request.headers.get("idempotency-key"));
-    expect(grantKeys[0]).toBe(grantKeys[1]);
+    expect(grantKeys[0]).not.toBe(grantKeys[1]);
   });
 
   it("refreshes a stale policy and requires a new confirmation intent", async () => {
     const user = userEvent.setup();
-    let reads = 0;
     let grants = 0;
     const responses: Parameters<typeof mockApiResponses>[0] = {};
     Object.defineProperty(responses, `GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
       enumerable: true,
       get: () => ({
         status: 200,
-        body: reads++ === 0
-          ? { ...accountProcessingNotGranted, policy_version: "retired-policy" }
-          : accountProcessingNotGranted,
+        body: accountProcessingNotGranted,
       }),
     });
     Object.defineProperty(responses, `PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
@@ -325,7 +366,9 @@ describe("birth onboarding", () => {
     render(<Onboarding onSubmit={onSubmit} />);
 
     await reachReviewStep(user);
-    expect(await screen.findByText("retired-policy")).toBeInTheDocument();
+    expect(
+      await screen.findByText("account-processing-v1-2026-08-28"),
+    ).toBeInTheDocument();
     const confirmation = screen.getByRole("checkbox", {
       name: /allow Pattern\/Like to encrypt these details/i,
     });

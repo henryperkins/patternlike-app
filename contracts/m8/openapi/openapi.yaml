@@ -355,6 +355,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AccountProcessingConsent' }
         '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
     put:
       tags: [consents]

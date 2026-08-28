@@ -10,6 +10,7 @@
   "status": "granted",
   "consent_id": "cns_01JAMPLEACCOUNTCONSENT01",
   "account_status": "active",
+  "has_active_chart": false,
   "regrant_will_restore_access": false,
   "policy_version": "account-processing-v1-2026-08-28",
   "granted_at": "2026-08-28T00:00:00.000Z",

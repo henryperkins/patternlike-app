@@ -26,6 +26,7 @@ import {
   isConsumedStatus,
   loadClaimForFingerprint,
 } from "../db/pattern-claims.js";
+import { reservePatternClaim } from "../db/pattern-claim-transitions.js";
 import {
   PATTERN_COMMAND_VERSION,
   PATTERN_JOB_TYPE,
@@ -291,20 +292,27 @@ export async function enqueuePatternGeneration(
   }
   if (!claim) {
     statements.push(
-      env.DB.prepare(
-        `INSERT INTO pattern_generation_claims (
-           id, user_id, chart_fingerprint_hash, last_chart_id, status,
-           active_generation_id, consumed_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, 'reserved', ?, NULL, ?, ?)`,
-      ).bind(claimId, identity.userId, fingerprintHash, chart.id, generationId, nowIso, nowIso),
+      reservePatternClaim(env, {
+        claimId,
+        userId: identity.userId,
+        chartFingerprintHash: fingerprintHash,
+        chartId: chart.id,
+        generationId,
+        now: nowIso,
+        existing: false,
+      }),
     );
   } else {
     statements.push(
-      env.DB.prepare(
-        `UPDATE pattern_generation_claims
-         SET status = 'reserved', active_generation_id = ?, last_chart_id = ?, updated_at = ?
-         WHERE id = ? AND status = 'available' AND consumed_at IS NULL`,
-      ).bind(generationId, chart.id, nowIso, claimId),
+      reservePatternClaim(env, {
+        claimId,
+        userId: identity.userId,
+        chartFingerprintHash: fingerprintHash,
+        chartId: chart.id,
+        generationId,
+        now: nowIso,
+        existing: true,
+      }),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'pattern claim was consumed before reservation'

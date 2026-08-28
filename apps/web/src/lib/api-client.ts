@@ -41,21 +41,8 @@ export interface BirthWorkflowResponse extends WorkflowAccepted {
   };
 }
 
-/**
- * The browser must be able to render a newly current server policy after a
- * stale-policy response. M8 pins the launch policy literally, while this wire
- * reader deliberately widens the two fields a later immutable policy changes.
- */
-export type AccountProcessingConsentDocument = Omit<
-  AccountProcessingConsentContract,
-  "policy_version" | "disclosure"
-> & {
-  policy_version: string;
-  disclosure: {
-    text: string;
-    links: AccountProcessingConsentContract["disclosure"]["links"];
-  };
-};
+export type AccountProcessingConsentDocument =
+  AccountProcessingConsentContract;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -903,7 +890,7 @@ export function getAccountProcessingConsent(
 }
 
 export function grantAccountProcessingConsent(
-  policyVersion: string,
+  policyVersion: AccountProcessingConsentContract["policy_version"],
   idempotencyKey: string,
   consentUiSurface: AccountProcessingConsentUiSurface,
   signal?: AbortSignal,
