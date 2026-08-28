@@ -321,11 +321,11 @@ SE_LICENSE_MODE = "agpl"
 OIDC_ISSUER = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/"
 OIDC_AUDIENCE = "bW9j2G79rWfKg2WDuAZdvi4EsS75ajcZ"
 OIDC_JWKS_URL = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/.well-known/jwks.json"
-# Cloudflare Access application protecting /admin/*. Replace these two
-# placeholders with the exact team origin and Application Audience tag before
-# the 0020/Worker cutover. They are public configuration, not secrets.
-ADMIN_ACCESS_TEAM_DOMAIN = "https://team.invalid"
-ADMIN_ACCESS_POLICY_AUD = "admin-unconfigured"
+# Cloudflare Access application protecting /admin/*. These are public
+# configuration, not secrets. Keep the AUD bound to the dedicated
+# `pattern_generation_auditor` application rather than any consumer identity.
+ADMIN_ACCESS_TEAM_DOMAIN = "https://hperkins.cloudflareaccess.com"
+ADMIN_ACCESS_POLICY_AUD = "0364be3622cd33e4507abb5bde3789a7b4ec9d0cdaa6225d403cefcd8d09267d"
 # Explicitly OFF rather than absent. Every read is `AUTH_STUB === "1"`
 # (middleware/auth.ts, middleware/config-guard.ts, routes/health.ts), so "0" is
 # functionally identical to omitting it — but omitting it made wrangler warn
