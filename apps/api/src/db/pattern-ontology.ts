@@ -267,7 +267,7 @@ function asSignedRelease(value: unknown): SignedOntologyRelease | null {
   return value as SignedOntologyRelease;
 }
 
-async function readVerifiedRelease(
+export async function readVerifiedOntologyRelease(
   env: Env,
   objectKey: string,
   expectedHash: string,
@@ -322,7 +322,7 @@ export async function loadActiveOntology(env: Env): Promise<ActiveOntology | nul
   if (!pointer?.version || !pointer.object_key || !pointer.bundle_hash || pointer.status !== "active") {
     return null;
   }
-  const release = await readVerifiedRelease(env, pointer.object_key, pointer.bundle_hash);
+  const release = await readVerifiedOntologyRelease(env, pointer.object_key, pointer.bundle_hash);
   if (!release) return null;
   return {
     version: pointer.version,
@@ -359,7 +359,7 @@ export async function loadOntologyByVersion(
       activation_scope: "internal" | "public";
     }>();
   if (!row || row.status === "recalled" || !env.ARTIFACTS) return null;
-  const release = await readVerifiedRelease(env, row.object_key, row.bundle_hash);
+  const release = await readVerifiedOntologyRelease(env, row.object_key, row.bundle_hash);
   if (!release) return null;
   return {
     version: row.version,

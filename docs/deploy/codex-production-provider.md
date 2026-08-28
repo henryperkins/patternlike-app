@@ -122,7 +122,7 @@ not represented as applied in this provider-only procedure.
 Generate two independent values in an approved secret-management workflow:
 
 - `CODEX_RUNNER_TOKEN`: 32–512 URL-safe characters, unique to this runner
-  authority and not reused as `SERVICE_AUTH_TOKEN` or `PATTERN_ADMIN_TOKEN`;
+  authority and not reused as `SERVICE_AUTH_TOKEN`;
 - `CODEX_PROVIDER_ARTIFACT_KEYRING`: a version-1 JSON keyring containing one
   random 32-byte AES key encoded as base64url.
 

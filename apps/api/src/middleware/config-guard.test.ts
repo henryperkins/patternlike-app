@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { checkSecureConfig } from "./config-guard.js";
+import {
+  checkAdminAccessConfig,
+  checkSecureConfig,
+} from "./config-guard.js";
 
 /**
  * The complete Codex Pattern posture every deployment carries.
@@ -50,6 +53,39 @@ const configuredProduction = {
   TIME_TRAVEL_RECEIPT_EPOCH: "1",
   TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
 };
+
+describe("Cloudflare Access administrator configuration", () => {
+  it("accepts an HTTPS team domain and a distinct application audience", () => {
+    expect(checkAdminAccessConfig({
+      ADMIN_ACCESS_TEAM_DOMAIN: "https://patternlike.cloudflareaccess.com",
+      ADMIN_ACCESS_POLICY_AUD: "admin-audience-tag",
+      OIDC_AUDIENCE: "consumer-audience",
+    })).toBeNull();
+  });
+
+  it.each([
+    {},
+    {
+      ADMIN_ACCESS_TEAM_DOMAIN: "https://team.invalid",
+      ADMIN_ACCESS_POLICY_AUD: "admin-audience-tag",
+    },
+    {
+      ADMIN_ACCESS_TEAM_DOMAIN: "http://patternlike.cloudflareaccess.com",
+      ADMIN_ACCESS_POLICY_AUD: "admin-audience-tag",
+    },
+    {
+      ADMIN_ACCESS_TEAM_DOMAIN: "https://patternlike.cloudflareaccess.com/path",
+      ADMIN_ACCESS_POLICY_AUD: "admin-audience-tag",
+    },
+    {
+      ADMIN_ACCESS_TEAM_DOMAIN: "https://patternlike.cloudflareaccess.com",
+      ADMIN_ACCESS_POLICY_AUD: "consumer-audience",
+      OIDC_AUDIENCE: "consumer-audience",
+    },
+  ])("rejects an unusable administrator authority: %j", (values) => {
+    expect(checkAdminAccessConfig(values)?.code).toBe("admin_auth_not_configured");
+  });
+});
 
 describe("birth operational configuration guard", () => {
   it("allows development to omit both values", () => {

@@ -407,6 +407,43 @@ export interface ConfigFailure {
  */
 export const PLACEHOLDER_OIDC_HOST = "issuer.invalid";
 
+export function checkAdminAccessConfig(
+  env: Partial<Env>,
+): ConfigFailure | null {
+  const teamDomain = env.ADMIN_ACCESS_TEAM_DOMAIN?.trim() ?? "";
+  const audience = env.ADMIN_ACCESS_POLICY_AUD?.trim() ?? "";
+  let parsed: URL;
+  try {
+    parsed = new URL(teamDomain);
+  } catch {
+    return {
+      code: "admin_auth_not_configured",
+      message: "Cloudflare Access administrator authentication is unavailable",
+    };
+  }
+  const validDomain =
+    parsed.protocol === "https:" &&
+    parsed.username === "" &&
+    parsed.password === "" &&
+    parsed.port === "" &&
+    parsed.pathname === "/" &&
+    parsed.search === "" &&
+    parsed.hash === "" &&
+    parsed.origin === teamDomain &&
+    parsed.hostname !== "cloudflareaccess.com" &&
+    parsed.hostname.endsWith(".cloudflareaccess.com");
+  const validAudience =
+    /^[A-Za-z0-9_-]{8,512}$/.test(audience) &&
+    audience !== env.OIDC_AUDIENCE?.trim();
+  if (!validDomain || !validAudience) {
+    return {
+      code: "admin_auth_not_configured",
+      message: "Cloudflare Access administrator authentication is unavailable",
+    };
+  }
+  return null;
+}
+
 function checkBirthOperationalConfig(env: Partial<Env>): ConfigFailure | null {
   const result = resolveBirthOperationalConfig(env);
   if (result.ok) return null;
@@ -423,7 +460,6 @@ export function checkSecureConfig(
   const runnerToken = env.CODEX_RUNNER_TOKEN?.trim() ?? "";
   const aliasedRunnerAuthority = runnerToken !== "" && [
     env.SERVICE_AUTH_TOKEN,
-    env.PATTERN_ADMIN_TOKEN,
   ].some((value) => value?.trim() === runnerToken);
   if (aliasedRunnerAuthority) {
     return {
@@ -529,7 +565,10 @@ export async function configGuard(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
   next: Next,
 ) {
-  const failure = checkSecureConfig(c.env);
+  const failure = checkSecureConfig(c.env) ??
+    (c.req.path.startsWith("/admin/") || c.req.path === "/admin"
+      ? checkAdminAccessConfig(c.env)
+      : null);
   if (failure) {
     const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
     c.set("requestId", requestId);
@@ -539,7 +578,9 @@ export async function configGuard(
     return c.json(
       {
         error: {
-          code: "configuration_error",
+          code: failure.code === "admin_auth_not_configured"
+            ? "admin_auth_not_configured"
+            : "configuration_error",
           message: failure.message,
           request_id: requestId,
         },

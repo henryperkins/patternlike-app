@@ -14,6 +14,10 @@ export type AppVariables = {
   /** Present only when a real session authenticated the request. */
   sessionId?: string;
   accountStatus: AccountStatus;
+  /** Verified Cloudflare Access subject on the isolated administrator path. */
+  adminSubject: string;
+  adminRole: "pattern_generation_auditor";
+  adminPurpose: "quality_review" | "safety_investigation" | "incident_response" | "retention_audit";
 };
 
 /** Same-origin browsers present the session here; native clients use Bearer. */

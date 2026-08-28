@@ -13,6 +13,7 @@ const expectedTail = [
   "0017_codex_reading_provider.sql",
   "0018_account_processing_consent.sql",
   "0019_pattern_claim_transition_guards.sql",
+  "0020_pattern_admin_sessions.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -34,6 +35,7 @@ const birthCalcUsageMigrationIndex = migrationNames.indexOf(expectedTail[7]);
 const codexReadingProviderMigrationIndex = migrationNames.indexOf(expectedTail[8]);
 const accountProcessingConsentMigrationIndex = migrationNames.indexOf(expectedTail[9]);
 const patternClaimTransitionMigrationIndex = migrationNames.indexOf(expectedTail[10]);
+const adminSessionMigrationIndex = migrationNames.indexOf(expectedTail[11]);
 
 interface SchemaColumn {
   name: string;
@@ -1074,7 +1076,10 @@ await upgradeDb.prepare(
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(patternClaimTransitionMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    patternClaimTransitionMigrationIndex,
+    adminSessionMigrationIndex,
+  ),
 );
 
 const populatedClaimAfter = await upgradeDb.prepare(
@@ -1142,3 +1147,32 @@ if (!terminalClaimReopenRejected) {
   throw new Error("0019 reopened a terminal Pattern claim");
 }
 await assertDatabaseHealthy(upgradeDb, "0019 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0020: Cloudflare Access administrator sessions.
+// ---------------------------------------------------------------------------
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(adminSessionMigrationIndex),
+);
+const adminSessionColumns = await upgradeDb.prepare(
+  "PRAGMA table_info(pattern_admin_sessions)",
+).all<{ name: string }>();
+if (
+  JSON.stringify(adminSessionColumns.results.map(({ name }) => name)) !==
+  JSON.stringify([
+    "id",
+    "token_hash",
+    "admin_subject",
+    "role",
+    "audience",
+    "access_expires_at",
+    "expires_at",
+    "created_at",
+    "revoked_at",
+  ])
+) {
+  throw new Error("0020 created the wrong Pattern administrator session columns");
+}
+await assertDatabaseHealthy(upgradeDb, "0020 populated apply");

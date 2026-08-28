@@ -104,7 +104,7 @@ export interface Env {
   /**
    * Dedicated bearer secret for the outbound-only Codex runner. Required
    * whenever Daily, Pattern, or the ontology pipeline runs on Codex, and
-   * deliberately distinct from SERVICE_AUTH_TOKEN and PATTERN_ADMIN_TOKEN.
+   * deliberately distinct from SERVICE_AUTH_TOKEN.
    */
   CODEX_RUNNER_TOKEN?: string;
   /** Staged machine-ontology pipeline rollout: `off` | `internal`. */
@@ -264,6 +264,8 @@ export interface Env {
   PATTERN_REPLAY_LEDGER_SIGNING_KEY?: string;
   /** Public Ed25519 verification allowlist retained across key rotations. */
   PATTERN_REPLAY_LEDGER_KEYS?: string;
-  /** Separate from SERVICE_AUTH_TOKEN and from consumer sessions. */
-  PATTERN_ADMIN_TOKEN?: string;
+  /** Cloudflare Access team origin, e.g. https://team.cloudflareaccess.com. */
+  ADMIN_ACCESS_TEAM_DOMAIN?: string;
+  /** Application Audience (AUD) tag for the Access-protected /admin path. */
+  ADMIN_ACCESS_POLICY_AUD?: string;
 }

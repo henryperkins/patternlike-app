@@ -253,6 +253,11 @@ that cookie — Cloudflare Access versus a separate administrator OIDC
 tenant — remains an **operator decision**. This amendment does not pick
 one. Slice C sizes both and stops at the decision gate.
 
+**2026-08-28 operator decision:** Cloudflare Access was selected. Slice C now
+validates the Access application assertion and dedicated AUD, then mints the
+short-lived server-side `pl_admin_session`; the separate-admin-OIDC path is not
+implemented.
+
 `GET /admin/pattern-ontology-releases/{version}` returns release metadata
 (version, hashes, provenance origin, evaluation booleans, record count).
 It does not return record bodies.
@@ -288,7 +293,8 @@ Recall, reconcile, and the artifact inventory catch the Worker up. Decrypt
 and the admin ontology-release route are specified ahead of Slice C.
 
 Admin paths document `adminSession` as the specified scheme and keep
-`adminToken` defined as deprecated transitional until Slice C deletes it.
+`adminToken` defined as deprecated transitional. Slice C deletes it from the
+current M8 projection; the byte-frozen M7 artifact remains historical evidence.
 
 ### 13. Human-free Pattern generation
 
@@ -307,8 +313,8 @@ runtime gate.
 
 ## Operator questions this amendment does not answer
 
-- Cloudflare Access versus a separate administrator OIDC tenant for
-  `pattern_generation_auditor`. Ask before implementing Slice C.
+- Cloudflare Access was selected for `pattern_generation_auditor` on
+  2026-08-28; the prior Slice C decision gate is closed.
 - Whether a later additive amendment should add `legal_privacy_request`.
   Not needed to implement Slice C against the shipped list.
 

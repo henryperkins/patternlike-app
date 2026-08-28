@@ -73,5 +73,6 @@ export const HERMETIC_TEST_BINDINGS = {
   CODEX_PROVIDER_ARTIFACT_KEYRING:
     '{"version":1,"keys":{"codex-test-key":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"}}',
   CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz",
-  PATTERN_ADMIN_TOKEN: "",
+  ADMIN_ACCESS_TEAM_DOMAIN: "",
+  ADMIN_ACCESS_POLICY_AUD: "",
 } as const;

@@ -2,8 +2,7 @@
 
 **Date:** 2026-08-16
 
-**Status:** Draft for approval. No plan may be derived until this is
-approved **and** the operator has picked the identity provider.
+**Status:** Approved. Cloudflare Access selected by the operator on 2026-08-28.
 
 **Scope:** Replace the shared `PATTERN_ADMIN_TOKEN` with a
 role-separated administrator session, and implement the three admin
@@ -33,7 +32,7 @@ decision 10, and the in-place §24 amendments in the 2026-08-14 design.
 - `/admin/*` on the same Worker is an acceptable path. §24.2 permits
   “a separate protected hostname **or path**.”
 
-## Blocking operator question
+## Operator identity decision
 
 §24.1 sanctions two ways to assign `pattern_generation_auditor`:
 
@@ -50,9 +49,10 @@ account-wide, this slice is the OIDC route and is materially larger
 (callback, session table, CSRF on any future mutation, a second set of
 `OIDC_*` bindings that must not silently reuse the consumer issuer).
 
-**Do not implement either path until the operator answers.** The rest of
-this design is valid for both; only the minting of `pl_admin_session`
-changes.
+**Decision answered 2026-08-28:** use Cloudflare Access. The Worker validates
+`Cf-Access-Jwt-Assertion` against the team certs endpoint and the dedicated
+application AUD on every request, then binds the verified subject to a
+short-lived opaque `pl_admin_session` stored by digest in D1.
 
 ## Goal
 
@@ -136,7 +136,8 @@ In the same change that accepts the first valid admin session:
 3. revoke the deployed `PATTERN_ADMIN_TOKEN` secret;
 4. add a test that a request carrying the old bearer, and no cookie,
    is `401`;
-5. remove `adminToken` from the M7 OpenAPI security schemes.
+5. remove `adminToken` from the current M8 OpenAPI security schemes. M7 is a
+   byte-frozen historical contract and retains its deprecated declaration.
 
 A deployment that lands identity and leaves the token is a failed
 Slice C, even if the happy path uses the cookie.
@@ -147,4 +148,3 @@ Slice C, even if the happy path uses the cookie.
 - Bulk export, “download all,” or clipboard instrumentation.
 - Adding `legal_privacy_request` to `purpose_class`.
 - Changing `PATTERN_AI_ROLLOUT`.
-- Implementing the identity provider before the operator answers.

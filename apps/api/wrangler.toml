@@ -158,6 +158,10 @@ SE_LICENSE_MODE = "agpl"
 OIDC_ISSUER = "https://issuer.invalid"
 OIDC_AUDIENCE = "patternlike-dev"
 OIDC_JWKS_URL = "https://issuer.invalid/.well-known/jwks.json"
+# Cloudflare Access administrator authority. Replace both together for local
+# admin-route work; the reserved domain keeps /admin fail-closed by default.
+ADMIN_ACCESS_TEAM_DOMAIN = "https://team.invalid"
+ADMIN_ACCESS_POLICY_AUD = "admin-unconfigured"
 # Constrained-model reading generation. Explicitly OFF rather than absent, for
 # the same reason AUTH_STUB is written out as "0" below: an omitted var trains
 # the reader to ignore wrangler's "vars exist at the top level" warning, which
@@ -317,6 +321,11 @@ SE_LICENSE_MODE = "agpl"
 OIDC_ISSUER = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/"
 OIDC_AUDIENCE = "bW9j2G79rWfKg2WDuAZdvi4EsS75ajcZ"
 OIDC_JWKS_URL = "https://dev-lqmwkyo17nm5mdjz.us.auth0.com/.well-known/jwks.json"
+# Cloudflare Access application protecting /admin/*. Replace these two
+# placeholders with the exact team origin and Application Audience tag before
+# the 0020/Worker cutover. They are public configuration, not secrets.
+ADMIN_ACCESS_TEAM_DOMAIN = "https://team.invalid"
+ADMIN_ACCESS_POLICY_AUD = "admin-unconfigured"
 # Explicitly OFF rather than absent. Every read is `AUTH_STUB === "1"`
 # (middleware/auth.ts, middleware/config-guard.ts, routes/health.ts), so "0" is
 # functionally identical to omitting it — but omitting it made wrangler warn

@@ -34,6 +34,7 @@ import { scheduled } from "./scheduled.js";
 import { safeLog } from "./services/safe-log.js";
 import { codexRunnerAuth } from "./middleware/codex-runner-auth.js";
 import { codexProviderRoutes } from "./routes/codex-provider.js";
+import { adminAuth } from "./middleware/admin-auth.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -93,6 +94,7 @@ internal.route("/", internalPatternReplayRoutes);
 
 const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 admin.use("*", configGuard);
+admin.use("*", adminAuth);
 admin.route("/", adminPatternRoutes);
 app.route("/admin", admin);
 

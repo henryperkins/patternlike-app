@@ -21,7 +21,6 @@ describe("Codex runner authentication", () => {
     await resetDb();
     env.CODEX_RUNNER_TOKEN = RUNNER_TOKEN;
     env.SERVICE_AUTH_TOKEN = "";
-    env.PATTERN_ADMIN_TOKEN = "";
     env.CODEX_PROVIDER_ARTIFACT_KEYRING = JSON.stringify({
       version: 1,
       keys: {
@@ -52,7 +51,7 @@ describe("Codex runner authentication", () => {
     });
   });
 
-  it.each(["SERVICE_AUTH_TOKEN", "PATTERN_ADMIN_TOKEN"] as const)(
+  it.each(["SERVICE_AUTH_TOKEN"] as const)(
     "fails closed when the runner token aliases %s",
     async (authority) => {
       env[authority] = RUNNER_TOKEN;

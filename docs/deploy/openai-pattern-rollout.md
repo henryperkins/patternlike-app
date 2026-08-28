@@ -954,9 +954,12 @@ signed create-only R2-first writer, atomic D1 receipts, lifecycle integrations,
 service-authenticated replayer/sweeper, replay bucket binding, and the dedicated
 `pattern-replay-2026-08` signing identity/keyring are present. The restore drill
 in `docs/deploy/pattern-erasure-replay-drill.md` cannot be exercised until Gate
-8 supplies an accepted Pattern to erase and restore. The admin route still
-accepts the shared static `PATTERN_ADMIN_TOKEN`; the existing dedicated
-`pattern_generation_auditor` identity criterion also remains open.
+8 supplies an accepted Pattern to erase and restore. The repository now
+implements the Cloudflare Access `pattern_generation_auditor` boundary and
+rejects the former shared bearer. Production cutover remains open: configure
+the Access application, apply `0020_pattern_admin_sessions.sql`, deploy the
+compatible Worker, and revoke the deployed `PATTERN_ADMIN_TOKEN` secret in that
+order.
 
 Before `first_open`, record all of the following against the same candidate:
 

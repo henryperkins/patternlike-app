@@ -130,6 +130,7 @@ const TABLES = [
   "pattern_documents",
   "pattern_generation_jobs",
   "pattern_generation_claims",
+  "pattern_admin_sessions",
   "pattern_admin_access_events",
   "pattern_erasure_replay_events",
   // 0012 control plane, children first. Its production no-delete triggers are

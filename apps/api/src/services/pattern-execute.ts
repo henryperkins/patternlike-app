@@ -733,6 +733,59 @@ export async function getArtifactAt<T>(
   return { value, plaintextHash };
 }
 
+/**
+ * Decrypt one administrator-selected artifact identity.
+ *
+ * The caller has already authorized and audited the exact read. This helper
+ * still binds the ciphertext to generation, artifact id, class, and owner,
+ * then recomputes the plaintext hash so an inventory/object mismatch fails
+ * closed instead of returning unauthenticated content.
+ */
+export async function getArtifactById<T>(
+  env: Env,
+  identity: UserIdentity,
+  generationId: string,
+  artifactId: string,
+  artifactClass: string,
+): Promise<T | null> {
+  if (!env.ARTIFACTS) return null;
+  const row = await env.DB.prepare(
+    `SELECT object_key, ciphertext_sha256, plaintext_sha256, byte_length
+     FROM pattern_generation_artifacts
+     WHERE id = ? AND generation_id = ? AND user_id = ? AND artifact_class = ?
+       AND deleted_at IS NULL`,
+  )
+    .bind(artifactId, generationId, identity.userId, artifactClass)
+    .first<{
+      object_key: string;
+      ciphertext_sha256: string;
+      plaintext_sha256: string;
+      byte_length: number;
+    }>();
+  if (!row) return null;
+  const object = await env.ARTIFACTS.get(row.object_key);
+  if (!object) return null;
+  const stored = new Uint8Array(await object.arrayBuffer());
+  if (stored.byteLength <= 12) return null;
+  if (
+    stored.byteLength !== row.byte_length ||
+    (await contentHash(b64(stored))) !== row.ciphertext_sha256
+  ) {
+    throw new Error("pattern artifact identity conflict");
+  }
+  const key = await unwrapArtifactKey(env, identity, generationId);
+  const value = await decryptUnderContentKey<T>(
+    stored.slice(12),
+    key,
+    stored.slice(0, 12),
+    artifactAad(generationId, artifactId, artifactClass),
+  );
+  if ((await contentHash(JSON.stringify(value))) !== row.plaintext_sha256) {
+    throw new Error("pattern artifact identity conflict");
+  }
+  return value;
+}
+
 async function eligibility(
   env: Env,
   identity: UserIdentity,

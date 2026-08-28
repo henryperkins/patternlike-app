@@ -32,6 +32,7 @@ export type ConfigurationCode =
   | "auth_stub_in_production"
   | "root_kek_not_configured"
   | "identity_not_configured"
+  | "admin_auth_not_configured"
   | "check_in_retention_misconfigured"
   | "birth_operational_config_invalid"
   | "time_travel_misconfigured"

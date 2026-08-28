@@ -539,20 +539,14 @@ components:
     serviceToken:
       type: http
       scheme: bearer
-    adminToken:
-      type: http
-      scheme: bearer
-      description: >
-        Deprecated transitional shared secret. Slice C deletes this scheme
-        together with PATTERN_ADMIN_TOKEN. New admin paths use adminSession.
     adminSession:
       type: apiKey
       in: cookie
       name: pl_admin_session
       description: >
-        Specified administrator session. HttpOnly, Secure, SameSite=Strict,
-        Path=/admin. Minted by Cloudflare Access or a separate administrator
-        OIDC tenant; the operator has not chosen which.
+        Short-lived server-side administrator session. HttpOnly, Secure,
+        SameSite=Strict, Path=/admin. Minted only after the Worker validates the
+        Cloudflare Access application assertion and its dedicated AUD.
   parameters:
     IdempotencyKey:
       name: Idempotency-Key

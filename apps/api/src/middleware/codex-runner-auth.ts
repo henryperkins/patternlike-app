@@ -49,7 +49,6 @@ export async function codexRunnerAuth(
   const expected = c.env.CODEX_RUNNER_TOKEN?.trim() ?? "";
   const aliasesAnotherAuthority = expected !== "" && [
     c.env.SERVICE_AUTH_TOKEN,
-    c.env.PATTERN_ADMIN_TOKEN,
   ].some((value) => value?.trim() === expected);
   if (
     expected.length < 32 ||
