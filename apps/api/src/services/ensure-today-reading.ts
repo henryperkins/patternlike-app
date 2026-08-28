@@ -19,6 +19,7 @@ import { localDateIn } from "./local-day.js";
 import type { CommandBuildFailure } from "./generation-command.js";
 import type { CommandBuildFailureV2 } from "./generation-command-v2.js";
 import {
+  MAX_COMMAND_GENERATION,
   isAutomaticReplacementFailure,
   isGenerationFailureCode,
   type GenerationReplacementReason,
@@ -251,6 +252,34 @@ export async function ensureTodayReading(
         reason: "rollout_disabled",
         detail: `constrained-model generation is not enabled for ${rolloutEntry}`,
       };
+    }
+    if (
+      state.assemblyMode === "constrained_model" &&
+      state.commandGeneration === MAX_COMMAND_GENERATION &&
+      (failedJob.resultClass === "publisher_unavailable" ||
+        failedJob.resultClass === "publisher_superseded")
+    ) {
+      const replaced = await replaceFailedCommand(
+        env,
+        identity.userId,
+        state.readingId,
+        "publisher_superseded",
+        "first_open",
+        now,
+      );
+      if (replaced.ok) {
+        return reconcileReservation(env, identity, localDate, generationMode === "v5");
+      }
+      if (
+        replaced.reason === "not_replaceable" ||
+        replaced.reason === "budget_exhausted" ||
+        replaced.reason === "stale_job" ||
+        replaced.reason === "day_too_old" ||
+        replaced.reason === "conflict"
+      ) {
+        return { ok: false, reason: "reading_generation_failed", detail: replaced.detail };
+      }
+      return { ok: false, reason: replaced.reason, detail: replaced.detail };
     }
     if (
       state.assemblyMode === "constrained_model" &&

@@ -28,6 +28,7 @@ import {
   CYCLE_FP_REFUSED,
   CYCLE_FP_UNAVAILABLE,
 } from "../../test/mock-calc-service.js";
+import { claimJob } from "../db/generation.js";
 import { encryptPayload } from "../db/users.js";
 import { fromB64 } from "../crypto.js";
 import { localDateIn } from "../services/local-day.js";
@@ -624,6 +625,143 @@ describe("V5 Today rollout and status projection", () => {
       });
       expect(JSON.stringify(response.body)).not.toContain(enqueued.jobId);
     }
+  });
+
+  it("recovers one exhausted OpenAI command under Codex without allowing generation five", async () => {
+    await seedV5Ready();
+    const { requestEnv, messages } = capturedEnv("first_open");
+    const enqueued = await enqueueConstrainedReading(requestEnv, USER_A, {
+      entry: "first_open",
+      reservationReason: "first_open",
+      targetLocalDate: today(),
+    });
+    if (!enqueued.ok) throw new Error(`V5 enqueue failed: ${enqueued.reason}`);
+
+    const legacyClaim = await claimJob(requestEnv, enqueued.jobId);
+    if (!legacyClaim || legacyClaim.command.command_version !== "v2") {
+      throw new Error("expected a claimed V2 command");
+    }
+    legacyClaim.command.command_generation = 3;
+    legacyClaim.command.publisher.provider =
+      "openai" as typeof legacyClaim.command.publisher.provider;
+    const sealedLegacyCommand = await encryptPayload(
+      requestEnv,
+      IDENTITY_A,
+      legacyClaim.command,
+      {
+        subject: IDENTITY_A.cryptoSubject,
+        field: "jobs.payload_enc",
+        recordId: enqueued.jobId,
+      },
+    );
+    const failedAt = new Date().toISOString();
+    await rows(
+      `UPDATE jobs
+       SET status = 'failed', result_class = 'publisher_unavailable', attempts = 4,
+           claim_token = NULL, lease_expires_at = NULL, finished_at = ?,
+           payload_enc = ?, payload_key_version = ?, payload_nonce = ?
+       WHERE id = ?`,
+      failedAt,
+      fromB64(sealedLegacyCommand.ciphertext),
+      sealedLegacyCommand.keyVersion,
+      sealedLegacyCommand.nonce,
+      enqueued.jobId,
+    );
+    await rows(
+      `UPDATE daily_readings
+       SET status = 'failed', command_generation = 3, updated_at = ?
+       WHERE id = ?`,
+      failedAt,
+      enqueued.readingId,
+    );
+    const [legacyPayloadBefore] = await rows<{ payload_hex: string }>(
+      "SELECT hex(payload_enc) AS payload_hex FROM jobs WHERE id = ?",
+      enqueued.jobId,
+    );
+    messages.length = 0;
+
+    expect(await putTodayWithEnv<PreparationBody>(requestEnv)).toMatchObject({
+      status: 202,
+      body: { schema_version: "0.5.0", status: "preparing" },
+    });
+    const [recovered] = await rows<{
+      status: string;
+      command_generation: number;
+      active_generation_job_id: string;
+    }>(
+      `SELECT status, command_generation, active_generation_job_id
+       FROM daily_readings WHERE id = ?`,
+      enqueued.readingId,
+    );
+    expect(recovered).toMatchObject({ status: "pending", command_generation: 4 });
+    expect(recovered!.active_generation_job_id).not.toBe(enqueued.jobId);
+    expect(messages).toEqual([
+      {
+        job_id: recovered!.active_generation_job_id,
+        reading_id: enqueued.readingId,
+      },
+    ]);
+    expect(
+      await rows(
+        `SELECT status, result_class, hex(payload_enc) AS payload_hex
+         FROM jobs WHERE id = ?`,
+        enqueued.jobId,
+      ),
+    ).toEqual([
+      {
+        status: "failed",
+        result_class: "publisher_unavailable",
+        payload_hex: legacyPayloadBefore!.payload_hex,
+      },
+    ]);
+    expect(
+      await rows("SELECT id FROM codex_provider_jobs WHERE pipeline = 'reading'"),
+    ).toEqual([]);
+
+    const replacement = await claimJob(requestEnv, recovered!.active_generation_job_id);
+    if (!replacement || replacement.command.command_version !== "v2") {
+      throw new Error("expected a claimed V2 replacement command");
+    }
+    expect(replacement.command).toMatchObject({
+      command_generation: 4,
+      replaces_job_id: enqueued.jobId,
+      command_replacement_reason: "publisher_superseded",
+      publisher: { provider: "codex" },
+    });
+
+    await rows(
+      `UPDATE jobs
+       SET status = 'failed', result_class = 'publisher_unavailable', attempts = 4,
+           claim_token = NULL, lease_expires_at = NULL, finished_at = ?
+       WHERE id = ?`,
+      new Date().toISOString(),
+      recovered!.active_generation_job_id,
+    );
+    await rows(
+      "UPDATE daily_readings SET status = 'failed' WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(await putTodayWithEnv<ErrorEnvelope>(requestEnv)).toMatchObject({
+      status: 424,
+      body: {
+        error: {
+          code: "reading_generation_failed",
+          retryable: false,
+        },
+      },
+    });
+    expect(
+      await rows(
+        "SELECT id FROM jobs WHERE user_id = ? AND job_type = 'generate_daily_reading'",
+        USER_A,
+      ),
+    ).toHaveLength(2);
+    expect(
+      await rows(
+        "SELECT status, command_generation FROM daily_readings WHERE id = ?",
+        enqueued.readingId,
+      ),
+    ).toEqual([{ status: "failed", command_generation: 4 }]);
   });
 
   it("owner-scoped PUT redrives only an undispatched or expired pending job", async () => {

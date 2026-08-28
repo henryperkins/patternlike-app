@@ -22,16 +22,16 @@
   },
   "files": {
     "pattern_like_astrology_app_product_platform_spec_v0.5.md": {
-      "sha256": "f3aaa5081a07e7f47bf02c1b31adbaa916474ecbe673c179416d7fe1824fb368",
-      "bytes": 18638
+      "sha256": "cb5e5c2584e696152a4bbecaa192cba64dfc37a1ba27a81a32b8692c75d45d27",
+      "bytes": 18995
     },
     "pattern_like_astrology_app_product_platform_spec_v0.5.docx": {
-      "sha256": "982323e6ab60b5855f584e64391e4980dc244511f3ffe7b512993df940c943f6",
-      "bytes": 42170
+      "sha256": "df8ad59b930b7b884a88797e20058082c8c4237f83465305b95d25e09e21a83b",
+      "bytes": 42293
     },
     "pattern_like_astrology_app_product_platform_spec_v0.5.pdf": {
-      "sha256": "edb1255f4ac95e4ade57c04bfcb7899d664a7a90ab425dda63bcfcbd786104e0",
-      "bytes": 19868
+      "sha256": "9f9372a88f8120f2f2f1fe92cf0c55cb0ba126d6dc2372a72cfc27939ce6985d",
+      "bytes": 20774
     }
   },
   "carried_forward_unchanged": {

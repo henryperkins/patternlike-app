@@ -5,6 +5,7 @@ import type { UserIdentity } from "../db/users.js";
 import { persistCycles } from "../db/cycles.js";
 import {
   markDispatched,
+  loadPublisherMigrationSourceCommand,
   replaceCommand,
   reserveInitial,
   reserveInvalidatedSuccessor,
@@ -36,6 +37,7 @@ import {
   type GenerationReplacementReason,
   type V5ReplacementReason,
 } from "./generation-failures.js";
+import { READING_PUBLISHER_PROVIDER } from "./reading-publisher.js";
 import { safeLog } from "./safe-log.js";
 
 export type { GenerationMessage } from "../env.js";
@@ -233,8 +235,13 @@ export type ReplaceEnqueueOutcome =
  * attempts with the launch policy, because each
  * replacement re-freezes a NEW command and a wider budget turns a persistent
  * outage into per-user amplification against the thing that is already failing.
- * And the day must still be current: silently regenerating a failure from three
- * weeks ago would publish a reading dated to a day the reader has moved past.
+ * A first-open request may grant one migration-only generation after that
+ * budget, but only after decrypting the active failed command and proving that
+ * its frozen publisher is the retired OpenAI transport while this deployment
+ * is configured for Codex. This is not a wider retry budget: the Codex successor
+ * is generation four and can never be replaced again. And the day must still be
+ * current: silently regenerating a failure from three weeks ago would publish a
+ * reading dated to a day the reader has moved past.
  */
 export async function replaceFailedCommand(
   env: Env,
@@ -284,7 +291,8 @@ export async function replaceFailedCommand(
     (actor === "scheduler" &&
       (!isGenerationFailureCode(reason) || !isAutomaticReplacementFailure(commandVersion, reason))) ||
     (actor === "first_open" &&
-      (commandVersion !== "v2" || reason !== "consent_regranted"))
+      (commandVersion !== "v2" ||
+        (reason !== "consent_regranted" && reason !== "publisher_superseded")))
   ) {
     return {
       ok: false,
@@ -294,7 +302,23 @@ export async function replaceFailedCommand(
   }
 
   const nextGeneration = reservation.command_generation + 1;
-  if (nextGeneration > MAX_COMMAND_GENERATION) {
+  const publisherMigrationRequested =
+    actor === "first_open" && reason === "publisher_superseded";
+  const publisherMigrationSource = publisherMigrationRequested &&
+      reservation.command_generation === MAX_COMMAND_GENERATION &&
+      nextGeneration === MAX_COMMAND_GENERATION + 1 &&
+      env.READING_PUBLISHER?.trim() === READING_PUBLISHER_PROVIDER
+    ? await loadPublisherMigrationSourceCommand(
+        env,
+        identity,
+        readingId,
+        reservation.active_generation_job_id,
+      )
+    : null;
+  if (
+    (publisherMigrationRequested && !publisherMigrationSource) ||
+    (!publisherMigrationRequested && nextGeneration > MAX_COMMAND_GENERATION)
+  ) {
     return {
       ok: false,
       reason: "budget_exhausted",

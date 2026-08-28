@@ -10,7 +10,9 @@ import {
 import {
   isCommandV2,
   type GenerateDailyReadingCommand,
+  type GenerateDailyReadingCommandV2,
 } from "../services/generation-command-v2.js";
+import { READING_PUBLISHER_PROVIDER } from "../services/reading-publisher.js";
 
 /**
  * Reservation, claim, and publication — every one a single guarded `DB.batch()`.
@@ -624,6 +626,84 @@ export type ReplaceOutcome =
     };
 
 /**
+ * Prove that one maxed-out failed reservation is carrying the retired OpenAI
+ * transport pin before granting its single migration replacement.
+ *
+ * The provider pin stays inside the encrypted command, so neither the public
+ * route nor a clear D1 column may make this decision. The joins prove current
+ * ownership and active-job identity before decryption; the command fields then
+ * prove that the encrypted payload agrees with the reservation.
+ */
+export async function loadPublisherMigrationSourceCommand(
+  env: Env,
+  identity: UserIdentity,
+  readingId: string,
+  expectedFailedJobId: string,
+): Promise<GenerateDailyReadingCommandV2 | null> {
+  const row = await env.DB.prepare(
+    `SELECT j.payload_enc, j.payload_key_version, j.payload_nonce
+     FROM daily_readings r
+     JOIN jobs j ON j.id = r.active_generation_job_id AND j.user_id = r.user_id
+     JOIN users u ON u.id = r.user_id AND u.status = 'active'
+     WHERE r.id = ? AND r.user_id = ? AND r.status = 'failed'
+       AND r.assembly_mode = 'constrained_model'
+       AND r.command_generation = ? AND r.active_generation_job_id = ?
+       AND j.job_type = ? AND j.status = 'failed'
+       AND j.result_class IN ('publisher_unavailable', 'publisher_superseded')
+       AND u.crypto_subject = ?`,
+  )
+    .bind(
+      readingId,
+      identity.userId,
+      MAX_COMMAND_GENERATION,
+      expectedFailedJobId,
+      JOB_TYPE,
+      identity.cryptoSubject,
+    )
+    .first<{
+      payload_enc: ArrayBuffer | null;
+      payload_key_version: number | null;
+      payload_nonce: string | null;
+    }>();
+  if (
+    !row ||
+    row.payload_enc === null ||
+    row.payload_key_version === null ||
+    row.payload_nonce === null
+  ) {
+    return null;
+  }
+
+  try {
+    const { dek } = await loadUserKey(env, identity);
+    const command = await decryptJson<GenerateDailyReadingCommand>(
+      {
+        key_version: row.payload_key_version,
+        nonce: row.payload_nonce,
+        ciphertext: bytesToBase64(new Uint8Array(row.payload_enc)),
+      },
+      dek,
+      {
+        subject: identity.cryptoSubject,
+        field: "jobs.payload_enc",
+        recordId: expectedFailedJobId,
+      },
+    );
+    if (
+      !isCommandV2(command) ||
+      command.reading_id !== readingId ||
+      command.command_generation !== MAX_COMMAND_GENERATION ||
+      command.publisher?.provider !== "openai"
+    ) {
+      return null;
+    }
+    return command;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Replace a terminally failed command with the next `gN` against the same
  * reservation.
  *
@@ -641,7 +721,23 @@ export async function replaceCommand(
   expectedFailedJobId: string,
   reason: GenerationReplacementReason,
 ): Promise<ReplaceOutcome> {
-  if (command.command_generation > MAX_COMMAND_GENERATION) {
+  const exceedsStandardBudget = command.command_generation > MAX_COMMAND_GENERATION;
+  const publisherMigrationRecovery =
+    exceedsStandardBudget &&
+    command.command_generation === MAX_COMMAND_GENERATION + 1 &&
+    reason === "publisher_superseded" &&
+    isCommandV2(command) &&
+    command.command_replacement_reason === "publisher_superseded" &&
+    command.replaces_job_id === expectedFailedJobId &&
+    command.publisher.provider === READING_PUBLISHER_PROVIDER &&
+    env.READING_PUBLISHER?.trim() === READING_PUBLISHER_PROVIDER &&
+    (await loadPublisherMigrationSourceCommand(
+      env,
+      identity,
+      command.reading_id,
+      expectedFailedJobId,
+    )) !== null;
+  if (exceedsStandardBudget && !publisherMigrationRecovery) {
     return {
       ok: false,
       reason: "budget_exhausted",

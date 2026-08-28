@@ -78,7 +78,7 @@ Anchor positions and lunar phase are always present when calculation succeeds. A
 
 Provider unavailability, calculation unavailability, and daily-sky unavailability retry the same command on the existing schedule. An invalid or refused candidate gets one fresh delivery. An exhausted daily provider budget makes no call and gets no retry. Configuration, authentication, model availability, consent, context eligibility, identity mismatch, and unsupported policy are terminal.
 
-A scheduler-replaceable failure may install at most two automatic replacement commands. After the third, the reading is unavailable for that local day and the interface stops offering a control that cannot succeed.
+A scheduler-replaceable failure may install at most two automatic replacement commands. After the third, the reading is unavailable for that local day and the interface stops offering a control that cannot succeed. The sole exception is transport migration: an authenticated Today request may install one generation-four successor only when the encrypted generation-three command proves that it pins the retired OpenAI transport and the current deployment is configured for Codex. The successor records `publisher_superseded`, and no generation-five command is permitted.
 
 There is no alternate model, no previous-day reuse, no deterministic copy, and no editorial-release fallback on this path.
 
