@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.8.0",
+  "kind": "account_processing",
+  "source_id": "AST-01",
+  "permission_tier": 0,
+  "allowed_uses": ["chart_fact", "cycle_detection", "uncertainty_model"],
+  "provider": null,
+  "scopes": [],
+  "connector_account_id": null,
+  "status": "not_granted",
+  "consent_id": null,
+  "account_status": "active",
+  "regrant_will_restore_access": false,
+  "policy_version": "account-processing-v0-2026-08-27",
+  "granted_at": null,
+  "ui_surface": null,
+  "disclosure": {
+    "text": "Pattern/Like uses the birth date, local birth time, accuracy choice, place label, coordinates, and timezone you submit to calculate your natal chart, timing cycles, and uncertainty. The API sends those values to Pattern/Like's calculation service; it does not send them to a generative model. Pattern/Like encrypts the submitted profile and retained birth fields under your account key while retaining the calculated chart facts needed by the product. Separate permissions govern generated readings, Your Pattern, research, and model training. You may withdraw this permission at any time. Withdrawal retains the account data but stops serving it by freezing the account; regrant, export, and account deletion remain available.",
+    "links": { "patternlike_terms": "/terms.html", "patternlike_privacy": "/privacy.html" }
+  }
+}

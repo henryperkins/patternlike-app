@@ -1,15 +1,23 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   BirthProfileRequest,
   BirthTimeAccuracy,
   TimezoneLookupResponse,
 } from "@patternlike/shared";
-import { lookupTimezone, onboardingConsentId } from "../lib/api-client.js";
+import {
+  ApiError,
+  getAccountProcessingConsent,
+  grantAccountProcessingConsent,
+  lookupTimezone,
+  newIdempotencyKey,
+  type AccountProcessingConsentDocument,
+} from "../lib/api-client.js";
+import { isAccountProcessingConsentResponse } from "../lib/account-processing-consent.js";
 import { systemTimezone } from "../lib/device.js";
 import { Icon } from "./icons.js";
 
 interface OnboardingProps {
-  onSubmit: (profile: BirthProfileRequest) => Promise<void>;
+  onSubmit: (profile: BirthProfileRequest, idempotencyKey: string) => Promise<void>;
   /**
    * First-time calculation vs replacing an already-active chart. The API is
    * the same POST; this only changes the words, hides the local example, and
@@ -21,6 +29,11 @@ interface OnboardingProps {
 
 /** Long enough that typing a decimal does not fire a request per keystroke. */
 const LOOKUP_DEBOUNCE_MS = 350;
+
+type ProcessingPolicyState =
+  | { status: "loading" }
+  | { status: "ready"; consent: AccountProcessingConsentDocument }
+  | { status: "unreadable"; message: string };
 
 const confidenceCopy: Record<TimezoneLookupResponse["confidence"], string> = {
   high: "High confidence",
@@ -67,6 +80,56 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
   const [submitting, setSubmitting] = useState(false);
   const [zone, setZone] = useState<TimezoneLookupResponse | null>(null);
   const [zoneState, setZoneState] = useState<"idle" | "loading" | "failed">("idle");
+  const [processingPolicy, setProcessingPolicy] = useState<ProcessingPolicyState>({
+    status: "loading",
+  });
+  const [policyRevision, setPolicyRevision] = useState(0);
+  const intentKeys = useRef<{ grant: string | null; birth: string | null }>({
+    grant: null,
+    birth: null,
+  });
+
+  useEffect(() => {
+    intentKeys.current.birth = null;
+  }, [
+    accuracy,
+    approximateWindow,
+    birthDate,
+    birthTime,
+    latitude,
+    longitude,
+    placeLabel,
+    timezone,
+  ]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setProcessingPolicy({ status: "loading" });
+    void getAccountProcessingConsent(controller.signal)
+      .then((current) => {
+        if (controller.signal.aborted) return;
+        if (isAccountProcessingConsentResponse(current)) {
+          setProcessingPolicy({ status: "ready", consent: current });
+        } else {
+          setProcessingPolicy({
+            status: "unreadable",
+            message:
+              "The calculation permission could not be read. Try again before submitting.",
+          });
+        }
+      })
+      .catch((policyError) => {
+        if (controller.signal.aborted) return;
+        setProcessingPolicy({
+          status: "unreadable",
+          message:
+            policyError instanceof Error
+              ? "The calculation permission could not be read. Try again before submitting."
+              : "The calculation permission could not be read in this session.",
+        });
+      });
+    return () => controller.abort();
+  }, [policyRevision]);
 
   const coordinatesReady =
     latitude.trim() !== "" &&
@@ -196,29 +259,64 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
       return;
     }
 
-    const profile: BirthProfileRequest = {
-      accuracy,
-      consent_id: onboardingConsentId(),
-      birth_date: birthDate,
-      birth_time_local: accuracy === "unknown" ? null : birthTime,
-      timezone_hint: timezone.trim(),
-      approximate_window_minutes:
-        accuracy === "approximate" ? Number(approximateWindow) : null,
-      birthplace:
-        placeLabel || latitude || longitude
-          ? {
-              label: placeLabel.trim() || undefined,
-              latitude: latitude ? Number(latitude) : null,
-              longitude: longitude ? Number(longitude) : null,
-            }
-          : undefined,
-    };
+    if (processingPolicy.status !== "ready") return;
 
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit(profile);
+      intentKeys.current.grant ??= newIdempotencyKey("web-account-processing");
+      const granted = await grantAccountProcessingConsent(
+        processingPolicy.consent.policy_version,
+        intentKeys.current.grant,
+        "onboarding",
+      );
+      if (
+        !isAccountProcessingConsentResponse(granted) ||
+        granted.status !== "granted" ||
+        !granted.consent_id
+      ) {
+        throw new Error(
+          "The calculation permission was not granted. Review it and try again.",
+        );
+      }
+
+      const profile: BirthProfileRequest = {
+        accuracy,
+        consent_id: granted.consent_id,
+        birth_date: birthDate,
+        birth_time_local: accuracy === "unknown" ? null : birthTime,
+        timezone_hint: timezone.trim(),
+        approximate_window_minutes:
+          accuracy === "approximate" ? Number(approximateWindow) : null,
+        birthplace:
+          placeLabel || latitude || longitude
+            ? {
+                label: placeLabel.trim() || undefined,
+                latitude: latitude ? Number(latitude) : null,
+                longitude: longitude ? Number(longitude) : null,
+              }
+            : undefined,
+      };
+
+      intentKeys.current.birth ??= newIdempotencyKey("web-birth");
+      await onSubmit(profile, intentKeys.current.birth);
     } catch (submissionError) {
+      if (
+        submissionError instanceof ApiError &&
+        (submissionError.code === "consent_policy_version_stale" ||
+          submissionError.code === "consent_invalid")
+      ) {
+        intentKeys.current = { grant: null, birth: null };
+        setConsent(false);
+        setPolicyRevision((revision) => revision + 1);
+        setError(
+          submissionError.code === "consent_policy_version_stale"
+            ? "The calculation permission changed. Review the current policy and confirm again."
+            : "The calculation permission is no longer current. Review it and confirm again.",
+        );
+        setSubmitting(false);
+        return;
+      }
       setError(
         submissionError instanceof Error
           ? submissionError.message
@@ -473,10 +571,53 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
               <div><span>Model access</span><strong>None during chart calculation</strong></div>
             </div>
 
+            {processingPolicy.status === "ready" ? (
+              <div className="privacy-note">
+                <Icon name="shield" />
+                <div>
+                  <p>
+                    Policy <code>{processingPolicy.consent.policy_version}</code>
+                  </p>
+                  <p>{processingPolicy.consent.disclosure.text}</p>
+                  <p>
+                    <a href={processingPolicy.consent.disclosure.links.patternlike_terms}>
+                      Terms
+                    </a>{" "}
+                    <a href={processingPolicy.consent.disclosure.links.patternlike_privacy}>
+                      Privacy policy
+                    </a>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p
+                  className="privacy-action__status"
+                  role="status"
+                  aria-label="Calculation permission status"
+                  aria-live="polite"
+                >
+                  {processingPolicy.status === "loading"
+                    ? "Reading the current calculation permission."
+                    : processingPolicy.message}
+                </p>
+                {processingPolicy.status === "unreadable" ? (
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    onClick={() => setPolicyRevision((revision) => revision + 1)}
+                  >
+                    Try again <Icon name="refresh" />
+                  </button>
+                ) : null}
+              </div>
+            )}
+
             <label className="consent-check">
               <input
                 type="checkbox"
                 checked={consent}
+                disabled={processingPolicy.status !== "ready"}
                 onChange={(event) => setConsent(event.target.checked)}
               />
               <span className="consent-check__box"><Icon name="check" /></span>
@@ -512,7 +653,11 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
               Cancel
             </button>
           ) : <span />}
-          <button className="button button--primary" type="submit" disabled={submitting}>
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={submitting || (step === 3 && processingPolicy.status !== "ready")}
+          >
             {step < 3
               ? "Continue"
               : submitting

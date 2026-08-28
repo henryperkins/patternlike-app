@@ -343,6 +343,67 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+  /v1/consents/account-processing:
+    get:
+      tags: [consents]
+      operationId: getAccountProcessingConsent
+      x-normative-schema: 'm8:account-processing-consent.schema.json#/$defs/accountProcessingConsentResponse'
+      responses:
+        '200':
+          description: Current server-owned disclosure, grant, and recovery state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProcessingConsent' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [consents]
+      operationId: grantAccountProcessingConsent
+      x-normative-request-schema: 'm8:account-processing-consent.schema.json#/$defs/accountProcessingConsentGrantRequest'
+      x-normative-response-schema: 'm8:account-processing-consent.schema.json#/$defs/accountProcessingConsentResponse'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConsentUiSurface'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountProcessingConsentGrant' }
+      responses:
+        '200':
+          description: Current policy granted or regranted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProcessingConsent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409':
+          description: consent_policy_version_stale, account_state_conflict, consent_conflict, or idempotency conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [consents]
+      operationId: revokeAccountProcessingConsent
+      x-normative-schema: 'm8:account-processing-consent.schema.json#/$defs/accountProcessingConsentResponse'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConsentUiSurface'
+      responses:
+        '200':
+          description: Current account-processing state after revocation or no-op
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProcessingConsent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /v1/readings:
     get:
       tags: [readings]
@@ -453,6 +514,7 @@ paths:
               schema: { $ref: '#/components/schemas/BirthProfileAccepted' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '429':
           description: Per-user UTC-day birth calculation budget exhausted
@@ -857,6 +919,82 @@ components:
         policy_version:
           type: string
           const: google-places-geocoding-v4-2026-08-26
+    AccountProcessingConsentGrant:
+      type: object
+      additionalProperties: false
+      required: [policy_version]
+      properties:
+        policy_version:
+          type: string
+          const: account-processing-v1-2026-08-28
+    AccountProcessingConsent:
+      type: object
+      additionalProperties: false
+      required:
+        [schema_version, kind, source_id, permission_tier, allowed_uses,
+         provider, scopes, connector_account_id, status, consent_id,
+         account_status, regrant_will_restore_access, policy_version, granted_at,
+         ui_surface, disclosure]
+      properties:
+        schema_version: { type: string, const: '0.8.0' }
+        kind: { type: string, const: account_processing }
+        source_id: { type: string, const: AST-01 }
+        permission_tier: { type: integer, const: 0 }
+        allowed_uses:
+          type: array
+          minItems: 3
+          maxItems: 3
+          prefixItems:
+            - { type: string, const: chart_fact }
+            - { type: string, const: cycle_detection }
+            - { type: string, const: uncertainty_model }
+          items: false
+        provider: { type: 'null', const: null }
+        scopes:
+          type: array
+          minItems: 0
+          maxItems: 0
+          items: false
+        connector_account_id: { type: 'null', const: null }
+        status: { type: string, enum: [granted, not_granted] }
+        consent_id: { type: [string, 'null'], minLength: 8, maxLength: 128 }
+        account_status: { type: string, enum: [active, frozen] }
+        regrant_will_restore_access: { type: boolean }
+        policy_version:
+          type: string
+          const: account-processing-v1-2026-08-28
+        granted_at: { type: [string, 'null'], format: date-time }
+        ui_surface:
+          type: [string, 'null']
+          enum: [onboarding, privacy_center, null]
+        disclosure:
+          type: object
+          additionalProperties: false
+          required: [text, links]
+          properties:
+            text:
+              type: string
+              const: "Pattern/Like uses the birth date, local birth time, accuracy choice, place label, coordinates, and timezone you submit to calculate your natal chart, timing cycles, and uncertainty. The API sends those values to Pattern/Like's calculation service; it does not send them to a generative model. Pattern/Like encrypts the submitted profile and retained birth fields under your account key while retaining the calculated chart facts needed by the product. Separate permissions govern generated readings, Your Pattern, research, and model training. You may withdraw this permission at any time. Withdrawal retains the account data but stops serving it by freezing the account; regrant, export, and account deletion remain available."
+            links:
+              type: object
+              additionalProperties: false
+              required: [patternlike_terms, patternlike_privacy]
+              properties:
+                patternlike_terms: { type: string, const: /terms.html }
+                patternlike_privacy: { type: string, const: /privacy.html }
+      oneOf:
+        - properties:
+            status: { const: granted }
+            consent_id: { type: string, minLength: 8, maxLength: 128 }
+            granted_at: { type: string, format: date-time }
+            ui_surface: { type: string, enum: [onboarding, privacy_center] }
+          required: [status, consent_id, granted_at, ui_surface]
+        - properties:
+            status: { const: not_granted }
+            consent_id: { type: 'null' }
+            granted_at: { type: 'null' }
+            ui_surface: { type: 'null' }
+          required: [status, consent_id, granted_at, ui_surface]
     GeocoderConsent:
       type: object
       additionalProperties: false

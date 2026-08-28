@@ -124,6 +124,18 @@
       ]
     },
     {
+      "file": "account-processing-consent.schema.json",
+      "id": "https://patternlike.app/contracts/m8/account-processing-consent.schema.json",
+      "defines": [
+        "accountProcessingAccountStatus",
+        "accountProcessingConsentGrantRequest",
+        "accountProcessingConsentResponse",
+        "accountProcessingConsentUiSurface",
+        "accountProcessingDisclosure",
+        "accountProcessingDisclosureLinks"
+      ]
+    },
+    {
       "file": "geocoder-consent.schema.json",
       "id": "https://patternlike.app/contracts/m8/geocoder-consent.schema.json",
       "defines": [
@@ -175,7 +187,7 @@
     {
       "file": "openapi/openapi.yaml",
       "version": "0.8.0",
-      "describes": "Complete M7 API plus consumer place search/resolution, revocable geocoder consent, reading History/Saved/detail/Save resources, and the birth calculation budget response."
+      "describes": "Complete M7 API plus account-processing and revocable geocoder consent, consumer place search/resolution, reading History/Saved/detail/Save resources, and the birth calculation budget response."
     }
   ],
   "compatibility": {

@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m8/account-processing-consent.schema.json",
+  "title": "M8 account-processing consent",
+  "$defs": {
+    "accountProcessingConsentUiSurface": {
+      "type": "string",
+      "enum": ["onboarding", "privacy_center"]
+    },
+    "accountProcessingDisclosureLinks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["patternlike_terms", "patternlike_privacy"],
+      "properties": {
+        "patternlike_terms": { "type": "string", "const": "/terms.html" },
+        "patternlike_privacy": { "type": "string", "const": "/privacy.html" }
+      }
+    },
+    "accountProcessingDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "links"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "const": "Pattern/Like uses the birth date, local birth time, accuracy choice, place label, coordinates, and timezone you submit to calculate your natal chart, timing cycles, and uncertainty. The API sends those values to Pattern/Like's calculation service; it does not send them to a generative model. Pattern/Like encrypts the submitted profile and retained birth fields under your account key while retaining the calculated chart facts needed by the product. Separate permissions govern generated readings, Your Pattern, research, and model training. You may withdraw this permission at any time. Withdrawal retains the account data but stops serving it by freezing the account; regrant, export, and account deletion remain available."
+        },
+        "links": { "$ref": "#/$defs/accountProcessingDisclosureLinks" }
+      }
+    },
+    "accountProcessingConsentGrantRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_version"],
+      "properties": {
+        "policy_version": {
+          "type": "string",
+          "const": "account-processing-v1-2026-08-28"
+        }
+      }
+    },
+    "accountProcessingAccountStatus": {
+      "type": "string",
+      "enum": ["active", "frozen"]
+    },
+    "accountProcessingConsentResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "source_id",
+        "permission_tier",
+        "allowed_uses",
+        "provider",
+        "scopes",
+        "connector_account_id",
+        "status",
+        "consent_id",
+        "account_status",
+        "regrant_will_restore_access",
+        "policy_version",
+        "granted_at",
+        "ui_surface",
+        "disclosure"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/schemaVersion"
+        },
+        "kind": { "type": "string", "const": "account_processing" },
+        "source_id": { "type": "string", "const": "AST-01" },
+        "permission_tier": { "type": "integer", "const": 0 },
+        "allowed_uses": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            { "type": "string", "const": "chart_fact" },
+            { "type": "string", "const": "cycle_detection" },
+            { "type": "string", "const": "uncertainty_model" }
+          ],
+          "items": false
+        },
+        "provider": { "type": "null", "const": null },
+        "scopes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 0,
+          "items": false
+        },
+        "connector_account_id": { "type": "null", "const": null },
+        "status": { "type": "string", "enum": ["granted", "not_granted"] },
+        "consent_id": {
+          "oneOf": [
+            { "type": "string", "minLength": 8, "maxLength": 128 },
+            { "type": "null" }
+          ]
+        },
+        "account_status": { "$ref": "#/$defs/accountProcessingAccountStatus" },
+        "regrant_will_restore_access": { "type": "boolean" },
+        "policy_version": {
+          "type": "string",
+          "const": "account-processing-v1-2026-08-28"
+        },
+        "granted_at": {
+          "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/nullableDateTime"
+        },
+        "ui_surface": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/accountProcessingConsentUiSurface" }
+          ]
+        },
+        "disclosure": { "$ref": "#/$defs/accountProcessingDisclosure" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": { "const": "granted" },
+            "consent_id": { "type": "string", "minLength": 8, "maxLength": 128 },
+            "granted_at": {
+              "$ref": "https://patternlike.app/contracts/m8/common.schema.json#/$defs/dateTime"
+            },
+            "ui_surface": { "$ref": "#/$defs/accountProcessingConsentUiSurface" }
+          },
+          "required": ["status", "consent_id", "granted_at", "ui_surface"]
+        },
+        {
+          "properties": {
+            "status": { "const": "not_granted" },
+            "consent_id": { "type": "null" },
+            "granted_at": { "type": "null" },
+            "ui_surface": { "type": "null" }
+          },
+          "required": ["status", "consent_id", "granted_at", "ui_surface"]
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/accountProcessingConsentGrantRequest" },
+    { "$ref": "#/$defs/accountProcessingConsentResponse" }
+  ]
+}

@@ -1,8 +1,35 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimezoneLookupResponse } from "@patternlike/shared";
+import { capturedFor, mockApiResponses } from "../test/api-mock.js";
+import {
+  ACCOUNT_PROCESSING_CONSENT_PATH,
+  accountProcessingGranted,
+  accountProcessingNotGranted,
+} from "../test/account-processing-fixture.js";
+import { ApiError } from "../lib/api-client.js";
 import { Onboarding } from "./Onboarding.js";
+
+beforeEach(() => {
+  mockApiResponses({
+    [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+      status: 200,
+      body: accountProcessingNotGranted,
+    },
+    [`PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+      status: 200,
+      body: accountProcessingGranted,
+    },
+  });
+});
+
+async function reachReviewStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("Birth date"), "1990-05-15");
+  await user.type(screen.getByLabelText("Local time"), "12:34:00");
+  await user.click(screen.getByRole("button", { name: /Continue/i }));
+  await user.click(screen.getByRole("button", { name: /Continue/i }));
+}
 
 describe("birth onboarding", () => {
   it("keeps unknown birth time as a first-class path", async () => {
@@ -32,6 +59,7 @@ describe("birth onboarding", () => {
         birth_date: "1990-05-15",
         birth_time_local: null,
       }),
+      expect.stringMatching(/^web-birth-/),
     );
   });
 
@@ -108,6 +136,288 @@ describe("birth onboarding", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Enter a birth date");
     expect(screen.getByRole("group", { name: /How precise is the birth time/i })).toBeInTheDocument();
   });
+
+  it("renders the current server policy and its links on the review step", async () => {
+    const user = userEvent.setup();
+    render(<Onboarding onSubmit={vi.fn()} />);
+
+    await reachReviewStep(user);
+
+    expect(
+      await screen.findByText("account-processing-v1-2026-08-28"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/API sends those values to Pattern\/Like's calculation service/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Terms/i })).toHaveAttribute(
+      "href",
+      "/terms.html",
+    );
+    expect(screen.getByRole("link", { name: /Privacy policy/i })).toHaveAttribute(
+      "href",
+      "/privacy.html",
+    );
+  });
+
+  it("keeps final submission disabled when the policy cannot be read", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 503,
+        body: {
+          error: {
+            code: "storage_unavailable",
+            message: "Consent storage is unavailable",
+            request_id: "req_consent_unreadable",
+          },
+        },
+      },
+    });
+    const onSubmit = vi.fn();
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+
+    expect(await screen.findByRole("status", { name: /Calculation permission status/i }))
+      .toHaveTextContent(/could not be read/i);
+    expect(screen.getByRole("button", { name: /Create my chart/i })).toBeDisabled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("treats a malformed success response as unreadable rather than consentable", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: {
+          ...accountProcessingNotGranted,
+          disclosure: null,
+        },
+      },
+    });
+    render(<Onboarding onSubmit={vi.fn()} />);
+
+    await reachReviewStep(user);
+
+    expect(await screen.findByRole("status", { name: /Calculation permission status/i }))
+      .toHaveTextContent(/could not be read/i);
+    expect(screen.getByRole("button", { name: /Create my chart/i })).toBeDisabled();
+  });
+
+  it("grants before birth and submits the exact returned consent id", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockImplementation(async (profile, birthKey) => {
+      expect(capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)).toHaveLength(2);
+      expect(
+        capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH).at(-1)?.method,
+      ).toBe("PUT");
+      expect(profile.consent_id).toBe(accountProcessingGranted.consent_id);
+      expect(birthKey).toMatch(/^web-birth-/);
+    });
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /allow Pattern\/Like to encrypt these details/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    const grant = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH).at(-1)!;
+    expect(grant.headers.get("x-consent-ui-surface")).toBe("onboarding");
+    expect(grant.headers.get("idempotency-key")).toMatch(
+      /^web-account-processing-/,
+    );
+  });
+
+  it("holds the grant and birth keys while the same visible intent is retried", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn()
+      .mockRejectedValueOnce(new Error("The calculation service could not be reached."))
+      .mockResolvedValueOnce(undefined);
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /allow Pattern\/Like to encrypt these details/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be reached/i);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+    const grantKeys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
+      .filter((request) => request.method === "PUT")
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(grantKeys).toHaveLength(2);
+    expect(grantKeys[0]).toBe(grantKeys[1]);
+    expect(onSubmit.mock.calls[0]![1]).toBe(onSubmit.mock.calls[1]![1]);
+  });
+
+  it("starts a new birth intent when submitted birth details are edited", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn()
+      .mockRejectedValueOnce(new Error("Review the birth details."))
+      .mockResolvedValueOnce(undefined);
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /allow Pattern\/Like to encrypt these details/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Review the birth details/i);
+
+    await user.click(screen.getByRole("button", { name: /Back/i }));
+    await user.click(screen.getByRole("button", { name: /Back/i }));
+    const date = screen.getByLabelText("Birth date");
+    await user.clear(date);
+    await user.type(date, "1991-06-16");
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+    expect(onSubmit.mock.calls[0]![1]).not.toBe(onSubmit.mock.calls[1]![1]);
+    const grantKeys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
+      .filter((request) => request.method === "PUT")
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(grantKeys[0]).toBe(grantKeys[1]);
+  });
+
+  it("refreshes a stale policy and requires a new confirmation intent", async () => {
+    const user = userEvent.setup();
+    let reads = 0;
+    let grants = 0;
+    const responses: Parameters<typeof mockApiResponses>[0] = {};
+    Object.defineProperty(responses, `GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
+      enumerable: true,
+      get: () => ({
+        status: 200,
+        body: reads++ === 0
+          ? { ...accountProcessingNotGranted, policy_version: "retired-policy" }
+          : accountProcessingNotGranted,
+      }),
+    });
+    Object.defineProperty(responses, `PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
+      enumerable: true,
+      get: () => grants++ === 0
+        ? {
+            status: 409,
+            body: {
+              error: {
+                code: "consent_policy_version_stale",
+                message: "Re-read the current account-processing policy",
+                request_id: "req_stale_policy",
+              },
+            },
+          }
+        : { status: 200, body: accountProcessingGranted },
+    });
+    mockApiResponses(responses);
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+    expect(await screen.findByText("retired-policy")).toBeInTheDocument();
+    const confirmation = screen.getByRole("checkbox", {
+      name: /allow Pattern\/Like to encrypt these details/i,
+    });
+    await user.click(confirmation);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/permission changed/i);
+    expect(confirmation).not.toBeChecked();
+    expect(
+      await screen.findByText("account-processing-v1-2026-08-28"),
+    ).toBeInTheDocument();
+    await user.click(confirmation);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+
+    const grantKeys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
+      .filter((request) => request.method === "PUT")
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(grantKeys).toHaveLength(2);
+    expect(grantKeys[0]).not.toBe(grantKeys[1]);
+  });
+
+  it("refreshes an invalidated grant and starts new mutation and birth intents", async () => {
+    const user = userEvent.setup();
+    const replacementGrant = {
+      ...accountProcessingGranted,
+      consent_id: "cns_account_processing_0002",
+      ui_surface: "privacy_center",
+    };
+    let reads = 0;
+    let grants = 0;
+    const responses: Parameters<typeof mockApiResponses>[0] = {};
+    Object.defineProperty(responses, `GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
+      enumerable: true,
+      get: () => ({
+        status: 200,
+        body: reads++ === 0 ? accountProcessingNotGranted : replacementGrant,
+      }),
+    });
+    Object.defineProperty(responses, `PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`, {
+      enumerable: true,
+      get: () => ({
+        status: 200,
+        body: grants++ === 0 ? accountProcessingGranted : replacementGrant,
+      }),
+    });
+    mockApiResponses(responses);
+    const onSubmit = vi.fn()
+      .mockRejectedValueOnce(
+        new ApiError(403, {
+          error: {
+            code: "consent_invalid",
+            message: "The submitted consent is not current",
+            request_id: "req_consent_invalid",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(undefined);
+    render(<Onboarding onSubmit={onSubmit} />);
+
+    await reachReviewStep(user);
+    const confirmation = screen.getByRole("checkbox", {
+      name: /allow Pattern\/Like to encrypt these details/i,
+    });
+    await user.click(confirmation);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no longer current/i);
+    await waitFor(() => {
+      expect(
+        capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH).filter(
+          (request) => request.method === "GET",
+        ),
+      ).toHaveLength(2);
+    });
+    expect(confirmation).not.toBeChecked();
+    await user.click(confirmation);
+    await user.click(screen.getByRole("button", { name: /Create my chart/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+
+    expect(onSubmit.mock.calls[0]![0].consent_id).toBe(
+      accountProcessingGranted.consent_id,
+    );
+    expect(onSubmit.mock.calls[1]![0].consent_id).toBe(
+      replacementGrant.consent_id,
+    );
+    expect(onSubmit.mock.calls[0]![1]).not.toBe(onSubmit.mock.calls[1]![1]);
+    const grantKeys = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)
+      .filter((request) => request.method === "PUT")
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(grantKeys[0]).not.toBe(grantKeys[1]);
+  });
 });
 
 describe("historical timezone lookup", () => {
@@ -131,7 +441,14 @@ describe("historical timezone lookup", () => {
   };
 
   function mockLookup(response: TimezoneLookupResponse | "unreachable") {
-    const fetchMock = vi.fn().mockImplementation(async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname === ACCOUNT_PROCESSING_CONSENT_PATH) {
+        return new Response(
+          JSON.stringify(init?.method === "PUT" ? accountProcessingGranted : accountProcessingNotGranted),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
       if (response === "unreachable") throw new TypeError("network down");
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -231,7 +548,11 @@ describe("historical timezone lookup", () => {
     await user.clear(field);
     await user.type(field, "Europe/Lisbon");
     expect(field).toHaveValue("Europe/Lisbon");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        new URL(String(input), "http://localhost").pathname === "/v1/timezone-lookup"
+      ),
+    ).toHaveLength(0);
   });
 
   it("still lets the user continue when the lookup cannot be reached", async () => {
@@ -260,6 +581,7 @@ describe("historical timezone lookup", () => {
       expect.objectContaining({
         birthplace: expect.objectContaining({ latitude: 34.0522, longitude: -118.2437 }),
       }),
+      expect.stringMatching(/^web-birth-/),
     );
   });
 });
@@ -305,6 +627,7 @@ describe("chart correction", () => {
         accuracy: "exact",
         birth_date: "1985-11-02",
       }),
+      expect.stringMatching(/^web-birth-/),
     );
   });
 });

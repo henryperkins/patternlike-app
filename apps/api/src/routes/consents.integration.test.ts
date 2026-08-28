@@ -299,7 +299,8 @@ describe("AI-synthesis consent routes", () => {
     });
     expect(
       await rows(
-        "SELECT kind, status, policy_version, version FROM consents WHERE user_id = ? ORDER BY version",
+        `SELECT kind, status, policy_version, version FROM consents
+         WHERE user_id = ? AND kind = 'ai_synthesis' ORDER BY version`,
         USER_A,
       ),
     ).toEqual([
@@ -334,7 +335,11 @@ describe("AI-synthesis consent routes", () => {
       key: "web-ai-synthesis-grant-1",
     });
     expect(otherOwner.status).toBe(200);
-    expect(await rows("SELECT user_id FROM consents ORDER BY user_id")).toEqual([
+    expect(
+      await rows(
+        "SELECT user_id FROM consents WHERE kind = 'ai_synthesis' ORDER BY user_id",
+      ),
+    ).toEqual([
       { user_id: USER_A },
       { user_id: USER_B },
     ]);

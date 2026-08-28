@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PrivacyView } from "./PrivacyView.js";
@@ -9,6 +9,12 @@ import {
   consentNotGranted,
   errorBody,
 } from "../test/reading-fixture.js";
+import {
+  ACCOUNT_PROCESSING_CONSENT_PATH,
+  accountProcessingGranted,
+  accountProcessingNotGranted,
+  accountProcessingRevokedFreeze,
+} from "../test/account-processing-fixture.js";
 
 const CONSENT = "/v1/consents/ai-synthesis";
 const TOPICS = "/v1/preferences/topic-exclusions";
@@ -21,7 +27,10 @@ const emptyTopics = ok({
   updated_at: null,
 });
 
-function renderPrivacy(responses: Record<string, MockResponse>) {
+function renderPrivacy(
+  responses: Record<string, MockResponse>,
+  onProcessingFrozen = vi.fn(),
+) {
   if (!(`GET ${TOPICS}` in responses) && !(TOPICS in responses)) {
     responses[`GET ${TOPICS}`] = emptyTopics;
   }
@@ -49,18 +58,31 @@ function renderPrivacy(responses: Record<string, MockResponse>) {
       },
     };
   }
+  if (
+    !(`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}` in responses) &&
+    !(ACCOUNT_PROCESSING_CONSENT_PATH in responses)
+  ) {
+    responses[`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`] = ok(
+      accountProcessingNotGranted,
+    );
+  }
   mockApiResponses(responses);
   return render(
     <PrivacyView
       hasChart
       onSignOut={() => undefined}
       onDeletionAccepted={() => undefined}
+      onProcessingFrozen={onProcessingFrozen}
     />,
   );
 }
 
 function consentPanel(): HTMLElement {
   return screen.getByRole("region", { name: /Who writes your reading/i });
+}
+
+function processingPanel(): HTMLElement {
+  return screen.getByRole("region", { name: /Birth calculation permission/i });
 }
 
 describe("Context & privacy", () => {
@@ -200,6 +222,130 @@ describe("Context & privacy", () => {
     expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
   });
 
+  it("reports granted, not-granted, and unknown processing states honestly", async () => {
+    const { unmount } = renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(accountProcessingGranted),
+    });
+
+    expect(await within(processingPanel()).findByText("Granted")).toBeInTheDocument();
+    expect(
+      within(processingPanel()).getByRole("button", {
+        name: /Withdraw calculation permission/i,
+      }),
+    ).toBeInTheDocument();
+
+    unmount();
+
+    mockApiResponses({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${TOPICS}`]: emptyTopics,
+      "GET /v1/consents/pattern-generation": ok({
+        schema_version: "0.7.0",
+        kind: "pattern_generation",
+        status: "not_granted",
+        provider: "OpenAI",
+        purpose: "one_pattern_per_chart",
+        policy_version: "1.0.0",
+        enabled_categories: [],
+        granted_at: null,
+      }),
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(accountProcessingNotGranted),
+    });
+    renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(accountProcessingNotGranted),
+    });
+    expect(await within(processingPanel()).findByText("Not granted"))
+      .toBeInTheDocument();
+  });
+
+  it("uses Unknown when processing consent cannot be read", async () => {
+    renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 0,
+        body: null,
+        unreachable: true,
+      },
+    });
+
+    const panel = processingPanel();
+    expect(await within(panel).findByText("Unknown")).toBeInTheDocument();
+    expect(within(panel).queryByText("Not granted")).not.toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("button", {
+        name: /Withdraw calculation permission/i,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("requires explicit freeze confirmation and enters frozen state immediately", async () => {
+    const user = userEvent.setup();
+    const onProcessingFrozen = vi.fn();
+    renderPrivacy(
+      {
+        [`GET ${CONSENT}`]: ok(consentGranted),
+        [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(accountProcessingGranted),
+        [`DELETE ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(
+          accountProcessingRevokedFreeze,
+        ),
+      },
+      onProcessingFrozen,
+    );
+
+    const panel = processingPanel();
+    await user.click(
+      await within(panel).findByRole("button", {
+        name: /Withdraw calculation permission/i,
+      }),
+    );
+    expect(capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH)).toHaveLength(1);
+    expect(within(panel).getByText(/freeze this account/i)).toBeInTheDocument();
+    const confirm = within(panel).getByRole("checkbox", {
+      name: /understand.*retained data.*stop being served/i,
+    });
+    const freeze = within(panel).getByRole("button", { name: /Freeze account/i });
+    expect(freeze).toBeDisabled();
+    await user.click(confirm);
+    await user.click(freeze);
+
+    await waitFor(() => expect(onProcessingFrozen).toHaveBeenCalledOnce());
+    const revoke = capturedFor(ACCOUNT_PROCESSING_CONSENT_PATH).at(-1)!;
+    expect(revoke.method).toBe("DELETE");
+    expect(revoke.body).toBeNull();
+    expect(revoke.headers.get("x-consent-ui-surface")).toBe("privacy_center");
+    expect(revoke.headers.get("idempotency-key")).toMatch(
+      /^web-account-processing-/,
+    );
+  });
+
+  it("moves keyboard focus into freeze confirmation and restores it on cancel", async () => {
+    const user = userEvent.setup();
+    renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentGranted),
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: ok(accountProcessingGranted),
+    });
+
+    const panel = processingPanel();
+    const withdraw = await within(panel).findByRole("button", {
+      name: /Withdraw calculation permission/i,
+    });
+    withdraw.focus();
+    await user.keyboard("{Enter}");
+    const confirmation = within(panel).getByRole("checkbox", {
+      name: /understand.*retained data.*stop being served/i,
+    });
+    expect(document.activeElement).toBe(confirmation);
+
+    await user.click(within(panel).getByRole("button", { name: /Cancel/i }));
+    expect(document.activeElement).toBe(
+      within(panel).getByRole("button", {
+        name: /Withdraw calculation permission/i,
+      }),
+    );
+  });
+
   it("shows the live daily check-in source without inventing external connectors", async () => {
     renderPrivacy({
       [`GET ${CONSENT}`]: ok(consentGranted),
@@ -268,6 +414,7 @@ describe("Context & privacy", () => {
         onSignOut={() => undefined}
         onDeletionAccepted={() => undefined}
         onCorrectBirth={onCorrectBirth}
+        onProcessingFrozen={() => undefined}
       />,
     );
 
@@ -282,6 +429,7 @@ describe("Context & privacy", () => {
         onSignOut={() => undefined}
         onDeletionAccepted={() => undefined}
         onCorrectBirth={onCorrectBirth}
+        onProcessingFrozen={() => undefined}
       />,
     );
     expect(screen.queryByRole("button", { name: /Correct/i })).not.toBeInTheDocument();
@@ -314,6 +462,7 @@ describe("Context & privacy", () => {
         hasChart
         onSignOut={onSignOut}
         onDeletionAccepted={() => undefined}
+        onProcessingFrozen={() => undefined}
       />,
     );
 

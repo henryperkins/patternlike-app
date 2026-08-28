@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  ACCOUNT_PROCESSING_ALLOWED_USES,
+  ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_LINKS,
+  ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_TEXT,
+  ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION,
   GEOCODER_CONSENT_ALLOWED_USES,
   GEOCODER_CONSENT_POLICY_VERSION,
   M8_SCHEMA_VERSION,
+  type AccountProcessingConsentResponse,
   type PlaceSearchRequest,
   type ReadingHistoryResponse,
 } from "./index.js";
@@ -19,6 +24,47 @@ test("M8 consumer constants pin the frozen package and consent policy", () => {
     "chart_fact",
     "timezone_resolution",
   ]);
+});
+
+test("account-processing consent exports the current immutable recovery contract", () => {
+  assert.equal(
+    ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION,
+    "account-processing-v1-2026-08-28",
+  );
+  assert.deepEqual(ACCOUNT_PROCESSING_ALLOWED_USES, [
+    "chart_fact",
+    "cycle_detection",
+    "uncertainty_model",
+  ]);
+  assert.equal(
+    ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_LINKS.patternlike_terms,
+    "/terms.html",
+  );
+  assert.match(ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_TEXT, /freezing the account/);
+
+  const response = {
+    schema_version: "0.8.0",
+    kind: "account_processing",
+    source_id: "AST-01",
+    permission_tier: 0,
+    allowed_uses: ["chart_fact", "cycle_detection", "uncertainty_model"],
+    provider: null,
+    scopes: [],
+    connector_account_id: null,
+    status: "not_granted",
+    consent_id: null,
+    account_status: "frozen",
+    regrant_will_restore_access: true,
+    policy_version: "account-processing-v1-2026-08-28",
+    granted_at: null,
+    ui_surface: null,
+    disclosure: {
+      text: ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_TEXT,
+      links: ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_LINKS,
+    },
+  } satisfies AccountProcessingConsentResponse;
+
+  assert.equal(response.regrant_will_restore_access, true);
 });
 
 test("public place requests stay provider-neutral", () => {

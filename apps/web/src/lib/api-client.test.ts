@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   ApiError,
+  createBirthProfile,
   ensureTodayReading,
+  getAccountProcessingConsent,
   getAiSynthesisConsent,
   getReadingEvidence,
   getTiming,
   grantAiSynthesisConsent,
+  grantAccountProcessingConsent,
   isDailyReadingV5,
   isReadingEvidenceV5,
   revokeAiSynthesisConsent,
+  revokeAccountProcessingConsent,
   type TimingFilters,
   type TimingResponse,
 } from "./api-client.js";
@@ -28,6 +32,40 @@ import {
 const TODAY = "/v1/readings/today";
 const TIMING = "/v1/timing";
 const CONSENT = "/v1/consents/ai-synthesis";
+const ACCOUNT_PROCESSING_CONSENT = "/v1/consents/account-processing";
+
+const accountProcessingNotGranted = {
+  schema_version: "0.8.0",
+  kind: "account_processing",
+  source_id: "AST-01",
+  permission_tier: 0,
+  allowed_uses: ["chart_fact", "cycle_detection", "uncertainty_model"],
+  provider: null,
+  scopes: [],
+  connector_account_id: null,
+  status: "not_granted",
+  consent_id: null,
+  account_status: "active",
+  regrant_will_restore_access: false,
+  policy_version: "account-processing-v1-2026-08-28",
+  granted_at: null,
+  ui_surface: null,
+  disclosure: {
+    text: "Current account-processing disclosure.",
+    links: {
+      patternlike_terms: "/terms.html",
+      patternlike_privacy: "/privacy.html",
+    },
+  },
+};
+
+const accountProcessingGranted = {
+  ...accountProcessingNotGranted,
+  status: "granted",
+  consent_id: "cns_account_processing_0001",
+  granted_at: "2026-08-28T12:00:00.000Z",
+  ui_surface: "onboarding",
+};
 
 const timingResponse = {
   schema_version: "0.3.0" as const,
@@ -215,6 +253,137 @@ describe("AI-synthesis consent", () => {
     await expect(grantAiSynthesisConsent("0.9.0", "web-ai-synthesis-old")).rejects.toMatchObject(
       { code: "consent_policy_version_stale", status: 409 },
     );
+  });
+});
+
+describe("account-processing consent", () => {
+  it("reads the current server-owned policy without mutation headers", async () => {
+    mockApiResponses({
+      [`GET ${ACCOUNT_PROCESSING_CONSENT}`]: {
+        status: 200,
+        body: accountProcessingNotGranted,
+      },
+    });
+
+    await expect(getAccountProcessingConsent()).resolves.toEqual(
+      accountProcessingNotGranted,
+    );
+
+    const [request] = capturedFor(ACCOUNT_PROCESSING_CONSENT);
+    expect(request.method).toBe("GET");
+    expect(request.body).toBeNull();
+    expect(request.headers.get("idempotency-key")).toBeNull();
+    expect(request.headers.get("x-consent-ui-surface")).toBeNull();
+  });
+
+  it("grants only the displayed policy under the onboarding intent", async () => {
+    mockApiResponses({
+      [`PUT ${ACCOUNT_PROCESSING_CONSENT}`]: {
+        status: 200,
+        body: accountProcessingGranted,
+      },
+    });
+
+    await expect(
+      grantAccountProcessingConsent(
+        "account-processing-v1-2026-08-28",
+        "web-account-processing-grant-0001",
+        "onboarding",
+      ),
+    ).resolves.toEqual(accountProcessingGranted);
+
+    const [request] = capturedFor(ACCOUNT_PROCESSING_CONSENT);
+    expect(request.method).toBe("PUT");
+    expect(request.body).toEqual({
+      policy_version: "account-processing-v1-2026-08-28",
+    });
+    expect(request.headers.get("idempotency-key")).toBe(
+      "web-account-processing-grant-0001",
+    );
+    expect(request.headers.get("x-consent-ui-surface")).toBe("onboarding");
+  });
+
+  it("echoes a newer policy version returned by the server instead of hardcoding launch", async () => {
+    const currentServerPolicy: string = "account-processing-v2-2026-09-01";
+    mockApiResponses({
+      [`PUT ${ACCOUNT_PROCESSING_CONSENT}`]: {
+        status: 200,
+        body: {
+          ...accountProcessingGranted,
+          policy_version: currentServerPolicy,
+          disclosure: {
+            ...accountProcessingGranted.disclosure,
+            text: "Updated current account-processing disclosure.",
+          },
+        },
+      },
+    });
+
+    await grantAccountProcessingConsent(
+      currentServerPolicy,
+      "web-account-processing-grant-0002",
+      "onboarding",
+    );
+
+    expect(capturedFor(ACCOUNT_PROCESSING_CONSENT)[0]!.body).toEqual({
+      policy_version: currentServerPolicy,
+    });
+  });
+
+  it("revokes with an empty body under the privacy-center intent", async () => {
+    mockApiResponses({
+      [`DELETE ${ACCOUNT_PROCESSING_CONSENT}`]: {
+        status: 200,
+        body: {
+          ...accountProcessingNotGranted,
+          account_status: "frozen",
+          regrant_will_restore_access: true,
+        },
+      },
+    });
+
+    await revokeAccountProcessingConsent("web-account-processing-revoke-0001");
+
+    const [request] = capturedFor(ACCOUNT_PROCESSING_CONSENT);
+    expect(request.method).toBe("DELETE");
+    expect(request.body).toBeNull();
+    expect(request.headers.get("content-type")).toBeNull();
+    expect(request.headers.get("idempotency-key")).toBe(
+      "web-account-processing-revoke-0001",
+    );
+    expect(request.headers.get("x-consent-ui-surface")).toBe("privacy_center");
+  });
+});
+
+describe("birth intent", () => {
+  it("uses the caller-held idempotency key for a retryable visible intent", async () => {
+    const profile = {
+      accuracy: "unknown" as const,
+      consent_id: "cns_account_processing_0001",
+      birth_date: "1990-05-15",
+      birth_time_local: null,
+      timezone_hint: "America/Los_Angeles",
+      approximate_window_minutes: null,
+    };
+    mockApiResponses({
+      "/v1/birth-profiles": {
+        status: 202,
+        body: {
+          schema_version: "0.2.0",
+          workflow: "CalculateBirthChart",
+          status: "queued",
+          idempotency_key: "web-birth-visible-intent-0001",
+          job_id: "job_birth_0001",
+          resource_id: null,
+        },
+      },
+    });
+
+    await createBirthProfile(profile, "web-birth-visible-intent-0001");
+
+    expect(
+      capturedFor("/v1/birth-profiles")[0]!.headers.get("idempotency-key"),
+    ).toBe("web-birth-visible-intent-0001");
   });
 });
 

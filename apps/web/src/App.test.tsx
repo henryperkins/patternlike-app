@@ -23,6 +23,13 @@ import {
   evidenceGraph,
   todayResponse,
 } from "./test/reading-fixture.js";
+import {
+  ACCOUNT_PROCESSING_CONSENT_PATH,
+  accountProcessingGranted,
+  accountProcessingNotGranted,
+  accountProcessingRevokedFreeze,
+  accountProcessingUnexplainedFreeze,
+} from "./test/account-processing-fixture.js";
 
 const auth0Harness = vi.hoisted(() => ({
   current: null as Auth0ContextInterface | null,
@@ -132,6 +139,21 @@ function mockApiResponses(responses: Record<string, MockResponse>) {
       },
     };
   }
+  if (
+    !(`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}` in responses) &&
+    !(ACCOUNT_PROCESSING_CONSENT_PATH in responses)
+  ) {
+    responses[`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`] = {
+      status: 200,
+      body: accountProcessingGranted,
+    };
+  }
+  if (!(`PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}` in responses)) {
+    responses[`PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`] = {
+      status: 200,
+      body: accountProcessingGranted,
+    };
+  }
   stubApiResponses(responses);
 }
 
@@ -228,6 +250,207 @@ describe("web application shell", () => {
       await screen.findByRole("heading", { name: /Begin with what you know/i }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Setup needed").length).toBeGreaterThan(0);
+  });
+
+  it("classifies a proven consent freeze into recovery outside the app shell", async () => {
+    mockApiResponses({
+      "/v1/chart": {
+        status: 403,
+        body: {
+          error: {
+            code: "account_not_active",
+            message: "The account is not active",
+            request_id: "req_frozen_chart",
+          },
+        },
+      },
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingRevokedFreeze,
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /account is frozen/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Restore access/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Request export/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Delete account/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Sign out/i })).toBeEnabled();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(preferenceSyncHarness.sync).not.toHaveBeenCalled();
+  });
+
+  it("does not label an unexplained frozen account as consent-recoverable", async () => {
+    mockApiResponses({
+      "/v1/chart": {
+        status: 403,
+        body: {
+          error: {
+            code: "account_not_active",
+            message: "The account is not active",
+          },
+        },
+      },
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingUnexplainedFreeze,
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /access is paused/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Restore access/i }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Request export/i })).toBeEnabled();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+  });
+
+  it("does not call a rejected consent read a consent freeze", async () => {
+    mockApiResponses({
+      "/v1/chart": {
+        status: 403,
+        body: {
+          error: {
+            code: "account_not_active",
+            message: "The account is not active",
+          },
+        },
+      },
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 403,
+        body: {
+          error: {
+            code: "account_not_active",
+            message: "This account cannot read consent state",
+            request_id: "req_consent_rejected",
+          },
+        },
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /Account access is unavailable/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/consent freeze/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Restore access/i }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Request export/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Delete account/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Sign out/i })).toBeEnabled();
+  });
+
+  it("offers current-policy reconfirmation for an active account without a grant", async () => {
+    mockApiResponses({
+      "/v1/chart": {
+        status: 403,
+        body: {
+          error: {
+            code: "account_processing_required",
+            message: "Current account-processing permission is required",
+          },
+        },
+      },
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingNotGranted,
+      },
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /Review calculation permission/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/account is frozen/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Grant permission and continue/i }),
+    ).toBeEnabled();
+  });
+
+  it("reloads the retained chart after a successful regrant", async () => {
+    const user = userEvent.setup();
+    let chartReads = 0;
+    const responses: Record<string, MockResponse> = {
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingRevokedFreeze,
+      },
+      [`PUT ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: {
+          ...accountProcessingGranted,
+          ui_surface: "privacy_center",
+        },
+      },
+    };
+    Object.defineProperty(responses, "/v1/chart", {
+      enumerable: true,
+      get: () => chartReads++ === 0
+        ? {
+            status: 403,
+            body: {
+              error: {
+                code: "account_not_active",
+                message: "The account is not active",
+              },
+            },
+          }
+        : { status: 200, body: chart },
+    });
+    mockApiResponses(responses);
+
+    render(<App />);
+    await user.click(
+      await screen.findByRole("button", { name: /Restore access/i }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /architecture of your chart/i }),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/chart")).toHaveLength(2);
+  });
+
+  it("enters recovery immediately after privacy withdrawal without probing a gated route", async () => {
+    const user = userEvent.setup();
+    mockApiResponses({
+      "/v1/chart": { status: 200, body: chart },
+      [`GET ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingGranted,
+      },
+      [`DELETE ${ACCOUNT_PROCESSING_CONSENT_PATH}`]: {
+        status: 200,
+        body: accountProcessingRevokedFreeze,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /architecture of your chart/i });
+    await user.click(screen.getAllByRole("link", { name: "Privacy" })[0]!);
+    const withdraw = await screen.findByRole("button", {
+      name: /Withdraw calculation permission/i,
+    });
+    await user.click(withdraw);
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /understand.*retained data.*stop being served/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Freeze account/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /account is frozen/i }),
+    ).toBeInTheDocument();
+    expect(capturedFor("/v1/chart")).toHaveLength(1);
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 
   it("renders calculated facts without inventing an interpretation", async () => {

@@ -73,6 +73,7 @@ export type SafeLogEvent =
       timeout_ms: number;
     }
   | { event: "birth_calc_budget_exhausted"; daily_limit: number }
+  | { event: "birth_calc_cancelled"; reason: "consent_invalid" }
   | { event: "calc_failed" }
   | { event: "content_release_keys_misconfigured" }
   | {

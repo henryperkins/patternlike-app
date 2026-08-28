@@ -1,6 +1,8 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BirthProfileRequest } from "@patternlike/shared";
+import { AccountAccessRecovery } from "./components/AccountAccessRecovery.js";
+import { AccountDataControls } from "./components/AccountDataControls.js";
 import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
 import { DeletionStatusView } from "./components/DeletionStatusView.js";
@@ -15,8 +17,10 @@ import {
   ApiError,
   createBirthProfile,
   endSession,
+  getAccountProcessingConsent,
   getChart,
   type BirthWorkflowResponse,
+  type AccountProcessingConsentDocument,
   type ChartResponse,
 } from "./lib/api-client.js";
 import {
@@ -24,6 +28,7 @@ import {
   completeSignIn,
   signOut,
 } from "./lib/auth.js";
+import { isAccountProcessingConsentResponse } from "./lib/account-processing-consent.js";
 import {
   DevicePreferenceSynchronizer,
   type DevicePreferenceSyncResult,
@@ -33,6 +38,8 @@ type ChartState =
   | { status: "loading" }
   | { status: "ready"; chart: ChartResponse }
   | { status: "missing" }
+  | { status: "access-recovery"; consent: AccountProcessingConsentDocument }
+  | { status: "access-unavailable"; message: string; requestId?: string | null }
   | { status: "offline"; message: string; requestId?: string | null };
 
 /**
@@ -105,6 +112,50 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
       if (error instanceof ApiError && error.status === 404) {
         setHasValidatedSession(true);
         setChartState({ status: "missing" });
+        return;
+      }
+      if (
+        error instanceof ApiError &&
+        error.status === 403 &&
+        (error.code === "account_not_active" ||
+          error.code === "account_processing_required")
+      ) {
+        setHasValidatedSession(false);
+        try {
+          const consent = await getAccountProcessingConsent(signal);
+          if (signal?.aborted) return;
+          if (!isAccountProcessingConsentResponse(consent)) {
+            setChartState({
+              status: "access-unavailable",
+              message:
+                "The current calculation permission could not be read safely.",
+              requestId: error.requestId,
+            });
+          } else if (
+            consent.account_status === "frozen" ||
+            (consent.account_status === "active" && consent.status === "not_granted")
+          ) {
+            setChartState({ status: "access-recovery", consent });
+          } else {
+            setChartState({
+              status: "access-unavailable",
+              message:
+                "The account state could not be reconciled with the current calculation permission.",
+              requestId: error.requestId,
+            });
+          }
+        } catch (consentError) {
+          if (signal?.aborted) return;
+          setChartState({
+            status: "access-unavailable",
+            message:
+              "The account is unavailable. Export, deletion, and sign out may still be available.",
+            requestId:
+              consentError instanceof ApiError
+                ? consentError.requestId
+                : error.requestId,
+          });
+        }
         return;
       }
       setHasValidatedSession(false);
@@ -251,10 +302,11 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   const submitBirthProfile = async (
     profile: BirthProfileRequest,
     intent: "create" | "correct",
+    idempotencyKey: string,
   ) => {
     let accepted: BirthWorkflowResponse | null = null;
     try {
-      accepted = await createBirthProfile(profile);
+      accepted = await createBirthProfile(profile, idempotencyKey);
     } catch (error) {
       if (!(error instanceof ApiError && error.code === "chart_already_exists")) {
         throw error;
@@ -293,12 +345,12 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     throw new Error("The calculation was accepted but is not ready yet. Try again in a moment.");
   };
 
-  const createChart = async (profile: BirthProfileRequest) => {
-    await submitBirthProfile(profile, "create");
+  const createChart = async (profile: BirthProfileRequest, idempotencyKey: string) => {
+    await submitBirthProfile(profile, "create", idempotencyKey);
   };
 
-  const correctChart = async (profile: BirthProfileRequest) => {
-    await submitBirthProfile(profile, "correct");
+  const correctChart = async (profile: BirthProfileRequest, idempotencyKey: string) => {
+    await submitBirthProfile(profile, "correct", idempotencyKey);
   };
 
   if (view === "deletion-status") {
@@ -314,6 +366,49 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         onSignIn={() => loginWithRedirect()}
         error={authState.error}
       />
+    );
+  }
+
+  if (chartState.status === "access-recovery") {
+    return (
+      <AccountAccessRecovery
+        consent={chartState.consent}
+        onRestored={() => {
+          setChartState({ status: "loading" });
+          void load();
+        }}
+        onSignOut={() => void endSessionAndSignOut()}
+        onDeletionAccepted={showDeletionStatus}
+      />
+    );
+  }
+
+  if (chartState.status === "access-unavailable") {
+    return (
+      <main className="privacy-page page-enter" id="main-content">
+        <header className="page-header privacy-page__header">
+          <div>
+            <p className="eyebrow">Account access</p>
+            <h1>Account access is unavailable.</h1>
+          </div>
+          <p className="page-header__lede">{chartState.message}</p>
+        </header>
+        {chartState.requestId ? <code>Request {chartState.requestId}</code> : null}
+        <AccountDataControls onDeletionAccepted={showDeletionStatus} />
+        <section className="privacy-session panel" aria-labelledby="unavailable-session-heading">
+          <div>
+            <p className="kicker">Session</p>
+            <h2 id="unavailable-session-heading">Leave this account?</h2>
+          </div>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => void endSessionAndSignOut()}
+          >
+            Sign out <Icon name="arrow" />
+          </button>
+        </section>
+      </main>
     );
   }
 
@@ -362,6 +457,10 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         onSignOut={() => void endSessionAndSignOut()}
         onDeletionAccepted={showDeletionStatus}
         onCorrectBirth={chart ? () => setCorrectingBirth(true) : undefined}
+        onProcessingFrozen={(consent) => {
+          setHasValidatedSession(false);
+          setChartState({ status: "access-recovery", consent });
+        }}
       />
     );
   } else if (view === "today") {

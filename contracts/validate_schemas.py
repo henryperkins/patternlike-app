@@ -157,6 +157,8 @@ FIXTURE_SCHEMA = {
         "account-export": M7_BASE + "account-export.schema.json#/$defs/accountExport",
     },
     "m8": {
+        "account-processing-consent": M8_BASE
+        + "account-processing-consent.schema.json#/$defs/accountProcessingConsentResponse",
         "place-search.query-too-short": M8_BASE
         + "place-search.schema.json#/$defs/placeSearchRequest",
         "place-search.results": M8_BASE
@@ -2411,6 +2413,8 @@ M8_PREDECESSOR_HASHES = {
     "contracts/m7": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
 }
 M8_REQUIRED_VALID_FIXTURES = {
+    "account-processing-consent.granted.json",
+    "account-processing-consent.not-granted.json",
     "account-export.saved-reading.json",
     "account-export.saved-reading-m3.json",
     "birth-profile.budget-exhausted.json",
@@ -2423,6 +2427,10 @@ M8_REQUIRED_VALID_FIXTURES = {
     "reading-save-state.saved.json",
 }
 M8_REQUIRED_INVALID_FIXTURES = {
+    "account-processing-consent.missing-consent-id.json",
+    "account-processing-consent.stale-policy.json",
+    "account-processing-consent.wrong-allowed-use.json",
+    "account-processing-consent.wrong-source.json",
     "account-export.secret-shaped-content.json",
     "birth-profile.budget-exhausted-missing-reset.json",
     "geocoder-consent.extra-field.json",
@@ -2437,6 +2445,7 @@ M8_REQUIRED_INVALID_FIXTURES = {
     "reading-save-state.unsaved-with-timestamp.json",
 }
 M8_REQUIRED_SCHEMAS = {
+    "account-processing-consent.schema.json",
     "account-export.schema.json",
     "common.schema.json",
     "geocoder-consent.schema.json",
@@ -2470,6 +2479,27 @@ M8_DISCLOSURE_LINKS = {
     "google_maps_terms": "https://maps.google.com/help/terms_maps/",
     "google_privacy": "https://policies.google.com/privacy",
 }
+M8_ACCOUNT_PROCESSING_POLICY_VERSION = "account-processing-v1-2026-08-28"
+M8_ACCOUNT_PROCESSING_DISCLOSURE_TEXT = (
+    "Pattern/Like uses the birth date, local birth time, accuracy choice, place label, "
+    "coordinates, and timezone you submit to calculate your natal chart, timing cycles, "
+    "and uncertainty. The API sends those values to Pattern/Like's calculation service; "
+    "it does not send them to a generative model. Pattern/Like encrypts the submitted "
+    "profile and retained birth fields under your account key while retaining the "
+    "calculated chart facts needed by the product. Separate permissions govern generated "
+    "readings, Your Pattern, research, and model training. You may withdraw this "
+    "permission at any time. Withdrawal retains the account data but stops serving it by "
+    "freezing the account; regrant, export, and account deletion remain available."
+)
+M8_ACCOUNT_PROCESSING_DISCLOSURE_LINKS = {
+    "patternlike_terms": "/terms.html",
+    "patternlike_privacy": "/privacy.html",
+}
+M8_ACCOUNT_PROCESSING_ALLOWED_USES = [
+    "chart_fact",
+    "cycle_detection",
+    "uncertainty_model",
+]
 
 
 def check_m8_fixture_inventory() -> list[str]:
@@ -2490,6 +2520,7 @@ def check_m8_fixture_inventory() -> list[str]:
         errors.append(f"M8 unexpected invalid fixture is present: {unexpected}")
 
     expected_prefixes = {
+        "account-processing-consent",
         "account-export",
         "birth-profile",
         "geocoder-consent",
@@ -2832,6 +2863,82 @@ def check_m8_schema_projection(registry: Registry) -> list[str]:
     ):
         errors.append("geocoder consent does not pin scopes to the empty tuple")
 
+    account_consent_defs = (
+        documents["account-processing-consent.schema.json"].get("$defs") or {}
+    )
+    account_consent = account_consent_defs.get("accountProcessingConsentResponse") or {}
+    account_props = account_consent.get("properties") or {}
+    account_expected_consts = {
+        "kind": "account_processing",
+        "source_id": "AST-01",
+        "permission_tier": 0,
+        "provider": None,
+        "connector_account_id": None,
+        "policy_version": M8_ACCOUNT_PROCESSING_POLICY_VERSION,
+    }
+    for field, expected in account_expected_consts.items():
+        if (account_props.get(field) or {}).get("const") != expected:
+            errors.append(
+                f"account-processing consent does not pin {field} to {expected!r}"
+            )
+    account_disclosure = account_props.get("disclosure") or {}
+    if account_disclosure.get("$ref") == "#/$defs/accountProcessingDisclosure":
+        account_disclosure = account_consent_defs.get("accountProcessingDisclosure") or {}
+    account_disclosure_props = account_disclosure.get("properties") or {}
+    if (
+        (account_disclosure_props.get("text") or {}).get("const")
+        != M8_ACCOUNT_PROCESSING_DISCLOSURE_TEXT
+    ):
+        errors.append("account-processing consent does not pin the immutable disclosure text")
+    account_links_schema = account_disclosure_props.get("links") or {}
+    if account_links_schema.get("$ref") == "#/$defs/accountProcessingDisclosureLinks":
+        account_links_schema = (
+            account_consent_defs.get("accountProcessingDisclosureLinks") or {}
+        )
+    account_links = account_links_schema.get("properties") or {}
+    for field, expected in M8_ACCOUNT_PROCESSING_DISCLOSURE_LINKS.items():
+        if (account_links.get(field) or {}).get("const") != expected:
+            errors.append(
+                f"account-processing consent does not pin disclosure link {field}"
+            )
+    account_allowed_uses = account_props.get("allowed_uses") or {}
+    account_allowed_use_consts = [
+        item.get("const")
+        for item in account_allowed_uses.get("prefixItems") or []
+        if isinstance(item, dict)
+    ]
+    if (
+        account_allowed_use_consts != M8_ACCOUNT_PROCESSING_ALLOWED_USES
+        or account_allowed_uses.get("minItems") != 3
+        or account_allowed_uses.get("maxItems") != 3
+        or account_allowed_uses.get("items") is not False
+    ):
+        errors.append("account-processing consent does not pin the ordered allowed-use tuple")
+    account_scopes = account_props.get("scopes") or {}
+    if (
+        account_scopes.get("minItems") != 0
+        or account_scopes.get("maxItems") != 0
+        or account_scopes.get("items") is not False
+    ):
+        errors.append("account-processing consent does not pin scopes to the empty tuple")
+    account_grant = account_consent_defs.get("accountProcessingConsentGrantRequest") or {}
+    account_grant_props = account_grant.get("properties") or {}
+    if (
+        account_grant.get("additionalProperties") is not False
+        or account_grant.get("required") != ["policy_version"]
+        or (account_grant_props.get("policy_version") or {}).get("const")
+        != M8_ACCOUNT_PROCESSING_POLICY_VERSION
+    ):
+        errors.append("account-processing consent grant is not the closed current policy")
+    account_status = account_props.get("account_status") or {}
+    if account_status.get("$ref") != "#/$defs/accountProcessingAccountStatus":
+        errors.append("account-processing consent does not reuse its closed account status")
+    if (account_props.get("regrant_will_restore_access") or {}).get("type") != "boolean":
+        errors.append("account-processing consent does not expose recovery truth as boolean")
+    account_variants = account_consent.get("oneOf") or []
+    if len(account_variants) != 2:
+        errors.append("account-processing consent does not close granted and not-granted variants")
+
     for filename in ("place-search.schema.json", "place-resolution.schema.json"):
         document = documents[filename]
         serialized = json.dumps(document).lower()
@@ -2979,6 +3086,13 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
                 )
 
     expected = {
+        ("/v1/consents/account-processing", "get"): {"200", "401", "503"},
+        ("/v1/consents/account-processing", "put"): {
+            "200", "400", "401", "403", "409", "429", "503"
+        },
+        ("/v1/consents/account-processing", "delete"): {
+            "200", "400", "401", "403", "409", "429", "503"
+        },
         ("/v1/places/search", "post"): {
             "200", "400", "401", "403", "409", "429", "503"
         },
@@ -2997,7 +3111,9 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
         ("/v1/readings/{reading_id}/save", "get"): {"200", "401", "404"},
         ("/v1/readings/{reading_id}/save", "put"): {"200", "401", "404"},
         ("/v1/readings/{reading_id}/save", "delete"): {"204", "401"},
-        ("/v1/birth-profiles", "post"): {"202", "400", "401", "409", "429", "503"},
+        ("/v1/birth-profiles", "post"): {
+            "202", "400", "401", "403", "409", "429", "503"
+        },
     }
     for (route, method), statuses in expected.items():
         operation = ((spec.get("paths") or {}).get(route) or {}).get(method)
@@ -3044,6 +3160,24 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
     if (consent_path.get("delete") or {}).get("requestBody") is not None:
         errors.append("M8 OpenAPI DELETE geocoder consent must have an empty body")
 
+    account_consent_path = (
+        (spec.get("paths") or {}).get("/v1/consents/account-processing") or {}
+    )
+    for method in ("put", "delete"):
+        operation = account_consent_path.get(method) or {}
+        refs = {
+            item.get("$ref")
+            for item in operation.get("parameters") or []
+            if isinstance(item, dict)
+        }
+        if refs != required_parameter_refs:
+            errors.append(
+                f"M8 OpenAPI {method.upper()} account-processing consent does not require "
+                "exactly Idempotency-Key and X-Consent-UI-Surface"
+            )
+    if (account_consent_path.get("delete") or {}).get("requestBody") is not None:
+        errors.append("M8 OpenAPI DELETE account-processing consent must have an empty body")
+
     schemas = components.get("schemas") or {}
     consent_component = schemas.get("GeocoderConsent") or {}
     consent_properties = consent_component.get("properties") or {}
@@ -3066,6 +3200,57 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
         != M8_POLICY_VERSION
     ):
         errors.append("M8 OpenAPI consent grant body is not the closed current policy")
+
+    account_component = schemas.get("AccountProcessingConsent") or {}
+    account_properties = account_component.get("properties") or {}
+    for field, expected_const in {
+        "kind": "account_processing",
+        "source_id": "AST-01",
+        "permission_tier": 0,
+        "provider": None,
+        "policy_version": M8_ACCOUNT_PROCESSING_POLICY_VERSION,
+    }.items():
+        if (account_properties.get(field) or {}).get("const") != expected_const:
+            errors.append(f"M8 OpenAPI AccountProcessingConsent does not pin {field}")
+    account_uses = account_properties.get("allowed_uses") or {}
+    account_use_consts = [
+        item.get("const")
+        for item in account_uses.get("prefixItems") or []
+        if isinstance(item, dict)
+    ]
+    if (
+        account_use_consts != M8_ACCOUNT_PROCESSING_ALLOWED_USES
+        or account_uses.get("minItems") != 3
+        or account_uses.get("maxItems") != 3
+        or account_uses.get("items") is not False
+    ):
+        errors.append("M8 OpenAPI AccountProcessingConsent does not pin ordered uses")
+    account_grant_component = schemas.get("AccountProcessingConsentGrant") or {}
+    account_grant_properties = account_grant_component.get("properties") or {}
+    if (
+        account_grant_component.get("additionalProperties") is not False
+        or account_grant_component.get("required") != ["policy_version"]
+        or (account_grant_properties.get("policy_version") or {}).get("const")
+        != M8_ACCOUNT_PROCESSING_POLICY_VERSION
+    ):
+        errors.append(
+            "M8 OpenAPI account-processing grant body is not the closed current policy"
+        )
+    account_disclosure = account_properties.get("disclosure") or {}
+    account_disclosure_properties = account_disclosure.get("properties") or {}
+    if (
+        (account_disclosure_properties.get("text") or {}).get("const")
+        != M8_ACCOUNT_PROCESSING_DISCLOSURE_TEXT
+    ):
+        errors.append("M8 OpenAPI AccountProcessingConsent does not pin disclosure text")
+    account_links = (
+        (account_disclosure_properties.get("links") or {}).get("properties") or {}
+    )
+    for field, expected in M8_ACCOUNT_PROCESSING_DISCLOSURE_LINKS.items():
+        if (account_links.get(field) or {}).get("const") != expected:
+            errors.append(
+                f"M8 OpenAPI AccountProcessingConsent does not pin disclosure link {field}"
+            )
 
     list_readings = ((spec.get("paths") or {}).get("/v1/readings") or {}).get("get") or {}
     list_parameters = {

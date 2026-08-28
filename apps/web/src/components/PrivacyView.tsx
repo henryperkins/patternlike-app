@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
+  getAccountProcessingConsent,
   getAiSynthesisConsent,
   getPatternGenerationConsent,
   grantAiSynthesisConsent,
   newIdempotencyKey,
+  revokeAccountProcessingConsent,
   revokeAiSynthesisConsent,
   revokePatternGenerationConsent,
+  type AccountProcessingConsentDocument,
   type AiSynthesisConsent,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
+import { isAccountProcessingConsentResponse } from "../lib/account-processing-consent.js";
 import { formatInstant } from "../lib/reading-format.js";
 import { AccountDataControls } from "./AccountDataControls.js";
 import { AiConsentTerms } from "./AiConsent.js";
@@ -23,6 +27,217 @@ type ConsentPanelState =
   | { status: "loading" }
   | { status: "ready"; consent: AiSynthesisConsent }
   | { status: "unreadable"; message: string };
+
+type ProcessingConsentPanelState =
+  | { status: "loading" }
+  | { status: "ready"; consent: AccountProcessingConsentDocument }
+  | { status: "unreadable"; message: string };
+
+function AccountProcessingConsentPanel({
+  onFrozen,
+}: {
+  onFrozen: (consent: AccountProcessingConsentDocument) => void;
+}) {
+  const [state, setState] = useState<ProcessingConsentPanelState>({
+    status: "loading",
+  });
+  const [reloads, setReloads] = useState(0);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const revokeKey = useRef<string | null>(null);
+  const withdrawTriggerRef = useRef<HTMLButtonElement>(null);
+  const confirmationRef = useRef<HTMLInputElement>(null);
+  const restoreWithdrawFocus = useRef(false);
+
+  useEffect(() => {
+    if (confirming) {
+      confirmationRef.current?.focus();
+    } else if (restoreWithdrawFocus.current) {
+      restoreWithdrawFocus.current = false;
+      withdrawTriggerRef.current?.focus();
+    }
+  }, [confirming]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getAccountProcessingConsent(controller.signal)
+      .then((consent) => {
+        if (controller.signal.aborted) return;
+        if (isAccountProcessingConsentResponse(consent)) {
+          setState({ status: "ready", consent });
+        } else {
+          setState({
+            status: "unreadable",
+            message: "The calculation permission could not be read in this session.",
+          });
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setState({
+            status: "unreadable",
+            message:
+              error instanceof Error
+                ? error.message
+                : "The calculation permission could not be read in this session.",
+          });
+        }
+      });
+    return () => controller.abort();
+  }, [reloads]);
+
+  const revoke = async () => {
+    if (!confirmed || busy) return;
+    setBusy(true);
+    setProblem(null);
+    revokeKey.current ??= newIdempotencyKey("web-account-processing");
+    try {
+      const next = await revokeAccountProcessingConsent(revokeKey.current);
+      if (!isAccountProcessingConsentResponse(next)) {
+        throw new Error("The updated calculation permission could not be read.");
+      }
+      revokeKey.current = null;
+      setState({ status: "ready", consent: next });
+      setConfirming(false);
+      setConfirmed(false);
+      if (next.account_status === "frozen") onFrozen(next);
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError
+          ? withRequestId(error.message, error.requestId)
+          : error instanceof Error
+            ? error.message
+            : "The calculation permission could not be withdrawn.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const granted = state.status === "ready" && state.consent.status === "granted";
+  const chip = state.status === "ready"
+    ? granted ? "Granted" : "Not granted"
+    : "Unknown";
+
+  return (
+    <section
+      className="ai-consent panel"
+      aria-labelledby="account-processing-consent-heading"
+    >
+      <div className="panel-heading">
+        <div>
+          <p className="kicker">Birth calculation</p>
+          <h2 id="account-processing-consent-heading">
+            Birth calculation permission
+          </h2>
+        </div>
+        <span className={`source-state${granted ? " source-state--active" : ""}`}>
+          <i /> {chip}
+        </span>
+      </div>
+
+      {state.status === "ready" ? (
+        <>
+          <p>{state.consent.disclosure.text}</p>
+          <p>
+            Policy <code>{state.consent.policy_version}</code>.{" "}
+            <a href={state.consent.disclosure.links.patternlike_terms}>Terms</a>{" "}
+            <a href={state.consent.disclosure.links.patternlike_privacy}>
+              Privacy policy
+            </a>
+          </p>
+          {granted && state.consent.granted_at ? (
+            <p className="ai-consent__since">
+              Granted {formatInstant(state.consent.granted_at)}.
+            </p>
+          ) : null}
+
+          {granted && !confirming ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              ref={withdrawTriggerRef}
+              onClick={() => {
+                setProblem(null);
+                setConfirming(true);
+              }}
+            >
+              Withdraw calculation permission <Icon name="shield" />
+            </button>
+          ) : null}
+
+          {granted && confirming ? (
+            <div className="privacy-action__confirm">
+              <p>
+                Withdrawing will freeze this account. Retained data will stop
+                being served until this permission is granted again.
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  ref={confirmationRef}
+                  checked={confirmed}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                />
+                I understand that retained data will stop being served.
+              </label>
+              <div className="privacy-action__confirm-actions">
+                <button
+                  className="button button--danger"
+                  type="button"
+                  disabled={!confirmed || busy}
+                  onClick={() => void revoke()}
+                >
+                  Freeze account
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    restoreWithdrawFocus.current = true;
+                    setConfirming(false);
+                    setConfirmed(false);
+                    setProblem(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      <p
+        className="privacy-action__status"
+        role="status"
+        aria-label="Birth calculation permission status"
+        aria-live="polite"
+      >
+        {state.status === "loading"
+          ? "Reading your current calculation permission."
+          : state.status === "unreadable"
+            ? state.message
+            : (problem ?? "")}
+      </p>
+      {state.status === "unreadable" ? (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => {
+            setState({ status: "loading" });
+            setReloads((value) => value + 1);
+          }}
+        >
+          Try again <Icon name="refresh" />
+        </button>
+      ) : null}
+    </section>
+  );
+}
 
 /**
  * The account-level AI-synthesis permission, shown where every other data
@@ -287,11 +502,13 @@ export function PrivacyView({
   onSignOut,
   onDeletionAccepted,
   onCorrectBirth,
+  onProcessingFrozen,
 }: {
   hasChart: boolean;
   onSignOut: () => void;
   onDeletionAccepted: () => void;
   onCorrectBirth?: () => void;
+  onProcessingFrozen: (consent: AccountProcessingConsentDocument) => void;
 }) {
   return (
     <div className="privacy-page page-enter">
@@ -323,6 +540,8 @@ export function PrivacyView({
       </section>
 
       <AiSynthesisConsentPanel />
+
+      <AccountProcessingConsentPanel onFrozen={onProcessingFrozen} />
 
       <PatternGenerationConsentPanel />
 

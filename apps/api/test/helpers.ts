@@ -37,6 +37,10 @@ import {
   OPENAI_READING_MODEL,
   READING_PROMPT_VERSION,
 } from "../src/services/reading-publisher.js";
+import {
+  ACCOUNT_PROCESSING_ALLOWED_USES,
+  ACCOUNT_PROCESSING_POLICY_VERSION,
+} from "../src/policies/account-processing-policies.js";
 
 /**
  * The Codex posture every suite that enables Daily generation needs.
@@ -403,16 +407,58 @@ export const IDENTITY_OTHER: UserIdentity = {
  * integration tests exercise the same shape production does. Not idempotent:
  * seed in exactly one place per suite or the users.id PRIMARY KEY collides.
  */
-export async function seedUser(id: UserIdentity): Promise<void> {
+export interface SeedUserOptions {
+  /**
+   * Ordinary route fixtures predate the launch account-processing gate. Seed
+   * its current grant by default so they continue to model an authorized
+   * active account; consent/gate suites opt out to exercise recovery states.
+   */
+  accountProcessingConsent?: boolean;
+  accountProcessingConsentId?: string;
+}
+
+export function seededAccountProcessingConsentId(userId: string): string {
+  if (userId === USER_A) return "cns_alice_0001";
+  if (userId === USER_B) return "cns_bob_0001";
+  if (userId === USER_OTHER) return "cns_other_0001";
+  return `cns_seed_${userId.replace(/[^A-Za-z0-9]/g, "_")}`;
+}
+
+export async function seedUser(
+  id: UserIdentity,
+  options: SeedUserOptions = {},
+): Promise<void> {
   const now = new Date().toISOString();
-  await env.DB.batch([
+  const statements = [
     env.DB.prepare(
       `INSERT INTO users (id, crypto_subject, status, locale, timezone,
                           entitlement_tier, created_at, updated_at)
        VALUES (?, ?, 'active', 'en-US', 'UTC', 'free', ?, ?)`,
     ).bind(id.userId, id.cryptoSubject, now, now),
     await buildUserKeyInsert(env, id),
-  ]);
+  ];
+  if (options.accountProcessingConsent !== false) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO consents (
+           id, user_id, kind, status, source_id, permission_tier,
+           allowed_uses_json, scopes_json, provider, connector_account_id,
+           policy_version, ui_surface, granted_at, version, created_at, updated_at
+         ) VALUES (?, ?, 'account_processing', 'granted', 'AST-01', 0,
+                   ?, '[]', NULL, NULL, ?, 'onboarding', ?, 1, ?, ?)`,
+      ).bind(
+        options.accountProcessingConsentId ??
+          seededAccountProcessingConsentId(id.userId),
+        id.userId,
+        JSON.stringify(ACCOUNT_PROCESSING_ALLOWED_USES),
+        ACCOUNT_PROCESSING_POLICY_VERSION,
+        now,
+        now,
+        now,
+      ),
+    );
+  }
+  await env.DB.batch(statements);
 }
 
 /**

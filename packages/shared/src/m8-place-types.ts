@@ -102,6 +102,58 @@ export interface GeocoderConsentResponse {
   };
 }
 
+export const ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION =
+  "account-processing-v1-2026-08-28" as const;
+
+export const ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_TEXT =
+  "Pattern/Like uses the birth date, local birth time, accuracy choice, place label, coordinates, and timezone you submit to calculate your natal chart, timing cycles, and uncertainty. The API sends those values to Pattern/Like's calculation service; it does not send them to a generative model. Pattern/Like encrypts the submitted profile and retained birth fields under your account key while retaining the calculated chart facts needed by the product. Separate permissions govern generated readings, Your Pattern, research, and model training. You may withdraw this permission at any time. Withdrawal retains the account data but stops serving it by freezing the account; regrant, export, and account deletion remain available." as const;
+
+export const ACCOUNT_PROCESSING_ALLOWED_USES = [
+  "chart_fact",
+  "cycle_detection",
+  "uncertainty_model",
+] as const;
+
+export const ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_LINKS = {
+  patternlike_terms: "/terms.html",
+  patternlike_privacy: "/privacy.html",
+} as const;
+
+export type AccountProcessingConsentUiSurface =
+  | "onboarding"
+  | "privacy_center";
+
+export type AccountProcessingAccountStatus = "active" | "frozen";
+
+export interface AccountProcessingConsentGrantRequest {
+  policy_version: typeof ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION;
+}
+
+export interface AccountProcessingConsentResponse {
+  schema_version: M8SchemaVersion;
+  kind: "account_processing";
+  source_id: "AST-01";
+  permission_tier: 0;
+  allowed_uses: ["chart_fact", "cycle_detection", "uncertainty_model"];
+  provider: null;
+  scopes: [];
+  connector_account_id: null;
+  status: "granted" | "not_granted";
+  consent_id: string | null;
+  account_status: AccountProcessingAccountStatus;
+  regrant_will_restore_access: boolean;
+  policy_version: typeof ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION;
+  granted_at: string | null;
+  ui_surface: AccountProcessingConsentUiSurface | null;
+  disclosure: {
+    text: typeof ACCOUNT_PROCESSING_CONSENT_DISCLOSURE_TEXT;
+    links: {
+      patternlike_terms: "/terms.html";
+      patternlike_privacy: "/privacy.html";
+    };
+  };
+}
+
 export interface BirthCalcBudgetExhausted {
   error: {
     code: "birth_calc_budget_exhausted";

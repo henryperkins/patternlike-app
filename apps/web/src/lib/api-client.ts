@@ -1,4 +1,6 @@
 import type {
+  AccountProcessingConsentResponse as AccountProcessingConsentContract,
+  AccountProcessingConsentUiSurface,
   BirthProfileRequest,
   BirthTimeAccuracy,
   ChartSnapshot,
@@ -38,6 +40,22 @@ export interface BirthWorkflowResponse extends WorkflowAccepted {
     status: "active";
   };
 }
+
+/**
+ * The browser must be able to render a newly current server policy after a
+ * stale-policy response. M8 pins the launch policy literally, while this wire
+ * reader deliberately widens the two fields a later immutable policy changes.
+ */
+export type AccountProcessingConsentDocument = Omit<
+  AccountProcessingConsentContract,
+  "policy_version" | "disclosure"
+> & {
+  policy_version: string;
+  disclosure: {
+    text: string;
+    links: AccountProcessingConsentContract["disclosure"]["links"];
+  };
+};
 
 export class ApiError extends Error {
   readonly status: number;
@@ -86,12 +104,20 @@ interface HeaderOptions {
    * for the real handler to land.
    */
   idempotencyKey?: string;
+  consentUiSurface?: AccountProcessingConsentUiSurface;
 }
 
-function requestHeaders({ json = false, idempotencyKey }: HeaderOptions = {}): Headers {
+function requestHeaders({
+  json = false,
+  idempotencyKey,
+  consentUiSurface,
+}: HeaderOptions = {}): Headers {
   const headers = new Headers();
   if (json) headers.set("content-type", "application/json");
   if (idempotencyKey) headers.set("idempotency-key", idempotencyKey);
+  if (consentUiSurface) {
+    headers.set("x-consent-ui-surface", consentUiSurface);
+  }
 
   const devUserId =
     import.meta.env.VITE_DEV_USER_ID ??
@@ -251,12 +277,13 @@ export function lookupTimezone(
 
 export function createBirthProfile(
   profile: BirthProfileRequest,
+  idempotencyKey: string,
 ): Promise<BirthWorkflowResponse> {
   return request<BirthWorkflowResponse>("/v1/birth-profiles", {
     method: "POST",
     headers: requestHeaders({
       json: true,
-      idempotencyKey: newIdempotencyKey("web-birth"),
+      idempotencyKey,
     }),
     body: JSON.stringify(profile),
   });
@@ -866,6 +893,54 @@ export function revokeAiSynthesisConsent(
   });
 }
 
+export function getAccountProcessingConsent(
+  signal?: AbortSignal,
+): Promise<AccountProcessingConsentDocument> {
+  return request<AccountProcessingConsentDocument>(
+    "/v1/consents/account-processing",
+    { method: "GET", headers: requestHeaders(), signal },
+  );
+}
+
+export function grantAccountProcessingConsent(
+  policyVersion: string,
+  idempotencyKey: string,
+  consentUiSurface: AccountProcessingConsentUiSurface,
+  signal?: AbortSignal,
+): Promise<AccountProcessingConsentDocument> {
+  return request<AccountProcessingConsentDocument>(
+    "/v1/consents/account-processing",
+    {
+      method: "PUT",
+      headers: requestHeaders({
+        json: true,
+        idempotencyKey,
+        consentUiSurface,
+      }),
+      body: JSON.stringify({ policy_version: policyVersion }),
+      signal,
+    },
+  );
+}
+
+/** Empty body by contract; the privacy-center header supplies the UI surface. */
+export function revokeAccountProcessingConsent(
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<AccountProcessingConsentDocument> {
+  return request<AccountProcessingConsentDocument>(
+    "/v1/consents/account-processing",
+    {
+      method: "DELETE",
+      headers: requestHeaders({
+        idempotencyKey,
+        consentUiSurface: "privacy_center",
+      }),
+      signal,
+    },
+  );
+}
+
 export type PreferenceWriteSource = "user_confirmed" | "device_derived";
 export type PreferenceSource = PreferenceWriteSource | "default_unconfirmed";
 
@@ -1254,8 +1329,4 @@ export function deleteLifeEvent(
     headers: requestHeaders({ idempotencyKey }),
     signal,
   });
-}
-
-export function onboardingConsentId(): string {
-  return import.meta.env.VITE_CONSENT_ID ?? "cns_local_web_0001";
 }

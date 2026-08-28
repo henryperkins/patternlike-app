@@ -54,6 +54,36 @@ async function startSession(idToken: string, requestId?: string) {
   );
 }
 
+async function grantAccountProcessing(
+  authorization: string,
+  idempotencyKey: string,
+): Promise<string> {
+  const response = await app.request(
+    "/v1/consents/account-processing",
+    {
+      method: "PUT",
+      headers: {
+        authorization,
+        "content-type": "application/json",
+        "idempotency-key": idempotencyKey,
+        "x-consent-ui-surface": "onboarding",
+      },
+      body: JSON.stringify({
+        policy_version: "account-processing-v1-2026-08-28",
+      }),
+    },
+    prodEnv(),
+  );
+  expect(response.status).toBe(200);
+  const document = (await response.json()) as {
+    status: string;
+    consent_id: string | null;
+  };
+  expect(document.status).toBe("granted");
+  expect(document.consent_id).toEqual(expect.any(String));
+  return document.consent_id!;
+}
+
 describe("identity end to end", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
@@ -216,6 +246,10 @@ describe("identity end to end", () => {
     const session = await startSession(await signToken({ sub: "sub-alice" }));
     const { token } = (await session.json()) as { token: string };
     const auth = { authorization: `Bearer ${token}` };
+    const consentId = await grantAccountProcessing(
+      auth.authorization,
+      "idem-e2e-consent-1",
+    );
 
     const post = await app.request(
       "/v1/birth-profiles",
@@ -226,7 +260,7 @@ describe("identity end to end", () => {
           "content-type": "application/json",
           "idempotency-key": "idem-e2e-1",
         },
-        body: JSON.stringify(ALICE),
+        body: JSON.stringify({ ...ALICE, consent_id: consentId }),
       },
       prodEnv(),
     );
@@ -246,6 +280,10 @@ describe("identity end to end", () => {
   it("does not serve one user's chart to another user's session", async () => {
     const aliceSession = await startSession(await signToken({ sub: "sub-alice" }));
     const { token: aliceToken } = (await aliceSession.json()) as { token: string };
+    const aliceConsentId = await grantAccountProcessing(
+      `Bearer ${aliceToken}`,
+      "idem-e2e-consent-2-alice",
+    );
 
     await app.request(
       "/v1/birth-profiles",
@@ -256,13 +294,17 @@ describe("identity end to end", () => {
           "content-type": "application/json",
           "idempotency-key": "idem-e2e-2",
         },
-        body: JSON.stringify(ALICE),
+        body: JSON.stringify({ ...ALICE, consent_id: aliceConsentId }),
       },
       prodEnv(),
     );
 
     const bobSession = await startSession(await signToken({ sub: "sub-bob" }));
     const { token: bobToken } = (await bobSession.json()) as { token: string };
+    await grantAccountProcessing(
+      `Bearer ${bobToken}`,
+      "idem-e2e-consent-2-bob",
+    );
 
     const bobChart = await app.request(
       "/v1/chart",

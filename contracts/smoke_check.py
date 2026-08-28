@@ -13,6 +13,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -115,6 +116,18 @@ def seed_job(con: sqlite3.Connection, jid: str, uid: str | None, key: str) -> No
         "VALUES (?, 'GenerateDailyReading', ?, ?, 'queued', 0, ?)",
         (jid, uid, key, NOW),
     )
+
+
+def check_migration_manifest() -> None:
+    manifest_path = MIGRATIONS / "MIGRATIONS.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    declared = [entry.get("file") for entry in manifest.get("migrations", [])]
+    shipped = [path.name for path in migration_files()]
+    if declared != shipped:
+        raise SystemExit(
+            f"MIGRATIONS.json files {declared} do not match shipped migrations {shipped}"
+        )
+    print(f"D1 OK  manifest declares all {len(shipped)} migration file(s) in order")
 
 
 def insert_reading(
@@ -1263,7 +1276,85 @@ def check_0016_over_populated_0015() -> None:
     )
 
 
+def check_0018_over_populated_0017() -> None:
+    """0018 adds truthful nullable consent provenance without inventing history."""
+    con = fresh(upto=17)
+    seed_user(con, USER_A, SUBJ_A)
+    seed_user(con, USER_B, SUBJ_B)
+    profiles_before = [
+        (USER_A, 7, "unknown", "invalid", NOW, NOW),
+        (USER_B, 41, "unknown", "invalid", NOW, NOW),
+    ]
+    con.executemany(
+        "INSERT INTO birth_profiles "
+        "(user_id, version, accuracy, status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        profiles_before,
+    )
+    con.execute(
+        "INSERT INTO consents "
+        "(id, user_id, kind, status, source_id, permission_tier, "
+        "allowed_uses_json, scopes_json, policy_version, ui_surface, granted_at, "
+        "version, created_at, updated_at) VALUES "
+        "('cns_account_processing_a', ?, 'account_processing', 'granted', "
+        "'AST-01', 0, '[\"chart_fact\",\"cycle_detection\",\"uncertainty_model\"]', "
+        "'[]', 'account-processing-v1-2026-08-28', 'onboarding', ?, 1, ?, ?)",
+        (USER_A, NOW, NOW, NOW),
+    )
+    con.commit()
+
+    apply_migrations(con, start=18)
+
+    columns = {row[1]: row for row in con.execute("PRAGMA table_info(birth_profiles)")}
+    consent_column = columns.get("consent_id")
+    if consent_column is None:
+        raise SystemExit("0018 did not add birth_profiles.consent_id")
+    if consent_column[2] != "TEXT" or consent_column[3] != 0:
+        raise SystemExit(
+            f"0018 birth_profiles.consent_id is not nullable TEXT: {consent_column}"
+        )
+
+    profiles_after = con.execute(
+        "SELECT user_id, version, accuracy, status, created_at, updated_at, consent_id "
+        "FROM birth_profiles ORDER BY user_id"
+    ).fetchall()
+    if profiles_after != [(*row, None) for row in profiles_before]:
+        raise SystemExit(f"0018 changed or fabricated legacy provenance: {profiles_after}")
+
+    foreign_keys = con.execute("PRAGMA foreign_key_list(birth_profiles)").fetchall()
+    if not any(
+        row[2:5] == ("consents", "consent_id", "id") for row in foreign_keys
+    ):
+        raise SystemExit(
+            f"0018 birth_profiles.consent_id has no consents(id) foreign key: {foreign_keys}"
+        )
+
+    con.execute(
+        "INSERT INTO birth_profiles "
+        "(user_id, version, accuracy, status, consent_id, created_at, updated_at) "
+        "VALUES (?, 8, 'unknown', 'invalid', 'cns_account_processing_a', ?, ?)",
+        (USER_A, NOW, NOW),
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO birth_profiles "
+            "(user_id, version, accuracy, status, consent_id, created_at, updated_at) "
+            "VALUES (?, 42, 'unknown', 'invalid', 'cns_missing', ?, ?)",
+            (USER_B, NOW, NOW),
+        ),
+        "0018 rejects a birth profile linked to a missing consent",
+    )
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("0018 populated apply left foreign-key violations")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("0018 populated apply failed quick_check")
+    print(
+        "D1 OK  0018 preserves nullable legacy provenance and enforces the consent FK"
+    )
+
+
 def main() -> int:
+    check_migration_manifest()
     check_fresh_schema()
     check_0004_over_populated_m5()
     check_upgrade_over_populated_0001()
@@ -1276,6 +1367,7 @@ def main() -> int:
     check_0007_over_consent_references()
     check_0008_replay_ledger()
     check_0016_over_populated_0015()
+    check_0018_over_populated_0017()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

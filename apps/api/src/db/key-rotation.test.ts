@@ -22,6 +22,7 @@ import {
   seedActiveRelease,
   seedChart,
   seedUser,
+  seededAccountProcessingConsentId,
 } from "../../test/helpers.js";
 import { claimJob } from "./generation.js";
 import { enqueueDailyReading } from "../services/enqueue.js";
@@ -209,6 +210,7 @@ describe("DEK rotation", () => {
     // below pass vacuously — [].every(...) is true.
     await postBirthProfile(USER_OTHER, "rotate-key-02", {
       ...ALICE,
+      consent_id: seededAccountProcessingConsentId(USER_OTHER),
       birth_date: "1988-03-03",
     });
 

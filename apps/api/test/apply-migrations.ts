@@ -11,6 +11,7 @@ const expectedTail = [
   "0015_ontology_pipeline_regression_evidence.sql",
   "0016_birth_calc_usage.sql",
   "0017_codex_reading_provider.sql",
+  "0018_account_processing_consent.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -30,6 +31,7 @@ const codexResponseUploadMigrationIndex = migrationNames.indexOf(expectedTail[5]
 const regressionEvidenceMigrationIndex = migrationNames.indexOf(expectedTail[6]);
 const birthCalcUsageMigrationIndex = migrationNames.indexOf(expectedTail[7]);
 const codexReadingProviderMigrationIndex = migrationNames.indexOf(expectedTail[8]);
+const accountProcessingConsentMigrationIndex = migrationNames.indexOf(expectedTail[9]);
 
 interface SchemaColumn {
   name: string;
@@ -175,6 +177,43 @@ async function assertBirthCalcSchema(db: D1Database, lane: string): Promise<void
   }
 }
 
+async function assertAccountProcessingConsentSchema(
+  db: D1Database,
+  lane: string,
+): Promise<void> {
+  const columns = await db.prepare("PRAGMA table_info(birth_profiles)")
+    .all<SchemaColumn>();
+  const consentColumn = columns.results.find((column) =>
+    column.name === "consent_id"
+  );
+  if (
+    consentColumn?.type !== "TEXT" ||
+    consentColumn.notnull !== 0 ||
+    consentColumn.dflt_value !== null ||
+    consentColumn.pk !== 0
+  ) {
+    throw new Error(
+      `0018 ${lane} has wrong birth_profiles.consent_id: ${JSON.stringify(consentColumn)}`,
+    );
+  }
+
+  const foreignKeys = await db.prepare("PRAGMA foreign_key_list(birth_profiles)")
+    .all<{
+      table: string;
+      from: string;
+      to: string;
+    }>();
+  if (
+    !foreignKeys.results.some((foreignKey) =>
+      foreignKey.table === "consents" &&
+      foreignKey.from === "consent_id" &&
+      foreignKey.to === "id"
+    )
+  ) {
+    throw new Error(`0018 ${lane} has no birth_profiles consent foreign key`);
+  }
+}
+
 async function assertDatabaseHealthy(db: D1Database, lane: string): Promise<void> {
   const foreignKeys = await db.prepare("PRAGMA foreign_key_check").all();
   if (foreignKeys.results.length !== 0) {
@@ -195,7 +234,8 @@ async function assertDatabaseHealthy(db: D1Database, lane: string): Promise<void
 // This is the fresh-database lane; individual tests then exercise the schema.
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 await assertBirthCalcSchema(env.DB, "clean apply");
-await assertDatabaseHealthy(env.DB, "0016 clean apply");
+await assertAccountProcessingConsentSchema(env.DB, "clean apply");
+await assertDatabaseHealthy(env.DB, "0018 clean apply");
 
 // The isolated upgrade binding stops before 0009, carries live rows through the
 // adapter rebuild/additive migrations and 0011, and only then applies 0012.
@@ -839,7 +879,10 @@ if (providerUploadsBefore.results.length !== uploadFixtures.length) {
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(codexReadingProviderMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    codexReadingProviderMigrationIndex,
+    accountProcessingConsentMigrationIndex,
+  ),
 );
 
 const providerJobsAfter = await upgradeDb.prepare(
@@ -929,3 +972,70 @@ if (!illegalReadingPassRejected) {
 }
 
 await assertDatabaseHealthy(upgradeDb, "0017 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0018: nullable account-processing authorization provenance.
+// ---------------------------------------------------------------------------
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(accountProcessingConsentMigrationIndex),
+);
+await assertAccountProcessingConsentSchema(upgradeDb, "populated apply");
+
+const legacyBirthProfileAfterConsentMigration = await upgradeDb.prepare(
+  `SELECT user_id, version, accuracy, status, created_at, updated_at, consent_id
+   FROM birth_profiles WHERE user_id = ? AND version = ?`,
+).bind(migrationUserId, birthProfileBefore.version).first();
+if (
+  JSON.stringify(legacyBirthProfileAfterConsentMigration) !==
+  JSON.stringify({ ...birthProfileBefore, consent_id: null })
+) {
+  throw new Error("0018 changed a legacy profile or fabricated consent provenance");
+}
+
+const accountProcessingConsentId = "cns_account_processing_migration";
+await upgradeDb.prepare(
+  `INSERT INTO consents (
+     id, user_id, kind, status, source_id, permission_tier, allowed_uses_json,
+     scopes_json, policy_version, ui_surface, granted_at, version, created_at,
+     updated_at
+   ) VALUES (?, ?, 'account_processing', 'granted', 'AST-01', 0,
+     '["chart_fact","cycle_detection","uncertainty_model"]', '[]',
+     'account-processing-v1-2026-08-28', 'onboarding', ?, 1, ?, ?)`,
+).bind(
+  accountProcessingConsentId,
+  migrationUserId,
+  artifactBefore.created_at,
+  artifactBefore.created_at,
+  artifactBefore.created_at,
+).run();
+await upgradeDb.prepare(
+  `INSERT INTO birth_profiles (
+     user_id, version, accuracy, status, consent_id, created_at, updated_at
+   ) VALUES (?, 28, 'unknown', 'invalid', ?, ?, ?)`,
+).bind(
+  migrationUserId,
+  accountProcessingConsentId,
+  artifactBefore.created_at,
+  artifactBefore.created_at,
+).run();
+
+let missingConsentRejected = false;
+try {
+  await upgradeDb.prepare(
+    `INSERT INTO birth_profiles (
+       user_id, version, accuracy, status, consent_id, created_at, updated_at
+     ) VALUES (?, 29, 'unknown', 'invalid', 'cns_missing', ?, ?)`,
+  ).bind(
+    migrationUserId,
+    artifactBefore.created_at,
+    artifactBefore.created_at,
+  ).run();
+} catch {
+  missingConsentRejected = true;
+}
+if (!missingConsentRejected) {
+  throw new Error("0018 admitted a profile linked to a missing consent");
+}
+await assertDatabaseHealthy(upgradeDb, "0018 populated apply");

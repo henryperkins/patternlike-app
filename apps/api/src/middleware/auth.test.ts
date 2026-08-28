@@ -164,15 +164,14 @@ describe("authenticate", () => {
     const { token } = await createSession(env, id.userId);
 
     const res = await app.request(
-      "/v1/chart",
+      "/v1/consents/account-processing",
       { headers: { authorization: `Bearer ${token}` } },
       prodEnv(),
     );
-    // No chart exists for this user yet, so 404 — but authentication passed.
-    // The code is `chart_not_found` (routes/chart.ts), NOT the router's
-    // `not_found`: reaching the handler at all is what proves auth succeeded.
-    expect(res.status).toBe(404);
-    expect((await body(res)).error?.code).toBe("chart_not_found");
+    // New identities have not granted account processing yet. The dedicated
+    // recovery resource is intentionally reachable before that grant, so its
+    // 200 proves authentication passed without weakening the product gate.
+    expect(res.status).toBe(200);
   });
 
   it("accepts the same session presented as a cookie", async () => {
@@ -180,12 +179,11 @@ describe("authenticate", () => {
     const { token } = await createSession(env, id.userId);
 
     const res = await app.request(
-      "/v1/chart",
+      "/v1/consents/account-processing",
       { headers: { cookie: `pl_session=${token}` } },
       prodEnv(),
     );
-    expect(res.status).toBe(404);
-    expect((await body(res)).error?.code).toBe("chart_not_found");
+    expect(res.status).toBe(200);
   });
 
   it("rejects a revoked session presented as a cookie", async () => {
@@ -227,11 +225,11 @@ describe("authenticate", () => {
   it("still trusts X-User-Id under AUTH_STUB=1 in development", async () => {
     const id = await linkIdentity(env, "oidc", "sub-alice");
     const res = await app.request(
-      "/v1/chart",
+      "/v1/consents/account-processing",
       { headers: { "x-user-id": id.userId } },
       { ...env, ENVIRONMENT: "development", AUTH_STUB: "1" },
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
   });
 
   it("401s under AUTH_STUB=1 when the header names no existing user", async () => {

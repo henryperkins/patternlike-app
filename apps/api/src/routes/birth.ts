@@ -42,6 +42,10 @@ import {
   reconcilePatternAfterChartCorrection,
   retryPatternReconcileIfStale,
 } from "../services/pattern-lifecycle.js";
+import {
+  assertExactCurrentAccountProcessingGrant,
+  loadExactCurrentAccountProcessingGrant,
+} from "../db/account-processing-consents.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -356,6 +360,14 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   const errorBody = (code: string, message: string) => ({
     error: { code, message, request_id: requestId },
   });
+  const consentInvalidResponse = () =>
+    c.json(
+      errorBody(
+        "consent_invalid",
+        "Birth calculation requires the exact current account-processing consent",
+      ),
+      403,
+    );
 
   const idem = requireIdempotencyKey(c.req.header("idempotency-key"));
   if (!idem) {
@@ -443,6 +455,16 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     existingJob?.status === "running"
   ) {
     return respondToExistingJob(existingJob);
+  }
+
+  const submittedConsentId = body.consent_id as string;
+  const submittedConsent = await loadExactCurrentAccountProcessingGrant(
+    c.env,
+    userId,
+    submittedConsentId,
+  );
+  if (!submittedConsent) {
+    return consentInvalidResponse();
   }
 
   let command: BirthCalcCommandV1;
@@ -537,11 +559,11 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   const profileStatement = existingJob
     ? c.env.DB.prepare(
       `INSERT INTO birth_profiles (
-        user_id, version, accuracy, status, timezone,
+        user_id, version, accuracy, status, timezone, consent_id,
         payload_enc, payload_key_version, payload_nonce,
         geocode_confidence, created_at, updated_at
        )
-       SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?
+       SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?
        WHERE EXISTS (
          SELECT 1 FROM birth_calc_reservations
          WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
@@ -558,6 +580,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       profileVersion,
       command.effective.accuracy,
       command.effective.timezone,
+      command.submitted.consent_id,
       encBytes,
       keyVersion,
       nonce,
@@ -576,11 +599,11 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     )
     : c.env.DB.prepare(
       `INSERT INTO birth_profiles (
-         user_id, version, accuracy, status, timezone,
+         user_id, version, accuracy, status, timezone, consent_id,
          payload_enc, payload_key_version, payload_nonce,
          geocode_confidence, created_at, updated_at
        )
-       SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?
+       SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?
        WHERE EXISTS (
          SELECT 1 FROM birth_calc_reservations
          WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
@@ -595,6 +618,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       profileVersion,
       command.effective.accuracy,
       command.effective.timezone,
+      command.submitted.consent_id,
       encBytes,
       keyVersion,
       nonce,
@@ -681,11 +705,22 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
 
   try {
     await c.env.DB.batch([
+      assertExactCurrentAccountProcessingGrant(
+        c.env,
+        userId,
+        command.submitted.consent_id,
+      ),
       ...prepared.statements,
       profileStatement,
       jobStatement,
     ]);
   } catch (error) {
+    const consentStillValid = await loadExactCurrentAccountProcessingGrant(
+      c.env,
+      userId,
+      command.submitted.consent_id,
+    );
+    if (!consentStillValid) return consentInvalidResponse();
     if (!isUniqueConstraintFailure(error)) throw error;
     const racedJob = await loadBirthJob(c.env, userId, idem);
     if (!racedJob) throw error;
@@ -738,6 +773,78 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   ) {
     if (claimedJob) return respondToExistingJob(claimedJob);
     throw new Error("birth calculation claim did not create a durable job");
+  }
+
+  const settleConsentInvalidAttempt = async () => {
+    const settlement = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE jobs
+         SET status = 'cancelled', result_class = 'consent_invalid', finished_at = ?
+         WHERE id = ? AND job_type = ? AND user_id = ?
+           AND idempotency_key = ? AND status = 'running'
+           AND attempts = ? AND payload_json = ?
+           AND EXISTS (
+             SELECT 1 FROM birth_calc_reservations
+             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+               AND status = 'charged'
+           )`,
+      ).bind(
+        nowIso,
+        jobId,
+        BIRTH_JOB_TYPE,
+        userId,
+        idem,
+        attempt,
+        profileMetadata,
+        userId,
+        prepared.reservationHash,
+        prepared.claimTokenHash,
+      ),
+      c.env.DB.prepare(
+        `UPDATE birth_profiles SET status = 'invalid', updated_at = ?
+         WHERE user_id = ? AND version = ?
+           AND status IN ('pending', 'superseded')
+           AND EXISTS (
+             SELECT 1 FROM birth_calc_reservations
+             WHERE user_id = ? AND reservation_hash = ? AND claim_token_hash = ?
+               AND status = 'charged'
+           )
+           AND EXISTS (
+             SELECT 1 FROM jobs
+             WHERE id = ? AND job_type = ? AND user_id = ?
+               AND idempotency_key = ? AND status = 'cancelled'
+               AND attempts = ? AND payload_json = ?
+               AND result_class = 'consent_invalid'
+           )`,
+      ).bind(
+        nowIso,
+        userId,
+        profileVersion,
+        userId,
+        prepared.reservationHash,
+        prepared.claimTokenHash,
+        jobId,
+        BIRTH_JOB_TYPE,
+        userId,
+        idem,
+        attempt,
+        profileMetadata,
+      ),
+    ]);
+    if (settlement[0]?.meta.changes !== 1 || settlement[1]?.meta.changes !== 1) {
+      throw new Error("birth consent-invalid settlement did not converge");
+    }
+    safeLog({ event: "birth_calc_cancelled", reason: "consent_invalid" });
+  };
+
+  const consentBeforeCalculation = await loadExactCurrentAccountProcessingGrant(
+    c.env,
+    userId,
+    command.submitted.consent_id,
+  );
+  if (!consentBeforeCalculation) {
+    await settleConsentInvalidAttempt();
+    return consentInvalidResponse();
   }
 
   const calcInvocation = await invokeCalc(c.env, {
@@ -887,8 +994,15 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   // previous profile versions, activate this profile, close the job. Previously
   // only charts were superseded, so failed calculations left several profile
   // rows at status='active' simultaneously for one user.
-  const publication = await c.env.DB.batch([
-    c.env.DB.prepare(
+  let publication: D1Result[];
+  try {
+    publication = await c.env.DB.batch([
+      assertExactCurrentAccountProcessingGrant(
+        c.env,
+        userId,
+        command.submitted.consent_id,
+      ),
+      c.env.DB.prepare(
       `INSERT OR IGNORE INTO chart_snapshots (
         id, user_id, profile_version, fingerprint, contract_id, contract_version,
         container_digest, tzdb_version, status, calculated_at, snapshot_json,
@@ -1054,10 +1168,22 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       profileVersion,
       userId,
       profileVersion,
-    ),
-  ]);
+      ),
+    ]);
+  } catch (error) {
+    const consentStillValid = await loadExactCurrentAccountProcessingGrant(
+      c.env,
+      userId,
+      command.submitted.consent_id,
+    );
+    if (!consentStillValid) {
+      await settleConsentInvalidAttempt();
+      return consentInvalidResponse();
+    }
+    throw error;
+  }
 
-  const insertChanges = publication[0]?.meta.changes;
+  const insertChanges = publication[1]?.meta.changes;
   if (
     typeof insertChanges !== "number" ||
     !Number.isInteger(insertChanges) ||

@@ -27,7 +27,7 @@ const DEFAULT_BIRTH_CALC_DAILY_LIMIT = env.BIRTH_CALC_DAILY_LIMIT;
 const TRIGGER_CALC_TIMEOUT = "TRIGGER_CALC_TIMEOUT";
 const RETRY_REQUEST: BirthProfileRequest = {
   accuracy: "exact",
-  consent_id: "cns_retry_safe_birth_0001",
+  consent_id: "cns_alice_0001",
   birth_date: "1990-05-15",
   birth_time_local: "12:34:00",
   approximate_window_minutes: null,
@@ -170,6 +170,51 @@ function completedCalcEvents(
   );
 }
 
+async function waitForBirthJob(
+  userId: string,
+  idempotencyKey: string,
+  status: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const job = await env.DB.prepare(
+      `SELECT status FROM jobs
+       WHERE job_type = 'NormalizeBirthAndCalculateChart'
+         AND user_id = ? AND idempotency_key = ?`,
+    ).bind(userId, idempotencyKey).first<{ status: string }>();
+    if (job?.status === status) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`birth job ${idempotencyKey} did not reach ${status}`);
+}
+
+async function mutateAccountProcessingConsent(
+  method: "PUT" | "DELETE",
+  key: string,
+): Promise<Record<string, unknown>> {
+  const response = await SELF.fetch(
+    "http://api.test/v1/consents/account-processing",
+    {
+      method,
+      headers: {
+        "x-user-id": USER_A,
+        "idempotency-key": key,
+        "x-consent-ui-surface":
+          method === "PUT" ? "privacy_center" : "privacy_center",
+        ...(method === "PUT" ? { "content-type": "application/json" } : {}),
+      },
+      ...(method === "PUT"
+        ? {
+            body: JSON.stringify({
+              policy_version: "account-processing-v1-2026-08-28",
+            }),
+          }
+        : {}),
+    },
+  );
+  expect(response.status).toBe(200);
+  return (await response.json()) as Record<string, unknown>;
+}
+
 // Users exist before any request now — creation moved to identity-link time.
 // resetDb truncates users, so both are seeded unconditionally: a suite that
 // authenticates as USER_B without a row would 401 where it asserts a
@@ -231,6 +276,331 @@ describe("POST /v1/birth-profiles — the cross-tenant defect", () => {
     );
     expect(jobs).toHaveLength(2);
     expect(jobs.every((j) => j.idempotency_key === "shared-key-001")).toBe(true);
+  });
+});
+
+describe("POST /v1/birth-profiles — exact account-processing authority", () => {
+  it("rejects an unknown consent before allocation, spend, writes, or calculation", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await postBirthProfile(USER_A, "key-consent-unknown", {
+      ...ALICE,
+      consent_id: "cns_unknown_account_processing",
+    });
+
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({
+      error: {
+        code: "consent_invalid",
+        request_id: expect.stringMatching(/^[A-Za-z0-9_.:-]{8,128}$/),
+      },
+    });
+    expect(await rows("SELECT * FROM birth_profile_version_counters")).toEqual([]);
+    expect(await rows("SELECT * FROM birth_calc_daily_usage")).toEqual([]);
+    expect(await rows("SELECT * FROM birth_calc_reservations")).toEqual([]);
+    expect(await rows("SELECT * FROM birth_profiles")).toEqual([]);
+    expect(await rows("SELECT * FROM jobs")).toEqual([]);
+    expect(completedCalcEvents(info)).toHaveLength(0);
+  });
+
+  it("stores the exact authorizing consent on initial and failed-retry profiles", async () => {
+    await postBirthProfile(USER_A, "key-consent-provenance", RETRY_REQUEST);
+    await postBirthProfile(USER_A, "key-consent-provenance", RETRY_REQUEST);
+
+    expect(
+      await rows<{ consent_id: string | null }>(
+        `SELECT consent_id FROM birth_profiles
+         WHERE user_id = ? ORDER BY version`,
+        USER_A,
+      ),
+    ).toEqual([
+      { consent_id: "cns_alice_0001" },
+      { consent_id: "cns_alice_0001" },
+    ]);
+  });
+
+  it("rolls back all charged work when revocation wins the reservation race", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await env.DB.prepare(
+      `CREATE TRIGGER revoke_before_birth_reservation
+       AFTER INSERT ON birth_profile_version_counters
+       WHEN NEW.user_id = '${USER_A}'
+       BEGIN
+         INSERT INTO consents (
+           id, user_id, kind, status, source_id, permission_tier,
+           allowed_uses_json, scopes_json, provider, connector_account_id,
+           policy_version, ui_surface, granted_at, revoked_at, version,
+           supersedes_consent_id, created_at, updated_at
+         ) VALUES (
+           'cns_reservation_race_revoke', '${USER_A}', 'account_processing',
+           'revoked', 'AST-01', 0,
+           '["chart_fact","cycle_detection","uncertainty_model"]', '[]',
+           NULL, NULL, 'account-processing-v1-2026-08-28', 'privacy_center',
+           NULL, '2026-08-28T00:00:01.000Z', 2, 'cns_alice_0001',
+           '2026-08-28T00:00:01.000Z', '2026-08-28T00:00:01.000Z'
+         );
+         UPDATE users SET status = 'frozen'
+         WHERE id = '${USER_A}' AND status = 'active';
+       END`,
+    ).run();
+    try {
+      const result = await postBirthProfile(
+        USER_A,
+        "key-consent-reservation-race",
+        ALICE,
+      );
+
+      expect(result.status).toBe(403);
+      expect(result.body).toMatchObject({
+        error: { code: "consent_invalid" },
+      });
+      expect(await rows("SELECT * FROM birth_calc_daily_usage")).toEqual([]);
+      expect(await rows("SELECT * FROM birth_calc_reservations")).toEqual([]);
+      expect(await rows("SELECT * FROM birth_profiles")).toEqual([]);
+      expect(await rows("SELECT * FROM jobs")).toEqual([]);
+      expect(completedCalcEvents(info)).toHaveLength(0);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER revoke_before_birth_reservation").run();
+    }
+  });
+
+  it("cancels charged work without calling calc when consent changes after reservation", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await env.DB.prepare(
+      `CREATE TRIGGER revoke_after_birth_reservation
+       AFTER INSERT ON jobs
+       WHEN NEW.job_type = 'NormalizeBirthAndCalculateChart'
+        AND NEW.idempotency_key = 'key-consent-pre-calc-race'
+       BEGIN
+         INSERT INTO consents (
+           id, user_id, kind, status, source_id, permission_tier,
+           allowed_uses_json, scopes_json, provider, connector_account_id,
+           policy_version, ui_surface, granted_at, revoked_at, version,
+           supersedes_consent_id, created_at, updated_at
+         ) VALUES (
+           'cns_pre_calc_race_revoke', '${USER_A}', 'account_processing',
+           'revoked', 'AST-01', 0,
+           '["chart_fact","cycle_detection","uncertainty_model"]', '[]',
+           NULL, NULL, 'account-processing-v1-2026-08-28', 'privacy_center',
+           NULL, '2026-08-28T00:00:02.000Z', 2, 'cns_alice_0001',
+           '2026-08-28T00:00:02.000Z', '2026-08-28T00:00:02.000Z'
+         );
+         UPDATE users SET status = 'frozen'
+         WHERE id = '${USER_A}' AND status = 'active';
+       END`,
+    ).run();
+    try {
+      const result = await postBirthProfile(
+        USER_A,
+        "key-consent-pre-calc-race",
+        ALICE,
+      );
+
+      expect(result.status).toBe(403);
+      expect(result.body).toMatchObject({
+        error: { code: "consent_invalid" },
+      });
+      expect(completedCalcEvents(info)).toHaveLength(0);
+      expect(
+        await rows<{ status: string; result_class: string }>(
+          `SELECT status, result_class FROM jobs
+           WHERE user_id = ? AND idempotency_key = ?`,
+          USER_A,
+          "key-consent-pre-calc-race",
+        ),
+      ).toEqual([{ status: "cancelled", result_class: "consent_invalid" }]);
+      expect(
+        await rows<{ status: string; consent_id: string | null }>(
+          "SELECT status, consent_id FROM birth_profiles WHERE user_id = ?",
+          USER_A,
+        ),
+      ).toEqual([{ status: "invalid", consent_id: "cns_alice_0001" }]);
+      expect(
+        await rows<{ status: string }>(
+          "SELECT status FROM birth_calc_reservations WHERE user_id = ?",
+          USER_A,
+        ),
+      ).toEqual([{ status: "charged" }]);
+      expect(
+        await rows<{ reserved_calc_count: number }>(
+          "SELECT reserved_calc_count FROM birth_calc_daily_usage WHERE user_id = ?",
+          USER_A,
+        ),
+      ).toEqual([{ reserved_calc_count: 1 }]);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER revoke_after_birth_reservation").run();
+    }
+  });
+
+  it("cannot publish an active chart when revocation wins during calculation", async () => {
+    const firstPromise = postBirthProfile(
+      USER_A,
+      "key-consent-publication-race",
+      {
+        ...ALICE,
+        birthplace: {
+          ...ALICE.birthplace!,
+          label: TRIGGER_CALC_FINGERPRINT_RACE,
+        },
+      },
+    );
+    await waitForBirthJob(
+      USER_A,
+      "key-consent-publication-race",
+      "running",
+    );
+
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO consents (
+           id, user_id, kind, status, source_id, permission_tier,
+           allowed_uses_json, scopes_json, provider, connector_account_id,
+           policy_version, ui_surface, granted_at, revoked_at, version,
+           supersedes_consent_id, created_at, updated_at
+         ) VALUES (
+           'cns_publication_race_revoke', ?, 'account_processing', 'revoked',
+           'AST-01', 0,
+           '["chart_fact","cycle_detection","uncertainty_model"]', '[]',
+           NULL, NULL, 'account-processing-v1-2026-08-28', 'privacy_center',
+           NULL, '2026-08-28T00:00:03.000Z', 2, 'cns_alice_0001',
+           '2026-08-28T00:00:03.000Z', '2026-08-28T00:00:03.000Z'
+         )`,
+      ).bind(USER_A),
+      env.DB.prepare(
+        "UPDATE users SET status = 'frozen' WHERE id = ? AND status = 'active'",
+      ).bind(USER_A),
+    ]);
+
+    const peerPromise = postBirthProfile(
+      USER_B,
+      "key-consent-publication-peer",
+      {
+        ...BOB,
+        birthplace: {
+          ...BOB.birthplace!,
+          label: TRIGGER_CALC_FINGERPRINT_RACE,
+        },
+      },
+    );
+    const [first, peer] = await Promise.all([firstPromise, peerPromise]);
+
+    expect(first.status).toBe(403);
+    expect(first.body).toMatchObject({
+      error: { code: "consent_invalid" },
+    });
+    expect(peer.status).toBe(202);
+    expect(peer.body.status).toBe("succeeded");
+    expect(
+      await rows("SELECT id FROM chart_snapshots WHERE user_id = ?", USER_A),
+    ).toEqual([]);
+    expect(
+      await rows<{ status: string; consent_id: string | null }>(
+        "SELECT status, consent_id FROM birth_profiles WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toEqual([{ status: "invalid", consent_id: "cns_alice_0001" }]);
+    expect(
+      await rows<{ status: string; result_class: string }>(
+        `SELECT status, result_class FROM jobs
+         WHERE user_id = ? AND idempotency_key = ?`,
+        USER_A,
+        "key-consent-publication-race",
+      ),
+    ).toEqual([{ status: "cancelled", result_class: "consent_invalid" }]);
+    expect(
+      await rows<{ status: string }>(
+        "SELECT status FROM birth_calc_reservations WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toEqual([{ status: "charged" }]);
+  });
+
+  it("does not resume a failed command after revoke and regrant", async () => {
+    const first = await postBirthProfile(
+      USER_A,
+      "key-consent-failed-before-regrant",
+      RETRY_REQUEST,
+    );
+    expect(first.status).toBe(502);
+
+    await mutateAccountProcessingConsent(
+      "DELETE",
+      "key-consent-failed-revoke",
+    );
+    const regranted = await mutateAccountProcessingConsent(
+      "PUT",
+      "key-consent-failed-regrant",
+    );
+    const nextConsentId = regranted.consent_id as string;
+    expect(nextConsentId).not.toBe(RETRY_REQUEST.consent_id);
+
+    const pinnedOldGrant = await postBirthProfile(
+      USER_A,
+      "key-consent-failed-before-regrant",
+      RETRY_REQUEST,
+    );
+    expect(pinnedOldGrant.status).toBe(403);
+    expect(pinnedOldGrant.body).toMatchObject({
+      error: { code: "consent_invalid" },
+    });
+
+    const changedCommand = await postBirthProfile(
+      USER_A,
+      "key-consent-failed-before-regrant",
+      { ...RETRY_REQUEST, consent_id: nextConsentId },
+    );
+    expect(changedCommand.status).toBe(409);
+    expect(changedCommand.body).toMatchObject({
+      error: { code: "idempotency_conflict" },
+    });
+    expect(
+      await rows<{ reserved_calc_count: number }>(
+        "SELECT reserved_calc_count FROM birth_calc_daily_usage WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toEqual([{ reserved_calc_count: 1 }]);
+    expect(
+      await rows("SELECT version FROM birth_profiles WHERE user_id = ?", USER_A),
+    ).toHaveLength(1);
+  });
+
+  it("keeps a succeeded replay free after the account receives a newer grant", async () => {
+    const first = await postBirthProfile(
+      USER_A,
+      "key-consent-succeeded-before-regrant",
+      ALICE,
+    );
+    expect(first.status).toBe(202);
+
+    await mutateAccountProcessingConsent(
+      "DELETE",
+      "key-consent-succeeded-revoke",
+    );
+    await mutateAccountProcessingConsent(
+      "PUT",
+      "key-consent-succeeded-regrant",
+    );
+
+    const replay = await postBirthProfile(
+      USER_A,
+      "key-consent-succeeded-before-regrant",
+      ALICE,
+    );
+    expect(replay.status).toBe(202);
+    expect(replay.body).toMatchObject({
+      status: "duplicate",
+      job_id: first.body.job_id,
+      resource_id: first.body.resource_id,
+    });
+    expect(
+      await rows<{ reserved_calc_count: number }>(
+        "SELECT reserved_calc_count FROM birth_calc_daily_usage WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toEqual([{ reserved_calc_count: 1 }]);
+    expect(
+      await rows("SELECT version FROM birth_profiles WHERE user_id = ?", USER_A),
+    ).toHaveLength(1);
   });
 });
 
@@ -481,10 +851,6 @@ describe("POST /v1/birth-profiles — operational guards", () => {
       ],
       ["birth-date", { ...RETRY_REQUEST, birth_date: "1991-05-15" }],
       ["birth-time", { ...RETRY_REQUEST, birth_time_local: "12:35:00" }],
-      [
-        "consent",
-        { ...RETRY_REQUEST, consent_id: "cns_retry_safe_birth_changed" },
-      ],
     ];
 
     for (const [label, changed] of changes) {
@@ -1439,7 +1805,10 @@ describe("chart lifecycle invariants", () => {
 
   it("serves the replacement chart and writes its natal-feature receipt", async () => {
     const first = await postBirthProfile(USER_A, "key-alpha-01", ALICE);
-    const second = await postBirthProfile(USER_A, "key-bob-corr", BOB);
+    const second = await postBirthProfile(USER_A, "key-bob-corr", {
+      ...BOB,
+      consent_id: ALICE.consent_id,
+    });
 
     expect(second.status).toBe(202);
     expect(second.body.status).toBe("succeeded");
@@ -1475,7 +1844,7 @@ describe("chart lifecycle invariants", () => {
 describe("unknown birth time", () => {
   const UNKNOWN = {
     accuracy: "unknown" as const,
-    consent_id: "cns_unknown",
+    consent_id: "cns_alice_0001",
     birth_date: "1990-05-15",
     timezone_hint: "America/Los_Angeles",
     birthplace: { label: "Los Angeles", latitude: 34.05, longitude: -118.24 },

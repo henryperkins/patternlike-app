@@ -4,6 +4,7 @@ import type { Env } from "../env.js";
 import type { CryptoSubject } from "../crypto.js";
 import { resolveSession, touchSessionActivity } from "../db/sessions.js";
 import { loadUserIdentity, type AccountStatus } from "../db/users.js";
+import { loadLiveAccountProcessingGrant } from "../db/account-processing-consents.js";
 
 export type AppVariables = {
   userId: string;
@@ -98,13 +99,14 @@ export async function authenticate(
   await next();
 }
 
-function frozenRouteAllowed(path: string): boolean {
+function recoveryRouteAllowed(path: string): boolean {
   return (
     path === "/v1/account" ||
     path === "/v1/exports" ||
     path.startsWith("/v1/exports/") ||
-    path === "/v1/consents" ||
-    path.startsWith("/v1/consents/")
+    path === "/v1/consents/ai-synthesis" ||
+    path === "/v1/consents/pattern-generation" ||
+    path === "/v1/consents/account-processing"
   );
 }
 
@@ -114,10 +116,9 @@ export async function accountStateGate(
   next: Next,
 ) {
   const status = c.get("accountStatus");
-  const allowed =
-    status === "active" ||
-    (status === "frozen" && frozenRouteAllowed(c.req.path));
-  if (!allowed) {
+  const recoveryRoute = recoveryRouteAllowed(c.req.path);
+  const lifecycleAllowed = status === "active" || (status === "frozen" && recoveryRoute);
+  if (!lifecycleAllowed) {
     return c.json(
       {
         error: {
@@ -128,6 +129,21 @@ export async function accountStateGate(
       },
       403,
     );
+  }
+  if (status === "active" && !recoveryRoute) {
+    const grant = await loadLiveAccountProcessingGrant(c.env, c.get("userId"));
+    if (!grant) {
+      return c.json(
+        {
+          error: {
+            code: "account_processing_required",
+            message: "Current account-processing consent is required for this operation",
+            request_id: c.get("requestId"),
+          },
+        },
+        403,
+      );
+    }
   }
   await next();
 }
