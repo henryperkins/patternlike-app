@@ -161,6 +161,15 @@ is a flat browser 401; detailed token-verification reasons remain server-only.
 
 `ROOT_KEK` → HKDF-SHA256 → KEK → per-user DEK (AES-256-GCM), in `apps/api/src/crypto.ts` and `src/db/users.ts`.
 
+Key maintenance is exposed only at the sibling `/crypto-operator/*` namespace
+through `CRYPTO_OPERATOR_TOKEN`. It must never be mounted below `/internal` or
+`/admin`, and that token must not equal service or Codex-runner authority.
+`ROOT_KEK_KEYRING` gives each root key an immutable id while legacy
+`ROOT_KEK` remains a migration fallback. Every batch committing newly sealed
+user-DEK bytes must prepend `buildCryptoWriteFence` with the exact sealing key
+version. Use `scripts/crypto-operations.mjs` and the runbooks under
+`docs/deploy/`; never pass root secrets as CLI arguments.
+
 - `users.crypto_subject` (`cs_*`), not `users.id` (`usr_*`), is the AEAD/DEK subject. `id` is a mutable public label; the subject must never change once ciphertext exists. `asCryptoSubject()` is the only string→`CryptoSubject` conversion and must only be fed a value read from the row or freshly minted — never a request header.
 - Every payload's AAD binds `(subject, "table.column", recordId, key_version)`; every wrapped DEK binds `(subject, key_version)`. Moving a blob between rows, columns, or users fails authentication even with the right DEK.
 - Bumping `AEAD_VERSION` or `KEK_DERIVATION_VERSION` makes existing ciphertext unreadable. `db/d1/MIGRATIONS.json` records each such break in its `notes`.

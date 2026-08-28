@@ -35,6 +35,9 @@ import { safeLog } from "./services/safe-log.js";
 import { codexRunnerAuth } from "./middleware/codex-runner-auth.js";
 import { codexProviderRoutes } from "./routes/codex-provider.js";
 import { adminAuth } from "./middleware/admin-auth.js";
+import { placeRoutes } from "./routes/places.js";
+import { cryptoOperatorAuth } from "./middleware/crypto-operator-auth.js";
+import { internalCryptoRoutes } from "./routes/internal-crypto.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -68,6 +71,7 @@ api.route("/", chartRoutes);
 api.route("/", timezoneRoutes);
 api.route("/", preferenceRoutes);
 api.route("/", consentRoutes);
+api.route("/", placeRoutes);
 api.route("/", accountProcessingConsentRoutes);
 api.route("/", readingRoutes);
 api.route("/", timingRoutes);
@@ -112,6 +116,17 @@ codexProvider.use("*", configGuard);
 codexProvider.use("*", codexRunnerAuth);
 codexProvider.route("/", codexProviderRoutes);
 app.route("/codex-provider", codexProvider);
+
+// Cryptographic maintenance is a sibling authority. It must never inherit the
+// service, Pattern-admin, Codex-runner, or consumer authentication surfaces.
+const cryptoOperator = new Hono<{
+  Bindings: Env;
+  Variables: AppVariables;
+}>();
+cryptoOperator.use("*", configGuard);
+cryptoOperator.use("*", cryptoOperatorAuth);
+cryptoOperator.route("/", internalCryptoRoutes);
+app.route("/crypto-operator", cryptoOperator);
 
 app.route("/", api);
 

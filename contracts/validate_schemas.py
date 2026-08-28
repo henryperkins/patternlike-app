@@ -3164,14 +3164,36 @@ def check_m8_openapi_projection(registry: Registry) -> list[str]:
             errors.append(f"M8 OpenAPI changes frozen M7 {top_level}")
     m7_components = m7_spec.get("components") or {}
     m8_components = spec.get("components") or {}
+    amended_m8_components = {
+        ("securitySchemes", "adminToken"),
+        ("securitySchemes", "adminSession"),
+    }
     for section_name, old_section in m7_components.items():
         new_section = m8_components.get(section_name) or {}
         for component_name, old_component in old_section.items():
+            if (section_name, component_name) in amended_m8_components:
+                continue
             if new_section.get(component_name) != old_component:
                 errors.append(
                     f"M8 OpenAPI changes frozen M7 component "
                     f"{section_name}.{component_name}"
                 )
+
+    security_schemes = m8_components.get("securitySchemes") or {}
+    expected_admin_session = {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "pl_admin_session",
+        "description": (
+            "Short-lived server-side administrator session. HttpOnly, Secure, "
+            "SameSite=Strict, Path=/admin. Minted only after the Worker validates "
+            "the Cloudflare Access application assertion and its dedicated AUD.\n"
+        ),
+    }
+    if "adminToken" in security_schemes:
+        errors.append("M8 OpenAPI retains the removed adminToken security scheme")
+    if security_schemes.get("adminSession") != expected_admin_session:
+        errors.append("M8 OpenAPI changes the approved Cloudflare Access adminSession")
 
     expected = {
         ("/v1/consents/account-processing", "get"): {"200", "401", "403", "503"},

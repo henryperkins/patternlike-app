@@ -1329,11 +1329,41 @@ describe("frozen inputs", () => {
 describe("claims", () => {
   beforeEach(seedEverything);
 
+  it("does not reserve encrypted work while a crypto write fence is installed", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001'
+       WHERE id = ?`,
+      USER_A,
+    );
+
+    const outcome = await enqueueDailyReading(env, USER_A);
+
+    expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
+    expect(await jobs()).toEqual([]);
+    expect(await readings()).toEqual([]);
+  });
+
   it("does not claim a reading job after the account leaves active state", async () => {
     const enqueued = await enqueueDailyReading(env, USER_A);
     if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
 
     await rows("UPDATE users SET status = 'pending_deletion' WHERE id = ?", USER_A);
+
+    expect(await claimJob(env, enqueued.jobId)).toBeNull();
+    expect((await jobs())[0]).toMatchObject({ status: "queued", attempts: 0 });
+  });
+
+  it("does not claim queued work while a crypto write fence is installed", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001'
+       WHERE id = ?`,
+      USER_A,
+    );
 
     expect(await claimJob(env, enqueued.jobId)).toBeNull();
     expect((await jobs())[0]).toMatchObject({ status: "queued", attempts: 0 });
@@ -1360,6 +1390,42 @@ describe("claims", () => {
 
     expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
     expect((await readings())[0]).toMatchObject({ status: "pending", reading_enc: null });
+    expect((await jobs())[0]).toMatchObject({ status: "running" });
+  });
+
+  it("refuses publication when a crypto write fence appears after claim", async () => {
+    const enqueued = await enqueueDailyReading(env, USER_A);
+    if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
+    const claim = await claimJob(env, enqueued.jobId);
+    if (!claim) throw new Error("claim missing");
+
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001'
+       WHERE id = ?`,
+      USER_A,
+    );
+
+    const outcome = await completeReading(env, {
+      identity: IDENTITY_A,
+      readingId: enqueued.readingId,
+      jobId: enqueued.jobId,
+      claimToken: claim.claimToken,
+      commandGeneration: 1,
+      predecessor: { kind: "none" },
+      reading: {
+        ciphertext: new Uint8Array([1, 2, 3]),
+        keyVersion: 1,
+        nonce: "stale",
+      },
+      evidence: [],
+    });
+
+    expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
+    expect((await readings())[0]).toMatchObject({
+      status: "pending",
+      reading_enc: null,
+    });
     expect((await jobs())[0]).toMatchObject({ status: "running" });
   });
 

@@ -384,6 +384,24 @@ describe("daily check-ins", () => {
     expect(third.body.normalized_hash).not.toBe(first.body.normalized_hash);
   });
 
+  it("does not store a check-in while crypto writes are fenced", async () => {
+    await enableSource();
+    await confirmPreferences(USER_A, "America/Chicago");
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await postCheckIn("idem-check-in-fenced", { energy: "low" });
+
+    expect(result.status).toBe(409);
+    expect(await rows("SELECT id FROM context_signals WHERE user_id = ?", USER_A))
+      .toEqual([]);
+    expect(await rows("SELECT id FROM jobs WHERE idempotency_key = ?", "idem-check-in-fenced"))
+      .toEqual([]);
+  });
+
   it("enforces the frozen request bounds", async () => {
     await enableSource();
     await confirmPreferences(USER_A);

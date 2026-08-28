@@ -17,6 +17,14 @@ database_name = "patternlike-ops"
 database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "../../db/d1"
 
+[[ratelimits]]
+name = "PLACE_SEARCH_RATE_LIMITER"
+namespace_id = "17001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
 # Immutable artifacts: signed editorial release bundles today, chart renders and
 # exports later. The default name is deliberately not the production bucket, so
 # a remote development command cannot reserve an immutable production key. The
@@ -142,6 +150,7 @@ crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 # configGuard middleware refuses AUTH_STUB=1 outside development.
 [vars]
 ENVIRONMENT = "development"
+GEOCODER_ROLLOUT = "off"
 AUTH_STUB = "1"
 CALC_SERVICE_URL = "http://127.0.0.1:8080"
 # Non-secret operational bounds for the synchronous birth calculation call.
@@ -292,6 +301,7 @@ crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 
 [env.production.vars]
 ENVIRONMENT = "production"
+GEOCODER_ROLLOUT = "off"
 CALC_SERVICE_URL = "https://patternlike-calc.fly.dev"
 CALC_FETCH_TIMEOUT_MS = "10000"
 BIRTH_CALC_DAILY_LIMIT = "5"
@@ -527,7 +537,7 @@ READING_DAILY_PROVIDER_CALL_LIMIT = "10000"
 [env.production.assets]
 directory = "../web/dist"
 not_found_handling = "single-page-application"
-run_worker_first = [ "/health", "/v1/*", "/internal/*", "/admin/*", "/codex-provider/*" ]
+run_worker_first = [ "/health", "/v1/*", "/internal/*", "/admin/*", "/codex-provider/*", "/crypto-operator/*" ]
 
 # Real database, created 2026-08-08 in region ENAM. Schema applied with
 # `wrangler d1 execute patternlike-ops --env production --remote --file=...`.
@@ -536,6 +546,14 @@ binding = "DB"
 database_name = "patternlike-ops"
 database_id = "1305a75d-0a8a-4a21-b201-d94fda0aaf93"
 migrations_dir = "../../db/d1"
+
+[[env.production.ratelimits]]
+name = "PLACE_SEARCH_RATE_LIMITER"
+namespace_id = "17001"
+
+  [env.production.ratelimits.simple]
+  limit = 30
+  period = 60
 
 [[env.production.r2_buckets]]
 binding = "ARTIFACTS"

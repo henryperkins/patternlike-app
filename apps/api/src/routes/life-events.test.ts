@@ -147,6 +147,30 @@ describe("USR-09 life-event routes", () => {
     ]);
   });
 
+  it("does not create a life event while crypto writes are fenced", async () => {
+    await grantUsr09();
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await mutate(
+      "POST",
+      "/v1/life-events",
+      "event-create-fenced-0001",
+      REQUEST,
+    );
+
+    expect(result.response.status).toBe(409);
+    expect(await rows("SELECT id FROM context_signals WHERE source_id = 'USR-09'"))
+      .toEqual([]);
+    expect(await rows(
+      "SELECT id FROM jobs WHERE idempotency_key = ?",
+      "event-create-fenced-0001",
+    )).toEqual([]);
+  });
+
   it("deletes the full chain, tombstones private replays, and keeps delete replay idempotent", async () => {
     await grantUsr09();
     const created = await mutate("POST", "/v1/life-events", "event-create-key-0002", REQUEST);

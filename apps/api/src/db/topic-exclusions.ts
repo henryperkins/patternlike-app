@@ -13,6 +13,10 @@ import {
   ensureFirstPartyGrant,
   type FirstPartyGrant,
 } from "./first-party-sources.js";
+import {
+  buildCryptoWriteFence,
+  requireSingleCryptoWriteVersion,
+} from "./crypto-write-fence.js";
 import { decryptPayload, encryptPayload, type UserIdentity } from "./users.js";
 
 const JOB_TYPE = "store_topic_exclusions";
@@ -268,6 +272,11 @@ async function persistEmpty(
     },
   );
   const statements = [
+    buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: sealedJob.keyVersion,
+      allowedStatuses: ["active"],
+    }),
     grantAssertion(env, identity.userId, grant.consentId),
     predecessorAssertion(env, identity.userId, predecessor),
   ];
@@ -332,6 +341,14 @@ async function persistTopics(
   );
   const usesJson = JSON.stringify(USR05_ALLOWED_USES);
   const statements = [
+    buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: requireSingleCryptoWriteVersion([
+        sealedValue.keyVersion,
+        sealedJob.keyVersion,
+      ]),
+      allowedStatuses: ["active"],
+    }),
     grantAssertion(env, identity.userId, grant.consentId),
     predecessorAssertion(env, identity.userId, predecessor),
   ];

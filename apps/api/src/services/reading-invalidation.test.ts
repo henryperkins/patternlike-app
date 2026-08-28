@@ -304,6 +304,28 @@ describe("fact invalidation lifecycle", () => {
     expect(JSON.stringify(audits)).not.toContain("smaller promise");
   });
 
+  it("does not reseal a reading while crypto writes are fenced", async () => {
+    const { readingId } = await seedPublishedReading();
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const outcome = await invalidatePublishedReading(env, {
+      identity: IDENTITY_A,
+      readingId,
+      reason: "chart_correction",
+      now: NOW,
+    });
+
+    expect(outcome).toMatchObject({ ok: false, reason: "not_published" });
+    expect(await rows<{ status: string }>(
+      "SELECT status FROM daily_readings WHERE id = ?",
+      readingId,
+    )).toEqual([{ status: "published" }]);
+  });
+
   it("keeps invalidation owner-scoped and idempotent under repeat or competing calls", async () => {
     const { readingId } = await seedPublishedReading();
     expect(

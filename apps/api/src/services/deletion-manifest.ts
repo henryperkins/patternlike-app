@@ -104,6 +104,9 @@ export const DELETED_USER_TABLES = [
   "birth_calc_reservations",
   "birth_calc_daily_usage",
   "birth_profile_version_counters",
+  "place_resolutions",
+  "crypto_kek_rewrap_items",
+  "crypto_operations",
   "chart_snapshots",
   "birth_profiles",
   "context_signals",
@@ -176,6 +179,9 @@ export const NON_PORTABLE_USER_TABLES = [
   "birth_calc_reservations",
   "birth_calc_daily_usage",
   "birth_profile_version_counters",
+  "place_resolutions",
+  "crypto_kek_rewrap_items",
+  "crypto_operations",
   /** Credentials, transport, and delivery state — not reader content. */
   "connector_accounts",
   "device_tokens",
@@ -208,7 +214,32 @@ export async function deleteUserRows(
     .bind(userId)
     .run();
 
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE crypto_operations
+       SET candidate_key_version = NULL, candidate_wrapped_dek = NULL,
+           candidate_root_kek_id = NULL, lease_token_hash = NULL,
+           lease_expires_at = NULL
+       WHERE user_id = ? AND stage = 'abandoned_to_deletion'`,
+    ).bind(userId),
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'crypto operation not safe for deletion'
+       WHERE EXISTS (
+         SELECT 1 FROM crypto_operations
+         WHERE user_id = ? AND (
+           stage IN (
+             'quiescing', 'reencrypting', 'finalizing',
+             'verifying', 'blocked'
+           )
+           OR candidate_wrapped_dek IS NOT NULL
+         )
+       )`,
+    ).bind(userId),
+  ]);
+
   for (const table of DELETED_USER_TABLES) {
+    if (table === "crypto_operations") continue;
     await env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`)
       .bind(userId)
       .run();

@@ -1,5 +1,6 @@
 import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import { buildCryptoWriteFence } from "./crypto-write-fence.js";
 import {
   decryptPayload,
   encryptPayload,
@@ -198,7 +199,7 @@ async function buildMutationInsert(
   input: StoredPreferenceMutation["input"],
   value: UserPreferences,
   now: string,
-): Promise<D1PreparedStatement> {
+): Promise<{ fence: D1PreparedStatement; insert: D1PreparedStatement }> {
   const jobId = newId("job");
   const sealed = await encryptPayload(env, identity, { input, value }, {
     subject: identity.cryptoSubject,
@@ -208,23 +209,30 @@ async function buildMutationInsert(
   const encrypted = Uint8Array.from(atob(sealed.ciphertext), (char) =>
     char.charCodeAt(0),
   );
-  return env.DB.prepare(
+  return {
+    fence: buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: sealed.keyVersion,
+      allowedStatuses: ["active"],
+    }),
+    insert: env.DB.prepare(
     `INSERT INTO jobs
        (id, job_type, user_id, idempotency_key, status,
         payload_enc, payload_key_version, payload_nonce,
         result_class, attempts, finished_at, created_at)
      VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, 'preference_saved', 1, ?, ?)`,
-  ).bind(
-    jobId,
-    jobType,
-    identity.userId,
-    idempotencyKey,
-    encrypted,
-    sealed.keyVersion,
-    sealed.nonce,
-    now,
-    now,
-  );
+    ).bind(
+      jobId,
+      jobType,
+      identity.userId,
+      idempotencyKey,
+      encrypted,
+      sealed.keyVersion,
+      sealed.nonce,
+      now,
+      now,
+    ),
+  };
 }
 
 async function identityForMutation(
@@ -356,17 +364,17 @@ export async function setSchedulingTimezone(
     );
   }
   if (identity && idempotencyKey) {
-    statements.push(
-      await buildMutationInsert(
-        env,
-        identity,
-        "preference_timezone",
-        idempotencyKey,
-        { value: timezone, source },
-        value,
-        now,
-      ),
+    const encryptedMutation = await buildMutationInsert(
+      env,
+      identity,
+      "preference_timezone",
+      idempotencyKey,
+      { value: timezone, source },
+      value,
+      now,
     );
+    statements.unshift(encryptedMutation.fence);
+    statements.push(encryptedMutation.insert);
   }
 
   try {
@@ -481,17 +489,17 @@ export async function setContentLocale(
     );
   }
   if (identity && idempotencyKey) {
-    statements.push(
-      await buildMutationInsert(
-        env,
-        identity,
-        "preference_locale",
-        idempotencyKey,
-        { value: locale, source },
-        value,
-        now,
-      ),
+    const encryptedMutation = await buildMutationInsert(
+      env,
+      identity,
+      "preference_locale",
+      idempotencyKey,
+      { value: locale, source },
+      value,
+      now,
     );
+    statements.unshift(encryptedMutation.fence);
+    statements.push(encryptedMutation.insert);
   }
 
   try {

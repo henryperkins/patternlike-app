@@ -1,6 +1,7 @@
 import { canonicalJson, newId } from "@patternlike/shared";
 import { b64 } from "../crypto.js";
 import type { Env } from "../env.js";
+import { buildCryptoWriteFence } from "./crypto-write-fence.js";
 import { decryptPayload, encryptPayload, type UserIdentity } from "./users.js";
 
 export const USR06_SOURCE_ID = "USR-06" as const;
@@ -307,6 +308,11 @@ export async function mutateContextSource(
   const usesJson = JSON.stringify(config.uses);
   try {
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: sealed.keyVersion,
+        allowedStatuses: ["active"],
+      }),
       ...current.sources.map((source) => stateAssertion(env, identity.userId, source)),
       env.DB.prepare(
         `INSERT INTO consents (

@@ -167,10 +167,43 @@ export async function reserveAccountDeletion(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'account cannot start deletion'
          WHERE NOT EXISTS (
-           SELECT 1 FROM users
-           WHERE id = ? AND status IN ('active', 'frozen')
+           SELECT 1 FROM users u
+           WHERE u.id = ? AND u.status IN ('active', 'frozen')
+             AND (
+               u.crypto_write_fence IS NULL
+               OR EXISTS (
+                 SELECT 1 FROM crypto_operations o
+                 WHERE o.id = u.crypto_write_fence AND o.user_id = u.id
+                   AND o.stage IN (
+                     'quiescing', 'reencrypting', 'finalizing',
+                     'verifying', 'blocked'
+                   )
+               )
+             )
          )`,
       ).bind(identity.userId),
+      env.DB.prepare(
+        `UPDATE crypto_operations
+         SET stage = 'abandoned_to_deletion',
+             candidate_key_version = NULL,
+             candidate_wrapped_dek = NULL,
+             candidate_root_kek_id = NULL,
+             lease_token_hash = NULL,
+             lease_expires_at = NULL,
+             error_class = 'account_deletion',
+             revision = revision + 1,
+             updated_at = ?, completed_at = ?
+         WHERE user_id = ?
+           AND stage IN (
+             'quiescing', 'reencrypting', 'finalizing',
+             'verifying', 'blocked'
+           )
+           AND EXISTS (
+             SELECT 1 FROM users u
+             WHERE u.id = crypto_operations.user_id
+               AND u.crypto_write_fence = crypto_operations.id
+           )`,
+      ).bind(acceptedAt, acceptedAt, identity.userId),
       env.DB.prepare(
         `INSERT INTO jobs
            (id, job_type, user_id, idempotency_key, status, payload_json,
@@ -203,9 +236,42 @@ export async function reserveAccountDeletion(
         acceptedAt,
       ),
       env.DB.prepare(
-        `UPDATE users SET status = 'pending_deletion', updated_at = ?
-         WHERE id = ? AND status IN ('active', 'frozen')`,
+        `UPDATE users
+         SET status = 'pending_deletion', crypto_write_fence = NULL,
+             updated_at = ?
+         WHERE id = ? AND status IN ('active', 'frozen')
+           AND (
+             crypto_write_fence IS NULL
+             OR EXISTS (
+               SELECT 1 FROM crypto_operations o
+               WHERE o.id = users.crypto_write_fence AND o.user_id = users.id
+                 AND o.stage = 'abandoned_to_deletion'
+                 AND o.candidate_key_version IS NULL
+                 AND o.candidate_wrapped_dek IS NULL
+                 AND o.candidate_root_kek_id IS NULL
+             )
+           )`,
       ).bind(acceptedAt, identity.userId),
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'deletion did not abandon crypto rotation'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM users
+           WHERE id = ? AND status = 'pending_deletion'
+             AND crypto_write_fence IS NULL
+         )
+         OR EXISTS (
+           SELECT 1 FROM crypto_operations
+           WHERE user_id = ?
+             AND (
+               stage IN (
+                 'quiescing', 'reencrypting', 'finalizing',
+                 'verifying', 'blocked'
+               )
+               OR candidate_wrapped_dek IS NOT NULL
+             )
+         )`,
+      ).bind(identity.userId, identity.userId),
       env.DB.prepare(
         `UPDATE sessions SET revoked_at = ?
          WHERE user_id = ? AND revoked_at IS NULL`,

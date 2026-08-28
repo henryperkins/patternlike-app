@@ -4,6 +4,7 @@ import type { Env } from "../env.js";
 import { asCryptoSubject, fromB64 } from "../crypto.js";
 import { persistCycles } from "../db/cycles.js";
 import { reserveInvalidatedSuccessor } from "../db/generation.js";
+import { buildCryptoWriteFence } from "../db/crypto-write-fence.js";
 import { loadPreferences } from "../db/preferences.js";
 import {
   decryptPayload,
@@ -142,6 +143,11 @@ export async function invalidatePublishedReading(
 
   try {
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: sealed.keyVersion,
+        allowedStatuses: ["active"],
+      }),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'published reading changed before invalidation'

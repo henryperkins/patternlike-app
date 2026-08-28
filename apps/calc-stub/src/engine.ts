@@ -26,6 +26,7 @@ import {
   type ChartSnapshot,
   type CelestialBody,
   type LongitudePosition,
+  type LocationQualifierCode,
   type NatalAspect,
   type AspectType,
   type UncertaintyReport,
@@ -385,6 +386,8 @@ export interface UncertaintyInputs {
   /** True only when houses and angles were actually computed and returned. */
   anglesIncluded: boolean;
   approximateWindowMinutes: number | null;
+  locationConfidence: CalcRequest["location_confidence"] | null;
+  locationQualifierCodes: LocationQualifierCode[];
 }
 
 /**
@@ -397,7 +400,14 @@ export interface UncertaintyInputs {
  * and that angles were unavailable.
  */
 function buildUncertainty(input: UncertaintyInputs): UncertaintyReport {
-  const { accuracy, syntheticNoon, anglesIncluded, approximateWindowMinutes } = input;
+  const {
+    accuracy,
+    syntheticNoon,
+    anglesIncluded,
+    approximateWindowMinutes,
+    locationConfidence,
+    locationQualifierCodes,
+  } = input;
 
   const suppressed_features: UncertaintyReport["suppressed_features"] = [];
   if (!anglesIncluded) {
@@ -437,7 +447,30 @@ function buildUncertainty(input: UncertaintyInputs): UncertaintyReport {
     }
   }
 
-  const user_facing_summary = (() => {
+  if (
+    locationConfidence === "medium" ||
+    locationConfidence === "low" ||
+    locationConfidence === "none"
+  ) {
+    qualified_features.push({
+      feature_id: "birthplace",
+      qualification: "technique_specific",
+    });
+  }
+  const civilTimeQualificationCodes = new Set<LocationQualifierCode>([
+    "pre_1970_zone_boundary",
+    "near_zone_boundary",
+    "local_time_ambiguous",
+    "local_time_nonexistent",
+  ]);
+  if (locationQualifierCodes.some((code) => civilTimeQualificationCodes.has(code))) {
+    qualified_features.push({
+      feature_id: "birth_instant",
+      qualification: "technique_specific",
+    });
+  }
+
+  const baseSummary = (() => {
     if (syntheticNoon) {
       return (
         "Birth time is unknown; houses, angles, and time-sensitive Moon claims are suppressed. " +
@@ -457,6 +490,14 @@ function buildUncertainty(input: UncertaintyInputs): UncertaintyReport {
     }
     return "Birth time is exact; houses and angles are included (Swiss Ephemeris).";
   })();
+  const locationSummary = qualified_features.some(
+    (feature) =>
+      feature.feature_id === "birthplace" ||
+      feature.feature_id === "birth_instant",
+  )
+    ? " Location details need confirmation; affected chart facts are qualified."
+    : "";
+  const user_facing_summary = `${baseSummary}${locationSummary}`;
 
   return {
     accuracy,
@@ -649,6 +690,46 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
   try {
     ensureInit();
 
+    const locationConfidences = new Set(["high", "medium", "low", "none"]);
+    const locationQualifierCodes = new Set<LocationQualifierCode>([
+      "approximate_match",
+      "region_level_match",
+      "pre_1970_zone_boundary",
+      "near_zone_boundary",
+      "hint_replaced",
+      "no_coordinates",
+      "nautical_zone",
+      "local_time_ambiguous",
+      "local_time_nonexistent",
+    ]);
+    if (
+      req.location_confidence !== undefined &&
+      !locationConfidences.has(req.location_confidence)
+    ) {
+      return {
+        ok: false,
+        chart: null,
+        error_class: "invalid_birth_profile",
+        error_message: "location_confidence is invalid",
+      };
+    }
+    if (
+      req.location_qualifier_codes !== undefined &&
+      (!Array.isArray(req.location_qualifier_codes) ||
+        req.location_qualifier_codes.some(
+          (code) => !locationQualifierCodes.has(code),
+        ) ||
+        new Set(req.location_qualifier_codes).size !==
+          req.location_qualifier_codes.length)
+    ) {
+      return {
+        ok: false,
+        chart: null,
+        error_class: "invalid_birth_profile",
+        error_message: "location_qualifier_codes are invalid",
+      };
+    }
+
     if (req.accuracy !== "unknown" && !req.birth_date) {
       return {
         ok: false,
@@ -772,6 +853,8 @@ export async function calculateChart(req: CalcRequest): Promise<CalcResponse> {
       syntheticNoon: utc.synthetic_local_noon,
       anglesIncluded: !suppressAngles,
       approximateWindowMinutes: req.approximate_window_minutes ?? null,
+      locationConfidence: req.location_confidence ?? null,
+      locationQualifierCodes: req.location_qualifier_codes ?? [],
     });
 
     const chartId = newId("cht");

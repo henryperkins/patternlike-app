@@ -33,7 +33,6 @@ import {
 } from "../services/birth-command.js";
 import {
   resolveTimezone,
-  type TimezoneResolution,
 } from "../services/timezone.js";
 import { reconcileCurrentFactRepair } from "../services/reading-invalidation.js";
 import { recomputeUserNextDueAt } from "../db/reading-scheduler.js";
@@ -46,6 +45,12 @@ import {
   assertExactCurrentAccountProcessingGrant,
   loadExactCurrentAccountProcessingGrant,
 } from "../db/account-processing-consents.js";
+import {
+  buildConsumePlaceResolution,
+  loadPlaceResolution,
+} from "../db/place-resolutions.js";
+import { buildCryptoWriteFence } from "../db/crypto-write-fence.js";
+import { combineLocationUncertainty } from "../services/location-uncertainty.js";
 
 export const birthRoutes = new Hono<{
   Bindings: Env;
@@ -332,18 +337,6 @@ function timezoneResponseFromCommand(
   };
 }
 
-function timezoneResponseFromResolution(
-  resolution: TimezoneResolution,
-): BirthTimezoneResponse {
-  return {
-    resolved: resolution.timezone,
-    source: resolution.source,
-    confidence: resolution.confidence,
-    hint_overridden: resolution.hintOverridden,
-    qualifiers: resolution.qualifiers,
-  };
-}
-
 function isUniqueConstraintFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
@@ -473,6 +466,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
 
   let command: BirthCalcCommandV1;
   let timezoneResponse: BirthTimezoneResponse;
+  let selectedPlaceId: string | null = null;
   if (existingJob) {
     if (existingJob.status !== "failed") {
       return c.json(
@@ -499,21 +493,56 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     command = decoded.command;
     timezoneResponse = timezoneResponseFromCommand(command);
   } else {
+    const requestedPlaceId = body.birthplace?.place_id?.trim() || null;
+    const selectedPlace = requestedPlaceId
+      ? await loadPlaceResolution(c.env, identity, requestedPlaceId, now)
+      : null;
+    if (requestedPlaceId && !selectedPlace) {
+      return c.json(
+        errorBody(
+          "invalid_place_id",
+          "The selected birthplace is unavailable; search again or enter it manually",
+        ),
+        400,
+      );
+    }
+    selectedPlaceId = selectedPlace?.place_id ?? null;
+    const effectiveBirthplace = selectedPlace
+      ? {
+          place_id: selectedPlace.place_id,
+          label: selectedPlace.label,
+          latitude: selectedPlace.latitude,
+          longitude: selectedPlace.longitude,
+        }
+      : undefined;
+
     // Resolve the zone from the birthplace rather than trusting the client's
     // hint, which is the browser's current zone and may not be the birth zone.
     // Replays and retry-safe failed attempts do not repeat this resolution.
     const timezone = resolveTimezone({
-      latitude: body.birthplace?.latitude ?? null,
-      longitude: body.birthplace?.longitude ?? null,
+      latitude: effectiveBirthplace?.latitude ?? body.birthplace?.latitude ?? null,
+      longitude: effectiveBirthplace?.longitude ?? body.birthplace?.longitude ?? null,
       birthDate: body.birth_date ?? null,
       birthTimeLocal: body.birth_time_local ?? null,
       timezoneHint: body.timezone_hint ?? null,
     });
-    command = buildBirthCalcCommand(
-      body as BirthProfileRequest,
-      timezone,
+    const location = combineLocationUncertainty({
+      geocodeConfidence: selectedPlace?.geocode_confidence ?? null,
+      timezoneConfidence: timezone.confidence,
+      placeQualifierCodes:
+        selectedPlace?.qualifiers.map((qualifier) => qualifier.code) ?? [],
+      timezoneQualifierCodes: timezone.qualifiers.map((qualifier) => qualifier.code),
+    });
+    command = buildBirthCalcCommand(body as BirthProfileRequest, timezone,
+      effectiveBirthplace
+        ? {
+            birthplace: effectiveBirthplace,
+            confidence: location.confidence,
+            qualifierCodes: location.qualifierCodes,
+          }
+        : undefined,
     );
-    timezoneResponse = timezoneResponseFromResolution(timezone);
+    timezoneResponse = timezoneResponseFromCommand(command);
   }
 
   const operational = resolveBirthOperationalConfig(c.env);
@@ -714,9 +743,22 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
         userId,
         command.submitted.consent_id,
       ),
+      buildCryptoWriteFence(c.env, {
+        userId,
+        keyVersion,
+        allowedStatuses: ["active"],
+      }),
       ...prepared.statements,
       profileStatement,
       jobStatement,
+      ...(selectedPlaceId === null
+        ? []
+        : [buildConsumePlaceResolution(c.env, {
+            userId,
+            placeId: selectedPlaceId,
+            consumedAt: nowIso,
+            profileVersion,
+          })]),
     ]);
   } catch (error) {
     const consentStillValid = await loadExactCurrentAccountProcessingGrant(
@@ -864,6 +906,8 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     place_label: command.effective.birthplace.label,
     approximate_window_minutes:
       command.effective.approximate_window_minutes,
+    location_confidence: command.effective.location_confidence,
+    location_qualifier_codes: command.effective.location_qualifier_codes,
     contract_id: CALC_CONTRACT_ID,
     contract_version: CALC_CONTRACT_VERSION,
   }, operational.value.fetchTimeoutMs);
@@ -1030,6 +1074,11 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
   let publication: D1Result[];
   try {
     publication = await c.env.DB.batch([
+      buildCryptoWriteFence(c.env, {
+        userId,
+        keyVersion: birthEnc.keyVersion,
+        allowedStatuses: ["active"],
+      }),
       assertExactCurrentAccountProcessingGrant(
         c.env,
         userId,
@@ -1216,7 +1265,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
     throw error;
   }
 
-  const insertChanges = publication[1]?.meta.changes;
+  const insertChanges = publication[2]?.meta.changes;
   if (
     typeof insertChanges !== "number" ||
     !Number.isInteger(insertChanges) ||
@@ -1625,6 +1674,7 @@ birthRoutes.post("/v1/birth-profiles", async (c) => {
       // the coordinates overruled would otherwise never learn the substitution
       // happened, and would keep showing the user a zone nothing used.
       timezone: timezoneResponse,
+      birthplace: command.effective.birthplace,
       chart: {
         id: chart.id,
         fingerprint: chart.fingerprint,

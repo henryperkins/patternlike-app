@@ -5,6 +5,8 @@ import type {
   BirthTimeAccuracy,
   ChartSnapshot,
   ErrorBody,
+  GeocoderConsentResponse,
+  GeocoderConsentUiSurface,
   LifeEvent,
   LifeEventRequest,
   PatternConsent,
@@ -13,6 +15,10 @@ import type {
   PatternResponse,
   PatternResponseV7,
   PatternStateDocument,
+  PlaceResolutionRequest,
+  PlaceResolutionResponse,
+  PlaceSearchRequest,
+  PlaceSearchResponse,
   ReadingPublisherProvider,
   TimeTravelResponse,
   TimezoneLookupRequest,
@@ -91,7 +97,7 @@ interface HeaderOptions {
    * for the real handler to land.
    */
   idempotencyKey?: string;
-  consentUiSurface?: AccountProcessingConsentUiSurface;
+  consentUiSurface?: AccountProcessingConsentUiSurface | GeocoderConsentUiSurface;
 }
 
 function requestHeaders({
@@ -926,6 +932,70 @@ export function revokeAccountProcessingConsent(
       signal,
     },
   );
+}
+
+export function searchPlaces(
+  placeRequest: PlaceSearchRequest,
+  signal?: AbortSignal,
+): Promise<PlaceSearchResponse> {
+  return request<PlaceSearchResponse>("/v1/places/search", {
+    method: "POST",
+    headers: requestHeaders({ json: true }),
+    body: JSON.stringify(placeRequest),
+    signal,
+  });
+}
+
+export function resolvePlace(
+  placeRequest: PlaceResolutionRequest,
+  signal?: AbortSignal,
+): Promise<PlaceResolutionResponse> {
+  return request<PlaceResolutionResponse>("/v1/places/resolve", {
+    method: "POST",
+    headers: requestHeaders({ json: true }),
+    body: JSON.stringify(placeRequest),
+    signal,
+  });
+}
+
+export function getGeocoderConsent(
+  signal?: AbortSignal,
+): Promise<GeocoderConsentResponse> {
+  return request<GeocoderConsentResponse>("/v1/consents/geocoder", {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function grantGeocoderConsent(
+  policyVersion: string,
+  uiSurface: GeocoderConsentUiSurface,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<GeocoderConsentResponse> {
+  return request<GeocoderConsentResponse>("/v1/consents/geocoder", {
+    method: "PUT",
+    headers: requestHeaders({
+      json: true,
+      idempotencyKey,
+      consentUiSurface: uiSurface,
+    }),
+    body: JSON.stringify({ policy_version: policyVersion }),
+    signal,
+  });
+}
+
+export function revokeGeocoderConsent(
+  uiSurface: GeocoderConsentUiSurface,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<GeocoderConsentResponse> {
+  return request<GeocoderConsentResponse>("/v1/consents/geocoder", {
+    method: "DELETE",
+    headers: requestHeaders({ idempotencyKey, consentUiSurface: uiSurface }),
+    signal,
+  });
 }
 
 export type PreferenceWriteSource = "user_confirmed" | "device_derived";

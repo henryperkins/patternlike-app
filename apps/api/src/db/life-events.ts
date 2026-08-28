@@ -16,6 +16,10 @@ import {
   type ContextSourceState,
 } from "./context-sources.js";
 import {
+  buildCryptoWriteFence,
+  requireSingleCryptoWriteVersion,
+} from "./crypto-write-fence.js";
+import {
   decryptPayload,
   encryptPayload,
   type UserIdentity,
@@ -515,6 +519,14 @@ export async function createLifeEvent(
   });
   try {
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: requireSingleCryptoWriteVersion([
+          sealedValue.sealed.keyVersion,
+          sealedJob.keyVersion,
+        ]),
+        allowedStatuses: ["active"],
+      }),
       permissionAssertion(env, identity, access),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -650,6 +662,14 @@ export async function updateLifeEvent(
   });
   try {
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: requireSingleCryptoWriteVersion([
+          sealedValue.sealed.keyVersion,
+          sealedJob.keyVersion,
+        ]),
+        allowedStatuses: ["active"],
+      }),
       permissionAssertion(env, identity, access),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)

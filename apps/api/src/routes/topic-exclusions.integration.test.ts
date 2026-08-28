@@ -76,6 +76,22 @@ describe("PUT /v1/preferences/topic-exclusions", () => {
     expect(reread.body.excluded_topics).toEqual(["relationships", "work"]);
   });
 
+  it("does not store exclusions while a crypto write fence is installed", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await put({ excluded_topics: ["work"] }, "idem-topics-fenced");
+
+    expect(result.status).toBe(409);
+    expect(await rows("SELECT id FROM context_signals WHERE user_id = ?", USER_A))
+      .toEqual([]);
+    expect(await rows("SELECT id FROM jobs WHERE idempotency_key = ?", "idem-topics-fenced"))
+      .toEqual([]);
+  });
+
   it("clears the current signal when the set is emptied", async () => {
     await put({ excluded_topics: ["home"] }, "idem-topics-set");
     const cleared = await put({ excluded_topics: [] }, "idem-topics-clear");

@@ -31,6 +31,9 @@ export type ConfigurationCode =
   | "reading_publisher_misconfigured"
   | "auth_stub_in_production"
   | "root_kek_not_configured"
+  | "root_kek_keyring_invalid"
+  | "geocoder_rollout_invalid"
+  | "geocoder_misconfigured"
   | "identity_not_configured"
   | "admin_auth_not_configured"
   | "check_in_retention_misconfigured"
@@ -40,7 +43,8 @@ export type ConfigurationCode =
   | "pattern_publisher_misconfigured"
   | "ontology_pipeline_rollout_invalid"
   | "ontology_pipeline_misconfigured"
-  | "codex_runner_authority_aliased";
+  | "codex_runner_authority_aliased"
+  | "crypto_operator_authority_aliased";
 
 type OperationalFailureClass =
   | GenerationFailureCode
@@ -57,6 +61,11 @@ export type DeletionFailureCheckpoint =
 
 export type SafeLogEvent =
   | { event: "unhandled_error" }
+  | {
+      event: "place_search_completed";
+      outcome: "success" | "empty" | "rate_limited" | "unavailable";
+      candidate_count: number;
+    }
   | { event: "generation_claim_release_failed" }
   | { event: "insecure_configuration"; config_code: ConfigurationCode }
   | { event: "generation_message_malformed" }

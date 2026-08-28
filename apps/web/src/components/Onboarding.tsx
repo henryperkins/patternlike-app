@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   BirthProfileRequest,
   BirthTimeAccuracy,
+  PlaceConfidence,
   TimezoneLookupResponse,
 } from "@patternlike/shared";
 import {
@@ -15,6 +16,7 @@ import {
 import { isAccountProcessingConsentResponse } from "../lib/account-processing-consent.js";
 import { systemTimezone } from "../lib/device.js";
 import { Icon } from "./icons.js";
+import { PlaceAutocomplete } from "./PlaceAutocomplete.js";
 
 interface OnboardingProps {
   onSubmit: (profile: BirthProfileRequest, idempotencyKey: string) => Promise<void>;
@@ -72,6 +74,8 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
   const [birthTime, setBirthTime] = useState("");
   const [approximateWindow, setApproximateWindow] = useState("30");
   const [placeLabel, setPlaceLabel] = useState("");
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [placeConfidence, setPlaceConfidence] = useState<PlaceConfidence | null>(null);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [timezone, setTimezone] = useState(systemTimezone());
@@ -99,6 +103,7 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
     latitude,
     longitude,
     placeLabel,
+    placeId,
     timezone,
   ]);
 
@@ -297,6 +302,7 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
           placeLabel || latitude || longitude
             ? {
                 label: placeLabel.trim() || undefined,
+                place_id: placeId,
                 latitude: latitude ? Number(latitude) : null,
                 longitude: longitude ? Number(longitude) : null,
               }
@@ -338,6 +344,8 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
     setBirthDate("1990-05-15");
     setBirthTime("12:34");
     setPlaceLabel("Los Angeles, CA");
+    setPlaceId(null);
+    setPlaceConfidence(null);
     setLatitude("34.0522");
     setLongitude("-118.2437");
     setTimezone("America/Los_Angeles");
@@ -459,16 +467,23 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
             <p className="field-help">
               Location is optional, but houses and angles require coordinates and a real time.
             </p>
-            <label className="field">
-              <span>Place label</span>
-              <input
-                type="text"
-                placeholder="City, region, country"
-                value={placeLabel}
-                onChange={(event) => setPlaceLabel(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
+            <PlaceAutocomplete
+              value={placeLabel}
+              selectedPlaceId={placeId}
+              selectedConfidence={placeConfidence}
+              onInputChange={(nextLabel) => {
+                setPlaceLabel(nextLabel);
+                setPlaceId(null);
+                setPlaceConfidence(null);
+              }}
+              onResolved={(place) => {
+                setPlaceId(place.place_id);
+                setPlaceLabel(place.label);
+                setLatitude(String(place.latitude));
+                setLongitude(String(place.longitude));
+                setPlaceConfidence(place.geocode_confidence);
+              }}
+            />
             <div className="field-row">
               <label className="field">
                 <span>Latitude</span>
@@ -479,7 +494,11 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
                   step="any"
                   placeholder="34.0522"
                   value={latitude}
-                  onChange={(event) => setLatitude(event.target.value)}
+                  onChange={(event) => {
+                    setLatitude(event.target.value);
+                    setPlaceId(null);
+                    setPlaceConfidence(null);
+                  }}
                 />
               </label>
               <label className="field">
@@ -491,7 +510,11 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
                   step="any"
                   placeholder="-118.2437"
                   value={longitude}
-                  onChange={(event) => setLongitude(event.target.value)}
+                  onChange={(event) => {
+                    setLongitude(event.target.value);
+                    setPlaceId(null);
+                    setPlaceConfidence(null);
+                  }}
                 />
               </label>
             </div>
@@ -573,6 +596,7 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
             <div className="consent-ledger">
               <div><span>Used now</span><strong>Birth details, chart calculation</strong></div>
               <div><span>Not connected</span><strong>Calendar, health, device, journal</strong></div>
+              <div><span>Place search</span><strong>Google only when you enable it</strong></div>
               <div><span>Model access</span><strong>None during chart calculation</strong></div>
             </div>
 

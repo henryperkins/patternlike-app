@@ -268,6 +268,26 @@ describe("AI-synthesis consent routes", () => {
     });
   });
 
+  it("does not store AI consent while crypto writes are fenced", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await requestConsent("PUT", { key: "ai-consent-fenced-0001" });
+
+    expect(result.status).toBe(409);
+    expect(await rows(
+      "SELECT id FROM consents WHERE user_id = ? AND kind = 'ai_synthesis'",
+      USER_A,
+    )).toEqual([]);
+    expect(await rows(
+      "SELECT id FROM jobs WHERE idempotency_key = ?",
+      "ai-consent-fenced-0001",
+    )).toEqual([]);
+  });
+
   it("requires the exact displayed policy and applies the existing idempotency convention", async () => {
     expect((await requestConsent("PUT")).status).toBe(400);
     expect(

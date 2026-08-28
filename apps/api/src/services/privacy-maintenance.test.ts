@@ -189,6 +189,7 @@ describe("privacy maintenance", () => {
       deletionArtifactsCleaned: 0,
       deletionReceiptsExpired: 1,
       devicePreferenceJobsPruned: 0,
+      placeResolutionsPruned: 0,
       privacyJobsDispatched: 2,
     });
     expect(sent).toEqual([

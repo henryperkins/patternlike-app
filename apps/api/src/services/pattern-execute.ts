@@ -22,6 +22,7 @@ import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { isConsumedStatus, loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { acceptPatternClaim } from "../db/pattern-claim-transitions.js";
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
+import { buildCryptoWriteFence } from "../db/crypto-write-fence.js";
 import {
   PATTERN_JOB_TYPE,
   isPatternCommand,
@@ -318,7 +319,11 @@ async function claimStage(
        WHERE id = ? AND job_type = ?
          AND (available_at IS NULL OR available_at <= ?)
          AND (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))
-         AND EXISTS (SELECT 1 FROM users WHERE users.id = jobs.user_id AND users.status = 'active')
+         AND EXISTS (
+           SELECT 1 FROM users
+           WHERE users.id = jobs.user_id AND users.status = 'active'
+             AND users.crypto_write_fence IS NULL
+         )
          AND EXISTS (
            SELECT 1 FROM pattern_generation_jobs
            WHERE generation_id = ? AND job_id = ? AND stage_generation = ?
@@ -1688,6 +1693,11 @@ async function publishPattern(
       now,
     );
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: wrapped.keyVersion,
+        allowedStatuses: ["active"],
+      }),
       patternPublicationAuthorizationGuard(env, proof, now),
       ...publicationTransition.guards,
       ...replay.receiptStatements(env),

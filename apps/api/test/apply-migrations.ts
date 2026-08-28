@@ -14,6 +14,8 @@ const expectedTail = [
   "0018_account_processing_consent.sql",
   "0019_pattern_claim_transition_guards.sql",
   "0020_pattern_admin_sessions.sql",
+  "0021_crypto_operations.sql",
+  "0022_place_resolutions.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -36,6 +38,8 @@ const codexReadingProviderMigrationIndex = migrationNames.indexOf(expectedTail[8
 const accountProcessingConsentMigrationIndex = migrationNames.indexOf(expectedTail[9]);
 const patternClaimTransitionMigrationIndex = migrationNames.indexOf(expectedTail[10]);
 const adminSessionMigrationIndex = migrationNames.indexOf(expectedTail[11]);
+const cryptoOperationsMigrationIndex = migrationNames.indexOf(expectedTail[12]);
+const placeResolutionsMigrationIndex = migrationNames.indexOf(expectedTail[13]);
 
 interface SchemaColumn {
   name: string;
@@ -1154,7 +1158,10 @@ await assertDatabaseHealthy(upgradeDb, "0019 populated apply");
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(adminSessionMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    adminSessionMigrationIndex,
+    cryptoOperationsMigrationIndex,
+  ),
 );
 const adminSessionColumns = await upgradeDb.prepare(
   "PRAGMA table_info(pattern_admin_sessions)",
@@ -1176,3 +1183,80 @@ if (
   throw new Error("0020 created the wrong Pattern administrator session columns");
 }
 await assertDatabaseHealthy(upgradeDb, "0020 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0021: versioned root keys and durable crypto operations.
+// ---------------------------------------------------------------------------
+
+const wrappedDekBefore = Uint8Array.from([1, 2, 3, 4, 5, 250]);
+await upgradeDb.prepare(
+  `INSERT INTO user_keys (
+     user_id, key_version, kek_version, wrapped_dek, created_at
+   ) VALUES (?, 1, 3, ?, ?)`,
+).bind(migrationUserId, wrappedDekBefore, artifactBefore.created_at).run();
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(
+    cryptoOperationsMigrationIndex,
+    placeResolutionsMigrationIndex,
+  ),
+);
+
+const upgradedKey = await upgradeDb.prepare(
+  `SELECT wrapped_dek, root_kek_id FROM user_keys
+   WHERE user_id = ? AND key_version = 1`,
+).bind(migrationUserId).first<{
+  wrapped_dek: ArrayBuffer | readonly number[];
+  root_kek_id: string;
+}>();
+const upgradedWrapped = upgradedKey?.wrapped_dek instanceof ArrayBuffer
+  ? new Uint8Array(upgradedKey.wrapped_dek)
+  : Uint8Array.from(upgradedKey?.wrapped_dek ?? []);
+if (
+  upgradedKey?.root_kek_id !== "legacy" ||
+  JSON.stringify([...upgradedWrapped]) !== JSON.stringify([...wrappedDekBefore])
+) {
+  throw new Error("0021 changed wrapped DEK bytes or failed the legacy key-id backfill");
+}
+for (const table of [
+  "crypto_operations",
+  "crypto_kek_rewrap_campaigns",
+  "crypto_kek_rewrap_items",
+]) {
+  const found = await upgradeDb.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+  ).bind(table).first();
+  if (!found) throw new Error(`0021 did not create ${table}`);
+}
+await assertDatabaseHealthy(upgradeDb, "0021 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0022: encrypted selected-place cache.
+// ---------------------------------------------------------------------------
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(placeResolutionsMigrationIndex),
+);
+const placeColumns = await upgradeDb.prepare(
+  "PRAGMA table_info(place_resolutions)",
+).all<{ name: string }>();
+if (
+  JSON.stringify(placeColumns.results.map(({ name }) => name)) !==
+  JSON.stringify([
+    "id",
+    "user_id",
+    "provider",
+    "policy_version",
+    "payload_enc",
+    "payload_key_version",
+    "payload_nonce",
+    "created_at",
+    "expires_at",
+    "consumed_at",
+  ])
+) {
+  throw new Error("0022 created the wrong selected-place columns");
+}
+await assertDatabaseHealthy(upgradeDb, "0022 populated apply");

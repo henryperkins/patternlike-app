@@ -185,6 +185,29 @@ describe("account-processing consent resource", () => {
     ]);
   });
 
+  it("does not store account-processing consent while crypto writes are fenced", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const response = await requestAccountProcessing("PUT", {
+      key: "account-processing-fenced-0001",
+      surface: "onboarding",
+    });
+
+    expect(response.status).toBe(409);
+    expect(await rows(
+      "SELECT id FROM consents WHERE user_id = ? AND kind = 'account_processing'",
+      USER_A,
+    )).toEqual([]);
+    expect(await rows(
+      "SELECT id FROM jobs WHERE idempotency_key = ?",
+      "account-processing-fenced-0001",
+    )).toEqual([]);
+  });
+
   it("aborts a grant when account deletion changes lifecycle state before its batch", async () => {
     const batch = env.DB.batch.bind(env.DB);
     let injected = false;

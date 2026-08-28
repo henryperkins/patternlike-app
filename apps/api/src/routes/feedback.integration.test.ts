@@ -117,6 +117,25 @@ describe("POST /v1/readings/:id/feedback", () => {
     expect(row?.notes_enc).not.toBeNull();
   });
 
+  it("does not store feedback while a crypto write fence is installed", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await post(READING_ID, {
+      resonance: "helpful",
+      note: "must not be committed under a stale key",
+    }, { idempotencyKey: "idem-feedback-fenced" });
+
+    expect(result.status).toBe(500);
+    expect(await rows("SELECT id FROM reading_feedback WHERE user_id = ?", USER_A))
+      .toEqual([]);
+    expect(await rows("SELECT id FROM jobs WHERE idempotency_key = ?", "idem-feedback-fenced"))
+      .toEqual([]);
+  });
+
   it("replays an identical idempotent retry and rejects a conflicting one", async () => {
     const first = await post(READING_ID, { resonance: "neutral" }, { idempotencyKey: "idem-same" });
     expect(first.status).toBe(201);

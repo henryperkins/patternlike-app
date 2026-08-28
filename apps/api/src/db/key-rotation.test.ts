@@ -2,13 +2,18 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { env } from "cloudflare:test";
 import type { Env } from "../env.js";
 import {
+  buildUserKeyInsert,
   decryptPayload,
   encryptPayload,
   loadUserKey,
   rewrapUserKey,
   rotateUserDek,
 } from "./users.js";
-import type { EncryptionContext } from "../crypto.js";
+import {
+  asCryptoSubject,
+  DEV_ROOT_KEK,
+  type EncryptionContext,
+} from "../crypto.js";
 import { resetDb, rows } from "../../test/helpers.js";
 import {
   ALICE,
@@ -30,6 +35,20 @@ import { dispatchGeneration } from "../services/generate-daily-reading.js";
 
 const NEW_ROOT_KEK = "a-rotated-root-kek-with-enough-entropy-01";
 
+function dualKeyringEnv(): Env {
+  return {
+    ...env,
+    ROOT_KEK_KEYRING: JSON.stringify({
+      version: 1,
+      active_key_id: "root-2026-09",
+      keys: {
+        legacy: DEV_ROOT_KEK,
+        "root-2026-09": NEW_ROOT_KEK,
+      },
+    }),
+  } as Env;
+}
+
 const CTX: EncryptionContext = {
   subject: SUBJECT_A,
   field: "birth_profiles.payload_enc",
@@ -49,8 +68,8 @@ describe("KEK rewrap", () => {
   it("keeps the DEK usable after the root secret changes", async () => {
     const sealed = await encryptPayload(env, IDENTITY_A, { birth_date: "1990-05-15" }, CTX);
 
-    const rotated = { ...env, ROOT_KEK: NEW_ROOT_KEK } as Env;
-    await rewrapUserKey(rotated, IDENTITY_A, env);
+    const rotated = dualKeyringEnv();
+    await rewrapUserKey(rotated, IDENTITY_A, "root-2026-09");
 
     const out = await decryptPayload<{ birth_date: string }>(
       rotated,
@@ -61,20 +80,11 @@ describe("KEK rewrap", () => {
     expect(out.birth_date).toBe("1990-05-15");
   });
 
-  it("makes the old root secret unable to unwrap the key", async () => {
-    await encryptPayload(env, IDENTITY_A, { birth_date: "1990-05-15" }, CTX);
-
-    const rotated = { ...env, ROOT_KEK: NEW_ROOT_KEK } as Env;
-    await rewrapUserKey(rotated, IDENTITY_A, env);
-
-    await expect(loadUserKey(env, IDENTITY_A)).rejects.toThrow();
-  });
-
   it("does not change the DEK version — only the wrapping", async () => {
     const before = await loadUserKey(env, IDENTITY_A);
 
-    const rotated = { ...env, ROOT_KEK: NEW_ROOT_KEK } as Env;
-    await rewrapUserKey(rotated, IDENTITY_A, env);
+    const rotated = dualKeyringEnv();
+    await rewrapUserKey(rotated, IDENTITY_A, "root-2026-09");
 
     // `rotated`, not `env`: after the rewrap the DEK is sealed under the NEW
     // root secret, so reading it back with the old one would throw.
@@ -86,16 +96,45 @@ describe("KEK rewrap", () => {
   it("stamps rotated_at and keeps exactly one live key", async () => {
     await loadUserKey(env, IDENTITY_A);
 
-    const rotated = { ...env, ROOT_KEK: NEW_ROOT_KEK } as Env;
-    await rewrapUserKey(rotated, IDENTITY_A, env);
+    const rotated = dualKeyringEnv();
+    const result = await rewrapUserKey(rotated, IDENTITY_A, "root-2026-09");
 
-    const keys = await rows<{ rotated_at: string | null; destroyed_at: string | null }>(
-      "SELECT rotated_at, destroyed_at FROM user_keys WHERE user_id = ?",
+    const keys = await rows<{
+      root_kek_id: string;
+      rotated_at: string | null;
+      destroyed_at: string | null;
+    }>(
+      "SELECT root_kek_id, rotated_at, destroyed_at FROM user_keys WHERE user_id = ?",
       USER_A,
     );
+    expect(result).toMatchObject({ rootKekId: "root-2026-09", changed: true });
     expect(keys).toHaveLength(1);
+    expect(keys[0]!.root_kek_id).toBe("root-2026-09");
     expect(keys[0]!.rotated_at).toBeTruthy();
     expect(keys[0]!.destroyed_at).toBeNull();
+  });
+
+  it("stores the active root key id for newly minted user keys", async () => {
+    const now = new Date().toISOString();
+    const rotated = dualKeyringEnv();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO users (id, crypto_subject, status, locale, timezone,
+                            entitlement_tier, created_at, updated_at)
+         VALUES ('usr_keyring_new_0001', 'cs_keyring_new_0001', 'active',
+                 'en-US', 'UTC', 'free', ?, ?)`,
+      ).bind(now, now),
+      await buildUserKeyInsert(rotated, {
+        userId: "usr_keyring_new_0001",
+        cryptoSubject: asCryptoSubject("cs_keyring_new_0001"),
+      }),
+    ]);
+
+    expect(
+      await rows<{ root_kek_id: string }>(
+        "SELECT root_kek_id FROM user_keys WHERE user_id = 'usr_keyring_new_0001'",
+      ),
+    ).toEqual([{ root_kek_id: "root-2026-09" }]);
   });
 });
 

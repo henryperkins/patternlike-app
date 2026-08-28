@@ -120,6 +120,20 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
               {chart.uncertainty.user_facing_summary ??
                 "Calculation confidence is recorded with the chart."}
             </p>
+            {chart.uncertainty.qualified_features.some(
+              (feature) =>
+                feature.feature_id === "birthplace" ||
+                feature.feature_id === "birth_instant",
+            ) && (
+              <ul className="uncertainty-card__qualifications">
+                {chart.uncertainty.qualified_features.some(
+                  (feature) => feature.feature_id === "birthplace",
+                ) && <li>Birthplace resolution needs confirmation.</li>}
+                {chart.uncertainty.qualified_features.some(
+                  (feature) => feature.feature_id === "birth_instant",
+                ) && <li>The civil-time conversion needs confirmation.</li>}
+              </ul>
+            )}
             <dl>
               <div>
                 <dt>Houses</dt>

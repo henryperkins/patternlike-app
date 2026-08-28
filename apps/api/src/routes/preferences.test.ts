@@ -155,6 +155,31 @@ describe("PUT /v1/preferences/timezone", () => {
     });
   });
 
+  it("does not store an idempotent preference mutation while crypto writes are fenced", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+    try {
+      const result = await setZone(
+        "America/Chicago",
+        "user_confirmed",
+        undefined,
+        "pref-zone-fenced-0001",
+      );
+
+      expect(result.status).toBe(500);
+      expect((await userRow()).timezone).toBe("UTC");
+      expect(await rows(
+        "SELECT id FROM jobs WHERE idempotency_key = ?",
+        "pref-zone-fenced-0001",
+      )).toEqual([]);
+    } finally {
+      await rows("UPDATE users SET crypto_write_fence = NULL WHERE id = ?", USER_A);
+    }
+  });
+
   it("moves the default off default_unconfirmed, which is what gates generation", async () => {
     expect((await userRow()).timezone_source).toBe("default_unconfirmed");
     await setZone("Europe/Berlin", "device_derived");

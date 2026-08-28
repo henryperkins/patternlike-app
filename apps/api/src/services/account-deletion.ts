@@ -163,6 +163,22 @@ async function eraseKeys(
        WHERE user_id = ?`,
     ).bind(nowIso, nowIso, claim.request.user_id),
     env.DB.prepare(
+      `DELETE FROM crypto_operations
+       WHERE user_id = ?
+         AND stage NOT IN (
+           'quiescing', 'reencrypting', 'finalizing',
+           'verifying', 'blocked'
+         )
+         AND candidate_wrapped_dek IS NULL`,
+    ).bind(claim.request.user_id),
+    env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'crypto operation survived key erasure'
+       WHERE EXISTS (
+         SELECT 1 FROM crypto_operations WHERE user_id = ?
+       )`,
+    ).bind(claim.request.user_id),
+    env.DB.prepare(
       `UPDATE deletion_requests
        SET dek_destroyed = 1, checkpoint = 'keys_erased', status_updated_at = ?
        WHERE id = ? AND job_id = ? AND status = 'running'

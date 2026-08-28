@@ -285,6 +285,39 @@ describe("account export", () => {
     expect(patternsConflict.body.error?.code).toBe("idempotency_conflict");
   });
 
+  it("does not reserve an export while crypto writes are fenced", async () => {
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await postExport(USER_A, "idem-export-fenced-0001");
+
+    expect(result.response.status).toBe(500);
+    expect(await rows("SELECT id FROM export_requests WHERE user_id = ?", USER_A))
+      .toEqual([]);
+    expect(await rows(
+      "SELECT id FROM jobs WHERE idempotency_key = ?",
+      "idem-export-fenced-0001",
+    )).toEqual([]);
+  });
+
+  it("does not claim a queued export after crypto writes become fenced", async () => {
+    const accepted = await postExport(USER_A, "idem-export-claim-fenced-0001");
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    expect(await claimExportJob(env, accepted.body.job_id)).toBeNull();
+    expect(await rows<{ status: string; attempts: number }>(
+      "SELECT status, attempts FROM jobs WHERE id = ?",
+      accepted.body.job_id,
+    )).toEqual([{ status: "queued", attempts: 0 }]);
+  });
+
   it("validates the frozen request without reserving work", async () => {
     const missing = await postExport(USER_A, null);
     expect(missing.response.status).toBe(400);

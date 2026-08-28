@@ -28,6 +28,10 @@ import {
 } from "../db/pattern-claims.js";
 import { reservePatternClaim } from "../db/pattern-claim-transitions.js";
 import {
+  buildCryptoWriteFence,
+  requireSingleCryptoWriteVersion,
+} from "../db/crypto-write-fence.js";
+import {
   PATTERN_COMMAND_VERSION,
   PATTERN_JOB_TYPE,
   type GeneratePatternCommandV1,
@@ -277,7 +281,16 @@ export async function enqueuePatternGeneration(
     { generation_id: generationId },
   );
 
-  const statements = [];
+  const statements: D1PreparedStatement[] = [
+    buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: requireSingleCryptoWriteVersion([
+        sealed.keyVersion,
+        wrappedArtifact.keyVersion,
+      ]),
+      allowedStatuses: ["active"],
+    }),
+  ];
   if (newConsent) {
     statements.push(
       insertPatternConsentGrant(

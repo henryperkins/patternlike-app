@@ -79,6 +79,25 @@ describe("M4 context-source document", () => {
     )).toEqual([{ allowed_uses_json: '["time_travel"]' }]);
   });
 
+  it("does not mutate a source while a crypto write fence is installed", async () => {
+    const initial = await getSources();
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await putSource(initial, "USR-09", "active", "source-fenced-0001");
+
+    expect(result.status).toBe(409);
+    expect(await rows(
+      "SELECT id FROM consents WHERE user_id = ? AND kind = 'product_source'",
+      USER_A,
+    )).toEqual([]);
+    expect(await rows("SELECT id FROM jobs WHERE idempotency_key = ?", "source-fenced-0001"))
+      .toEqual([]);
+  });
+
   it("scopes one idempotency namespace across both source families", async () => {
     const initial = await getSources();
     const granted = await putSource(initial, "USR-09", "active", "source-common-key-0002");

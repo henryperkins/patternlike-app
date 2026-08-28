@@ -7,6 +7,7 @@ import {
   type AccountProcessingUiSurface,
 } from "../policies/account-processing-policies.js";
 import { decryptPayload, encryptPayload, type AccountStatus, type UserIdentity } from "./users.js";
+import { buildCryptoWriteFence } from "./crypto-write-fence.js";
 
 const GRANT_JOB_TYPE = "account_processing_consent_grant";
 const REVOKE_JOB_TYPE = "account_processing_consent_revoke";
@@ -385,30 +386,37 @@ async function mutationInsert(
   idempotencyKey: string,
   mutation: StoredMutation,
   now: string,
-): Promise<D1PreparedStatement> {
+): Promise<{ fence: D1PreparedStatement; insert: D1PreparedStatement }> {
   const jobId = newId("job");
   const sealed = await encryptPayload(env, identity, mutation, {
     subject: identity.cryptoSubject,
     field: "jobs.payload_enc",
     recordId: jobId,
   });
-  return env.DB.prepare(
-    `INSERT INTO jobs
+  return {
+    fence: buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: sealed.keyVersion,
+      allowedStatuses: ["active", "frozen"],
+    }),
+    insert: env.DB.prepare(
+      `INSERT INTO jobs
        (id, job_type, user_id, idempotency_key, status, payload_enc,
         payload_key_version, payload_nonce, result_class, attempts, finished_at, created_at)
      VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, ?, 1, ?, ?)`,
-  ).bind(
-    jobId,
-    jobType,
-    identity.userId,
-    idempotencyKey,
-    Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
-    sealed.keyVersion,
-    sealed.nonce,
-    mutation.cursorRefresh.required ? "consent_cursor_pending" : "consent_no_cursor_change",
-    now,
-    now,
-  );
+    ).bind(
+      jobId,
+      jobType,
+      identity.userId,
+      idempotencyKey,
+      Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
+      sealed.keyVersion,
+      sealed.nonce,
+      mutation.cursorRefresh.required ? "consent_cursor_pending" : "consent_no_cursor_change",
+      now,
+      now,
+    ),
+  };
 }
 
 async function finishStoredCursorRefresh(
@@ -591,7 +599,16 @@ async function mutate(
       ).bind(newId("aud"), identity.userId, identity.userId, now),
     );
   }
-  statements.push(await mutationInsert(env, identity, jobType, input.idempotencyKey, mutation, now));
+  const encryptedMutation = await mutationInsert(
+    env,
+    identity,
+    jobType,
+    input.idempotencyKey,
+    mutation,
+    now,
+  );
+  statements.unshift(encryptedMutation.fence);
+  statements.push(encryptedMutation.insert);
   if (changing && nextConsentId) {
     statements.push(
       env.DB.prepare(
@@ -623,10 +640,16 @@ async function mutate(
       await finishStoredCursorRefresh(env, identity, raced);
       return { ok: true, changed: false };
     }
-    const [currentLatest, currentAccountStatus] = await Promise.all([
+    const [currentLatest, currentAccountStatus, currentCryptoState] = await Promise.all([
       loadLatest(env, identity.userId),
       loadAccountStatus(env, identity.userId),
+      env.DB.prepare(
+        "SELECT crypto_write_fence FROM users WHERE id = ?",
+      ).bind(identity.userId).first<{ crypto_write_fence: string | null }>(),
     ]);
+    if (currentCryptoState?.crypto_write_fence) {
+      return { ok: false, reason: "account_state_conflict" };
+    }
     if (currentAccountStatus !== accountStatus) {
       return { ok: false, reason: "account_state_conflict" };
     }

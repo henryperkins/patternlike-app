@@ -2,6 +2,10 @@ import { canonicalJson, newId, requireIdempotencyKey } from "@patternlike/shared
 import { b64 } from "../crypto.js";
 import type { Env } from "../env.js";
 import { USR12_SOURCE_ID, ensureFirstPartyGrant } from "./first-party-sources.js";
+import {
+  buildCryptoWriteFence,
+  requireSingleCryptoWriteVersion,
+} from "./crypto-write-fence.js";
 import { decryptPayload, encryptPayload, type UserIdentity } from "./users.js";
 
 const JOB_TYPE = "store_reading_feedback";
@@ -241,6 +245,14 @@ export async function storeReadingFeedback(
 
   try {
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: requireSingleCryptoWriteVersion([
+          sealedJob.keyVersion,
+          ...(notesKeyVersion === null ? [] : [notesKeyVersion]),
+        ]),
+        allowedStatuses: ["active"],
+      }),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'reading feedback target missing'

@@ -60,6 +60,8 @@ interface CalcRequestBody {
   longitude: number | null;
   place_label: string | null;
   approximate_window_minutes?: number | null;
+  location_confidence?: "high" | "medium" | "low" | "none";
+  location_qualifier_codes?: string[];
   contract_id: string;
   contract_version: string;
 }
@@ -1524,10 +1526,37 @@ export async function mockCalcService(request: Request): Promise<Response> {
               }
             : null,
         suppressed_features: suppressed,
-        qualified_features: [],
-        user_facing_summary: anglesIncluded
+        qualified_features: [
+          ...(
+            req.location_confidence === "medium" ||
+            req.location_confidence === "low" ||
+            req.location_confidence === "none"
+              ? [{ feature_id: "birthplace", qualification: "technique_specific" }]
+              : []
+          ),
+          ...(
+            req.location_qualifier_codes?.some((code) => [
+              "pre_1970_zone_boundary",
+              "near_zone_boundary",
+              "local_time_ambiguous",
+              "local_time_nonexistent",
+            ].includes(code))
+              ? [{ feature_id: "birth_instant", qualification: "technique_specific" }]
+              : []
+          ),
+        ],
+        user_facing_summary: (anglesIncluded
           ? "Birth time is exact; houses and angles are included (Swiss Ephemeris)."
-          : "Birth time is unknown; houses, angles, and time-sensitive Moon claims are suppressed.",
+          : "Birth time is unknown; houses, angles, and time-sensitive Moon claims are suppressed.") +
+          ((req.location_confidence && req.location_confidence !== "high") ||
+            req.location_qualifier_codes?.some((code) => [
+              "pre_1970_zone_boundary",
+              "near_zone_boundary",
+              "local_time_ambiguous",
+              "local_time_nonexistent",
+            ].includes(code))
+            ? " Location details need confirmation; affected chart facts are qualified."
+            : ""),
       },
       calculated_at: "2026-08-01T12:00:00.000Z",
       status: "active",

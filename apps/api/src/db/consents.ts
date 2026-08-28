@@ -1,11 +1,15 @@
 import {
   AI_CONSENT_DATA_CATEGORIES,
+  GEOCODER_CONSENT_ALLOWED_USES,
+  GEOCODER_CONSENT_POLICY_VERSION,
   newId,
   type AiConsentDataCategory,
+  type GeocoderConsentUiSurface,
 } from "@patternlike/shared";
 import type { ConstrainedContextSourceInput } from "@patternlike/reading-engine";
 import type { Env } from "../env.js";
 import { decryptPayload, encryptPayload, type UserIdentity } from "./users.js";
+import { buildCryptoWriteFence } from "./crypto-write-fence.js";
 
 /**
  * The consent reads the publisher depends on.
@@ -235,7 +239,7 @@ async function mutationInsert(
   idempotencyKey: string,
   stored: StoredConsentMutation,
   now: string,
-): Promise<D1PreparedStatement> {
+): Promise<{ fence: D1PreparedStatement; insert: D1PreparedStatement }> {
   const jobId = newId("job");
   const sealed = await encryptPayload(env, identity, stored, {
     subject: identity.cryptoSubject,
@@ -245,24 +249,31 @@ async function mutationInsert(
   const resultClass = stored.cursorRefresh?.required
     ? "consent_cursor_pending"
     : "consent_no_cursor_change";
-  return env.DB.prepare(
-    `INSERT INTO jobs
+  return {
+    fence: buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: sealed.keyVersion,
+      allowedStatuses: ["active"],
+    }),
+    insert: env.DB.prepare(
+      `INSERT INTO jobs
        (id, job_type, user_id, idempotency_key, status, payload_enc,
         payload_key_version, payload_nonce, result_class, attempts,
         finished_at, created_at)
      VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, ?, 1, ?, ?)`,
-  ).bind(
-    jobId,
-    jobType,
-    identity.userId,
-    idempotencyKey,
-    Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
-    sealed.keyVersion,
-    sealed.nonce,
-    resultClass,
-    now,
-    now,
-  );
+    ).bind(
+      jobId,
+      jobType,
+      identity.userId,
+      idempotencyKey,
+      Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
+      sealed.keyVersion,
+      sealed.nonce,
+      resultClass,
+      now,
+      now,
+    ),
+  };
 }
 
 async function finishStoredCursorRefresh(
@@ -396,16 +407,16 @@ async function writeAiConsentMutation(
       ),
     );
   }
-  statements.push(
-    await mutationInsert(
-      env,
-      identity,
-      jobType,
-      input.idempotencyKey,
-      stored,
-      now,
-    ),
+  const encryptedMutation = await mutationInsert(
+    env,
+    identity,
+    jobType,
+    input.idempotencyKey,
+    stored,
+    now,
   );
+  statements.unshift(encryptedMutation.fence);
+  statements.push(encryptedMutation.insert);
   if (changed && nextConsentId) {
     statements.push(
       env.DB.prepare(
@@ -484,6 +495,421 @@ export async function revokeAiSynthesisConsent(
   return writeAiConsentMutation(env, identity, {
     operation: "revoke",
     policyVersion: AI_SYNTHESIS_POLICY_VERSION,
+    idempotencyKey,
+    now,
+  });
+}
+
+const GEOCODER_SOURCE_ID = "AST-02" as const;
+const GEOCODER_PROVIDER = "google_places_geocoding_v4" as const;
+const GEOCODER_ALLOWED_USES_JSON = JSON.stringify(GEOCODER_CONSENT_ALLOWED_USES);
+const GEOCODER_GRANT_JOB_TYPE = "geocoder_consent_grant";
+const GEOCODER_REVOKE_JOB_TYPE = "geocoder_consent_revoke";
+
+interface GeocoderConsentRow {
+  id: string;
+  status: string;
+  permission_tier: number;
+  allowed_uses_json: string;
+  scopes_json: string;
+  connector_account_id: string | null;
+  policy_version: string;
+  ui_surface: string | null;
+  granted_at: string | null;
+  revoked_at: string | null;
+  paused_at: string | null;
+  expires_at: string | null;
+  version: number;
+  created_at: string;
+}
+
+export interface GeocoderConsentState {
+  status: "granted" | "not_granted";
+  grantedAt: string | null;
+  uiSurface: GeocoderConsentUiSurface | null;
+}
+
+export interface GeocoderGrant {
+  consentId: string;
+  policyVersion: typeof GEOCODER_CONSENT_POLICY_VERSION;
+  grantedAt: string;
+  uiSurface: GeocoderConsentUiSurface;
+}
+
+async function loadLatestGeocoderConsent(
+  env: Env,
+  userId: string,
+): Promise<GeocoderConsentRow | null> {
+  return env.DB.prepare(
+    `SELECT id, status, permission_tier, allowed_uses_json, scopes_json,
+            connector_account_id, policy_version, ui_surface, granted_at,
+            revoked_at, paused_at, expires_at, version, created_at
+     FROM consents
+     WHERE user_id = ? AND kind = 'product_source' AND source_id = ?
+       AND provider = ?
+     ORDER BY version DESC, created_at DESC, id DESC LIMIT 1`,
+  ).bind(userId, GEOCODER_SOURCE_ID, GEOCODER_PROVIDER).first<GeocoderConsentRow>();
+}
+
+function geocoderGrantFromRow(
+  row: GeocoderConsentRow | null,
+  now = new Date(),
+): GeocoderGrant | null {
+  if (
+    !row ||
+    row.status !== "granted" ||
+    row.policy_version !== GEOCODER_CONSENT_POLICY_VERSION ||
+    row.permission_tier !== 0 ||
+    row.allowed_uses_json !== GEOCODER_ALLOWED_USES_JSON ||
+    row.scopes_json !== "[]" ||
+    row.connector_account_id !== null ||
+    row.granted_at === null ||
+    row.revoked_at !== null ||
+    row.paused_at !== null ||
+    (row.expires_at !== null && row.expires_at <= now.toISOString()) ||
+    (row.ui_surface !== "onboarding" && row.ui_surface !== "privacy_center")
+  ) {
+    return null;
+  }
+  return {
+    consentId: row.id,
+    policyVersion: GEOCODER_CONSENT_POLICY_VERSION,
+    grantedAt: row.granted_at,
+    uiSurface: row.ui_surface,
+  };
+}
+
+export async function loadGeocoderGrant(
+  env: Env,
+  userId: string,
+  now = new Date(),
+): Promise<GeocoderGrant | null> {
+  return geocoderGrantFromRow(await loadLatestGeocoderConsent(env, userId), now);
+}
+
+export async function loadGeocoderConsentState(
+  env: Env,
+  userId: string,
+  now = new Date(),
+): Promise<GeocoderConsentState> {
+  const latest = await loadLatestGeocoderConsent(env, userId);
+  const grant = geocoderGrantFromRow(latest, now);
+  return grant
+    ? { status: "granted", grantedAt: grant.grantedAt, uiSurface: grant.uiSurface }
+    : {
+        status: "not_granted",
+        grantedAt: null,
+        uiSurface: latest?.ui_surface === "onboarding" || latest?.ui_surface === "privacy_center"
+          ? latest.ui_surface
+          : null,
+      };
+}
+
+interface StoredGeocoderConsentMutation {
+  operation: "grant" | "revoke";
+  policyVersion: string;
+  uiSurface: GeocoderConsentUiSurface;
+  state: GeocoderConsentState;
+  changed: boolean;
+}
+
+interface StoredGeocoderMutationRecord {
+  mutation: StoredGeocoderConsentMutation;
+}
+
+function isStoredGeocoderMutation(value: unknown): value is StoredGeocoderConsentMutation {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Partial<StoredGeocoderConsentMutation>;
+  return (
+    (record.operation === "grant" || record.operation === "revoke") &&
+    typeof record.policyVersion === "string" &&
+    (record.uiSurface === "onboarding" || record.uiSurface === "privacy_center") &&
+    typeof record.changed === "boolean" &&
+    !!record.state &&
+    (record.state.status === "granted" || record.state.status === "not_granted") &&
+    (record.state.grantedAt === null || typeof record.state.grantedAt === "string") &&
+    (record.state.uiSurface === null ||
+      record.state.uiSurface === "onboarding" ||
+      record.state.uiSurface === "privacy_center")
+  );
+}
+
+async function loadStoredGeocoderMutation(
+  env: Env,
+  identity: UserIdentity,
+  jobType: string,
+  idempotencyKey: string,
+): Promise<StoredGeocoderMutationRecord | null> {
+  const row = await env.DB.prepare(
+    `SELECT id, payload_enc, payload_key_version, payload_nonce
+     FROM jobs WHERE job_type = ? AND user_id = ? AND idempotency_key = ?
+       AND status = 'succeeded'`,
+  ).bind(jobType, identity.userId, idempotencyKey).first<ConsentMutationJobRow>();
+  if (!row) return null;
+  if (!row.payload_enc || row.payload_key_version === null || !row.payload_nonce) {
+    throw new Error("Geocoder consent idempotency record is incomplete");
+  }
+  const mutation = await decryptPayload<unknown>(env, identity, {
+    ciphertext: bytesToBase64(row.payload_enc),
+    key_version: row.payload_key_version,
+    nonce: row.payload_nonce,
+  }, {
+    subject: identity.cryptoSubject,
+    field: "jobs.payload_enc",
+    recordId: row.id,
+  });
+  if (!isStoredGeocoderMutation(mutation)) {
+    throw new Error("Geocoder consent idempotency record is invalid");
+  }
+  return { mutation };
+}
+
+function geocoderLatestAssertion(
+  env: Env,
+  userId: string,
+  latest: GeocoderConsentRow | null,
+): D1PreparedStatement {
+  if (!latest) {
+    return env.DB.prepare(
+      `INSERT INTO assertion_probe (id, reason)
+       SELECT 1, 'geocoder consent state appeared concurrently'
+       WHERE EXISTS (
+         SELECT 1 FROM consents WHERE user_id = ? AND kind = 'product_source'
+           AND source_id = ? AND provider = ?
+       )`,
+    ).bind(userId, GEOCODER_SOURCE_ID, GEOCODER_PROVIDER);
+  }
+  return env.DB.prepare(
+    `INSERT INTO assertion_probe (id, reason)
+     SELECT 1, 'geocoder consent state changed concurrently'
+     WHERE NOT EXISTS (
+       SELECT 1 FROM consents current
+       WHERE current.id = ? AND current.user_id = ?
+         AND current.kind = 'product_source' AND current.source_id = ?
+         AND current.provider = ? AND current.version = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM consents newer
+           WHERE newer.user_id = current.user_id
+             AND newer.kind = current.kind
+             AND newer.source_id = current.source_id
+             AND newer.provider = current.provider
+             AND (
+               newer.version > current.version OR
+               (newer.version = current.version AND newer.created_at > current.created_at) OR
+               (newer.version = current.version AND newer.created_at = current.created_at AND newer.id > current.id)
+             )
+         )
+     )`,
+  ).bind(
+    latest.id,
+    userId,
+    GEOCODER_SOURCE_ID,
+    GEOCODER_PROVIDER,
+    latest.version,
+  );
+}
+
+async function buildGeocoderMutationInsert(
+  env: Env,
+  identity: UserIdentity,
+  jobType: string,
+  idempotencyKey: string,
+  mutation: StoredGeocoderConsentMutation,
+  now: string,
+): Promise<{ fence: D1PreparedStatement; insert: D1PreparedStatement }> {
+  const jobId = newId("job");
+  const sealed = await encryptPayload(env, identity, mutation, {
+    subject: identity.cryptoSubject,
+    field: "jobs.payload_enc",
+    recordId: jobId,
+  });
+  return {
+    fence: buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: sealed.keyVersion,
+      allowedStatuses: ["active"],
+    }),
+    insert: env.DB.prepare(
+      `INSERT INTO jobs (
+         id, job_type, user_id, idempotency_key, status, payload_enc,
+         payload_key_version, payload_nonce, result_class, attempts,
+         finished_at, created_at
+       ) VALUES (?, ?, ?, ?, 'succeeded', ?, ?, ?, 'consent_recorded', 1, ?, ?)`,
+    ).bind(
+      jobId,
+      jobType,
+      identity.userId,
+      idempotencyKey,
+      Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
+      sealed.keyVersion,
+      sealed.nonce,
+      now,
+      now,
+    ),
+  };
+}
+
+export type GeocoderConsentMutationOutcome =
+  | { ok: true; state: GeocoderConsentState; changed: boolean }
+  | { ok: false; reason: "idempotency_conflict" | "conflict" };
+
+async function writeGeocoderConsentMutation(
+  env: Env,
+  identity: UserIdentity,
+  input: {
+    operation: "grant" | "revoke";
+    policyVersion: string;
+    uiSurface: GeocoderConsentUiSurface;
+    idempotencyKey: string;
+    now: Date;
+  },
+): Promise<GeocoderConsentMutationOutcome> {
+  const jobType = input.operation === "grant"
+    ? GEOCODER_GRANT_JOB_TYPE
+    : GEOCODER_REVOKE_JOB_TYPE;
+  const replay = await loadStoredGeocoderMutation(
+    env,
+    identity,
+    jobType,
+    input.idempotencyKey,
+  );
+  if (replay) {
+    return replay.mutation.operation === input.operation &&
+        replay.mutation.policyVersion === input.policyVersion &&
+        replay.mutation.uiSurface === input.uiSurface
+      ? {
+          ok: true,
+          state: replay.mutation.state,
+          changed: replay.mutation.changed,
+        }
+      : { ok: false, reason: "idempotency_conflict" };
+  }
+
+  const latest = await loadLatestGeocoderConsent(env, identity.userId);
+  const active = geocoderGrantFromRow(latest, input.now);
+  const changed = input.operation === "grant" ? active === null : latest?.status === "granted";
+  const now = input.now.toISOString();
+  const state: GeocoderConsentState = input.operation === "grant"
+    ? {
+        status: "granted",
+        grantedAt: active?.grantedAt ?? now,
+        uiSurface: active?.uiSurface ?? input.uiSurface,
+      }
+    : { status: "not_granted", grantedAt: null, uiSurface: input.uiSurface };
+  const mutation: StoredGeocoderConsentMutation = {
+    operation: input.operation,
+    policyVersion: input.policyVersion,
+    uiSurface: input.uiSurface,
+    state,
+    changed,
+  };
+  const receipt = await buildGeocoderMutationInsert(
+    env,
+    identity,
+    jobType,
+    input.idempotencyKey,
+    mutation,
+    now,
+  );
+  const statements = [
+    geocoderLatestAssertion(env, identity.userId, latest),
+    receipt.fence,
+  ];
+  let consentId: string | null = null;
+  if (changed) {
+    consentId = newId("cns");
+    statements.push(env.DB.prepare(
+      `INSERT INTO consents (
+         id, user_id, kind, status, source_id, permission_tier,
+         allowed_uses_json, scopes_json, provider, connector_account_id,
+         policy_version, ui_surface, granted_at, revoked_at, version,
+         supersedes_consent_id, created_at, updated_at
+       ) VALUES (?, ?, 'product_source', ?, ?, 0, ?, '[]', ?, NULL,
+                 ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      consentId,
+      identity.userId,
+      input.operation === "grant" ? "granted" : "revoked",
+      GEOCODER_SOURCE_ID,
+      GEOCODER_ALLOWED_USES_JSON,
+      GEOCODER_PROVIDER,
+      input.policyVersion,
+      input.uiSurface,
+      input.operation === "grant" ? now : null,
+      input.operation === "revoke" ? now : null,
+      (latest?.version ?? 0) + 1,
+      latest?.id ?? null,
+      now,
+      now,
+    ));
+  }
+  statements.push(receipt.insert);
+  if (consentId) {
+    statements.push(env.DB.prepare(
+      `INSERT INTO audit_events (
+         id, actor_type, actor_id, action, resource_type, resource_id,
+         result, detail_class, created_at
+       ) VALUES (?, 'user', ?, ?, 'consent', ?, 'success', 'geocoder', ?)`,
+    ).bind(
+      newId("aud"),
+      identity.userId,
+      input.operation === "grant" ? "consent.granted" : "consent.revoked",
+      consentId,
+      now,
+    ));
+  }
+
+  try {
+    await env.DB.batch(statements);
+    return { ok: true, state, changed };
+  } catch {
+    const raced = await loadStoredGeocoderMutation(
+      env,
+      identity,
+      jobType,
+      input.idempotencyKey,
+    );
+    if (!raced) return { ok: false, reason: "conflict" };
+    return raced.mutation.operation === input.operation &&
+        raced.mutation.policyVersion === input.policyVersion &&
+        raced.mutation.uiSurface === input.uiSurface
+      ? {
+          ok: true,
+          state: raced.mutation.state,
+          changed: raced.mutation.changed,
+        }
+      : { ok: false, reason: "idempotency_conflict" };
+  }
+}
+
+export async function grantGeocoderConsent(
+  env: Env,
+  identity: UserIdentity,
+  policyVersion: string,
+  uiSurface: GeocoderConsentUiSurface,
+  idempotencyKey: string,
+  now = new Date(),
+): Promise<GeocoderConsentMutationOutcome> {
+  return writeGeocoderConsentMutation(env, identity, {
+    operation: "grant",
+    policyVersion,
+    uiSurface,
+    idempotencyKey,
+    now,
+  });
+}
+
+export async function revokeGeocoderConsent(
+  env: Env,
+  identity: UserIdentity,
+  uiSurface: GeocoderConsentUiSurface,
+  idempotencyKey: string,
+  now = new Date(),
+): Promise<GeocoderConsentMutationOutcome> {
+  return writeGeocoderConsentMutation(env, identity, {
+    operation: "revoke",
+    policyVersion: GEOCODER_CONSENT_POLICY_VERSION,
+    uiSurface,
     idempotencyKey,
     now,
   });

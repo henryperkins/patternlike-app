@@ -25,6 +25,9 @@ export const HERMETIC_TEST_BINDINGS = {
   OIDC_AUDIENCE: "patternlike-dev",
   OIDC_JWKS_URL: "https://issuer.invalid/.well-known/jwks.json",
   ROOT_KEK: "",
+  ROOT_KEK_KEYRING: "",
+  GEOCODER_ROLLOUT: "off",
+  GOOGLE_MAPS_PLATFORM_API_KEY: "",
   SERVICE_AUTH_TOKEN: "",
   CONTENT_RELEASE_KEYS: "",
   READING_V5_ROLLOUT: "off",
@@ -73,6 +76,7 @@ export const HERMETIC_TEST_BINDINGS = {
   CODEX_PROVIDER_ARTIFACT_KEYRING:
     '{"version":1,"keys":{"codex-test-key":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"}}',
   CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz",
+  CRYPTO_OPERATOR_TOKEN: "",
   ADMIN_ACCESS_TEAM_DOMAIN: "",
   ADMIN_ACCESS_POLICY_AUD: "",
 } as const;

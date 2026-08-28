@@ -8,6 +8,7 @@ import {
 } from "./users.js";
 import type { ExportOptions } from "../services/account-export.js";
 import type { SealedExport } from "../services/export-envelope.js";
+import { buildCryptoWriteFence } from "./crypto-write-fence.js";
 
 export const EXPORT_JOB_TYPE = "export_account" as const;
 export const PRIVACY_CLAIM_LEASE_MS = 5 * 60 * 1000;
@@ -152,6 +153,11 @@ export async function reserveAccountExport(
 
   try {
     await env.DB.batch([
+      buildCryptoWriteFence(env, {
+        userId: identity.userId,
+        keyVersion: sealed.keyVersion,
+        allowedStatuses: ["active", "frozen"],
+      }),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'account cannot reserve export'
@@ -248,6 +254,7 @@ export async function claimExportJob(
        AND EXISTS (
          SELECT 1 FROM users u
          WHERE u.id = jobs.user_id AND u.status IN ('active', 'frozen')
+           AND u.crypto_write_fence IS NULL
        )`,
   )
     .bind(

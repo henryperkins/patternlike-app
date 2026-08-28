@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env, SELF } from "cloudflare:test";
 import type { BirthProfileRequest } from "@patternlike/shared";
 import { decryptPayload, encryptPayload, type UserIdentity } from "../db/users.js";
+import { storePlaceResolution } from "../db/place-resolutions.js";
 import {
   ALICE,
   BOB,
@@ -34,7 +35,7 @@ const RETRY_REQUEST: BirthProfileRequest = {
   approximate_window_minutes: null,
   timezone_hint: "America/Los_Angeles",
   birthplace: {
-    place_id: "plc_retry_safe_birth_0001",
+    place_id: null,
     label: TRIGGER_CALC_ERROR,
     latitude: 34.05,
     longitude: -118.24,
@@ -514,6 +515,59 @@ describe("POST /v1/birth-profiles — exact account-processing authority", () =>
         USER_A,
       ),
     ).toEqual([{ status: "charged" }]);
+  });
+
+  it("cannot publish ciphertext sealed before a crypto write fence", async () => {
+    const firstPromise = postBirthProfile(
+      USER_A,
+      "key-crypto-publication-race",
+      {
+        ...ALICE,
+        birthplace: {
+          ...ALICE.birthplace!,
+          label: TRIGGER_CALC_FINGERPRINT_RACE,
+        },
+      },
+    );
+    await waitForBirthJob(USER_A, "key-crypto-publication-race", "running");
+
+    await env.DB.prepare(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001'
+       WHERE id = ?`,
+    ).bind(USER_A).run();
+
+    const peerPromise = postBirthProfile(
+      USER_B,
+      "key-crypto-publication-peer",
+      {
+        ...BOB,
+        birthplace: {
+          ...BOB.birthplace!,
+          label: TRIGGER_CALC_FINGERPRINT_RACE,
+        },
+      },
+    );
+    const [first, peer] = await Promise.all([firstPromise, peerPromise]);
+
+    expect(first.status).toBe(500);
+    expect(peer.status).toBe(202);
+    expect(await rows("SELECT id FROM chart_snapshots WHERE user_id = ?", USER_A))
+      .toEqual([]);
+    expect(
+      await rows<{ status: string }>(
+        "SELECT status FROM birth_profiles WHERE user_id = ?",
+        USER_A,
+      ),
+    ).toEqual([{ status: "pending" }]);
+    expect(
+      await rows<{ status: string }>(
+        `SELECT status FROM jobs
+         WHERE user_id = ? AND idempotency_key = ?`,
+        USER_A,
+        "key-crypto-publication-race",
+      ),
+    ).toEqual([{ status: "running" }]);
   });
 
   it("cancels instead of recording a retryable calc failure when revocation wins", async () => {
@@ -1959,6 +2013,91 @@ describe("unknown birth time", () => {
 });
 
 describe("historical timezone resolution", () => {
+  it("uses the owner-scoped selected place instead of client copies", async () => {
+    const selected = await storePlaceResolution(env, IDENTITY_A, {
+      label: "London, United Kingdom",
+      latitude: 51.5072,
+      longitude: -0.1276,
+      geocode_confidence: "medium",
+      qualifiers: [{
+        code: "approximate_match",
+        message: "Approximate provider match.",
+      }],
+    });
+
+    const result = await postBirthProfile(USER_A, "key-selected-place", {
+      ...ALICE,
+      timezone_hint: "America/Los_Angeles",
+      birthplace: {
+        place_id: selected.placeId,
+        label: "TAMPERED PRIVATE LABEL",
+        latitude: 0,
+        longitude: 0,
+      },
+    });
+
+    expect(result.status).toBe(202);
+    expect(result.body.birthplace).toEqual({
+      place_id: selected.placeId,
+      label: "London, United Kingdom",
+      latitude: 51.5072,
+      longitude: -0.1276,
+    });
+    expect(result.body.timezone).toMatchObject({
+      resolved: "Europe/London",
+      confidence: "medium",
+    });
+    expect(JSON.stringify(result.body)).not.toContain("TAMPERED PRIVATE LABEL");
+    expect(await rows<{ consumed_at: string | null }>(
+      "SELECT consumed_at FROM place_resolutions WHERE id = ?",
+      selected.placeId,
+    )).toEqual([{ consumed_at: expect.any(String) }]);
+  });
+
+  it("returns one opaque error for foreign and expired selected places", async () => {
+    const foreign = await storePlaceResolution(env, IDENTITY_B, {
+      label: "Paris, France",
+      latitude: 48.8566,
+      longitude: 2.3522,
+      geocode_confidence: "high",
+      qualifiers: [],
+    });
+    const expired = await storePlaceResolution(env, IDENTITY_A, {
+      label: "Berlin, Germany",
+      latitude: 52.52,
+      longitude: 13.405,
+      geocode_confidence: "high",
+      qualifiers: [],
+    }, { now: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) });
+
+    const request = (placeId: string): BirthProfileRequest => ({
+      ...(ALICE as BirthProfileRequest),
+      birthplace: { place_id: placeId },
+    });
+    const foreignResult = await postBirthProfile(
+      USER_A,
+      "key-foreign-place",
+      request(foreign.placeId),
+    );
+    const expiredResult = await postBirthProfile(
+      USER_A,
+      "key-expired-place",
+      request(expired.placeId),
+    );
+
+    expect(foreignResult.status).toBe(400);
+    expect(expiredResult.status).toBe(400);
+    for (const response of [foreignResult, expiredResult]) {
+      expect(response.body).toMatchObject({
+        error: {
+          code: "invalid_place_id",
+          message:
+            "The selected birthplace is unavailable; search again or enter it manually",
+        },
+      });
+    }
+  });
+
   /**
    * `timezone_hint` is the browser's *current* zone, which is wrong for anyone
    * who has moved since being born. Before the lookup was connected it was

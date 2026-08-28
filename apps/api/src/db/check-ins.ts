@@ -9,6 +9,10 @@ import {
   USR06_SOURCE_ID,
 } from "./context-sources.js";
 import {
+  buildCryptoWriteFence,
+  requireSingleCryptoWriteVersion,
+} from "./crypto-write-fence.js";
+import {
   decryptPayload,
   encryptPayload,
   type UserIdentity,
@@ -400,6 +404,14 @@ export async function storeCheckIn(
       ).bind(identity.userId, USR06_SOURCE_ID, sourceWindow);
 
   const statements: D1PreparedStatement[] = [
+    buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: requireSingleCryptoWriteVersion([
+        sealedValue.keyVersion,
+        sealedJob.keyVersion,
+      ]),
+      allowedStatuses: ["active"],
+    }),
     env.DB.prepare(
       `INSERT INTO assertion_probe (id, reason)
        SELECT 1, 'check-in permission changed concurrently'

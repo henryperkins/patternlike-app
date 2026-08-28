@@ -13,6 +13,10 @@ import {
   type GenerateDailyReadingCommandV2,
 } from "../services/generation-command-v2.js";
 import { READING_PUBLISHER_PROVIDER } from "../services/reading-publisher.js";
+import {
+  buildCryptoWriteFence,
+  requireSingleCryptoWriteVersion,
+} from "./crypto-write-fence.js";
 
 /**
  * Reservation, claim, and publication — every one a single guarded `DB.batch()`.
@@ -98,27 +102,34 @@ async function encryptedJobInsert(
   command: GenerateDailyReadingCommand,
   idempotencyKey: string,
   now: string,
-): Promise<D1PreparedStatement> {
+): Promise<{ fence: D1PreparedStatement; insert: D1PreparedStatement }> {
   const sealed = await encryptPayload(env, identity, command, {
     subject: identity.cryptoSubject,
     field: "jobs.payload_enc",
     recordId: jobId,
   });
-  return env.DB.prepare(
-    `INSERT INTO jobs
-       (id, job_type, user_id, idempotency_key, status, payload_json,
-        payload_enc, payload_key_version, payload_nonce, attempts, created_at)
-     VALUES (?, ?, ?, ?, 'queued', NULL, ?, ?, ?, 0, ?)`,
-  ).bind(
-    jobId,
-    JOB_TYPE,
-    identity.userId,
-    idempotencyKey,
-    Uint8Array.from(atob(sealed.ciphertext), (ch) => ch.charCodeAt(0)),
-    sealed.keyVersion,
-    sealed.nonce,
-    now,
-  );
+  return {
+    fence: buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion: sealed.keyVersion,
+      allowedStatuses: ["active"],
+    }),
+    insert: env.DB.prepare(
+      `INSERT INTO jobs
+         (id, job_type, user_id, idempotency_key, status, payload_json,
+          payload_enc, payload_key_version, payload_nonce, attempts, created_at)
+       VALUES (?, ?, ?, ?, 'queued', NULL, ?, ?, ?, 0, ?)`,
+    ).bind(
+      jobId,
+      JOB_TYPE,
+      identity.userId,
+      idempotencyKey,
+      Uint8Array.from(atob(sealed.ciphertext), (ch) => ch.charCodeAt(0)),
+      sealed.keyVersion,
+      sealed.nonce,
+      now,
+    ),
+  };
 }
 
 /**
@@ -294,9 +305,18 @@ export async function reserveInitial(
   const now = new Date().toISOString();
   const jobId = newId("job");
   const columns = reservationColumns(command);
+  const encryptedJob = await encryptedJobInsert(
+    env,
+    identity,
+    jobId,
+    command,
+    idempotencyKeyFor(command),
+    now,
+  );
 
   try {
     await env.DB.batch([
+      encryptedJob.fence,
       // Not merely an optimisation over the partial unique indexes: those would
       // abort with a constraint error that reads identically to a real fault,
       // and this names the state so the caller can answer `duplicate` instead of
@@ -309,14 +329,7 @@ export async function reserveInitial(
            WHERE user_id = ? AND local_date = ? AND status IN ('pending', 'published')
          )`,
       ).bind(identity.userId, command.target_local_date),
-      await encryptedJobInsert(
-        env,
-        identity,
-        jobId,
-        command,
-        idempotencyKeyFor(command),
-        now,
-      ),
+      encryptedJob.insert,
       env.DB.prepare(
         `INSERT INTO daily_readings
            (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
@@ -393,9 +406,18 @@ export async function reserveReissue(
   ) {
     return { ok: false, reason: "stale_predecessor" };
   }
+  const encryptedJob = await encryptedJobInsert(
+    env,
+    identity,
+    jobId,
+    command,
+    idempotencyKeyFor(command),
+    now,
+  );
 
   try {
     await env.DB.batch([
+      encryptedJob.fence,
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'expected predecessor is no longer the live reading at the expected revision'
@@ -418,14 +440,7 @@ export async function reserveReissue(
            WHERE user_id = ? AND local_date = ? AND status = 'pending'
          )`,
       ).bind(identity.userId, command.target_local_date),
-      await encryptedJobInsert(
-        env,
-        identity,
-        jobId,
-        command,
-        idempotencyKeyFor(command),
-        now,
-      ),
+      encryptedJob.insert,
       env.DB.prepare(
         `INSERT INTO daily_readings
            (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
@@ -525,9 +540,18 @@ export async function reserveInvalidatedSuccessor(
   ) {
     return { ok: false, reason: "stale_predecessor" };
   }
+  const encryptedJob = await encryptedJobInsert(
+    env,
+    identity,
+    jobId,
+    command,
+    idempotencyKeyFor(command),
+    now,
+  );
 
   try {
     await env.DB.batch([
+      encryptedJob.fence,
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
          SELECT 1, 'expected predecessor is not invalidated at the expected revision'
@@ -549,14 +573,7 @@ export async function reserveInvalidatedSuccessor(
            SELECT 1 FROM daily_readings WHERE supersedes_reading_id = ?
          )`,
       ).bind(invalidatedReadingId),
-      await encryptedJobInsert(
-        env,
-        identity,
-        jobId,
-        command,
-        idempotencyKeyFor(command),
-        now,
-      ),
+      encryptedJob.insert,
       env.DB.prepare(
         `INSERT INTO daily_readings
            (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
@@ -752,9 +769,18 @@ export async function replaceCommand(
     isCommandV2(command) && command.reservation_reason === "fact_repair"
       ? "invalidated"
       : "published";
+  const encryptedJob = await encryptedJobInsert(
+    env,
+    identity,
+    jobId,
+    command,
+    idempotencyKeyFor(command),
+    now,
+  );
 
   try {
     await env.DB.batch([
+      encryptedJob.fence,
       // The CAS: this reservation, in this failed state, pointing at exactly
       // this terminal job, at exactly the previous generation. A stale job id, a
       // non-terminal job, or a generation that has already moved all abort.
@@ -789,14 +815,7 @@ export async function replaceCommand(
         identity.userId,
         predecessorStatus,
       ),
-      await encryptedJobInsert(
-        env,
-        identity,
-        jobId,
-        command,
-        idempotencyKeyFor(command),
-        now,
-      ),
+      encryptedJob.insert,
       env.DB.prepare(
         `UPDATE daily_readings
          SET status = 'pending', command_generation = ?, active_generation_job_id = ?,
@@ -959,6 +978,7 @@ export async function claimJob(
        AND EXISTS (
          SELECT 1 FROM users
          WHERE users.id = jobs.user_id AND users.status = 'active'
+           AND users.crypto_write_fence IS NULL
        )`,
   )
     .bind(claimToken, leaseExpiresAt, nowIso, nowIso, jobId, JOB_TYPE, nowIso, nowIso)
@@ -1389,8 +1409,17 @@ export async function completeReading(
 ): Promise<PublishOutcome> {
   const now = new Date().toISOString();
   const { identity, readingId, jobId, claimToken } = input;
+  const keyVersion = requireSingleCryptoWriteVersion([
+    input.reading.keyVersion,
+    ...input.evidence.map((row) => row.keyVersion),
+  ]);
 
   const statements: D1PreparedStatement[] = [
+    buildCryptoWriteFence(env, {
+      userId: identity.userId,
+      keyVersion,
+      allowedStatuses: ["active"],
+    }),
     env.DB.prepare(
       `INSERT INTO assertion_probe (id, reason)
        SELECT 1, 'reservation or claim is no longer the one this result was produced for'

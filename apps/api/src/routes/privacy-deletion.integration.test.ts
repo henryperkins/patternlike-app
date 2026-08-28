@@ -19,6 +19,7 @@ import {
   reserveAccountExport,
 } from "../db/privacy-jobs.js";
 import { processDeletionMessage } from "../services/account-deletion.js";
+import { startDekRotation } from "../services/crypto-operations.js";
 import { exportObjectKey } from "../services/export-envelope.js";
 import { processExportMessage } from "../services/privacy-jobs.js";
 import { runPrivacyMaintenance } from "../services/privacy-maintenance.js";
@@ -98,6 +99,44 @@ beforeEach(async () => {
 });
 
 describe("account deletion", () => {
+  it("abandons an active DEK rotation and clears candidate key material", async () => {
+    const operation = await startDekRotation(env, {
+      userId: USER_A,
+      idempotencyKey: "idem-rotation-before-deletion-0001",
+      now: new Date("2026-08-28T00:00:00.000Z"),
+    });
+    await env.DB.prepare(
+      `UPDATE crypto_operations
+       SET candidate_key_version = 2, candidate_wrapped_dek = X'010203',
+           candidate_root_kek_id = 'legacy'
+       WHERE id = ?`,
+    ).bind(operation.id).run();
+
+    const accepted = await requestDeletion("idem-delete-abandons-rotation-0001");
+
+    expect(accepted.response.status).toBe(202);
+    expect(await rows<{ status: string; crypto_write_fence: string | null }>(
+      "SELECT status, crypto_write_fence FROM users WHERE id = ?",
+      USER_A,
+    )).toEqual([{ status: "pending_deletion", crypto_write_fence: null }]);
+    expect(await rows<{
+      stage: string;
+      candidate_key_version: number | null;
+      candidate_wrapped_dek: ArrayBuffer | null;
+      candidate_root_kek_id: string | null;
+    }>(
+      `SELECT stage, candidate_key_version, candidate_wrapped_dek,
+              candidate_root_kek_id
+       FROM crypto_operations WHERE id = ?`,
+      operation.id,
+    )).toEqual([{
+      stage: "abandoned_to_deletion",
+      candidate_key_version: null,
+      candidate_wrapped_dek: null,
+      candidate_root_kek_id: null,
+    }]);
+  });
+
   it("leaves account rows and keys intact when its replay intent cannot replicate", async () => {
     await seedChart(IDENTITY_A);
     const accepted = await requestDeletion("idem-delete-account-replay-outage");

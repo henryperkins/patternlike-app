@@ -15,6 +15,7 @@ import {
 } from "../services/reading-publisher.js";
 import { CODEX_PROVIDER_TIMEOUT_MS } from "../services/codex-provider-contract.js";
 import { resolveBirthOperationalConfig } from "../services/birth-operational-config.js";
+import { readRootKekKeyring } from "../services/root-kek-keyring.js";
 
 export const ONTOLOGY_PIPELINE_ROLLOUT_MODES = ["off", "internal"] as const;
 export type OntologyPipelineRollout = (typeof ONTOLOGY_PIPELINE_ROLLOUT_MODES)[number];
@@ -468,6 +469,18 @@ export function checkSecureConfig(
     };
   }
 
+  const cryptoOperatorToken = env.CRYPTO_OPERATOR_TOKEN?.trim() ?? "";
+  const aliasedCryptoAuthority = cryptoOperatorToken !== "" && [
+    env.SERVICE_AUTH_TOKEN,
+    env.CODEX_RUNNER_TOKEN,
+  ].some((value) => value?.trim() === cryptoOperatorToken);
+  if (aliasedCryptoAuthority) {
+    return {
+      code: "crypto_operator_authority_aliased",
+      message: "CRYPTO_OPERATOR_TOKEN must be unique to the crypto operator authority",
+    };
+  }
+
   const checkInRetention = resolveCheckInRetentionMonths(
     env.CHECK_IN_RETENTION_MONTHS,
   );
@@ -502,6 +515,33 @@ export function checkSecureConfig(
   const ontologyPipeline = resolveOntologyPipelineConfiguration(env);
   if (!ontologyPipeline.ok) {
     return { code: ontologyPipeline.code, message: ontologyPipeline.message };
+  }
+
+  if (env.ROOT_KEK_KEYRING?.trim()) {
+    const keyring = readRootKekKeyring(env);
+    if (!keyring.ok) {
+      return {
+        code: keyring.code,
+        message: "ROOT_KEK_KEYRING must name one to four valid wrapping keys and an available active key",
+      };
+    }
+  }
+
+  const geocoderRollout = env.GEOCODER_ROLLOUT?.trim() || "off";
+  if (geocoderRollout !== "off" && geocoderRollout !== "enabled") {
+    return {
+      code: "geocoder_rollout_invalid",
+      message: "GEOCODER_ROLLOUT must be off or enabled",
+    };
+  }
+  if (
+    geocoderRollout === "enabled" &&
+    !env.GOOGLE_MAPS_PLATFORM_API_KEY?.trim()
+  ) {
+    return {
+      code: "geocoder_misconfigured",
+      message: "The geocoder credential is required while rollout is enabled",
+    };
   }
 
   if (isDevEnvironment(env.ENVIRONMENT)) {

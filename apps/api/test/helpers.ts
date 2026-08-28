@@ -145,6 +145,10 @@ const TABLES = [
   "pattern_ontology_releases",
   "pattern_provider_daily_usage",
   "pattern_ontology_provider_daily_usage",
+  "crypto_kek_rewrap_items",
+  "crypto_operations",
+  "crypto_kek_rewrap_campaigns",
+  "place_resolutions",
   // 0016 owner-scoped operational state. All three point directly at users,
   // so they must be cleared before the user fixture is removed.
   "birth_calc_reservations",

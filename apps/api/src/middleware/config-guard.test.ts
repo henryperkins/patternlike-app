@@ -54,6 +54,101 @@ const configuredProduction = {
   TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
 };
 
+describe("root encryption key configuration", () => {
+  it("accepts the retained legacy root without a keyring", () => {
+    expect(guard({
+      ...configuredProduction,
+      CALC_FETCH_TIMEOUT_MS: "10000",
+      BIRTH_CALC_DAILY_LIMIT: "5",
+    })).toBeNull();
+  });
+
+  it("accepts a valid keyring while the legacy root remains configured", () => {
+    expect(
+      guard({
+        ...configuredProduction,
+        CALC_FETCH_TIMEOUT_MS: "10000",
+        BIRTH_CALC_DAILY_LIMIT: "5",
+        ROOT_KEK_KEYRING: JSON.stringify({
+          version: 1,
+          active_key_id: "root-2026-09",
+          keys: {
+            legacy: configuredProduction.ROOT_KEK,
+            "root-2026-09": "b-real-root-kek-with-enough-entropy-32+",
+          },
+        }),
+      }),
+    ).toBeNull();
+  });
+
+  it.each([
+    "not-json",
+    JSON.stringify({
+      version: 1,
+      active_key_id: "missing",
+      keys: { legacy: configuredProduction.ROOT_KEK },
+    }),
+  ])("rejects a malformed configured keyring before the development short-circuit", (keyring) => {
+    expect(
+      guard({
+        ENVIRONMENT: "development",
+        AUTH_STUB: "1",
+        ROOT_KEK_KEYRING: keyring,
+      })?.code,
+    ).toBe("root_kek_keyring_invalid");
+  });
+
+  it("retains the production legacy-root requirement during migration", () => {
+    expect(
+      guard({
+        ...configuredProduction,
+        CALC_FETCH_TIMEOUT_MS: "10000",
+        BIRTH_CALC_DAILY_LIMIT: "5",
+        ROOT_KEK: undefined,
+        ROOT_KEK_KEYRING: JSON.stringify({
+          version: 1,
+          active_key_id: "root-2026-09",
+          keys: {
+            "root-2026-09": "b-real-root-kek-with-enough-entropy-32+",
+          },
+        }),
+      })?.code,
+    ).toBe("root_kek_not_configured");
+  });
+});
+
+describe("geocoder rollout configuration", () => {
+  it("keeps unrelated routes healthy while rollout is off without a key", () => {
+    expect(guard({
+      ENVIRONMENT: "development",
+      AUTH_STUB: "1",
+      GEOCODER_ROLLOUT: "off",
+    })).toBeNull();
+  });
+
+  it("rejects unknown rollout values before the development short-circuit", () => {
+    expect(guard({
+      ENVIRONMENT: "development",
+      AUTH_STUB: "1",
+      GEOCODER_ROLLOUT: "partial",
+    })?.code).toBe("geocoder_rollout_invalid");
+  });
+
+  it("requires a credential only while enabled", () => {
+    expect(guard({
+      ENVIRONMENT: "development",
+      AUTH_STUB: "1",
+      GEOCODER_ROLLOUT: "enabled",
+    })?.code).toBe("geocoder_misconfigured");
+    expect(guard({
+      ENVIRONMENT: "development",
+      AUTH_STUB: "1",
+      GEOCODER_ROLLOUT: "enabled",
+      GOOGLE_MAPS_PLATFORM_API_KEY: "configured-test-key",
+    })).toBeNull();
+  });
+});
+
 describe("Cloudflare Access administrator configuration", () => {
   it("accepts an HTTPS team domain and a distinct application audience", () => {
     expect(checkAdminAccessConfig({

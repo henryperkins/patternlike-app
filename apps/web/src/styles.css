@@ -5508,3 +5508,77 @@ summary:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+.place-autocomplete {
+  display: grid;
+  gap: 12px;
+}
+
+.place-autocomplete__consent {
+  border: 1px solid var(--line, #d8d3ca);
+  border-radius: 12px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--paper, #fff) 92%, #f1eee7);
+}
+
+.place-autocomplete__consent > p:first-child {
+  margin-top: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.place-autocomplete__links,
+.place-autocomplete__status,
+.place-autocomplete__selected {
+  font-size: 0.8rem;
+}
+
+.place-autocomplete__results {
+  border: 1px solid var(--line, #d8d3ca);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--paper, #fff);
+}
+
+.place-autocomplete__results ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.place-autocomplete__results li + li {
+  border-top: 1px solid var(--line, #d8d3ca);
+}
+
+.place-autocomplete__results button {
+  display: grid;
+  width: 100%;
+  gap: 2px;
+  border: 0;
+  padding: 12px 14px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.place-autocomplete__results [aria-selected="true"] button,
+.place-autocomplete__results button:hover {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.place-autocomplete__results button span {
+  color: var(--muted, #67625b);
+}
+
+.google-maps-attribution {
+  display: inline-block;
+  min-height: 16px;
+  padding: 5px 10px;
+  white-space: nowrap;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1;
+  color: #5e5e5e;
+  background: #fff;
+}

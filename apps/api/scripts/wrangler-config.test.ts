@@ -131,7 +131,22 @@ test("production sends every API namespace through the Worker before assets", ()
     "/internal/*",
     "/admin/*",
     "/codex-provider/*",
+    "/crypto-operator/*",
   ]);
+});
+
+test("geocoder ships disabled with the same bounded rate limiter in both environments", () => {
+  const development = unstable_readConfig({ config: configPath });
+  const production = unstable_readConfig({ config: configPath, env: "production" });
+
+  for (const block of [development, production]) {
+    assert.equal(block.vars.GEOCODER_ROLLOUT, "off");
+    assert.deepEqual(block.ratelimits, [{
+      name: "PLACE_SEARCH_RATE_LIMITER",
+      namespace_id: "17001",
+      simple: { limit: 30, period: 60 },
+    }]);
+  }
 });
 
 test("ontology pipeline queues are distinct and fully redeclared", () => {

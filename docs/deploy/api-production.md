@@ -3,6 +3,13 @@
 Runbook for `patternlike-api-production`, which serves the PWA and API from one
 Cloudflare Worker origin.
 
+Encryption-key maintenance has separate runbooks:
+[root KEK rotation](./root-kek-rotation.md) and
+[single-user DEK rotation](./user-dek-rotation.md). Apply migration `0021`
+before deploying the `/crypto-operator/*` routes, store a dedicated
+`CRYPTO_OPERATOR_TOKEN`, and never alias it to service, admin, or Codex-runner
+authority.
+
 Repository and recorded live state, reconciled 2026-08-27:
 
 | Step | State |

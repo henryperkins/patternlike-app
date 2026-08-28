@@ -2,6 +2,7 @@ import {
   isValidIanaZone,
   type BirthProfileRequest,
   type BirthTimeAccuracy,
+  type LocationQualifierCode,
   type TimezoneConfidence,
   type TimezoneQualifier,
 } from "@patternlike/shared";
@@ -34,10 +35,7 @@ const QUALIFIER_CODES = new Set<BirthLocationQualifierCode>([
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_RE = /^\d{2}:\d{2}(?::\d{2})?$/;
 
-export type BirthLocationQualifierCode =
-  | TimezoneQualifier["code"]
-  | "approximate_match"
-  | "region_level_match";
+export type BirthLocationQualifierCode = LocationQualifierCode;
 
 export interface NormalizedBirthplace {
   place_id: string | null;
@@ -75,6 +73,12 @@ export interface BirthCommandResolution {
   timezone: string;
   confidence: TimezoneConfidence;
   qualifiers: Array<Pick<TimezoneQualifier, "code">>;
+}
+
+export interface BirthCommandEffectiveLocation {
+  birthplace: NormalizedBirthplace;
+  confidence: TimezoneConfidence;
+  qualifierCodes: BirthLocationQualifierCode[];
 }
 
 export interface LegacyBirthPayload {
@@ -136,6 +140,7 @@ function emptyBirthplace(): NormalizedBirthplace {
 export function buildBirthCalcCommand(
   request: BirthProfileRequest,
   resolution: BirthCommandResolution,
+  effectiveLocation?: BirthCommandEffectiveLocation,
 ): BirthCalcCommandV1 {
   const submitted = normalizeBirthCalcSubmission(request);
   return {
@@ -148,11 +153,14 @@ export function buildBirthCalcCommand(
       approximate_window_minutes:
         submitted.approximate_window_minutes,
       timezone: resolution.timezone,
-      birthplace: submitted.birthplace ?? emptyBirthplace(),
-      location_confidence: resolution.confidence,
-      location_qualifier_codes: resolution.qualifiers.map(
-        (qualifier) => qualifier.code,
-      ),
+      birthplace:
+        effectiveLocation?.birthplace ?? submitted.birthplace ?? emptyBirthplace(),
+      location_confidence:
+        effectiveLocation?.confidence ?? resolution.confidence,
+      location_qualifier_codes:
+        effectiveLocation?.qualifierCodes ?? resolution.qualifiers.map(
+          (qualifier) => qualifier.code,
+        ),
     },
   };
 }

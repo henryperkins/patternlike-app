@@ -1,6 +1,7 @@
 import type { Env, PrivacyMessage } from "../env.js";
 import { DELETION_ARTIFACT_FAMILIES } from "./deletion-manifest.js";
 import { exportObjectKey } from "./export-envelope.js";
+import { pruneExpiredPlaceResolutions } from "../db/place-resolutions.js";
 
 const DEFAULT_BATCH_LIMIT = 50;
 const MAX_BATCH_LIMIT = 100;
@@ -26,6 +27,7 @@ export interface PrivacyMaintenanceSummary {
   deletionArtifactsCleaned: number;
   deletionReceiptsExpired: number;
   devicePreferenceJobsPruned: number;
+  placeResolutionsPruned: number;
   privacyJobsDispatched: number;
 }
 
@@ -400,6 +402,11 @@ export async function runPrivacyMaintenance(
     now,
     limit,
   );
+  const placeResolutionsPruned = await pruneExpiredPlaceResolutions(
+    env,
+    now,
+    limit,
+  );
   const privacyJobsDispatched = await recoverPrivacyJobs(
     env,
     nowIso,
@@ -415,6 +422,7 @@ export async function runPrivacyMaintenance(
     deletionArtifactsCleaned,
     deletionReceiptsExpired,
     devicePreferenceJobsPruned,
+    placeResolutionsPruned,
     privacyJobsDispatched,
   };
 }

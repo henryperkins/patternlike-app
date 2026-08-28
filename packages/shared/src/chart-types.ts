@@ -1,5 +1,20 @@
-import type { AspectType, BirthTimeAccuracy, CelestialBody } from "./types.js";
+import type {
+  AspectType,
+  BirthTimeAccuracy,
+  CelestialBody,
+} from "./types.js";
 import type { SuppressedFeatureClass } from "./cycle-types.js";
+
+export type LocationQualifierCode =
+  | "approximate_match"
+  | "region_level_match"
+  | "pre_1970_zone_boundary"
+  | "near_zone_boundary"
+  | "hint_replaced"
+  | "no_coordinates"
+  | "nautical_zone"
+  | "local_time_ambiguous"
+  | "local_time_nonexistent";
 
 export interface UncertaintyReport {
   accuracy: BirthTimeAccuracy;
@@ -93,6 +108,8 @@ export interface CalcRequest {
   longitude: number | null;
   place_label: string | null;
   approximate_window_minutes?: number | null;
+  location_confidence?: "high" | "medium" | "low" | "none";
+  location_qualifier_codes?: LocationQualifierCode[];
   contract_id: string;
   contract_version: string;
 }

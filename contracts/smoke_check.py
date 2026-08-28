@@ -317,6 +317,8 @@ def check_fresh_schema() -> None:
         "pattern_erasure_replay_events",
         "birth_calc_daily_usage", "birth_calc_reservations",
         "birth_profile_version_counters",
+        "crypto_operations", "crypto_kek_rewrap_campaigns",
+        "crypto_kek_rewrap_items", "place_resolutions",
     }
     missing = expected - tables
     if missing:
@@ -365,13 +367,24 @@ def check_fresh_schema() -> None:
         # 0016. Owner-scoped reservation pruning must not scan every user's
         # invocation ledger.
         "idx_birth_calc_reservations_user_date",
+        # 0021-0022. Rotation/campaign claims and selected-place expiry remain
+        # bounded and never require a full-table scan.
+        "idx_user_keys_live_root_kek",
+        "uq_crypto_operations_active_user",
+        "uq_crypto_kek_rewrap_active",
+        "idx_crypto_kek_rewrap_items_pending",
+        "idx_place_resolutions_expiry",
+        "idx_place_resolutions_user_expiry",
     ):
         if name not in indexes:
             raise SystemExit(f"Missing index {name}")
     print("D1 OK  partial and composite-parent indexes exist")
 
     columns = {r[1] for r in con.execute("PRAGMA table_info(users)")}
-    for name in ("timezone_source", "timezone_revision", "locale_source"):
+    for name in (
+        "timezone_source", "timezone_revision", "locale_source",
+        "crypto_write_fence",
+    ):
         if name not in columns:
             raise SystemExit(f"users.{name} missing")
     if "next_due_at" not in columns:
@@ -392,6 +405,8 @@ def check_fresh_schema() -> None:
         raise SystemExit("user_keys.erased_at missing")
     if key_columns["wrapped_dek"][3] != 0:
         raise SystemExit("user_keys.wrapped_dek is still unconditionally NOT NULL")
+    if "root_kek_id" not in key_columns or key_columns["root_kek_id"][4] != "'legacy'":
+        raise SystemExit("user_keys.root_kek_id missing or lacks the legacy default")
 
     for table, required in {
         "export_requests": {
@@ -406,6 +421,21 @@ def check_fresh_schema() -> None:
         },
         "context_signals": {
             "source_revision", "is_current", "retention_expires_at",
+        },
+        "crypto_operations": {
+            "kind", "user_id", "idempotency_hash", "stage", "not_before",
+            "candidate_wrapped_dek", "candidate_root_kek_id", "revision",
+        },
+        "crypto_kek_rewrap_campaigns": {
+            "target_root_kek_id", "status", "total_count", "completed_count",
+            "blocked_count", "revision",
+        },
+        "crypto_kek_rewrap_items": {
+            "campaign_id", "user_id", "source_root_kek_id", "status",
+        },
+        "place_resolutions": {
+            "user_id", "provider", "policy_version", "payload_enc",
+            "payload_key_version", "payload_nonce", "expires_at", "consumed_at",
         },
     }.items():
         columns = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
@@ -431,6 +461,34 @@ def check_fresh_schema() -> None:
     if con.execute("SELECT * FROM assertion_probe").fetchall():
         raise SystemExit("assertion_probe was armed on a fresh database")
     print("D1 OK  foreign_key_check clean, quick_check ok")
+
+
+def check_0021_over_populated_0020() -> None:
+    """0021 labels existing wrapped keys without rewriting their bytes."""
+    con = fresh(upto=20)
+    seed_user(con, USER_A, SUBJ_A)
+    wrapped = b"\x00\x01\x02existing-wrapped-dek\xff"
+    con.execute(
+        "INSERT INTO user_keys "
+        "(user_id, key_version, kek_version, wrapped_dek, created_at) "
+        "VALUES (?, 1, 3, ?, ?)",
+        (USER_A, wrapped, NOW),
+    )
+    con.commit()
+
+    apply_migrations(con, upto=21, start=21)
+    row = con.execute(
+        "SELECT wrapped_dek, root_kek_id FROM user_keys "
+        "WHERE user_id = ? AND key_version = 1",
+        (USER_A,),
+    ).fetchone()
+    if row != (wrapped, "legacy"):
+        raise SystemExit("0021 changed wrapped bytes or missed the legacy key id")
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("0021 populated apply left foreign-key violations")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("0021 populated apply failed quick_check")
+    print("D1 OK  0021 preserves populated wrapped DEKs and labels them legacy")
 
 
 def check_0004_over_populated_m5() -> None:
@@ -1452,6 +1510,7 @@ def main() -> int:
     check_0016_over_populated_0015()
     check_0018_over_populated_0017()
     check_0019_over_populated_0018()
+    check_0021_over_populated_0020()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

@@ -4,11 +4,13 @@ import {
   getAccountProcessingConsent,
   getAiSynthesisConsent,
   getPatternGenerationConsent,
+  getGeocoderConsent,
   grantAiSynthesisConsent,
   newIdempotencyKey,
   revokeAccountProcessingConsent,
   revokeAiSynthesisConsent,
   revokePatternGenerationConsent,
+  revokeGeocoderConsent,
   type AccountProcessingConsentDocument,
   type AiSynthesisConsent,
 } from "../lib/api-client.js";
@@ -22,6 +24,106 @@ import { ContextSourceControl } from "./ContextSourceControl.js";
 import { TopicExclusionsPanel } from "./TopicExclusionsPanel.js";
 import { Icon } from "./icons.js";
 import type { PatternConsent } from "@patternlike/shared";
+import type { GeocoderConsentResponse } from "@patternlike/shared";
+import { isGeocoderConsentResponse } from "../lib/geocoder-consent.js";
+
+function GeocoderConsentPanel() {
+  const [state, setState] = useState<
+    | { status: "loading" }
+    | { status: "ready"; consent: GeocoderConsentResponse }
+    | { status: "failed"; message: string }
+  >({ status: "loading" });
+  const [busy, setBusy] = useState(false);
+  const revokeKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getGeocoderConsent(controller.signal)
+      .then((consent) => {
+        if (controller.signal.aborted) return;
+        setState(isGeocoderConsentResponse(consent)
+          ? { status: "ready", consent }
+          : { status: "failed", message: "The Google search permission could not be read." });
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setState({
+            status: "failed",
+            message: error instanceof Error
+              ? error.message
+              : "The Google search permission could not be read.",
+          });
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  const revoke = async () => {
+    if (state.status !== "ready" || busy) return;
+    setBusy(true);
+    revokeKey.current ??= newIdempotencyKey("web-geocoder-consent");
+    try {
+      const consent = await revokeGeocoderConsent(
+        "privacy_center",
+        revokeKey.current,
+      );
+      if (!isGeocoderConsentResponse(consent)) {
+        throw new Error("The Google search permission response could not be verified.");
+      }
+      revokeKey.current = null;
+      setState({ status: "ready", consent });
+    } catch (error) {
+      setState({
+        status: "failed",
+        message: error instanceof Error
+          ? error.message
+          : "The Google search permission could not be withdrawn.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const granted = state.status === "ready" && state.consent.status === "granted";
+  return (
+    <section className="ai-consent panel" aria-labelledby="geocoder-consent-heading">
+      <div className="panel-heading">
+        <div>
+          <p className="kicker">Optional external processing</p>
+          <h2 id="geocoder-consent-heading">Google birthplace search</h2>
+        </div>
+        <span className={`source-state${granted ? " source-state--active" : ""}`}>
+          <i /> {granted ? "Granted" : "Not granted"}
+        </span>
+      </div>
+      {state.status === "ready" ? (
+        <>
+          <p>{state.consent.disclosure.text}</p>
+          <p>
+            <a href={state.consent.disclosure.links.patternlike_terms}>Terms</a>{" "}
+            <a href={state.consent.disclosure.links.patternlike_privacy}>Privacy</a>{" "}
+            <a href={state.consent.disclosure.links.google_maps_terms}>Google Maps terms</a>{" "}
+            <a href={state.consent.disclosure.links.google_privacy}>Google privacy</a>
+          </p>
+          {granted ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              disabled={busy}
+              onClick={() => void revoke()}
+            >
+              Withdraw Google search permission <Icon name="shield" />
+            </button>
+          ) : null}
+        </>
+      ) : (
+        <p role="status">
+          {state.status === "loading" ? "Reading Google search permission." : state.message}
+        </p>
+      )}
+    </section>
+  );
+}
 
 type ConsentPanelState =
   | { status: "loading" }
@@ -542,6 +644,8 @@ export function PrivacyView({
       <AiSynthesisConsentPanel />
 
       <AccountProcessingConsentPanel onFrozen={onProcessingFrozen} />
+
+      <GeocoderConsentPanel />
 
       <PatternGenerationConsentPanel />
 

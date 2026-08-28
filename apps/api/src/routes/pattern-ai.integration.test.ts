@@ -13,6 +13,7 @@ import {
   enablePatternAi,
   postBirthProfile,
   resetDb,
+  rows,
   seedActiveOntology,
   seedActiveRelease,
   seedChart,
@@ -1026,6 +1027,72 @@ describe("M7 AI-generated Pattern", () => {
     });
     expect(reserved.status).toBe(409);
     expect((reserved.body.error as { code: string }).code).toBe("ontology_unavailable");
+  });
+
+  it("does not reserve Pattern ciphertext while crypto writes are fenced", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    const result = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-fenced-0001" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+
+    expect(result.status).toBe(500);
+    expect(await rows(
+      "SELECT id FROM jobs WHERE idempotency_key = ?",
+      "idem-pattern-fenced-0001",
+    )).toEqual([]);
+    expect(await rows("SELECT generation_id FROM pattern_generation_jobs WHERE user_id = ?", USER_A))
+      .toEqual([]);
+  });
+
+  it("does not claim queued Pattern work after crypto writes become fenced", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const reserved = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-claim-fenced-0001" },
+      body: JSON.stringify({
+        schema_version: "0.7.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    const generationId = (reserved.body.generation as { generation_id: string }).generation_id;
+    const [job] = await rows<{ job_id: string; stage_generation: number }>(
+      `SELECT job_id, stage_generation FROM pattern_generation_jobs
+       WHERE generation_id = ?`,
+      generationId,
+    );
+    await rows(
+      `UPDATE users SET crypto_write_fence =
+         'cop_00000000000000000000000000000001' WHERE id = ?`,
+      USER_A,
+    );
+
+    expect(await executePatternJob(env, {
+      kind: "pattern_generation",
+      job_id: job!.job_id,
+      generation_id: generationId,
+      stage_generation: job!.stage_generation,
+    })).toMatchObject({ ok: false, reason: "duplicate" });
+    expect(await rows<{ status: string; attempts: number }>(
+      "SELECT status, attempts FROM jobs WHERE id = ?",
+      job!.job_id,
+    )).toEqual([{ status: "queued", attempts: 0 }]);
   });
 
   it("refuses chart-correction auto-reserve without a prior grant", async () => {

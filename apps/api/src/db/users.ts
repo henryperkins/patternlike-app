@@ -2,7 +2,6 @@ import type { Env } from "../env.js";
 import {
   b64,
   generateUserDek,
-  resolveRootKey,
   wrapDek,
   unwrapDek,
   encryptJson,
@@ -12,8 +11,11 @@ import {
   type CryptoSubject,
   type EncryptedPayload,
   type EncryptionContext,
-  type RootKeyEnv,
 } from "../crypto.js";
+import {
+  resolveActiveRootKey,
+  resolveRootKeyById,
+} from "../services/root-kek-keyring.js";
 
 /**
  * A user's two identifiers. `userId` addresses rows; `cryptoSubject` addresses
@@ -87,7 +89,7 @@ export class NoUserKeyError extends Error {
 }
 
 /** nonce(12) || ciphertext, as stored in user_keys.wrapped_dek. */
-function packWrapped(nonce_b64: string, wrapped_b64: string): Uint8Array {
+export function packWrapped(nonce_b64: string, wrapped_b64: string): Uint8Array {
   const nonce = Uint8Array.from(atob(nonce_b64), (c) => c.charCodeAt(0));
   const ct = Uint8Array.from(atob(wrapped_b64), (c) => c.charCodeAt(0));
   const packed = new Uint8Array(nonce.length + ct.length);
@@ -100,11 +102,21 @@ interface LiveKeyRow {
   key_version: number;
   kek_version: number;
   wrapped_dek: ArrayBuffer;
+  root_kek_id: string;
+}
+
+async function userKeysHaveRootKekId(env: Env): Promise<boolean> {
+  const { results } = await env.DB.prepare("PRAGMA table_info(user_keys)")
+    .all<{ name: string }>();
+  return results.some((column) => column.name === "root_kek_id");
 }
 
 async function readLiveKey(env: Env, userId: string): Promise<LiveKeyRow | null> {
+  const rootKekProjection = await userKeysHaveRootKekId(env)
+    ? "root_kek_id"
+    : "'legacy' AS root_kek_id";
   return env.DB.prepare(
-    `SELECT key_version, kek_version, wrapped_dek FROM user_keys
+    `SELECT key_version, kek_version, wrapped_dek, ${rootKekProjection} FROM user_keys
      WHERE user_id = ? AND destroyed_at IS NULL
      ORDER BY key_version DESC LIMIT 1`,
   )
@@ -142,7 +154,7 @@ export async function loadUserKey(
     throw new UnsupportedKekVersionError(active.kek_version);
   }
 
-  const root = await resolveRootKey(env);
+  const root = await resolveRootKeyById(env, active.root_kek_id);
   const dek = await unwrapDek(
     new Uint8Array(active.wrapped_dek),
     root,
@@ -161,16 +173,38 @@ export async function buildUserKeyInsert(
   env: Env,
   id: UserIdentity,
 ): Promise<D1PreparedStatement> {
-  const root = await resolveRootKey(env);
+  const storesRootKekId = await userKeysHaveRootKekId(env);
+  const root = storesRootKekId
+    ? await resolveActiveRootKey(env)
+    : { keyId: "legacy", key: await resolveRootKeyById(env, "legacy") };
   const dek = await generateUserDek();
-  const { wrapped_b64, nonce_b64 } = await wrapDek(dek, root, id.cryptoSubject, 1);
+  const { wrapped_b64, nonce_b64 } = await wrapDek(
+    dek,
+    root.key,
+    id.cryptoSubject,
+    1,
+  );
+  if (!storesRootKekId) {
+    return env.DB.prepare(
+      `INSERT INTO user_keys (
+         user_id, key_version, kek_version, wrapped_dek, created_at
+       ) VALUES (?, 1, ?, ?, ?)`,
+    ).bind(
+      id.userId,
+      KEK_DERIVATION_VERSION,
+      packWrapped(nonce_b64, wrapped_b64),
+      new Date().toISOString(),
+    );
+  }
   return env.DB.prepare(
-    `INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at)
-     VALUES (?, 1, ?, ?, ?)`,
+    `INSERT INTO user_keys (
+       user_id, key_version, kek_version, wrapped_dek, root_kek_id, created_at
+     ) VALUES (?, 1, ?, ?, ?, ?)`,
   ).bind(
     id.userId,
     KEK_DERIVATION_VERSION,
     packWrapped(nonce_b64, wrapped_b64),
+    root.keyId,
     new Date().toISOString(),
   );
 }
@@ -197,26 +231,32 @@ export async function decryptPayload<T = unknown>(
 }
 
 /**
- * Re-wrap a user's DEK under a new root secret.
+ * Re-wrap a user's DEK under another configured root-key identity.
  *
  * The DEK itself is unchanged, so no stored ciphertext is touched — this is the
- * cheap half of key rotation, for when ROOT_KEK is replaced. `previous` must
- * resolve to the root key the DEK is currently wrapped under; `env` carries the
- * new one. Run it for every user in one pass: there is no per-row record of
- * which secret wrapped which key.
+ * cheap half of key rotation. The current and target secrets are resolved from
+ * the versioned keyring and never cross this function boundary.
  */
 export async function rewrapUserKey(
   env: Env,
   id: UserIdentity,
-  previous: RootKeyEnv,
-): Promise<{ keyVersion: number }> {
+  targetRootKekId: string,
+): Promise<{ keyVersion: number; rootKekId: string; changed: boolean }> {
   const active = await readLiveKey(env, id.userId);
   if (!active) throw new NoUserKeyError(id.userId);
   if (active.kek_version !== KEK_DERIVATION_VERSION) {
     throw new UnsupportedKekVersionError(active.kek_version);
   }
 
-  const oldRoot = await resolveRootKey(previous);
+  if (active.root_kek_id === targetRootKekId) {
+    return {
+      keyVersion: active.key_version,
+      rootKekId: active.root_kek_id,
+      changed: false,
+    };
+  }
+
+  const oldRoot = await resolveRootKeyById(env, active.root_kek_id);
   const dek = await unwrapDek(
     new Uint8Array(active.wrapped_dek),
     oldRoot,
@@ -224,7 +264,7 @@ export async function rewrapUserKey(
     active.key_version,
   );
 
-  const newRoot = await resolveRootKey(env);
+  const newRoot = await resolveRootKeyById(env, targetRootKekId);
   const { wrapped_b64, nonce_b64 } = await wrapDek(
     dek,
     newRoot,
@@ -232,19 +272,30 @@ export async function rewrapUserKey(
     active.key_version,
   );
 
-  await env.DB.prepare(
-    `UPDATE user_keys SET wrapped_dek = ?, rotated_at = ?
-     WHERE user_id = ? AND key_version = ?`,
+  const result = await env.DB.prepare(
+    `UPDATE user_keys
+     SET wrapped_dek = ?, root_kek_id = ?, rotated_at = ?
+     WHERE user_id = ? AND key_version = ? AND destroyed_at IS NULL
+       AND root_kek_id = ? AND wrapped_dek = ?`,
   )
     .bind(
       packWrapped(nonce_b64, wrapped_b64),
+      targetRootKekId,
       new Date().toISOString(),
       id.userId,
       active.key_version,
+      active.root_kek_id,
+      active.wrapped_dek,
     )
     .run();
 
-  return { keyVersion: active.key_version };
+  return {
+    keyVersion: active.key_version,
+    rootKekId: result.meta.changes === 1
+      ? targetRootKekId
+      : active.root_kek_id,
+    changed: result.meta.changes === 1,
+  };
 }
 
 /**
@@ -331,6 +382,13 @@ export const ENCRYPTED_COLUMNS = [
     keyVersionColumn: "wrapped_key_version",
     nonceColumn: "wrapped_key_nonce",
   },
+  {
+    table: "place_resolutions",
+    idColumn: "id",
+    encColumn: "payload_enc",
+    keyVersionColumn: "payload_key_version",
+    nonceColumn: "payload_nonce",
+  },
 ] as const;
 
 /**
@@ -360,7 +418,7 @@ export const NESTED_CONTENT_CIPHERTEXT_COLUMNS = [
   },
 ] as const;
 
-async function assertNoUnrotatedCiphertext(
+export async function assertNoUnrotatedCiphertext(
   env: Env,
   id: UserIdentity,
   newKeyVersion: number,
@@ -410,15 +468,16 @@ export async function rotateUserDek(
     throw new UnsupportedKekVersionError(active.kek_version);
   }
 
-  const root = await resolveRootKey(env);
+  const oldRoot = await resolveRootKeyById(env, active.root_kek_id);
   const oldDek = await unwrapDek(
     new Uint8Array(active.wrapped_dek),
-    root,
+    oldRoot,
     id.cryptoSubject,
     active.key_version,
   );
   const newKeyVersion = active.key_version + 1;
   const newDek = await generateUserDek();
+  const activeRoot = await resolveActiveRootKey(env);
 
   const writes: D1PreparedStatement[] = [];
   let reencrypted = 0;
@@ -474,7 +533,7 @@ export async function rotateUserDek(
   const now = new Date().toISOString();
   const { wrapped_b64, nonce_b64 } = await wrapDek(
     newDek,
-    root,
+    activeRoot.key,
     id.cryptoSubject,
     newKeyVersion,
   );
@@ -487,13 +546,15 @@ export async function rotateUserDek(
        WHERE user_id = ? AND key_version = ?`,
     ).bind(now, now, id.userId, active.key_version),
     env.DB.prepare(
-      `INSERT INTO user_keys (user_id, key_version, kek_version, wrapped_dek, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO user_keys (
+         user_id, key_version, kek_version, wrapped_dek, root_kek_id, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
     ).bind(
       id.userId,
       newKeyVersion,
       KEK_DERIVATION_VERSION,
       packWrapped(nonce_b64, wrapped_b64),
+      activeRoot.keyId,
       now,
     ),
   );

@@ -60,6 +60,14 @@ export interface Env {
   /** Absolute URL of the issuer's JWKS document. */
   OIDC_JWKS_URL: string;
   ROOT_KEK?: string;
+  /** Secret version-one root wrapping-key ring. Never commit its value. */
+  ROOT_KEK_KEYRING?: string;
+  /** Disabled-by-default Google Places/Geocoding adapter rollout. */
+  GEOCODER_ROLLOUT?: string;
+  /** Secret; configured only when GEOCODER_ROLLOUT is enabled. */
+  GOOGLE_MAPS_PLATFORM_API_KEY?: string;
+  /** Soft per-user interactive abuse guard for place search and resolution. */
+  PLACE_SEARCH_RATE_LIMITER: RateLimit;
   SERVICE_AUTH_TOKEN?: string;
   /**
    * Public keys trusted to sign editorial release bundles, as JSON:
@@ -107,6 +115,8 @@ export interface Env {
    * deliberately distinct from SERVICE_AUTH_TOKEN.
    */
   CODEX_RUNNER_TOKEN?: string;
+  /** Dedicated bearer secret for encryption-key operations. */
+  CRYPTO_OPERATOR_TOKEN?: string;
   /** Staged machine-ontology pipeline rollout: `off` | `internal`. */
   ONTOLOGY_PIPELINE_ROLLOUT?: string;
   /** `openai` (default) or `codex`. Selects the frozen provider transport. */
