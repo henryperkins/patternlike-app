@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-16
 
-**Status:** Approved. Cloudflare Access selected by the operator on 2026-08-28.
+**Status:** Implemented and deployed. Cloudflare Access selected by the
+operator and cut over in production on 2026-08-28.
 
 **Scope:** Replace the shared `PATTERN_ADMIN_TOKEN` with a
 role-separated administrator session, and implement the three admin

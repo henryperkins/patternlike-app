@@ -956,10 +956,11 @@ service-authenticated replayer/sweeper, replay bucket binding, and the dedicated
 in `docs/deploy/pattern-erasure-replay-drill.md` cannot be exercised until Gate
 8 supplies an accepted Pattern to erase and restore. The repository now
 implements the Cloudflare Access `pattern_generation_auditor` boundary and
-rejects the former shared bearer. Production cutover remains open: configure
-the Access application, apply `0020_pattern_admin_sessions.sql`, deploy the
-compatible Worker, and revoke the deployed `PATTERN_ADMIN_TOKEN` secret in that
-order.
+rejects the former shared bearer. Production cutover completed on 2026-08-28:
+the path-scoped Access application and exact-email auditor policy are active,
+migrations `0018` through `0020` are applied, and Worker version
+`fc7acdf3-cbfc-4724-8dbe-b127128e9637` is deployed. The legacy
+`PATTERN_ADMIN_TOKEN` secret was already absent and remains absent.
 
 Before `first_open`, record all of the following against the same candidate:
 
