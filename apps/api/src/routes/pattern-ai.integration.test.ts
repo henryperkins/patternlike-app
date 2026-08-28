@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env, SELF } from "cloudflare:test";
+import { Jwt } from "hono/utils/jwt";
 import {
   ALICE,
   DETERMINISTIC_PATTERN_PUBLISHER,
@@ -19,6 +20,7 @@ import {
 } from "../../test/helpers.js";
 import { sha256Hex } from "@patternlike/shared";
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
+import { app } from "../index.js";
 import {
   executePatternJob,
   getArtifact,
@@ -60,6 +62,7 @@ import {
   generatePatternReplayTestKeys,
   installPatternReplayTestKeys,
 } from "../../test/pattern-replay-fixtures.js";
+import { __resetAdminAccessJwksCacheForTests } from "../services/admin-access.js";
 
 const POLICY = "1.1.0";
 
@@ -1075,17 +1078,70 @@ describe("M7 AI-generated Pattern", () => {
   });
 
   it("audits admin reads and records not_found instead of granted on 404", async () => {
+    const teamDomain = "https://pattern-ai-test.cloudflareaccess.com";
+    const audience = "pattern-ai-admin-audience";
+    const keyPair = (await crypto.subtle.generateKey(
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256",
+      },
+      true,
+      ["sign", "verify"],
+    )) as CryptoKeyPair;
+    const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+    const privateKey = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    const previousTeamDomain = env.ADMIN_ACCESS_TEAM_DOMAIN;
+    const previousAudience = env.ADMIN_ACCESS_POLICY_AUD;
+    env.ADMIN_ACCESS_TEAM_DOMAIN = teamDomain;
+    env.ADMIN_ACCESS_POLICY_AUD = audience;
+    __resetAdminAccessJwksCacheForTests();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        keys: [{ ...publicKey, kid: "pattern-ai-admin-key", alg: "RS256", use: "sig" }],
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const assertion = await Jwt.sign(
+      {
+        iss: teamDomain,
+        aud: audience,
+        sub: "pattern-ai-admin-subject",
+        exp: now + 300,
+        iat: now,
+      },
+      { ...privateKey, kid: "pattern-ai-admin-key" } as never,
+      "RS256",
+    );
     const missing = "pgen_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const response = await SELF.fetch(`http://api.test/admin/pattern-generations/${missing}`);
-    expect(response.status).toBe(404);
-    const event = await env.DB.prepare(
-      `SELECT result, target_scope_hash FROM pattern_admin_access_events WHERE generation_id = ?`,
-    )
-      .bind(missing)
-      .first<{ result: string; target_scope_hash: string }>();
-    expect(event?.result).toBe("not_found");
-    expect(event?.target_scope_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(event?.target_scope_hash).not.toBe(missing);
+    try {
+      const response = await app.request(
+        `http://api.test/admin/pattern-generations/${missing}?purpose=quality_review`,
+        { headers: { "cf-access-jwt-assertion": assertion } },
+        env,
+      );
+      expect(response.status).toBe(404);
+      const event = await env.DB.prepare(
+        `SELECT admin_subject, result, target_scope_hash
+         FROM pattern_admin_access_events WHERE generation_id = ?`,
+      )
+        .bind(missing)
+        .first<{
+          admin_subject: string;
+          result: string;
+          target_scope_hash: string;
+        }>();
+      expect(event?.admin_subject).toBe("pattern-ai-admin-subject");
+      expect(event?.result).toBe("not_found");
+      expect(event?.target_scope_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(event?.target_scope_hash).not.toBe(missing);
+    } finally {
+      fetchSpy.mockRestore();
+      env.ADMIN_ACCESS_TEAM_DOMAIN = previousTeamDomain;
+      env.ADMIN_ACCESS_POLICY_AUD = previousAudience;
+      __resetAdminAccessJwksCacheForTests();
+    }
   });
 
   it("clears the frozen Pattern command on chart correction", async () => {
