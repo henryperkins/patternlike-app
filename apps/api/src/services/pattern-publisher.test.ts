@@ -52,7 +52,7 @@ function env(overrides: Record<string, unknown> = {}) {
     OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
     OPENAI_PATTERN_WRITER_REASONING: "high",
-    OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.1",
+    OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.2",
     OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
@@ -146,7 +146,7 @@ describe("Pattern publisher configuration", () => {
     expect(outcome.config.pin.planner_model).toBe("gpt-5.6-sol");
     expect(outcome.config.pin.planner_reasoning).toBe("high");
     expect(outcome.config.pin.planner_prompt_version).toBe("1.0.1");
-    expect(outcome.config.pin.writer_prompt_version).toBe("1.0.1");
+    expect(outcome.config.pin.writer_prompt_version).toBe("1.0.2");
     expect(outcome.config.pin.verifier_prompt_version).toBe("1.0.0-verifier");
     expect(outcome.config.pin.planner_max_output_tokens).toBe(32000);
     expect(outcome.config.pin.input_max_bytes).toBe(98_304);

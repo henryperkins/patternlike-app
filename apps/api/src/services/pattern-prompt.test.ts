@@ -39,7 +39,7 @@ function pin(): PatternPublisherPin {
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",
-    writer_prompt_version: "1.0.1",
+    writer_prompt_version: "1.0.2",
     writer_max_output_tokens: 8000,
     verifier_model: "gpt-5.6-sol",
     verifier_reasoning: "high",
@@ -279,6 +279,33 @@ describe("Pattern prompt module", () => {
     });
   });
 
+  describe("writer voice contract", () => {
+    it("sends both writer attempts a direct, warm, emotionally attentive voice", () => {
+      const plain = buildPatternResponsesRequest("writer", {}, pin());
+      const correction = buildPatternResponsesRequest("writer", {}, pin(), {
+        correction: true,
+      });
+
+      for (const request of [plain, correction]) {
+        const instructions = request.instructions.toLowerCase();
+        expect(instructions).toContain('write to the reader as "you"');
+        expect(instructions).toContain("possible lived or emotional experience");
+        expect(instructions).toContain("pair challenge with compassion");
+        expect(instructions).toContain("thoughtful person speaking to one person");
+      }
+    });
+
+    it("does not buy emotional warmth with false intimacy or unsupported feelings", () => {
+      const instructions = buildPatternResponsesRequest("writer", {}, pin())
+        .instructions.toLowerCase();
+
+      expect(instructions).toContain("authorized material supports it");
+      expect(instructions).toContain("do not tell the reader what they definitely feel");
+      expect(instructions).toContain("do not manufacture intimacy");
+      expect(instructions).toContain("therapy-speak");
+    });
+  });
+
   describe("verifier finding vocabulary", () => {
     it("is closed and recognizes only its own codes", () => {
       expect(PATTERN_FINDING_CODES.length).toBeGreaterThan(0);
@@ -384,7 +411,7 @@ describe("Pattern prompt module", () => {
   describe("prompt versions", () => {
     it("re-exports the compiled versions the configuration pins against", () => {
       expect(PATTERN_PLANNER_PROMPT_VERSION).toBe("1.0.1");
-      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.1");
+      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.2");
       expect(PATTERN_VERIFIER_PROMPT_VERSION).toBe("1.0.0-verifier");
     });
 
