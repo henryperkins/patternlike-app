@@ -304,7 +304,7 @@ describe("V5 execution", () => {
       model: {
         provider: "codex",
         model: OPENAI_READING_MODEL,
-        prompt_version: "1.0.1",
+        prompt_version: "1.0.2",
         provider_request_id: expect.any(String),
         input_tokens: 4210,
         output_tokens: 512,
@@ -392,7 +392,7 @@ describe("V5 execution", () => {
     expect(claimed!.job.model).toBe(command.publisher.model);
     expect(claimed!.job.promptVersion).toBe(command.publisher.prompt_version);
     expect(claimed!.job.model).not.toBe("a-new-current-model");
-    expect(command.publisher.prompt_version).toBe("1.0.1");
+    expect(command.publisher.prompt_version).toBe("1.0.2");
     expect(claimed!.packet.prompt_version).toBe(command.publisher.prompt_version);
   });
 

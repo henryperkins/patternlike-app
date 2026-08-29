@@ -92,8 +92,30 @@ function hostileRequest(): ReadingGenerationRequest {
 }
 
 describe("provider request body", () => {
-  it("identifies the collective-scope prompt revision", () => {
-    expect(READING_PROMPT_VERSION).toBe("1.0.1");
+  it("identifies the personable Daily prompt revision", () => {
+    expect(READING_PROMPT_VERSION).toBe("1.0.2");
+  });
+
+  it("asks for emotional warmth without pretending to know the reader's feelings", () => {
+    for (const guidance of [
+      "warm, perceptive person",
+      "possible lived or emotional experience",
+      "Pair challenge with compassion",
+      "Never claim to know exactly what the reader feels",
+    ]) {
+      expect(READING_SYSTEM_POLICY, guidance).toContain(guidance);
+    }
+  });
+
+  it("makes eligible personal material specific without manufacturing intimacy", () => {
+    for (const guidance of [
+      "If a line could fit most readers",
+      "one safe, concrete detail or constraint",
+      "Prior readings are for continuity",
+      "do not manufacture intimacy",
+    ]) {
+      expect(READING_SYSTEM_POLICY, guidance).toContain(guidance);
+    }
   });
 
   it("targets the Responses endpoint directly when no gateway is configured", () => {

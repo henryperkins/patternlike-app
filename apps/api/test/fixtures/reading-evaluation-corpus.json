@@ -6,19 +6,19 @@
     "Changing the model, reasoning effort, response ceiling, prompt, selection policy, or validation policy requires re-running this",
     "corpus, incrementing corpus_version, and updating gates."
   ],
-  "corpus_version": "1.0.1",
+  "corpus_version": "1.0.2",
   "gates": {
     "model": "gpt-5.6-sol",
     "reasoning_effort": "high",
     "max_output_tokens": 4000,
-    "prompt_version": "1.0.1",
+    "prompt_version": "1.0.2",
     "selection_policy_version": "1.0.0",
     "validation_policy_version": "1.0.0",
     "evaluation_policy_version": "1.0.0"
   },
   "base": {
     "schema_version": "0.5.0",
-    "prompt_version": "1.0.1",
+    "prompt_version": "1.0.2",
     "output_schema": "daily-reading-v5",
     "selection_policy_version": "1.0.0",
     "validation_policy_version": "1.0.0",
@@ -1237,9 +1237,9 @@
         "output_schema": "daily-reading-v5",
         "local_date": "2026-07-30",
         "locale": "en-US",
-        "headline": "A narrower commitment",
+        "headline": "Make room for the plan you can keep",
         "lead": {
-          "text": "Saturn is square your Sun today, and the pressure asks for a smaller promise than the one you had in mind.",
+          "text": "You may feel the week tightening around you as Saturn squares your Sun. With the deadline moved up, the kinder move may be to choose one promise you can actually keep.",
           "fact_ids": [
             "cyc_3268633a9ebd1a14e4379744bafce2b2"
           ],
@@ -1250,7 +1250,7 @@
         "paragraphs": [
           {
             "role": "supporting_theme",
-            "text": "You have been holding two versions of the same plan. Only one of them survives an ordinary Tuesday.",
+            "text": "It is frustrating to steady a plan while the timing keeps changing. You do not have to rescue every version of it; protect the next honest step and let the rest wait.",
             "fact_ids": [],
             "context_refs": [
               "ctx_1"
@@ -1258,7 +1258,7 @@
           }
         ],
         "reflection_prompt": {
-          "text": "What would you keep doing if no one noticed for a month?",
+          "text": "What is the smallest part of this plan you would still feel proud to keep?",
           "fact_ids": [],
           "context_refs": [
             "ctx_1"

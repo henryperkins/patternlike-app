@@ -291,7 +291,7 @@ export function responsesUrlFor(route: AiGatewayRoute | null): string {
  * can pin the deployed variable against it without a circular import;
  * `reading-prompt.ts` re-exports it, so every caller still reads it from there.
  */
-export const READING_PROMPT_VERSION = "1.0.1";
+export const READING_PROMPT_VERSION = "1.0.2";
 
 // ---------------------------------------------------------------------------
 // Frozen configuration pin
