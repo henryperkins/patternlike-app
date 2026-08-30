@@ -1,6 +1,6 @@
 {
   "engine": "cloudflare-d1",
-  "schema_version": "0.8.0",
+  "schema_version": "0.9.0",
   "migrations": [
     {
       "id": "0001_m0_core",
@@ -111,6 +111,11 @@
       "id": "0022_place_resolutions",
       "file": "0022_place_resolutions.sql",
       "description": "Add a 24-hour owner-scoped selected-place cache. The normalized label, coordinates, confidence, and qualifiers are encrypted under the user's DEK; queries, suggestions, provider responses, and Place IDs are not retained. The new encrypted column is registered for DEK rotation. No crypto-version change."
+    },
+    {
+      "id": "0023_pattern_source_regeneration",
+      "file": "0023_pattern_source_regeneration.sql",
+      "description": "Add M9 source-triggered Pattern regeneration. Accepted claims gain one nullable pending regeneration coordinate; Pattern jobs and documents pin a required Pattern-creation source hash; source_update widens the job reason; and the signed replay receipt admits one accepted-to-accepted pattern_regenerated replacement event. Existing encrypted job/document bytes are copied explicitly and receive a legacy all-zero source hash. No crypto-version change."
     }
   ],
   "notes": [
@@ -140,6 +145,7 @@
     "2026-08-28: 0020 is forward-only and additive. It adds only short-lived hashed administrator session state for the Cloudflare Access protected /admin path.",
     "2026-08-28: 0021 is forward-only and additive. It records root wrapping-key identity, adds a transactional crypto write fence, and creates durable resumable key-operation ledgers. Existing wrapped DEKs are byte-identical and are labeled legacy. It does not change AEAD_VERSION or KEK_DERIVATION_VERSION and must be applied before runtime code selects root_kek_id or crypto_write_fence.",
     "2026-08-28: 0022 is forward-only and additive. It adds an ephemeral selected-place table whose normalized payload is user-DEK encrypted and registered for rotation. No provider query, suggestion list, raw response, or Place ID is retained. It does not change AEAD_VERSION or KEK_DERIVATION_VERSION and must be applied before the place-resolution runtime is deployed.",
+    "2026-08-29: 0023 is forward-only and is NOT applied by this change. It rebuilds only the Pattern job/document pair and replay receipt whose closed CHECKs must widen, with foreign keys enabled and populated rows copied explicitly. Existing encrypted commands, documents, and wrapped keys are not decrypted or rewritten and receive an all-zero legacy source coordinate; new runtime writes use the compiled source hash. Accepted claims gain one nullable pending regeneration coordinate guarded against concurrent ownership and terminal transitions. It is not a crypto-version break and must be applied before a Worker writes source_update jobs.",
     "2026-08-28 ~07:32 UTC: 0018, 0019, and 0020 APPLIED to production (patternlike-ops 1305a75d-0a8a-4a21-b201-d94fda0aaf93, ENAM) before Worker version fc7acdf3-cbfc-4724-8dbe-b127128e9637 was deployed. Restore bookmark immediately prior: 000001af-0000001c-000050d5-cd1a71a54bfb35bb6e39fb1e9d158e6b; post-apply bookmark: 000001af-00000026-000050d5-733b93a4e1f8212791c0f51068c4b78d. Full SQL export is outside the repository at /home/henry/patternlike-admin-cutover.oDOnJY/pre-0018-0020.sql, mode 0600, 5,649,840 bytes, sha256 5055ecb30e1b9a3507dc21f2ff09d217c3de6efb406bfa03749859355894a5a1. The first apply committed 0018 and stopped atomically on 0019 because Wrangler/D1 misparsed unparenthesized CASE expressions inside the trigger; no trigger or 0019 migration record was left behind. Commit 30e7c06 parenthesized those expressions, the seven focused transition tests passed, and the retry applied 0019 and 0020. Post-apply verification: no pending migrations, zero foreign-key violations, PRAGMA quick_check ok, the transition trigger/session table/session expiry index exist, and the session table started empty. The Access application f4c454cd-2140-4287-a865-2d4abc6e7d48 protects only patternlike-api-production.lfd.workers.dev/admin/* with the exact-email pattern_generation_auditor policy; PATTERN_ADMIN_TOKEN was already absent and remained absent."
   ],
   "apply_hint": "wrangler d1 migrations apply patternlike-ops --local   (add --env production --remote for the live database)"

@@ -5,7 +5,10 @@ import {
   type PatternWriterOutput,
 } from "@patternlike/shared";
 
-import type { GeneratePatternCommandV1 } from "./pattern-command.js";
+import type {
+  GeneratePatternCommand,
+  PatternReservationReason,
+} from "./pattern-command.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 import type { PatternJobRow } from "./pattern-stage-protocol.js";
 import type { Env } from "../env.js";
@@ -26,6 +29,8 @@ export interface PatternPublicationProof {
   semanticVerdictHash: string;
   semanticVerdict: "pass";
   executedWriterPin: PatternPublisherPin;
+  patternSourceHash: string;
+  reservationReason: PatternReservationReason;
 }
 
 export interface PatternPublicationBundle {
@@ -71,7 +76,7 @@ function pinsEqual(left: PatternPublisherPin, right: PatternPublisherPin): boole
  * with the durable job coordinate before the proof is returned.
  */
 export async function buildPatternPublicationProof(input: {
-  command: GeneratePatternCommandV1;
+  command: GeneratePatternCommand;
   job: PatternJobRow;
   executedWriterPin: PatternPublisherPin;
   readArtifact: (artifactClass: PatternPublicationArtifactClass) => Promise<unknown | null>;
@@ -83,7 +88,10 @@ export async function buildPatternPublicationProof(input: {
     command.claim_id !== job.claim_id ||
     command.user_id !== job.user_id ||
     command.locale !== job.locale ||
-    command.locale_revision !== job.locale_revision
+    command.locale_revision !== job.locale_revision ||
+    command.reservation_reason !== job.reservation_reason ||
+    !("pattern_source_hash" in command) ||
+    command.pattern_source_hash !== job.pattern_source_hash
   ) {
     throw new PatternPublicationProofError("publication_coordinate_mismatch");
   }
@@ -140,6 +148,8 @@ export async function buildPatternPublicationProof(input: {
       semanticVerdictHash,
       semanticVerdict: "pass",
       executedWriterPin,
+      patternSourceHash: command.pattern_source_hash,
+      reservationReason: command.reservation_reason,
     },
     plan,
     writer,
@@ -188,6 +198,7 @@ export function patternPublicationAuthorizationGuard(
          AND generation.consent_id = ?
          AND generation.ontology_version = ?
          AND generation.ontology_bundle_hash = ?
+         AND generation.pattern_source_hash = ?
          AND account.status = 'active'
          AND chart.status = 'active'
          AND account.locale = ?
@@ -219,9 +230,26 @@ export function patternPublicationAuthorizationGuard(
          )
          AND ontology.bundle_hash = ?
          AND ontology.status != 'recalled'
-         AND claim.status = 'reserved'
-         AND claim.consumed_at IS NULL
-         AND claim.active_generation_id = generation.generation_id
+         AND (
+           (
+             generation.reservation_reason != 'source_update'
+             AND claim.status = 'reserved'
+             AND claim.consumed_at IS NULL
+             AND claim.active_generation_id = generation.generation_id
+           )
+           OR (
+             generation.reservation_reason = 'source_update'
+             AND claim.status = 'accepted'
+             AND claim.consumed_at IS NOT NULL
+             AND claim.pending_regeneration_id = generation.generation_id
+             AND EXISTS (
+               SELECT 1 FROM pattern_documents current_document
+               WHERE current_document.user_id = generation.user_id
+                 AND current_document.claim_id = generation.claim_id
+                 AND current_document.chart_fingerprint_hash = generation.chart_fingerprint_hash
+             )
+           )
+         )
          AND job.status = 'running'
      )`,
   ).bind(
@@ -235,6 +263,7 @@ export function patternPublicationAuthorizationGuard(
     proof.consentId,
     proof.ontologyVersion,
     proof.ontologyBundleHash,
+    proof.patternSourceHash,
     proof.locale,
     proof.localeRevision,
     now.toISOString(),

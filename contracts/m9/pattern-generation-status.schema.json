@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m9/pattern-generation-status.schema.json",
+  "title": "Pattern generation status",
+  "$defs": {
+    "patternGenerationStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "generation_id", "stage", "status_updated_at", "started_at", "retryable"],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/schemaVersion" },
+        "generation_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationId" },
+        "stage": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/publicStage" },
+        "status_updated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "started_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "retryable": { "type": "boolean" },
+        "finished_at": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" }
+          ]
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternGenerationStatus"
+}

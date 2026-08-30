@@ -112,11 +112,11 @@ async function seedGeneration(): Promise<void> {
          feature_policy_version, selection_policy_version, locale,
          locale_revision, consent_id, consent_policy_version,
          ontology_version, ontology_bundle_hash, corpus_release_hash,
-         reservation_reason, stage, stage_generation, plan_hash,
+         pattern_source_hash, reservation_reason, stage, stage_generation, plan_hash,
          candidate_hash, created_at, updated_at
        ) VALUES (?, ?, ?, ?, 'cht_admin_fixture', ?, 'nfs_admin_fixture', ?,
                  '1.0.0', '1.0.0', 'en-US', 1, 'cns_admin_fixture', '1.0.0',
-                 'ontology-admin-fixture', ?, ?, 'first_open', 'writing', 2,
+                 'ontology-admin-fixture', ?, ?, ?, 'first_open', 'writing', 2,
                  ?, NULL, ?, ?)`,
     ).bind(
       GENERATION_ID,
@@ -127,6 +127,7 @@ async function seedGeneration(): Promise<void> {
       `sha256:${"2".repeat(64)}`,
       `sha256:${"3".repeat(64)}`,
       `sha256:${"4".repeat(64)}`,
+      `sha256:${"6".repeat(64)}`,
       `sha256:${"5".repeat(64)}`,
       CREATED_AT,
       CREATED_AT,

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m9/pattern-generation-accepted.schema.json",
+  "title": "Pattern generation accepted",
+  "$defs": {
+    "patternGenerationAccepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "consent", "generation"],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/schemaVersion" },
+        "consent": { "$ref": "https://patternlike.app/contracts/m7/pattern-consent.schema.json#/$defs/patternConsent" },
+        "generation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["generation_id", "stage"],
+          "properties": {
+            "generation_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationId" },
+            "stage": {
+              "type": "string",
+              "enum": ["organizing_evidence", "writing", "checking_claims", "ready"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternGenerationAccepted"
+}

@@ -64,6 +64,7 @@ import {
   installPatternReplayTestKeys,
 } from "../../test/pattern-replay-fixtures.js";
 import { __resetAdminAccessJwksCacheForTests } from "../services/admin-access.js";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
 
 const POLICY = "1.1.0";
 
@@ -216,6 +217,364 @@ describe("M7 AI-generated Pattern", () => {
     expect(withCursor.body.error).toEqual(
       expect.objectContaining({ code: "invalid_pattern_query" }),
     );
+  });
+
+  it("keeps the current Pattern readable while one source update atomically replaces it", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+
+    const first = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-original" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    expect(first.status, JSON.stringify(first.body)).toBe(202);
+    const originalGenerationId = (first.body.generation as { generation_id: string })
+      .generation_id;
+    expect(await drain(originalGenerationId)).toBe("succeeded");
+
+    const original = await env.DB.prepare(
+      `SELECT id, generation_id FROM pattern_documents WHERE user_id = ?`,
+    ).bind(USER_A).first<{ id: string; generation_id: string }>();
+    expect(original?.generation_id).toBe(originalGenerationId);
+    await env.DB.prepare(
+      `UPDATE pattern_documents
+       SET pattern_source_hash = ? WHERE user_id = ?`,
+    ).bind(`sha256:${"0".repeat(64)}`, USER_A).run();
+
+    const eligible = await json("/v1/pattern-state");
+    expect(eligible.body).toMatchObject({
+      schema_version: "0.9.0",
+      state: "ready",
+      regeneration: { eligible: true, generation: null, failure: null },
+    });
+
+    const replacement = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-replacement-a" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "REGENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    expect(replacement.status, JSON.stringify(replacement.body)).toBe(202);
+    const replacementGenerationId = (
+      replacement.body.generation as { generation_id: string }
+    ).generation_id;
+    expect(replacementGenerationId).not.toBe(originalGenerationId);
+
+    const converged = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-replacement-b" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "REGENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    expect(converged.status).toBe(200);
+    expect((converged.body.generation as { generation_id: string }).generation_id)
+      .toBe(replacementGenerationId);
+
+    const retained = await json("/v1/pattern");
+    expect(retained.status).toBe(200);
+    expect(retained.body.pattern_id).toBe(original?.id);
+    const activeState = await json("/v1/pattern-state");
+    expect(activeState.body).toMatchObject({
+      state: "ready",
+      pattern: { pattern_id: original?.id },
+      regeneration: {
+        eligible: false,
+        generation: { generation_id: replacementGenerationId },
+        failure: null,
+      },
+    });
+
+    expect(await drain(replacementGenerationId)).toBe("succeeded");
+
+    const current = await env.DB.prepare(
+      `SELECT id, generation_id, pattern_source_hash, compact_provenance_json
+       FROM pattern_documents WHERE user_id = ?`,
+    ).bind(USER_A).first<{
+      id: string;
+      generation_id: string;
+      pattern_source_hash: string;
+      compact_provenance_json: string;
+    }>();
+    expect(current).toMatchObject({
+      generation_id: replacementGenerationId,
+      pattern_source_hash: PATTERN_CREATION_SOURCE_HASH,
+    });
+    expect(current?.id).not.toBe(original?.id);
+    expect(JSON.parse(current!.compact_provenance_json)).toMatchObject({
+      pattern_source_hash: PATTERN_CREATION_SOURCE_HASH,
+    });
+    expect(await env.DB.prepare(
+      `SELECT status, active_generation_id, pending_regeneration_id
+       FROM pattern_generation_claims WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      status: "accepted",
+      active_generation_id: null,
+      pending_regeneration_id: null,
+    });
+    expect(await env.DB.prepare(
+      `SELECT payload_enc FROM jobs WHERE id = (
+         SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?
+       )`,
+    ).bind(originalGenerationId).first()).toEqual({ payload_enc: null });
+    expect(await env.DB.prepare(
+      `SELECT erased_at FROM pattern_generation_artifact_keys
+       WHERE generation_id = ?`,
+    ).bind(originalGenerationId).first<{ erased_at: string | null }>()).toEqual({
+      erased_at: expect.any(String),
+    });
+    expect((await env.ARTIFACTS!.list({
+      prefix: `pattern-generations/${originalGenerationId}/`,
+    })).objects).toHaveLength(0);
+
+    const replay = await env.DB.prepare(
+      `SELECT event_class, generation_id, pattern_id,
+              replacement_generation_id, replacement_pattern_id,
+              pattern_source_hash
+       FROM pattern_erasure_replay_events
+       WHERE event_class = 'pattern_regenerated'`,
+    ).first<Record<string, unknown>>();
+    // schema_version lives inside the signed object; the D1 receipt stores all
+    // signed lifecycle coordinates except that redundant discriminator.
+    expect(replay).toMatchObject({
+      event_class: "pattern_regenerated",
+      generation_id: originalGenerationId,
+      pattern_id: original?.id,
+      replacement_generation_id: replacementGenerationId,
+      replacement_pattern_id: current?.id,
+      pattern_source_hash: PATTERN_CREATION_SOURCE_HASH,
+    });
+    expect((await json("/v1/pattern-state")).body.regeneration).toEqual({
+      eligible: false,
+      generation: null,
+      failure: null,
+    });
+  });
+
+  it("offers source regeneration only after drift and retains the old Pattern on failure", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const first = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-failure-original" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    const originalGenerationId = (first.body.generation as { generation_id: string })
+      .generation_id;
+    expect(await drain(originalGenerationId)).toBe("succeeded");
+    const original = await json("/v1/pattern");
+
+    const currentDenied = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-current-denied" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "REGENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    expect(currentDenied.status).toBe(409);
+    expect((currentDenied.body.error as { code: string }).code)
+      .toBe("pattern_regeneration_not_available");
+
+    await env.DB.prepare(
+      `UPDATE pattern_documents SET pattern_source_hash = ? WHERE user_id = ?`,
+    ).bind(`sha256:${"0".repeat(64)}`, USER_A).run();
+    const wrongConfirmation = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-wrong-confirm" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    expect(wrongConfirmation.status).toBe(400);
+
+    const replacement = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-failure" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "REGENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    const replacementGenerationId = (
+      replacement.body.generation as { generation_id: string }
+    ).generation_id;
+    const replacementJob = await env.DB.prepare(
+      `SELECT job_id, stage_generation FROM pattern_generation_jobs
+       WHERE generation_id = ?`,
+    ).bind(replacementGenerationId).first<{
+      job_id: string;
+      stage_generation: number;
+    }>();
+    env.PATTERN_PUBLISHER = "";
+    await executePatternJob(env, {
+      kind: "pattern_generation",
+      job_id: replacementJob!.job_id,
+      generation_id: replacementGenerationId,
+      stage_generation: replacementJob!.stage_generation,
+    });
+    enablePatternAi();
+
+    expect(await env.DB.prepare(
+      `SELECT stage, failure_class FROM pattern_generation_jobs
+       WHERE generation_id = ?`,
+    ).bind(replacementGenerationId).first()).toEqual({
+      stage: "failed",
+      failure_class: "publisher_not_configured",
+    });
+    expect(await env.DB.prepare(
+      `SELECT status, pending_regeneration_id FROM pattern_generation_claims
+       WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      status: "accepted",
+      pending_regeneration_id: null,
+    });
+    const retained = await json("/v1/pattern");
+    expect(retained.status).toBe(200);
+    expect(retained.body.pattern_id).toBe(original.body.pattern_id);
+    expect((await json("/v1/pattern-state")).body).toMatchObject({
+      state: "ready",
+      pattern: { pattern_id: original.body.pattern_id },
+      regeneration: {
+        eligible: true,
+        generation: null,
+        failure: { generation_id: replacementGenerationId },
+      },
+    });
+
+    const staleRetry = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-changed-in-flight" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "REGENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    const staleGenerationId = (
+      staleRetry.body.generation as { generation_id: string }
+    ).generation_id;
+    const staleJob = await env.DB.prepare(
+      `SELECT job_id, stage_generation FROM pattern_generation_jobs
+       WHERE generation_id = ?`,
+    ).bind(staleGenerationId).first<{
+      job_id: string;
+      stage_generation: number;
+    }>();
+    await env.DB.prepare(
+      `UPDATE pattern_generation_jobs SET pattern_source_hash = ?
+       WHERE generation_id = ?`,
+    ).bind(`sha256:${"c".repeat(64)}`, staleGenerationId).run();
+    await executePatternJob(env, {
+      kind: "pattern_generation",
+      job_id: staleJob!.job_id,
+      generation_id: staleGenerationId,
+      stage_generation: staleJob!.stage_generation,
+    });
+    expect(await env.DB.prepare(
+      `SELECT stage, cancellation_reason FROM pattern_generation_jobs
+       WHERE generation_id = ?`,
+    ).bind(staleGenerationId).first()).toEqual({
+      stage: "cancelled",
+      cancellation_reason: "cancel_source_changed",
+    });
+    expect(await env.DB.prepare(
+      `SELECT status, pending_regeneration_id FROM pattern_generation_claims
+       WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      status: "accepted",
+      pending_regeneration_id: null,
+    });
+    expect((await json("/v1/pattern")).body.pattern_id)
+      .toBe(original.body.pattern_id);
+  });
+
+  it("cancels a pending source update on consent withdrawal without touching the accepted Pattern", async () => {
+    enablePatternAi();
+    await seedActiveOntology();
+    const first = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-revoke-original" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "GENERATE MY PATTERN",
+        reason: "first_open",
+      }),
+    });
+    const originalGenerationId = (first.body.generation as { generation_id: string })
+      .generation_id;
+    expect(await drain(originalGenerationId)).toBe("succeeded");
+    const original = await json("/v1/pattern");
+
+    await env.DB.prepare(
+      `UPDATE pattern_documents SET pattern_source_hash = ? WHERE user_id = ?`,
+    ).bind(`sha256:${"0".repeat(64)}`, USER_A).run();
+    const replacement = await json("/v1/pattern-generations", {
+      method: "POST",
+      headers: { "idempotency-key": "idem-pattern-source-revoke-pending" },
+      body: JSON.stringify({
+        schema_version: "0.9.0",
+        consent_policy_version: POLICY,
+        confirm: "REGENERATE MY PATTERN",
+        reason: "source_update",
+      }),
+    });
+    expect(replacement.status, JSON.stringify(replacement.body)).toBe(202);
+    const replacementGenerationId = (
+      replacement.body.generation as { generation_id: string }
+    ).generation_id;
+
+    await revokePatternGenerationConsent(env, IDENTITY_A);
+
+    expect(await env.DB.prepare(
+      `SELECT status, pending_regeneration_id FROM pattern_generation_claims
+       WHERE user_id = ?`,
+    ).bind(USER_A).first()).toEqual({
+      status: "accepted",
+      pending_regeneration_id: null,
+    });
+    expect(await env.DB.prepare(
+      `SELECT stage, cancellation_reason FROM pattern_generation_jobs
+       WHERE generation_id = ?`,
+    ).bind(replacementGenerationId).first()).toEqual({
+      stage: "cancelled",
+      cancellation_reason: "consent_revoked",
+    });
+    expect((await json("/v1/pattern")).body.pattern_id)
+      .toBe(original.body.pattern_id);
+    expect((await json("/v1/pattern-state")).body).toMatchObject({
+      state: "ready",
+      pattern: { pattern_id: original.body.pattern_id },
+      consent: { status: "not_granted" },
+      regeneration: { eligible: false, generation: null, failure: null },
+    });
   });
 
   it("freezes the approved three-attempt writer ceiling in a new command", async () => {

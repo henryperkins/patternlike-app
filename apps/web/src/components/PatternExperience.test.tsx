@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import type { PatternConsent, PatternResponseV7, PatternStateDocument } from "@patternlike/shared";
+import type {
+  PatternConsent,
+  PatternRegenerationState,
+  PatternResponseV7,
+  PatternStateDocumentV9,
+} from "@patternlike/shared";
 import { PATTERN_GENERATION_CONSENT_POLICY_VERSION } from "@patternlike/shared";
 import { capturedFor, mockApiResponses } from "../test/api-mock.js";
 import { PatternExperience } from "./PatternExperience.js";
@@ -27,9 +32,9 @@ const consent: PatternConsent = {
   granted_at: null,
 };
 
-function stateDoc(overrides: Partial<PatternStateDocument> = {}): PatternStateDocument {
+function stateDoc(overrides: Partial<PatternStateDocumentV9> = {}): PatternStateDocumentV9 {
   return {
-    schema_version: "0.7.0",
+    schema_version: "0.9.0",
     state: "consent_required",
     chart: {
       chart_id: "cht_pattern_ai_0001",
@@ -39,6 +44,18 @@ function stateDoc(overrides: Partial<PatternStateDocument> = {}): PatternStateDo
     consent,
     generation: null,
     pattern: null,
+    regeneration: null,
+    ...overrides,
+  };
+}
+
+function regeneration(
+  overrides: Partial<PatternRegenerationState> = {},
+): PatternRegenerationState {
+  return {
+    eligible: false,
+    generation: null,
+    failure: null,
     ...overrides,
   };
 }
@@ -96,7 +113,7 @@ describe("PatternExperience", () => {
       [`POST ${GENERATIONS}`]: {
         status: 202,
         body: {
-          schema_version: "0.7.0",
+          schema_version: "0.9.0",
           consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
           generation: { generation_id: "pgen_test_0001", stage: "organizing_evidence" },
         },
@@ -106,13 +123,13 @@ describe("PatternExperience", () => {
     render(<PatternExperience onUnauthorized={noop} />);
     expect(await screen.findByRole("button", { name: /Generate my Pattern/i })).toBeInTheDocument();
     expect(screen.getByText(/Birth date, time, place, and coordinates are not sent/i)).toBeInTheDocument();
-    expect(screen.getByText("A successful Pattern cannot be rerolled for this chart.")).toBeInTheDocument();
+    expect(screen.getByText(/A successful Pattern is not a rerollable reading/i)).toBeInTheDocument();
     expect(screen.getByText("Deleting your Pattern is permanent.")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Generate my Pattern/i }));
     const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
     expect(posted?.body).toEqual({
-      schema_version: "0.7.0",
+      schema_version: "0.9.0",
       consent_policy_version: PATTERN_GENERATION_CONSENT_POLICY_VERSION,
       confirm: "GENERATE MY PATTERN",
       reason: "first_open",
@@ -152,6 +169,159 @@ describe("PatternExperience", () => {
     await userEvent.click(screen.getByRole("button", { name: /Confirm deletion/i }));
     const deleted = capturedFor(PATTERN).find((request) => request.method === "DELETE");
     expect(deleted?.body).toEqual({ confirm: "DELETE PATTERN" });
+  });
+
+  it("offers a source update without starting it until the reader types the exact confirmation", async () => {
+    mockApiResponses({
+      [`GET ${STATE}`]: {
+        status: 200,
+        body: stateDoc({
+          state: "ready",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+          pattern: {
+            pattern_id: generated.pattern_id,
+            generated_at: generated.generated_at,
+            locale: generated.locale,
+            effective_accuracy: generated.effective_accuracy,
+          },
+          regeneration: regeneration({ eligible: true }),
+        }),
+      },
+      [`GET ${PATTERN}`]: { status: 200, body: generated },
+      [`POST ${GENERATIONS}`]: {
+        status: 202,
+        body: {
+          schema_version: "0.9.0",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+          generation: { generation_id: "pgen_source_update_0001", stage: "organizing_evidence" },
+        },
+      },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
+    const review = screen.getByRole("button", { name: "Review Pattern update" });
+    expect(review).toBeInTheDocument();
+    expect(capturedFor(GENERATIONS).filter((request) => request.method === "POST")).toEqual([]);
+
+    await userEvent.click(review);
+    const confirmation = screen.getByLabelText(/Type REGENERATE MY PATTERN to confirm/i);
+    const replace = screen.getByRole("button", { name: "Replace my Pattern" });
+    expect(replace).toBeDisabled();
+    await userEvent.type(confirmation, "REGENERATE MY PATTERN");
+    await userEvent.dblClick(replace);
+
+    const posts = capturedFor(GENERATIONS).filter((request) => request.method === "POST");
+    expect(posts).toHaveLength(1);
+    const posted = posts[0];
+    expect(posted?.body).toEqual({
+      schema_version: "0.9.0",
+      consent_policy_version: PATTERN_GENERATION_CONSENT_POLICY_VERSION,
+      confirm: "REGENERATE MY PATTERN",
+      reason: "source_update",
+    });
+    expect(posted?.headers.get("idempotency-key")).toMatch(/^web-pattern-regeneration-/);
+  });
+
+  it("keeps the current Pattern readable while its source update is being written", async () => {
+    mockApiResponses({
+      [`GET ${STATE}`]: {
+        status: 200,
+        body: stateDoc({
+          state: "ready",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+          pattern: {
+            pattern_id: generated.pattern_id,
+            generated_at: generated.generated_at,
+            locale: generated.locale,
+            effective_accuracy: generated.effective_accuracy,
+          },
+          regeneration: regeneration({
+            generation: {
+              generation_id: "pgen_source_update_0002",
+              stage: "writing",
+              status_updated_at: "2026-08-29T12:00:00.000Z",
+              started_at: "2026-08-29T11:59:00.000Z",
+              retryable: false,
+              request_id: null,
+            },
+          }),
+        }),
+      },
+      [`GET ${PATTERN}`]: { status: 200, body: generated },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Updating your Pattern");
+    expect(screen.getByRole("status")).toHaveTextContent("Writing your Pattern");
+    expect(screen.getByText(/current Pattern stays readable until the replacement succeeds/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review Pattern update" })).toBeNull();
+  });
+
+  it("retains the current Pattern after a failed source update and offers a confirmed retry", async () => {
+    mockApiResponses({
+      [`GET ${STATE}`]: {
+        status: 200,
+        body: stateDoc({
+          state: "ready",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+          pattern: {
+            pattern_id: generated.pattern_id,
+            generated_at: generated.generated_at,
+            locale: generated.locale,
+            effective_accuracy: generated.effective_accuracy,
+          },
+          regeneration: regeneration({
+            eligible: true,
+            failure: {
+              generation_id: "pgen_source_update_failed",
+              stage: "checking_claims",
+              status_updated_at: "2026-08-29T12:00:00.000Z",
+              started_at: "2026-08-29T11:59:00.000Z",
+              retryable: true,
+              request_id: null,
+            },
+          }),
+        }),
+      },
+      [`GET ${PATTERN}`]: { status: 200, body: generated },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
+    expect(screen.getByText(/The update did not finish. Your current Pattern was not changed/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try the update again" }));
+    expect(screen.getByLabelText(/Type REGENERATE MY PATTERN to confirm/i)).toBeInTheDocument();
+  });
+
+  it("does not expose regeneration controls when the current Pattern uses the current source", async () => {
+    mockApiResponses({
+      [`GET ${STATE}`]: {
+        status: 200,
+        body: stateDoc({
+          state: "ready",
+          consent: { ...consent, status: "granted", granted_at: "2026-08-14T18:00:00.000Z" },
+          pattern: {
+            pattern_id: generated.pattern_id,
+            generated_at: generated.generated_at,
+            locale: generated.locale,
+            effective_accuracy: generated.effective_accuracy,
+          },
+          regeneration: regeneration(),
+        }),
+      },
+      [`GET ${PATTERN}`]: { status: 200, body: generated },
+    });
+
+    render(<PatternExperience onUnauthorized={noop} />);
+
+    expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
+    expect(screen.queryByText(/Pattern update available/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Pattern update/i })).toBeNull();
   });
 
   it.each([
@@ -206,7 +376,7 @@ describe("PatternExperience", () => {
       [`POST ${GENERATIONS}`]: {
         status: 202,
         body: {
-          schema_version: "0.7.0",
+          schema_version: "0.9.0",
           consent: { ...consent, status: "granted", granted_at: "2026-08-27T12:00:00.000Z" },
           generation: { generation_id: "pgen_test_0002", stage: "organizing_evidence" },
         },
@@ -242,7 +412,7 @@ describe("PatternExperience", () => {
       [`POST ${GENERATIONS}`]: {
         status: 202,
         body: {
-          schema_version: "0.7.0",
+          schema_version: "0.9.0",
           consent: { ...consent, status: "granted", granted_at: "2026-08-27T12:00:00.000Z" },
           generation: { generation_id: "pgen_failed_retry", stage: "organizing_evidence" },
         },
@@ -256,7 +426,7 @@ describe("PatternExperience", () => {
 
     const posted = capturedFor(GENERATIONS).find((request) => request.method === "POST");
     expect(posted?.body).toEqual({
-      schema_version: "0.7.0",
+      schema_version: "0.9.0",
       consent_policy_version: PATTERN_GENERATION_CONSENT_POLICY_VERSION,
       confirm: "GENERATE MY PATTERN",
       reason: "failed_attempt_retry",

@@ -3,17 +3,20 @@ import type { Env } from "../env.js";
 import { hasPatternProviderCallCapacity } from "../db/pattern-provider-usage.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 
-export const PATTERN_COMMAND_VERSION = "GeneratePatternCommandV1" as const;
+export const PATTERN_COMMAND_VERSION_V1 = "GeneratePatternCommandV1" as const;
+export const PATTERN_COMMAND_VERSION_V2 = "GeneratePatternCommandV2" as const;
+export const PATTERN_COMMAND_VERSION = PATTERN_COMMAND_VERSION_V2;
 export const PATTERN_JOB_TYPE = "generate_pattern" as const;
 
 export type PatternReservationReason =
   | "first_open"
   | "first_open_retry"
   | "failed_attempt_retry"
-  | "chart_correction";
+  | "chart_correction"
+  | "source_update";
 
 export interface GeneratePatternCommandV1 {
-  command_version: typeof PATTERN_COMMAND_VERSION;
+  command_version: typeof PATTERN_COMMAND_VERSION_V1;
   schema_version: "0.7.0";
   generation_id: string;
   job_id: string;
@@ -57,20 +60,39 @@ export interface GeneratePatternCommandV1 {
   artifact_retention_days: number;
 }
 
-export function isPatternCommand(value: unknown): value is GeneratePatternCommandV1 {
+export interface GeneratePatternCommandV2
+  extends Omit<GeneratePatternCommandV1, "command_version" | "schema_version"> {
+  command_version: typeof PATTERN_COMMAND_VERSION_V2;
+  schema_version: "0.9.0";
+  pattern_source_hash: string;
+}
+
+export type GeneratePatternCommand = GeneratePatternCommandV1 | GeneratePatternCommandV2;
+
+const CONTENT_HASH = /^sha256:[a-f0-9]{64}$/;
+
+export function isPatternCommand(value: unknown): value is GeneratePatternCommand {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as {
     command_version?: unknown;
+    schema_version?: unknown;
+    pattern_source_hash?: unknown;
     planner_attempts_max?: unknown;
     writer_attempts_max?: unknown;
     verifier_attempts_max?: unknown;
   };
-  return (
-    record.command_version === PATTERN_COMMAND_VERSION &&
+  const sharedShape =
     record.planner_attempts_max === 2 &&
     (record.writer_attempts_max === 2 || record.writer_attempts_max === 3) &&
-    record.verifier_attempts_max === 2
-  );
+    record.verifier_attempts_max === 2;
+  if (!sharedShape) return false;
+  if (record.command_version === PATTERN_COMMAND_VERSION_V1) {
+    return record.schema_version === "0.7.0";
+  }
+  return record.command_version === PATTERN_COMMAND_VERSION_V2 &&
+    record.schema_version === "0.9.0" &&
+    typeof record.pattern_source_hash === "string" &&
+    CONTENT_HASH.test(record.pattern_source_hash);
 }
 
 /** Budget failures are retryable only when the current shared ledger has room. */

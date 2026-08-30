@@ -10,11 +10,11 @@ import type {
   LifeEvent,
   LifeEventRequest,
   PatternConsent,
-  PatternGenerationAccepted,
-  PatternGenerationStatus,
+  PatternGenerationAcceptedV9,
+  PatternGenerationStatusV9,
   PatternResponse,
   PatternResponseV7,
-  PatternStateDocument,
+  PatternStateDocumentV9,
   PlaceResolutionRequest,
   PlaceResolutionResponse,
   PlaceSearchRequest,
@@ -1249,8 +1249,8 @@ export function getPattern(
   });
 }
 
-export function getPatternState(signal?: AbortSignal): Promise<PatternStateDocument> {
-  return request<PatternStateDocument>("/v1/pattern-state", {
+export function getPatternState(signal?: AbortSignal): Promise<PatternStateDocumentV9> {
+  return request<PatternStateDocumentV9>("/v1/pattern-state", {
     method: "GET",
     headers: requestHeaders(),
     signal,
@@ -1292,12 +1292,12 @@ export function startPatternGeneration(
   reason: "first_open" | "first_open_retry" | "failed_attempt_retry",
   idempotencyKey: string,
   signal?: AbortSignal,
-): Promise<PatternGenerationAccepted> {
-  return request<PatternGenerationAccepted>("/v1/pattern-generations", {
+): Promise<PatternGenerationAcceptedV9> {
+  return request<PatternGenerationAcceptedV9>("/v1/pattern-generations", {
     method: "POST",
     headers: requestHeaders({ json: true, idempotencyKey }),
     body: JSON.stringify({
-      schema_version: "0.7.0",
+      schema_version: "0.9.0",
       consent_policy_version: consentPolicyVersion,
       confirm: "GENERATE MY PATTERN",
       reason,
@@ -1306,11 +1306,29 @@ export function startPatternGeneration(
   });
 }
 
+export function regeneratePattern(
+  consentPolicyVersion: string,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<PatternGenerationAcceptedV9> {
+  return request<PatternGenerationAcceptedV9>("/v1/pattern-generations", {
+    method: "POST",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify({
+      schema_version: "0.9.0",
+      consent_policy_version: consentPolicyVersion,
+      confirm: "REGENERATE MY PATTERN",
+      reason: "source_update",
+    }),
+    signal,
+  });
+}
+
 export function getPatternGeneration(
   generationId: string,
   signal?: AbortSignal,
-): Promise<PatternGenerationStatus> {
-  return request<PatternGenerationStatus>(
+): Promise<PatternGenerationStatusV9> {
+  return request<PatternGenerationStatusV9>(
     `/v1/pattern-generations/${encodeURIComponent(generationId)}`,
     { method: "GET", headers: requestHeaders(), signal },
   );

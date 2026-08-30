@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m9/pattern-state.schema.json",
+  "title": "Pattern state with source regeneration",
+  "$defs": {
+    "chart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chart_id", "effective_accuracy", "feature_policy_version"],
+      "properties": {
+        "chart_id": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/opaqueId" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" },
+        "feature_policy_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern_id", "generated_at", "locale", "effective_accuracy"],
+      "properties": {
+        "pattern_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/patternId" },
+        "generated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "locale": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/localeTag" },
+        "effective_accuracy": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/birthTimeAccuracy" }
+      }
+    },
+    "regeneration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["eligible", "generation", "failure"],
+          "properties": {
+            "eligible": { "const": false },
+            "generation": { "type": "null" },
+            "failure": { "type": "null" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["eligible", "generation", "failure"],
+          "properties": {
+            "eligible": { "const": true },
+            "generation": { "type": "null" },
+            "failure": { "type": "null" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["eligible", "generation", "failure"],
+          "properties": {
+            "eligible": { "const": false },
+            "generation": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationState" },
+            "failure": { "type": "null" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["eligible", "generation", "failure"],
+          "properties": {
+            "eligible": { "const": true },
+            "generation": { "type": "null" },
+            "failure": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationState" }
+          }
+        }
+      ]
+    },
+    "patternStateDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "state", "chart", "consent", "generation", "pattern", "regeneration"],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/schemaVersion" },
+        "state": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/patternState" },
+        "chart": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/chart" }
+          ]
+        },
+        "consent": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m7/pattern-consent.schema.json#/$defs/patternConsent" }
+          ]
+        },
+        "generation": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationState" }
+          ]
+        },
+        "pattern": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/pattern" }
+          ]
+        },
+        "regeneration": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/regeneration" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "state": { "const": "ready" } },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "pattern": { "$ref": "#/$defs/pattern" },
+              "regeneration": { "$ref": "#/$defs/regeneration" }
+            }
+          },
+          "else": {
+            "properties": { "regeneration": { "type": "null" } }
+          }
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/patternStateDocument"
+}

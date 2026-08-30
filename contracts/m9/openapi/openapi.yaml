@@ -1,0 +1,124 @@
+openapi: 3.1.0
+info:
+  title: Pattern-Like Pattern Source Regeneration API
+  version: 0.9.0
+  description: >-
+    Additive Pattern control-plane successor. The complete consumer API remains
+    described by M8; this overlay supersedes only Pattern state, generation
+    request/acceptance/status, and documents the unchanged M7 reader response.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+  - url: http://localhost:8787
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/pattern-state:
+    get:
+      operationId: getPatternStateM9
+      x-normative-schema: 'm9:pattern-state.schema.json#/$defs/patternStateDocument'
+      responses:
+        '200':
+          description: Pattern state including private-hash-free regeneration eligibility
+          content:
+            application/json:
+              schema:
+                $ref: 'https://patternlike.app/contracts/m9/pattern-state.schema.json#/$defs/patternStateDocument'
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/pattern-generations:
+    post:
+      operationId: startPatternGenerationM9
+      x-normative-schema: 'm9:pattern-generation-request.schema.json#/$defs/patternGenerationRequest'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: 'https://patternlike.app/contracts/m9/pattern-generation-request.schema.json#/$defs/patternGenerationRequest'
+      responses:
+        '200':
+          description: Idempotent replay or convergence on the already-pending generation
+          content:
+            application/json:
+              schema:
+                $ref: 'https://patternlike.app/contracts/m9/pattern-generation-accepted.schema.json#/$defs/patternGenerationAccepted'
+        '202':
+          description: Initial generation or source regeneration reserved
+          content:
+            application/json:
+              schema:
+                $ref: 'https://patternlike.app/contracts/m9/pattern-generation-accepted.schema.json#/$defs/patternGenerationAccepted'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/pattern-generations/{generation_id}:
+    get:
+      operationId: getPatternGenerationM9
+      x-normative-schema: 'm9:pattern-generation-status.schema.json#/$defs/patternGenerationStatus'
+      parameters:
+        - $ref: '#/components/parameters/GenerationId'
+      responses:
+        '200':
+          description: Owner-scoped generation status
+          content:
+            application/json:
+              schema:
+                $ref: 'https://patternlike.app/contracts/m9/pattern-generation-status.schema.json#/$defs/patternGenerationStatus'
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/pattern:
+    get:
+      operationId: getGeneratedPatternM9
+      x-normative-schema: 'm7:pattern-response.schema.json#/$defs/patternResponse'
+      responses:
+        '200':
+          description: The current frozen M7 public Pattern reader document
+          content:
+            application/json:
+              schema:
+                $ref: 'https://patternlike.app/contracts/m7/pattern-response.schema.json#/$defs/patternResponse'
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    GenerationId:
+      name: generation_id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^pgen_[0-9a-f]{32}$' }
+  responses:
+    Error:
+      description: Existing request-id error envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [error]
+            properties:
+              error:
+                type: object
+                additionalProperties: true
+                required: [code, message, request_id]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  request_id: { type: [string, 'null'] }

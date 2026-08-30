@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.9.0",
+  "state": "ready",
+  "chart": null,
+  "consent": null,
+  "generation": null,
+  "pattern": {
+    "pattern_id": "pat_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generated_at": "2026-08-29T12:00:00Z",
+    "locale": "en-US",
+    "effective_accuracy": "exact"
+  },
+  "regeneration": {
+    "eligible": true,
+    "generation": {
+      "generation_id": "pgen_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stage": "writing",
+      "status_updated_at": "2026-08-29T12:01:00Z",
+      "started_at": "2026-08-29T12:00:00Z",
+      "retryable": false,
+      "request_id": null
+    },
+    "failure": null
+  }
+}

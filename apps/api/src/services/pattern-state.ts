@@ -1,8 +1,9 @@
 import {
-  M7_SCHEMA_VERSION,
+  M9_SCHEMA_VERSION,
   NATAL_FEATURE_POLICY_VERSION,
   type PatternResponseV7,
-  type PatternStateDocument,
+  type PatternStateDocumentV9,
+  type PatternStateGeneration,
 } from "@patternlike/shared";
 import { projectPublicPattern } from "@patternlike/pattern-engine";
 import type { Env } from "../env.js";
@@ -26,6 +27,7 @@ import {
   type PatternDomainStage,
 } from "./pattern-stage-protocol.js";
 import type { PatternDocumentInternal } from "@patternlike/shared";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
 
 interface DocumentRow {
   id: string;
@@ -42,6 +44,7 @@ interface DocumentRow {
   chart_fingerprint_hash: string;
   compact_provenance_json: string;
   ontology_version: string;
+  pattern_source_hash: string;
 }
 
 export async function loadActiveChart(
@@ -64,7 +67,8 @@ export async function loadAnyPatternDocument(
   return env.DB.prepare(
     `SELECT id, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
             wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
-            generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version
+            generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version,
+            pattern_source_hash
      FROM pattern_documents WHERE user_id = ?`,
   )
     .bind(userId)
@@ -79,7 +83,8 @@ export async function loadActivePatternDocument(
   return env.DB.prepare(
     `SELECT id, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
             wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
-            generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version
+            generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version,
+            pattern_source_hash
      FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash = ?`,
   )
     .bind(userId, fingerprintHash)
@@ -136,25 +141,26 @@ export async function buildPatternState(
   env: Env,
   identity: UserIdentity,
   now = new Date(),
-): Promise<PatternStateDocument> {
+): Promise<PatternStateDocumentV9> {
   const consent = patternConsentDocument(await loadPatternGenerationGrant(env, identity.userId, now));
   const chart = await loadActiveChart(env, identity.userId);
 
   if (!chart) {
     return {
-      schema_version: M7_SCHEMA_VERSION,
+      schema_version: M9_SCHEMA_VERSION,
       state: "chart_required",
       chart: null,
       consent,
       generation: null,
       pattern: null,
+      regeneration: null,
     };
   }
 
   const preferences = await loadPreferences(env, identity.userId);
   if (!preferences || preferences.localeSource !== "user_confirmed") {
     return {
-      schema_version: M7_SCHEMA_VERSION,
+      schema_version: M9_SCHEMA_VERSION,
       state: "locale_confirmation_required",
       chart: {
         chart_id: chart.id,
@@ -164,6 +170,7 @@ export async function buildPatternState(
       consent,
       generation: null,
       pattern: null,
+      regeneration: null,
     };
   }
 
@@ -212,7 +219,7 @@ export async function buildPatternState(
       }>();
     if (failed) {
       return {
-        schema_version: M7_SCHEMA_VERSION,
+        schema_version: M9_SCHEMA_VERSION,
         state: "failed",
         chart: chartBlock,
         consent,
@@ -227,6 +234,7 @@ export async function buildPatternState(
           request_id: null,
         },
         pattern: null,
+        regeneration: null,
       };
     }
   }
@@ -235,8 +243,75 @@ export async function buildPatternState(
     if (document.chart_fingerprint_hash !== fingerprintHash) {
       return emptyState("available", chartBlock, consent);
     }
+    const sourceChanged = document.pattern_source_hash !== PATTERN_CREATION_SOURCE_HASH;
+    const canRegenerate =
+      sourceChanged &&
+      consent.status === "granted" &&
+      ontologyServesAccount(ontology);
+    let regeneration: PatternStateDocumentV9["regeneration"] = {
+      eligible: canRegenerate,
+      generation: null,
+      failure: null,
+    };
+
+    if (claim.pending_regeneration_id) {
+      const active = await env.DB.prepare(
+        `SELECT generation_id, stage, updated_at, created_at, failure_class,
+                public_failure_stage
+         FROM pattern_generation_jobs
+         WHERE generation_id = ? AND user_id = ? AND reservation_reason = 'source_update'`,
+      )
+        .bind(claim.pending_regeneration_id, identity.userId)
+        .first<{
+          generation_id: string;
+          stage: PatternDomainStage;
+          updated_at: string;
+          created_at: string;
+          failure_class: string | null;
+          public_failure_stage: string | null;
+        }>();
+      const activeStage = active ? publicStageFor(active.stage) : null;
+      if (active && activeStage) {
+        regeneration = {
+          eligible: false,
+          generation: patternGenerationState(active, activeStage, false),
+          failure: null,
+        };
+      }
+    } else if (canRegenerate) {
+      const failed = await env.DB.prepare(
+        `SELECT generation_id, stage, updated_at, created_at, failure_class,
+                public_failure_stage
+         FROM pattern_generation_jobs
+         WHERE user_id = ? AND chart_fingerprint_hash = ?
+           AND reservation_reason = 'source_update' AND stage = 'failed'
+         ORDER BY updated_at DESC, generation_id DESC LIMIT 1`,
+      )
+        .bind(identity.userId, fingerprintHash)
+        .first<{
+          generation_id: string;
+          stage: PatternDomainStage;
+          updated_at: string;
+          created_at: string;
+          failure_class: string | null;
+          public_failure_stage: string | null;
+        }>();
+      if (failed) {
+        regeneration = {
+          eligible: true,
+          generation: null,
+          failure: patternGenerationState(
+            failed,
+            publicFailureStageFor(failed.public_failure_stage) ??
+              "organizing_evidence",
+            await patternFailureIsRetryable(env, failed.failure_class, now),
+          ),
+        };
+      }
+    }
+
     return {
-      schema_version: M7_SCHEMA_VERSION,
+      schema_version: M9_SCHEMA_VERSION,
       state: "ready",
       chart: chartBlock,
       consent,
@@ -247,6 +322,7 @@ export async function buildPatternState(
         locale: document.locale,
         effective_accuracy: document.effective_accuracy,
       },
+      regeneration,
     };
   }
 
@@ -261,7 +337,7 @@ export async function buildPatternState(
       const publicStage = publicStageFor(job.stage);
       if (job.stage === "failed") {
         return {
-          schema_version: M7_SCHEMA_VERSION,
+          schema_version: M9_SCHEMA_VERSION,
           state: "failed",
           chart: chartBlock,
           consent,
@@ -274,11 +350,12 @@ export async function buildPatternState(
             request_id: null,
           },
           pattern: null,
+          regeneration: null,
         };
       }
       if (publicStage) {
         return {
-          schema_version: M7_SCHEMA_VERSION,
+          schema_version: M9_SCHEMA_VERSION,
           state: publicStage,
           chart: chartBlock,
           consent,
@@ -291,6 +368,7 @@ export async function buildPatternState(
             request_id: null,
           },
           pattern: null,
+          regeneration: null,
         };
       }
     }
@@ -306,17 +384,37 @@ export async function buildPatternState(
 }
 
 function emptyState(
-  state: PatternStateDocument["state"],
-  chart: PatternStateDocument["chart"],
-  consent: PatternStateDocument["consent"],
-): PatternStateDocument {
+  state: PatternStateDocumentV9["state"],
+  chart: PatternStateDocumentV9["chart"],
+  consent: PatternStateDocumentV9["consent"],
+): PatternStateDocumentV9 {
   return {
-    schema_version: M7_SCHEMA_VERSION,
+    schema_version: M9_SCHEMA_VERSION,
     state,
     chart,
     consent,
     generation: null,
     pattern: null,
+    regeneration: null,
+  };
+}
+
+function patternGenerationState(
+  row: {
+    generation_id: string;
+    updated_at: string;
+    created_at: string;
+  },
+  stage: PatternStateGeneration["stage"],
+  retryable: boolean,
+): PatternStateGeneration {
+  return {
+    generation_id: row.generation_id,
+    stage,
+    status_updated_at: row.updated_at,
+    started_at: row.created_at,
+    retryable,
+    request_id: null,
   };
 }
 

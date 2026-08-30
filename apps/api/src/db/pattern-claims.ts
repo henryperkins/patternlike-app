@@ -21,6 +21,7 @@ export interface PatternClaimRow {
   last_chart_id: string | null;
   status: PatternClaimStatus;
   active_generation_id: string | null;
+  pending_regeneration_id: string | null;
   consumed_at: string | null;
   accepted_at: string | null;
   deleted_at: string | null;
@@ -35,7 +36,7 @@ export async function loadClaimForFingerprint(
 ): Promise<PatternClaimRow | null> {
   return env.DB.prepare(
     `SELECT id, user_id, chart_fingerprint_hash, last_chart_id, status,
-            active_generation_id, consumed_at, accepted_at, deleted_at,
+            active_generation_id, pending_regeneration_id, consumed_at, accepted_at, deleted_at,
             superseded_at, withdrawn_at
      FROM pattern_generation_claims
      WHERE user_id = ? AND chart_fingerprint_hash = ?`,
@@ -47,7 +48,7 @@ export async function loadClaimForFingerprint(
 export async function loadAnyClaim(env: Env, userId: string): Promise<PatternClaimRow | null> {
   return env.DB.prepare(
     `SELECT id, user_id, chart_fingerprint_hash, last_chart_id, status,
-            active_generation_id, consumed_at, accepted_at, deleted_at,
+            active_generation_id, pending_regeneration_id, consumed_at, accepted_at, deleted_at,
             superseded_at, withdrawn_at
      FROM pattern_generation_claims
      WHERE user_id = ?
@@ -65,7 +66,7 @@ export async function loadClaimByGeneration(
 ): Promise<PatternClaimRow | null> {
   return env.DB.prepare(
     `SELECT c.id, c.user_id, c.chart_fingerprint_hash, c.last_chart_id, c.status,
-            c.active_generation_id, c.consumed_at, c.accepted_at, c.deleted_at,
+            c.active_generation_id, c.pending_regeneration_id, c.consumed_at, c.accepted_at, c.deleted_at,
             c.superseded_at, c.withdrawn_at
      FROM pattern_generation_claims c
      JOIN pattern_generation_jobs j ON j.claim_id = c.id

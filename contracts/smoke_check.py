@@ -1494,6 +1494,264 @@ def check_0019_over_populated_0018() -> None:
     )
 
 
+def check_0023_pattern_source_regeneration() -> None:
+    """0023 preserves encrypted rows and adds one accepted-claim reservation."""
+    con = fresh(upto=22)
+    seed_user(con, USER_A, SUBJ_A)
+    legacy_hash = "sha256:" + ("0" * 64)
+    source_hash = "sha256:" + ("23" * 32)
+    fingerprint = "sha256:" + ("ab" * 32)
+    claim_id = "pgc_populated_0023"
+    generation_id = "pgen_populated_0023"
+    pattern_id = "pat_populated_0023"
+    job_id = "job_populated_0023"
+
+    con.execute(
+        "INSERT INTO jobs "
+        "(id, job_type, user_id, idempotency_key, status, payload_enc, "
+        "payload_key_version, payload_nonce, attempts, finished_at, created_at) "
+        "VALUES (?, 'generate_pattern', ?, 'idem-populated-0023', 'succeeded', "
+        "X'010203', 1, 'payload-nonce', 1, ?, ?)",
+        (job_id, USER_A, NOW, NOW),
+    )
+    con.execute(
+        "INSERT INTO pattern_generation_claims "
+        "(id, user_id, chart_fingerprint_hash, last_chart_id, status, "
+        "active_generation_id, consumed_at, accepted_at, deleted_at, "
+        "superseded_at, withdrawn_at, created_at, updated_at) "
+        "VALUES (?, ?, ?, 'cht_populated_0023', 'accepted', NULL, ?, ?, "
+        "NULL, NULL, NULL, ?, ?)",
+        (claim_id, USER_A, fingerprint, NOW, NOW, NOW, NOW),
+    )
+    con.execute(
+        "INSERT INTO pattern_generation_jobs "
+        "(generation_id, job_id, user_id, claim_id, chart_id, "
+        "chart_fingerprint_hash, feature_set_id, feature_set_hash, "
+        "feature_policy_version, selection_policy_version, locale, "
+        "locale_revision, consent_id, consent_policy_version, "
+        "ontology_version, ontology_bundle_hash, corpus_release_hash, "
+        "reservation_reason, stage, stage_generation, planner_attempts, "
+        "writer_attempts, verifier_attempts, plan_hash, candidate_hash, "
+        "semantic_verdict_hash, created_at, updated_at, finished_at) "
+        "VALUES (?, ?, ?, ?, 'cht_populated_0023', ?, 'nfs_populated_0023', "
+        "?, '1.0.0', '1.0.0', 'en-US', 1, 'cns_populated_0023', '1.1.0', "
+        "'ontology-populated-0023', ?, ?, 'first_open', 'succeeded', 7, 1, "
+        "2, 1, ?, ?, ?, ?, ?, ?)",
+        (
+            generation_id,
+            job_id,
+            USER_A,
+            claim_id,
+            fingerprint,
+            "sha256:" + ("cd" * 32),
+            "sha256:" + ("ef" * 32),
+            "sha256:" + ("12" * 32),
+            "sha256:" + ("34" * 32),
+            "sha256:" + ("56" * 32),
+            "sha256:" + ("78" * 32),
+            NOW,
+            NOW,
+            NOW,
+        ),
+    )
+    con.execute(
+        "INSERT INTO pattern_documents "
+        "(id, user_id, claim_id, generation_id, chart_fingerprint_hash, "
+        "ontology_version, ontology_bundle_hash, locale, effective_accuracy, "
+        "document_enc, document_nonce, wrapped_document_key_enc, "
+        "wrapped_document_key_version, wrapped_document_key_nonce, content_hash, "
+        "compact_provenance_json, generated_at, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 'ontology-populated-0023', ?, 'en-US', 'exact', "
+        "X'102030', 'document-nonce', X'405060', 1, 'wrapped-nonce', ?, '{}', ?, ?)",
+        (
+            pattern_id,
+            USER_A,
+            claim_id,
+            generation_id,
+            fingerprint,
+            "sha256:" + ("12" * 32),
+            "sha256:" + ("90" * 32),
+            NOW,
+            NOW,
+        ),
+    )
+    con.execute(
+        "INSERT INTO pattern_erasure_replay_events "
+        "(event_id, event_class, occurred_at, target_user_id, "
+        "chart_fingerprint_hash, claim_id, generation_id, pattern_id, "
+        "ontology_version, prior_claim_status, next_claim_status, content_hash, "
+        "signing_key_id, signature, replica_put_at, created_at) "
+        "VALUES ('prel_23232323232323232323232323232323', 'claim_consumed', ?, ?, "
+        "?, ?, ?, ?, 'ontology-populated-0023', 'reserved', 'accepted', ?, "
+        "'replay-key', 'signature', ?, ?)",
+        (
+            NOW,
+            USER_A,
+            fingerprint,
+            claim_id,
+            generation_id,
+            pattern_id,
+            "sha256:" + ("aa" * 32),
+            NOW,
+            NOW,
+        ),
+    )
+    con.commit()
+
+    job_columns = [row[1] for row in con.execute("PRAGMA table_info(pattern_generation_jobs)")]
+    document_columns = [row[1] for row in con.execute("PRAGMA table_info(pattern_documents)")]
+    replay_columns = [row[1] for row in con.execute("PRAGMA table_info(pattern_erasure_replay_events)")]
+    job_before = con.execute(
+        f"SELECT {', '.join(job_columns)} FROM pattern_generation_jobs WHERE generation_id = ?",
+        (generation_id,),
+    ).fetchone()
+    document_before = con.execute(
+        f"SELECT {', '.join(document_columns)} FROM pattern_documents WHERE id = ?",
+        (pattern_id,),
+    ).fetchone()
+    replay_before = con.execute(
+        f"SELECT {', '.join(replay_columns)} FROM pattern_erasure_replay_events "
+        "WHERE event_id = 'prel_23232323232323232323232323232323'"
+    ).fetchone()
+
+    apply_migrations(con, upto=23, start=23)
+
+    expected_columns = {
+        "pattern_generation_claims": "pending_regeneration_id",
+        "pattern_generation_jobs": "pattern_source_hash",
+        "pattern_documents": "pattern_source_hash",
+        "pattern_erasure_replay_events": "replacement_generation_id",
+    }
+    for table, column in expected_columns.items():
+        columns = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            raise SystemExit(f"0023 did not add {table}.{column}")
+
+    job_after = con.execute(
+        f"SELECT {', '.join(job_columns)} FROM pattern_generation_jobs WHERE generation_id = ?",
+        (generation_id,),
+    ).fetchone()
+    document_after = con.execute(
+        f"SELECT {', '.join(document_columns)} FROM pattern_documents WHERE id = ?",
+        (pattern_id,),
+    ).fetchone()
+    replay_after = con.execute(
+        f"SELECT {', '.join(replay_columns)} FROM pattern_erasure_replay_events "
+        "WHERE event_id = 'prel_23232323232323232323232323232323'"
+    ).fetchone()
+    if job_after != job_before or document_after != document_before or replay_after != replay_before:
+        raise SystemExit("0023 changed populated Pattern or replay bytes")
+
+    stored_hashes = con.execute(
+        "SELECT j.pattern_source_hash, p.pattern_source_hash "
+        "FROM pattern_generation_jobs j JOIN pattern_documents p "
+        "ON p.generation_id = j.generation_id WHERE j.generation_id = ?",
+        (generation_id,),
+    ).fetchone()
+    if stored_hashes != (legacy_hash, legacy_hash):
+        raise SystemExit(f"0023 did not truthfully mark legacy source identity: {stored_hashes}")
+
+    con.execute(
+        "UPDATE pattern_generation_claims SET pending_regeneration_id = ?, updated_at = ? "
+        "WHERE id = ?",
+        ("pgen_pending_0023", NOW, claim_id),
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "UPDATE pattern_generation_claims SET pending_regeneration_id = ?, updated_at = ? "
+            "WHERE id = ?",
+            ("pgen_other_0023", NOW, claim_id),
+        ),
+        "0023 rejects a pending regeneration owner swap",
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "UPDATE pattern_generation_claims SET status = 'deleted', deleted_at = ?, "
+            "pending_regeneration_id = NULL, updated_at = ? WHERE id = ?",
+            (NOW, NOW, claim_id),
+        ),
+        "0023 blocks a terminal transition while regeneration is pending",
+    )
+    con.execute(
+        "UPDATE pattern_generation_claims SET pending_regeneration_id = NULL, updated_at = ? "
+        "WHERE id = ?",
+        (NOW, claim_id),
+    )
+
+    con.execute(
+        "INSERT INTO jobs "
+        "(id, job_type, user_id, idempotency_key, status, attempts, created_at) "
+        "VALUES ('job_source_update_0023', 'generate_pattern', ?, "
+        "'idem-source-update-0023', 'queued', 0, ?)",
+        (USER_A, NOW),
+    )
+    con.execute(
+        "INSERT INTO pattern_generation_jobs "
+        "(generation_id, job_id, user_id, claim_id, chart_id, "
+        "chart_fingerprint_hash, feature_set_id, feature_set_hash, "
+        "feature_policy_version, selection_policy_version, locale, locale_revision, "
+        "consent_id, consent_policy_version, ontology_version, ontology_bundle_hash, "
+        "corpus_release_hash, pattern_source_hash, reservation_reason, stage, "
+        "created_at, updated_at) VALUES "
+        "('pgen_source_update_0023', 'job_source_update_0023', ?, ?, "
+        "'cht_populated_0023', ?, 'nfs_source_update_0023', ?, '1.0.0', '1.0.0', "
+        "'en-US', 1, 'cns_populated_0023', '1.1.0', 'ontology-populated-0023', "
+        "?, ?, ?, 'source_update', 'reserved', ?, ?)",
+        (
+            USER_A,
+            claim_id,
+            fingerprint,
+            "sha256:" + ("cd" * 32),
+            "sha256:" + ("12" * 32),
+            "sha256:" + ("34" * 32),
+            source_hash,
+            NOW,
+            NOW,
+        ),
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "UPDATE pattern_generation_jobs SET pattern_source_hash = 'sha256:not-a-hash' "
+            "WHERE generation_id = 'pgen_source_update_0023'"
+        ),
+        "0023 rejects an invalid Pattern source hash",
+    )
+
+    con.execute(
+        "INSERT INTO pattern_erasure_replay_events "
+        "(event_id, event_class, occurred_at, target_user_id, "
+        "chart_fingerprint_hash, claim_id, generation_id, pattern_id, "
+        "replacement_generation_id, replacement_pattern_id, ontology_version, "
+        "prior_claim_status, next_claim_status, pattern_source_hash, content_hash, "
+        "signing_key_id, signature, replica_put_at, created_at) "
+        "VALUES ('prel_45454545454545454545454545454545', 'pattern_regenerated', "
+        "?, ?, ?, ?, ?, ?, 'pgen_source_update_0023', "
+        "'pat_23232323232323232323232323232323', 'ontology-populated-0023', "
+        "'accepted', 'accepted', ?, ?, 'replay-key', 'signature', ?, ?)",
+        (
+            NOW,
+            USER_A,
+            fingerprint,
+            claim_id,
+            generation_id,
+            pattern_id,
+            source_hash,
+            "sha256:" + ("45" * 32),
+            NOW,
+            NOW,
+        ),
+    )
+
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("0023 populated apply left foreign-key violations")
+    if con.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+        raise SystemExit("0023 populated apply failed quick_check")
+    print(
+        "D1 OK  0023 preserves populated encrypted Pattern rows, pins legacy/new "
+        "source identity, and enforces one accepted replacement"
+    )
+
+
 def main() -> int:
     check_migration_manifest()
     check_fresh_schema()
@@ -1511,6 +1769,7 @@ def main() -> int:
     check_0018_over_populated_0017()
     check_0019_over_populated_0018()
     check_0021_over_populated_0020()
+    check_0023_pattern_source_regeneration()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

@@ -20,14 +20,18 @@ import { ensureNatalFeatureSet } from "../db/natal-features.js";
 import { loadActiveOntology, loadOntologyByVersion } from "../db/pattern-ontology.js";
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { isConsumedStatus, loadClaimForFingerprint } from "../db/pattern-claims.js";
-import { acceptPatternClaim } from "../db/pattern-claim-transitions.js";
+import {
+  acceptPatternClaim,
+  releasePatternRegeneration,
+} from "../db/pattern-claim-transitions.js";
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import { buildCryptoWriteFence } from "../db/crypto-write-fence.js";
 import {
   PATTERN_JOB_TYPE,
   isPatternCommand,
-  type GeneratePatternCommandV1,
+  type GeneratePatternCommand,
 } from "./pattern-command.js";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
 import {
   buildPatternTransitionStatements,
   commitPatternTransition,
@@ -87,6 +91,7 @@ import {
   patternPublicationAuthorizationGuard,
   type PatternPublicationBundle,
 } from "./pattern-publication-proof.js";
+import { deleteGenerationObjects } from "./pattern-lifecycle.js";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
@@ -375,7 +380,7 @@ async function loadCommand(
   env: Env,
   identity: UserIdentity,
   jobId: string,
-): Promise<GeneratePatternCommandV1> {
+): Promise<GeneratePatternCommand> {
   const row = await env.DB.prepare(
     `SELECT payload_enc, payload_key_version, payload_nonce FROM jobs WHERE id = ? AND user_id = ?`,
   )
@@ -794,9 +799,23 @@ export async function getArtifactById<T>(
 async function eligibility(
   env: Env,
   identity: UserIdentity,
-  command: GeneratePatternCommandV1,
+  command: GeneratePatternCommand,
+  job: PatternJobRow,
   now: Date,
-): Promise<"ok" | "cancel_consent" | "cancel_stale" | "cancel_ontology"> {
+): Promise<
+  | "ok"
+  | "cancel_consent"
+  | "cancel_stale"
+  | "cancel_ontology"
+  | "cancel_source_changed"
+> {
+  if (
+    !("pattern_source_hash" in command) ||
+    command.pattern_source_hash !== PATTERN_CREATION_SOURCE_HASH ||
+    job.pattern_source_hash !== command.pattern_source_hash
+  ) {
+    return "cancel_source_changed";
+  }
   const grant = await loadPatternGenerationGrant(env, identity.userId, now);
   if (!grant || grant.consentId !== command.consent_id) return "cancel_consent";
   const chart = await env.DB.prepare(
@@ -822,7 +841,28 @@ async function eligibility(
     if (!frozen || frozen.status === "recalled") return "cancel_ontology";
   }
   const claim = await loadClaimForFingerprint(env, identity.userId, command.chart_fingerprint_hash);
-  if (!claim || (isConsumedStatus(claim.status) && claim.status !== "accepted")) return "cancel_stale";
+  if (!claim) return "cancel_stale";
+  if (command.reservation_reason === "source_update") {
+    if (
+      claim.status !== "accepted" ||
+      claim.pending_regeneration_id !== command.generation_id
+    ) {
+      return "cancel_stale";
+    }
+    const document = await env.DB.prepare(
+      `SELECT 1 AS present FROM pattern_documents
+       WHERE user_id = ? AND claim_id = ? AND chart_fingerprint_hash = ?`,
+    )
+      .bind(identity.userId, command.claim_id, command.chart_fingerprint_hash)
+      .first<{ present: number }>();
+    if (!document) return "cancel_stale";
+  } else if (
+    claim.status !== "reserved" ||
+    claim.active_generation_id !== command.generation_id ||
+    isConsumedStatus(claim.status)
+  ) {
+    return "cancel_stale";
+  }
   return "ok";
 }
 
@@ -956,7 +996,7 @@ export async function executePatternJob(
     return { ok: false, reason: "terminal", failureClass: "account_inactive" };
   }
   const identity: UserIdentity = { userId: identityRow.userId, cryptoSubject: identityRow.cryptoSubject };
-  let command: GeneratePatternCommandV1;
+  let command: GeneratePatternCommand;
   try {
     command = await loadCommand(env, identity, claimed.job.job_id);
   } catch {
@@ -968,7 +1008,7 @@ export async function executePatternJob(
     return { ok: false, reason: "terminal", failureClass: "payload_undecryptable" };
   }
 
-  const gate = await eligibility(env, identity, command, now);
+  const gate = await eligibility(env, identity, command, claimed.job, now);
   if (gate !== "ok") {
     await commitPatternTransition(env, claimed.job, claimed.token, {
       kind: "cancel",
@@ -1614,6 +1654,23 @@ async function publishPattern(
     `pattern-document-v1:${proof.generationId}`,
   )).slice(0, 32)}`;
   const generatedAt = now.toISOString();
+  const sourceUpdate = proof.reservationReason === "source_update";
+  const priorDocument = sourceUpdate
+    ? await env.DB.prepare(
+        `SELECT id, generation_id, ontology_version
+         FROM pattern_documents
+         WHERE user_id = ? AND claim_id = ? AND chart_fingerprint_hash = ?`,
+      )
+        .bind(identity.userId, proof.claimId, proof.chartFingerprintHash)
+        .first<{
+          id: string;
+          generation_id: string;
+          ontology_version: string;
+        }>()
+    : null;
+  if (sourceUpdate && !priorDocument) {
+    return { status: "retry", failureClass: "publication_authorization_changed" };
+  }
   const documentKey = randomKey();
   const nonce = randomNonce();
   const publisherProvenance = provenanceFromExecutedPin(proof.executedWriterPin);
@@ -1657,10 +1714,30 @@ async function publishPattern(
     { claim_id: proof.claimId, generation_id: proof.generationId },
   );
   const content = await contentHash(JSON.stringify(internal));
+  const compactProvenance = {
+    ...internal.compact_provenance,
+    pattern_source_hash: proof.patternSourceHash,
+  };
   const accuracy = internal.effective_accuracy;
   let replay;
   try {
-    replay = await writePatternReplayIntent(env, {
+    replay = await writePatternReplayIntent(env, sourceUpdate
+      ? {
+          eventClass: "pattern_regenerated",
+          semanticOperationKey: proof.generationId,
+          targetUserId: identity.userId,
+          chartFingerprintHash: proof.chartFingerprintHash,
+          claimId: proof.claimId,
+          generationId: priorDocument!.generation_id,
+          patternId: priorDocument!.id,
+          replacementGenerationId: proof.generationId,
+          replacementPatternId: patternId,
+          patternSourceHash: proof.patternSourceHash,
+          ontologyVersion: proof.ontologyVersion,
+          priorClaimStatus: "accepted",
+          nextClaimStatus: "accepted",
+        }
+      : {
       eventClass: "claim_consumed",
       semanticOperationKey: proof.generationId,
       targetUserId: identity.userId,
@@ -1692,6 +1769,60 @@ async function publishPattern(
       },
       now,
     );
+    const documentRemoval = sourceUpdate
+      ? env.DB.prepare(
+          `DELETE FROM pattern_documents
+           WHERE user_id = ? AND claim_id = ? AND generation_id = ? AND id = ?`,
+        ).bind(
+          identity.userId,
+          proof.claimId,
+          priorDocument!.generation_id,
+          priorDocument!.id,
+        )
+      : env.DB.prepare(
+          `DELETE FROM pattern_documents
+           WHERE user_id = ? AND chart_fingerprint_hash != ?`,
+        ).bind(identity.userId, proof.chartFingerprintHash);
+    const claimMutation = sourceUpdate
+      ? releasePatternRegeneration(env, {
+          claimId: proof.claimId,
+          userId: identity.userId,
+          generationId: proof.generationId,
+          now: generatedAt,
+        })
+      : acceptPatternClaim(env, {
+          claimId: proof.claimId,
+          userId: identity.userId,
+          generationId: proof.generationId,
+          now: generatedAt,
+        });
+    const priorGenerationErasure = sourceUpdate
+      ? [
+          env.DB.prepare(
+            `UPDATE pattern_generation_artifact_keys
+             SET wrapped_key_enc = NULL, wrapped_key_version = NULL,
+                 wrapped_key_nonce = NULL, erased_at = COALESCE(erased_at, ?)
+             WHERE user_id = ? AND generation_id = ?`,
+          ).bind(generatedAt, identity.userId, priorDocument!.generation_id),
+          env.DB.prepare(
+            `UPDATE pattern_generation_artifacts
+             SET deleted_at = COALESCE(deleted_at, ?)
+             WHERE user_id = ? AND generation_id = ?`,
+          ).bind(generatedAt, identity.userId, priorDocument!.generation_id),
+          env.DB.prepare(
+            `UPDATE jobs
+             SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
+             WHERE user_id = ? AND id = (
+               SELECT job_id FROM pattern_generation_jobs
+               WHERE generation_id = ? AND user_id = ?
+             )`,
+          ).bind(
+            identity.userId,
+            priorDocument!.generation_id,
+            identity.userId,
+          ),
+        ]
+      : [];
     await env.DB.batch([
       buildCryptoWriteFence(env, {
         userId: identity.userId,
@@ -1701,16 +1832,15 @@ async function publishPattern(
       patternPublicationAuthorizationGuard(env, proof, now),
       ...publicationTransition.guards,
       ...replay.receiptStatements(env),
-      env.DB.prepare(
-        `DELETE FROM pattern_documents WHERE user_id = ? AND chart_fingerprint_hash != ?`,
-      ).bind(identity.userId, proof.chartFingerprintHash),
+      documentRemoval,
       env.DB.prepare(
         `INSERT INTO pattern_documents (
            id, user_id, claim_id, generation_id, chart_fingerprint_hash, ontology_version,
            ontology_bundle_hash, locale, effective_accuracy, document_enc, document_nonce,
            wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
-           content_hash, compact_provenance_json, generated_at, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           content_hash, compact_provenance_json, pattern_source_hash,
+           generated_at, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         patternId,
         identity.userId,
@@ -1727,23 +1857,35 @@ async function publishPattern(
         wrapped.keyVersion,
         wrapped.nonce,
         content,
-        JSON.stringify(internal.compact_provenance),
+        JSON.stringify(compactProvenance),
+        proof.patternSourceHash,
         generatedAt,
         generatedAt,
       ),
-      acceptPatternClaim(env, {
-        claimId: proof.claimId,
-        userId: identity.userId,
-        generationId: proof.generationId,
-        now: generatedAt,
-      }),
+      ...priorGenerationErasure,
+      claimMutation,
       ...publicationTransition.mutations,
       env.DB.prepare(
         `INSERT INTO audit_events
            (id, actor_type, actor_id, action, resource_type, resource_id, result, detail_class, created_at)
-         VALUES (?, 'system', ?, 'pattern_generation.published', 'pattern', ?, 'success', 'accepted', ?)`,
-      ).bind(newId("aud"), identity.userId, patternId, generatedAt),
+         VALUES (?, 'system', ?, 'pattern_generation.published', 'pattern', ?, 'success', ?, ?)`,
+      ).bind(
+        newId("aud"),
+        identity.userId,
+        patternId,
+        sourceUpdate ? "source_replaced" : "accepted",
+        generatedAt,
+      ),
     ]);
+    if (sourceUpdate) {
+      try {
+        await deleteGenerationObjects(env, priorDocument!.generation_id);
+      } catch {
+        // The committed key erasure is already irreversible. The signed replay
+        // receipt lets the maintenance sweep retry physical object deletion.
+        safeLog({ event: "pattern_artifact_cleanup_failed" });
+      }
+    }
     return { status: "published" };
   } catch {
     return { status: "retry", failureClass: "publication_commit_failed" };

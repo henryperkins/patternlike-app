@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.9.0",
+  "event_id": "prel_cccccccccccccccccccccccccccccccc",
+  "event_class": "pattern_regenerated",
+  "occurred_at": "2026-08-29T12:05:00Z",
+  "target_user_id": "usr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "chart_fingerprint_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "claim_id": "pgc_dddddddddddddddddddddddddddddddd",
+  "generation_id": "pgen_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "pattern_id": "pat_ffffffffffffffffffffffffffffffff",
+  "replacement_generation_id": "pgen_11111111111111111111111111111111",
+  "replacement_pattern_id": "pat_22222222222222222222222222222222",
+  "ontology_version": "ontology-2026-08",
+  "prior_claim_status": "accepted",
+  "next_claim_status": "accepted",
+  "pattern_source_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "signing_key_id": "pattern-replay-2026-08",
+  "signature": "signed-event"
+}

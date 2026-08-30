@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m9/common.schema.json",
+  "title": "Pattern/Like M9 Pattern regeneration definitions",
+  "$defs": {
+    "schemaVersion": { "type": "string", "const": "0.9.0" },
+    "generationId": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/generationId" },
+    "patternId": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternId" },
+    "claimId": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/claimId" },
+    "replayEventId": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/replayEventId" },
+    "contentHash": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/contentHash" },
+    "patternState": { "$ref": "https://patternlike.app/contracts/m7/common.schema.json#/$defs/patternState" },
+    "publicStage": {
+      "type": "string",
+      "enum": ["organizing_evidence", "writing", "checking_claims"]
+    },
+    "generationReason": {
+      "type": "string",
+      "enum": ["first_open", "first_open_retry", "failed_attempt_retry", "source_update"]
+    },
+    "generationState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation_id", "stage", "status_updated_at", "started_at", "retryable", "request_id"],
+      "properties": {
+        "generation_id": { "$ref": "#/$defs/generationId" },
+        "stage": { "$ref": "#/$defs/publicStage" },
+        "status_updated_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "started_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "retryable": { "type": "boolean" },
+        "request_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

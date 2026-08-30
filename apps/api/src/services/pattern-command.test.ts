@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "../../test/helpers.js";
 import {
   PATTERN_COMMAND_VERSION,
+  PATTERN_COMMAND_VERSION_V1,
   isPatternCommand,
   patternFailureIsRetryable,
 } from "./pattern-command.js";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
 
 function commandWithMaxima(
   writerAttemptsMax: unknown,
@@ -15,6 +17,8 @@ function commandWithMaxima(
 ): Record<string, unknown> {
   return {
     command_version: PATTERN_COMMAND_VERSION,
+    schema_version: "0.9.0",
+    pattern_source_hash: PATTERN_CREATION_SOURCE_HASH,
     planner_attempts_max: plannerAttemptsMax,
     writer_attempts_max: writerAttemptsMax,
     verifier_attempts_max: verifierAttemptsMax,
@@ -22,6 +26,27 @@ function commandWithMaxima(
 }
 
 describe("Pattern command attempt maxima", () => {
+  it("accepts a source-pinned V2 command", () => {
+    expect(isPatternCommand(commandWithMaxima(3))).toBe(true);
+  });
+
+  it("keeps historical V1 commands decodable without pretending they are current", () => {
+    const command = commandWithMaxima(3);
+    command.command_version = PATTERN_COMMAND_VERSION_V1;
+    command.schema_version = "0.7.0";
+    delete command.pattern_source_hash;
+    expect(isPatternCommand(command)).toBe(true);
+  });
+
+  it.each([undefined, null, "", `sha256:${"a".repeat(63)}`, `sha256:${"A".repeat(64)}`])(
+    "rejects a V2 source hash of %s",
+    (sourceHash) => {
+      const command = commandWithMaxima(3);
+      command.pattern_source_hash = sourceHash;
+      expect(isPatternCommand(command)).toBe(false);
+    },
+  );
+
   it.each([2, 3])("decodes a stored writer maximum of %i", (writerAttemptsMax) => {
     expect(isPatternCommand(commandWithMaxima(writerAttemptsMax))).toBe(true);
   });

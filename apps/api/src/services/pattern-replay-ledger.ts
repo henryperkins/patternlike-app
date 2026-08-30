@@ -1,8 +1,10 @@
 import {
   M7_SCHEMA_VERSION,
+  M9_SCHEMA_VERSION,
   contentHash,
   jcsCanonicalize,
   sha256Hex,
+  type PatternRegenerationReplayEvent,
 } from "@patternlike/shared";
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
@@ -10,6 +12,8 @@ import addFormats from "ajv-formats";
 import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
 import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
 import replayEventSchema from "../../../../contracts/m7/pattern-erasure-replay-event.schema.json";
+import m9CommonSchema from "../../../../contracts/m9/common.schema.json";
+import regenerationReplayEventSchema from "../../../../contracts/m9/pattern-regeneration-replay-event.schema.json";
 import type { Env } from "../env.js";
 import {
   collectDeletionArtifactKeys,
@@ -17,7 +21,7 @@ import {
   deleteUserRows,
 } from "./deletion-manifest.js";
 
-export const PATTERN_REPLAY_EVENT_CLASSES = [
+const LEGACY_PATTERN_REPLAY_EVENT_CLASSES = [
   "claim_consumed",
   "pattern_deleted",
   "chart_correction_erased",
@@ -26,8 +30,16 @@ export const PATTERN_REPLAY_EVENT_CLASSES = [
   "account_deleted",
 ] as const;
 
+export const PATTERN_REPLAY_EVENT_CLASSES = [
+  ...LEGACY_PATTERN_REPLAY_EVENT_CLASSES,
+  "pattern_regenerated",
+] as const;
+
 export type PatternReplayEventClass =
   (typeof PATTERN_REPLAY_EVENT_CLASSES)[number];
+
+type LegacyPatternReplayEventClass =
+  (typeof LEGACY_PATTERN_REPLAY_EVENT_CLASSES)[number];
 
 export type PatternReplayClaimStatus =
   | "available"
@@ -40,7 +52,7 @@ export type PatternReplayClaimStatus =
 export interface PatternErasureReplayEvent {
   schema_version: typeof M7_SCHEMA_VERSION;
   event_id: string;
-  event_class: PatternReplayEventClass;
+  event_class: LegacyPatternReplayEventClass;
   occurred_at: string;
   target_user_id: string | null;
   chart_fingerprint_hash: string | null;
@@ -57,6 +69,10 @@ export interface PatternErasureReplayEvent {
   signing_key_id: string;
   signature: string;
 }
+
+export type PatternReplayEvent =
+  | PatternErasureReplayEvent
+  | PatternRegenerationReplayEvent;
 
 export interface ParsedPatternReplaySigningKey {
   keyId: string;
@@ -77,11 +93,14 @@ export interface PatternReplayIntentInput {
     PatternReplayClaimStatus,
     "available" | "reserved"
   > | null;
+  replacementGenerationId?: string | null;
+  replacementPatternId?: string | null;
+  patternSourceHash?: string | null;
 }
 
 export class PreparedPatternReplayEvent {
   constructor(
-    readonly event: PatternErasureReplayEvent,
+    readonly event: PatternReplayEvent,
     readonly objectKey: string,
     readonly canonicalBytes: string,
     readonly replicaPutAt: string,
@@ -91,6 +110,9 @@ export class PreparedPatternReplayEvent {
     env: Pick<Env, "DB">,
   ): D1PreparedStatement[] {
     const event = this.event;
+    const regeneration = event.event_class === "pattern_regenerated"
+      ? event
+      : null;
     const values = [
       event.event_id,
       event.event_class,
@@ -100,9 +122,12 @@ export class PreparedPatternReplayEvent {
       event.claim_id,
       event.generation_id,
       event.pattern_id,
+      regeneration?.replacement_generation_id ?? null,
+      regeneration?.replacement_pattern_id ?? null,
       event.ontology_version,
       event.prior_claim_status,
       event.next_claim_status,
+      regeneration?.pattern_source_hash ?? null,
       event.content_hash,
       event.signing_key_id,
       event.signature,
@@ -114,9 +139,11 @@ export class PreparedPatternReplayEvent {
         `INSERT OR IGNORE INTO pattern_erasure_replay_events (
            event_id, event_class, occurred_at, target_user_id,
            chart_fingerprint_hash, claim_id, generation_id, pattern_id,
+           replacement_generation_id, replacement_pattern_id,
            ontology_version, prior_claim_status, next_claim_status,
-           content_hash, signing_key_id, signature, replica_put_at, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           pattern_source_hash, content_hash, signing_key_id, signature,
+           replica_put_at, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(...values),
       env.DB.prepare(
         `INSERT INTO assertion_probe (id, reason)
@@ -131,9 +158,12 @@ export class PreparedPatternReplayEvent {
              AND claim_id IS ?
              AND generation_id IS ?
              AND pattern_id IS ?
+             AND replacement_generation_id IS ?
+             AND replacement_pattern_id IS ?
              AND ontology_version IS ?
              AND prior_claim_status IS ?
              AND next_claim_status IS ?
+             AND pattern_source_hash IS ?
              AND content_hash IS ?
              AND signing_key_id IS ?
              AND signature IS ?
@@ -167,7 +197,13 @@ const PUBLIC_KEY_FIELDS = new Set(["alg", "public_key"]);
 
 const schemaValidator = new Ajv2020({ strict: true });
 addFormats(schemaValidator);
-for (const schema of [m0CommonSchema, m7CommonSchema, replayEventSchema]) {
+for (const schema of [
+  m0CommonSchema,
+  m7CommonSchema,
+  replayEventSchema,
+  m9CommonSchema,
+  regenerationReplayEventSchema,
+]) {
   schemaValidator.addSchema(schema);
 }
 function requiredReplayEventValidator(): ValidateFunction<PatternErasureReplayEvent> {
@@ -180,6 +216,17 @@ function requiredReplayEventValidator(): ValidateFunction<PatternErasureReplayEv
   return validator;
 }
 const validateReplayEvent = requiredReplayEventValidator();
+
+function requiredRegenerationReplayEventValidator(): ValidateFunction<PatternRegenerationReplayEvent> {
+  const validator = schemaValidator.getSchema<PatternRegenerationReplayEvent>(
+    regenerationReplayEventSchema.$id,
+  );
+  if (!validator) {
+    throw new Error("M9 regeneration replay event schema is unavailable");
+  }
+  return validator;
+}
+const validateRegenerationReplayEvent = requiredRegenerationReplayEventValidator();
 
 function fail(code: string): never {
   throw new PatternReplayLedgerError(code);
@@ -283,7 +330,7 @@ export function parsePatternReplayKeyring(
   return keys;
 }
 
-function replaySigningPayload(event: PatternErasureReplayEvent): string {
+function replaySigningPayload(event: PatternReplayEvent): string {
   const {
     content_hash: _contentHash,
     signature: _signature,
@@ -314,9 +361,12 @@ async function importReplayVerifyKey(
 export async function verifyPatternReplayEvent(
   value: unknown,
   rawKeyring: string | undefined,
-): Promise<PatternErasureReplayEvent> {
-  if (!validateReplayEvent(value)) fail("replay_event_schema_invalid");
-  const event = value as PatternErasureReplayEvent;
+): Promise<PatternReplayEvent> {
+  const valid = isRecord(value) && value.schema_version === M9_SCHEMA_VERSION
+    ? validateRegenerationReplayEvent(value)
+    : validateReplayEvent(value);
+  if (!valid) fail("replay_event_schema_invalid");
+  const event = value as PatternReplayEvent;
   const payload = replaySigningPayload(event);
   if (await contentHash(payload) !== event.content_hash) {
     fail("replay_event_hash_mismatch");
@@ -408,7 +458,7 @@ async function signReplayPayload(
 }
 
 function eventMatchesIntent(
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
   eventId: string,
   input: PatternReplayIntentInput,
 ): boolean {
@@ -422,7 +472,14 @@ function eventMatchesIntent(
     event.pattern_id === input.patternId &&
     event.ontology_version === input.ontologyVersion &&
     event.prior_claim_status === input.priorClaimStatus &&
-    event.next_claim_status === input.nextClaimStatus
+    event.next_claim_status === input.nextClaimStatus &&
+    (event.event_class === "pattern_regenerated"
+      ? event.replacement_generation_id === input.replacementGenerationId &&
+        event.replacement_pattern_id === input.replacementPatternId &&
+        event.pattern_source_hash === input.patternSourceHash
+      : input.replacementGenerationId == null &&
+        input.replacementPatternId == null &&
+        input.patternSourceHash == null)
   );
 }
 
@@ -465,7 +522,7 @@ async function readReplicaEvent(
   } catch {
     fail("replay_replica_integrity");
   }
-  let event: PatternErasureReplayEvent;
+  let event: PatternReplayEvent;
   try {
     event = await verifyPatternReplayEvent(parsed, rawKeyring);
   } catch {
@@ -502,6 +559,24 @@ export async function writePatternReplayIntent(
   if (!env.PATTERN_REPLAY_LEDGER || !Number.isFinite(now.getTime())) {
     fail("replay_replica_unavailable");
   }
+  const regeneration = input.eventClass === "pattern_regenerated";
+  if (
+    regeneration
+      ? input.priorClaimStatus !== "accepted" ||
+        input.nextClaimStatus !== "accepted" ||
+        !input.generationId ||
+        !input.patternId ||
+        !input.replacementGenerationId ||
+        !input.replacementPatternId ||
+        !input.patternSourceHash ||
+        input.generationId === input.replacementGenerationId ||
+        input.patternId === input.replacementPatternId
+      : input.replacementGenerationId != null ||
+        input.replacementPatternId != null ||
+        input.patternSourceHash != null
+  ) {
+    fail("replay_intent_invalid");
+  }
   const eventId = await patternReplayEventId(
     input.eventClass,
     input.semanticOperationKey,
@@ -526,8 +601,7 @@ export async function writePatternReplayIntent(
   const signingKey = await importReplaySigningKey(writer.privateKeyPkcs8);
   if (!signingKey) fail("replay_signing_configuration_invalid");
 
-  const unsigned = {
-    schema_version: M7_SCHEMA_VERSION,
+  const commonUnsigned = {
     event_id: eventId,
     event_class: input.eventClass,
     occurred_at: now.toISOString(),
@@ -541,12 +615,26 @@ export async function writePatternReplayIntent(
     next_claim_status: input.nextClaimStatus,
     signing_key_id: writer.keyId,
   };
+  const unsigned = regeneration
+    ? {
+        ...commonUnsigned,
+        schema_version: M9_SCHEMA_VERSION,
+        event_class: "pattern_regenerated" as const,
+        replacement_generation_id: input.replacementGenerationId!,
+        replacement_pattern_id: input.replacementPatternId!,
+        pattern_source_hash: input.patternSourceHash!,
+      }
+    : {
+        ...commonUnsigned,
+        schema_version: M7_SCHEMA_VERSION,
+        event_class: input.eventClass as LegacyPatternReplayEventClass,
+      };
   const payload = jcsCanonicalize(unsigned);
-  const event: PatternErasureReplayEvent = {
+  const event = {
     ...unsigned,
     content_hash: await contentHash(payload),
     signature: await signReplayPayload(signingKey, payload),
-  };
+  } as PatternReplayEvent;
   try {
     await verifyPatternReplayEvent(event, env.PATTERN_REPLAY_LEDGER_KEYS);
   } catch {
@@ -574,7 +662,7 @@ export async function writePatternReplayIntent(
 }
 
 function terminalClaimTimestamp(
-  status: PatternErasureReplayEvent["next_claim_status"],
+  status: PatternReplayEvent["next_claim_status"],
   expected: Exclude<PatternReplayClaimStatus, "available" | "reserved">,
   occurredAt: string,
 ): string | null {
@@ -594,7 +682,7 @@ async function existingReplicaPutAt(
 
 function claimReplayStatements(
   env: Pick<Env, "DB">,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
 ): D1PreparedStatement[] {
   const acceptedAt = terminalClaimTimestamp(
     event.next_claim_status,
@@ -696,7 +784,7 @@ function claimReplayStatements(
 
 function erasureReplayStatements(
   env: Pick<Env, "DB">,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
 ): D1PreparedStatement[] {
   return [
     env.DB.prepare(
@@ -741,7 +829,7 @@ function erasureReplayStatements(
 
 function claimReplayConvergenceStatement(
   env: Pick<Env, "DB">,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
 ): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO assertion_probe (id, reason)
@@ -764,7 +852,7 @@ function claimReplayConvergenceStatement(
 
 function erasureReplayConvergenceStatement(
   env: Pick<Env, "DB">,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
 ): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO assertion_probe (id, reason)
@@ -804,9 +892,127 @@ function erasureReplayConvergenceStatement(
   );
 }
 
+function regenerationReplayStatements(
+  env: Pick<Env, "DB">,
+  event: PatternRegenerationReplayEvent,
+): D1PreparedStatement[] {
+  return [
+    env.DB.prepare(
+      `DELETE FROM pattern_documents
+       WHERE user_id = ? AND claim_id = ? AND generation_id = ? AND id = ?
+         AND generation_id != ? AND id != ?`,
+    ).bind(
+      event.target_user_id,
+      event.claim_id,
+      event.generation_id,
+      event.pattern_id,
+      event.replacement_generation_id,
+      event.replacement_pattern_id,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_generation_artifact_keys
+       SET wrapped_key_enc = NULL, wrapped_key_version = NULL,
+           wrapped_key_nonce = NULL, erased_at = COALESCE(erased_at, ?)
+       WHERE user_id = ? AND generation_id = ?`,
+    ).bind(event.occurred_at, event.target_user_id, event.generation_id),
+    env.DB.prepare(
+      `UPDATE pattern_generation_artifacts
+       SET deleted_at = COALESCE(deleted_at, ?)
+       WHERE user_id = ? AND generation_id = ?`,
+    ).bind(event.occurred_at, event.target_user_id, event.generation_id),
+    env.DB.prepare(
+      `UPDATE jobs
+       SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
+       WHERE user_id = ? AND id = (
+         SELECT job_id FROM pattern_generation_jobs
+         WHERE generation_id = ? AND user_id = ?
+       )`,
+    ).bind(
+      event.target_user_id,
+      event.generation_id,
+      event.target_user_id,
+    ),
+    env.DB.prepare(
+      `UPDATE pattern_generation_claims
+       SET pending_regeneration_id = NULL, updated_at = ?
+       WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
+         AND status = 'accepted' AND consumed_at IS NOT NULL
+         AND pending_regeneration_id = ?`,
+    ).bind(
+      event.occurred_at,
+      event.claim_id,
+      event.target_user_id,
+      event.chart_fingerprint_hash,
+      event.replacement_generation_id,
+    ),
+  ];
+}
+
+function regenerationReplayConvergenceStatement(
+  env: Pick<Env, "DB">,
+  event: PatternRegenerationReplayEvent,
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO assertion_probe (id, reason)
+     SELECT 1, 'Pattern regeneration replay did not converge'
+     WHERE EXISTS (
+       SELECT 1 FROM pattern_documents
+       WHERE user_id = ? AND claim_id = ? AND generation_id = ? AND id = ?
+     ) OR EXISTS (
+       SELECT 1 FROM pattern_generation_artifact_keys
+       WHERE user_id = ? AND generation_id = ? AND erased_at IS NULL
+     ) OR EXISTS (
+       SELECT 1 FROM jobs
+       WHERE user_id = ?
+         AND id = (
+           SELECT job_id FROM pattern_generation_jobs
+           WHERE generation_id = ? AND user_id = ?
+         )
+         AND payload_enc IS NOT NULL
+     ) OR EXISTS (
+       SELECT 1 FROM pattern_generation_claims
+       WHERE id = ? AND user_id = ? AND pending_regeneration_id = ?
+     )`,
+  ).bind(
+    event.target_user_id,
+    event.claim_id,
+    event.generation_id,
+    event.pattern_id,
+    event.target_user_id,
+    event.generation_id,
+    event.target_user_id,
+    event.generation_id,
+    event.target_user_id,
+    event.claim_id,
+    event.target_user_id,
+    event.replacement_generation_id,
+  );
+}
+
+async function deleteReplayGenerationObjects(
+  env: Pick<Env, "ARTIFACTS">,
+  generationId: string,
+): Promise<void> {
+  if (!env.ARTIFACTS) return;
+  let cursor: string | undefined;
+  try {
+    do {
+      const page = await env.ARTIFACTS.list({
+        prefix: `pattern-generations/${generationId}/`,
+        cursor,
+      });
+      const keys = page.objects.map((object) => object.key);
+      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  } catch {
+    fail("replay_event_apply_unavailable");
+  }
+}
+
 function ontologyRecallReplayStatements(
   env: Pick<Env, "DB">,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
 ): D1PreparedStatement[] {
   return [
     env.DB.prepare(
@@ -838,7 +1044,7 @@ function ontologyRecallReplayStatements(
 
 function ontologyRecallConvergenceStatement(
   env: Pick<Env, "DB">,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
 ): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO assertion_probe (id, reason)
@@ -855,7 +1061,7 @@ function ontologyRecallConvergenceStatement(
 
 async function applyAccountDeletionReplay(
   env: Env,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
   receipt: PreparedPatternReplayEvent,
 ): Promise<void> {
   if (
@@ -993,7 +1199,7 @@ async function applyAccountDeletionReplay(
 /** Apply one already-signed event without ever assigning an available claim. */
 export async function applyPatternReplayEvent(
   env: Env,
-  event: PatternErasureReplayEvent,
+  event: PatternReplayEvent,
   appliedAt = new Date(),
 ): Promise<"applied" | "replay"> {
   if (!Number.isFinite(appliedAt.getTime())) fail("replay_event_apply_invalid");
@@ -1006,11 +1212,13 @@ export async function applyPatternReplayEvent(
     verified.event_class === "pattern_withdrawn";
   const ontologyRecall = verified.event_class === "ontology_recalled";
   const accountDeletion = verified.event_class === "account_deleted";
+  const regeneration = verified.event_class === "pattern_regenerated";
   if (
     verified.event_class !== "claim_consumed" &&
     !erasure &&
     !ontologyRecall &&
-    !accountDeletion
+    !accountDeletion &&
+    !regeneration
   ) {
     fail("replay_event_apply_unsupported");
   }
@@ -1021,6 +1229,38 @@ export async function applyPatternReplayEvent(
     jcsCanonicalize(verified),
     priorReplicaPutAt ?? appliedAt.toISOString(),
   );
+  if (regeneration) {
+    if (
+      verified.generation_id === verified.replacement_generation_id ||
+      verified.pattern_id === verified.replacement_pattern_id
+    ) {
+      fail("replay_event_apply_invalid");
+    }
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'Pattern regeneration replay precondition failed'
+         WHERE ? != 'pattern_regenerated'
+           OR ? = ? OR ? = ?
+           OR ? != 'accepted' OR ? != 'accepted'`,
+      ).bind(
+        verified.event_class,
+        verified.generation_id,
+        verified.replacement_generation_id,
+        verified.pattern_id,
+        verified.replacement_pattern_id,
+        verified.prior_claim_status,
+        verified.next_claim_status,
+      ),
+      ...claimReplayStatements(env, verified),
+      ...regenerationReplayStatements(env, verified),
+      ...receipt.receiptStatements(env),
+      claimReplayConvergenceStatement(env, verified),
+      regenerationReplayConvergenceStatement(env, verified),
+    ]);
+    await deleteReplayGenerationObjects(env, verified.generation_id);
+    return priorReplicaPutAt === null ? "applied" : "replay";
+  }
   if (accountDeletion) {
     await applyAccountDeletionReplay(env, verified, receipt);
     return priorReplicaPutAt === null ? "applied" : "replay";

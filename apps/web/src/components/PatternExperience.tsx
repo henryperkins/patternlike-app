@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   PatternConsent,
   PatternPublicChapter,
+  PatternRegenerationState,
   PatternResponseV7,
   PatternState,
-  PatternStateDocument,
+  PatternStateDocumentV9,
 } from "@patternlike/shared";
 import {
   ApiError,
@@ -12,6 +13,7 @@ import {
   getGeneratedPattern,
   getPatternState,
   newIdempotencyKey,
+  regeneratePattern,
   startPatternGeneration,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
@@ -68,15 +70,152 @@ function GeneratedChapter({ chapter, index }: { chapter: PatternPublicChapter; i
 }
 
 const DELETE_CONFIRMATION = "DELETE PATTERN";
+const REGENERATE_CONFIRMATION = "REGENERATE MY PATTERN";
+
+function PatternRegenerationPanel({
+  regeneration,
+  onRegenerate,
+  onRefresh,
+  busy,
+  error,
+}: {
+  regeneration: PatternRegenerationState | null;
+  onRegenerate: () => void;
+  onRefresh: () => void;
+  busy: boolean;
+  error: string | null;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
+  if (!regeneration) return null;
+
+  if (regeneration.generation) {
+    return (
+      <section
+        className="pattern-regeneration pattern-regeneration--active"
+        aria-labelledby="pattern-regeneration-heading"
+        aria-busy="true"
+      >
+        <p className="kicker">Pattern update</p>
+        <h3 id="pattern-regeneration-heading">Updating your Pattern</h3>
+        <p className="pattern-regeneration__status" role="status">
+          Updating your Pattern · {PROGRESS[regeneration.generation.stage]}
+        </p>
+        <p>Your current Pattern stays readable until the replacement succeeds.</p>
+      </section>
+    );
+  }
+
+  const failed = regeneration.failure;
+  if (!regeneration.eligible && !failed) return null;
+
+  return (
+    <section
+      className={`pattern-regeneration${failed ? " pattern-regeneration--failed" : ""}`}
+      aria-labelledby="pattern-regeneration-heading"
+    >
+      <p className="kicker">{failed ? "Pattern update paused" : "Pattern update available"}</p>
+      <h3 id="pattern-regeneration-heading">
+        {failed ? "Your Pattern was not changed" : "A newer Pattern method is available"}
+      </h3>
+      <p>
+        {failed
+          ? "The update did not finish. Your current Pattern was not changed."
+          : "The source code used to write Patterns has changed since this reading was created."}
+      </p>
+      {!failed ? (
+        <p>
+          Your current Pattern stays here while the replacement is written. If
+          the update succeeds, this version is permanently erased and replaced.
+        </p>
+      ) : null}
+      {error ? <p className="pattern-regeneration__error" role="status">{error}</p> : null}
+      {confirming ? (
+        <form
+          className="pattern-regeneration__confirm"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (confirmText !== REGENERATE_CONFIRMATION || busy) return;
+            onRegenerate();
+          }}
+        >
+          <label htmlFor="pattern-regeneration-confirm">
+            Type {REGENERATE_CONFIRMATION} to confirm. The same minimized,
+            chart-derived content will be sent again to Codex, run by OpenAI.
+            If the replacement succeeds, this version is permanently erased
+            and cannot be recovered.
+          </label>
+          <input
+            id="pattern-regeneration-confirm"
+            name="pattern-regeneration-confirm"
+            type="text"
+            autoComplete="off"
+            value={confirmText}
+            onChange={(event) => setConfirmText(event.target.value)}
+            disabled={busy}
+          />
+          <div className="pattern-regeneration__confirm-actions">
+            <button
+              className="button"
+              type="submit"
+              disabled={confirmText !== REGENERATE_CONFIRMATION || busy}
+            >
+              Replace my Pattern
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => {
+                setConfirming(false);
+                setConfirmText("");
+              }}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : failed && !failed.retryable ? (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={onRefresh}
+          disabled={busy}
+        >
+          Check again
+        </button>
+      ) : (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={busy}
+          aria-expanded={confirming}
+        >
+          {failed ? "Try the update again" : "Review Pattern update"}
+        </button>
+      )}
+    </section>
+  );
+}
 
 function ReadyDocument({
   document,
+  regeneration,
+  onRegenerate,
+  onRefresh,
   onDelete,
   busy,
+  error,
 }: {
   document: PatternResponseV7;
+  regeneration: PatternRegenerationState | null;
+  onRegenerate: () => void;
+  onRefresh: () => void;
   onDelete: () => void;
   busy: boolean;
+  error: string | null;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -127,6 +266,13 @@ function ReadyDocument({
         Your birth date, time, birthplace, and coordinates were not sent to the
         model ({document.provenance.provider}).
       </p>
+      <PatternRegenerationPanel
+        regeneration={regeneration}
+        onRegenerate={onRegenerate}
+        onRefresh={onRefresh}
+        busy={busy}
+        error={error}
+      />
       <div className="pattern-delete">
         {confirming ? (
           <form
@@ -191,13 +337,15 @@ function ReadyDocument({
 }
 
 export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
-  const [state, setState] = useState<PatternStateDocument | null>(null);
+  const [state, setState] = useState<PatternStateDocumentV9 | null>(null);
   const [document, setDocument] = useState<PatternResponseV7 | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const generateKey = useRef<string | null>(null);
+  const regenerateKey = useRef<string | null>(null);
+  const regenerationInFlight = useRef(false);
   const deleteKey = useRef<string | null>(null);
 
   const load = useCallback(async (signal: AbortSignal) => {
@@ -239,7 +387,10 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
   }, [attempt, load]);
 
   useEffect(() => {
-    if (!state || !isProgress(state.state)) return;
+    const activeStage = state && isProgress(state.state)
+      ? state.state
+      : state?.regeneration?.generation?.stage;
+    if (!activeStage) return;
     const page = globalThis.document;
     const tick = () => {
       if (page.visibilityState === "hidden") return;
@@ -296,6 +447,41 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
     }
   };
 
+  const regenerate = async () => {
+    if (
+      regenerationInFlight.current ||
+      state?.state !== "ready" ||
+      !state.regeneration?.eligible ||
+      state.consent?.status !== "granted"
+    ) {
+      return;
+    }
+    regenerationInFlight.current = true;
+    setBusy(true);
+    setError(null);
+    setRequestId(null);
+    regenerateKey.current ??= newIdempotencyKey("web-pattern-regeneration");
+    try {
+      await regeneratePattern(state.consent.policy_version, regenerateKey.current);
+      regenerateKey.current = null;
+      setAttempt((value) => value + 1);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 401) {
+        onUnauthorized();
+        return;
+      }
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "This Pattern update could not be started.",
+      );
+      setRequestId(caught instanceof ApiError ? caught.requestId : null);
+      setBusy(false);
+    } finally {
+      regenerationInFlight.current = false;
+    }
+  };
+
   const heading = (
     <div className="panel-heading">
       <div>
@@ -330,7 +516,17 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
   }
 
   if (state.state === "ready" && document) {
-    return <ReadyDocument document={document} onDelete={() => void erase()} busy={busy} />;
+    return (
+      <ReadyDocument
+        document={document}
+        regeneration={state.regeneration}
+        onRegenerate={() => void regenerate()}
+        onRefresh={() => setAttempt((value) => value + 1)}
+        onDelete={() => void erase()}
+        busy={busy}
+        error={error ? withRequestId(error, requestId) : null}
+      />
+    );
   }
 
   if (isProgress(state.state)) {

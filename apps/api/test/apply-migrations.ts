@@ -16,6 +16,7 @@ const expectedTail = [
   "0020_pattern_admin_sessions.sql",
   "0021_crypto_operations.sql",
   "0022_place_resolutions.sql",
+  "0023_pattern_source_regeneration.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -40,6 +41,7 @@ const patternClaimTransitionMigrationIndex = migrationNames.indexOf(expectedTail
 const adminSessionMigrationIndex = migrationNames.indexOf(expectedTail[11]);
 const cryptoOperationsMigrationIndex = migrationNames.indexOf(expectedTail[12]);
 const placeResolutionsMigrationIndex = migrationNames.indexOf(expectedTail[13]);
+const patternSourceRegenerationMigrationIndex = migrationNames.indexOf(expectedTail[14]);
 
 interface SchemaColumn {
   name: string;
@@ -1237,7 +1239,10 @@ await assertDatabaseHealthy(upgradeDb, "0021 populated apply");
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(placeResolutionsMigrationIndex),
+  env.TEST_MIGRATIONS.slice(
+    placeResolutionsMigrationIndex,
+    patternSourceRegenerationMigrationIndex,
+  ),
 );
 const placeColumns = await upgradeDb.prepare(
   "PRAGMA table_info(place_resolutions)",
@@ -1260,3 +1265,26 @@ if (
   throw new Error("0022 created the wrong selected-place columns");
 }
 await assertDatabaseHealthy(upgradeDb, "0022 populated apply");
+
+// ---------------------------------------------------------------------------
+// 0023: source-pinned Pattern replacement lane.
+// ---------------------------------------------------------------------------
+
+await applyD1Migrations(
+  upgradeDb,
+  env.TEST_MIGRATIONS.slice(patternSourceRegenerationMigrationIndex),
+);
+const patternClaimColumns = await upgradeDb.prepare(
+  "PRAGMA table_info(pattern_generation_claims)",
+).all<{ name: string }>();
+if (!patternClaimColumns.results.some(({ name }) => name === "pending_regeneration_id")) {
+  throw new Error("0023 did not add the single pending Pattern replacement owner");
+}
+for (const table of ["pattern_generation_jobs", "pattern_documents"]) {
+  const columns = await upgradeDb.prepare(`PRAGMA table_info(${table})`)
+    .all<{ name: string }>();
+  if (!columns.results.some(({ name }) => name === "pattern_source_hash")) {
+    throw new Error(`0023 did not pin Pattern creation source on ${table}`);
+  }
+}
+await assertDatabaseHealthy(upgradeDb, "0023 populated apply");

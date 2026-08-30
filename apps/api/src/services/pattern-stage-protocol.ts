@@ -5,7 +5,11 @@ import {
 } from "@patternlike/shared";
 
 import type { Env } from "../env.js";
-import { releaseUnconsumedPatternClaim } from "../db/pattern-claim-transitions.js";
+import {
+  releasePatternRegeneration,
+  releaseUnconsumedPatternClaim,
+} from "../db/pattern-claim-transitions.js";
+import type { PatternReservationReason } from "./pattern-command.js";
 import { PATTERN_JOB_TYPE } from "./pattern-command.js";
 import type { PatternStageClass } from "./pattern-publisher.js";
 
@@ -26,7 +30,8 @@ export type PatternStageOwner = PatternStageClass | "publication" | "terminal";
 export type PatternCancellationReason =
   | "cancel_consent"
   | "cancel_stale"
-  | "cancel_ontology";
+  | "cancel_ontology"
+  | "cancel_source_changed";
 
 export interface PatternStageState {
   generation_id: string;
@@ -327,6 +332,8 @@ export interface PatternJobRow extends PatternStageState {
   claim_id: string;
   locale: string;
   locale_revision: number;
+  reservation_reason: PatternReservationReason;
+  pattern_source_hash: string;
 }
 
 export interface PatternTransitionStatements {
@@ -342,7 +349,8 @@ export async function loadPatternJob(
   return env.DB.prepare(
     `SELECT generation_id, job_id, user_id, claim_id, stage, stage_generation,
             planner_attempts, writer_attempts, verifier_attempts, plan_hash,
-            candidate_hash, semantic_verdict_hash, locale, locale_revision
+            candidate_hash, semantic_verdict_hash, locale, locale_revision,
+            reservation_reason, pattern_source_hash
      FROM pattern_generation_jobs WHERE generation_id = ?`,
   )
     .bind(generationId)
@@ -451,7 +459,9 @@ export function buildPatternTransitionStatements(
 
   if (effect.releaseUnconsumedClaim) {
     mutations.push(
-      releaseUnconsumedPatternClaim(env, {
+      (job.reservation_reason === "source_update"
+        ? releasePatternRegeneration
+        : releaseUnconsumedPatternClaim)(env, {
         claimId: job.claim_id,
         userId: job.user_id,
         generationId: job.generation_id,

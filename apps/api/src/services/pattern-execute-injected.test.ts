@@ -175,7 +175,7 @@ async function assertPublicFailure(
   const status = await json(`/v1/pattern-generations/${generationId}`);
   expect(status.status, JSON.stringify(status.body)).toBe(200);
   expect(status.body).toEqual({
-    schema_version: "0.7.0",
+    schema_version: "0.9.0",
     generation_id: generationId,
     stage: publicStage,
     status_updated_at: expect.any(String),

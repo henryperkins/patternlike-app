@@ -81,6 +81,57 @@ export function releaseUserPatternClaims(
   ).bind(input.now, input.userId);
 }
 
+/** Clear every accepted replacement owner after a user-wide lifecycle cancel. */
+export function releaseUserPatternRegenerations(
+  env: ClaimEnv,
+  input: { userId: string; now: string },
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `UPDATE pattern_generation_claims
+     SET pending_regeneration_id = NULL, updated_at = ?
+     WHERE user_id = ? AND status = 'accepted'
+       AND consumed_at IS NOT NULL AND pending_regeneration_id IS NOT NULL`,
+  ).bind(input.now, input.userId);
+}
+
+/** Reserve the only replacement generation while the accepted document stays live. */
+export function reservePatternRegeneration(
+  env: ClaimEnv,
+  input: ClaimIdentity & {
+    chartFingerprintHash: string;
+    chartId: string;
+    generationId: string;
+  },
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `UPDATE pattern_generation_claims
+     SET pending_regeneration_id = ?, last_chart_id = ?, updated_at = ?
+     WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
+       AND status = 'accepted' AND consumed_at IS NOT NULL
+       AND pending_regeneration_id IS NULL`,
+  ).bind(
+    input.generationId,
+    input.chartId,
+    input.now,
+    input.claimId,
+    input.userId,
+    input.chartFingerprintHash,
+  );
+}
+
+/** Clear only the matching replacement owner; the accepted claim stays consumed. */
+export function releasePatternRegeneration(
+  env: ClaimEnv,
+  input: ClaimIdentity & { generationId: string },
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `UPDATE pattern_generation_claims
+     SET pending_regeneration_id = NULL, updated_at = ?
+     WHERE id = ? AND user_id = ? AND status = 'accepted'
+       AND consumed_at IS NOT NULL AND pending_regeneration_id = ?`,
+  ).bind(input.now, input.claimId, input.userId, input.generationId);
+}
+
 /** Consume the exact reservation in the publication transaction. */
 export function acceptPatternClaim(
   env: ClaimEnv,

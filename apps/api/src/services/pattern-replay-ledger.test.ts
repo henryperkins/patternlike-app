@@ -1,5 +1,6 @@
 import {
   M7_SCHEMA_VERSION,
+  M9_SCHEMA_VERSION,
   contentHash,
   jcsCanonicalize,
   sha256Hex,
@@ -476,14 +477,55 @@ describe("Pattern replay D1 receipts", () => {
       claim_id: prepared.event.claim_id,
       generation_id: prepared.event.generation_id,
       pattern_id: prepared.event.pattern_id,
+      replacement_generation_id: null,
+      replacement_pattern_id: null,
       ontology_version: prepared.event.ontology_version,
       prior_claim_status: prepared.event.prior_claim_status,
       next_claim_status: prepared.event.next_claim_status,
+      pattern_source_hash: null,
       content_hash: prepared.event.content_hash,
       signing_key_id: prepared.event.signing_key_id,
       signature: prepared.event.signature,
       replica_put_at: prepared.replicaPutAt,
       created_at: prepared.replicaPutAt,
+    });
+  });
+
+  it("signs and receipts both sides of one source replacement", async () => {
+    const key = await testSigningKey();
+    const prepared = await writePatternReplayIntent(
+      replayEnv(writerSecret(key), publicKeyring(key)),
+      {
+        ...intent(),
+        eventClass: "pattern_regenerated",
+        semanticOperationKey: "pgen_99999999999999999999999999999999",
+        priorClaimStatus: "accepted",
+        nextClaimStatus: "accepted",
+        replacementGenerationId: "pgen_99999999999999999999999999999999",
+        replacementPatternId: "pat_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        patternSourceHash: `sha256:${"b".repeat(64)}`,
+      } as unknown as PatternReplayIntentInput,
+      new Date("2026-08-22T14:40:30.000Z"),
+    );
+
+    expect(prepared.event).toMatchObject({
+      schema_version: M9_SCHEMA_VERSION,
+      event_class: "pattern_regenerated",
+      replacement_generation_id: "pgen_99999999999999999999999999999999",
+      replacement_pattern_id: "pat_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      pattern_source_hash: `sha256:${"b".repeat(64)}`,
+    });
+    await expect(
+      verifyPatternReplayEvent(prepared.event, publicKeyring(key)),
+    ).resolves.toEqual(prepared.event);
+    await env.DB.batch(prepared.receiptStatements(env));
+    expect(await env.DB.prepare(
+      `SELECT replacement_generation_id, replacement_pattern_id, pattern_source_hash
+       FROM pattern_erasure_replay_events WHERE event_id = ?`,
+    ).bind(prepared.event.event_id).first()).toEqual({
+      replacement_generation_id: "pgen_99999999999999999999999999999999",
+      replacement_pattern_id: "pat_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      pattern_source_hash: `sha256:${"b".repeat(64)}`,
     });
   });
 
@@ -666,11 +708,11 @@ describe("Pattern replay erasure application", () => {
            feature_policy_version, selection_policy_version, locale,
            locale_revision, consent_id, consent_policy_version,
            ontology_version, ontology_bundle_hash, corpus_release_hash,
-           reservation_reason, stage, stage_generation, created_at, updated_at,
+           pattern_source_hash, reservation_reason, stage, stage_generation, created_at, updated_at,
            finished_at
          ) VALUES (?, 'job_replay_pattern', ?, ?, 'cht_replay_pattern', ?,
                    'nfs_replay_pattern', ?, '1.0.0', '1.0.0', 'en-US', 1,
-                   'cns_replay_pattern', '1.0.0', ?, ?, ?, 'first_open',
+                   'cns_replay_pattern', '1.0.0', ?, ?, ?, ?, 'first_open',
                    'succeeded', 1, ?, ?, ?)`,
       ).bind(
         input.generationId,
@@ -681,6 +723,7 @@ describe("Pattern replay erasure application", () => {
         input.ontologyVersion,
         `sha256:${"6".repeat(64)}`,
         `sha256:${"7".repeat(64)}`,
+        `sha256:${"9".repeat(64)}`,
         at,
         at,
         at,
@@ -697,9 +740,10 @@ describe("Pattern replay erasure application", () => {
            ontology_version, ontology_bundle_hash, locale, effective_accuracy,
            document_enc, document_nonce, wrapped_document_key_enc,
            wrapped_document_key_version, wrapped_document_key_nonce,
-           content_hash, compact_provenance_json, generated_at, created_at
+           content_hash, compact_provenance_json, pattern_source_hash,
+           generated_at, created_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'en-US', 'exact', ?, 'document-nonce',
-                   ?, 1, 'wrapped-nonce', ?, '{}', ?, ?)`,
+                   ?, 1, 'wrapped-nonce', ?, '{}', ?, ?, ?)`,
       ).bind(
         input.patternId,
         USER_A,
@@ -711,6 +755,7 @@ describe("Pattern replay erasure application", () => {
         new Uint8Array([4, 5, 6]),
         new Uint8Array([7, 8, 9]),
         `sha256:${"8".repeat(64)}`,
+        `sha256:${"9".repeat(64)}`,
         at,
         at,
       ),

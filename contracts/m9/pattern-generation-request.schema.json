@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m9/pattern-generation-request.schema.json",
+  "title": "Pattern generation or source regeneration request",
+  "$defs": {
+    "patternGenerationRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "consent_policy_version", "confirm", "reason"],
+          "properties": {
+            "schema_version": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/schemaVersion" },
+            "consent_policy_version": { "type": "string", "minLength": 1 },
+            "confirm": { "const": "GENERATE MY PATTERN" },
+            "reason": {
+              "type": "string",
+              "enum": ["first_open", "first_open_retry", "failed_attempt_retry"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "consent_policy_version", "confirm", "reason"],
+          "properties": {
+            "schema_version": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/schemaVersion" },
+            "consent_policy_version": { "type": "string", "minLength": 1 },
+            "confirm": { "const": "REGENERATE MY PATTERN" },
+            "reason": { "const": "source_update" }
+          }
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/patternGenerationRequest"
+}

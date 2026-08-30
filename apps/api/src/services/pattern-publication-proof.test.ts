@@ -1,7 +1,7 @@
 import { contentHash, type PatternPlan, type PatternSemanticVerdict, type PatternWriterOutput } from "@patternlike/shared";
 import { describe, expect, it } from "vitest";
 
-import type { GeneratePatternCommandV1 } from "./pattern-command.js";
+import type { GeneratePatternCommandV2 } from "./pattern-command.js";
 import { buildPatternPublicationProof } from "./pattern-publication-proof.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 import type { PatternJobRow } from "./pattern-stage-protocol.js";
@@ -66,8 +66,12 @@ async function fixture() {
     semantic_verdict_hash: null,
     locale: "en-US",
     locale_revision: 7,
+    reservation_reason: "first_open",
+    pattern_source_hash: `sha256:${"4".repeat(64)}`,
   } satisfies PatternJobRow;
   const command = {
+    command_version: "GeneratePatternCommandV2",
+    schema_version: "0.9.0",
     generation_id: job.generation_id,
     job_id: job.job_id,
     claim_id: job.claim_id,
@@ -79,8 +83,10 @@ async function fixture() {
     consent_id: "cns_proof",
     ontology_version: "ontology-proof",
     ontology_bundle_hash: `sha256:${"3".repeat(64)}`,
+    pattern_source_hash: job.pattern_source_hash,
+    reservation_reason: job.reservation_reason,
     publisher: pin,
-  } as GeneratePatternCommandV1;
+  } as GeneratePatternCommandV2;
   const artifacts: Record<string, unknown> = {
     planner_response: planner,
     validated_plan: plan,

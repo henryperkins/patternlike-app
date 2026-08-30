@@ -127,7 +127,7 @@ function mockApiResponses(responses: Record<string, MockResponse>) {
     responses["GET /v1/pattern-state"] = {
       status: 200,
       body: {
-        schema_version: "0.7.0",
+        schema_version: "0.9.0",
         // The default for suites that are not about Pattern. Every
         // authenticated account is in the generated flow now, and an account
         // with no chart waits on one.
@@ -136,6 +136,7 @@ function mockApiResponses(responses: Record<string, MockResponse>) {
         consent: null,
         generation: null,
         pattern: null,
+        regeneration: null,
       },
     };
   }

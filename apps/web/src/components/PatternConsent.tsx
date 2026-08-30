@@ -68,7 +68,11 @@ export function PatternConsentTerms({ consent, privacyLink }: PatternConsentTerm
       <p className="ai-consent-note">{PATTERN_CONSENT_TRAINING_NOTE}</p>
       <p className="ai-consent-note">{PATTERN_CONSENT_RETENTION_NOTE}</p>
       <p className="ai-consent-note">{PATTERN_CONSENT_REVOKE_NOTE}</p>
-      <p className="ai-consent-note">A successful Pattern cannot be rerolled for this chart.</p>
+      <p className="ai-consent-note">
+        A successful Pattern is not a rerollable reading. If Pattern/Like&apos;s
+        creation source changes, you can explicitly replace it with one written
+        by the updated source.
+      </p>
       <p className="ai-consent-note">Deleting your Pattern is permanent.</p>
       {privacyLink ? (
         <p className="ai-consent-note">

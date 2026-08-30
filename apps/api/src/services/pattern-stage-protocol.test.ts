@@ -44,6 +44,8 @@ const publicationJob: PatternJobRow = {
   claim_id: "pgc_protocol",
   locale: "en-US",
   locale_revision: 1,
+  reservation_reason: "first_open",
+  pattern_source_hash: `sha256:${"a".repeat(64)}`,
 };
 
 const publicationTransition = {

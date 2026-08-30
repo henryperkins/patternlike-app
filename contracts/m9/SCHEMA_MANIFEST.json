@@ -1,0 +1,84 @@
+{
+  "package": "contracts/m9",
+  "schema_version": "0.9.0",
+  "document_date": "2026-08-29",
+  "status": "additive",
+  "milestone": "M9 - Pattern source regeneration",
+  "predecessors": [
+    {
+      "package": "contracts/m7",
+      "schema_version": "0.7.0",
+      "manifest_sha256": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
+      "relationship": "frozen_pattern_reader_and_generation_predecessor",
+      "note": "M9 leaves every M7 file unchanged, retains the M7 public Pattern document, and succeeds only the Pattern state and generation control shapes that need regeneration metadata. Existing M7 replay events remain valid."
+    },
+    {
+      "package": "contracts/m8",
+      "schema_version": "0.8.0",
+      "manifest_sha256": "6aecb0a84f74b1e174ee060cc4497cf0d0673896d913eceaebf2e78d6a88512e",
+      "relationship": "current_consumer_api_predecessor",
+      "note": "M9 is a narrow Pattern overlay on the complete M8 consumer API. M8 place, consent, reading history, Save, export, and birth-budget contracts remain unchanged."
+    }
+  ],
+  "supersedes": [
+    {
+      "family": "pattern-state",
+      "documents": ["m7:pattern-state.schema.json#/$defs/patternStateDocument"],
+      "note": "New state responses use M9 and add the closed regeneration block. Stored or historical M7 states remain valid under M7."
+    },
+    {
+      "family": "pattern-generation-control",
+      "documents": [
+        "m7:pattern-generation-request.schema.json#/$defs/patternGenerationRequest",
+        "m7:pattern-generation-accepted.schema.json#/$defs/patternGenerationAccepted",
+        "m7:pattern-generation-status.schema.json#/$defs/patternGenerationStatus"
+      ],
+      "note": "M9 adds source_update with a distinct confirmation phrase and moves current accepted/status responses to 0.9.0."
+    }
+  ],
+  "schemas": [
+    {
+      "file": "common.schema.json",
+      "id": "https://patternlike.app/contracts/m9/common.schema.json",
+      "defines": ["claimId", "contentHash", "generationId", "generationReason", "generationState", "patternId", "patternState", "publicStage", "replayEventId", "schemaVersion"]
+    },
+    {
+      "file": "pattern-generation-accepted.schema.json",
+      "id": "https://patternlike.app/contracts/m9/pattern-generation-accepted.schema.json",
+      "defines": ["patternGenerationAccepted"]
+    },
+    {
+      "file": "pattern-generation-request.schema.json",
+      "id": "https://patternlike.app/contracts/m9/pattern-generation-request.schema.json",
+      "defines": ["patternGenerationRequest"]
+    },
+    {
+      "file": "pattern-generation-status.schema.json",
+      "id": "https://patternlike.app/contracts/m9/pattern-generation-status.schema.json",
+      "defines": ["patternGenerationStatus"]
+    },
+    {
+      "file": "pattern-regeneration-replay-event.schema.json",
+      "id": "https://patternlike.app/contracts/m9/pattern-regeneration-replay-event.schema.json",
+      "defines": ["patternRegenerationReplayEvent"]
+    },
+    {
+      "file": "pattern-state.schema.json",
+      "id": "https://patternlike.app/contracts/m9/pattern-state.schema.json",
+      "defines": ["chart", "pattern", "patternStateDocument", "regeneration"]
+    }
+  ],
+  "openapi": [
+    {
+      "file": "openapi/openapi.yaml",
+      "version": "0.9.0",
+      "describes": "Narrow successor overlay for Pattern state, initial/source-update reservation, status, and the unchanged M7 public reader document."
+    }
+  ],
+  "compatibility": {
+    "json_schema": "draft/2020-12",
+    "wire_format": "snake_case",
+    "frozen_unchanged_packages": ["contracts/m0", "contracts/m1", "contracts/m2", "contracts/m3", "contracts/m4", "contracts/m5", "contracts/m6", "contracts/m7", "contracts/m8"]
+  },
+  "amendments": []
+}

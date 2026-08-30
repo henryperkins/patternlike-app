@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/m9/pattern-regeneration-replay-event.schema.json",
+  "title": "Pattern regeneration replacement-erasure replay event",
+  "$defs": {
+    "patternRegenerationReplayEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "event_id",
+        "event_class",
+        "occurred_at",
+        "target_user_id",
+        "chart_fingerprint_hash",
+        "claim_id",
+        "generation_id",
+        "pattern_id",
+        "replacement_generation_id",
+        "replacement_pattern_id",
+        "ontology_version",
+        "prior_claim_status",
+        "next_claim_status",
+        "pattern_source_hash",
+        "content_hash",
+        "signing_key_id",
+        "signature"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/schemaVersion" },
+        "event_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/replayEventId" },
+        "event_class": { "const": "pattern_regenerated" },
+        "occurred_at": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/isoDateTime" },
+        "target_user_id": { "$ref": "https://patternlike.app/contracts/m0/common.schema.json#/$defs/userId" },
+        "chart_fingerprint_hash": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/contentHash" },
+        "claim_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/claimId" },
+        "generation_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationId" },
+        "pattern_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/patternId" },
+        "replacement_generation_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/generationId" },
+        "replacement_pattern_id": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/patternId" },
+        "ontology_version": { "type": "string", "minLength": 1 },
+        "prior_claim_status": { "const": "accepted" },
+        "next_claim_status": { "const": "accepted" },
+        "pattern_source_hash": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/contentHash" },
+        "content_hash": { "$ref": "https://patternlike.app/contracts/m9/common.schema.json#/$defs/contentHash" },
+        "signing_key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "signature": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$ref": "#/$defs/patternRegenerationReplayEvent"
+}

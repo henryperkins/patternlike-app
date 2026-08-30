@@ -45,6 +45,7 @@ M5 = ROOT / "m5"
 M6 = ROOT / "m6"
 M7 = ROOT / "m7"
 M8 = ROOT / "m8"
+M9 = ROOT / "m9"
 PATTERN_PROVIDER_BOUNDARY_POLICY_PATH = (
     ROOT / "policies" / "pattern-provider-boundary-v1.json"
 )
@@ -58,6 +59,7 @@ M5_BASE = "https://patternlike.app/contracts/m5/"
 M6_BASE = "https://patternlike.app/contracts/m6/"
 M7_BASE = "https://patternlike.app/contracts/m7/"
 M8_BASE = "https://patternlike.app/contracts/m8/"
+M9_BASE = "https://patternlike.app/contracts/m9/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
@@ -180,6 +182,17 @@ FIXTURE_SCHEMA = {
         "account-export": M8_BASE + "account-export.schema.json#/$defs/accountExport",
         "birth-profile": M8_BASE + "common.schema.json#/$defs/birthCalcBudgetExhausted",
     },
+    "m9": {
+        "pattern-state": M9_BASE + "pattern-state.schema.json#/$defs/patternStateDocument",
+        "pattern-generation-request": M9_BASE
+        + "pattern-generation-request.schema.json#/$defs/patternGenerationRequest",
+        "pattern-generation-accepted": M9_BASE
+        + "pattern-generation-accepted.schema.json#/$defs/patternGenerationAccepted",
+        "pattern-generation-status": M9_BASE
+        + "pattern-generation-status.schema.json#/$defs/patternGenerationStatus",
+        "pattern-regeneration-replay-event": M9_BASE
+        + "pattern-regeneration-replay-event.schema.json#/$defs/patternRegenerationReplayEvent",
+    },
 }
 
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
@@ -230,6 +243,7 @@ POLICY_ONLY = {
     "m8": {
         "reading-history.cursor-mode-mismatch",
     },
+    "m9": set(),
 }
 
 braced_placeholder_re = re.compile(r"\{([^{}]*)\}")
@@ -363,7 +377,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7, M8):
+    for package in (M0, M3, M4, M5, M6, M7, M8, M9):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1360,6 +1374,8 @@ def validate_package(
             return _m7_policy_errors(fixture, instance)
         if name == "m8":
             return _m8_policy_errors(fixture, instance)
+        if name == "m9":
+            return []
         raise ValueError(f"unregistered contract package policy: {name}")
 
     for path in sorted((package / "fixtures" / "valid").glob("*.json")):
@@ -1424,6 +1440,7 @@ PACKAGE_BASE = {
     "m6": M6_BASE,
     "m7": M7_BASE,
     "m8": M8_BASE,
+    "m9": M9_BASE,
 }
 
 
@@ -1503,7 +1520,7 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            if package == M8:
+            if package in (M8, M9):
                 # The validate() shortcut builds SchemaPath with its own handlers
                 # before instantiating `cls`, so a custom class cannot affect
                 # retrieval there. Construct the validator from the raw mapping.
@@ -1720,6 +1737,28 @@ def check_predecessors_frozen() -> list[str]:
             m8_recorded.get(label),
             "contracts/m8/SCHEMA_MANIFEST.json",
         )
+
+    m9_manifest = M9 / "SCHEMA_MANIFEST.json"
+    if not m9_manifest.exists():
+        errors.append(
+            "contracts/m9/SCHEMA_MANIFEST.json is missing, so M7/M8 have no "
+            "recorded freeze for the Pattern source-regeneration successor"
+        )
+        return errors
+
+    m9_recorded = _recorded_predecessors(m9_manifest)
+    errors += check_frozen(
+        M7,
+        "contracts/m7",
+        m9_recorded.get("contracts/m7"),
+        "contracts/m9/SCHEMA_MANIFEST.json",
+    )
+    errors += check_frozen(
+        M8,
+        "contracts/m8",
+        m9_recorded.get("contracts/m8"),
+        "contracts/m9/SCHEMA_MANIFEST.json",
+    )
     return errors
 
 
@@ -2497,6 +2536,25 @@ M8_PREDECESSOR_HASHES = {
     "contracts/m5": "1fb5228da8488a78e9a4e3dead4e9eb175cf41442b48eee42f2271079c397757",
     "contracts/m6": "03037cdf6a3d92965bd5cc4513950c4ba92c0ff6ab24c81ec24550badab6d221",
     "contracts/m7": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
+}
+
+M9_SCHEMA_VERSION = "0.9.0"
+M9_PREDECESSOR_HASHES = {
+    "contracts/m7": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
+    "contracts/m8": "6aecb0a84f74b1e174ee060cc4497cf0d0673896d913eceaebf2e78d6a88512e",
+}
+M9_REQUIRED_VALID_FIXTURES = {
+    "pattern-generation-accepted.source-update.json",
+    "pattern-generation-request.source-update.json",
+    "pattern-generation-status.source-update.json",
+    "pattern-regeneration-replay-event.replaced.json",
+    "pattern-state.source-update-eligible.json",
+}
+M9_REQUIRED_INVALID_FIXTURES = {
+    "pattern-generation-request.source-update-wrong-confirm.json",
+    "pattern-regeneration-replay-event.missing-replacement.json",
+    "pattern-state.active-marked-eligible.json",
+    "pattern-state.source-hash-leak.json",
 }
 M8_REQUIRED_VALID_FIXTURES = {
     "account-processing-consent.granted.json",
@@ -3563,6 +3621,253 @@ def check_m6_openapi_projection() -> list[str]:
     return errors
 
 
+def check_m9_fixture_inventory() -> list[str]:
+    errors: list[str] = []
+    actual_valid = {
+        path.name for path in (M9 / "fixtures" / "valid").glob("*.json")
+    }
+    actual_invalid = {
+        path.name for path in (M9 / "fixtures" / "invalid").glob("*.json")
+    }
+    if actual_valid != M9_REQUIRED_VALID_FIXTURES:
+        errors.append(
+            f"M9 valid fixture inventory is {sorted(actual_valid)}, "
+            f"expected {sorted(M9_REQUIRED_VALID_FIXTURES)}"
+        )
+    if actual_invalid != M9_REQUIRED_INVALID_FIXTURES:
+        errors.append(
+            f"M9 invalid fixture inventory is {sorted(actual_invalid)}, "
+            f"expected {sorted(M9_REQUIRED_INVALID_FIXTURES)}"
+        )
+    if not errors:
+        print(
+            "OK  inventory     M9 pins source-update state, request, status, "
+            "replacement replay, and rejection fixtures"
+        )
+    return errors
+
+
+def check_m9_manifest() -> list[str]:
+    errors: list[str] = []
+    path = M9 / "SCHEMA_MANIFEST.json"
+    if not path.exists():
+        return ["contracts/m9/SCHEMA_MANIFEST.json is missing"]
+
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    if doc.get("package") != "contracts/m9":
+        errors.append("M9 manifest package is not contracts/m9")
+    if doc.get("schema_version") != M9_SCHEMA_VERSION:
+        errors.append("M9 manifest schema_version is not 0.9.0")
+    if doc.get("status") != "additive":
+        errors.append("M9 manifest does not classify the successor as additive")
+
+    declared = {entry.get("file"): entry for entry in doc.get("schemas") or []}
+    shipped = {schema.name: schema for schema in sorted(M9.glob("*.schema.json"))}
+    for missing in sorted(set(shipped) - set(declared)):
+        errors.append(f"M9 manifest does not declare shipped schema {missing}")
+    for extra in sorted(set(declared) - set(shipped)):
+        errors.append(f"M9 manifest declares {extra}, which the package does not ship")
+    for filename, entry in declared.items():
+        if filename not in shipped:
+            continue
+        schema = json.loads(shipped[filename].read_text(encoding="utf-8"))
+        if entry.get("id") != schema.get("$id"):
+            errors.append(f"{filename}: M9 manifest id disagrees with the document $id")
+        if sorted(entry.get("defines") or []) != sorted(schema.get("$defs") or {}):
+            errors.append(f"{filename}: M9 manifest definition inventory disagrees")
+
+    recorded = _recorded_predecessors(path)
+    if set(recorded) != set(M9_PREDECESSOR_HASHES):
+        errors.append(
+            f"M9 predecessor packages are {sorted(recorded)}, "
+            f"expected {sorted(M9_PREDECESSOR_HASHES)}"
+        )
+    for package, expected in M9_PREDECESSOR_HASHES.items():
+        actual_recorded = recorded.get(package)
+        if actual_recorded != expected:
+            errors.append(
+                f"M9 manifest records {actual_recorded!r} for {package}, expected {expected}"
+            )
+        package_path = ROOT / package.removeprefix("contracts/")
+        actual = _normalised_manifest_digest(package_path)
+        if actual != expected:
+            errors.append(
+                f"{package} manifest digest is {actual}, expected frozen hash {expected}"
+            )
+        elif actual_recorded == expected:
+            print(f"OK  predecessor   {package} {expected}")
+
+    supersedes = doc.get("supersedes")
+    expected_supersedes = {
+        "pattern-state": [
+            "m7:pattern-state.schema.json#/$defs/patternStateDocument",
+        ],
+        "pattern-generation-control": [
+            "m7:pattern-generation-request.schema.json#/$defs/patternGenerationRequest",
+            "m7:pattern-generation-accepted.schema.json#/$defs/patternGenerationAccepted",
+            "m7:pattern-generation-status.schema.json#/$defs/patternGenerationStatus",
+        ],
+    }
+    actual_supersedes = {
+        entry.get("family"): entry.get("documents")
+        for entry in supersedes or []
+        if isinstance(entry, dict)
+    }
+    if actual_supersedes != expected_supersedes:
+        errors.append(
+            "M9 manifest must supersede exactly M7 Pattern state and generation control"
+        )
+
+    if not errors:
+        print(
+            f"OK  manifest      contracts/m9 declares {len(declared)} schema(s), "
+            "pins M7/M8, and narrows supersession to Pattern control"
+        )
+    return errors
+
+
+def check_m9_schema_projection() -> list[str]:
+    errors: list[str] = []
+    state_path = M9 / "pattern-state.schema.json"
+    state_schema = json.loads(state_path.read_text(encoding="utf-8"))
+
+    def property_names(node):
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                yield from properties
+            for value in node.values():
+                yield from property_names(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from property_names(value)
+
+    leaked = {
+        name
+        for name in property_names(state_schema)
+        if name in {"pattern_source_hash", "source_hash", "compiled_source_hash"}
+    }
+    if leaked:
+        errors.append(f"M9 Pattern state leaks private source identity fields {sorted(leaked)}")
+
+    regeneration = (state_schema.get("$defs") or {}).get("regeneration") or {}
+    variants = regeneration.get("oneOf") or []
+    expected_shapes = {
+        (False, "null", "null"),
+        (True, "null", "null"),
+        (False, "generation", "null"),
+        (True, "null", "failure"),
+    }
+    actual_shapes: set[tuple[bool, str, str]] = set()
+    for variant in variants:
+        properties = variant.get("properties") or {}
+        eligible = (properties.get("eligible") or {}).get("const")
+        generation = properties.get("generation") or {}
+        failure = properties.get("failure") or {}
+        generation_shape = "null" if generation.get("type") == "null" else "generation"
+        failure_shape = "null" if failure.get("type") == "null" else "failure"
+        actual_shapes.add((eligible, generation_shape, failure_shape))
+    if actual_shapes != expected_shapes:
+        errors.append(
+            "M9 regeneration does not encode exactly unavailable, eligible, active, "
+            "and retryable-failure states"
+        )
+
+    request_schema = json.loads(
+        (M9 / "pattern-generation-request.schema.json").read_text(encoding="utf-8")
+    )
+    requests = ((request_schema.get("$defs") or {}).get("patternGenerationRequest") or {})
+    source_variants = [
+        variant
+        for variant in requests.get("oneOf") or []
+        if ((variant.get("properties") or {}).get("reason") or {}).get("const")
+        == "source_update"
+    ]
+    if len(source_variants) != 1 or (
+        ((source_variants[0].get("properties") or {}).get("confirm") or {}).get("const")
+        if source_variants else None
+    ) != "REGENERATE MY PATTERN":
+        errors.append("M9 source_update does not require its exact confirmation phrase")
+
+    replay_schema = json.loads(
+        (M9 / "pattern-regeneration-replay-event.schema.json").read_text(encoding="utf-8")
+    )
+    replay = ((replay_schema.get("$defs") or {}).get("patternRegenerationReplayEvent") or {})
+    required = set(replay.get("required") or [])
+    for field in {
+        "generation_id",
+        "pattern_id",
+        "replacement_generation_id",
+        "replacement_pattern_id",
+        "pattern_source_hash",
+    }:
+        if field not in required:
+            errors.append(f"M9 regeneration replay does not require {field}")
+
+    if not errors:
+        print(
+            "OK  projection    M9 state hides source hashes, pins exact confirmation, "
+            "and names both sides of irreversible replacement"
+        )
+    return errors
+
+
+def check_m9_openapi_projection() -> list[str]:
+    try:
+        import yaml
+    except ImportError:
+        return []
+
+    path = M9 / "openapi" / "openapi.yaml"
+    if not path.exists():
+        return ["contracts/m9/openapi/openapi.yaml is missing"]
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    if (spec.get("info") or {}).get("version") != M9_SCHEMA_VERSION:
+        errors.append("M9 OpenAPI info.version is not 0.9.0")
+
+    expected = {
+        ("/v1/pattern-state", "get"): {"200", "401"},
+        ("/v1/pattern-generations", "post"): {
+            "200", "202", "400", "401", "409", "503"
+        },
+        ("/v1/pattern-generations/{generation_id}", "get"): {"200", "401", "404"},
+        ("/v1/pattern", "get"): {"200", "401", "404", "409", "410"},
+    }
+    paths = spec.get("paths") or {}
+    if set(paths) != {route for route, _ in expected}:
+        errors.append("M9 OpenAPI is not the narrow four-route Pattern overlay")
+    for (route, method), statuses in expected.items():
+        operation = (paths.get(route) or {}).get(method)
+        if operation is None:
+            errors.append(f"M9 OpenAPI does not describe {method.upper()} {route}")
+            continue
+        actual = set(operation.get("responses") or {})
+        if actual != statuses:
+            errors.append(
+                f"M9 OpenAPI {method.upper()} {route} responses are "
+                f"{sorted(actual)}, expected {sorted(statuses)}"
+            )
+
+    reader = ((paths.get("/v1/pattern") or {}).get("get") or {})
+    reader_ref = (
+        (((reader.get("responses") or {}).get("200") or {}).get("content") or {})
+        .get("application/json", {})
+        .get("schema", {})
+        .get("$ref")
+    )
+    expected_reader_ref = M7_BASE + "pattern-response.schema.json#/$defs/patternResponse"
+    if reader_ref != expected_reader_ref:
+        errors.append("M9 OpenAPI changes the frozen M7 public Pattern reader document")
+
+    if not errors:
+        print(
+            "OK  projection    M9 OpenAPI is a four-route overlay and keeps the "
+            "public reader on the frozen M7 response"
+        )
+    return errors
+
+
 def main() -> int:
     print("== freeze ==")
     freeze_errors = check_predecessors_frozen()
@@ -3656,6 +3961,14 @@ def main() -> int:
     errors += check_m8_schema_projection(registry)
     errors += check_m8_manifest()
     errors += check_m8_openapi_projection(registry)
+
+    print("\n== contracts/m9 ==")
+    errors += validate_package(registry, "m9", M9, set())
+    errors += check_openapi(M9, registry)
+    errors += check_m9_fixture_inventory()
+    errors += check_m9_manifest()
+    errors += check_m9_schema_projection()
+    errors += check_m9_openapi_projection()
 
     if errors:
         print(f"\n{len(errors)} error(s)")

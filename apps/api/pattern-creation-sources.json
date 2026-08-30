@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "sources": [
+    "apps/api/src/db/natal-features.ts",
+    "apps/api/src/db/pattern-ontology.ts",
+    "apps/api/src/services/codex-pattern-publisher.ts",
+    "apps/api/src/services/natal-features.ts",
+    "apps/api/src/services/openai-pattern-publisher.ts",
+    "apps/api/src/services/pattern-command.ts",
+    "apps/api/src/services/pattern-enqueue.ts",
+    "apps/api/src/services/pattern-execute.ts",
+    "apps/api/src/services/pattern-packet.ts",
+    "apps/api/src/services/pattern-prompt.ts",
+    "apps/api/src/services/pattern-publication-proof.ts",
+    "apps/api/src/services/pattern-publisher-factory.ts",
+    "apps/api/src/services/pattern-publisher.ts",
+    "apps/api/src/services/pattern-semantic.ts",
+    "apps/api/src/services/pattern-stage-protocol.ts",
+    "packages/pattern-engine/src/candidate-validate.ts",
+    "packages/pattern-engine/src/ontology.ts",
+    "packages/pattern-engine/src/plan-validate.ts",
+    "packages/pattern-engine/src/policy.ts",
+    "packages/pattern-engine/src/projection.ts",
+    "packages/pattern-engine/src/selection.ts",
+    "packages/pattern-engine/src/types.ts",
+    "packages/pattern-engine/src/words.ts"
+  ]
+}

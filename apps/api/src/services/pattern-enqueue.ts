@@ -1,12 +1,12 @@
 import {
   CALC_CONTRACT_ID,
   CALC_CONTRACT_VERSION,
-  M7_SCHEMA_VERSION,
+  M9_SCHEMA_VERSION,
   NATAL_FEATURE_POLICY_VERSION,
   PATTERN_GENERATION_CONSENT_POLICY_VERSION,
   newId,
-  type PatternGenerationAccepted,
-  type PatternGenerationReason,
+  type PatternGenerationAcceptedV9,
+  type PatternGenerationReasonV9,
 } from "@patternlike/shared";
 import { PATTERN_SELECTION_POLICY_ID, PATTERN_SELECTION_POLICY_VERSION } from "@patternlike/pattern-engine";
 import type { Env, PatternGenerationMessage } from "../env.js";
@@ -26,7 +26,10 @@ import {
   isConsumedStatus,
   loadClaimForFingerprint,
 } from "../db/pattern-claims.js";
-import { reservePatternClaim } from "../db/pattern-claim-transitions.js";
+import {
+  reservePatternClaim,
+  reservePatternRegeneration,
+} from "../db/pattern-claim-transitions.js";
 import {
   buildCryptoWriteFence,
   requireSingleCryptoWriteVersion,
@@ -34,9 +37,10 @@ import {
 import {
   PATTERN_COMMAND_VERSION,
   PATTERN_JOB_TYPE,
-  type GeneratePatternCommandV1,
+  type GeneratePatternCommandV2,
   type PatternReservationReason,
 } from "./pattern-command.js";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
 import {
   acceptedReplayStage,
   type PatternDomainStage,
@@ -50,7 +54,7 @@ import { randomKey, wrapContentKey } from "./pattern-crypto.js";
 
 export type PatternEnqueueFailure =
   | { ok: false; status: 400 | 409 | 503; code: string; message: string }
-  | { ok: true; body: PatternGenerationAccepted; replay: boolean };
+  | { ok: true; body: PatternGenerationAcceptedV9; replay: boolean };
 
 interface ActiveChartRow {
   id: string;
@@ -59,7 +63,9 @@ interface ActiveChartRow {
   profile_version: number;
 }
 
-function reasonToReservation(reason: PatternGenerationReason | "chart_correction"): PatternReservationReason {
+type PatternEnqueueReason = PatternGenerationReasonV9 | "chart_correction";
+
+function reasonToReservation(reason: PatternEnqueueReason): PatternReservationReason {
   return reason;
 }
 
@@ -67,18 +73,50 @@ async function loadStoredReservation(
   env: Env,
   identity: UserIdentity,
   idempotencyKey: string,
-): Promise<{ generationId: string; consentId: string; stage: PatternDomainStage } | null> {
+): Promise<{
+  generationId: string;
+  consentId: string;
+  stage: PatternDomainStage;
+  reservationReason: PatternReservationReason;
+} | null> {
   const row = await env.DB.prepare(
-    `SELECT j.id AS job_id, p.generation_id, p.consent_id, p.stage
+    `SELECT j.id AS job_id, p.generation_id, p.consent_id, p.stage,
+            p.reservation_reason
      FROM jobs j
      JOIN pattern_generation_jobs p ON p.job_id = j.id
      WHERE j.job_type = ? AND j.user_id = ? AND j.idempotency_key = ?`,
   )
     .bind(PATTERN_JOB_TYPE, identity.userId, idempotencyKey)
-    .first<{ job_id: string; generation_id: string; consent_id: string; stage: PatternDomainStage }>();
+    .first<{
+      job_id: string;
+      generation_id: string;
+      consent_id: string;
+      stage: PatternDomainStage;
+      reservation_reason: PatternReservationReason;
+    }>();
   return row
-    ? { generationId: row.generation_id, consentId: row.consent_id, stage: row.stage }
+    ? {
+        generationId: row.generation_id,
+        consentId: row.consent_id,
+        stage: row.stage,
+        reservationReason: row.reservation_reason,
+      }
     : null;
+}
+
+function acceptedBody(
+  consent: PatternGenerationAcceptedV9["consent"],
+  generationId: string,
+  stage: PatternDomainStage,
+): PatternGenerationAcceptedV9 {
+  return {
+    schema_version: M9_SCHEMA_VERSION,
+    consent,
+    generation: {
+      generation_id: generationId,
+      stage: acceptedReplayStage(stage),
+    },
+  };
 }
 
 export async function enqueuePatternGeneration(
@@ -87,7 +125,7 @@ export async function enqueuePatternGeneration(
   input: {
     idempotencyKey: string;
     consentPolicyVersion: string;
-    reason: PatternGenerationReason | "chart_correction";
+    reason: PatternEnqueueReason;
     requestId: string;
   },
   now = new Date(),
@@ -107,15 +145,23 @@ export async function enqueuePatternGeneration(
 
   const existing = await loadStoredReservation(env, identity, input.idempotencyKey);
   if (existing) {
+    if (existing.reservationReason !== input.reason) {
+      return {
+        ok: false,
+        status: 409,
+        code: "idempotency_key_reused",
+        message: "Idempotency-Key was already used for a different Pattern action",
+      };
+    }
     const grant = await loadPatternGenerationGrant(env, identity.userId, now);
     return {
       ok: true,
       replay: true,
-      body: {
-        schema_version: M7_SCHEMA_VERSION,
-        consent: patternConsentDocument(grant),
-        generation: { generation_id: existing.generationId, stage: acceptedReplayStage(existing.stage) },
-      },
+      body: acceptedBody(
+        patternConsentDocument(grant),
+        existing.generationId,
+        existing.stage,
+      ),
     };
   }
 
@@ -154,7 +200,74 @@ export async function enqueuePatternGeneration(
   const features = await ensureNatalFeatureSet(env, identity.userId, chart.id, now);
   const fingerprintHash = await hashChartFingerprint(chart.fingerprint);
   const claim = await loadClaimForFingerprint(env, identity.userId, fingerprintHash);
-  if (claim && isConsumedStatus(claim.status)) {
+  const sourceUpdate = input.reason === "source_update";
+  const currentDocument = sourceUpdate
+    ? await env.DB.prepare(
+        `SELECT id, generation_id, pattern_source_hash
+         FROM pattern_documents
+         WHERE user_id = ? AND chart_fingerprint_hash = ?`,
+      )
+        .bind(identity.userId, fingerprintHash)
+        .first<{
+          id: string;
+          generation_id: string;
+          pattern_source_hash: string;
+        }>()
+    : null;
+
+  if (sourceUpdate) {
+    if (claim?.status !== "accepted" || !currentDocument) {
+      return {
+        ok: false,
+        status: 409,
+        code: "pattern_regeneration_not_available",
+        message: "A current accepted Pattern is required before regeneration",
+      };
+    }
+    if (claim.pending_regeneration_id) {
+      const pendingJob = await env.DB.prepare(
+        `SELECT stage FROM pattern_generation_jobs
+         WHERE generation_id = ? AND user_id = ? AND reservation_reason = 'source_update'`,
+      )
+        .bind(claim.pending_regeneration_id, identity.userId)
+        .first<{ stage: PatternDomainStage }>();
+      if (pendingJob) {
+        const grant = await loadPatternGenerationGrant(env, identity.userId, now);
+        return {
+          ok: true,
+          replay: true,
+          body: acceptedBody(
+            patternConsentDocument(grant),
+            claim.pending_regeneration_id,
+            pendingJob.stage,
+          ),
+        };
+      }
+      return {
+        ok: false,
+        status: 409,
+        code: "pattern_regeneration_in_progress",
+        message: "A Pattern regeneration is already reserved",
+      };
+    }
+    if (currentDocument.pattern_source_hash === PATTERN_CREATION_SOURCE_HASH) {
+      return {
+        ok: false,
+        status: 409,
+        code: "pattern_regeneration_not_available",
+        message: "This Pattern already uses the current creation source",
+      };
+    }
+    const currentGrant = await loadPatternGenerationGrant(env, identity.userId, now);
+    if (!currentGrant) {
+      return {
+        ok: false,
+        status: 409,
+        code: "pattern_generation_consent_required",
+        message: "Pattern generation consent is required before regeneration",
+      };
+    }
+  } else if (claim && isConsumedStatus(claim.status)) {
     return {
       ok: false,
       status: 409,
@@ -162,7 +275,7 @@ export async function enqueuePatternGeneration(
       message: "This chart has already used its one Pattern generation",
     };
   }
-  if (claim?.status === "reserved" && claim.active_generation_id) {
+  if (!sourceUpdate && claim?.status === "reserved" && claim.active_generation_id) {
     const grant = await loadPatternGenerationGrant(env, identity.userId, now);
     const reservedJob = await env.DB.prepare(
       `SELECT stage FROM pattern_generation_jobs WHERE generation_id = ? AND user_id = ?`,
@@ -172,17 +285,14 @@ export async function enqueuePatternGeneration(
     return {
       ok: true,
       replay: true,
-      body: {
-        schema_version: M7_SCHEMA_VERSION,
-        consent: patternConsentDocument(grant),
-        generation: {
-          generation_id: claim.active_generation_id,
-          stage: acceptedReplayStage(reservedJob?.stage ?? "reserved"),
-        },
-      },
+      body: acceptedBody(
+        patternConsentDocument(grant),
+        claim.active_generation_id,
+        reservedJob?.stage ?? "reserved",
+      ),
     };
   }
-  if (input.reason === "failed_attempt_retry") {
+  if (!sourceUpdate && input.reason === "failed_attempt_retry") {
     const failed = await env.DB.prepare(
       `SELECT generation_id FROM pattern_generation_jobs
        WHERE user_id = ? AND chart_fingerprint_hash = ? AND stage = 'failed'
@@ -233,9 +343,9 @@ export async function enqueuePatternGeneration(
   const claimId = claim?.id ?? newId("pgc");
   const localeRevision = preferences.localeUpdatedAt ? Date.parse(preferences.localeUpdatedAt) || 1 : 1;
 
-  const command: GeneratePatternCommandV1 = {
+  const command: GeneratePatternCommandV2 = {
     command_version: PATTERN_COMMAND_VERSION,
-    schema_version: M7_SCHEMA_VERSION,
+    schema_version: M9_SCHEMA_VERSION,
     generation_id: generationId,
     job_id: jobId,
     claim_id: claimId,
@@ -258,6 +368,7 @@ export async function enqueuePatternGeneration(
     ontology_version: ontology.version,
     ontology_bundle_hash: ontology.bundleHash,
     corpus_release_hash: ontology.corpusReleaseHash,
+    pattern_source_hash: PATTERN_CREATION_SOURCE_HASH,
     reservation_reason: reasonToReservation(input.reason),
     publisher: publisher.config.pin,
     planner_attempts_max: 2,
@@ -303,7 +414,26 @@ export async function enqueuePatternGeneration(
       ),
     );
   }
-  if (!claim) {
+  if (sourceUpdate) {
+    statements.push(
+      reservePatternRegeneration(env, {
+        claimId,
+        userId: identity.userId,
+        chartFingerprintHash: fingerprintHash,
+        chartId: chart.id,
+        generationId,
+        now: nowIso,
+      }),
+      env.DB.prepare(
+        `INSERT INTO assertion_probe (id, reason)
+         SELECT 1, 'pattern regeneration reservation did not win'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM pattern_generation_claims
+           WHERE id = ? AND status = 'accepted' AND pending_regeneration_id = ?
+         )`,
+      ).bind(claimId, generationId),
+    );
+  } else if (!claim) {
     statements.push(
       reservePatternClaim(env, {
         claimId,
@@ -357,9 +487,10 @@ export async function enqueuePatternGeneration(
          generation_id, job_id, user_id, claim_id, chart_id, chart_fingerprint_hash,
          feature_set_id, feature_set_hash, feature_policy_version, selection_policy_version,
          locale, locale_revision, consent_id, consent_policy_version, ontology_version,
-         ontology_bundle_hash, corpus_release_hash, reservation_reason, stage,
+         ontology_bundle_hash, corpus_release_hash, pattern_source_hash,
+         reservation_reason, stage,
          stage_generation, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, ?, ?)`,
     ).bind(
       generationId,
       jobId,
@@ -378,6 +509,7 @@ export async function enqueuePatternGeneration(
       ontology.version,
       ontology.bundleHash,
       ontology.corpusReleaseHash,
+      PATTERN_CREATION_SOURCE_HASH,
       command.reservation_reason,
       nowIso,
       nowIso,
@@ -406,40 +538,43 @@ export async function enqueuePatternGeneration(
     await env.DB.batch(statements);
   } catch {
     const replay = await loadStoredReservation(env, identity, input.idempotencyKey);
-    if (replay) {
+    if (replay && replay.reservationReason === input.reason) {
       const currentGrant = await loadPatternGenerationGrant(env, identity.userId, now);
       return {
         ok: true,
         replay: true,
-        body: {
-          schema_version: M7_SCHEMA_VERSION,
-          consent: patternConsentDocument(currentGrant),
-          generation: { generation_id: replay.generationId, stage: acceptedReplayStage(replay.stage) },
-        },
+        body: acceptedBody(
+          patternConsentDocument(currentGrant),
+          replay.generationId,
+          replay.stage,
+        ),
       };
     }
     // Concurrent POSTs with different keys can both observe `available` (or no
     // claim). Only one UPDATE/INSERT wins; the loser must replay the winner
     // rather than throw a 500 after the reservation already exists.
     const winner = await loadClaimForFingerprint(env, identity.userId, fingerprintHash);
-    if (winner?.status === "reserved" && winner.active_generation_id) {
+    const winnerGenerationId = sourceUpdate
+      ? winner?.pending_regeneration_id
+      : winner?.active_generation_id;
+    const winnerOwnsExpectedLane = sourceUpdate
+      ? winner?.status === "accepted"
+      : winner?.status === "reserved";
+    if (winnerOwnsExpectedLane && winnerGenerationId) {
       const currentGrant = await loadPatternGenerationGrant(env, identity.userId, now);
       const reservedJob = await env.DB.prepare(
         `SELECT stage FROM pattern_generation_jobs WHERE generation_id = ? AND user_id = ?`,
       )
-        .bind(winner.active_generation_id, identity.userId)
+        .bind(winnerGenerationId, identity.userId)
         .first<{ stage: PatternDomainStage }>();
       return {
         ok: true,
         replay: true,
-        body: {
-          schema_version: M7_SCHEMA_VERSION,
-          consent: patternConsentDocument(currentGrant),
-          generation: {
-            generation_id: winner.active_generation_id,
-            stage: acceptedReplayStage(reservedJob?.stage ?? "reserved"),
-          },
-        },
+        body: acceptedBody(
+          patternConsentDocument(currentGrant),
+          winnerGenerationId,
+          reservedJob?.stage ?? "reserved",
+        ),
       };
     }
     throw new Error("pattern reservation batch failed");
@@ -462,10 +597,10 @@ export async function enqueuePatternGeneration(
   return {
     ok: true,
     replay: false,
-    body: {
-      schema_version: M7_SCHEMA_VERSION,
-      consent: patternConsentDocument(grant),
-      generation: { generation_id: generationId, stage: "organizing_evidence" },
-    },
+    body: acceptedBody(
+      patternConsentDocument(grant),
+      generationId,
+      "reserved",
+    ),
   };
 }

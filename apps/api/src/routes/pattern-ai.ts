@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import {
   M7_SCHEMA_VERSION,
+  M9_SCHEMA_VERSION,
   PATTERN_GENERATION_CONSENT_POLICY_VERSION,
   requireIdempotencyKey,
 } from "@patternlike/shared";
@@ -96,10 +97,20 @@ patternAiRoutes.post("/v1/pattern-generations", async (c) => {
     confirm?: unknown;
     reason?: unknown;
   };
+  const initialReason = record.reason === "first_open" ||
+    record.reason === "first_open_retry" ||
+    record.reason === "failed_attempt_retry";
+  const initialRequest =
+    (record.schema_version === M7_SCHEMA_VERSION ||
+      record.schema_version === M9_SCHEMA_VERSION) &&
+    record.confirm === "GENERATE MY PATTERN" &&
+    initialReason;
+  const sourceUpdateRequest =
+    record.schema_version === M9_SCHEMA_VERSION &&
+    record.confirm === "REGENERATE MY PATTERN" &&
+    record.reason === "source_update";
   if (
-    record.schema_version !== M7_SCHEMA_VERSION ||
-    record.confirm !== "GENERATE MY PATTERN" ||
-    (record.reason !== "first_open" && record.reason !== "first_open_retry" && record.reason !== "failed_attempt_retry") ||
+    (!initialRequest && !sourceUpdateRequest) ||
     typeof record.consent_policy_version !== "string"
   ) {
     return c.json(error(requestId, "invalid_request", "Pattern generation request is not valid"), 400);
@@ -109,7 +120,11 @@ patternAiRoutes.post("/v1/pattern-generations", async (c) => {
   const result = await enqueuePatternGeneration(c.env, identity, {
     idempotencyKey: key,
     consentPolicyVersion: record.consent_policy_version,
-    reason: record.reason,
+    reason: record.reason as
+      | "first_open"
+      | "first_open_retry"
+      | "failed_attempt_retry"
+      | "source_update",
     requestId,
   });
   if (!result.ok) return c.json(error(requestId, result.code, result.message), result.status);
@@ -141,7 +156,7 @@ patternAiRoutes.get("/v1/pattern-generations/:generation_id", async (c) => {
   if (!stage) return c.json(error(requestId, "not_found", "Generation not found"), 404);
   return c.json(
     {
-      schema_version: M7_SCHEMA_VERSION,
+      schema_version: M9_SCHEMA_VERSION,
       generation_id: row.generation_id,
       stage,
       status_updated_at: row.updated_at,

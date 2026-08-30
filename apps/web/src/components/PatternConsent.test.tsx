@@ -86,11 +86,14 @@ describe("Pattern consent terms", () => {
     );
   });
 
-  it("keeps the no-reroll, permanent-deletion, and withdrawal warnings", () => {
+  it("distinguishes a source update from a reroll and keeps deletion and withdrawal warnings", () => {
     render(<PatternConsentTerms consent={consent()} />);
     const text = terms();
 
-    expect(text).toContain("A successful Pattern cannot be rerolled for this chart.");
+    expect(text).toContain("A successful Pattern is not a rerollable reading.");
+    expect(text).toContain(
+      "If Pattern/Like's creation source changes, you can explicitly replace it",
+    );
     expect(text).toContain("Deleting your Pattern is permanent.");
     expect(text).toContain("Withdrawing stops unfinished and future Pattern generation.");
     expect(text).toContain("An already accepted Pattern stays readable until you delete it.");
