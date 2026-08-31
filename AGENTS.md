@@ -13,7 +13,7 @@ Run commands from the repository root with Node 20+ and Python 3.11+.
 - `npm test` runs calculation, API, schema, OpenAPI, and D1 smoke tests. The calculation pretest may download ephemeris data.
 - `npm run build` builds the calculation service and performs a dry-run Worker build.
 - `npm run calc:dev` starts the calculation service on port 8080; `npm run dev:api` starts Wrangler on port 8787.
-- `npm run db:local` applies `0001_m0_core.sql` to local D1.
+- `npm run db:local` applies the ordered `db/d1/` directory (currently `0001`–`0022`) to local D1, not only `0001`.
 - `npm run test:contracts` and `npm run calc:golden` run focused verification lanes.
 
 ## Coding Style & Naming Conventions

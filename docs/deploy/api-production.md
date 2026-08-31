@@ -10,12 +10,15 @@ before deploying the `/crypto-operator/*` routes, store a dedicated
 `CRYPTO_OPERATOR_TOKEN`, and never alias it to service, admin, or Codex-runner
 authority.
 
-Repository and recorded live state, reconciled 2026-08-27:
+Repository and recorded live state, reconciled 2026-08-27, with the 2026-08-28
+Access/consent ledger appended from `db/d1/MIGRATIONS.json` notes (not a new
+live query):
 
 | Step | State |
 | --- | --- |
 | D1 `patternlike-ops` created (`1305a75d-0a8a-4a21-b201-d94fda0aaf93`, ENAM) | done |
 | Migrations through `0017` applied remotely | done — `0017` verified around 17:32 UTC on 2026-08-27; Worker version `287bce63-dece-4911-96db-dd212c2cec33` remains the recorded 0016 birth-guard deployment |
+| Migrations `0018`–`0020` applied remotely | done — 2026-08-28 ~07:32 UTC, before Worker `fc7acdf3-cbfc-4724-8dbe-b127128e9637` (Access cutover). `0021` and `0022` are in the repository; no production apply is recorded |
 | `database_id` wired into `[[env.production.d1_databases]]` | done |
 | Origin decided: PWA ships inside the API Worker (`[env.production.assets]`) | done, dry-run validated |
 | Auth0 tenant `dev-lqmwkyo17nm5mdjz.us.auth0.com` + SPA app `Pattern/Like Web` | done |
@@ -269,7 +272,7 @@ The configuration lives in `[env.production.assets]` in
   `not_found_handling = "single-page-application"` returns `index.html` with a
   **200**, so a forgotten route silently serves HTML to an API client. It
   currently reads `["/health", "/v1/*", "/internal/*", "/admin/*",
-  "/codex-provider/*"]` — keep it in sync with `apps/api/src/index.ts`.
+  "/codex-provider/*", "/crypto-operator/*"]` — keep it in sync with `apps/api/src/index.ts`.
 - **`assets` is scoped to `[env.production]`, not top-level.**
   `@cloudflare/vitest-pool-workers` loads this file, and a top-level
   `assets.directory` pointing at an unbuilt `apps/web/dist` would break the API
@@ -282,9 +285,10 @@ npm run deploy:api     # builds @patternlike/web, then wrangler deploy --env pro
 ```
 
 Requests that match a static asset never invoke the Worker and are free and
-unlimited; only `/v1/*`, `/internal/*`, `/admin/*`, `/codex-provider/*`, and
-`/health` cost a request. A useful consequence: a `503 configuration_error`
-from `configGuard` degrades the API only — the app shell still loads.
+unlimited; only `/v1/*`, `/internal/*`, `/admin/*`, `/codex-provider/*`,
+`/crypto-operator/*`, and `/health` cost a request. A useful consequence: a
+`503 configuration_error` from `configGuard` degrades the API only — the app
+shell still loads.
 
 Verify:
 
@@ -412,12 +416,21 @@ as the product-session authority. The 2026-08-22 canary exercised that path.
 Local development deliberately keeps the separate `AUTH_STUB=1` path.
 `X-User-Id` names an existing user, so after applying local D1 migrations run
 `node scripts/dev/seed-dev-user.mjs`; the script creates the user, crypto
-subject, and wrapped DEK together.
+subject, and wrapped DEK together. It does not grant account-processing consent.
 
-One M1 consent gap remains separate from authentication: onboarding still sends
-the local `cns_local_web_0001` placeholder, and the birth route checks only that
-`consent_id` is present. Persisted `account_processing` consent and its
-grant/revoke enforcement are not implemented.
+Persisted `account_processing` consent landed 2026-08-28 (migration `0018`,
+policy `account-processing-v1-2026-08-28`). Onboarding and the privacy center
+grant and revoke it through `GET`/`PUT`/`DELETE /v1/consents/account-processing`.
+`accountStateGate` requires the current grant on every authenticated product
+path except the enumerated recovery routes; `POST /v1/birth-profiles` further
+requires that the submitted `consent_id` is that exact grant
+(`400 consent_invalid` otherwise). Revocation freezes the account; regrant
+restores access. The retired `VITE_CONSENT_ID` placeholder is gone.
+
+Place search is implemented and committed off: `GEOCODER_ROLLOUT = "off"` in
+both Wrangler blocks, so `/v1/places/*` answers `503 geocoder_unavailable`.
+Manual coordinates remain the working birthplace path. Apply `0022` before
+enabling the Worker that writes `place_resolutions`; that apply is not recorded.
 
 ## 6. The daily reading publisher
 
@@ -434,6 +447,14 @@ accepts only `codex`, so this Worker holds no OpenAI credential for Daily.
 Operate it from [`codex-production-provider.md`](codex-production-provider.md);
 [`openai-daily-reading-rollout.md`](openai-daily-reading-rollout.md) is
 superseded as a procedure and retained only as dated evidence.
+
+The compiled Daily writer policy is prompt `1.0.2` (`READING_PROMPT_VERSION` /
+`OPENAI_READING_PROMPT_VERSION`): warmer, more specific prose under the same
+packet, validator, and Codex transport. Changing the policy text without
+bumping that pin, or pinning a different version in Wrangler, is
+`503 configuration_error`. Pattern writer prompt `1.0.2` is a separate pin
+(`OPENAI_PATTERN_WRITER_PROMPT_VERSION`); planner and verifier versions stay
+where they are so the verifier-independence check still holds.
 
 That means three things for this runbook:
 

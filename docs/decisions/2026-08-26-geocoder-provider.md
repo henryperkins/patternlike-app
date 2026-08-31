@@ -1,7 +1,10 @@
 # Geocoder Provider, Rights, and Privacy Decision
 
 - **Date:** 2026-08-26
-- **Status:** Approved; implementation pending
+- **Status:** Approved; implementation landed 2026-08-28 (`f1c6711`). Committed
+  configuration keeps `GEOCODER_ROLLOUT = "off"` in development and production,
+  so search/resolve/consent answer `503 geocoder_unavailable`. Manual
+  coordinates remain the complete fallback until an operator enables it.
 - **Approval provenance:** The repository owner explicitly supplied
   product/privacy/legal approval in this Cursor implementation session on
   2026-08-26
