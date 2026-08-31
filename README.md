@@ -2,7 +2,7 @@
 
 Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculation authority; editorial content ships via signed WordPress releases; Fly.io is portable compute (not launch-critical).
 
-**Spec:** `spec-bundle/` (v0.2) · **Contracts:** `contracts/m0/` · **D1:** `db/d1/`
+**Spec:** `spec-bundle/` (v0.2) · **Contracts:** `contracts/m0/` (frozen baseline; additive packages through `contracts/m8/`) · **D1:** `db/d1/`
 
 **Open contract decisions:** [`docs/reviews/2026-08-01-spec-escalations.md`](docs/reviews/2026-08-01-spec-escalations.md) — twelve reviewed items where the code implements the frozen contract faithfully and the fix belongs in the spec.
 
@@ -48,28 +48,46 @@ npm run web:dev
 
 The web client opens at `http://127.0.0.1:5173` and proxies `/v1` requests to
 the local Worker at `http://127.0.0.1:8787`. Development defaults to
-`usr_local_dev_0001`; override `VITE_DEV_USER_ID`, `VITE_CONSENT_ID`, or
-`VITE_API_PROXY_TARGET` in `apps/web/.env.local` when needed. The seed command
-above creates that local user, crypto subject, and wrapped DEK idempotently.
-Production identity is implemented; `VITE_CONSENT_ID` remains local scaffolding
-because persisted `account_processing` consent is not yet implemented.
+`usr_local_dev_0001`; override `VITE_DEV_USER_ID` or `VITE_API_PROXY_TARGET` in
+`apps/web/.env.local` when needed. The seed command above creates that local
+user, crypto subject, and wrapped DEK idempotently. It does **not** grant
+account-processing consent — onboarding does that itself, and the curl loop
+below must too.
 
 ### Birth → chart (local)
 
 ```bash
 curl -s http://127.0.0.1:8787/health
 
+# Grant the current account-processing policy. GET/PUT/DELETE
+# /v1/consents/account-processing are recovery routes, so they work before a
+# grant exists; every other product path returns 403 account_processing_required.
+CONSENT_ID=$(curl -s -X PUT http://127.0.0.1:8787/v1/consents/account-processing \
+  -H "content-type: application/json" \
+  -H "x-user-id: usr_local_dev_0001" \
+  -H "idempotency-key: demo-account-processing-001" \
+  -H "x-consent-ui-surface: onboarding" \
+  -d '{"policy_version":"account-processing-v1-2026-08-28"}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['consent_id'])")
+
 curl -s -X POST http://127.0.0.1:8787/v1/birth-profiles \
   -H "content-type: application/json" \
   -H "x-user-id: usr_local_dev_0001" \
   -H "idempotency-key: demo-birth-001" \
-  -d "{\"accuracy\":\"exact\",\"consent_id\":\"cns_local_dev_0001\",\"birth_date\":\"1990-05-15\",\"birth_time_local\":\"12:34:00\",\"timezone_hint\":\"America/Los_Angeles\",\"birthplace\":{\"label\":\"Los Angeles\",\"latitude\":34.05,\"longitude\":-118.24}}"
+  -d "{\"accuracy\":\"exact\",\"consent_id\":\"${CONSENT_ID}\",\"birth_date\":\"1990-05-15\",\"birth_time_local\":\"12:34:00\",\"timezone_hint\":\"America/Los_Angeles\",\"birthplace\":{\"label\":\"Los Angeles\",\"latitude\":34.05,\"longitude\":-118.24}}"
 
 curl -s http://127.0.0.1:8787/v1/chart \
   -H "x-user-id: usr_local_dev_0001"
 ```
 
 `AUTH_STUB=1` (default `[vars]` in `wrangler.toml`) accepts **`X-User-Id`** for local development only. It is absent from `[env.production]`, and the `configGuard` middleware returns `503 configuration_error` for any request when `AUTH_STUB=1` or `ROOT_KEK` is unset/placeholder outside `ENVIRONMENT=development|test`. `npm run deploy` targets `--env production`.
+
+The birth route then checks that `consent_id` is the **exact current**
+account-processing grant (`loadExactCurrentAccountProcessingGrant`). A
+placeholder, a revoked id, or a grant for a different policy is
+`400 consent_invalid`. Revoke only from the privacy center
+(`DELETE` plus `X-Consent-UI-Surface: privacy_center`); that freezes the
+account. Regrant restores access without minting a new user.
 
 Idempotency keys are scoped per user, so the static `demo-birth-001` above is safe across local users. Resubmitting the same birth data under a different key returns `409 chart_already_exists` rather than a 500.
 
@@ -140,6 +158,17 @@ or repeated, and coordinates that land in open water all come back qualified
 rather than silently trusted. The grade is stored on
 `birth_profiles.geocode_confidence`.
 
+### Place-name search stays off until an operator flips it
+
+`POST /v1/places/search` and `POST /v1/places/resolve` exist, plus a separate
+geocoder consent (`AST-02`). The browser never calls Google; the Worker talks
+to Places Autocomplete (New) and Geocoding API v4. Committed configuration
+keeps `GEOCODER_ROLLOUT = "off"` in both the development block and
+`[env.production.vars]`, so those routes — and the consent GET — answer
+`503 geocoder_unavailable`. Manual label + coordinates remain the complete
+fallback. Enabling it is a configuration change, not missing code: see
+[`docs/decisions/2026-08-26-geocoder-provider.md`](docs/decisions/2026-08-26-geocoder-provider.md).
+
 ## Swiss Ephemeris (`apps/calc-stub`)
 
 | Pin | Value |
@@ -178,7 +207,7 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 
 ## M1 status
 
-- [x] Monorepo + green CI on GitHub Actions
+- [x] Monorepo + local merge gate (`npm run ci:local`; GitHub Actions is billing-locked on this account)
 - [x] Workers integration tests: `apps/api` runs inside workerd with a real local D1 (`@cloudflare/vitest-pool-workers`)
 - [x] M0 contracts validation in CI
 - [x] D1 core schema with encryption CHECKs
@@ -192,8 +221,8 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Privacy center export/delete workflows, including encrypted artifacts and terminal deletion status
 - [x] Bounded birth calculation: a validated fetch deadline, a 1 MiB response ceiling, and an exact per-user UTC-day invocation budget that charges only requests which actually call calc. Entry criteria for making the workflow asynchronous are recorded in [`docs/deploy/birth-calc-slo.md`](docs/deploy/birth-calc-slo.md) and none has been measured
 - [x] Migration `0016_birth_calc_usage.sql` applied to the remote database 2026-08-27. Worker version `287bce63-dece-4911-96db-dd212c2cec33` serves the budget guard.
-- [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
-- [ ] Persisted `account_processing` consent: onboarding still sends a local placeholder and the birth route checks only that an id is present
+- [x] Place-name geocoding: Worker adapter and consent exist; committed `GEOCODER_ROLLOUT = "off"` in development and production, so typing a city still requires coordinates until an operator enables it
+- [x] Persisted `account_processing` consent: onboarding grants policy `account-processing-v1-2026-08-28`; `accountStateGate` requires the current grant on every product path except the enumerated recovery routes; birth stores that exact `consent_id`
 
 ## M2 status — editorial control plane
 

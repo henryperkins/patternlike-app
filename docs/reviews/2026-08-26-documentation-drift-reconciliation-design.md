@@ -3,6 +3,13 @@
 **Date:** 2026-08-26
 **Status:** Approved for planning
 
+> **Snapshot notice, 2026-08-31.** This design described repository docs as of
+> 2026-08-26. One listed gap is resolved in runtime source: persisted
+> `account_processing` consent shipped 2026-08-28 (`12b1a94` / `3d6e59a`,
+> migration `0018`). Current authorities are `README.md`, `CLAUDE.md`, and
+> `docs/deploy/api-production.md` §5. The remaining items below are the
+> original 2026-08-26 inventory and are not a live status.
+
 ## Goal
 
 Reconcile current repository documentation with the implementation and committed
