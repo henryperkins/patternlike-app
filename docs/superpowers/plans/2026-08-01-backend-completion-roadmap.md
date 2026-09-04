@@ -154,9 +154,8 @@ service produces a `502 calc_failed` within the timeout rather than hanging.
 1. **Calc authentication — deployed.** `POST /v1/calculate` requires a bearer
    token outside development, answering `503 service_auth_not_configured`
    without configuration and `401` on a bad token, while `/health` and
-   `/v1/engine` stay public. `docs/deploy/api-production.md` records the token as
-   set on both sides in its 2026-08-26 reconciliation — a ledger row, not a
-   queried inventory.
+   `/v1/engine` stay public. A 2026-08-26 reconciliation recorded the token as
+   set on both sides — a ledger observation, not a queried inventory.
 2. **Bounding the request — deployed as Worker version
    `287bce63-dece-4911-96db-dd212c2cec33`.**
    `invokeCalc` now takes an explicit `timeoutMs`, sets

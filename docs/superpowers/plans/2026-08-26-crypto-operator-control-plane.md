@@ -692,7 +692,6 @@ git commit -m "api: expose resumable crypto operator routes"
 - Create: `scripts/crypto-operations.test.mjs`
 - Create: `docs/deploy/root-kek-rotation.md`
 - Create: `docs/deploy/user-dek-rotation.md`
-- Modify: `docs/deploy/api-production.md`
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: Write failing CLI protocol tests**
@@ -752,7 +751,7 @@ rg -n "ROOT_KEK.*(echo|console|print)|previous_root|wrapped_dek" scripts/crypto-
 Expected: tests pass; no secret-printing path.
 
 ```bash
-git add scripts/crypto-operations.mjs scripts/crypto-operations.test.mjs docs/deploy/root-kek-rotation.md docs/deploy/user-dek-rotation.md docs/deploy/api-production.md CLAUDE.md
+git add scripts/crypto-operations.mjs scripts/crypto-operations.test.mjs docs/deploy/root-kek-rotation.md docs/deploy/user-dek-rotation.md CLAUDE.md
 git commit -m "ops: add encryption key rotation runbooks"
 ```
 

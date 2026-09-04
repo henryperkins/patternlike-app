@@ -16,8 +16,6 @@ Companion documents:
 - `docs/superpowers/archive/plans/2026-08-15-m7-remaining-slices-handoff.md` — the
   scoping brief for slices A–D. It records settled decisions and constraints,
   and it is **not** itself a design or a plan for any slice.
-- `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` —
-  normative product contract for Your Pattern; outranks both design documents.
 - `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` —
   settled freeze-versus-design decisions. Cite it where the 2026-08-14 text
   used to disagree with `contracts/m7`.

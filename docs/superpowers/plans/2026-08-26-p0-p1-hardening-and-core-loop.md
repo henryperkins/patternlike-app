@@ -217,7 +217,6 @@ Completion gate: history pages without duplicates; a specific saved revision sur
 **Files:**
 - Modify: `README.md`
 - Modify: `docs/superpowers/archive/README.md`
-- Modify: `docs/deploy/api-production.md`
 - Modify: `docs/superpowers/plans/2026-08-01-backend-completion-roadmap.md`
 
 - [ ] **Step 1: Update status documentation only after each runtime slice passes**
@@ -278,7 +277,7 @@ For each migration:
 - [ ] **Step 6: Commit the final status update**
 
 ```bash
-git add README.md docs/superpowers/archive/README.md docs/deploy/api-production.md docs/superpowers/plans/2026-08-01-backend-completion-roadmap.md
+git add README.md docs/superpowers/archive/README.md docs/superpowers/plans/2026-08-01-backend-completion-roadmap.md
 git commit -m "docs: record P0 and P1 completion"
 ```
 

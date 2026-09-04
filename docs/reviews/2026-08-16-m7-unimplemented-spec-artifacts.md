@@ -5,9 +5,8 @@
 > signed replay runtime subsequently landed. Its absence claims are preserved
 > below as review evidence, not current inventory. The remaining current work is
 > the administrator session/decrypt boundary and production evidence gates; see
-> [`contracts/m7/SCHEMA_MANIFEST.json`](../../contracts/m7/SCHEMA_MANIFEST.json),
-> [`docs/deploy/openai-pattern-rollout.md`](../deploy/openai-pattern-rollout.md),
-> and [`docs/deploy/pattern-erasure-replay-drill.md`](../deploy/pattern-erasure-replay-drill.md).
+> [`contracts/m7/SCHEMA_MANIFEST.json`](../../contracts/m7/SCHEMA_MANIFEST.json)
+> and [`docs/deploy/openai-pattern-rollout.md`](../deploy/openai-pattern-rollout.md).
 
 **Date:** 2026-08-16
 **Subject:** [`docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`](../superpowers/specs/2026-08-14-ai-generated-pattern-design.md)

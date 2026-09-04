@@ -57,7 +57,7 @@ Seven workspaces (`apps/*`, `packages/*`), one product request path plus an isol
 
 `apps/web` (React 19 + Vite PWA) → `apps/api` (Hono on Cloudflare Workers, D1) → `apps/calc-stub` (Node + Swiss Ephemeris, AGPL, deployed to Fly). The calc binding is plain HTTP (`CALC_SERVICE_URL` + optional `CALC_SERVICE_AUTH_TOKEN`) so the runtime can move without touching contracts. `apps/ontology-signer` is not on that path: the API reaches its single `signOntology` RPC through the `ONTOLOGY_SIGNER` service binding. `packages/shared` holds wire types, id minting, canonical JSON, and the launch body/aspect lists used by both sides.
 
-`contracts/m0/` is the frozen baseline (JSON Schema + OpenAPI + valid/invalid fixtures); additive milestone contracts run through `contracts/m7/`. `db/d1/0001_m0_core.sql` is the core operational schema. Product-spec v0.2 remains the baseline, v0.5 restates the daily-reading contract, and v0.6 adds AI-generated Pattern.
+`contracts/m0/` is the frozen baseline (JSON Schema + OpenAPI + valid/invalid fixtures); additive milestone contracts run through `contracts/m7/`. `db/d1/0001_m0_core.sql` is the core operational schema. Product-spec v0.2 remains the baseline and v0.5 restates the daily-reading contract; Your Pattern is defined by `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` as amended by `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` and `docs/superpowers/specs/2026-08-29-pattern-source-regeneration-design.md`.
 
 ### Worker routing
 
@@ -215,7 +215,7 @@ For M7 ontology corpora, `license_class` is a publication-rights flag, not an au
 
 ## Deployment
 
-- **API + PWA are one Worker.** `[env.production.assets]` in `apps/api/wrangler.toml` ships `apps/web/dist` alongside the API, so both live on one origin (`patternlike-api-production.lfd.workers.dev`). Deploy with `npm run deploy:api` from the root — it builds the web app first, which the upload requires. **Live** since 2026-08-08; see `docs/deploy/api-production.md`.
+- **API + PWA are one Worker.** `[env.production.assets]` in `apps/api/wrangler.toml` ships `apps/web/dist` alongside the API, so both live on one origin (`patternlike-api-production.lfd.workers.dev`). Deploy with `npm run deploy:api` from the root — it builds the web app first, which the upload requires. **Live** since 2026-08-08; the applied-migration ledger is `db/d1/MIGRATIONS.json` and the rollout runbooks are under `docs/deploy/`.
 - `run_worker_first` lists every path family the Hono app serves (`["/health", "/v1/*", "/internal/*", "/admin/*", "/codex-provider/*"]`). A path missing from it is **not** a 404 — static assets answer first and `not_found_handling: single-page-application` returns `index.html` with a 200, silently serving HTML to an API client. Keep it in sync with `src/index.ts`.
 - `assets` is scoped to `[env.production]` deliberately: the vitest pool loads `wrangler.toml`, and a top-level `assets.directory` pointing at an unbuilt `apps/web/dist` breaks the API suite.
 - Same-origin is a requirement, not a preference: sessions ride an httpOnly cookie with `SameSite=Strict` and `Path=/v1`, and cross-origin makes it a third-party cookie that Safari's ITP blocks.

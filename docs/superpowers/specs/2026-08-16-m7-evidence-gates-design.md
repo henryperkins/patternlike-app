@@ -22,8 +22,8 @@ recorded evidence and an empty ledger table, not a feature design.
 - Slice D does not invent the replay ledger. It runs the drill against
   the `0008` runtime. A drill against absent support proves nothing.
 - Criterion 20 is a signed checklist over the evaluation and privacy
-  gates already named in the M7 design §28.8 and in product-spec v0.6
-  §15. Zero exceptions.
+  gates already named in the M7 design §28.8 (the retired product-spec v0.6
+  §15 restated the same bar). Zero exceptions.
 - Criterion 22 is five separately reported operations. Ontology
   activation for external readers is Slice B, not Slice A. Rollout
   does not move as a consequence of merging any remaining-slice PR.

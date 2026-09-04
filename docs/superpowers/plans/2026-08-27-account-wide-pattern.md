@@ -336,8 +336,6 @@
 - Modify: `docs/deploy/codex-production-provider.md`
 - Modify: `docs/deploy/openai-pattern-rollout.md`
 - Modify: `docs/deploy/2026-08-23-pattern-generation-handoff.md`
-- Modify: `docs/deploy/pattern-erasure-replay-drill.md`
-- Modify: `docs/deploy/api-production.md`
 
 **Interfaces:**
 
@@ -354,7 +352,7 @@
 - [x] Rewrite active runbook steps that tell operators to set a Pattern rollout or allowlist. Preserve dated historical observations only when clearly labeled non-actionable history.
 - [x] Replace rollback instructions with the approved behavior: roll back the Worker/config version, stop the runner for provider containment, and rely on current-owner checks. Do not introduce an account gate. Budget exhaustion may stop spend but is not advertised as a product switch.
 - [x] Update erasure replay instructions so they no longer require keeping a removed flag off; instead require the runner stopped or the known-good Worker version during a destructive drill.
-- [x] Reconcile `api-production.md` with its pre-existing user edit before staging. The current `README.md` contains no Pattern rollout/allowlist instruction, so leave that user-owned file untouched.
+- [x] Reconcile the production deployment documentation with its pre-existing user edit before staging. The current `README.md` contains no Pattern rollout/allowlist instruction, so leave that user-owned file untouched.
 - [x] Run:
 
       npm run test:wrangler-config -w @patternlike/api

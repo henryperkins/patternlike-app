@@ -70,8 +70,10 @@ step.
   `docs/superpowers/plans/2026-08-20-automated-ontology-pipeline.md`
 - current ledger:
   `docs/superpowers/plans/2026-08-15-m7-remaining-slices-ledger.md`
-- normative product contract:
-  `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md`
+- normative product design:
+  `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`
+- spec-artifact amendments:
+  `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md`
 
 ## Non-negotiable generation rule
 
@@ -953,8 +955,9 @@ complete, while operational certification remains open. Migration `0008`, the
 signed create-only R2-first writer, atomic D1 receipts, lifecycle integrations,
 service-authenticated replayer/sweeper, replay bucket binding, and the dedicated
 `pattern-replay-2026-08` signing identity/keyring are present. The restore drill
-in `docs/deploy/pattern-erasure-replay-drill.md` cannot be exercised until Gate
-8 supplies an accepted Pattern to erase and restore. The repository now
+(Criterion 23 in `docs/superpowers/specs/2026-08-16-m7-evidence-gates-design.md`)
+cannot be exercised until Gate 8 supplies an accepted Pattern to erase and
+restore. The repository now
 implements the Cloudflare Access `pattern_generation_auditor` boundary and
 rejects the former shared bearer. Production cutover completed on 2026-08-28:
 the path-scoped Access application and exact-email auditor policy are active,

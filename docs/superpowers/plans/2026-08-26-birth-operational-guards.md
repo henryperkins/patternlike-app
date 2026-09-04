@@ -403,7 +403,7 @@ git commit -m "api: prepare birth calculation budget reservations"
 > safe at any time; it is deploying *code* ahead of schema that is not.
 >
 > Do the export, bookmark, and `foreign_key_check` / `quick_check` verification
-> from `docs/deploy/api-production.md` first.
+> first; the commands are under Gate 2 in `docs/deploy/openai-pattern-rollout.md`.
 
 ---
 

@@ -19,7 +19,7 @@ later reading of the repository.
 | --- | --- |
 | `plans/2026-08-01-code-review-remediation.md` | Self-declared `STATUS: EXECUTED`, `53847f0..0d2784b`. |
 | `plans/2026-08-01-identity-and-sessions.md` | Self-declared `STATUS: EXECUTED`, `38e13c9..e758f48`. |
-| `plans/2026-08-08-pr-8-review-remediation.md` | PR #8 merged; the production API it gated has been live since 2026-08-08 (`docs/deploy/api-production.md`). |
+| `plans/2026-08-08-pr-8-review-remediation.md` | PR #8 merged; the production API it gated has been live since 2026-08-08. |
 | `plans/2026-08-09-m3-generation-followup.md` | Batching, placeholder-grammar validation, canonicalization fixtures, and queue backoff all shipped. |
 | `plans/2026-08-09-m3-implementation-handoff.md` | Handoff prompt for the M3 pipeline; superseded by the shipped pipeline. Its own banner overstates one item: phase 7's DEV-01 foreground/system-change preference sync has no client half. The API side is ready (`apps/api/src/db/preferences.ts`), but nothing in `apps/web/src` ever writes a `device_derived` preference — `PreferenceWriteSource` is declared and only ever passed `user_confirmed`. |
 | `plans/2026-08-09-today-lead-line.md` | Shipped in `apps/web/src/components/TodayView.tsx`. |

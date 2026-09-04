@@ -31,9 +31,7 @@
 
 **Files:**
 
-- Create: `docs/deploy/codex-reader-rollout.md`
 - Modify: `docs/deploy/codex-production-provider.md`
-- Modify: `docs/deploy/api-production.md`
 
 **Interfaces:**
 
@@ -62,7 +60,7 @@
 - [ ] Run documentation checks and inspect only the intended files:
 
       git diff --check
-      rg -n "store:false|OPENAI_API_KEY|contractual_use|retention_deletion" docs/deploy/codex-reader-rollout.md docs/deploy/codex-production-provider.md docs/deploy/api-production.md
+      rg -n "store:false|OPENAI_API_KEY|contractual_use|retention_deletion" docs/deploy/codex-production-provider.md
 
 - [ ] Commit: `docs: establish Codex reader release gates`
 
@@ -70,7 +68,6 @@
 
 **Files:**
 
-- Modify: `docs/deploy/codex-reader-rollout.md`
 - Modify: `docs/deploy/openai-pattern-rollout.md`
 
 **Interfaces:**

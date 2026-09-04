@@ -32,7 +32,7 @@ secrets, provider usage, and cron bindings, then record a new baseline. Do not
 replay migration or secret steps merely because their historical checkbox is
 empty. Every new gate action still requires its own authorization.
 
-**Companion documents:** `docs/deploy/api-production.md` for the deployed Worker,
+**Companion documents:**
 `docs/superpowers/specs/2026-08-10-openai-daily-reading-publisher-design.md` for
 the approved design, and
 `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.5.md` for the

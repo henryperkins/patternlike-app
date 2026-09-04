@@ -178,7 +178,7 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 
 ## M1 status
 
-- [x] Monorepo + green CI on GitHub Actions
+- [x] Monorepo + `npm run ci:local` merge gate (GitHub Actions never runs on this account; see `AGENTS.md`)
 - [x] Workers integration tests: `apps/api` runs inside workerd with a real local D1 (`@cloudflare/vitest-pool-workers`)
 - [x] M0 contracts validation in CI
 - [x] D1 core schema with encryption CHECKs
@@ -316,7 +316,7 @@ Configure the same generated token on both sides; never commit it:
 ```bash
 fly secrets set CALC_SERVICE_AUTH_TOKEN="<generated-secret>" -a patternlike-calc
 
-# Worker side (when the production API deploys):
+# Worker side:
 npx wrangler secret put CALC_SERVICE_AUTH_TOKEN --env production
 ```
 
@@ -325,7 +325,7 @@ npx wrangler secret put CALC_SERVICE_AUTH_TOKEN --env production
 ```bash
 curl --fail https://patternlike-calc.fly.dev/health
 curl --fail https://patternlike-calc.fly.dev/v1/engine
-curl --fail https://patternlike-app.fly.dev/
+curl --fail https://patternlike-api-production.lfd.workers.dev/
 
 # 401 proves the calculate gate is enforcing:
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://patternlike-calc.fly.dev/v1/calculate

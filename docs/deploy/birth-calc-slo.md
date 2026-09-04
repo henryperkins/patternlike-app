@@ -23,7 +23,6 @@ live account, the preconditions section says how to verify it.
   `docs/superpowers/plans/2026-08-26-p0-p1-hardening-and-core-loop.md`
 - deferred workstream:
   `docs/superpowers/plans/2026-08-01-backend-completion-roadmap.md` § Stream 8
-- production origin runbook: `docs/deploy/api-production.md`
 
 ---
 

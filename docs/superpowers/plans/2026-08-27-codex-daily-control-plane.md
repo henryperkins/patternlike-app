@@ -579,7 +579,6 @@
 - Modify: `apps/api/src/db/reading-scheduler.integration.test.ts`
 - Modify: `docs/deploy/openai-daily-reading-rollout.md`
 - Modify: `docs/deploy/codex-production-provider.md`
-- Modify: `docs/deploy/api-production.md`
 
 **Interfaces:**
 

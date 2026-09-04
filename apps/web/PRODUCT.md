@@ -53,7 +53,7 @@ The voice is calm, precise, direct, and non-mystifying. It leads with ordinary l
 
 ## Evidence on Hand
 
-- `spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md` is the current product and engineering specification for Your Pattern. v0.5 beside it remains the daily-reading contract. The v0.2 bundle is the superseded editorial-assembly baseline and is kept, unedited.
+- `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md`, as amended by `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md`, defines the current Your Pattern product and engineering behavior. v0.5 remains the daily-reading contract. The v0.2 bundle is the superseded editorial-assembly baseline and is kept, unedited.
 - `apps/web/src/App.tsx` and the components under `apps/web/src/components/` implement the signed-out, onboarding, chart, Today, Timing, Time Travel, and privacy surfaces.
 - `apps/web/public/mark.svg` and `apps/web/public/manifest.webmanifest` contain the current product mark, name, and PWA metadata.
 - Contract fixtures, calculation fingerprints, uncertainty metadata, and technical evidence exposed by the application support inspectability claims.

@@ -279,7 +279,6 @@ git commit -m "api: restore Pattern erasures from the replay replica"
 ### Task 5: Restore drill and full gate
 
 **Files:**
-- Create: `docs/deploy/pattern-erasure-replay-drill.md`
 - Modify: `docs/deploy/openai-pattern-rollout.md`
 - Modify: `docs/superpowers/specs/2026-08-16-pattern-replay-ledger-design.md`
 
@@ -308,6 +307,6 @@ Create distinct development and production replay buckets. Generate one Ed25519 
 - [ ] **Step 4: Record evidence and commit**
 
 ```text
-git add docs/deploy/pattern-erasure-replay-drill.md docs/deploy/openai-pattern-rollout.md docs/superpowers/specs/2026-08-16-pattern-replay-ledger-design.md
+git add docs/deploy/openai-pattern-rollout.md docs/superpowers/specs/2026-08-16-pattern-replay-ledger-design.md
 git commit -m "docs: record the Pattern replay restore gate"
 ```

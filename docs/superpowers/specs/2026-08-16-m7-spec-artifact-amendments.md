@@ -9,8 +9,8 @@ that yields to the already-frozen wire.
 
 **Subject:** [`docs/reviews/2026-08-16-m7-unimplemented-spec-artifacts.md`](../../reviews/2026-08-16-m7-unimplemented-spec-artifacts.md)
 
-**Normative product contract after this amendment:**
-[`spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md`](../../../spec-bundle/pattern_like_astrology_app_product_platform_spec_v0.6.md)
+**Normative authorities after this amendment:** the approved 2026-08-14 M7
+design, this amendment, and the frozen `contracts/m7` wire documents.
 
 This document does the spec work the review inserted in front of slices A–D.
 It does not implement a publisher, an ontology pipeline, administrator OIDC,
@@ -26,6 +26,14 @@ members do not change.
 
 The product specification outranks both design documents. v0.6 is that
 amendment.
+
+> **Retirement note (2026-09-04).** The v0.6 product-spec restatement has been
+> removed from `spec-bundle/`; its immutability rule was superseded by
+> `2026-08-29-pattern-source-regeneration-design.md`, and its Your Pattern
+> language lives in `apps/web/PRODUCT.md`. The authorities are now the
+> 2026-08-14 design as amended here and by the regeneration design, plus the
+> frozen `contracts/m7` and `contracts/m9` wire documents. Section 1 below
+> records the decision as it was made.
 
 ## Settled findings
 

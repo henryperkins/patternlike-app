@@ -43,7 +43,7 @@ test("the generated allowlist still matches the registry", () => {
     // would restore exactly the "correct today" posture this test exists to end.
     assert.fail(
       `could not run the allowlist generator (${result.error.message}). ` +
-        "Python 3.11+ with pyyaml is required — see CLAUDE.md.",
+        "Python 3.11+ with pyyaml is required — see AGENTS.md.",
     );
   }
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
