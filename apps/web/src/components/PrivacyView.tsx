@@ -6,6 +6,7 @@ import {
   getPatternGenerationConsent,
   getGeocoderConsent,
   grantAiSynthesisConsent,
+  grantGeocoderConsent,
   newIdempotencyKey,
   revokeAccountProcessingConsent,
   revokeAiSynthesisConsent,
@@ -27,14 +28,47 @@ import type { PatternConsent } from "@patternlike/shared";
 import type { GeocoderConsentResponse } from "@patternlike/shared";
 import { isGeocoderConsentResponse } from "../lib/geocoder-consent.js";
 
+type GeocoderConsentPanelState =
+  | { status: "loading" }
+  | { status: "ready"; consent: GeocoderConsentResponse }
+  | { status: "unreadable"; message: string };
+
+function describeGeocoderProblem(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === "geocoder_unavailable") {
+      // Rollout is off. The grant itself is what the server refuses, and it
+      // does so before recording anything, so the offer stays on screen and
+      // the manual fields remain the working path.
+      return withRequestId(
+        "Google birthplace search is not available yet, so this permission cannot be granted right now. You can still enter the place, coordinates, and time zone by hand.",
+        error.requestId,
+      );
+    }
+    if (error.code === "consent_policy_version_stale") {
+      return withRequestId(
+        "The Google search terms changed since this page was read. Review the current text and grant again.",
+        error.requestId,
+      );
+    }
+    return withRequestId(error.message, error.requestId);
+  }
+  return error instanceof Error
+    ? error.message
+    : "That could not be saved in this session.";
+}
+
 function GeocoderConsentPanel() {
-  const [state, setState] = useState<
-    | { status: "loading" }
-    | { status: "ready"; consent: GeocoderConsentResponse }
-    | { status: "failed"; message: string }
-  >({ status: "loading" });
+  const [state, setState] = useState<GeocoderConsentPanelState>({ status: "loading" });
+  const [reloads, setReloads] = useState(0);
   const [busy, setBusy] = useState(false);
-  const revokeKey = useRef<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  // One key per intent, minted at the press and held until it succeeds, so a
+  // retry after a transient failure resumes the same mutation rather than
+  // recording a second one.
+  const keys = useRef<{ grant: string | null; revoke: string | null }>({
+    grant: null,
+    revoke: null,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -43,12 +77,12 @@ function GeocoderConsentPanel() {
         if (controller.signal.aborted) return;
         setState(isGeocoderConsentResponse(consent)
           ? { status: "ready", consent }
-          : { status: "failed", message: "The Google search permission could not be read." });
+          : { status: "unreadable", message: "The Google search permission could not be read." });
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
           setState({
-            status: "failed",
+            status: "unreadable",
             message: error instanceof Error
               ? error.message
               : "The Google search permission could not be read.",
@@ -56,35 +90,50 @@ function GeocoderConsentPanel() {
         }
       });
     return () => controller.abort();
-  }, []);
+  }, [reloads]);
 
-  const revoke = async () => {
-    if (state.status !== "ready" || busy) return;
+  const mutate = async (intent: "grant" | "revoke", consent: GeocoderConsentResponse) => {
+    if (busy) return;
     setBusy(true);
-    revokeKey.current ??= newIdempotencyKey("web-geocoder-consent");
+    setProblem(null);
     try {
-      const consent = await revokeGeocoderConsent(
-        "privacy_center",
-        revokeKey.current,
-      );
-      if (!isGeocoderConsentResponse(consent)) {
+      let next: GeocoderConsentResponse;
+      if (intent === "grant") {
+        keys.current.grant ??= newIdempotencyKey("web-geocoder-consent");
+        next = await grantGeocoderConsent(
+          consent.policy_version,
+          "privacy_center",
+          keys.current.grant,
+        );
+      } else {
+        keys.current.revoke ??= newIdempotencyKey("web-geocoder-consent");
+        next = await revokeGeocoderConsent("privacy_center", keys.current.revoke);
+      }
+      if (!isGeocoderConsentResponse(next)) {
         throw new Error("The Google search permission response could not be verified.");
       }
-      revokeKey.current = null;
-      setState({ status: "ready", consent });
+      keys.current = { grant: null, revoke: null };
+      setState({ status: "ready", consent: next });
     } catch (error) {
-      setState({
-        status: "failed",
-        message: error instanceof Error
-          ? error.message
-          : "The Google search permission could not be withdrawn.",
-      });
+      setProblem(describeGeocoderProblem(error));
+      if (error instanceof ApiError && error.code === "consent_policy_version_stale") {
+        // The grant echoes the policy version this page read, so a stale
+        // refusal means the disclosure on screen is no longer the one being
+        // agreed to. Re-read it rather than resend the old version.
+        setReloads((value) => value + 1);
+      }
     } finally {
       setBusy(false);
     }
   };
 
   const granted = state.status === "ready" && state.consent.status === "granted";
+  // "Unknown" while loading or unreadable, for the same reason the reading
+  // panel below gives: "Not granted" is a definite claim about a state this
+  // page has not actually read.
+  const chip =
+    state.status === "ready" ? (granted ? "Granted" : "Not granted") : "Unknown";
+
   return (
     <section className="ai-consent panel" aria-labelledby="geocoder-consent-heading">
       <div className="panel-heading">
@@ -93,11 +142,16 @@ function GeocoderConsentPanel() {
           <h2 id="geocoder-consent-heading">Google birthplace search</h2>
         </div>
         <span className={`source-state${granted ? " source-state--active" : ""}`}>
-          <i /> {granted ? "Granted" : "Not granted"}
+          <i /> {chip}
         </span>
       </div>
       {state.status === "ready" ? (
         <>
+          {granted && state.consent.granted_at ? (
+            <p className="ai-consent__since">
+              Granted {formatInstant(state.consent.granted_at)}.
+            </p>
+          ) : null}
           <p>{state.consent.disclosure.text}</p>
           <p>
             <a href={state.consent.disclosure.links.patternlike_terms}>Terms</a>{" "}
@@ -105,22 +159,40 @@ function GeocoderConsentPanel() {
             <a href={state.consent.disclosure.links.google_maps_terms}>Google Maps terms</a>{" "}
             <a href={state.consent.disclosure.links.google_privacy}>Google privacy</a>
           </p>
-          {granted ? (
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={busy}
-              onClick={() => void revoke()}
-            >
-              Withdraw Google search permission <Icon name="shield" />
-            </button>
-          ) : null}
+          <button
+            className={`button ${granted ? "button--secondary" : "button--primary"}`}
+            type="button"
+            onClick={() => void mutate(granted ? "revoke" : "grant", state.consent)}
+            disabled={busy}
+            aria-busy={busy}
+            aria-describedby="geocoder-consent-status"
+          >
+            {granted ? "Withdraw Google search permission" : "Grant Google search permission"}{" "}
+            <Icon name={granted ? "shield" : "check"} />
+          </button>
         </>
-      ) : (
-        <p role="status">
-          {state.status === "loading" ? "Reading Google search permission." : state.message}
-        </p>
-      )}
+      ) : null}
+      <p
+        className="privacy-action__status"
+        id="geocoder-consent-status"
+        role="status"
+        aria-live="polite"
+      >
+        {state.status === "loading"
+          ? "Reading Google search permission."
+          : state.status === "unreadable"
+            ? state.message
+            : (problem ?? "")}
+      </p>
+      {state.status === "unreadable" ? (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => setReloads((value) => value + 1)}
+        >
+          Try again <Icon name="refresh" />
+        </button>
+      ) : null}
     </section>
   );
 }

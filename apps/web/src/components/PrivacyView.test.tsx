@@ -15,6 +15,12 @@ import {
   accountProcessingNotGranted,
   accountProcessingRevokedFreeze,
 } from "../test/account-processing-fixture.js";
+import {
+  GEOCODER_CONSENT_PATH,
+  geocoderGranted,
+  geocoderGrantedFromPrivacy,
+  geocoderNotGranted,
+} from "../test/geocoder-consent-fixture.js";
 
 const CONSENT = "/v1/consents/ai-synthesis";
 const TOPICS = "/v1/preferences/topic-exclusions";
@@ -66,6 +72,12 @@ function renderPrivacy(
       accountProcessingNotGranted,
     );
   }
+  if (
+    !(`GET ${GEOCODER_CONSENT_PATH}` in responses) &&
+    !(GEOCODER_CONSENT_PATH in responses)
+  ) {
+    responses[`GET ${GEOCODER_CONSENT_PATH}`] = ok(geocoderNotGranted);
+  }
   mockApiResponses(responses);
   return render(
     <PrivacyView
@@ -83,6 +95,10 @@ function consentPanel(): HTMLElement {
 
 function processingPanel(): HTMLElement {
   return screen.getByRole("region", { name: /Birth calculation permission/i });
+}
+
+function geocoderPanel(): HTMLElement {
+  return screen.getByRole("region", { name: /Google birthplace search/i });
 }
 
 describe("Context & privacy", () => {
@@ -220,6 +236,148 @@ describe("Context & privacy", () => {
       await screen.findByRole("button", { name: /Withdraw permission/i }),
     ).toBeInTheDocument();
     expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
+  });
+
+  it("grants Google birthplace search from Privacy under the privacy_center surface", async () => {
+    const user = userEvent.setup();
+    renderPrivacy({
+      [`GET ${GEOCODER_CONSENT_PATH}`]: ok(geocoderNotGranted),
+      [`PUT ${GEOCODER_CONSENT_PATH}`]: ok(geocoderGrantedFromPrivacy),
+    });
+
+    const panel = geocoderPanel();
+    expect(await within(panel).findByText("Not granted")).toBeInTheDocument();
+    expect(within(panel).getByText(geocoderNotGranted.disclosure.text)).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: "Google privacy" })).toHaveAttribute(
+      "href",
+      geocoderNotGranted.disclosure.links.google_privacy,
+    );
+
+    await user.click(
+      within(panel).getByRole("button", { name: /Grant Google search permission/i }),
+    );
+
+    const [request] = capturedFor(GEOCODER_CONSENT_PATH).filter((call) => call.method === "PUT");
+    expect(request!.body).toEqual({ policy_version: geocoderNotGranted.policy_version });
+    expect(request!.headers.get("x-consent-ui-surface")).toBe("privacy_center");
+    expect(request!.headers.get("idempotency-key")).toMatch(/^web-geocoder-consent-/);
+
+    // The control becomes its own inverse rather than disappearing.
+    expect(
+      await within(panel).findByRole("button", { name: /Withdraw Google search permission/i }),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText("Granted")).toBeInTheDocument();
+    expect(within(panel).getByText(/^Granted .+\.$/)).toBeInTheDocument();
+  });
+
+  it("keeps the Google grant offered and says why when the search is not enabled", async () => {
+    const user = userEvent.setup();
+    renderPrivacy({
+      [`PUT ${GEOCODER_CONSENT_PATH}`]: {
+        status: 503,
+        body: errorBody("geocoder_unavailable", "Place search is unavailable"),
+      },
+    });
+
+    const panel = geocoderPanel();
+    await user.click(
+      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+    );
+
+    const status = await within(panel).findByText(/not available yet/i);
+    expect(status).toHaveTextContent("enter the place, coordinates, and time zone by hand");
+    expect(status).toHaveTextContent("Request req_geocoder_unavailable");
+    expect(
+      within(panel).getByRole("button", { name: /Grant Google search permission/i }),
+    ).toBeEnabled();
+    expect(within(panel).getByText("Not granted")).toBeInTheDocument();
+    expect(capturedFor(GEOCODER_CONSENT_PATH).filter((call) => call.method === "GET")).toHaveLength(1);
+  });
+
+  it("re-reads the Google search terms when the grant names a stale policy", async () => {
+    const user = userEvent.setup();
+    renderPrivacy({
+      [`PUT ${GEOCODER_CONSENT_PATH}`]: {
+        status: 409,
+        body: errorBody(
+          "consent_policy_version_stale",
+          "Re-read the current geocoder policy and grant again",
+        ),
+      },
+    });
+
+    const panel = geocoderPanel();
+    await user.click(
+      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+    );
+
+    expect(await within(panel).findByText(/terms changed since this page was read/i))
+      .toHaveTextContent("Request req_consent_policy_version_stale");
+    await waitFor(() => {
+      expect(
+        capturedFor(GEOCODER_CONSENT_PATH).filter((call) => call.method === "GET"),
+      ).toHaveLength(2);
+    });
+    expect(
+      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+    ).toBeEnabled();
+  });
+
+  it("withdraws Google birthplace search from Privacy with an empty DELETE", async () => {
+    const user = userEvent.setup();
+    renderPrivacy({
+      [`GET ${GEOCODER_CONSENT_PATH}`]: ok(geocoderGranted),
+      [`DELETE ${GEOCODER_CONSENT_PATH}`]: ok(geocoderNotGranted),
+    });
+
+    const panel = geocoderPanel();
+    expect(await within(panel).findByText("Granted")).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("button", { name: /Grant Google search permission/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(panel).getByRole("button", { name: /Withdraw Google search permission/i }),
+    );
+
+    const [request] = capturedFor(GEOCODER_CONSENT_PATH).filter(
+      (call) => call.method === "DELETE",
+    );
+    expect(request!.body).toBeNull();
+    expect(request!.headers.get("x-consent-ui-surface")).toBe("privacy_center");
+    expect(request!.headers.get("idempotency-key")).toMatch(/^web-geocoder-consent-/);
+
+    expect(
+      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText("Not granted")).toBeInTheDocument();
+  });
+
+  it("says Unknown for Google search when the permission cannot be read", async () => {
+    const user = userEvent.setup();
+    let reads = 0;
+    const responses: Record<string, MockResponse> = {};
+    Object.defineProperty(responses, `GET ${GEOCODER_CONSENT_PATH}`, {
+      enumerable: true,
+      get: (): MockResponse =>
+        reads++ === 0
+          ? { status: 500, body: errorBody("internal_error", "The read failed") }
+          : ok(geocoderNotGranted),
+    });
+    renderPrivacy(responses);
+
+    const panel = geocoderPanel();
+    expect(await within(panel).findByText("Unknown")).toBeInTheDocument();
+    expect(within(panel).getByText(/The read failed/)).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("button", { name: /Google search permission/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: /Try again/i }));
+    expect(
+      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText("Not granted")).toBeInTheDocument();
   });
 
   it("reports granted, not-granted, and unknown processing states honestly", async () => {
