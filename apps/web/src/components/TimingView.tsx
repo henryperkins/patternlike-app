@@ -4,6 +4,7 @@ import {
   useId,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import {
   ApiError,
@@ -17,9 +18,13 @@ import { isNotImplemented } from "../lib/api-status.js";
 import {
   DURATION_OPTIONS,
   PHASE_OPTIONS,
+  TIMING_GLOSSARY,
+  formatTimingDate,
   formatTimingDuration,
-  formatTimingInstant,
+  formatTimingLength,
+  formatTimingLocalDate,
   formatTimingOrb,
+  nextPassIndex,
   timingCycleTitle,
   timingDirectionLabel,
   timingPhaseLabel,
@@ -34,16 +39,16 @@ interface TimingViewProps {
   onUnauthorized: () => void;
 }
 
-type TimelineStyle = CSSProperties & { "--timing-position": string };
+type TrackStyle = CSSProperties & { "--timing-at": string };
 
-function timelinePosition(
+/** Where an instant sits along the envelope, clamped to the track. */
+function trackPosition(
   instant: string,
-  startAt: string,
-  endAt: string,
+  cycle: Pick<TimingCycle, "start_at" | "end_at">,
 ): number {
   const instantMs = new Date(instant).valueOf();
-  const startMs = new Date(startAt).valueOf();
-  const endMs = new Date(endAt).valueOf();
+  const startMs = new Date(cycle.start_at).valueOf();
+  const endMs = new Date(cycle.end_at).valueOf();
   if (
     !Number.isFinite(instantMs) ||
     !Number.isFinite(startMs) ||
@@ -55,128 +60,268 @@ function timelinePosition(
   return Math.min(100, Math.max(0, ((instantMs - startMs) / (endMs - startMs)) * 100));
 }
 
-function markerStyle(
+function at(
   instant: string,
   cycle: Pick<TimingCycle, "start_at" | "end_at">,
-): TimelineStyle {
-  return {
-    "--timing-position": `${timelinePosition(
-      instant,
-      cycle.start_at,
-      cycle.end_at,
-    )}%`,
-  };
-}
-
-function scanStateLabel(state: TimingResponse["calculation_status"]["state"]): string {
-  switch (state) {
-    case "current":
-      return "Current scan";
-    case "stale":
-      return "Stale scan";
-    case "not_scanned":
-      return "Not scanned";
-  }
+): TrackStyle {
+  return { "--timing-at": `${trackPosition(instant, cycle)}%` };
 }
 
 function unreadableMessage(count: number): string {
   return `${count} stored ${count === 1 ? "cycle" : "cycles"} could not be read.`;
 }
 
-function Timeline({ cycle, asOf }: { cycle: TimingCycle; asOf: string }) {
-  const nextPass = cycle.passes.find(
-    (pass) => new Date(pass.exact_at).valueOf() >= new Date(asOf).valueOf(),
-  );
-
+/**
+ * The arc as a picture: a rule from start to end, filled as far as today,
+ * with each exact pass ticked and numbered to match the list beneath it.
+ *
+ * Decorative by contract. Every date it plots is in the visible list and the
+ * span line as real `<time>` elements, so nothing here is the only copy.
+ */
+function Track({
+  cycle,
+  asOf,
+  nextIndex,
+}: {
+  cycle: TimingCycle;
+  asOf: string;
+  nextIndex: number;
+}) {
+  const active = cycle.status === "active";
   return (
-    <div className="timing-cycle__timeline" aria-hidden="true">
-      <span className="timing-cycle__timeline-rule" />
-      {cycle.status === "active" ? (
-        <span
-          className="timing-cycle__marker timing-cycle__marker--current"
-          style={markerStyle(asOf, cycle)}
-        />
+    <div className="timing-track" aria-hidden="true">
+      <span className="timing-track__rule" />
+      {active ? (
+        <span className="timing-track__elapsed" style={at(asOf, cycle)} />
       ) : null}
-      {cycle.passes.map((pass) => (
+      {cycle.passes.map((pass, index) => (
         <span
-          className={`timing-cycle__marker timing-cycle__marker--pass${
-            pass === nextPass ? " timing-cycle__marker--next" : ""
+          className={`timing-track__pass${
+            index === nextIndex ? " timing-track__pass--next" : ""
           }`}
           key={pass.pass_index}
-          style={markerStyle(pass.exact_at, cycle)}
-        />
+          style={at(pass.exact_at, cycle)}
+        >
+          {pass.pass_index}
+        </span>
       ))}
+      {active ? <span className="timing-track__now" style={at(asOf, cycle)} /> : null}
     </div>
   );
 }
 
 function CycleArticle({ cycle, asOf }: { cycle: TimingCycle; asOf: string }) {
   const headingId = useId();
+  const nextIndex = nextPassIndex(cycle.passes, asOf);
+  const nextPass = nextIndex === -1 ? null : cycle.passes[nextIndex] ?? null;
+  const lastPass = cycle.passes[cycle.passes.length - 1] ?? null;
+
+  let detail: ReactNode;
+  if (cycle.status === "upcoming") {
+    detail = (
+      <>
+        Starts{" "}
+        <time dateTime={cycle.start_at}>{formatTimingDate(cycle.start_at, asOf)}</time>
+      </>
+    );
+  } else if (nextPass) {
+    detail = (
+      <>
+        Next exact{" "}
+        <time dateTime={nextPass.exact_at}>
+          {formatTimingDate(nextPass.exact_at, asOf)}
+        </time>
+      </>
+    );
+  } else if (lastPass) {
+    detail = (
+      <>
+        Last exact{" "}
+        <time dateTime={lastPass.exact_at}>
+          {formatTimingDate(lastPass.exact_at, asOf)}
+        </time>
+      </>
+    );
+  } else {
+    detail = null;
+  }
 
   return (
     <article className="timing-cycle" aria-labelledby={headingId}>
-      <header className="timing-cycle__header">
-        <h2 id={headingId}>
-          {timingCycleTitle(cycle.body, cycle.aspect, cycle.target)}
-        </h2>
+      <h3 id={headingId}>
+        {timingCycleTitle(cycle.body, cycle.aspect, cycle.target)}
+      </h3>
+      <p className="timing-cycle__status">
         <span className="timing-cycle__phase">
           {timingPhaseLabel(cycle.phase, cycle.status)}
         </span>
-      </header>
+        {detail ? (
+          <span
+            className={`timing-cycle__detail-line${
+              cycle.status === "active" && nextPass
+                ? " timing-cycle__detail-line--next"
+                : ""
+            }`}
+          >
+            {detail}
+          </span>
+        ) : null}
+      </p>
 
-      <div className="timing-cycle__envelope">
-        <p>
-          <span>Starts</span>{" "}
-          <time dateTime={cycle.start_at}>
-            {formatTimingInstant(cycle.start_at)}
-          </time>
-        </p>
-        <p>
-          <span>Ends</span>{" "}
-          <time dateTime={cycle.end_at}>{formatTimingInstant(cycle.end_at)}</time>
-        </p>
-      </div>
+      <Track cycle={cycle} asOf={asOf} nextIndex={nextIndex} />
+      <p className="timing-cycle__span">
+        <time dateTime={cycle.start_at}>{formatTimingDate(cycle.start_at, asOf)}</time>
+        <span className="timing-cycle__length">
+          {formatTimingLength(cycle.duration_days)}
+        </span>
+        <time dateTime={cycle.end_at}>{formatTimingDate(cycle.end_at, asOf)}</time>
+      </p>
 
-      <Timeline cycle={cycle} asOf={asOf} />
-
-      <div className="timing-cycle__passes">
-        <h3>Exact passes</h3>
-        <ol>
-          {cycle.passes.map((pass) => (
-            <li key={pass.pass_index}>
-              <span className="timing-cycle__pass-number">
-                Pass {pass.pass_index}
-              </span>
-              <time dateTime={pass.exact_at}>
-                {formatTimingInstant(pass.exact_at)}
+      <ol className="timing-cycle__passes" aria-label="Exact passes">
+        {cycle.passes.map((pass, index) => {
+          const relation =
+            index === nextIndex
+              ? "next"
+              : nextIndex === -1 || index < nextIndex
+                ? "past"
+                : "later";
+          return (
+            <li className={`timing-pass timing-pass--${relation}`} key={pass.pass_index}>
+              <span className="timing-pass__index">Pass {pass.pass_index}</span>
+              <time className="timing-pass__date" dateTime={pass.exact_at}>
+                {formatTimingDate(pass.exact_at, asOf)}
               </time>
-              <span className="timing-cycle__direction">
+              <span className="timing-pass__direction">
                 {timingDirectionLabel(pass.direction)}
               </span>
+              {relation === "next" ? (
+                <span className="timing-pass__relation">Next</span>
+              ) : null}
             </li>
-          ))}
-        </ol>
-      </div>
+          );
+        })}
+      </ol>
 
-      <dl className="timing-cycle__evidence">
-        <div>
-          <dt>Technique</dt>
-          <dd>Transit</dd>
-        </div>
-        <div>
-          <dt>Orb</dt>
-          <dd>{formatTimingOrb(cycle.orb_deg)}</dd>
-        </div>
-        <div>
-          <dt>Duration</dt>
-          <dd>{formatTimingDuration(cycle.duration_days)}</dd>
-        </div>
-        <div className="timing-cycle__identity">
-          <dt>Cycle id</dt>
-          <dd>{cycle.cycle_id}</dd>
-        </div>
-      </dl>
+      <details className="timing-cycle__detail">
+        <summary>
+          <span>Calculation details</span>
+          <span className="timing-toggle">Open</span>
+        </summary>
+        <dl className="timing-cycle__evidence">
+          <div>
+            <dt>Orb</dt>
+            <dd>{formatTimingOrb(cycle.orb_deg)}</dd>
+          </div>
+          <div>
+            <dt>In range for</dt>
+            <dd>{formatTimingDuration(cycle.duration_days)}</dd>
+          </div>
+          <div>
+            <dt>Technique</dt>
+            <dd>Transit</dd>
+          </div>
+          <div className="timing-cycle__identity">
+            <dt>Cycle id</dt>
+            <dd>{cycle.cycle_id}</dd>
+          </div>
+        </dl>
+      </details>
     </article>
+  );
+}
+
+function CycleGroup({
+  id,
+  heading,
+  cycles,
+  asOf,
+}: {
+  id: string;
+  heading: string;
+  cycles: TimingCycle[];
+  asOf: string;
+}) {
+  return (
+    <section className="timing-group" aria-labelledby={id}>
+      <h2 className="timing-group__heading" id={id}>
+        {heading}{" "}
+        <span className="timing-group__count">{cycles.length}</span>
+      </h2>
+      <ol className="timing-cycles">
+        {cycles.map((cycle) => (
+          <li key={cycle.cycle_id}>
+            <CycleArticle cycle={cycle} asOf={asOf} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * When these cycles were found, in one sentence.
+ *
+ * The receipt is written by daily-reading preparation, so the honest way to
+ * say "fresh" is to say which day's reading did the work. A stale receipt
+ * keeps its facts on screen and names the one action that renews it.
+ *
+ * "Today" is the server's word: it compares the receipt's local date with the
+ * reader's current local date in the confirmed scheduling zone. The receipt
+ * instant would render in the browser's zone, which can sit on the other side
+ * of midnight, so no clock time is placed next to that word.
+ *
+ * A response can carry stored cycles and no receipt at all — persistence
+ * succeeded and the reading reservation did not — and the omission count is
+ * independent of the receipt. Both stay visible in every state.
+ */
+function Freshness({ response }: { response: TimingResponse }) {
+  const status = response.calculation_status;
+  const unreadable = response.unreadable_cycle_count;
+  const hasStoredCycles = response.cycles.length > 0 || unreadable > 0;
+  if (status.state === "not_scanned" && !hasStoredCycles) return null;
+
+  const refreshedAt = status.last_refresh_at;
+  const refreshedOn = status.last_refresh_local_date;
+
+  let sentence: ReactNode;
+  if (status.state === "current") {
+    sentence = <p>Calculated today, when your daily reading was prepared.</p>;
+  } else if (status.state === "stale") {
+    sentence = (
+      <p>
+        Calculated{" "}
+        {refreshedOn ? (
+          <time dateTime={refreshedOn}>
+            {formatTimingLocalDate(refreshedOn, response.as_of)}
+          </time>
+        ) : refreshedAt ? (
+          <time dateTime={refreshedAt}>
+            {formatTimingDate(refreshedAt, response.as_of)}
+          </time>
+        ) : (
+          "on an earlier day"
+        )}{" "}
+        with that day's reading. It updates when today's reading is prepared.{" "}
+        <a href="#today">Open Today</a>
+      </p>
+    );
+  } else {
+    sentence = (
+      <p>
+        Calculated for a daily reading that did not finish preparing. It
+        updates when today's reading is prepared.{" "}
+        <a href="#today">Open Today</a>
+      </p>
+    );
+  }
+
+  return (
+    <div className="timing-scan">
+      {sentence}
+      {unreadable > 0 ? (
+        <p className="timing-scan__warning">{unreadableMessage(unreadable)}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -185,13 +330,17 @@ function TimingEmptyState({ response }: { response: TimingResponse }) {
     response.applied_filters.phase !== null ||
     response.applied_filters.duration !== null;
 
-  if (response.calculation_status.state === "not_scanned") {
+  if (
+    response.calculation_status.state === "not_scanned" &&
+    response.unreadable_cycle_count === 0
+  ) {
     return (
       <section className="timing-empty" aria-labelledby="timing-empty-heading">
-        <h2 id="timing-empty-heading">Timing does not have a persisted scan yet.</h2>
+        <h2 id="timing-empty-heading">No cycles have been calculated yet.</h2>
         <p>
-          Today is where preparation begins. It may first require chart,
-          scheduling time zone, locale, or active release setup.
+          They are calculated the first time your daily reading is prepared.
+          That needs your chart, a confirmed time zone and language, and your
+          AI-synthesis consent.
         </p>
         <a className="timing-empty__link" href="#today">
           Open Today <Icon name="arrow" />
@@ -203,13 +352,9 @@ function TimingEmptyState({ response }: { response: TimingResponse }) {
   if (isFiltered) {
     return (
       <section className="timing-empty" aria-labelledby="timing-empty-heading">
-        <h2 id="timing-empty-heading">
-          {response.unreadable_cycle_count > 0
-            ? "No readable cycles match the selected filters."
-            : "No persisted cycles match the selected filters."}
-        </h2>
+        <h2 id="timing-empty-heading">No cycles match these filters.</h2>
         {response.unreadable_cycle_count > 0 ? (
-          <p>Omitted stored cycles could not be evaluated against the filters.</p>
+          <p>Cycles that could not be read were not checked against them.</p>
         ) : null}
       </section>
     );
@@ -218,18 +363,24 @@ function TimingEmptyState({ response }: { response: TimingResponse }) {
   if (response.unreadable_cycle_count > 0) {
     return (
       <section className="timing-empty" aria-labelledby="timing-empty-heading">
-        <h2 id="timing-empty-heading">No stored cycles could be displayed.</h2>
-        <p>The persisted scan contained no other readable cycle artifacts.</p>
+        <h2 id="timing-empty-heading">None of the stored cycles could be shown.</h2>
+        <p>
+          Every cycle stored by this calculation failed to read. There is
+          nothing else to show.
+        </p>
       </section>
     );
   }
 
+  // The route drops a cycle the moment its envelope ends, so an empty list is
+  // a statement about now, never about what the scan stored.
   return (
     <section className="timing-empty" aria-labelledby="timing-empty-heading">
-      <h2 id="timing-empty-heading">
-        No stored cycles overlap the current scan window.
-      </h2>
-      <p>This does not describe activity outside that stored window.</p>
+      <h2 id="timing-empty-heading">Nothing is in range right now.</h2>
+      <p>
+        No stored cycle is in range today or about to come into range. That
+        says nothing about dates outside the window the calculation covered.
+      </p>
     </section>
   );
 }
@@ -298,28 +449,57 @@ export function TimingView({ onUnauthorized }: TimingViewProps) {
 
   const isFiltered = phase !== "" || duration !== "";
   const statusMessage = busy
-    ? "Loading persisted cycle timing."
+    ? "Loading your cycles."
     : failure?.kind === "not_implemented"
-      ? "Timing availability changed."
+      ? "Timing is not available on this server."
       : failure
-        ? "Timing request failed."
+        ? "Timing could not be loaded."
         : response
-          ? "Persisted cycle timing loaded."
-          : "Timing is ready to load.";
+          ? "Cycles loaded."
+          : "Ready to load.";
+
+  // Filters only appear when there is something they could narrow: a list, or
+  // an applied filter the reader needs to be able to clear. The server's echo
+  // counts too, so a filtered-empty answer can never strand the controls.
+  const responseFiltered =
+    response !== null &&
+    (response.applied_filters.phase !== null ||
+      response.applied_filters.duration !== null);
+  const showFilters =
+    response !== null &&
+    (response.cycles.length > 0 || isFiltered || responseFiltered);
+  const activeCycles = response?.cycles.filter((cycle) => cycle.status === "active") ?? [];
+  const upcomingCycles =
+    response?.cycles.filter((cycle) => cycle.status === "upcoming") ?? [];
 
   return (
     <section className="timing-page page-enter">
       <header className="timing-hero">
         <p className="eyebrow">Timing / Active cycles</p>
-        <h1>See the whole arc, not just the peak.</h1>
-        <p>
-          Inspect calculated cycle windows and exact passes already stored with
-          your daily reading. These are factual timing records, not promised
-          events or outcomes.
+        <h1>Where each cycle stands today.</h1>
+        <p className="timing-hero__lede">
+          A cycle is a planet in the current sky lining up at a set angle with
+          a point in your birth chart. It comes into range, is exact once or a
+          few times, then moves on. These are the cycles your daily reading
+          works from: calculated dates, not predicted events.
         </p>
+        <details className="timing-glossary">
+          <summary>
+            <span>What the terms mean</span>
+            <span className="timing-toggle">Open</span>
+          </summary>
+          <dl>
+            {TIMING_GLOSSARY.map((entry) => (
+              <div key={entry.term}>
+                <dt>{entry.term}</dt>
+                <dd>{entry.definition}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </header>
 
-      <p className="timing-page__status" role="status" aria-live="polite">
+      <p className="sr-only" role="status" aria-live="polite">
         {statusMessage}
       </p>
 
@@ -327,16 +507,16 @@ export function TimingView({ onUnauthorized }: TimingViewProps) {
         <section className="timing-failure panel" aria-labelledby="timing-failure-heading">
           <h2 id="timing-failure-heading">
             {failure.kind === "not_implemented"
-              ? "Timing is not active on this Worker."
+              ? "Timing is not available on this server."
               : failure.message}
           </h2>
           {failure.kind === "not_implemented" ? (
             <p>
               An installed or cached copy of the app may be newer than the
-              Worker currently serving this route.
+              server answering it.
             </p>
           ) : (
-            <p>The persisted Timing facts remain unchanged. Try the request again.</p>
+            <p>Nothing stored has changed. Try the request again.</p>
           )}
           {failure.requestId ? (
             <small className="timing-failure__request">
@@ -357,84 +537,79 @@ export function TimingView({ onUnauthorized }: TimingViewProps) {
         </section>
       ) : (
         <>
-          <section className="timing-scan" aria-label="Timing scan status">
-            <div>
-              <span className="timing-scan__label">Persisted daily-reading scan</span>
-              <strong>
-                {response
-                  ? scanStateLabel(response.calculation_status.state)
-                  : "Checking scan"}
-              </strong>
+          {response ? <Freshness response={response} /> : null}
+
+          {showFilters ? (
+            <section
+              className={`timing-filters${busy ? " timing-filters--busy" : ""}`}
+              aria-label="Timing filters"
+            >
+              <label>
+                <span>Phase</span>
+                <select
+                  value={phase}
+                  onChange={(event) =>
+                    setPhase(event.currentTarget.value as "" | TimingPhaseFilter)
+                  }
+                >
+                  {PHASE_OPTIONS.map((option) => (
+                    <option key={option.value || "all"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Duration</span>
+                <select
+                  value={duration}
+                  onChange={(event) =>
+                    setDuration(
+                      event.currentTarget.value as "" | TimingDurationFilter,
+                    )
+                  }
+                >
+                  {DURATION_OPTIONS.map((option) => (
+                    <option key={option.value || "all"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+          ) : null}
+
+          {busy && !response ? (
+            <div className="timing-loading" aria-hidden="true">
+              <span />
+              <span />
+              <span />
             </div>
-            {response?.calculation_status.last_refresh_at ? (
-              <p>
-                Last prepared{" "}
-                <time dateTime={response.calculation_status.last_refresh_at}>
-                  {formatTimingInstant(response.calculation_status.last_refresh_at)}
-                </time>
-              </p>
-            ) : null}
-            {response && response.unreadable_cycle_count > 0 ? (
-              <p className="timing-scan__warning">
-                {unreadableMessage(response.unreadable_cycle_count)}
-              </p>
-            ) : null}
-          </section>
-
-          <section className="timing-filters" aria-label="Timing filters">
-            <label>
-              <span>Phase</span>
-              <select
-                value={phase}
-                onChange={(event) =>
-                  setPhase(event.currentTarget.value as "" | TimingPhaseFilter)
-                }
-              >
-                {PHASE_OPTIONS.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Duration</span>
-              <select
-                value={duration}
-                onChange={(event) =>
-                  setDuration(
-                    event.currentTarget.value as "" | TimingDurationFilter,
-                  )
-                }
-              >
-                {DURATION_OPTIONS.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
-
-          {response?.calculation_status.state === "stale" ? (
-            <aside className="timing-notice">
-              <p>This persisted scan is from an earlier local day.</p>
-              <a href="#today">Open Today</a>
-            </aside>
           ) : null}
 
           {response && response.cycles.length > 0 ? (
-            <ol className="timing-cycles">
-              {response.cycles.map((cycle) => (
-                <li key={cycle.cycle_id}>
-                  <CycleArticle cycle={cycle} asOf={response.as_of} />
-                </li>
-              ))}
-            </ol>
+            <div className="timing-groups" aria-busy={busy || undefined}>
+              {activeCycles.length > 0 ? (
+                <CycleGroup
+                  id="timing-active-heading"
+                  heading="Active now"
+                  cycles={activeCycles}
+                  asOf={response.as_of}
+                />
+              ) : null}
+              {upcomingCycles.length > 0 ? (
+                <CycleGroup
+                  id="timing-upcoming-heading"
+                  heading="Upcoming"
+                  cycles={upcomingCycles}
+                  asOf={response.as_of}
+                />
+              ) : null}
+            </div>
           ) : response ? (
             <>
               <TimingEmptyState response={response} />
-              {isFiltered ? (
+              {isFiltered || responseFiltered ? (
                 <button
                   className="button button--secondary timing-filters__reset"
                   type="button"

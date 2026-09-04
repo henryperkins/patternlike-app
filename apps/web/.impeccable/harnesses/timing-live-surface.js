@@ -174,20 +174,20 @@ async page => {
   await page
     .getByRole("heading", {
       level: 1,
-      name: "See the whole arc, not just the peak.",
+      name: "Where each cycle stands today.",
     })
     .waitFor();
 
   if (mode === "live") {
     await page
-      .getByRole("heading", { level: 2, name: "Saturn square your Sun" })
+      .getByRole("heading", { level: 3, name: "Saturn square your Sun" })
       .waitFor();
     await page.getByText("1 stored cycle could not be read.", { exact: true }).waitFor();
   } else {
     await page
       .getByRole("heading", {
         level: 2,
-        name: "Timing does not have a persisted scan yet.",
+        name: "No cycles have been calculated yet.",
       })
       .waitFor();
   }

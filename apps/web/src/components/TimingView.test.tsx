@@ -17,12 +17,14 @@ import {
   timingResponseFixture,
 } from "../test/timing-fixture.js";
 import {
+  formatTimingDate,
   formatTimingDuration,
-  formatTimingInstant,
+  formatTimingLocalDate,
   formatTimingOrb,
 } from "../lib/timing-format.js";
 
 const TIMING = "/v1/timing";
+const AS_OF = TIMING_RESPONSE.as_of;
 const ok = (body: unknown): MockResponse => ({ status: 200, body });
 
 function renderTiming(responses: Record<string, MockResponse>) {
@@ -38,42 +40,64 @@ describe("TimingView", () => {
 
     const heading = await screen.findByRole("heading", {
       level: 1,
-      name: "See the whole arc, not just the peak.",
+      name: "Where each cycle stands today.",
     });
     expect(screen.getAllByRole("heading", { level: 1 })).toEqual([heading]);
     expect(
-      screen.getByText(/calculated cycle windows and exact passes already stored/i),
+      screen.getByText(/lining up at a set angle with a point in your birth chart/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/not promised events or outcomes/i)).toBeInTheDocument();
-    expect(screen.getByText("Persisted daily-reading scan")).toBeInTheDocument();
-    expect(screen.getByText("Current scan")).toBeInTheDocument();
+    expect(screen.getByText(/calculated dates, not predicted events/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("Calculated today, when your daily reading was prepared."),
+    ).toBeInTheDocument();
+
+    // Cycles are grouped by status, so the reader sees "what is in play" before
+    // reading a single card. The group heading owns the level the cards sat at.
+    expect(screen.getByRole("heading", { level: 2, name: /Active now/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /Upcoming/ })).toBeInTheDocument();
 
     const activeHeading = screen.getByRole("heading", {
-      level: 2,
+      level: 3,
       name: "Saturn square your Sun",
     });
     const activeArticle = activeHeading.closest("article");
     expect(activeArticle).not.toBeNull();
     const active = within(activeArticle!);
     expect(active.getByText("Reconsidering")).toBeInTheDocument();
-    expect(active.getByText(formatTimingInstant(ACTIVE_TIMING_CYCLE.start_at))).toBeInTheDocument();
-    expect(active.getByText(formatTimingInstant(ACTIVE_TIMING_CYCLE.end_at))).toBeInTheDocument();
+    expect(active.getByText(/Next exact/)).toBeInTheDocument();
+    expect(
+      active.getByText(formatTimingDate(ACTIVE_TIMING_CYCLE.start_at, AS_OF)),
+    ).toBeInTheDocument();
+    expect(
+      active.getByText(formatTimingDate(ACTIVE_TIMING_CYCLE.end_at, AS_OF)),
+    ).toBeInTheDocument();
+    expect(active.getByText("about 6 months")).toBeInTheDocument();
     expect(active.getByText("Pass 1")).toBeInTheDocument();
     expect(active.getByText("Pass 2")).toBeInTheDocument();
     expect(active.getByText("Pass 3")).toBeInTheDocument();
     expect(active.getByText("Retrograde")).toBeInTheDocument();
+    // The next pass is named twice on purpose: once as the headline fact and
+    // once in its row, which is the one tagged.
+    expect(
+      active.getAllByText(formatTimingDate(ACTIVE_TIMING_CYCLE.passes[1]!.exact_at, AS_OF)),
+    ).toHaveLength(2);
+    expect(active.getByText("Next")).toBeInTheDocument();
     expect(active.getByText("Transit")).toBeInTheDocument();
     expect(active.getByText(formatTimingOrb(3))).toBeInTheDocument();
     expect(
       active.getByText(formatTimingDuration(ACTIVE_TIMING_CYCLE.duration_days)),
     ).toBeInTheDocument();
     expect(active.getByText(ACTIVE_TIMING_CYCLE.cycle_id)).toBeInTheDocument();
+    expect(active.getByText("Calculation details").closest("details")).not.toHaveAttribute("open");
 
     const upcomingHeading = screen.getByRole("heading", {
-      level: 2,
+      level: 3,
       name: "Jupiter trine your Moon",
     });
-    expect(within(upcomingHeading.closest("article")!).getByText("Upcoming")).toBeInTheDocument();
+    const upcoming = within(upcomingHeading.closest("article")!);
+    expect(upcoming.getByText("Upcoming")).toBeInTheDocument();
+    expect(upcoming.getByText(/Starts/)).toBeInTheDocument();
+    expect(upcoming.getByText("about 3 weeks")).toBeInTheDocument();
 
     const dateTimes = Array.from(container.querySelectorAll("time"), (time) =>
       time.getAttribute("datetime"),
@@ -89,19 +113,33 @@ describe("TimingView", () => {
       ]),
     );
     expect(
-      container.querySelectorAll('.timing-cycle__timeline[aria-hidden="true"]'),
+      container.querySelectorAll('.timing-track[aria-hidden="true"]'),
     ).toHaveLength(2);
   });
 
-  it("limits a current empty claim to the stored scan window", async () => {
+  it("explains the vocabulary once, in a disclosure that starts closed", async () => {
+    renderTiming({ [TIMING]: ok(TIMING_RESPONSE) });
+    await screen.findByRole("heading", { name: "Saturn square your Sun" });
+
+    const summary = screen.getByText("What the terms mean");
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    expect(
+      screen.getByText(/Reconsidering is between the first and last pass/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/called the orb/)).toBeInTheDocument();
+  });
+
+  it("limits a current empty claim to the stored scan window and hides the filters", async () => {
     renderTiming({
       [TIMING]: ok(timingResponseFixture({ cycles: [] })),
     });
 
+    expect(await screen.findByText(/Nothing is in range right now/i)).toBeInTheDocument();
     expect(
-      await screen.findByText(/No stored cycles overlap the current scan window/i),
+      screen.getByText(/says nothing about dates outside the window/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/does not describe activity outside that stored window/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Phase")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Duration")).not.toBeInTheDocument();
   });
 
   it("keeps stale facts visible and links to Today for preparation", async () => {
@@ -112,7 +150,10 @@ describe("TimingView", () => {
     expect(
       await screen.findByRole("heading", { name: "Saturn square your Sun" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/scan is from an earlier local day/i)).toBeInTheDocument();
+    expect(screen.getByText(formatTimingLocalDate("2026-08-09", AS_OF))).toBeInTheDocument();
+    expect(
+      screen.getByText(/It updates when today's reading is prepared/i),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open Today/i })).toHaveAttribute(
       "href",
       "#today",
@@ -127,16 +168,57 @@ describe("TimingView", () => {
     });
 
     expect(
-      await screen.findByText(/does not have a persisted scan yet/i),
+      await screen.findByText(/No cycles have been calculated yet/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/chart, scheduling time zone, locale, or active release setup/i),
+      screen.getByText(/chart, a confirmed time zone and language, and your AI-synthesis consent/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open Today/i })).toHaveAttribute(
       "href",
       "#today",
     );
     expect(screen.queryByText(/will populate/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Calculated/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Phase")).not.toBeInTheDocument();
+  });
+
+  it("keeps stored cycles and omissions visible when no receipt exists", async () => {
+    const first = renderTiming({
+      [TIMING]: ok(
+        timingResponseFixture({
+          state: "not_scanned",
+          cycles: [ACTIVE_TIMING_CYCLE],
+          unreadableCycleCount: 1,
+        }),
+      ),
+    });
+
+    expect(
+      await screen.findByRole("heading", { level: 3, name: "Saturn square your Sun" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 stored cycle could not be read.")).toBeInTheDocument();
+    expect(screen.getByText(/did not finish preparing/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open Today/i })).toHaveAttribute(
+      "href",
+      "#today",
+    );
+    expect(screen.queryByText(/No cycles have been calculated yet/i)).not.toBeInTheDocument();
+    first.unmount();
+
+    renderTiming({
+      [TIMING]: ok(
+        timingResponseFixture({
+          state: "not_scanned",
+          cycles: [],
+          unreadableCycleCount: 2,
+        }),
+      ),
+    });
+    expect(
+      await screen.findByText(/None of the stored cycles could be shown/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 stored cycles could not be read.")).toBeInTheDocument();
+    expect(screen.queryByText(/No cycles have been calculated yet/i)).not.toBeInTheDocument();
   });
 
   it("keeps filters visible on an empty match and resets to the unfiltered URL", async () => {
@@ -156,7 +238,7 @@ describe("TimingView", () => {
     await user.selectOptions(screen.getByLabelText("Phase"), "building");
 
     expect(
-      await screen.findByText(/No persisted cycles match the selected filters/i),
+      await screen.findByText(/No cycles match these filters/i),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Duration")).toBeInTheDocument();
     expect(capturedFor(TIMING).at(-1)!.search).toBe("?phase=building");
@@ -183,7 +265,7 @@ describe("TimingView", () => {
       ),
     });
     expect(
-      await screen.findByText(/No stored cycles could be displayed/i),
+      await screen.findByText(/None of the stored cycles could be shown/i),
     ).toBeInTheDocument();
     expect(screen.getByText("2 stored cycles could not be read.")).toBeInTheDocument();
   });
@@ -219,6 +301,12 @@ describe("TimingView", () => {
     await user.selectOptions(screen.getByLabelText("Duration"), "medium");
     await waitFor(() => expect(capturedFor(TIMING)).toHaveLength(3));
 
+    // Pending: the filters carry the visible busy cue and the results stay
+    // rendered, undimmed, under an aria-busy marker.
+    const filters = screen.getByLabelText("Phase").closest("section")!;
+    expect(filters).toHaveClass("timing-filters--busy");
+    expect(screen.getByRole("heading", { name: "Saturn square your Sun" })).toBeInTheDocument();
+
     expect(phaseSignal?.aborted).toBe(true);
     expect(capturedFor(TIMING)[1]!.search).toBe("?phase=peak");
     expect(capturedFor(TIMING)[2]!.search).toBe("?phase=peak&duration=medium");
@@ -226,6 +314,7 @@ describe("TimingView", () => {
 
     await act(async () => durationGate.release());
     await screen.findByRole("heading", { name: "Saturn square your Sun" });
+    await waitFor(() => expect(filters).not.toHaveClass("timing-filters--busy"));
     await act(async () => phaseGate.release());
   });
 
@@ -238,15 +327,14 @@ describe("TimingView", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "See the whole arc, not just the peak.",
+        name: "Where each cycle stands today.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /Loading persisted cycle timing/i,
-    );
+    expect(screen.getByRole("status")).toHaveTextContent(/Loading your cycles/i);
 
     await act(async () => gate.release());
     await screen.findByRole("heading", { name: "Saturn square your Sun" });
+    expect(screen.getByRole("status")).toHaveTextContent(/Cycles loaded/i);
   });
 
   it("keeps the cached-PWA rollback state honest without milestone or JSON copy", async () => {
@@ -255,9 +343,12 @@ describe("TimingView", () => {
     });
 
     expect(
-      await screen.findByText(/Timing is not active on this Worker/i),
+      await screen.findByRole("heading", {
+        name: /Timing is not available on this server/i,
+      }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Request req_timing_rollback/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Worker/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Planned \/ M3/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/route is returning data/i)).not.toBeInTheDocument();
     expect(container.querySelector("pre")).toBeNull();
@@ -291,7 +382,9 @@ describe("TimingView", () => {
     };
     renderTiming(responses);
 
-    expect(await screen.findByText("Timing could not be loaded.")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Timing could not be loaded." }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Request req_timing_error/i)).toBeInTheDocument();
     const retry = screen.getByRole("button", { name: /Try again/i });
     retry.focus();

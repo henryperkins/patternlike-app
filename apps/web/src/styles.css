@@ -115,6 +115,20 @@ summary:focus-visible {
   transform: translateY(0);
 }
 
+/* Present to assistive technology, absent from the page: live-region text
+ * and other announcements that would only be noise on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app-shell {
   min-height: 100dvh;
 }
@@ -3016,117 +3030,155 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
-/* Timing */
+/* Timing
+ *
+ * Written mobile-first and kept in one place: the base rules are the phone
+ * layout, and the two `min-width` steps below widen it. The shell's own
+ * breakpoints (960 for chrome, 700 for gutters) are the ones honoured here. */
 .timing-page {
   width: min(100%, 1540px);
   margin: 0 auto;
-  padding: 64px clamp(34px, 5vw, 88px) 96px;
+  padding: 36px 18px 62px;
 }
 
 .timing-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.6fr);
-  align-items: end;
-  gap: 16px 48px;
-  padding-bottom: 42px;
+  padding-bottom: 26px;
   border-bottom: 1px solid var(--line);
 }
 
-.timing-hero .eyebrow {
-  grid-column: 1 / -1;
-}
-
 .timing-hero h1 {
-  max-width: 760px;
-  margin: 0;
+  max-width: 14ch;
+  margin: 15px 0 0;
   font-family: var(--serif);
-  font-size: clamp(42px, 5vw, 72px);
+  font-size: clamp(38px, 11vw, 56px);
   font-weight: 400;
-  line-height: 0.98;
+  line-height: 1;
   letter-spacing: -0.04em;
   text-wrap: balance;
 }
 
-.timing-hero > p:last-child {
-  max-width: 68ch;
-  margin: 0;
+.timing-hero__lede {
+  max-width: 62ch;
+  margin: 20px 0 0;
   color: var(--ink-soft);
   font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
-.timing-page__status {
-  min-height: 16px;
-  margin: 12px 0 0;
-  color: var(--ink-faint);
-  font-family: var(--mono);
-  font-size: var(--label-sm);
-  letter-spacing: 0.06em;
-}
-
-.timing-scan {
-  display: grid;
-  min-height: 64px;
-  grid-template-columns: minmax(250px, 1fr) auto auto;
-  align-items: center;
-  gap: 16px 30px;
+/* The one-time explainer. A reader opens it on the first visit, then never
+ * again, which is why it is a disclosure and not a paragraph on every card. */
+.timing-glossary {
   margin-top: 18px;
-  padding: 13px 18px;
-  border-top: 1px solid var(--line-dark);
-  border-bottom: 1px solid var(--line);
-  background: rgba(250, 248, 242, 0.48);
+  border: 1px solid var(--line);
+  background: rgba(250, 248, 242, 0.58);
 }
 
-.timing-scan > div {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 14px;
+.timing-glossary dl {
+  margin: 0;
+  padding: 0 16px 6px;
+  border-top: 1px solid var(--line);
 }
 
-.timing-scan__label,
-.timing-scan strong,
-.timing-scan p {
-  font-family: var(--mono);
-  font-size: var(--label-sm);
-  line-height: 1.5;
-  letter-spacing: 0.06em;
+.timing-glossary dl > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
 }
 
-.timing-scan__label {
-  color: var(--ink-faint);
-  text-transform: uppercase;
+.timing-glossary dl > div + div {
+  border-top: 1px solid var(--line);
 }
 
-.timing-scan strong {
-  color: var(--forest);
-  font-weight: 700;
-  white-space: nowrap;
+.timing-glossary dt {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 750;
 }
 
-.timing-scan p {
+.timing-glossary dd {
   margin: 0;
   color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* When these cycles were found, as a sentence rather than a receipt. */
+.timing-scan {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.timing-scan p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.timing-scan time {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.timing-scan a {
+  color: var(--forest);
+  font-weight: 750;
+  text-underline-offset: 4px;
+  white-space: nowrap;
 }
 
 .timing-scan__warning {
   color: var(--coral-ink) !important;
-  font-weight: 700;
+  font-weight: 600;
 }
 
+/* Two columns need 372px of content, so phones narrower than about 410px
+ * stack: the longest duration label, "1 year or longer", clips inside
+ * anything narrower than a 180px select. */
 .timing-filters {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 250px));
-  gap: 18px;
-  padding: 24px 0 30px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+  padding-bottom: 22px;
   border-bottom: 1px solid var(--line);
+}
+
+/* A pending filter request sweeps a coral rule along the filters' bottom
+ * edge. The results underneath stay fully opaque: dimming them read as
+ * feedback but pushed 13px text under AA for as long as the request lasted. */
+.timing-filters--busy::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--coral), transparent);
+  background-repeat: no-repeat;
+  background-size: 40% 100%;
+  animation: timing-sweep 1100ms ease-in-out infinite;
+  content: "";
+}
+
+@keyframes timing-sweep {
+  from {
+    background-position: -40% 0;
+  }
+
+  to {
+    background-position: 140% 0;
+  }
 }
 
 .timing-filters label {
   display: grid;
   min-width: 0;
-  gap: 8px;
+  gap: 6px;
 }
 
 .timing-filters label > span {
@@ -3140,8 +3192,8 @@ summary:focus-visible {
 
 .timing-filters select {
   width: 100%;
-  min-height: 49px;
-  padding: 0 40px 0 14px;
+  min-height: 48px;
+  padding: 0 36px 0 14px;
   border: 1px solid var(--line);
   border-radius: 0;
   color: var(--ink);
@@ -3162,32 +3214,59 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
-.timing-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+.timing-loading {
+  display: grid;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.timing-loading span {
+  display: block;
+  height: 12px;
+  background: var(--paper-deep);
+}
+
+.timing-loading span:nth-child(1) {
+  width: 62%;
+  height: 24px;
+}
+
+.timing-loading span:nth-child(2) {
+  height: 3px;
+  margin-top: 10px;
+}
+
+.timing-loading span:nth-child(3) {
+  width: 38%;
+}
+
+.timing-group {
   margin-top: 26px;
-  padding: 15px 18px;
-  border: 1px solid var(--line);
-  background: rgba(250, 248, 242, 0.58);
 }
 
-.timing-notice p {
+.timing-group + .timing-group {
+  margin-top: 34px;
+}
+
+.timing-group__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin: 0;
-  color: var(--ink-soft);
-  font-size: 13px;
-  line-height: 1.6;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-dark);
+  color: var(--ink-faint);
+  font-family: var(--sans);
+  font-size: var(--label-md);
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 
-.timing-notice a,
-.timing-empty__link {
-  color: var(--forest);
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: 0.035em;
-  text-underline-offset: 4px;
-  white-space: nowrap;
+.timing-group__count {
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.06em;
 }
 
 .timing-cycles {
@@ -3202,40 +3281,40 @@ summary:focus-visible {
 }
 
 .timing-cycles > li + li {
-  margin-top: 54px;
+  border-top: 1px solid var(--line);
 }
 
 .timing-cycle {
   min-width: 0;
-  padding-top: 32px;
-  border-top: 1px solid var(--forest);
+  padding: 22px 0 24px;
 }
 
-.timing-cycle__header {
-  display: flex;
-  min-width: 0;
-  align-items: start;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.timing-cycle__header h2 {
-  min-width: 0;
-  max-width: 780px;
+.timing-cycle h3 {
   margin: 0;
   font-family: var(--serif);
-  font-size: clamp(29px, 3.2vw, 43px);
+  font-size: 24px;
   font-weight: 500;
-  line-height: 1.05;
-  letter-spacing: -0.035em;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
   text-wrap: balance;
+}
+
+.timing-cycle__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .timing-cycle__phase {
   flex: none;
-  padding: 7px 10px;
-  border: 1px solid var(--coral);
-  color: var(--coral-ink);
+  padding: 6px 9px;
+  border: 1px solid var(--line-dark);
+  color: var(--ink-soft);
   font-family: var(--mono);
   font-size: var(--label-sm);
   font-weight: 700;
@@ -3243,100 +3322,141 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
-.timing-cycle__envelope {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  margin-top: 28px;
-}
-
-.timing-cycle__envelope p {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0;
+.timing-cycle__detail-line time {
   color: var(--ink);
-  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.timing-cycle__envelope p:last-child {
-  justify-self: end;
+.timing-cycle__detail-line--next time {
+  color: var(--coral-ink);
 }
 
-.timing-cycle__envelope span {
-  color: var(--ink-faint);
-  font-family: var(--mono);
-  font-size: var(--label-xs);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.timing-cycle__timeline {
+/* The arc. Rule from start to end; the elapsed part fills as far as today;
+ * ticks are numbered to match "Pass n" in the list. Coral is spent on exactly
+ * two things: where today is, and the next exact pass. */
+.timing-track {
   position: relative;
-  height: 28px;
-  margin: 14px 0 30px;
+  height: 34px;
+  margin-top: 18px;
 }
 
-.timing-cycle__timeline-rule {
+.timing-track__rule {
   position: absolute;
-  inset: 13px 0 auto;
+  right: 0;
+  bottom: 8px;
+  left: 0;
   height: 1px;
   background: var(--line-dark);
 }
 
-.timing-cycle__marker {
+.timing-track__elapsed {
   position: absolute;
-  top: 8px;
-  left: var(--timing-position);
-  width: 1px;
-  height: 12px;
+  bottom: 7px;
+  left: 0;
+  width: var(--timing-at);
+  height: 3px;
   background: var(--forest);
+  transform-origin: left center;
+  animation: timing-fill 700ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+@keyframes timing-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.timing-track__pass {
+  position: absolute;
+  bottom: 3px;
+  left: var(--timing-at);
+  display: flex;
+  width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: var(--label-sm);
+  line-height: 1;
+}
+
+.timing-track__pass::after {
+  width: 1px;
+  height: 11px;
+  background: var(--forest);
+  content: "";
+}
+
+.timing-track__pass--next {
+  color: var(--coral-ink);
+  font-weight: 700;
+}
+
+.timing-track__pass--next::after {
+  width: 2px;
+  background: var(--coral);
+}
+
+.timing-track__now {
+  position: absolute;
+  bottom: 1px;
+  left: var(--timing-at);
+  width: 3px;
+  height: 15px;
+  background: var(--coral);
   transform: translateX(-50%);
 }
 
-.timing-cycle__marker--current {
-  top: 2px;
-  width: 3px;
-  height: 24px;
-  background: var(--coral);
+.timing-cycle__span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
 
-.timing-cycle__marker--next {
-  top: 5px;
-  width: 3px;
-  height: 18px;
-  background: var(--coral);
+.timing-cycle__span time {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.timing-cycle__passes h3 {
-  margin: 0 0 10px;
+.timing-cycle__length {
   color: var(--ink-faint);
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: var(--label-sm);
-  font-weight: 800;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.06em;
+  text-align: center;
   text-transform: uppercase;
 }
 
-.timing-cycle__passes ol {
-  margin: 0;
+.timing-cycle__passes {
+  margin: 16px 0 0;
   padding: 0;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
   list-style: none;
 }
 
-.timing-cycle__passes li {
+.timing-pass {
   display: grid;
-  min-height: 54px;
-  grid-template-columns: 90px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  border-top: 1px solid var(--line);
+  min-height: 44px;
+  grid-template-areas:
+    "index date relation"
+    "index direction relation";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.timing-cycle__pass-number,
-.timing-cycle__direction {
+.timing-pass__index,
+.timing-pass__direction,
+.timing-pass__relation {
   color: var(--ink-faint);
   font-family: var(--mono);
   font-size: var(--label-sm);
@@ -3344,35 +3464,56 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
-.timing-cycle__passes time {
-  min-width: 0;
-  color: var(--ink-soft);
-  font-size: 13px;
-  overflow-wrap: anywhere;
+.timing-pass__index {
+  grid-area: index;
+  min-width: 52px;
 }
 
-.timing-cycle__direction {
-  color: var(--ink-soft);
+.timing-pass__date {
+  grid-area: date;
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timing-pass__direction {
+  grid-area: direction;
+}
+
+.timing-pass__relation {
+  grid-area: relation;
+  color: var(--coral-ink);
+  font-weight: 700;
+}
+
+.timing-pass--past .timing-pass__date {
+  color: var(--ink-faint);
+}
+
+.timing-cycle__detail {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
 }
 
 .timing-cycle__evidence {
   display: grid;
-  grid-template-columns: repeat(3, minmax(90px, 0.5fr)) minmax(220px, 1.8fr);
-  margin: 22px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
   border-top: 1px solid var(--line);
   border-left: 1px solid var(--line);
 }
 
 .timing-cycle__evidence > div {
   min-width: 0;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: rgba(232, 227, 216, 0.42);
 }
 
 .timing-cycle__evidence dt {
-  margin: 0 0 7px;
+  margin: 0 0 6px;
   color: var(--ink-faint);
   font-family: var(--sans);
   font-size: var(--label-xs);
@@ -3391,19 +3532,22 @@ summary:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.timing-cycle__identity {
+  grid-column: 1 / -1;
+}
+
 .timing-cycle__identity dd {
   overflow-wrap: anywhere;
 }
 
 .timing-empty,
 .timing-failure {
-  width: min(680px, 100%);
-  margin-top: 38px;
+  width: min(640px, 100%);
+  margin-top: 30px;
 }
 
 .timing-empty {
-  padding: 30px 0;
-  border-top: 1px solid var(--line-dark);
+  padding: 4px 0 26px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -3412,24 +3556,24 @@ summary:focus-visible {
   flex-direction: column;
   align-items: start;
   gap: 16px;
-  padding: 30px;
+  padding: 24px 20px;
 }
 
 .timing-empty h2,
 .timing-failure h2 {
   margin: 0;
   font-family: var(--serif);
-  font-size: clamp(27px, 3vw, 38px);
+  font-size: clamp(26px, 6.5vw, 34px);
   font-weight: 500;
   line-height: 1.12;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
 .timing-empty p,
 .timing-failure p {
-  max-width: 65ch;
-  margin: 14px 0 0;
+  max-width: 60ch;
+  margin: 12px 0 0;
   color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.7;
@@ -3444,7 +3588,13 @@ summary:focus-visible {
   min-height: 44px;
   align-items: center;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 16px;
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  text-underline-offset: 4px;
+  white-space: nowrap;
 }
 
 .timing-empty__link svg {
@@ -3460,7 +3610,102 @@ summary:focus-visible {
 }
 
 .timing-filters__reset {
-  margin-top: 22px;
+  margin-top: 18px;
+}
+
+@media (min-width: 701px) {
+  .timing-page {
+    padding: 42px clamp(34px, 5vw, 88px) 96px;
+  }
+
+  .timing-hero {
+    padding-bottom: 40px;
+  }
+
+  .timing-hero h1 {
+    max-width: 16ch;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 0.98;
+  }
+
+  .timing-hero__lede {
+    max-width: 68ch;
+    margin-top: 24px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .timing-glossary {
+    max-width: 68ch;
+    margin-top: 22px;
+  }
+
+  .timing-glossary dl > div {
+    grid-template-columns: 170px minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .timing-scan {
+    margin-top: 22px;
+  }
+
+  .timing-filters {
+    max-width: 860px;
+    grid-template-columns: repeat(2, minmax(0, 220px));
+    gap: 18px;
+    margin-top: 22px;
+    padding-bottom: 28px;
+  }
+
+  .timing-group {
+    max-width: 860px;
+  }
+
+  .timing-cycle {
+    padding: 30px 0 32px;
+  }
+
+  .timing-cycle h3 {
+    font-size: 27px;
+  }
+
+  .timing-cycle__status {
+    margin-top: 12px;
+  }
+
+  .timing-track {
+    height: 38px;
+    margin-top: 22px;
+  }
+
+  .timing-pass {
+    min-height: 48px;
+    grid-template-areas: "index date direction relation";
+    grid-template-columns: 68px minmax(0, 180px) minmax(0, 1fr) auto;
+  }
+
+  .timing-cycle__evidence {
+    grid-template-columns: repeat(3, minmax(90px, 0.5fr)) minmax(220px, 1.8fr);
+  }
+
+  .timing-cycle__identity {
+    grid-column: auto;
+  }
+
+  .timing-empty,
+  .timing-failure {
+    margin-top: 38px;
+  }
+
+  .timing-failure {
+    padding: 30px;
+  }
+}
+
+@media (min-width: 961px) {
+  .timing-page {
+    padding-top: 64px;
+  }
 }
 
 /* Your Pattern: reviewed chapters under the calculation layer */
@@ -3628,7 +3873,9 @@ summary:focus-visible {
 
 .pattern-chapter__why summary,
 .travel-cycle__detail summary,
-.travel-state__rest summary {
+.travel-state__rest summary,
+.timing-glossary summary,
+.timing-cycle__detail summary {
   display: flex;
   min-height: 52px;
   align-items: center;
@@ -3645,12 +3892,15 @@ summary:focus-visible {
 
 .pattern-chapter__why summary::-webkit-details-marker,
 .travel-cycle__detail summary::-webkit-details-marker,
-.travel-state__rest summary::-webkit-details-marker {
+.travel-state__rest summary::-webkit-details-marker,
+.timing-glossary summary::-webkit-details-marker,
+.timing-cycle__detail summary::-webkit-details-marker {
   display: none;
 }
 
 .pattern-chapter__toggle,
-.travel-cycle__toggle {
+.travel-cycle__toggle,
+.timing-toggle {
   flex: none;
   color: var(--ink-faint);
   font-family: var(--mono);
@@ -3661,13 +3911,17 @@ summary:focus-visible {
 
 .pattern-chapter__why[open] .pattern-chapter__toggle,
 .travel-cycle__detail[open] .travel-cycle__toggle,
-.travel-state__rest[open] .travel-cycle__toggle {
+.travel-state__rest[open] .travel-cycle__toggle,
+.timing-glossary[open] .timing-toggle,
+.timing-cycle__detail[open] .timing-toggle {
   font-size: 0;
 }
 
 .pattern-chapter__why[open] .pattern-chapter__toggle::after,
 .travel-cycle__detail[open] .travel-cycle__toggle::after,
-.travel-state__rest[open] .travel-cycle__toggle::after {
+.travel-state__rest[open] .travel-cycle__toggle::after,
+.timing-glossary[open] .timing-toggle::after,
+.timing-cycle__detail[open] .timing-toggle::after {
   font-size: var(--label-sm);
   content: "Close";
 }
@@ -4991,10 +5245,6 @@ summary:focus-visible {
     padding-top: 42px;
   }
 
-  .timing-page {
-    padding-top: 42px;
-  }
-
   .onboarding__intro h1 {
     font-size: clamp(52px, 10vw, 78px);
   }
@@ -5041,78 +5291,6 @@ summary:focus-visible {
     padding: 36px 18px 62px;
   }
 
-  .timing-page {
-    padding: 36px 18px 62px;
-  }
-
-  .timing-hero {
-    display: block;
-    padding-bottom: 32px;
-  }
-
-  .timing-hero h1 {
-    margin-top: 15px;
-    font-size: clamp(40px, 12vw, 56px);
-    line-height: 1;
-  }
-
-  .timing-hero > p:last-child {
-    margin-top: 24px;
-  }
-
-  .timing-scan {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    padding-block: 16px;
-  }
-
-  .timing-scan > div {
-    display: grid;
-    gap: 4px;
-  }
-
-  .timing-filters {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .timing-notice {
-    align-items: start;
-  }
-
-  .timing-cycle__header {
-    display: block;
-  }
-
-  .timing-cycle__phase {
-    display: inline-block;
-    margin-top: 16px;
-  }
-
-  .timing-cycle__envelope {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  .timing-cycle__envelope p:last-child {
-    justify-self: start;
-  }
-
-  .timing-cycle__passes li {
-    grid-template-columns: 78px minmax(0, 1fr) auto;
-    gap: 12px;
-  }
-
-  .timing-cycle__evidence {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .timing-cycle__identity {
-    grid-column: 1 / -1;
-  }
-
-  .timing-failure {
-    padding: 24px 20px;
-  }
   .travel-page {
     padding: 36px 18px 62px;
   }
@@ -5489,42 +5667,6 @@ summary:focus-visible {
     justify-content: start;
   }
 
-  .timing-notice {
-    display: grid;
-    gap: 10px;
-  }
-
-  .timing-cycle {
-    padding-top: 26px;
-  }
-
-  .timing-cycle__header h2 {
-    font-size: clamp(29px, 9vw, 36px);
-  }
-
-  .timing-cycle__passes li {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 12px;
-    padding: 11px 0;
-  }
-
-  .timing-cycle__passes time {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .timing-cycle__direction {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .timing-cycle__evidence {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .timing-cycle__identity {
-    grid-column: auto;
-  }
   .travel-controls__steps {
     display: grid;
     gap: 10px;
