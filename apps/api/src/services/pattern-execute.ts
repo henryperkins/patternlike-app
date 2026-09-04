@@ -27,6 +27,10 @@ import {
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import { buildCryptoWriteFence } from "../db/crypto-write-fence.js";
 import {
+  deleteGenerationObjects,
+  eraseGenerationStatements,
+} from "../db/pattern-generation-erasure.js";
+import {
   PATTERN_JOB_TYPE,
   isPatternCommand,
   type GeneratePatternCommand,
@@ -91,7 +95,6 @@ import {
   patternPublicationAuthorizationGuard,
   type PatternPublicationBundle,
 } from "./pattern-publication-proof.js";
-import { deleteGenerationObjects } from "./pattern-lifecycle.js";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
@@ -1797,31 +1800,11 @@ async function publishPattern(
           now: generatedAt,
         });
     const priorGenerationErasure = sourceUpdate
-      ? [
-          env.DB.prepare(
-            `UPDATE pattern_generation_artifact_keys
-             SET wrapped_key_enc = NULL, wrapped_key_version = NULL,
-                 wrapped_key_nonce = NULL, erased_at = COALESCE(erased_at, ?)
-             WHERE user_id = ? AND generation_id = ?`,
-          ).bind(generatedAt, identity.userId, priorDocument!.generation_id),
-          env.DB.prepare(
-            `UPDATE pattern_generation_artifacts
-             SET deleted_at = COALESCE(deleted_at, ?)
-             WHERE user_id = ? AND generation_id = ?`,
-          ).bind(generatedAt, identity.userId, priorDocument!.generation_id),
-          env.DB.prepare(
-            `UPDATE jobs
-             SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
-             WHERE user_id = ? AND id = (
-               SELECT job_id FROM pattern_generation_jobs
-               WHERE generation_id = ? AND user_id = ?
-             )`,
-          ).bind(
-            identity.userId,
-            priorDocument!.generation_id,
-            identity.userId,
-          ),
-        ]
+      ? eraseGenerationStatements(env, {
+          userId: identity.userId,
+          generationId: priorDocument!.generation_id,
+          at: generatedAt,
+        })
       : [];
     await env.DB.batch([
       buildCryptoWriteFence(env, {

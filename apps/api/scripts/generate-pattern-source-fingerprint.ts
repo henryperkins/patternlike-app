@@ -55,6 +55,7 @@ function validateSourcePath(value: unknown): string {
   }
   if (
     !value.startsWith("apps/api/src/") &&
+    !value.startsWith("apps/codex-runner/src/") &&
     !value.startsWith("packages/pattern-engine/src/")
   ) {
     fail("manifest_outside_pattern_source_path");

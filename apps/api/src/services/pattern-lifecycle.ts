@@ -21,15 +21,56 @@ import {
   writePatternReplayIntent,
 } from "./pattern-replay-ledger.js";
 
-export async function deleteGenerationObjects(env: Env, generationId: string): Promise<void> {
-  if (!env.ARTIFACTS) return;
-  let cursor: string | undefined;
-  do {
-    const page = await env.ARTIFACTS.list({ prefix: `pattern-generations/${generationId}/`, cursor });
-    const keys = page.objects.map((object) => object.key);
-    if (keys.length > 0) await env.ARTIFACTS.delete(keys);
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
+import { deleteGenerationObjects } from "../db/pattern-generation-erasure.js";
+
+type PatternCancellationReason =
+  | "consent_revoked"
+  | "pattern_deleted"
+  | "chart_correction"
+  | "ontology_recalled";
+
+/**
+ * Cancel every unfinished Pattern generation a lifecycle event invalidates,
+ * account-wide or for one claim, and clear any accepted replacement owner.
+ *
+ * The regeneration release is account-wide in both scopes: a reader holds at
+ * most one accepted claim, and `0023` refuses to close a claim whose
+ * replacement is still pending, so the release must land in the same batch
+ * as, and ahead of, the terminal claim transition the caller appends.
+ */
+function cancelPatternWorkStatements(
+  env: Env,
+  input: {
+    userId: string;
+    claimId?: string;
+    reason: PatternCancellationReason;
+    now: string;
+  },
+): D1PreparedStatement[] {
+  const claimFilter = input.claimId === undefined ? "" : " AND claim_id = ?";
+  const claimBinds = input.claimId === undefined ? [] : [input.claimId];
+  const jobScope = input.claimId === undefined
+    ? ""
+    : ` AND id IN (
+           SELECT job_id FROM pattern_generation_jobs
+           WHERE user_id = ? AND claim_id = ?
+         )`;
+  const jobScopeBinds = input.claimId === undefined ? [] : [input.userId, input.claimId];
+  return [
+    env.DB.prepare(
+      `UPDATE pattern_generation_jobs
+       SET stage = 'cancelled', cancellation_reason = ?, updated_at = ?, finished_at = ?
+       WHERE user_id = ?${claimFilter}
+         AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
+    ).bind(input.reason, input.now, input.now, input.userId, ...claimBinds),
+    env.DB.prepare(
+      `UPDATE jobs
+       SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL,
+           finished_at = ?, result_class = ?
+       WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')${jobScope}`,
+    ).bind(input.now, input.reason, input.userId, PATTERN_JOB_TYPE, ...jobScopeBinds),
+    releaseUserPatternRegenerations(env, { userId: input.userId, now: input.now }),
+  ];
 }
 
 export async function revokePatternGenerationConsent(
@@ -49,21 +90,12 @@ export async function revokePatternGenerationConsent(
     const consentId = newId("cns");
     await env.DB.batch([
       insertPatternConsentRevoke(env, identity.userId, consentId, latest.version + 1, latest.id, nowIso),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'cancelled', cancellation_reason = 'consent_revoked', updated_at = ?, finished_at = ?
-         WHERE user_id = ? AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(nowIso, nowIso, identity.userId),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL,
-                finished_at = ?, result_class = 'consent_revoked'
-         WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')`,
-      ).bind(nowIso, identity.userId, PATTERN_JOB_TYPE),
-      releaseUserPatternClaims(env, { userId: identity.userId, now: nowIso }),
-      releaseUserPatternRegenerations(env, {
+      ...cancelPatternWorkStatements(env, {
         userId: identity.userId,
+        reason: "consent_revoked",
         now: nowIso,
       }),
+      releaseUserPatternClaims(env, { userId: identity.userId, now: nowIso }),
     ]);
   }
   const chart = await loadActiveChart(env, identity.userId);
@@ -113,20 +145,9 @@ export async function deleteCurrentPattern(
   await env.DB.batch([
     ...replay.receiptStatements(env),
     env.DB.prepare(`DELETE FROM pattern_documents WHERE user_id = ? AND id = ?`).bind(identity.userId, document.id),
-    env.DB.prepare(
-      `UPDATE pattern_generation_jobs
-       SET stage = 'cancelled', cancellation_reason = 'pattern_deleted',
-           updated_at = ?, finished_at = ?
-       WHERE user_id = ? AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-    ).bind(nowIso, nowIso, identity.userId),
-    env.DB.prepare(
-      `UPDATE jobs
-       SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL,
-           finished_at = ?, result_class = 'pattern_deleted'
-       WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')`,
-    ).bind(nowIso, identity.userId, PATTERN_JOB_TYPE),
-    releaseUserPatternRegenerations(env, {
+    ...cancelPatternWorkStatements(env, {
       userId: identity.userId,
+      reason: "pattern_deleted",
       now: nowIso,
     }),
     env.DB.prepare(
@@ -186,16 +207,11 @@ export async function reconcilePatternAfterChartCorrection(
   await env.DB.batch([
     ...(replay?.receiptStatements(env) ?? []),
     env.DB.prepare(`DELETE FROM pattern_documents WHERE user_id = ?`).bind(identity.userId),
-    env.DB.prepare(
-      `UPDATE pattern_generation_jobs
-       SET stage = 'cancelled', cancellation_reason = 'chart_correction', updated_at = ?, finished_at = ?
-       WHERE user_id = ? AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-    ).bind(nowIso, nowIso, identity.userId),
-    env.DB.prepare(
-      `UPDATE jobs SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL,
-              finished_at = ?, result_class = 'chart_correction'
-       WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')`,
-    ).bind(nowIso, identity.userId, PATTERN_JOB_TYPE),
+    ...cancelPatternWorkStatements(env, {
+      userId: identity.userId,
+      reason: "chart_correction",
+      now: nowIso,
+    }),
     env.DB.prepare(
       `UPDATE jobs SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
        WHERE user_id = ? AND job_type = ?`,
@@ -205,10 +221,6 @@ export async function reconcilePatternAfterChartCorrection(
        SET wrapped_key_enc = NULL, wrapped_key_version = NULL, wrapped_key_nonce = NULL, erased_at = ?
        WHERE user_id = ? AND erased_at IS NULL`,
     ).bind(nowIso, identity.userId),
-    releaseUserPatternRegenerations(env, {
-      userId: identity.userId,
-      now: nowIso,
-    }),
     document
       ? supersedeAcceptedPatternClaim(env, {
           claimId: document.claim_id,
@@ -323,6 +335,9 @@ export async function recallOntologyAndWithdraw(
     version,
   );
   let withdrawnDocuments = 0;
+  // Retries give one claim several generation rows; cancel the claim's work
+  // once and let each row erase only its own generation.
+  const claimsCancelled = new Set<string>();
   for (const row of jobs) {
     const withdrawal = row.pattern_id && row.claim_status === "accepted"
       ? await writePatternReplayIntent(env, {
@@ -341,39 +356,14 @@ export async function recallOntologyAndWithdraw(
     await env.DB.batch([
       ...(withdrawal?.receiptStatements(env) ?? []),
       env.DB.prepare(`DELETE FROM pattern_documents WHERE generation_id = ?`).bind(row.generation_id),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'cancelled', cancellation_reason = 'ontology_recalled',
-             updated_at = ?, finished_at = ?
-         WHERE claim_id = ? AND user_id = ?
-           AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(now, now, row.claim_id, row.user_id),
-      env.DB.prepare(
-        `UPDATE jobs
-         SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL,
-             finished_at = ?, result_class = 'ontology_recalled'
-         WHERE user_id = ? AND job_type = ? AND status IN ('queued', 'running')
-           AND id IN (
-             SELECT job_id FROM pattern_generation_jobs
-             WHERE claim_id = ? AND user_id = ?
-           )`,
-      ).bind(now, row.user_id, PATTERN_JOB_TYPE, row.claim_id, row.user_id),
-      releaseUserPatternRegenerations(env, {
-        userId: row.user_id,
-        now,
-      }),
-      env.DB.prepare(
-        `UPDATE pattern_generation_jobs
-         SET stage = 'cancelled', cancellation_reason = 'ontology_recalled', updated_at = ?, finished_at = ?
-         WHERE generation_id = ? AND stage NOT IN ('succeeded', 'failed', 'cancelled')`,
-      ).bind(now, now, row.generation_id),
-      env.DB.prepare(
-        `UPDATE jobs SET status = 'cancelled', claim_token = NULL, lease_expires_at = NULL,
-                finished_at = ?, result_class = 'ontology_recalled',
-                payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
-         WHERE id = (SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?)
-           AND status IN ('queued', 'running')`,
-      ).bind(now, row.generation_id),
+      ...(claimsCancelled.has(row.claim_id)
+        ? []
+        : cancelPatternWorkStatements(env, {
+            userId: row.user_id,
+            claimId: row.claim_id,
+            reason: "ontology_recalled",
+            now,
+          })),
       env.DB.prepare(
         `UPDATE jobs SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
          WHERE id = (SELECT job_id FROM pattern_generation_jobs WHERE generation_id = ?)`,
@@ -396,6 +386,7 @@ export async function recallOntologyAndWithdraw(
          WHERE generation_id = ? AND user_id = ?`,
       ).bind(now, row.generation_id, row.user_id),
     ]);
+    claimsCancelled.add(row.claim_id);
     if (row.pattern_id) withdrawnDocuments += 1;
     await deleteGenerationObjects(env, row.generation_id);
   }

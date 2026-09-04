@@ -809,6 +809,79 @@ describe("Pattern replay erasure application", () => {
       });
     },
   );
+
+  it("pattern_regenerated erases only the replaced generation and clears the replacement owner", async () => {
+    await seedAcceptedPattern();
+    const seeded = intent({ targetUserId: USER_A });
+    const replacementGenerationId = "pgen_99999999999999999999999999999999";
+    const replacementPatternId = "pat_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE pattern_generation_claims SET pending_regeneration_id = ? WHERE id = ?`,
+      ).bind(replacementGenerationId, seeded.claimId),
+      env.DB.prepare(
+        `UPDATE jobs SET payload_enc = ?, payload_key_version = 1, payload_nonce = 'nonce'
+         WHERE id = 'job_replay_pattern'`,
+      ).bind(new Uint8Array([9, 9, 9])),
+    ]);
+    await env.ARTIFACTS!.put(
+      `pattern-generations/${seeded.generationId}/planner/0/request`,
+      new Uint8Array([1]),
+    );
+    const key = await testSigningKey();
+    const configured = replayEnv(writerSecret(key), publicKeyring(key));
+    const prepared = await writePatternReplayIntent(
+      configured,
+      intent({
+        eventClass: "pattern_regenerated",
+        semanticOperationKey: replacementGenerationId,
+        targetUserId: USER_A,
+        priorClaimStatus: "accepted",
+        nextClaimStatus: "accepted",
+        replacementGenerationId,
+        replacementPatternId,
+        patternSourceHash: `sha256:${"b".repeat(64)}`,
+      }),
+      new Date("2026-08-22T14:43:00.000Z"),
+    );
+
+    await expect(applyPatternReplayEvent(
+      configured,
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    )).resolves.toBe("applied");
+
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM pattern_documents WHERE generation_id = ?",
+    ).bind(seeded.generationId).first()).toEqual({ count: 0 });
+    expect(await env.DB.prepare(
+      `SELECT wrapped_key_enc, erased_at
+       FROM pattern_generation_artifact_keys WHERE generation_id = ?`,
+    ).bind(seeded.generationId).first()).toEqual({
+      wrapped_key_enc: null,
+      erased_at: prepared.event.occurred_at,
+    });
+    expect(await env.DB.prepare(
+      "SELECT payload_enc, payload_key_version FROM jobs WHERE id = 'job_replay_pattern'",
+    ).first()).toEqual({ payload_enc: null, payload_key_version: null });
+    expect(await env.DB.prepare(
+      `SELECT status, consumed_at, pending_regeneration_id
+       FROM pattern_generation_claims WHERE id = ?`,
+    ).bind(seeded.claimId).first()).toEqual({
+      status: "accepted",
+      consumed_at: "2026-08-22T14:00:00.000Z",
+      pending_regeneration_id: null,
+    });
+    expect((await env.ARTIFACTS!.list({
+      prefix: `pattern-generations/${seeded.generationId}/`,
+    })).objects).toEqual([]);
+
+    await expect(applyPatternReplayEvent(
+      configured,
+      prepared.event,
+      new Date(prepared.replicaPutAt),
+    )).resolves.toBe("replay");
+  });
 });
 
 describe("Pattern replay ontology recall application", () => {

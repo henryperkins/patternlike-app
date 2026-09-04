@@ -15,6 +15,11 @@ import replayEventSchema from "../../../../contracts/m7/pattern-erasure-replay-e
 import m9CommonSchema from "../../../../contracts/m9/common.schema.json";
 import regenerationReplayEventSchema from "../../../../contracts/m9/pattern-regeneration-replay-event.schema.json";
 import type { Env } from "../env.js";
+import { releasePatternRegeneration } from "../db/pattern-claim-transitions.js";
+import {
+  deleteGenerationObjects,
+  eraseGenerationStatements,
+} from "../db/pattern-generation-erasure.js";
 import {
   collectDeletionArtifactKeys,
   DELETED_USER_TABLES,
@@ -909,42 +914,20 @@ function regenerationReplayStatements(
       event.replacement_generation_id,
       event.replacement_pattern_id,
     ),
-    env.DB.prepare(
-      `UPDATE pattern_generation_artifact_keys
-       SET wrapped_key_enc = NULL, wrapped_key_version = NULL,
-           wrapped_key_nonce = NULL, erased_at = COALESCE(erased_at, ?)
-       WHERE user_id = ? AND generation_id = ?`,
-    ).bind(event.occurred_at, event.target_user_id, event.generation_id),
-    env.DB.prepare(
-      `UPDATE pattern_generation_artifacts
-       SET deleted_at = COALESCE(deleted_at, ?)
-       WHERE user_id = ? AND generation_id = ?`,
-    ).bind(event.occurred_at, event.target_user_id, event.generation_id),
-    env.DB.prepare(
-      `UPDATE jobs
-       SET payload_enc = NULL, payload_key_version = NULL, payload_nonce = NULL
-       WHERE user_id = ? AND id = (
-         SELECT job_id FROM pattern_generation_jobs
-         WHERE generation_id = ? AND user_id = ?
-       )`,
-    ).bind(
-      event.target_user_id,
-      event.generation_id,
-      event.target_user_id,
-    ),
-    env.DB.prepare(
-      `UPDATE pattern_generation_claims
-       SET pending_regeneration_id = NULL, updated_at = ?
-       WHERE id = ? AND user_id = ? AND chart_fingerprint_hash = ?
-         AND status = 'accepted' AND consumed_at IS NOT NULL
-         AND pending_regeneration_id = ?`,
-    ).bind(
-      event.occurred_at,
-      event.claim_id,
-      event.target_user_id,
-      event.chart_fingerprint_hash,
-      event.replacement_generation_id,
-    ),
+    ...eraseGenerationStatements(env, {
+      userId: event.target_user_id,
+      generationId: event.generation_id,
+      at: event.occurred_at,
+    }),
+    // The same live writer publication used. The claim's fingerprint is
+    // immutable (0023 trigger) and was what selected this claim for the
+    // proof, so no extra fingerprint predicate is needed here.
+    releasePatternRegeneration(env, {
+      claimId: event.claim_id,
+      userId: event.target_user_id,
+      generationId: event.replacement_generation_id,
+      now: event.occurred_at,
+    }),
   ];
 }
 
@@ -993,18 +976,8 @@ async function deleteReplayGenerationObjects(
   env: Pick<Env, "ARTIFACTS">,
   generationId: string,
 ): Promise<void> {
-  if (!env.ARTIFACTS) return;
-  let cursor: string | undefined;
   try {
-    do {
-      const page = await env.ARTIFACTS.list({
-        prefix: `pattern-generations/${generationId}/`,
-        cursor,
-      });
-      const keys = page.objects.map((object) => object.key);
-      if (keys.length > 0) await env.ARTIFACTS.delete(keys);
-      cursor = page.truncated ? page.cursor : undefined;
-    } while (cursor);
+    await deleteGenerationObjects(env, generationId);
   } catch {
     fail("replay_event_apply_unavailable");
   }

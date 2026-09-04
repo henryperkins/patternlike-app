@@ -69,6 +69,7 @@ test("rejects ambiguous or out-of-scope manifests", async () => {
     ["traversal", ["../outside.ts"]],
     ["absolute", ["/tmp/outside.ts"]],
     ["non-typescript", ["apps/api/src/a.json"]],
+    ["outside_pattern_source", ["apps/web/src/a.ts"]],
   ];
 
   for (const [label, sources] of cases) {
@@ -76,6 +77,7 @@ test("rejects ambiguous or out-of-scope manifests", async () => {
       "apps/api/src/a.ts": "export const a = 1;\n",
       "apps/api/src/b.ts": "export const b = 2;\n",
       "apps/api/src/a.json": "{}\n",
+      "apps/web/src/a.ts": "export const a = 1;\n",
     }, sources);
     try {
       await assert.rejects(

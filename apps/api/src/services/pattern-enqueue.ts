@@ -65,10 +65,6 @@ interface ActiveChartRow {
 
 type PatternEnqueueReason = PatternGenerationReasonV9 | "chart_correction";
 
-function reasonToReservation(reason: PatternEnqueueReason): PatternReservationReason {
-  return reason;
-}
-
 async function loadStoredReservation(
   env: Env,
   identity: UserIdentity,
@@ -200,19 +196,18 @@ export async function enqueuePatternGeneration(
   const features = await ensureNatalFeatureSet(env, identity.userId, chart.id, now);
   const fingerprintHash = await hashChartFingerprint(chart.fingerprint);
   const claim = await loadClaimForFingerprint(env, identity.userId, fingerprintHash);
+  // One grant read serves every branch below. The read after the batch at the
+  // end is separate: the batch may insert the consent row that reply reports.
+  let grant = await loadPatternGenerationGrant(env, identity.userId, now);
   const sourceUpdate = input.reason === "source_update";
   const currentDocument = sourceUpdate
     ? await env.DB.prepare(
-        `SELECT id, generation_id, pattern_source_hash
+        `SELECT pattern_source_hash
          FROM pattern_documents
          WHERE user_id = ? AND chart_fingerprint_hash = ?`,
       )
         .bind(identity.userId, fingerprintHash)
-        .first<{
-          id: string;
-          generation_id: string;
-          pattern_source_hash: string;
-        }>()
+        .first<{ pattern_source_hash: string }>()
     : null;
 
   if (sourceUpdate) {
@@ -232,7 +227,6 @@ export async function enqueuePatternGeneration(
         .bind(claim.pending_regeneration_id, identity.userId)
         .first<{ stage: PatternDomainStage }>();
       if (pendingJob) {
-        const grant = await loadPatternGenerationGrant(env, identity.userId, now);
         return {
           ok: true,
           replay: true,
@@ -258,8 +252,7 @@ export async function enqueuePatternGeneration(
         message: "This Pattern already uses the current creation source",
       };
     }
-    const currentGrant = await loadPatternGenerationGrant(env, identity.userId, now);
-    if (!currentGrant) {
+    if (!grant) {
       return {
         ok: false,
         status: 409,
@@ -275,8 +268,7 @@ export async function enqueuePatternGeneration(
       message: "This chart has already used its one Pattern generation",
     };
   }
-  if (!sourceUpdate && claim?.status === "reserved" && claim.active_generation_id) {
-    const grant = await loadPatternGenerationGrant(env, identity.userId, now);
+  if (claim?.status === "reserved" && claim.active_generation_id) {
     const reservedJob = await env.DB.prepare(
       `SELECT stage FROM pattern_generation_jobs WHERE generation_id = ? AND user_id = ?`,
     )
@@ -292,7 +284,7 @@ export async function enqueuePatternGeneration(
       ),
     };
   }
-  if (!sourceUpdate && input.reason === "failed_attempt_retry") {
+  if (input.reason === "failed_attempt_retry") {
     const failed = await env.DB.prepare(
       `SELECT generation_id FROM pattern_generation_jobs
        WHERE user_id = ? AND chart_fingerprint_hash = ? AND stage = 'failed'
@@ -324,7 +316,6 @@ export async function enqueuePatternGeneration(
     };
   }
 
-  let grant = await loadPatternGenerationGrant(env, identity.userId, now);
   if (input.reason === "chart_correction" && !grant) {
     return {
       ok: false,
@@ -369,7 +360,7 @@ export async function enqueuePatternGeneration(
     ontology_bundle_hash: ontology.bundleHash,
     corpus_release_hash: ontology.corpusReleaseHash,
     pattern_source_hash: PATTERN_CREATION_SOURCE_HASH,
-    reservation_reason: reasonToReservation(input.reason),
+    reservation_reason: input.reason,
     publisher: publisher.config.pin,
     planner_attempts_max: 2,
     writer_attempts_max: 3,
