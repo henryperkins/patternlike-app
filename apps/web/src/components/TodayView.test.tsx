@@ -95,7 +95,7 @@ describe("TodayView", () => {
     expect(screen.queryByText(/horoscope/i)).not.toBeInTheDocument();
   });
 
-  it("places a check-in before the reading without rewriting the published artifact", async () => {
+  it("places future context after the chapter without rewriting the published artifact", async () => {
     const user = userEvent.setup();
     const expiresAt = "2026-08-14T12:30:00.000Z";
     const { container } = renderToday({
@@ -136,8 +136,12 @@ describe("TodayView", () => {
     const reading = container.querySelector<HTMLElement>(".today-reading");
     expect(checkIn).not.toBeNull();
     expect(reading).not.toBeNull();
-    expect(checkIn!.compareDocumentPosition(reading!) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(reading!.compareDocumentPosition(checkIn!) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Did this meet you?" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "This helped" }))
+      .not.toBeInTheDocument();
 
     await user.click(await screen.findByRole("radio", { name: /Quiet/i }));
     await user.click(screen.getByRole("button", { name: /Keep this/i }));
@@ -939,6 +943,22 @@ describe("the Today surface", () => {
     const v5 = (): Record<string, MockResponse> => ({
       [TODAY]: ok(todayResponseV5),
       [EVIDENCE_V5]: ok(evidenceGraphV5),
+    });
+
+    it("ends with future context instead of a second feedback prompt", async () => {
+      const { container } = renderToday(v5());
+      await screen.findByText(todayResponseV5.reading.paragraphs[0]!.text);
+
+      const reading = container.querySelector<HTMLElement>(".today-reading");
+      const checkIn = container.querySelector<HTMLElement>(".daily-check-in");
+      expect(reading).not.toBeNull();
+      expect(checkIn).not.toBeNull();
+      expect(reading!.compareDocumentPosition(checkIn!) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+      expect(screen.queryByRole("heading", { name: "Did this meet you?" }))
+        .not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "This helped" }))
+        .not.toBeInTheDocument();
     });
 
     it("renders the headline as the lead's quiet kicker, not a second heading", async () => {

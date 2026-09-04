@@ -199,11 +199,10 @@ export function DailyCheckInCard() {
   };
 
   return (
-    <section className="daily-check-in panel" aria-labelledby="daily-check-in-heading">
+    <section className="daily-check-in" aria-labelledby="daily-check-in-heading">
       <div className="daily-check-in__heading">
-        <p className="kicker">Private context · one day</p>
-        <span className="panel-code">USR-06</span>
         <h2 id="daily-check-in-heading">How are you arriving?</h2>
+        <p className="daily-check-in__retention">Private · one day</p>
       </div>
 
       {availability.status === "loading" ? (
@@ -245,8 +244,7 @@ export function DailyCheckInCard() {
       ) : (
         <form className="daily-check-in__form" onSubmit={submit}>
           <p className="daily-check-in__invite" id="daily-check-in-invite">
-            One mark is enough. It lasts a day, and only a later reading can
-            use it — never this one.
+            One mark is enough. Only a later reading can use it — never this one.
           </p>
           <fieldset className="daily-check-in__energy" aria-describedby="daily-check-in-invite">
             <legend>Energy</legend>
@@ -334,7 +332,7 @@ export function DailyCheckInCard() {
 
           <div className="daily-check-in__footer">
             <button
-              className="button button--primary"
+              className="button button--secondary"
               type="submit"
               disabled={busy || !form.energy}
               aria-busy={busy}

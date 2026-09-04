@@ -17,7 +17,6 @@ import {
 } from "../lib/reading-format.js";
 import { AiConsentGate } from "./AiConsentGate.js";
 import { DailyCheckInCard } from "./DailyCheckInCard.js";
-import { ReadingFeedbackCard } from "./ReadingFeedbackCard.js";
 import { PreferenceConfirm } from "./PreferenceConfirm.js";
 import { WhyThisDrawer } from "./WhyThisDrawer.js";
 import { Icon } from "./icons.js";
@@ -191,8 +190,6 @@ function TodayReadingV3({
         domainPreference={reading.domain_preference}
       />
 
-      <DailyCheckInCard />
-
       {isFallbackShape(reading) ? (
         <p className="today-fallback-note">
           Nothing in your chart was eligible to be written about today, so what
@@ -223,7 +220,7 @@ function TodayReadingV3({
           />
         ) : null}
       </div>
-      <ReadingFeedbackCard readingId={reading.reading_id} />
+      <DailyCheckInCard />
     </article>
   );
 }
@@ -263,8 +260,6 @@ function TodayReadingV5({
         domainPreference={reading.domain_preference}
       />
 
-      <DailyCheckInCard />
-
       <div className="today-reading">
         <div className="today-body">
           {paragraphs.map((paragraph, index) => (
@@ -288,7 +283,7 @@ function TodayReadingV5({
           onUnauthorized={onUnauthorized}
         />
       </div>
-      <ReadingFeedbackCard readingId={reading.reading_id} />
+      <DailyCheckInCard />
     </article>
   );
 }
