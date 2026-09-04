@@ -116,6 +116,11 @@
       "id": "0023_pattern_source_regeneration",
       "file": "0023_pattern_source_regeneration.sql",
       "description": "Add M9 source-triggered Pattern regeneration. Accepted claims gain one nullable pending regeneration coordinate; Pattern jobs and documents pin a required Pattern-creation source hash; source_update widens the job reason; and the signed replay receipt admits one accepted-to-accepted pattern_regenerated replacement event. Existing encrypted job/document bytes are copied explicitly and receive a legacy all-zero source hash. No crypto-version change."
+    },
+    {
+      "id": "0024_geoapify_place_resolutions",
+      "file": "0024_geoapify_place_resolutions.sql",
+      "description": "Admit Geoapify selected-place handoffs while preserving historical Google rows, identifiers, encrypted payload bytes, key versions, nonces, ownership, timestamps, and indexes. No existing consent is reclassified, no birth profile changes, and no crypto-version change. Apply before the Geoapify Worker; compatible with the previous Google schema reader."
     }
   ],
   "notes": [

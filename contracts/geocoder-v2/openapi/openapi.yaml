@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Pattern/Like Geoapify consent successor
+  version: 0.8.1
+  description: |
+    Narrow overlay replacing only the M8 geocoder consent endpoint. All M0-M9
+    files remain frozen. Place search and resolution still use M8 0.8.0.
+    Google consent does not authorize Geoapify. Missing optional credentials
+    disable new grants and place requests, not unrelated product routes.
+servers:
+  - url: https://patternlike-api-production.lfd.workers.dev
+  - url: http://localhost:8787
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+paths:
+  /v1/consents/geocoder:
+    get:
+      operationId: getGeocoderConsent
+      x-normative-schema: 'geocoder-v2:geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+      responses:
+        '200': { $ref: '#/components/responses/Consent' }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: grantGeocoderConsent
+      x-normative-request-schema: 'geocoder-v2:geocoder-consent.schema.json#/$defs/geocoderConsentGrantRequest'
+      x-normative-response-schema: 'geocoder-v2:geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConsentUiSurface'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: 'https://patternlike.app/contracts/geocoder-v2/geocoder-consent.schema.json#/$defs/geocoderConsentGrantRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Consent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: revokeGeocoderConsent
+      description: Remains available without the provider key or enabled rollout.
+      x-normative-schema: 'geocoder-v2:geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConsentUiSurface'
+      responses:
+        '200': { $ref: '#/components/responses/Consent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    ConsentUiSurface:
+      name: X-Consent-UI-Surface
+      in: header
+      required: true
+      schema: { type: string, enum: [onboarding, privacy_center] }
+  responses:
+    Consent:
+      description: Current immutable Geoapify terms and grant state
+      content:
+        application/json:
+          schema:
+            $ref: 'https://patternlike.app/contracts/geocoder-v2/geocoder-consent.schema.json#/$defs/geocoderConsentResponse'
+    Error:
+      description: Request-id error envelope; 409 requires a current policy or new idempotency key
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code, message, request_id]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  request_id: { type: [string, 'null'] }

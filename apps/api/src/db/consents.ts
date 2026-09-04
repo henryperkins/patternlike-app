@@ -2,6 +2,7 @@ import {
   AI_CONSENT_DATA_CATEGORIES,
   GEOCODER_CONSENT_ALLOWED_USES,
   GEOCODER_CONSENT_POLICY_VERSION,
+  GEOCODER_PROVIDER,
   newId,
   type AiConsentDataCategory,
   type GeocoderConsentUiSurface,
@@ -501,7 +502,6 @@ export async function revokeAiSynthesisConsent(
 }
 
 const GEOCODER_SOURCE_ID = "AST-02" as const;
-const GEOCODER_PROVIDER = "google_places_geocoding_v4" as const;
 const GEOCODER_ALLOWED_USES_JSON = JSON.stringify(GEOCODER_CONSENT_ALLOWED_USES);
 const GEOCODER_GRANT_JOB_TYPE = "geocoder_consent_grant";
 const GEOCODER_REVOKE_JOB_TYPE = "geocoder_consent_revoke";

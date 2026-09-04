@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.8.1",
+  "kind": "product_source",
+  "source_id": "AST-02",
+  "permission_tier": 0,
+  "allowed_uses": ["chart_fact", "timezone_resolution"],
+  "provider": "geoapify",
+  "scopes": [],
+  "connector_account_id": null,
+  "status": "not_granted",
+  "policy_version": "geoapify-2026-09-04",
+  "granted_at": null,
+  "ui_surface": null,
+  "disclosure": {
+    "text": "Geoapify birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Geoapify. After you choose a suggestion, it sends the selected Geoapify place identifier and language preference to retrieve the place. Pattern/Like does not send your birth date or time, device location, user, account, birth-profile, or consent identifiers, or the app-owned search session token. Geoapify also receives Pattern/Like's API credential and network metadata such as the server IP. Geoapify logs API requests for access control, usage counting, troubleshooting, and performance; its privacy policy says successful request logs are generally kept no longer than 24 hours. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected place and coordinates under your account key, retaining the selection handoff for up to 24 hours and the saved values in your birth profile. Deleting your Pattern/Like account does not delete Geoapify's separate records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually.",
+    "links": {
+      "patternlike_terms": "/terms.html",
+      "patternlike_privacy": "/privacy.html",
+      "geoapify_terms": "https://www.geoapify.com/terms-and-conditions/",
+      "geoapify_privacy": "https://www.geoapify.com/privacy-policy/"
+    },
+    "analytics": true
+  }
+}

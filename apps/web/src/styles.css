@@ -5825,14 +5825,10 @@ summary:focus-visible {
   color: var(--muted, #67625b);
 }
 
-.google-maps-attribution {
+.place-autocomplete__attribution {
   display: inline-block;
-  min-height: 16px;
   padding: 5px 10px;
-  white-space: nowrap;
-  font-family: Roboto, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1;
-  color: #5e5e5e;
-  background: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
 }

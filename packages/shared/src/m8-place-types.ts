@@ -1,7 +1,8 @@
 /**
  * M8 consumer place, consent, and birth-budget wire types.
  *
- * Normative definitions live in `contracts/m8`. Request fields remain
+ * Normative definitions live in `contracts/m8`, with the geocoder consent
+ * successor in `contracts/geocoder-v2`. Request fields remain
  * provider-neutral; provider identity appears only in the consent document.
  */
 
@@ -54,11 +55,14 @@ export interface PlaceResolutionResponse {
   qualifiers: PlaceQualifier[];
 }
 
+export const GEOCODER_PROVIDER = "geoapify" as const;
+export const GEOCODER_CONSENT_SCHEMA_VERSION = "0.8.1" as const;
+
 export const GEOCODER_CONSENT_POLICY_VERSION =
-  "google-places-geocoding-v4-2026-08-26" as const;
+  "geoapify-2026-09-04" as const;
 
 export const GEOCODER_CONSENT_DISCLOSURE_TEXT =
-  "Google birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Google Places Autocomplete. After you choose a suggestion, Pattern/Like sends only Google's opaque Place ID to Google Geocoding. Pattern/Like does not send your birth date or time, coordinates or device location, Pattern/Like user, account, birth-profile, or consent identifiers, or the app-owned search session token. Google receives these requests, Pattern/Like's project credential, and network metadata such as the Worker IP. Google acts as an independent controller and may retain and use information it receives, including search terms and IP addresses, to provide and improve Google products and services; the reviewed terms do not promise to exclude model training. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected formatted address, coordinates, confidence, and qualifiers under your account key and deletes that data with your Pattern/Like account, but account deletion does not delete Google's separately controlled records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually." as const;
+  "Geoapify birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Geoapify. After you choose a suggestion, it sends the selected Geoapify place identifier and language preference to retrieve the place. Pattern/Like does not send your birth date or time, device location, user, account, birth-profile, or consent identifiers, or the app-owned search session token. Geoapify also receives Pattern/Like's API credential and network metadata such as the server IP. Geoapify logs API requests for access control, usage counting, troubleshooting, and performance; its privacy policy says successful request logs are generally kept no longer than 24 hours. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected place and coordinates under your account key, retaining the selection handoff for up to 24 hours and the saved values in your birth profile. Deleting your Pattern/Like account does not delete Geoapify's separate records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually." as const;
 
 export const GEOCODER_CONSENT_ALLOWED_USES = [
   "chart_fact",
@@ -68,8 +72,8 @@ export const GEOCODER_CONSENT_ALLOWED_USES = [
 export const GEOCODER_CONSENT_DISCLOSURE_LINKS = {
   patternlike_terms: "/terms.html",
   patternlike_privacy: "/privacy.html",
-  google_maps_terms: "https://maps.google.com/help/terms_maps/",
-  google_privacy: "https://policies.google.com/privacy",
+  geoapify_terms: "https://www.geoapify.com/terms-and-conditions/",
+  geoapify_privacy: "https://www.geoapify.com/privacy-policy/",
 } as const;
 
 export type GeocoderConsentUiSurface = "onboarding" | "privacy_center";
@@ -79,12 +83,12 @@ export interface GeocoderConsentGrantRequest {
 }
 
 export interface GeocoderConsentResponse {
-  schema_version: M8SchemaVersion;
+  schema_version: typeof GEOCODER_CONSENT_SCHEMA_VERSION;
   kind: "product_source";
   source_id: "AST-02";
   permission_tier: 0;
   allowed_uses: ["chart_fact", "timezone_resolution"];
-  provider: "google_places_geocoding_v4";
+  provider: typeof GEOCODER_PROVIDER;
   scopes: [];
   connector_account_id: null;
   status: "granted" | "not_granted";
@@ -96,8 +100,8 @@ export interface GeocoderConsentResponse {
     links: {
       patternlike_terms: "/terms.html";
       patternlike_privacy: "/privacy.html";
-      google_maps_terms: "https://maps.google.com/help/terms_maps/";
-      google_privacy: "https://policies.google.com/privacy";
+      geoapify_terms: "https://www.geoapify.com/terms-and-conditions/";
+      geoapify_privacy: "https://www.geoapify.com/privacy-policy/";
     };
   };
 }

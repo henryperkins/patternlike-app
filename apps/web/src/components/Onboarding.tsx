@@ -596,7 +596,7 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
             <div className="consent-ledger">
               <div><span>Used now</span><strong>Birth details, chart calculation</strong></div>
               <div><span>Not connected</span><strong>Calendar, health, device, journal</strong></div>
-              <div><span>Place search</span><strong>Google only when you enable it</strong></div>
+              <div><span>Place search</span><strong>Geoapify only when you enable it</strong></div>
               <div><span>Model access</span><strong>None during chart calculation</strong></div>
             </div>
 

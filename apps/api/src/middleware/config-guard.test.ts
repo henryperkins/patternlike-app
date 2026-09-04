@@ -134,17 +134,23 @@ describe("geocoder rollout configuration", () => {
     })?.code).toBe("geocoder_rollout_invalid");
   });
 
-  it("requires a credential only while enabled", () => {
+  it("does not make an optional geocoder credential load-bearing for the product", () => {
+    expect(guard({
+      ...configuredProduction,
+      CALC_FETCH_TIMEOUT_MS: "10000",
+      BIRTH_CALC_DAILY_LIMIT: "5",
+      GEOCODER_ROLLOUT: "enabled",
+    })).toBeNull();
     expect(guard({
       ENVIRONMENT: "development",
       AUTH_STUB: "1",
       GEOCODER_ROLLOUT: "enabled",
-    })?.code).toBe("geocoder_misconfigured");
+    })).toBeNull();
     expect(guard({
       ENVIRONMENT: "development",
       AUTH_STUB: "1",
       GEOCODER_ROLLOUT: "enabled",
-      GOOGLE_MAPS_PLATFORM_API_KEY: "configured-test-key",
+      GEOAPIFY_API_KEY: "configured-test-key",
     })).toBeNull();
   });
 });

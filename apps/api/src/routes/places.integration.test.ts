@@ -12,11 +12,16 @@ import {
   USER_A,
 } from "../../test/helpers.js";
 
+const OSM_SOURCE = {
+  sourcename: "openstreetmap", attribution: "© OpenStreetMap contributors",
+  license: "Open Database License", url: "https://www.openstreetmap.org/copyright",
+};
+
 function requestEnv(overrides: Record<string, unknown> = {}) {
   return {
     ...env,
     GEOCODER_ROLLOUT: "enabled",
-    GOOGLE_MAPS_PLATFORM_API_KEY: "test-google-key",
+    GEOAPIFY_API_KEY: "test-geoapify-key",
     PLACE_SEARCH_RATE_LIMITER: {
       limit: async () => ({ success: true }),
     },
@@ -48,13 +53,47 @@ describe("place routes", () => {
     vi.stubGlobal("fetch", fetcher);
     const response = await post("/v1/places/search", { malformed: true }, {
       GEOCODER_ROLLOUT: "off",
-      GOOGLE_MAPS_PLATFORM_API_KEY: "",
+      GEOAPIFY_API_KEY: "",
     });
     expect(response).toMatchObject({
       status: 503,
       body: { error: { code: "geocoder_unavailable" } },
     });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("isolates a missing Geoapify key to search, resolve, and new grants", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const overrides = { GEOAPIFY_API_KEY: " ", GOOGLE_MAPS_PLATFORM_API_KEY: "legacy-key-is-not-a-fallback" };
+    for (const path of ["/v1/places/search", "/v1/places/resolve"]) {
+      expect(await post(path, { malformed: true }, overrides)).toMatchObject({
+        status: 503, body: { error: { code: "geocoder_unavailable" } },
+      });
+    }
+    const headers = { "x-user-id": USER_A, "idempotency-key": "geocoder-missing-key", "x-consent-ui-surface": "privacy_center" };
+    const unavailable = await app.request("http://api.test/v1/consents/geocoder", { method: "PUT", headers }, requestEnv(overrides));
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toMatchObject({ error: { code: "geocoder_unavailable" } });
+    for (const path of ["/v1/preferences/topic-exclusions", "/v1/consents/geocoder"]) {
+      const response = await app.request(`http://api.test${path}`, { headers }, requestEnv(overrides));
+      expect(response.status).toBe(200);
+    }
+    const revoked = await app.request("http://api.test/v1/consents/geocoder", { method: "DELETE", headers }, requestEnv(overrides));
+    expect(revoked.status).toBe(200);
+    expect(await revoked.json()).toMatchObject({ schema_version: "0.8.1", provider: "geoapify", status: "not_granted" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Google policy when granting Geoapify permission", async () => {
+    const response = await app.request("http://api.test/v1/consents/geocoder", {
+      method: "PUT",
+      headers: { "x-user-id": USER_A, "content-type": "application/json", "idempotency-key": "old-policy-grant", "x-consent-ui-surface": "onboarding" },
+      body: JSON.stringify({ policy_version: "google-places-geocoding-v4-2026-08-26" }),
+    }, requestEnv());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "consent_policy_version_stale" } });
+    expect(await rows("SELECT id FROM consents WHERE source_id = 'AST-02'")).toEqual([]);
   });
 
   it("requires the exact active geocoder consent before rate limiting", async () => {
@@ -79,25 +118,24 @@ describe("place routes", () => {
       "geocoder-grant-0001",
     );
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).includes("places:autocomplete")) {
+      if (String(input).includes("/geocode/autocomplete")) {
         return new Response(JSON.stringify({
-          suggestions: [{
-            placePrediction: {
-              placeId: "google-place-id",
-              structuredFormat: {
-                mainText: { text: "London" },
-                secondaryText: { text: "United Kingdom" },
-              },
-            },
+          results: [{
+            place_id: "geoapify-place-id",
+            result_type: "city",
+            address_line1: "London",
+            address_line2: "United Kingdom",
+            datasource: OSM_SOURCE,
           }],
         }));
       }
       return new Response(JSON.stringify({
-        formattedAddress: "London, UK",
-        location: { latitude: 51.5074, longitude: -0.1278 },
-        granularity: "GEOMETRIC_CENTER",
-        types: ["locality"],
-        addressComponents: [],
+        type: "FeatureCollection",
+        features: [{ type: "Feature", properties: {
+          feature_type: "details", formatted: "London, UK",
+          lat: 51.5074, lon: -0.1278, categories: ["administrative.city_level"],
+          datasource: OSM_SOURCE,
+        } }],
       }));
     });
     vi.stubGlobal("fetch", fetcher);
@@ -110,12 +148,12 @@ describe("place routes", () => {
       status: 200,
       body: {
         schema_version: "0.8.0",
-        candidates: [{ candidate_id: "google-place-id" }],
+        candidates: [{ candidate_id: "geoapify-place-id" }],
       },
     });
 
     const resolved = await post("/v1/places/resolve", {
-      candidate_id: "google-place-id",
+      candidate_id: "geoapify-place-id",
       session_token: "session-0001",
     });
     expect(resolved).toMatchObject({
@@ -131,5 +169,20 @@ describe("place routes", () => {
     expect(String(resolved.body.place_id)).toMatch(/^plc_[0-9a-f]{32}$/);
     expect(await rows("SELECT id FROM place_resolutions WHERE user_id = ?", USER_A))
       .toHaveLength(1);
+  });
+
+  it("never persists a place whose source is not covered by the visible attribution", async () => {
+    await grantGeocoderConsent(env, IDENTITY_A, GEOCODER_CONSENT_POLICY_VERSION, "onboarding", "attribution-grant");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: {
+        feature_type: "details", formatted: "London, UK",
+        lat: 51.5074, lon: -0.1278, categories: ["administrative.city_level"],
+        datasource: { sourcename: "geonames" },
+      } }],
+    })));
+    expect(await post("/v1/places/resolve", { candidate_id: "unsupported-source", session_token: "session-0001" }))
+      .toMatchObject({ status: 503, body: { error: { code: "geocoder_unavailable" } } });
+    expect(await rows("SELECT id FROM place_resolutions WHERE user_id = ?", USER_A)).toEqual([]);
   });
 });

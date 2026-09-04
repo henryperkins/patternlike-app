@@ -62,10 +62,10 @@ export interface Env {
   ROOT_KEK?: string;
   /** Secret version-one root wrapping-key ring. Never commit its value. */
   ROOT_KEK_KEYRING?: string;
-  /** Disabled-by-default Google Places/Geocoding adapter rollout. */
+  /** Disabled-by-default Geoapify adapter rollout. */
   GEOCODER_ROLLOUT?: string;
-  /** Secret; configured only when GEOCODER_ROLLOUT is enabled. */
-  GOOGLE_MAPS_PLATFORM_API_KEY?: string;
+  /** Server-only secret; absence disables optional search, not the product. */
+  GEOAPIFY_API_KEY?: string;
   /** Soft per-user interactive abuse guard for place search and resolution. */
   PLACE_SEARCH_RATE_LIMITER: RateLimit;
   SERVICE_AUTH_TOKEN?: string;

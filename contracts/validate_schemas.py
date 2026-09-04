@@ -46,6 +46,7 @@ M6 = ROOT / "m6"
 M7 = ROOT / "m7"
 M8 = ROOT / "m8"
 M9 = ROOT / "m9"
+GEOCODER_V2 = ROOT / "geocoder-v2"
 PATTERN_PROVIDER_BOUNDARY_POLICY_PATH = (
     ROOT / "policies" / "pattern-provider-boundary-v1.json"
 )
@@ -60,10 +61,17 @@ M6_BASE = "https://patternlike.app/contracts/m6/"
 M7_BASE = "https://patternlike.app/contracts/m7/"
 M8_BASE = "https://patternlike.app/contracts/m8/"
 M9_BASE = "https://patternlike.app/contracts/m9/"
+GEOCODER_V2_BASE = "https://patternlike.app/contracts/geocoder-v2/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
 FIXTURE_SCHEMA = {
+    "geocoder-v2": {
+        "geocoder-consent-grant": GEOCODER_V2_BASE
+        + "geocoder-consent.schema.json#/$defs/geocoderConsentGrantRequest",
+        "geocoder-consent": GEOCODER_V2_BASE
+        + "geocoder-consent.schema.json#/$defs/geocoderConsentResponse",
+    },
     "m3": {
         "assembly-identity": M3_BASE
         + "assembly-identity.schema.json#/$defs/assemblyIdentityInputV1",
@@ -198,6 +206,7 @@ FIXTURE_SCHEMA = {
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
 # may legitimately accept them; the policy check below must not.
 POLICY_ONLY = {
+    "geocoder-v2": set(),
     "m3": {
         "assembly-identity.accuracy-mismatch",
         "cycle-response.unordered-passes",
@@ -377,7 +386,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7, M8, M9):
+    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1374,7 +1383,7 @@ def validate_package(
             return _m7_policy_errors(fixture, instance)
         if name == "m8":
             return _m8_policy_errors(fixture, instance)
-        if name == "m9":
+        if name in ("m9", "geocoder-v2"):
             return []
         raise ValueError(f"unregistered contract package policy: {name}")
 
@@ -1441,6 +1450,7 @@ PACKAGE_BASE = {
     "m7": M7_BASE,
     "m8": M8_BASE,
     "m9": M9_BASE,
+    "geocoder-v2": GEOCODER_V2_BASE,
 }
 
 
@@ -1520,7 +1530,7 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            if package in (M8, M9):
+            if package in (M8, M9, GEOCODER_V2):
                 # The validate() shortcut builds SchemaPath with its own handlers
                 # before instantiating `cls`, so a custom class cannot affect
                 # retrieval there. Construct the validator from the raw mapping.
@@ -3868,6 +3878,51 @@ def check_m9_openapi_projection() -> list[str]:
     return errors
 
 
+def check_geocoder_v2_projection(registry: Registry) -> list[str]:
+    """The live consent successor must not rewrite or silently reuse M8."""
+    import yaml
+
+    errors = check_frozen(
+        M8, "contracts/m8",
+        _recorded_predecessors(GEOCODER_V2 / "SCHEMA_MANIFEST.json").get("contracts/m8"),
+        "contracts/geocoder-v2/SCHEMA_MANIFEST.json",
+    )
+    schema = json.loads((GEOCODER_V2 / "geocoder-consent.schema.json").read_text())
+    props = schema["$defs"]["geocoderConsentResponse"]["properties"]
+    for field, value in {
+        "schema_version": "0.8.1", "provider": "geoapify",
+        "policy_version": "geoapify-2026-09-04",
+    }.items():
+        if props[field].get("const") != value:
+            errors.append(f"Geoapify consent must pin {field} to {value}")
+    # Bridge the published contract to the actual shared disclosure, not a
+    # fixture generated from the same source during the test.
+    shared = (ROOT.parent / "packages/shared/src/m8-place-types.ts").read_text()
+    match = re.search(r'GEOCODER_CONSENT_DISCLOSURE_TEXT =\s*"([^"]+)" as const', shared)
+    text = schema["$defs"]["geocoderDisclosure"]["properties"]["text"]["const"]
+    if not match or match.group(1) != text:
+        errors.append("Geoapify runtime disclosure differs from its immutable contract")
+    validator = resolve_validator(
+        GEOCODER_V2_BASE + "geocoder-consent.schema.json#/$defs/geocoderConsentResponse", registry,
+    )
+    for path in (M8 / "fixtures/valid").glob("geocoder-consent.*.json"):
+        if validator.is_valid(json.loads(path.read_text())):
+            errors.append("Geoapify consent accepts a frozen Google document")
+    spec = yaml.safe_load((GEOCODER_V2 / "openapi/openapi.yaml").read_text())
+    if spec["info"]["version"] != "0.8.1" or set(spec["paths"]) != {"/v1/consents/geocoder"}:
+        errors.append("Geoapify OpenAPI must remain a one-route 0.8.1 overlay")
+    response_ref = spec["components"]["responses"]["Consent"]["content"]["application/json"]["schema"].get("$ref")
+    if response_ref != GEOCODER_V2_BASE + "geocoder-consent.schema.json#/$defs/geocoderConsentResponse":
+        errors.append("Geoapify OpenAPI does not serve its normative consent response")
+    for method in ("get", "put", "delete"):
+        operation = spec["paths"]["/v1/consents/geocoder"][method]
+        if operation["responses"]["200"].get("$ref") != "#/components/responses/Consent":
+            errors.append(f"Geoapify {method} does not return the current consent")
+        if method == "delete" and "requestBody" in operation:
+            errors.append("Geoapify DELETE must retain an empty request body")
+    return errors
+
+
 def main() -> int:
     print("== freeze ==")
     freeze_errors = check_predecessors_frozen()
@@ -3969,6 +4024,11 @@ def main() -> int:
     errors += check_m9_manifest()
     errors += check_m9_schema_projection()
     errors += check_m9_openapi_projection()
+
+    print("\n== contracts/geocoder-v2 ==")
+    errors += validate_package(registry, "geocoder-v2", GEOCODER_V2, set())
+    errors += check_openapi(GEOCODER_V2, registry)
+    errors += check_geocoder_v2_projection(registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")

@@ -8,17 +8,21 @@ import {
   ACCOUNT_PROCESSING_CONSENT_POLICY_VERSION,
   GEOCODER_CONSENT_ALLOWED_USES,
   GEOCODER_CONSENT_POLICY_VERSION,
+  GEOCODER_CONSENT_SCHEMA_VERSION,
+  GEOCODER_PROVIDER,
   M8_SCHEMA_VERSION,
   type AccountProcessingConsentResponse,
   type PlaceSearchRequest,
   type ReadingHistoryResponse,
 } from "./index.js";
 
-test("M8 consumer constants pin the frozen package and consent policy", () => {
+test("place requests retain M8 while Geoapify consent uses its explicit successor", () => {
   assert.equal(M8_SCHEMA_VERSION, "0.8.0");
+  assert.equal(GEOCODER_CONSENT_SCHEMA_VERSION, "0.8.1");
+  assert.equal(GEOCODER_PROVIDER, "geoapify");
   assert.equal(
     GEOCODER_CONSENT_POLICY_VERSION,
-    "google-places-geocoding-v4-2026-08-26",
+    "geoapify-2026-09-04",
   );
   assert.deepEqual(GEOCODER_CONSENT_ALLOWED_USES, [
     "chart_fact",

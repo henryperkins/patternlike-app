@@ -1,103 +1,94 @@
-# Google birthplace search — rollout and evidence runbook
+# Geoapify birthplace search rollout
 
-**Created:** 2026-09-04
+Updated: 2026-09-04. Local implementation is not production proof. Record the
+exact release SHA, Worker version/allocation, credential canary, and migration
+receipt when the live switch is performed.
 
-**Status:** The production configuration commit that sets
-`GEOCODER_ROLLOUT = "enabled"` exists on a branch and is **not merged**. Gate 3
-is open: the production Worker has no `GOOGLE_MAPS_PLATFORM_API_KEY` (verified
-2026-09-04 with `wrangler secret list --env production`), and no billing-account
-region, quota, budget, alert, or canary has been recorded. Merging before the
-secret exists makes `configGuard` answer `503 configuration_error` on **every**
-product request, not just place search.
+## Incident and successor
 
-The decision and its mandatory order live in
-`docs/decisions/2026-08-26-geocoder-provider.md` ("Fail-closed rollout"). This
-file is where the production operator records each gate with the evidence
-behind it, in the same spirit as `openai-pattern-rollout.md`.
+The Google enablement commit 2887937 reached production without its required
+credential. The global configuration guard then rejected product routes with
+503 configuration_error, even though /health returned 200. The earlier
+statement that the enablement was unmerged was incorrect.
 
-## Why the order is what it is
+The Geoapify successor moves credential availability to the optional route
+boundary. A missing GEOAPIFY_API_KEY or rollout off disables POST place search,
+POST place resolve, and PUT geocoder consent. GET and DELETE consent, manual
+birth entry, and unrelated product routes remain available. Google keys are
+not read by the new runtime. The adapter and old tests are retained in Git
+history, not as a fallback.
 
-- `checkSecureConfig` (`apps/api/src/middleware/config-guard.ts`) accepts only
-  `off` or `enabled`, and when the value is `enabled` it requires a non-empty
-  `GOOGLE_MAPS_PLATFORM_API_KEY`. The check runs on every product request and
-  in `queue()`, so a missing key is a whole-product outage, not a degraded
-  search. **Secret first, deploy second.**
-- Under `off`, grant (`PUT`), search, and resolve answer a generic
-  `503 geocoder_unavailable` and make no Google call; `GET` still serves the
-  disclosure and state; `DELETE` still revokes. Rollback is therefore a config
-  commit flipping the value back to `off`, and never deleting the secret while
-  the value is `enabled`.
-- The development block stays `off`. A local Worker enables the search by
-  putting both `GEOCODER_ROLLOUT=enabled` and the key in `apps/api/.dev.vars`
-  (mode 0600, never committed); `wrangler dev` lets `.dev.vars` override
-  `[vars]`.
+This first successor accepts only verified OpenStreetMap-backed Geoapify
+results matching the displayed attribution. Unknown or other data sources are
+refused, so coverage can be narrower than Geoapify's complete dataset. Manual
+entry remains available. Do not remove this guard without supporting the other
+sources' attribution requirements through display and retained-data reuse.
 
-## Gate ledger
+Design and source review: [Geoapify decision](../decisions/2026-09-04-geoapify-geocoder.md).
 
-| Gate | Requirement (ADR) | Evidence | Status |
-| --- | --- | --- | --- |
-| 1 | Provider adapter, consent routes, search/resolve routes, and config landed with both blocks `off` | `f1c6711` (2026-08-28) "api: add crypto and place control planes" | done |
-| 2 | Public Terms and Privacy carry the Google flow-down; exact disclosure; complete attribution | `apps/web/public/terms.html` links the Google Maps/Google Earth Additional Terms; `apps/web/public/privacy.html` links the Google Privacy Policy and states independent-controller processing, separate retention, and the absence of a residency control. The disclosure is the shared `GEOCODER_CONSENT_DISCLOSURE_TEXT` served by `GET /v1/consents/geocoder`; "Google Maps" text attribution sits beside suggestions and the selected result in `PlaceAutocomplete.tsx`. Inspected 2026-09-04. | done |
-| 3a | Tests | `scripts/wrangler-config.test.ts` asserts development `off` / production `enabled`; `config-guard.test.ts` covers the enabled-without-key refusal; `places.integration.test.ts` exercises the routes with rollout overridden to `enabled`. Run 2026-09-04 on the branch; `npm run ci:local` summary goes in the PR. | done |
-| 3b | API-restricted secret on the production Worker | Absent on 2026-09-04 (`wrangler secret list --env production`). | **open** |
-| 3c | Billing-account region recorded as `EEA` or `non-EEA` before provisioning | Not recorded. | **open** |
-| 3d | Project quotas: Places Autocomplete (New) 120/min, Geocoding API 30/min | Not recorded. | **open** |
-| 3e | Monthly budget USD 50 with alerts at 50 %, 75 %, 90 %, 100 %, and named recipients | Not recorded. | **open** |
-| 3f | Successful internal canary in a non-reader-serving Worker version or environment | None. | **open** |
-| 4 | Production enabled in a separate configuration commit and deploy | Branch prepared 2026-09-04; not merged. | pending 3b–3f |
+## Credential
 
-## Operator procedure
+1. Create a project and key at [Geoapify MyProjects](https://myprojects.geoapify.com/).
+   No key is provisioned by gcloud. Do not paste it into a chat or commit it.
+2. Save it locally as GEOAPIFY_API_KEY in apps/api/.dev.vars (mode 0600), or
+   enter it directly into wrangler secret put GEOAPIFY_API_KEY --env production
+   from apps/api. For a local Worker also set GEOCODER_ROLLOUT=enabled.
+3. Keep it server-only. Browser referrer/origin restrictions do not match this
+   server-to-server adapter; use a dedicated project and review provider key
+   controls suitable for Worker egress. Never forward user headers to satisfy
+   a restriction. Use the x-api-key header, never a URL query parameter.
+4. Review [current plan limits](https://www.geoapify.com/pricing/) and set the
+   provider project's usage controls before public rollout. The reviewed free
+   plan offers 3,000 credits/day and 5 requests/second; free commercial use is
+   limited under provider terms. The existing app limit is per user, not a
+   global provider spending cap. No paid plan purchase is implied here.
 
-Each step is recorded in the ledger above when done. Do not reorder.
+## Verification and deployment order
 
-1. **Record the billing-account region** (3c). It decides which Google Service
-   Specific Terms govern; the ADR's rights analysis passes under both.
-2. **Provision in Google Cloud.** Enable *Places API (New)* and *Geocoding
-   API* on the project. Create an API key whose API restriction is exactly
-   those two services. Worker egress has no fixed address, so the API
-   restriction is the control; the key is sent only in `X-Goog-Api-Key` by the
-   adapter, which calls `places.googleapis.com/v1/places:autocomplete` and
-   `geocode.googleapis.com/v4/geocode/places` with frozen field masks.
-3. **Quotas, budget, alerts** (3d, 3e). Set the two per-minute quotas, the
-   USD 50 budget, the four alert thresholds, and the recipients. Record the
-   values here. Quotas are rate ceilings, not spend caps.
-4. **Put the secret on the production Worker** (3b). It prompts interactively;
-   never pass the value as an argument:
-
-   ```bash
-   cd apps/api && npx wrangler secret put GOOGLE_MAPS_PLATFORM_API_KEY --env production
-   npx wrangler secret list --env production | grep GOOGLE_MAPS_PLATFORM_API_KEY
-   ```
-
-   Putting a secret creates a new version of the *current* deployment, which
-   still reads `off`, so nothing changes for readers yet.
-5. **Canary without serving readers** (3f). The product path needs an Auth0
-   session bound to the production origin, so a version preview URL cannot
-   sign in. Use a local Worker with the real key instead: add
-   `GEOCODER_ROLLOUT=enabled` and `GOOGLE_MAPS_PLATFORM_API_KEY=…` to
-   `apps/api/.dev.vars`, run `npm run dev:api` and `npm run web:dev`, grant the
-   permission on Privacy or in the birth form, type a city, pick a suggestion,
-   and confirm coordinates and time zone resolve. The API log carries the
-   `place_search_completed` safe-log event with its `outcome`. Remove the key
-   from `.dev.vars` afterwards and record the date and result here.
-6. **Merge the configuration branch.** Workers Builds deploys `main`. Then, on
-   the live origin: the Privacy page reads the permission, a grant answers
-   `Granted`, a search returns candidates, and
-   `npx wrangler tail --env production` shows `place_search_completed`. Record
-   the Worker version id here.
+- Run npm run ci:local on the final candidate and keep its complete paste-ready
+  summary in the PR before merging. GitHub Actions remains billing-blocked;
+  merging main still triggers Cloudflare Workers Builds.
+- Run a real adapter canary with a synthetic city (not a user's birthplace),
+  checking both autocomplete and details with the same server-side key header.
+  Confirm the returned source notice passes the OSM attribution guard for each
+  endpoint; mock success does not establish real city coverage.
+  Report only status, candidate count, resolution/confidence, and key presence.
+  Never log the key, outbound URL, raw provider payload, or real user data.
+- Inspect the exact pending D1 migration ledger. Migration 0024 follows 0023;
+  do not silently apply unexpected earlier migrations. Export a mode-0600
+  backup outside the repo and record a Time Travel bookmark before mutation.
+- Apply 0024_geoapify_place_resolutions.sql before deploying the compatible
+  Worker. It rebuilds only the selected-place table and preserves existing
+  Google rows byte-for-byte. Verify both indexes, provider CHECK, row counts,
+  PRAGMA foreign_key_check, and PRAGMA quick_check after application.
+- Provision the key before activating search. The code can safely deploy
+  without it to restore non-geocoder routes, but that is not a working-search
+  release and must not be reported as one.
+- Verify the exact deployed SHA/version and 100% allocation. Check both the
+  workers.dev origin and the production custom origin, asset manifest/hydration,
+  and that an unauthenticated protected route returns 401 rather than the old
+  503 configuration_error. Health alone does not establish recovery.
+- In an authorized test account, prove no query is sent before permission,
+  grant the current Geoapify policy, search, select, resolve to an encrypted
+  account-owned handoff, and withdraw. Verify manual entry remains available.
+  Do not create a birth chart or alter a real profile just for a canary.
 
 ## Rollback
 
-Flip `[env.production.vars] GEOCODER_ROLLOUT` back to `"off"` in its own
-commit and merge. Existing grants stay recorded and stay visible on Privacy;
-grant, search, and resolve answer `503 geocoder_unavailable`; withdrawal keeps
-working, so no reader is trapped in a grant they cannot revoke. Leave the
-secret in place — it is inert under `off`, and deleting it while the value is
-`enabled` is the outage described above.
+Disable GEOCODER_ROLLOUT to stop new grants and provider calls. Consent reads
+and withdrawal still work. Do not roll back to the Google-enabled/no-key
+Worker, which restores the whole-product outage. The widened database remains
+compatible with old Google rows and requires no destructive rollback.
 
-## Record
+## Evidence ledger
 
-| Date (UTC) | Event | Evidence |
-| --- | --- | --- |
-| 2026-09-04 | Production secret inventory checked; `GOOGLE_MAPS_PLATFORM_API_KEY` absent. | `wrangler secret list --env production` |
-| 2026-09-04 | Configuration branch prepared: production `enabled`, development `off`, config test and decision record updated. | this file's commit |
+| Proof | Required evidence |
+| --- | --- |
+| Local merge gate | Final SHA and full ci:local summary |
+| Credential | Dedicated Geoapify key present; no value recorded |
+| Provider canary | Autocomplete and details succeed with x-api-key |
+| Database | Backup/bookmark, exact migration receipt, integrity checks |
+| Worker | Release SHA, version ID, 100% allocation, both live origins |
+| Authenticated journey | Grant, search, selection, withdrawal, manual fallback |
+
+No ledger entry may be marked complete based only on configuration or a mock.

@@ -139,11 +139,10 @@ test("geocoder is enabled in production only, behind the same bounded rate limit
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({ config: configPath, env: "production" });
 
-  // Development stays off. A local Worker has no GOOGLE_MAPS_PLATFORM_API_KEY
-  // unless .dev.vars supplies one, and configGuard refuses every request when
-  // the value is enabled without the key; a local enablement overrides both
-  // in .dev.vars. Production carries the value, which is why the secret has to
-  // be on the Worker before the deploy that reads this (docs/deploy/geocoder-rollout.md).
+  // Development stays off; local search needs rollout enabled and a
+  // GEOAPIFY_API_KEY in .dev.vars. Missing credentials disable only place
+  // requests and new grants, never unrelated routes. Production still needs
+  // a provider canary before search is considered live (see the rollout runbook).
   assert.equal(development.vars.GEOCODER_ROLLOUT, "off");
   assert.equal(production.vars.GEOCODER_ROLLOUT, "enabled");
 

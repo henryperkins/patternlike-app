@@ -51,11 +51,19 @@ describe("selected place resolutions", () => {
       "SELECT payload_enc, provider FROM place_resolutions WHERE user_id = ?",
       USER_A,
     );
-    expect(stored[0]!.provider).toBe("google_places_geocoding_v4");
+    expect(stored[0]!.provider).toBe("geoapify");
     const payloadBytes = stored[0]!.payload_enc instanceof ArrayBuffer
       ? new Uint8Array(stored[0]!.payload_enc)
       : Uint8Array.from(stored[0]!.payload_enc);
     expect(new TextDecoder().decode(payloadBytes)).not.toContain("London");
+  });
+
+  it("does not reuse historical Google handoffs as Geoapify selections", async () => {
+    const created = await storePlaceResolution(env, IDENTITY_A, SELECTED);
+    await env.DB.prepare("UPDATE place_resolutions SET provider = 'google_places_geocoding_v4' WHERE id = ?")
+      .bind(created.placeId).run();
+    expect(await loadPlaceResolution(env, IDENTITY_A, created.placeId)).toBeNull();
+    expect(await rows("SELECT id FROM place_resolutions")).toEqual([{ id: created.placeId }]);
   });
 
   it("returns null for foreign and expired ids", async () => {

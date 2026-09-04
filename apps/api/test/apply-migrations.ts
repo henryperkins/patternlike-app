@@ -17,6 +17,7 @@ const expectedTail = [
   "0021_crypto_operations.sql",
   "0022_place_resolutions.sql",
   "0023_pattern_source_regeneration.sql",
+  "0024_geoapify_place_resolutions.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -42,6 +43,7 @@ const adminSessionMigrationIndex = migrationNames.indexOf(expectedTail[11]);
 const cryptoOperationsMigrationIndex = migrationNames.indexOf(expectedTail[12]);
 const placeResolutionsMigrationIndex = migrationNames.indexOf(expectedTail[13]);
 const patternSourceRegenerationMigrationIndex = migrationNames.indexOf(expectedTail[14]);
+const geoapifyMigrationIndex = migrationNames.indexOf(expectedTail[15]);
 
 interface SchemaColumn {
   name: string;
@@ -1272,7 +1274,7 @@ await assertDatabaseHealthy(upgradeDb, "0022 populated apply");
 
 await applyD1Migrations(
   upgradeDb,
-  env.TEST_MIGRATIONS.slice(patternSourceRegenerationMigrationIndex),
+  env.TEST_MIGRATIONS.slice(patternSourceRegenerationMigrationIndex, geoapifyMigrationIndex),
 );
 const patternClaimColumns = await upgradeDb.prepare(
   "PRAGMA table_info(pattern_generation_claims)",
@@ -1288,3 +1290,33 @@ for (const table of ["pattern_generation_jobs", "pattern_documents"]) {
   }
 }
 await assertDatabaseHealthy(upgradeDb, "0023 populated apply");
+
+// 0024 widens the provider constraint without changing historical ciphertext,
+// identifiers (part of encryption AAD), expiry, or consumption state.
+const legacyPlaceId = "plc_00000000000000000000000000000001";
+await upgradeDb.prepare(
+  `INSERT INTO place_resolutions
+   (id, user_id, provider, policy_version, payload_enc, payload_key_version,
+    payload_nonce, created_at, expires_at, consumed_at)
+   VALUES (?, ?, 'google_places_geocoding_v4', '1.0.0', X'0001FFAA', 1,
+           'legacy-nonce', '2026-09-04T00:00:00Z', '2026-09-05T00:00:00Z', '2026-09-04T01:00:00Z')`,
+).bind(legacyPlaceId, migrationUserId).run();
+const beforeGeoapify = await upgradeDb.prepare("SELECT *, hex(payload_enc) AS payload_hex FROM place_resolutions WHERE id = ?")
+  .bind(legacyPlaceId).first();
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(geoapifyMigrationIndex));
+const afterGeoapify = await upgradeDb.prepare("SELECT *, hex(payload_enc) AS payload_hex FROM place_resolutions WHERE id = ?")
+  .bind(legacyPlaceId).first();
+if (JSON.stringify(beforeGeoapify) !== JSON.stringify(afterGeoapify)) {
+  throw new Error("0024 changed a historical selected-place record");
+}
+await upgradeDb.prepare(
+  `INSERT INTO place_resolutions
+   SELECT 'plc_00000000000000000000000000000002', user_id, 'geoapify',
+          policy_version, payload_enc, payload_key_version, payload_nonce,
+          created_at, expires_at, NULL FROM place_resolutions WHERE id = ?`,
+).bind(legacyPlaceId).run();
+const placeIndexes = await upgradeDb.prepare("PRAGMA index_list(place_resolutions)").all<{ name: string }>();
+for (const name of ["idx_place_resolutions_expiry", "idx_place_resolutions_user_expiry"]) {
+  if (!placeIndexes.results.some((index) => index.name === name)) throw new Error(`0024 lost ${name}`);
+}
+await assertDatabaseHealthy(upgradeDb, "0024 populated apply");

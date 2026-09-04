@@ -8,14 +8,14 @@ import {
 
 export const GEOCODER_CONSENT_PATH = "/v1/consents/geocoder";
 
-/** Field-for-field `contracts/m8/fixtures/valid/geocoder-consent.not-granted.json`. */
+/** Field-for-field `contracts/geocoder-v2/fixtures/valid/geocoder-consent.not-granted.json`. */
 export const geocoderNotGranted = {
-  schema_version: "0.8.0",
+  schema_version: "0.8.1",
   kind: "product_source",
   source_id: "AST-02",
   permission_tier: 0,
   allowed_uses: [...GEOCODER_CONSENT_ALLOWED_USES],
-  provider: "google_places_geocoding_v4",
+  provider: "geoapify",
   scopes: [],
   connector_account_id: null,
   status: "not_granted",

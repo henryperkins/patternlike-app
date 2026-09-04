@@ -5,7 +5,7 @@ import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { loadGeocoderGrant } from "../db/consents.js";
 import { storePlaceResolution } from "../db/place-resolutions.js";
-import { createGeocoder, GEOCODER_TIMEOUT_MS } from "../services/geocoder/index.js";
+import { createGeocoder, isGeocoderAvailable, GEOCODER_TIMEOUT_MS } from "../services/geocoder/index.js";
 import { safeLog } from "../services/safe-log.js";
 
 export const placeRoutes = new Hono<{
@@ -110,7 +110,7 @@ async function providerPermission(c: PlaceContext): Promise<Response | null> {
 }
 
 placeRoutes.post("/v1/places/search", async (c) => {
-  if (c.env.GEOCODER_ROLLOUT !== "enabled") return unavailable(c);
+  if (!isGeocoderAvailable(c.env)) return unavailable(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -146,7 +146,7 @@ placeRoutes.post("/v1/places/search", async (c) => {
 });
 
 placeRoutes.post("/v1/places/resolve", async (c) => {
-  if (c.env.GEOCODER_ROLLOUT !== "enabled") return unavailable(c);
+  if (!isGeocoderAvailable(c.env)) return unavailable(c);
   let body: unknown;
   try {
     body = await c.req.json();

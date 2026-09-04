@@ -1,0 +1,14 @@
+{
+  "package": "contracts/geocoder-v2",
+  "schema_version": "0.8.1",
+  "document_date": "2026-09-04",
+  "status": "narrow_successor",
+  "predecessor": {
+    "package": "contracts/m8",
+    "manifest_sha256": "6aecb0a84f74b1e174ee060cc4497cf0d0673896d913eceaebf2e78d6a88512e"
+  },
+  "supersedes": ["m8:geocoder-consent.schema.json"],
+  "schemas": ["geocoder-consent.schema.json"],
+  "openapi": ["openapi/openapi.yaml"],
+  "note": "Only the live geocoder consent changes to Geoapify. M0-M9 remain byte-for-byte unchanged. Place search and resolution retain M8 0.8.0. Historical Google grants remain audit records and do not authorize Geoapify."
+}

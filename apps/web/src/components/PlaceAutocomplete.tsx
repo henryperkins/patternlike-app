@@ -37,6 +37,16 @@ function locale(): string | null {
   return value || null;
 }
 
+function GeocoderAttribution() {
+  return (
+    <span className="place-autocomplete__attribution">
+      <a href="https://www.geoapify.com/" translate="no">Powered by Geoapify</a>
+      {" · "}
+      <a href="https://www.openstreetmap.org/copyright" translate="no">© OpenStreetMap contributors</a>
+    </span>
+  );
+}
+
 export function PlaceAutocomplete({
   value,
   selectedPlaceId,
@@ -70,7 +80,7 @@ export function PlaceAutocomplete({
         } else {
           setConsentState({
             status: "failed",
-            message: "The Google search permission could not be read.",
+            message: "The Geoapify search permission could not be read.",
           });
         }
       })
@@ -80,7 +90,7 @@ export function PlaceAutocomplete({
             status: "failed",
             message: error instanceof Error
               ? error.message
-              : "Google birthplace search is unavailable.",
+              : "Geoapify birthplace search is unavailable.",
           });
         }
       });
@@ -144,7 +154,7 @@ export function PlaceAutocomplete({
           grantKey.current,
         );
         if (!isGeocoderConsentResponse(document)) {
-          throw new Error("The Google search permission response could not be verified.");
+          throw new Error("The Geoapify search permission response could not be verified.");
         }
         grantKey.current = null;
         setConsentState({ status: "ready", document });
@@ -159,14 +169,14 @@ export function PlaceAutocomplete({
           revokeKey.current,
         );
         if (!isGeocoderConsentResponse(document)) {
-          throw new Error("The Google search permission response could not be verified.");
+          throw new Error("The Geoapify search permission response could not be verified.");
         }
         revokeKey.current = null;
         setConsentState({ status: "ready", document });
       }
     } catch (error) {
       setEnabled(false);
-      setProblem(error instanceof Error ? error.message : "Google birthplace search is unavailable.");
+      setProblem(error instanceof Error ? error.message : "Geoapify birthplace search is unavailable.");
     } finally {
       setBusyConsent(false);
     }
@@ -206,8 +216,8 @@ export function PlaceAutocomplete({
           <p className="place-autocomplete__links">
             <a href={consentState.document.disclosure.links.patternlike_terms}>Terms</a>{" "}
             <a href={consentState.document.disclosure.links.patternlike_privacy}>Privacy</a>{" "}
-            <a href={consentState.document.disclosure.links.google_maps_terms}>Google Maps terms</a>{" "}
-            <a href={consentState.document.disclosure.links.google_privacy}>Google privacy</a>
+            <a href={consentState.document.disclosure.links.geoapify_terms}>Geoapify terms</a>{" "}
+            <a href={consentState.document.disclosure.links.geoapify_privacy}>Geoapify privacy</a>
           </p>
           <label className="consent-check consent-check--compact">
             <input
@@ -217,13 +227,13 @@ export function PlaceAutocomplete({
               onChange={(event) => void toggleConsent(event.target.checked)}
             />
             <span className="consent-check__box" aria-hidden="true" />
-            <span>Enable optional Google birthplace search</span>
+            <span>Enable optional Geoapify birthplace search</span>
           </label>
         </div>
       ) : (
         <p className="field-help" role="status">
           {consentState.status === "loading"
-            ? "Reading the optional Google search permission."
+            ? "Reading the optional Geoapify search permission."
             : consentState.message}
         </p>
       )}
@@ -277,18 +287,14 @@ export function PlaceAutocomplete({
               </li>
             ))}
           </ul>
-          <span className="google-maps-attribution" aria-label="Google Maps" translate="no">
-            Google Maps
-          </span>
+          <GeocoderAttribution />
         </div>
       ) : null}
 
       {selectedPlaceId ? (
         <p className="place-autocomplete__selected">
           Selected with {selectedConfidence ?? "unknown"} confidence ·{" "}
-          <span className="google-maps-attribution" aria-label="Google Maps" translate="no">
-            Google Maps
-          </span>
+          <GeocoderAttribution />
         </p>
       ) : null}
 
@@ -299,7 +305,7 @@ export function PlaceAutocomplete({
             : searchState === "empty"
               ? "No matching cities found. Enter the place and coordinates manually."
               : searchState === "failed"
-                ? "Google search is unavailable. Enter the place and coordinates manually."
+                ? "Geoapify search is unavailable. Enter the place and coordinates manually."
                 : "")}
       </p>
     </div>

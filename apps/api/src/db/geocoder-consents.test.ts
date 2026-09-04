@@ -42,8 +42,8 @@ describe("geocoder consent chain", () => {
       policyVersion: GEOCODER_CONSENT_POLICY_VERSION,
       uiSurface: "onboarding",
     });
-    expect(await rows("SELECT id FROM consents WHERE source_id = 'AST-02'"))
-      .toHaveLength(1);
+    expect(await rows("SELECT provider, policy_version FROM consents WHERE source_id = 'AST-02'"))
+      .toEqual([{ provider: "geoapify", policy_version: "geoapify-2026-09-04" }]);
   });
 
   it("rejects different input under the same scoped key", async () => {
@@ -71,7 +71,7 @@ describe("geocoder consent chain", () => {
          policy_version, ui_surface, granted_at, version, created_at, updated_at
        ) VALUES ('cns_geocoder_old', ?, 'product_source', 'granted', 'AST-02', 0,
                  '["chart_fact","timezone_resolution"]', '[]',
-                 'google_places_geocoding_v4', NULL, 'old-policy', 'onboarding',
+                 'geoapify', NULL, 'old-policy', 'onboarding',
                  ?, 1, ?, ?)`,
     ).bind(USER_A, "2026-08-28T08:00:00.000Z", "2026-08-28T08:00:00.000Z", "2026-08-28T08:00:00.000Z").run();
     expect(await loadGeocoderGrant(env, USER_A)).toBeNull();
@@ -90,5 +90,16 @@ describe("geocoder consent chain", () => {
     });
     expect(await rows("SELECT version FROM consents WHERE source_id = 'AST-02' ORDER BY version"))
       .toEqual([{ version: 1 }, { version: 2 }]);
+  });
+
+  it("requires a new grant even if a Google consent has the current policy string", async () => {
+    await grantGeocoderConsent(env, IDENTITY_A, GEOCODER_CONSENT_POLICY_VERSION, "onboarding", "old-google-grant");
+    await env.DB.prepare("UPDATE consents SET provider = 'google_places_geocoding_v4' WHERE source_id = 'AST-02'").run();
+    expect(await loadGeocoderGrant(env, USER_A)).toBeNull();
+    expect(await loadGeocoderConsentState(env, USER_A)).toMatchObject({ status: "not_granted" });
+    const fresh = await grantGeocoderConsent(env, IDENTITY_A, GEOCODER_CONSENT_POLICY_VERSION, "privacy_center", "new-geoapify-grant");
+    expect(fresh).toMatchObject({ ok: true, state: { status: "granted" } });
+    expect(await rows("SELECT provider, version FROM consents WHERE source_id = 'AST-02' ORDER BY provider"))
+      .toEqual([{ provider: "geoapify", version: 1 }, { provider: "google_places_geocoding_v4", version: 1 }]);
   });
 });

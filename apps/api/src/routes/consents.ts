@@ -5,11 +5,13 @@ import {
   GEOCODER_CONSENT_DISCLOSURE_LINKS,
   GEOCODER_CONSENT_DISCLOSURE_TEXT,
   GEOCODER_CONSENT_POLICY_VERSION,
-  M8_SCHEMA_VERSION,
+  GEOCODER_CONSENT_SCHEMA_VERSION,
+  GEOCODER_PROVIDER,
   requireIdempotencyKey,
   type GeocoderConsentUiSurface,
 } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import { isGeocoderAvailable } from "../services/geocoder/index.js";
 import type { AppVariables } from "../middleware/auth.js";
 import {
   AI_SYNTHESIS_POLICY_VERSION,
@@ -53,18 +55,18 @@ function idempotencyKey(header: string | undefined): string | null {
 
 function geocoderResponseBody(state: GeocoderConsentState) {
   return {
-    schema_version: M8_SCHEMA_VERSION,
+    schema_version: GEOCODER_CONSENT_SCHEMA_VERSION,
     kind: "product_source" as const,
     source_id: "AST-02" as const,
     permission_tier: 0 as const,
     allowed_uses: [...GEOCODER_CONSENT_ALLOWED_USES],
-    provider: "google_places_geocoding_v4" as const,
+    provider: GEOCODER_PROVIDER,
     scopes: [] as [],
     connector_account_id: null,
     status: state.status,
     policy_version: GEOCODER_CONSENT_POLICY_VERSION,
     granted_at: state.grantedAt,
-    ui_surface: state.uiSurface,
+    ui_surface: state.status === "granted" ? state.uiSurface : null,
     disclosure: {
       text: GEOCODER_CONSENT_DISCLOSURE_TEXT,
       links: { ...GEOCODER_CONSENT_DISCLOSURE_LINKS },
@@ -91,7 +93,7 @@ consentRoutes.get("/v1/consents/geocoder", async (c) => {
 });
 
 consentRoutes.put("/v1/consents/geocoder", async (c) => {
-  if (c.env.GEOCODER_ROLLOUT !== "enabled") return geocoderUnavailable(c);
+  if (!isGeocoderAvailable(c.env)) return geocoderUnavailable(c);
   const requestId = c.get("requestId");
   const key = idempotencyKey(c.req.header("idempotency-key"));
   const uiSurface = geocoderUiSurface(c.req.header("x-consent-ui-surface"));

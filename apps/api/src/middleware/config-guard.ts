@@ -534,15 +534,8 @@ export function checkSecureConfig(
       message: "GEOCODER_ROLLOUT must be off or enabled",
     };
   }
-  if (
-    geocoderRollout === "enabled" &&
-    !env.GOOGLE_MAPS_PLATFORM_API_KEY?.trim()
-  ) {
-    return {
-      code: "geocoder_misconfigured",
-      message: "The geocoder credential is required while rollout is enabled",
-    };
-  }
+  // Optional place search checks its credential at the route boundary. Missing
+  // credentials must not block authentication, consent withdrawal, or the app.
 
   if (isDevEnvironment(env.ENVIRONMENT)) {
     // Unit callers that exercise unrelated config rules may omit the M4 pair,

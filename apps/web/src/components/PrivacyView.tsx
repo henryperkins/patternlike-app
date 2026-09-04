@@ -40,13 +40,13 @@ function describeGeocoderProblem(error: unknown): string {
       // does so before recording anything, so the offer stays on screen and
       // the manual fields remain the working path.
       return withRequestId(
-        "Google birthplace search is not available yet, so this permission cannot be granted right now. You can still enter the place, coordinates, and time zone by hand.",
+        "Geoapify birthplace search is not available yet, so this permission cannot be granted right now. You can still enter the place, coordinates, and time zone by hand.",
         error.requestId,
       );
     }
     if (error.code === "consent_policy_version_stale") {
       return withRequestId(
-        "The Google search terms changed since this page was read. Review the current text and grant again.",
+        "The Geoapify search terms changed since this page was read. Review the current text and grant again.",
         error.requestId,
       );
     }
@@ -77,7 +77,7 @@ function GeocoderConsentPanel() {
         if (controller.signal.aborted) return;
         setState(isGeocoderConsentResponse(consent)
           ? { status: "ready", consent }
-          : { status: "unreadable", message: "The Google search permission could not be read." });
+          : { status: "unreadable", message: "The Geoapify search permission could not be read." });
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
@@ -85,7 +85,7 @@ function GeocoderConsentPanel() {
             status: "unreadable",
             message: error instanceof Error
               ? error.message
-              : "The Google search permission could not be read.",
+              : "The Geoapify search permission could not be read.",
           });
         }
       });
@@ -110,7 +110,7 @@ function GeocoderConsentPanel() {
         next = await revokeGeocoderConsent("privacy_center", keys.current.revoke);
       }
       if (!isGeocoderConsentResponse(next)) {
-        throw new Error("The Google search permission response could not be verified.");
+        throw new Error("The Geoapify search permission response could not be verified.");
       }
       keys.current = { grant: null, revoke: null };
       setState({ status: "ready", consent: next });
@@ -139,7 +139,7 @@ function GeocoderConsentPanel() {
       <div className="panel-heading">
         <div>
           <p className="kicker">Optional external processing</p>
-          <h2 id="geocoder-consent-heading">Google birthplace search</h2>
+          <h2 id="geocoder-consent-heading">Geoapify birthplace search</h2>
         </div>
         <span className={`source-state${granted ? " source-state--active" : ""}`}>
           <i /> {chip}
@@ -156,8 +156,8 @@ function GeocoderConsentPanel() {
           <p>
             <a href={state.consent.disclosure.links.patternlike_terms}>Terms</a>{" "}
             <a href={state.consent.disclosure.links.patternlike_privacy}>Privacy</a>{" "}
-            <a href={state.consent.disclosure.links.google_maps_terms}>Google Maps terms</a>{" "}
-            <a href={state.consent.disclosure.links.google_privacy}>Google privacy</a>
+            <a href={state.consent.disclosure.links.geoapify_terms}>Geoapify terms</a>{" "}
+            <a href={state.consent.disclosure.links.geoapify_privacy}>Geoapify privacy</a>
           </p>
           <button
             className={`button ${granted ? "button--secondary" : "button--primary"}`}
@@ -167,7 +167,7 @@ function GeocoderConsentPanel() {
             aria-busy={busy}
             aria-describedby="geocoder-consent-status"
           >
-            {granted ? "Withdraw Google search permission" : "Grant Google search permission"}{" "}
+            {granted ? "Withdraw Geoapify search permission" : "Grant Geoapify search permission"}{" "}
             <Icon name={granted ? "shield" : "check"} />
           </button>
         </>
@@ -179,7 +179,7 @@ function GeocoderConsentPanel() {
         aria-live="polite"
       >
         {state.status === "loading"
-          ? "Reading Google search permission."
+          ? "Reading Geoapify search permission."
           : state.status === "unreadable"
             ? state.message
             : (problem ?? "")}

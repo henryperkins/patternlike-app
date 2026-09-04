@@ -1,5 +1,9 @@
 # Geocoder Provider, Rights, and Privacy Decision
 
+> Historical Google decision. Superseded for new requests by
+> [the 2026-09-04 Geoapify decision](2026-09-04-geoapify-geocoder.md).
+> The frozen M8 Google contract and historical consent records remain unchanged.
+
 - **Date:** 2026-08-26
 - **Status:** Approved; implementation pending
 - **Approval provenance:** The repository owner explicitly supplied

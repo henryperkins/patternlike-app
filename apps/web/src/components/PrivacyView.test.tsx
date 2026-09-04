@@ -98,7 +98,7 @@ function processingPanel(): HTMLElement {
 }
 
 function geocoderPanel(): HTMLElement {
-  return screen.getByRole("region", { name: /Google birthplace search/i });
+  return screen.getByRole("region", { name: /Geoapify birthplace search/i });
 }
 
 describe("Context & privacy", () => {
@@ -238,7 +238,7 @@ describe("Context & privacy", () => {
     expect(within(consentPanel()).getByText("Granted")).toBeInTheDocument();
   });
 
-  it("grants Google birthplace search from Privacy under the privacy_center surface", async () => {
+  it("grants Geoapify birthplace search from Privacy under the privacy_center surface", async () => {
     const user = userEvent.setup();
     renderPrivacy({
       [`GET ${GEOCODER_CONSENT_PATH}`]: ok(geocoderNotGranted),
@@ -248,13 +248,13 @@ describe("Context & privacy", () => {
     const panel = geocoderPanel();
     expect(await within(panel).findByText("Not granted")).toBeInTheDocument();
     expect(within(panel).getByText(geocoderNotGranted.disclosure.text)).toBeInTheDocument();
-    expect(within(panel).getByRole("link", { name: "Google privacy" })).toHaveAttribute(
+    expect(within(panel).getByRole("link", { name: "Geoapify privacy" })).toHaveAttribute(
       "href",
-      geocoderNotGranted.disclosure.links.google_privacy,
+      geocoderNotGranted.disclosure.links.geoapify_privacy,
     );
 
     await user.click(
-      within(panel).getByRole("button", { name: /Grant Google search permission/i }),
+      within(panel).getByRole("button", { name: /Grant Geoapify search permission/i }),
     );
 
     const [request] = capturedFor(GEOCODER_CONSENT_PATH).filter((call) => call.method === "PUT");
@@ -264,13 +264,13 @@ describe("Context & privacy", () => {
 
     // The control becomes its own inverse rather than disappearing.
     expect(
-      await within(panel).findByRole("button", { name: /Withdraw Google search permission/i }),
+      await within(panel).findByRole("button", { name: /Withdraw Geoapify search permission/i }),
     ).toBeInTheDocument();
     expect(within(panel).getByText("Granted")).toBeInTheDocument();
     expect(within(panel).getByText(/^Granted .+\.$/)).toBeInTheDocument();
   });
 
-  it("keeps the Google grant offered and says why when the search is not enabled", async () => {
+  it("keeps the Geoapify grant offered and says why when the search is not enabled", async () => {
     const user = userEvent.setup();
     renderPrivacy({
       [`PUT ${GEOCODER_CONSENT_PATH}`]: {
@@ -281,20 +281,20 @@ describe("Context & privacy", () => {
 
     const panel = geocoderPanel();
     await user.click(
-      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+      await within(panel).findByRole("button", { name: /Grant Geoapify search permission/i }),
     );
 
     const status = await within(panel).findByText(/not available yet/i);
     expect(status).toHaveTextContent("enter the place, coordinates, and time zone by hand");
     expect(status).toHaveTextContent("Request req_geocoder_unavailable");
     expect(
-      within(panel).getByRole("button", { name: /Grant Google search permission/i }),
+      within(panel).getByRole("button", { name: /Grant Geoapify search permission/i }),
     ).toBeEnabled();
     expect(within(panel).getByText("Not granted")).toBeInTheDocument();
     expect(capturedFor(GEOCODER_CONSENT_PATH).filter((call) => call.method === "GET")).toHaveLength(1);
   });
 
-  it("re-reads the Google search terms when the grant names a stale policy", async () => {
+  it("re-reads the Geoapify search terms when the grant names a stale policy", async () => {
     const user = userEvent.setup();
     renderPrivacy({
       [`PUT ${GEOCODER_CONSENT_PATH}`]: {
@@ -308,7 +308,7 @@ describe("Context & privacy", () => {
 
     const panel = geocoderPanel();
     await user.click(
-      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+      await within(panel).findByRole("button", { name: /Grant Geoapify search permission/i }),
     );
 
     expect(await within(panel).findByText(/terms changed since this page was read/i))
@@ -319,11 +319,11 @@ describe("Context & privacy", () => {
       ).toHaveLength(2);
     });
     expect(
-      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+      await within(panel).findByRole("button", { name: /Grant Geoapify search permission/i }),
     ).toBeEnabled();
   });
 
-  it("withdraws Google birthplace search from Privacy with an empty DELETE", async () => {
+  it("withdraws Geoapify birthplace search from Privacy with an empty DELETE", async () => {
     const user = userEvent.setup();
     renderPrivacy({
       [`GET ${GEOCODER_CONSENT_PATH}`]: ok(geocoderGranted),
@@ -333,11 +333,11 @@ describe("Context & privacy", () => {
     const panel = geocoderPanel();
     expect(await within(panel).findByText("Granted")).toBeInTheDocument();
     expect(
-      within(panel).queryByRole("button", { name: /Grant Google search permission/i }),
+      within(panel).queryByRole("button", { name: /Grant Geoapify search permission/i }),
     ).not.toBeInTheDocument();
 
     await user.click(
-      within(panel).getByRole("button", { name: /Withdraw Google search permission/i }),
+      within(panel).getByRole("button", { name: /Withdraw Geoapify search permission/i }),
     );
 
     const [request] = capturedFor(GEOCODER_CONSENT_PATH).filter(
@@ -348,12 +348,12 @@ describe("Context & privacy", () => {
     expect(request!.headers.get("idempotency-key")).toMatch(/^web-geocoder-consent-/);
 
     expect(
-      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+      await within(panel).findByRole("button", { name: /Grant Geoapify search permission/i }),
     ).toBeInTheDocument();
     expect(within(panel).getByText("Not granted")).toBeInTheDocument();
   });
 
-  it("says Unknown for Google search when the permission cannot be read", async () => {
+  it("says Unknown for Geoapify search when the permission cannot be read", async () => {
     const user = userEvent.setup();
     let reads = 0;
     const responses: Record<string, MockResponse> = {};
@@ -370,12 +370,12 @@ describe("Context & privacy", () => {
     expect(await within(panel).findByText("Unknown")).toBeInTheDocument();
     expect(within(panel).getByText(/The read failed/)).toBeInTheDocument();
     expect(
-      within(panel).queryByRole("button", { name: /Google search permission/i }),
+      within(panel).queryByRole("button", { name: /Geoapify search permission/i }),
     ).not.toBeInTheDocument();
 
     await user.click(within(panel).getByRole("button", { name: /Try again/i }));
     expect(
-      await within(panel).findByRole("button", { name: /Grant Google search permission/i }),
+      await within(panel).findByRole("button", { name: /Grant Geoapify search permission/i }),
     ).toBeInTheDocument();
     expect(within(panel).getByText("Not granted")).toBeInTheDocument();
   });

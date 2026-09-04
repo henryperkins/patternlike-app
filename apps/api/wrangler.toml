@@ -301,9 +301,9 @@ crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 
 [env.production.vars]
 ENVIRONMENT = "production"
-# Google birthplace search. "enabled" makes GOOGLE_MAPS_PLATFORM_API_KEY
-# load-bearing: configGuard refuses every request while the secret is
-# missing. Set the secret before the deploy that carries this value.
+# Geoapify birthplace search. Missing GEOAPIFY_API_KEY disables only place
+# requests and new geocoder grants; the rest of the product stays available.
+# Provision the secret and apply migration 0024 before enabling live search.
 # Gates and rollback: docs/deploy/geocoder-rollout.md.
 GEOCODER_ROLLOUT = "enabled"
 CALC_SERVICE_URL = "https://patternlike-calc.fly.dev"

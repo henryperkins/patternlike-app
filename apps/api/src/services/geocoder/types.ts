@@ -5,7 +5,7 @@ import type {
   PlaceSearchCandidate,
 } from "@patternlike/shared";
 
-export const GEOCODER_PROVIDER = "google_places_geocoding_v4" as const;
+export { GEOCODER_PROVIDER } from "@patternlike/shared";
 export const GEOCODER_POLICY_VERSION = "1.0.0" as const;
 export const GEOCODER_TIMEOUT_MS = 5_000;
 
