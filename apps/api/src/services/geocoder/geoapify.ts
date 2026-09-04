@@ -125,7 +125,9 @@ export function createGeoapifyGeocoder(input: { apiKey: string; fetcher?: typeof
       // Current Geoapify OpenAPI supports x-api-key for server-to-server use.
       // No forwarded user headers, client IP, session identifiers, or cookies.
       // Never log this URL: text / selected place ID are personal data.
-      response = await fetcher(url, { method: "GET", headers: { "x-api-key": apiKey }, redirect: "error", signal });
+      // Use Workers-compatible manual mode: do not follow redirects with the
+      // credential. The response.ok guard below refuses every 3xx response.
+      response = await fetcher(url, { method: "GET", headers: { "x-api-key": apiKey }, redirect: "manual", signal });
     } catch {
       // Fetch exceptions can embed the URL. Do not propagate provider details.
       throw new GeocoderAdapterError("geocoder_upstream_failed");

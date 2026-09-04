@@ -28,7 +28,12 @@ function details(properties: Record<string, unknown> = CITY) {
 }
 
 function responding(payload: unknown) {
-  return vi.fn<typeof fetch>(async () => Response.json(payload));
+  return vi.fn<typeof fetch>(async (input, init) => {
+    // Keep Workers request-option validation real; only the external response
+    // is mocked. Otherwise unsupported redirect modes pass every happy path.
+    new Request(input, init);
+    return Response.json(payload);
+  });
 }
 
 describe("Geoapify geocoder", () => {
@@ -45,7 +50,7 @@ describe("Geoapify geocoder", () => {
     expect(Object.fromEntries(request.searchParams)).toEqual({
       text: "Lon & Paris", type: "city", format: "json", limit: "8", lang: "en",
     });
-    expect(init).toEqual({ method: "GET", headers: { "x-api-key": "secret" }, redirect: "error", signal });
+    expect(init).toEqual({ method: "GET", headers: { "x-api-key": "secret" }, redirect: "manual", signal });
     expect(result).toHaveLength(8);
     expect(result[0]).toEqual({ candidate_id: "city-0", primary_label: "London", secondary_label: "United Kingdom" });
   });
@@ -152,6 +157,33 @@ describe("Geoapify geocoder", () => {
     const adapter = createGeoapifyGeocoder({ apiKey: "secret", fetcher: async () => new Response("private", { status }) });
     await expect(adapter.search({ query: "Lon", locale: null }))
       .rejects.toMatchObject({ code: "geocoder_upstream_failed" });
+  });
+
+  it.each([301, 302, 303, 307, 308])("refuses upstream HTTP %i without forwarding the key", async (status) => {
+    const requests: Request[] = [];
+    const adapter = createGeoapifyGeocoder({
+      apiKey: "secret",
+      fetcher: async (input, init) => {
+        const request = new Request(input, init);
+        requests.push(request);
+        return new Response(null, {
+          status,
+          headers: { location: "https://untrusted.example/redirected" },
+        });
+      },
+    });
+
+    await expect(adapter.search({ query: "Lon", locale: null }))
+      .rejects.toMatchObject({ code: "geocoder_upstream_failed" });
+    await expect(adapter.resolve({ candidateId: CITY.place_id, locale: null }))
+      .rejects.toMatchObject({ code: "geocoder_upstream_failed" });
+    expect(requests.map((request) => ({
+      origin: new URL(request.url).origin,
+      redirect: request.redirect,
+    }))).toEqual([
+      { origin: "https://api.geoapify.com", redirect: "manual" },
+      { origin: "https://api.geoapify.com", redirect: "manual" },
+    ]);
   });
 
   it("does not call the provider for missing keys or invalid IDs", async () => {
