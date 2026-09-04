@@ -295,9 +295,12 @@ suggestions are never persisted.
 - `off`
 - `enabled`
 
-Both top-level development vars and production vars are committed as `off`.
-Hermetic route tests explicitly override it to `enabled`; no other value is
-accepted.
+The top-level development block is committed `off`; a local Worker that needs
+the search overrides it in `.dev.vars` together with the key. The production
+block was changed to `enabled` on 2026-09-04 in its own configuration commit;
+`docs/deploy/geocoder-rollout.md` records each gate below with the evidence
+behind it and the rollback. Hermetic route tests explicitly override the value
+to `enabled`; no other value is accepted.
 
 While rollout is `off`, consent grant (`PUT`), place search, and place resolve
 return the same generic `503 geocoder_unavailable` envelope and make no Google

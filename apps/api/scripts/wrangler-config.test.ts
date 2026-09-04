@@ -135,12 +135,19 @@ test("production sends every API namespace through the Worker before assets", ()
   ]);
 });
 
-test("geocoder ships disabled with the same bounded rate limiter in both environments", () => {
+test("geocoder is enabled in production only, behind the same bounded rate limiter", () => {
   const development = unstable_readConfig({ config: configPath });
   const production = unstable_readConfig({ config: configPath, env: "production" });
 
+  // Development stays off. A local Worker has no GOOGLE_MAPS_PLATFORM_API_KEY
+  // unless .dev.vars supplies one, and configGuard refuses every request when
+  // the value is enabled without the key; a local enablement overrides both
+  // in .dev.vars. Production carries the value, which is why the secret has to
+  // be on the Worker before the deploy that reads this (docs/deploy/geocoder-rollout.md).
+  assert.equal(development.vars.GEOCODER_ROLLOUT, "off");
+  assert.equal(production.vars.GEOCODER_ROLLOUT, "enabled");
+
   for (const block of [development, production]) {
-    assert.equal(block.vars.GEOCODER_ROLLOUT, "off");
     assert.deepEqual(block.ratelimits, [{
       name: "PLACE_SEARCH_RATE_LIMITER",
       namespace_id: "17001",
