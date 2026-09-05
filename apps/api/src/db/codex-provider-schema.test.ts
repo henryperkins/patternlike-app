@@ -30,6 +30,7 @@ interface ProviderJobSeed {
   pass: string;
   stageGeneration?: number;
   stageAttempt?: number;
+  reasoningEffort?: string;
 }
 
 function providerJobColumns(seed: ProviderJobSeed) {
@@ -51,7 +52,7 @@ function providerJobColumns(seed: ProviderJobSeed) {
     request_nonce: `nonce-${discriminator.slice(0, 16)}`,
     request_byte_length: 512,
     model: "gpt-5.6-sol",
-    reasoning_effort: "high",
+    reasoning_effort: seed.reasoningEffort ?? "high",
     prompt_version: "1.0.1",
     timeout_ms: 900000,
     daily_call_limit: 10000,
@@ -78,6 +79,32 @@ describe("the codex_provider_jobs coordinate vocabulary", () => {
   beforeEach(async () => {
     await resetDb();
     await seedUser(IDENTITY_A);
+  });
+
+  it("stores xhigh and legacy high jobs but rejects unapproved reasoning levels", async () => {
+    for (const [index, effort] of ["xhigh", "high"].entries()) {
+      await insertProviderJob(env.DB, {
+        id: `cpjob_${index.toString(16).repeat(32)}`,
+        pipeline: "reading",
+        ownerId: `job_reasoning_${effort}`,
+        userId: USER_A,
+        pass: "publisher",
+        reasoningEffort: effort,
+      });
+    }
+    for (const effort of ["low", "medium", "max", "ultra"]) {
+      await expect(insertProviderJob(env.DB, {
+        pipeline: "reading",
+        ownerId: `job_reasoning_${effort}`,
+        userId: USER_A,
+        pass: "publisher",
+        reasoningEffort: effort,
+      })).rejects.toThrow();
+    }
+    const rows = await env.DB.prepare(
+      "SELECT reasoning_effort FROM codex_provider_jobs ORDER BY reasoning_effort",
+    ).all<{ reasoning_effort: string }>();
+    expect(rows.results.map((row) => row.reasoning_effort)).toEqual(["high", "xhigh"]);
   });
 
   it("admits a reading publisher job owned by a user", async () => {
@@ -189,7 +216,7 @@ describe("the codex_provider_jobs coordinate vocabulary", () => {
     const normalized = source?.sql.replace(/\s+/g, " ") ?? "";
     for (const snippet of [
       "length(id) = 38 AND substr(id, 1, 6) = 'cpjob_'",
-      "reasoning_effort = 'high'",
+      "reasoning_effort IN ('high', 'xhigh')",
       "timeout_ms = 900000",
       "daily_call_limit > 0",
       "status IN ('pending', 'leased', 'completed', 'failed', 'cancelled')",

@@ -107,6 +107,7 @@ import { createOpenAiOntologyPublisher } from "./openai-ontology-publisher.js";
 import { createCodexOntologyPublisher } from "./codex-ontology-publisher.js";
 import { createCodexPatternPublisher } from "./codex-pattern-publisher.js";
 import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
+import { isCodexProviderReasoningEffort } from "./codex-provider-contract.js";
 import {
   ONTOLOGY_REGRESSION_MAXIMUM_INPUT_TOKENS_PER_CALL,
   ONTOLOGY_REGRESSION_MAXIMUM_PROVIDER_CALLS,
@@ -118,6 +119,7 @@ import {
   createOntologyRegressionFixtureState,
   loadOntologyRegressionCorpus,
   ontologyRegressionConfigurationHash,
+  ontologyRegressionPatternPin,
   ontologyRegressionPassCanAttempt,
   ontologyRegressionPassMaximumOutputTokens,
   ontologyRegressionPassTimeoutMs,
@@ -430,12 +432,13 @@ function commandIsExecutable(
     corpus.object_key ===
       `pattern-ontology-corpora/${row.corpus_release_id}.json` &&
     generator.model === pin.generator_model &&
-    generator.reasoning === pin.generator_reasoning &&
+    isCodexProviderReasoningEffort(generator.reasoning) &&
     generator.prompt_version === pin.generator_prompt_version &&
     generator.timeout_ms === configuration.generatorTimeoutMs &&
     generator.max_output_tokens === pin.generator_max_output_tokens &&
     evaluator.model === pin.evaluator_model &&
-    evaluator.reasoning === pin.evaluator_reasoning &&
+    isCodexProviderReasoningEffort(evaluator.reasoning) &&
+    generator.reasoning === evaluator.reasoning &&
     evaluator.prompt_version === pin.evaluator_prompt_version &&
     evaluator.timeout_ms === configuration.evaluatorTimeoutMs &&
     evaluator.max_output_tokens === pin.evaluator_max_output_tokens &&
@@ -2034,12 +2037,9 @@ function regressionPublisherName(
 }
 
 function regressionPatternPin(
-  configuration: OntologyPipelineConfiguration,
+  command: OntologyPipelineCommand,
 ): PatternPublisherPin {
-  return {
-    ...ONTOLOGY_REGRESSION_PATTERN_PIN,
-    publisher: regressionPublisherName(configuration),
-  };
+  return ontologyRegressionPatternPin(command.provider, command.generator.reasoning);
 }
 
 function regressionMetadataMatches(
@@ -2463,6 +2463,7 @@ async function createCompletedRegressionReport(input: {
   }
   const configurationHash = await ontologyRegressionConfigurationHash(
     regressionPublisherName(input.context.configuration),
+    input.context.command.generator.reasoning,
   );
   return createCanonicalOntologyRegressionReport({
     ontologyVersion: input.context.command.candidate_ontology_version,
@@ -2621,7 +2622,7 @@ async function executeRegressing(
       {
         requestId: `opreq_${crypto.randomUUID()}`,
         timeoutMs,
-        pin: regressionPatternPin(context.configuration),
+        pin: regressionPatternPin(context.command),
         ...(context.command.provider === "codex"
           ? {
               codexJob: {

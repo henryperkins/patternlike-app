@@ -8,6 +8,14 @@ export const CODEX_PROVIDER_LEASE_MS = 1_200_000;
 export const CODEX_PROVIDER_MAX_REQUEST_BYTES = 256 * 1024;
 export const CODEX_PROVIDER_MAX_RESPONSE_BYTES = 1024 * 1024;
 
+export type CodexProviderReasoningEffort = "high" | "xhigh";
+
+export function isCodexProviderReasoningEffort(
+  value: unknown,
+): value is CodexProviderReasoningEffort {
+  return value === "high" || value === "xhigh";
+}
+
 const textEncoder = new TextEncoder();
 const LEASE_TOKEN = /^[A-Za-z0-9._-]{32,256}$/;
 const PROVIDER_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
@@ -61,9 +69,10 @@ function encodedLength(value: string): number {
 
 export function invocationFromResponsesRequest(
   body: unknown,
-  expected: { model: string; reasoningEffort: "high" },
+  expected: { model: string; reasoningEffort: CodexProviderReasoningEffort },
 ): CodexContractParseOutcome<CodexProviderInvocation> {
   if (
+    !isCodexProviderReasoningEffort(expected.reasoningEffort) ||
     !isRecord(body) ||
     !hasExactKeys(
       body,

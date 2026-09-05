@@ -87,6 +87,7 @@ export async function buildTestPassedRegressionReport(input: {
   candidateHash: string;
   evaluationReportHash: string;
   publisher?: "openai" | "codex";
+  reasoning?: "high" | "xhigh";
 }): Promise<{
   document: Record<string, unknown>;
   canonicalBytes: string;
@@ -96,6 +97,7 @@ export async function buildTestPassedRegressionReport(input: {
   const corpus = loadOntologyRegressionCorpus();
   const configurationHash = await ontologyRegressionConfigurationHash(
     input.publisher ?? "openai",
+    input.reasoning ?? "xhigh",
   );
   const results = corpus.fixtures.map((fixture, index) => ({
     fixture_id: fixture.fixture_id,

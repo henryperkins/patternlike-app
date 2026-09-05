@@ -59,7 +59,7 @@ export function createCodexPatternPublisher(
     );
     const converted = invocationFromResponsesRequest(body, {
       model: options.pin[`${pass}_model`],
-      reasoningEffort: "high",
+      reasoningEffort: options.pin[`${pass}_reasoning`],
     });
     if (!converted.ok) return unavailable<T>();
     const serialized = canonicalJson(converted.value);
@@ -106,7 +106,7 @@ export function createCodexPatternPublisher(
           stageAttempt: coordinate.stageAttempt,
           request: request.artifact,
           model: options.pin[`${pass}_model`],
-          reasoningEffort: "high",
+          reasoningEffort: options.pin[`${pass}_reasoning`],
           promptVersion: options.pin[`${pass}_prompt_version`],
           timeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
           dailyCallLimit: coordinate.dailyCallLimit,

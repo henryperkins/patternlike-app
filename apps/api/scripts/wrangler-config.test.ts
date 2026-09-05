@@ -70,7 +70,7 @@ test("production parks the machine pipeline and configures Pattern for every acc
   assert.equal(production.vars.READING_PUBLISHER, "codex");
   assert.equal(production.vars.OPENAI_READING_TIMEOUT_MS, "900000");
   assert.equal(production.vars.OPENAI_READING_MODEL, "gpt-5.6-sol");
-  assert.equal(production.vars.OPENAI_READING_REASONING, "high");
+  assert.equal(production.vars.OPENAI_READING_REASONING, "xhigh");
   assert.equal(production.vars.OPENAI_READING_PROMPT_VERSION, "1.0.2");
   assert.equal(production.vars.OPENAI_READING_MAX_OUTPUT_TOKENS, "4000");
   assert.equal(production.vars.READING_CONTEXT_MAX_BYTES, "98304");

@@ -498,12 +498,12 @@ function configuredEnv(
     ONTOLOGY_PIPELINE_ROLLOUT: "internal",
     ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS: "1",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
-    OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_GENERATOR_REASONING: "xhigh",
     OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.5",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
-    OPENAI_ONTOLOGY_EVALUATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_EVALUATOR_REASONING: "xhigh",
     OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION: "1.0.0-evaluator",
     OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS: "4000",
@@ -556,6 +556,7 @@ async function reserveFixture(
     allowedTransformations?: PatternTransformationClass[];
     manifest?: TestCorpusManifest;
     codex?: boolean;
+    reasoning?: "high" | "xhigh";
   } = {},
 ): Promise<ReservedFixture> {
   const suffix = crypto.randomUUID();
@@ -597,28 +598,54 @@ async function reserveFixture(
   });
   const clock = new TestClock(options.clockStartMs);
   const version = `ontology-task-6-${suffix}`;
-  const reservation = await enqueueOntologyPipelineRun(
-    pipelineEnv,
-    {
-      idempotencyKey: `task-6-${suffix}`,
-      corpusReleaseId: releaseId,
-      candidateOntologyVersion: version,
-    },
-    clock.now(),
-  );
+  let runId: string;
+  if (options.reasoning === "high") {
+    // Seed the historical reservation directly: persisted pins are immutable.
+    const command = await buildOntologyPipelineCommand(pipelineEnv, releaseId, version);
+    command.generator.reasoning = "high";
+    command.evaluator.reasoning = "high";
+    const configuration = canonicalJson(command);
+    runId = `oprun_legacy_${suffix}`;
+    const at = clock.now().toISOString();
+    await env.DB.prepare(
+      `INSERT INTO pattern_ontology_pipeline_runs (
+         run_id, idempotency_key, corpus_release_id, corpus_hash,
+         candidate_ontology_version, configuration_json, configuration_hash,
+         stage, available_at, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?)`,
+    ).bind(
+      runId, `task-6-${suffix}`, releaseId, manifest.corpus_hash, version,
+      configuration, await contentHash(configuration), at, at, at,
+    ).run();
+  } else {
+    const reservation = await enqueueOntologyPipelineRun(
+      pipelineEnv,
+      {
+        idempotencyKey: `task-6-${suffix}`,
+        corpusReleaseId: releaseId,
+        candidateOntologyVersion: version,
+      },
+      clock.now(),
+    );
+    runId = reservation.runId;
+  }
   return {
     pipelineEnv,
     manifest,
     records: pipelineRecords(manifest.fragments[0]!.id),
-    runId: reservation.runId,
+    runId,
     version,
     clock,
   };
 }
 
-async function reserveActivationFixture(codex = false): Promise<ReservedFixture> {
+async function reserveActivationFixture(
+  codex = false,
+  reasoning: "high" | "xhigh" = "xhigh",
+): Promise<ReservedFixture> {
   const fixture = await reserveFixture({
     codex,
+    reasoning,
     allowedTransformations: [
       "intersection",
       "contrast",
@@ -797,11 +824,14 @@ async function driveToEvaluating(
   });
 }
 
-async function driveActivationToRegression(codex = false): Promise<{
+async function driveActivationToRegression(
+  codex = false,
+  reasoning: "high" | "xhigh" = "xhigh",
+): Promise<{
   fixture: ReservedFixture;
   publisher: FakeOntologyPublisher;
 }> {
-  const fixture = await reserveActivationFixture(codex);
+  const fixture = await reserveActivationFixture(codex, reasoning);
   const publisher = new FakeOntologyPublisher(
     [{ schema_version: "0.7.0", records: fixture.records, complete: true }],
     fixture.records.map((record) => passingVerdict(record.id)),
@@ -1219,8 +1249,8 @@ describe("ontology pipeline execution", () => {
     ).bind(fixture.runId).first()).toEqual({ count: 2 });
   });
 
-  it("parks and adopts a Codex regression planner at the same attempt", async () => {
-    const { fixture } = await driveActivationToRegression(true);
+  it.each(["high", "xhigh"] as const)("parks and adopts a frozen %s Codex regression planner at the same attempt", async (reasoning) => {
+    const { fixture } = await driveActivationToRegression(true, reasoning);
     const message = await currentMessage(fixture.runId);
     const before = await runRow(fixture.runId);
     expect(before).toMatchObject({
@@ -1248,6 +1278,7 @@ describe("ontology pipeline execution", () => {
       throw new Error("Codex regression planner job missing");
     }
     expect(claimed.job.pass).toBe("planner");
+    expect(claimed.job.reasoningEffort).toBe(reasoning);
     const invocationBytes = await readCodexProviderArtifact(
       fixture.pipelineEnv,
       {

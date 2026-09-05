@@ -19,7 +19,7 @@ export interface CodexProviderClaim {
   job_id: string;
   lease_token: string;
   model: string;
-  reasoning_effort: "high";
+  reasoning_effort: "high" | "xhigh";
   prompt_version: string;
   timeout_ms: number;
   invocation: CodexProviderInvocation;
@@ -97,7 +97,7 @@ export function parseCodexProviderClaim(value: unknown): CodexProviderClaim | nu
     !LEASE_TOKEN.test(value.lease_token) ||
     typeof value.model !== "string" ||
     !PIN.test(value.model) ||
-    value.reasoning_effort !== "high" ||
+    (value.reasoning_effort !== "high" && value.reasoning_effort !== "xhigh") ||
     typeof value.prompt_version !== "string" ||
     !PIN.test(value.prompt_version) ||
     !Number.isSafeInteger(value.timeout_ms) ||

@@ -41,7 +41,7 @@ export const PATTERN_PUBLISHER_CODEX = "codex" as const;
 export const PATTERN_PUBLISHER_WORKERS_AI = "workers_ai" as const;
 
 export const OPENAI_PATTERN_PLANNER_MODEL = "gpt-5.6-sol";
-export const OPENAI_PATTERN_PLANNER_REASONING = "high" as const;
+export const OPENAI_PATTERN_PLANNER_REASONING = "xhigh" as const;
 /**
  * `1.0.1` adds `PLAN_CLOSURE_RULES` -- the closure properties
  * `validatePatternPlan` enforces -- to the planner policy. See the comment
@@ -52,7 +52,7 @@ export const OPENAI_PATTERN_PLANNER_TIMEOUT_MS = 120_000;
 export const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 32000;
 
 export const OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
-export const OPENAI_PATTERN_WRITER_REASONING = "high" as const;
+export const OPENAI_PATTERN_WRITER_REASONING = "xhigh" as const;
 /**
  * `1.0.2` adds the warm, direct, emotionally attentive voice contract while
  * keeping emotion traceable to authorized material. See `WRITER_POLICY` in
@@ -65,7 +65,7 @@ export const OPENAI_PATTERN_WRITER_TIMEOUT_MS = 120_000;
 export const OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = 32000;
 
 export const OPENAI_PATTERN_VERIFIER_MODEL = "gpt-5.6-sol";
-export const OPENAI_PATTERN_VERIFIER_REASONING = "high" as const;
+export const OPENAI_PATTERN_VERIFIER_REASONING = "xhigh" as const;
 export const OPENAI_PATTERN_VERIFIER_PROMPT_VERSION = "1.0.0-verifier";
 export const OPENAI_PATTERN_VERIFIER_TIMEOUT_MS = 120_000;
 export const OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS = 32000;
@@ -142,15 +142,15 @@ export type PatternPublisherSafeDetailCode =
 export interface PatternPublisherPin {
   publisher: PatternPublisherName;
   planner_model: string;
-  planner_reasoning: "high";
+  planner_reasoning: "high" | "xhigh";
   planner_prompt_version: string;
   planner_max_output_tokens: number;
   writer_model: string;
-  writer_reasoning: "high";
+  writer_reasoning: "high" | "xhigh";
   writer_prompt_version: string;
   writer_max_output_tokens: number;
   verifier_model: string;
-  verifier_reasoning: "high";
+  verifier_reasoning: "high" | "xhigh";
   verifier_prompt_version: string;
   verifier_max_output_tokens: number;
   input_max_bytes: number;

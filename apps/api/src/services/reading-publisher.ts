@@ -59,7 +59,7 @@ export const READING_PUBLISHER_PROVIDER = "codex" as const;
  * Daily.
  */
 export const OPENAI_READING_MODEL = "gpt-5.6-sol";
-export const OPENAI_READING_REASONING = "high" as const;
+export const OPENAI_READING_REASONING = "xhigh" as const;
 /**
  * The runner's deadline, not a Worker's.
  *
@@ -313,7 +313,7 @@ export interface PublisherConfigPin {
    */
   provider: ReadingPublisherProvider;
   model: string;
-  reasoning_effort: "low" | "medium" | "high";
+  reasoning_effort: "low" | "medium" | "high" | "xhigh";
   prompt_version: string;
   output_schema: "daily-reading-v5";
   selection_policy_version: string;
@@ -561,7 +561,7 @@ export function resolvePublisherConfiguration(
   }
   const reasoning = env.OPENAI_READING_REASONING?.trim();
   if (reasoning !== undefined && reasoning !== "" && reasoning !== OPENAI_READING_REASONING) {
-    return misconfigured("OPENAI_READING_REASONING must be high");
+    return misconfigured("OPENAI_READING_REASONING must be xhigh");
   }
   const callLimitRaw = env.READING_DAILY_PROVIDER_CALL_LIMIT?.trim();
   let callLimit: number | null = null;

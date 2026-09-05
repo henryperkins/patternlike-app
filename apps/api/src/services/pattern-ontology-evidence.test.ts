@@ -34,6 +34,7 @@ import {
   succeedOntologyPipelineRun,
 } from "../db/ontology-pipeline.js";
 import { putOntologyPipelineArtifact } from "./ontology-pipeline-artifacts.js";
+import { ONTOLOGY_REGRESSION_PATTERN_PIN } from "./ontology-regression-report.js";
 import {
   loadActiveOntology,
   loadOntologyByVersion,
@@ -144,6 +145,8 @@ async function evidenceFixture(
       corpus_release_id: corpusReleaseId,
     },
     provider: "openai",
+    generator: { reasoning: "xhigh" },
+    evaluator: { reasoning: "xhigh" },
     regression: {
       fixture_count: 30,
       maximum_provider_calls_per_fixture: 11,
@@ -368,6 +371,30 @@ describe("machine ontology evidence", () => {
     await resetDb();
     env.ONTOLOGY_PIPELINE_ARTIFACT_KEYRING =
       testOntologyPipelineArtifactKeyring();
+  });
+
+  it("verifies historical high regression evidence under the current xhigh defaults", async () => {
+    const value = await release();
+    const legacyHash = await contentHash(canonicalJson({
+      ...ONTOLOGY_REGRESSION_PATTERN_PIN,
+      publisher: "codex",
+      planner_reasoning: "high",
+      writer_reasoning: "high",
+      verifier_reasoning: "high",
+    }));
+    const { input } = await evidenceFixture(value, {
+      mutateCommand: (command) => {
+        command.provider = "codex";
+        command.generator = { reasoning: "high" };
+        command.evaluator = { reasoning: "high" };
+      },
+      mutateRegressionReport: (report) => {
+        report.configuration_hash = legacyHash;
+      },
+    });
+    await commitOntologyPipelineEvidence(env, input);
+    expect(await verifyPatternOntologyEvidence(env, value, input.signingKeyId))
+      .toMatchObject({ regressionReportHash: input.regressionReportHash });
   });
 
   it("commits and verifies a succeeded public-capable receipt against real R2 bytes", async () => {

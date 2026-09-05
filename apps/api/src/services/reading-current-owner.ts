@@ -23,6 +23,7 @@ import {
   type GenerateDailyReadingCommandV2,
 } from "./generation-command-v2.js";
 import { resolvePublisherConfiguration } from "./reading-publisher.js";
+import { isCodexProviderReasoningEffort } from "./codex-provider-contract.js";
 
 export interface CurrentDailyOwner {
   jobId: string;
@@ -87,8 +88,9 @@ export async function loadCurrentDailyOwner(
 }
 
 /**
- * Whether the frozen publisher pin is still the configuration this deployment
- * would freeze today.
+ * Whether this deployment can still execute the frozen publisher pin.
+ * Legacy high reasoning stays executable at its original effort when new
+ * commands move to xhigh; the provider job must match that frozen effort.
  *
  * The whole pin, not just the model string. A command that named the right
  * model under a different prompt version, a different selection or validation
@@ -110,7 +112,7 @@ function publisherPinIsCurrent(
   return (
     frozen.provider === pin.provider &&
     frozen.model === pin.model &&
-    frozen.reasoning_effort === pin.reasoning_effort &&
+    isCodexProviderReasoningEffort(frozen.reasoning_effort) &&
     frozen.prompt_version === pin.prompt_version &&
     frozen.output_schema === pin.output_schema &&
     frozen.selection_policy_version === pin.selection_policy_version &&

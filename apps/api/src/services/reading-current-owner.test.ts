@@ -16,6 +16,7 @@ import {
 import { AI_SYNTHESIS_POLICY_VERSION } from "../db/consents.js";
 import { claimJob } from "../db/generation.js";
 import type { CodexProviderJob } from "../db/codex-provider-jobs.js";
+import { encryptPayload } from "../db/users.js";
 import { enqueueConstrainedReading, resolveV5TargetDate } from "./enqueue.js";
 import {
   loadCurrentDailyOwner,
@@ -24,6 +25,7 @@ import {
 import { codexProviderOwnerIsCurrent } from "./codex-provider-domain.js";
 import {
   OPENAI_READING_MODEL,
+  OPENAI_READING_REASONING,
   READING_PROMPT_VERSION,
 } from "./reading-publisher.js";
 
@@ -111,7 +113,7 @@ function providerJob(
     },
     response: null,
     model: OPENAI_READING_MODEL,
-    reasoningEffort: "high",
+    reasoningEffort: OPENAI_READING_REASONING,
     promptVersion: READING_PROMPT_VERSION,
     timeoutMs: 900_000,
     dailyCallLimit: 250,
@@ -270,6 +272,37 @@ describe("reading provider owner admission", () => {
     // The shared dispatcher must route reading work to this predicate rather
     // than falling through to the ontology one.
     expect(await codexProviderOwnerIsCurrent(current, job)).toBe(true);
+  });
+
+  it("keeps a frozen high command executable without accepting an xhigh replacement", async () => {
+    const { jobId } = await reserveClaimed();
+    const current = enabledEnv();
+    const owner = await loadCurrentDailyOwner(current, jobId);
+    expect(owner!.command.publisher.reasoning_effort).toBe("xhigh");
+    const legacyCommand = structuredClone(owner!.command);
+    legacyCommand.publisher.reasoning_effort = "high";
+    const sealed = await encryptPayload(current, IDENTITY_A, legacyCommand, {
+      subject: IDENTITY_A.cryptoSubject,
+      field: "jobs.payload_enc",
+      recordId: jobId,
+    });
+    await rows(
+      "UPDATE jobs SET payload_enc = ?, payload_key_version = ?, payload_nonce = ? WHERE id = ?",
+      Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
+      sealed.keyVersion,
+      sealed.nonce,
+      jobId,
+    );
+    expect(await readingProviderOwnerIsCurrent(
+      current,
+      providerJob({ ownerId: jobId, reasoningEffort: "high" }),
+    )).toBe(true);
+    expect(await readingProviderOwnerIsCurrent(
+      current,
+      providerJob({ ownerId: jobId, reasoningEffort: "xhigh" }),
+    )).toBe(false);
+    expect((await loadCurrentDailyOwner(current, jobId))!.command)
+      .toEqual(legacyCommand);
   });
 
   it("refuses a coordinate that does not match the owner", async () => {

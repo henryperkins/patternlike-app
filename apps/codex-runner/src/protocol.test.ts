@@ -42,6 +42,14 @@ test("accepts the exact claim envelope the Worker sends", () => {
   assert.equal(parsed.invocation.schema_version, "codex-provider-invocation/v1");
 });
 
+test("accepts xhigh while preserving the reasoning on legacy high claims", () => {
+  for (const effort of ["xhigh", "high"]) {
+    const parsed = parseCodexProviderClaim(claim({ reasoning_effort: effort }));
+    assert.ok(parsed);
+    assert.equal(parsed.reasoning_effort, effort);
+  }
+});
+
 test("the claim wire shape carries no pipeline, pass, or reader identity", () => {
   // The runner performs inference and nothing else. It is not told which
   // product surface asked for the work, so a Daily reading, a Pattern pass, and

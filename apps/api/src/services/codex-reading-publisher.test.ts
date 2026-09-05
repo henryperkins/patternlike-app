@@ -197,6 +197,17 @@ describe("the Codex Daily publisher adapter", () => {
     env.CODEX_PROVIDER_ARTIFACT_KEYRING = CODEX_TEST_ARTIFACT_KEYRING;
   });
 
+  it.each(["high", "xhigh"] as const)("freezes the requested %s effort in the durable job", async (reasoningEffort) => {
+    const result = await createCodexReadingPublisher(env).publish(packet, options({
+      configuration: { ...pin, reasoning_effort: reasoningEffort },
+    }));
+    expect(result.ok).toBe(false);
+    if (result.ok || result.code !== "publisher_pending") throw new Error("publisher did not enqueue");
+    const job = await loadCodexProviderJob(env, result.job_id);
+    expect(job?.model).toBe("gpt-5.6-sol");
+    expect(job?.reasoningEffort).toBe(reasoningEffort);
+  });
+
   it("creates one durable job from deterministic request bytes and waits", async () => {
     const publisher = createCodexReadingPublisher(env);
     const result = await publisher.publish(packet, options());

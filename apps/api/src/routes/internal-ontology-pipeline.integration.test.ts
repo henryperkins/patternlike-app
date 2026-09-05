@@ -137,6 +137,8 @@ async function prepareMachineRelease(
       corpus_release_id: corpusReleaseId,
     },
     provider: "openai",
+    generator: { reasoning: "xhigh" },
+    evaluator: { reasoning: "xhigh" },
     regression: {
       fixture_count: 30,
       maximum_provider_calls_per_fixture: 11,
@@ -455,12 +457,12 @@ describe("POST /internal/ontology-pipeline-runs", () => {
     env.ONTOLOGY_PIPELINE_ROLLOUT = "internal";
     env.ONTOLOGY_PIPELINE_ALLOW_EQUAL_MODELS = "1";
     env.OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol";
-    env.OPENAI_ONTOLOGY_GENERATOR_REASONING = "high";
+    env.OPENAI_ONTOLOGY_GENERATOR_REASONING = "xhigh";
     env.OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.5";
     env.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = "120000";
     env.OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = "8000";
     env.OPENAI_ONTOLOGY_EVALUATOR_MODEL = "gpt-5.6-sol";
-    env.OPENAI_ONTOLOGY_EVALUATOR_REASONING = "high";
+    env.OPENAI_ONTOLOGY_EVALUATOR_REASONING = "xhigh";
     env.OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION = "1.0.0-evaluator";
     env.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = "120000";
     env.OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS = "4000";

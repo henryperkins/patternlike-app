@@ -21,13 +21,13 @@ export const ONTOLOGY_PIPELINE_ROLLOUT_MODES = ["off", "internal"] as const;
 export type OntologyPipelineRollout = (typeof ONTOLOGY_PIPELINE_ROLLOUT_MODES)[number];
 
 export const OPENAI_ONTOLOGY_GENERATOR_MODEL = "gpt-5.6-sol";
-export const OPENAI_ONTOLOGY_GENERATOR_REASONING = "high" as const;
+export const OPENAI_ONTOLOGY_GENERATOR_REASONING = "xhigh" as const;
 export const OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION = "1.0.5";
 export const OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS = 120_000;
 export const OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS = 8000;
 
 export const OPENAI_ONTOLOGY_EVALUATOR_MODEL = "gpt-5.6-sol";
-export const OPENAI_ONTOLOGY_EVALUATOR_REASONING = "high" as const;
+export const OPENAI_ONTOLOGY_EVALUATOR_REASONING = "xhigh" as const;
 export const OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION = "1.0.0-evaluator";
 export const OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS = 120_000;
 export const OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS = 4000;
@@ -40,11 +40,11 @@ export const ONTOLOGY_PIPELINE_EQUAL_MODEL_REGRESSION_MINIMUM_PASS_RATE = 1;
 
 export interface OntologyPipelineConfigPin {
   generator_model: string;
-  generator_reasoning: "high";
+  generator_reasoning: "high" | "xhigh";
   generator_prompt_version: string;
   generator_max_output_tokens: number;
   evaluator_model: string;
-  evaluator_reasoning: "high";
+  evaluator_reasoning: "high" | "xhigh";
   evaluator_prompt_version: string;
   evaluator_max_output_tokens: number;
   input_max_bytes: number;

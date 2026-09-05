@@ -191,8 +191,8 @@
     },
     "reasoningEffort": {
       "type": "string",
-      "enum": ["low", "medium", "high"],
-      "description": "Frozen into the command so a configuration change cannot alter an in-flight generation. Production configuration pins 'high'; the other values exist so a frozen older command remains describable."
+      "enum": ["low", "medium", "high", "xhigh"],
+      "description": "Frozen into the command so a configuration change cannot alter an in-flight generation. Production configuration pins 'xhigh'; older values remain describable, and Codex can finish legacy 'high' commands at their original effort."
     },
     "publisherConfigPin": {
       "type": "object",

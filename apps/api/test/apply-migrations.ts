@@ -18,6 +18,7 @@ const expectedTail = [
   "0022_place_resolutions.sql",
   "0023_pattern_source_regeneration.sql",
   "0024_geoapify_place_resolutions.sql",
+  "0025_codex_xhigh_reasoning.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -44,6 +45,7 @@ const cryptoOperationsMigrationIndex = migrationNames.indexOf(expectedTail[12]);
 const placeResolutionsMigrationIndex = migrationNames.indexOf(expectedTail[13]);
 const patternSourceRegenerationMigrationIndex = migrationNames.indexOf(expectedTail[14]);
 const geoapifyMigrationIndex = migrationNames.indexOf(expectedTail[15]);
+const codexXhighMigrationIndex = migrationNames.indexOf(expectedTail[16]);
 
 interface SchemaColumn {
   name: string;
@@ -1303,7 +1305,7 @@ await upgradeDb.prepare(
 ).bind(legacyPlaceId, migrationUserId).run();
 const beforeGeoapify = await upgradeDb.prepare("SELECT *, hex(payload_enc) AS payload_hex FROM place_resolutions WHERE id = ?")
   .bind(legacyPlaceId).first();
-await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(geoapifyMigrationIndex));
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(geoapifyMigrationIndex, codexXhighMigrationIndex));
 const afterGeoapify = await upgradeDb.prepare("SELECT *, hex(payload_enc) AS payload_hex FROM place_resolutions WHERE id = ?")
   .bind(legacyPlaceId).first();
 if (JSON.stringify(beforeGeoapify) !== JSON.stringify(afterGeoapify)) {
@@ -1320,3 +1322,19 @@ for (const name of ["idx_place_resolutions_expiry", "idx_place_resolutions_user_
   if (!placeIndexes.results.some((index) => index.name === name)) throw new Error(`0024 lost ${name}`);
 }
 await assertDatabaseHealthy(upgradeDb, "0024 populated apply");
+
+// 0025 rebuilds the provider parent/child pair. The populated upgrade fixture
+// includes live leases, terminal exchanges, and response uploads: compare every
+// field so a passing empty-database migration cannot hide lost audit state.
+const providerTables = ["codex_provider_jobs", "codex_provider_response_uploads"] as const;
+const beforeXhigh = await Promise.all(providerTables.map((table) =>
+  upgradeDb.prepare(`SELECT * FROM ${table} ORDER BY 1, 2`).all(),
+));
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(codexXhighMigrationIndex));
+for (const [index, table] of providerTables.entries()) {
+  const after = await upgradeDb.prepare(`SELECT * FROM ${table} ORDER BY 1, 2`).all();
+  if (JSON.stringify(beforeXhigh[index]!.results) !== JSON.stringify(after.results)) {
+    throw new Error(`0025 changed historical ${table} rows`);
+  }
+}
+await assertDatabaseHealthy(upgradeDb, "0025 populated apply");

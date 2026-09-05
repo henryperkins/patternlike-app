@@ -85,9 +85,12 @@ export function createCodexOntologyPublisher(
     const promptVersion = input.pass === "generator"
       ? input.options.configuration.generator_prompt_version
       : input.options.configuration.evaluator_prompt_version;
+    const reasoningEffort = input.pass === "generator"
+      ? input.options.configuration.generator_reasoning
+      : input.options.configuration.evaluator_reasoning;
     const invocation = invocationFromResponsesRequest(input.body, {
       model,
-      reasoningEffort: "high",
+      reasoningEffort,
     });
     if (!invocation.ok) return unavailable<T>();
     const serialized = canonicalJson(invocation.value);
@@ -127,7 +130,7 @@ export function createCodexOntologyPublisher(
           stageAttempt: coordinate.stageAttempt,
           request: request.artifact,
           model,
-          reasoningEffort: "high",
+          reasoningEffort,
           promptVersion,
           timeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
           dailyCallLimit: coordinate.dailyCallLimit,

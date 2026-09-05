@@ -5,7 +5,10 @@ import {
 } from "@patternlike/shared";
 
 import type { Env } from "../env.js";
-import { CODEX_PROVIDER_LEASE_MS } from "../services/codex-provider-contract.js";
+import {
+  CODEX_PROVIDER_LEASE_MS,
+  type CodexProviderReasoningEffort,
+} from "../services/codex-provider-contract.js";
 import type {
   PublisherFailureCode,
   PublisherSafeDetailCode,
@@ -92,7 +95,7 @@ export interface EnqueueCodexProviderJobInput {
   stageAttempt: number;
   request: CodexProviderArtifactPointer;
   model: string;
-  reasoningEffort: "high";
+  reasoningEffort: CodexProviderReasoningEffort;
   promptVersion: string;
   timeoutMs: number;
   dailyCallLimit: number;
@@ -109,7 +112,7 @@ export interface CodexProviderJob {
   request: CodexProviderArtifactPointer;
   response: CodexProviderArtifactPointer | null;
   model: string;
-  reasoningEffort: "high";
+  reasoningEffort: CodexProviderReasoningEffort;
   promptVersion: string;
   timeoutMs: number;
   dailyCallLimit: number;
@@ -149,7 +152,7 @@ interface CodexProviderJobRow {
   response_nonce: string | null;
   response_byte_length: number | null;
   model: string;
-  reasoning_effort: "high";
+  reasoning_effort: CodexProviderReasoningEffort;
   prompt_version: string;
   timeout_ms: number;
   daily_call_limit: number;

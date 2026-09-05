@@ -426,7 +426,7 @@ export interface PatternResponsesRequestBody {
   store: false;
   instructions: string;
   input: PatternResponsesInputMessage[];
-  reasoning: { effort: "low" | "medium" | "high" };
+  reasoning: { effort: "low" | "medium" | "high" | "xhigh" };
   text: {
     verbosity: "low" | "medium";
     format: {

@@ -8,14 +8,14 @@
     {
       "package": "contracts/m7",
       "schema_version": "0.7.0",
-      "manifest_sha256": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
+      "manifest_sha256": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
       "relationship": "frozen_pattern_reader_and_generation_predecessor",
       "note": "M9 leaves every M7 file unchanged, retains the M7 public Pattern document, and succeeds only the Pattern state and generation control shapes that need regeneration metadata. Existing M7 replay events remain valid."
     },
     {
       "package": "contracts/m8",
       "schema_version": "0.8.0",
-      "manifest_sha256": "6aecb0a84f74b1e174ee060cc4497cf0d0673896d913eceaebf2e78d6a88512e",
+      "manifest_sha256": "9e81e38c3c417728f5230de9e36f13f774d15b3d3a33717a6593be2df4ddc136",
       "relationship": "current_consumer_api_predecessor",
       "note": "M9 is a narrow Pattern overlay on the complete M8 consumer API. M8 place, consent, reading history, Save, export, and birth-budget contracts remain unchanged."
     }
