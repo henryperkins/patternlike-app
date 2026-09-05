@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
@@ -8,7 +8,7 @@ import type {
   PatternStateDocumentV9,
 } from "@patternlike/shared";
 import { PATTERN_GENERATION_CONSENT_POLICY_VERSION } from "@patternlike/shared";
-import { capturedFor, mockApiResponses } from "../test/api-mock.js";
+import { capturedFor, deferred, mockApiResponses } from "../test/api-mock.js";
 import { PatternExperience } from "./PatternExperience.js";
 
 const STATE = "/v1/pattern-state";
@@ -101,7 +101,7 @@ describe("PatternExperience", () => {
       },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     expect(await screen.findByText("Your Pattern is not ready.")).toBeInTheDocument();
     expect(screen.queryByText("Why this?")).toBeNull();
     expect(screen.queryByText("Holding a line under pressure")).toBeNull();
@@ -120,7 +120,7 @@ describe("PatternExperience", () => {
       },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     expect(await screen.findByRole("button", { name: /Generate my Pattern/i })).toBeInTheDocument();
     expect(screen.getByText(/Birth date, time, place, and coordinates are not sent/i)).toBeInTheDocument();
     expect(screen.getByText(/A successful Pattern is not a rerollable reading/i)).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe("PatternExperience", () => {
       [`DELETE ${PATTERN}`]: { status: 204, body: null },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "A private reading of this chart" })).toBeInTheDocument();
     expect(screen.queryByText("Why this?")).not.toBeInTheDocument();
@@ -198,7 +198,7 @@ describe("PatternExperience", () => {
       },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
     const review = screen.getByRole("button", { name: "Review Pattern update" });
@@ -252,7 +252,7 @@ describe("PatternExperience", () => {
       [`GET ${PATTERN}`]: { status: 200, body: generated },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Updating your Pattern");
@@ -290,7 +290,7 @@ describe("PatternExperience", () => {
       [`GET ${PATTERN}`]: { status: 200, body: generated },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
     expect(screen.getByText(/The update did not finish. Your current Pattern was not changed/i)).toBeInTheDocument();
@@ -317,7 +317,7 @@ describe("PatternExperience", () => {
       [`GET ${PATTERN}`]: { status: 200, body: generated },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: "A standing emphasis" })).toBeInTheDocument();
     expect(screen.queryByText(/Pattern update available/i)).toBeNull();
@@ -335,7 +335,7 @@ describe("PatternExperience", () => {
       [`GET ${STATE}`]: { status: 200, body: stateDoc({ state, consent: null }) },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
     expect(await screen.findByRole("heading", { name: title })).toBeInTheDocument();
     // None of these states can generate, so none of them offers the action.
@@ -362,7 +362,7 @@ describe("PatternExperience", () => {
         },
       });
 
-      render(<PatternExperience onUnauthorized={noop} />);
+      render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
 
       const status = await screen.findByRole("status");
       expect(status).toBeInTheDocument();
@@ -383,7 +383,7 @@ describe("PatternExperience", () => {
       },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     await screen.findByRole("button", { name: /Generate my Pattern/i });
 
     // Reaching the consent surface is not agreeing to it. Account-wide
@@ -419,7 +419,7 @@ describe("PatternExperience", () => {
       },
     });
 
-    render(<PatternExperience onUnauthorized={noop} />);
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
     await userEvent.click(
       await screen.findByRole("button", { name: /Generate my Pattern/i }),
     );
@@ -431,5 +431,49 @@ describe("PatternExperience", () => {
       confirm: "GENERATE MY PATTERN",
       reason: "failed_attempt_retry",
     });
+  });
+});
+
+
+describe("Pattern reader revision matching", () => {
+  const readyState = () => stateDoc({ state: "ready", pattern: { pattern_id: generated.pattern_id, generated_at: generated.generated_at, locale: generated.locale, effective_accuracy: generated.effective_accuracy } });
+
+  it("does not expose an old chart's reading when the active chart differs", async () => {
+    mockApiResponses({ [STATE]: { status: 200, body: readyState() }, [PATTERN]: { status: 200, body: generated } });
+    render(<PatternExperience chartId="new-chart" onUnauthorized={noop} />);
+    expect(await screen.findByText(/no longer matches/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
+    expect(capturedFor(PATTERN)).toHaveLength(0);
+  });
+
+  it("rejects a document fetched after the state revision changed", async () => {
+    mockApiResponses({ [STATE]: { status: 200, body: readyState() }, [PATTERN]: { status: 200, body: { ...generated, pattern_id: "other-pattern" } } });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    expect(await screen.findByText(/no longer matches/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Delete this Pattern/i })).toBeNull();
+  });
+
+  it("aborts an old document request and never reveals it after a chart correction", async () => {
+    const gate = deferred();
+    mockApiResponses({ [STATE]: { status: 200, body: readyState() }, [PATTERN]: { status: 200, body: generated, gate: gate.promise } });
+    const view = render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    await waitFor(() => expect(capturedFor(PATTERN)).toHaveLength(1));
+    const signal = capturedFor(PATTERN)[0].signal!;
+    view.rerender(<PatternExperience chartId="replacement-chart" onUnauthorized={noop} />);
+    expect(signal.aborted).toBe(true);
+    await act(async () => gate.release());
+    expect(await screen.findByText(/no longer matches/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
+  });
+
+  it("adds optional portrait creation to a matched four-chapter reading without removing account controls", async () => {
+    const fourChapters = { ...generated, core_chapters: Array.from({ length: 4 }, (_, index) => ({ ...generated.core_chapters[0], title: `Published chapter ${index + 1}` })) };
+    mockApiResponses({ [STATE]: { status: 200, body: { ...readyState(), consent: { ...consent, status: "granted" } } }, [PATTERN]: { status: 200, body: fourChapters }, "/v1/pattern-portrait": { status: 200, body: { schema_version: "pattern-portrait/v1", status: "not_started", portrait_id: null, chart_id: "cht_pattern_ai_0001", pattern_id: generated.pattern_id, generated_at: generated.generated_at, document_revision: `0.7.0:${generated.pattern_id}:${generated.generated_at}`, sun_sign: "aries", completed_chapters: 0, retryable: true, chapters: [], graph: null } } });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    expect(await screen.findByRole("button", { name: "Create my constellation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Published chapter 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete this Pattern" })).toBeInTheDocument();
+    expect(screen.getByText(/Your birth date, time, birthplace/i)).toBeInTheDocument();
   });
 });

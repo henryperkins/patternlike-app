@@ -19,6 +19,7 @@ const expectedTail = [
   "0023_pattern_source_regeneration.sql",
   "0024_geoapify_place_resolutions.sql",
   "0025_codex_xhigh_reasoning.sql",
+  "0026_pattern_portraits.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==

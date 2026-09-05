@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChartResponse } from "../lib/api-client.js";
 import { ChartView } from "./ChartView.js";
 
-vi.mock("./PatternExperience.js", () => ({ PatternExperience: () => null }));
+const reader = vi.hoisted(() => vi.fn());
+vi.mock("./PatternExperience.js", () => ({ PatternExperience: (props: unknown) => { reader(props); return null; } }));
 
 function chart(qualifiedFeatures: ChartResponse["uncertainty"]["qualified_features"]): ChartResponse {
   return {
@@ -42,6 +43,14 @@ function chart(qualifiedFeatures: ChartResponse["uncertainty"]["qualified_featur
 }
 
 describe("ChartView location qualifications", () => {
+  it("passes the current chart identity into the account reader after replacement", () => {
+    const original = chart([]);
+    const onUnauthorized = vi.fn();
+    const view = render(<ChartView chart={original} onUnauthorized={onUnauthorized} />);
+    expect(reader).toHaveBeenLastCalledWith({ chartId: original.id, onUnauthorized });
+    view.rerender(<ChartView chart={{ ...original, id: "replacement-chart" }} onUnauthorized={onUnauthorized} />);
+    expect(reader).toHaveBeenLastCalledWith({ chartId: "replacement-chart", onUnauthorized });
+  });
   it("renders plain-language location qualifications", () => {
     render(<ChartView chart={chart([
       { feature_id: "birthplace", qualification: "technique_specific" },

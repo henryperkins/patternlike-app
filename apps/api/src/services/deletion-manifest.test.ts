@@ -42,6 +42,7 @@ describe("account-deletion manifest", () => {
   it("registers each user artifact family behind an internal safe prefix", () => {
     expect(DELETION_ARTIFACT_FAMILIES.map(({ family, prefix }) => ({ family, prefix })))
       .toEqual([
+        { family: "pattern_portraits", prefix: "pattern-portraits/" },
         { family: "account_exports", prefix: "exports/" },
         { family: "pattern_generations", prefix: "pattern-generations/" },
         { family: "codex_provider_jobs", prefix: "codex-provider-jobs/" },

@@ -2,9 +2,9 @@ import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, us
 import { createRoot, events, extend, useFrame, useThree, type ReconcilerRoot, type RootStore } from "@react-three/fiber";
 import { AdditiveBlending, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments, PerspectiveCamera, Points, ShaderMaterial, Vector3, type BufferGeometry, type Camera } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createImageSculpture } from "../lib/image-sculpture.js";
+import { createImageSculpture, sculptureFromGraph } from "../lib/image-sculpture.js";
 import { loadPortraitImages } from "../lib/portrait-images.js";
-import type { ZodiacSignName } from "@patternlike/shared";
+import type { PortraitGraph, ZodiacSignName } from "@patternlike/shared";
 
 export interface CameraAction {
   kind: "left" | "right" | "closer" | "farther" | "reset";
@@ -12,6 +12,7 @@ export interface CameraAction {
 }
 interface SculptureProps {
   imageUrls: readonly string[];
+  graph?: PortraitGraph;
   sunSign: ZodiacSignName | null;
   selectedIndex: number;
   onSelect: (index: number | null) => void;
@@ -379,9 +380,9 @@ function SculptureCanvas(props: CanvasProps) {
     : <div className="portrait-canvas" ref={host} />;
 }
 
-/** Geometry receives image pixels and an explicit Sun sign; never reading metadata. */
+/** Geometry receives a saved image-derived graph, or image pixels plus Sun sign. */
 export default function PatternSculpture(props: SculptureProps) {
-  const sculptureKey = JSON.stringify([props.imageUrls, props.sunSign]);
+  const sculptureKey = JSON.stringify(props.graph ? ["saved", props.graph] : [props.imageUrls, props.sunSign]);
   const [loaded, setLoaded] = useState<{ key: string; model: SculptureModel } | null>(null);
   const model = loaded?.key === sculptureKey ? loaded.model : null;
   const [failed, setFailed] = useState(false);
@@ -390,11 +391,14 @@ export default function PatternSculpture(props: SculptureProps) {
     let owned: SculptureModel | null = null;
     setLoaded(null);
     setFailed(false);
-    void loadPortraitImages(props.imageUrls, controller.signal).then((images) => {
+    const load = async () => {
+      const graph = props.graph;
+      const images = graph ? null : await loadPortraitImages(props.imageUrls, controller.signal);
       if (controller.signal.aborted) return;
-      owned = createImageSculpture(images, props.sunSign);
+      owned = graph ? sculptureFromGraph(graph) : createImageSculpture(images!, props.sunSign);
       setLoaded({ key: sculptureKey, model: owned });
-    }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    };
+    void load().catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => { controller.abort(); owned?.geometry.dispose(); owned?.lineGeometry.dispose(); };
   }, [sculptureKey]);
   useEffect(() => { if (failed) props.onUnavailable(); }, [failed, props.onUnavailable]);

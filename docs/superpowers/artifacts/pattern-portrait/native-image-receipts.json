@@ -1,0 +1,59 @@
+{
+  "schema_version": "portrait-native-study-evidence/v1",
+  "source": "Four authored fictional chapters; no personal account data",
+  "authentication": "Codex ChatGPT login",
+  "orchestration_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "codex_cli_version": "0.153.3",
+  "image_model_evidence": "Reviewed native-tool pin; not an independently returned per-image model identifier",
+  "chapters": [
+    {
+      "chapter": 1,
+      "object": "Adjustable brass compass",
+      "source_sha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9",
+      "original_sha256": "f3c0a36549207001e83a68b2c6c3d285c4d143e375da1cda91388e73a49d88bb",
+      "derivative_sha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+      "derivative_bytes": 324323,
+      "original_bytes": 1927197,
+      "provider_request_id": "01a072c6-dbe5-7991-a54d-26ad92803869:01a072c6-dc4d-75c2-8b57-2ee35609d682",
+      "image_request_id": "exec-8cda10b2-4c14-4c45-828e-9a4183d7d442",
+      "image_model_pin": "gpt-image-2"
+    },
+    {
+      "chapter": 2,
+      "object": "Two-seat wooden rocking bench",
+      "source_sha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70",
+      "original_sha256": "c663d13c3cc2d5612b0d68867f6dc49af5ba25873edf852c221225db6487af0b",
+      "derivative_sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+      "derivative_bytes": 279754,
+      "original_bytes": 1572565,
+      "provider_request_id": "01a072c9-0c62-7363-8ddc-00be2b2fc1b3:01a072c9-0cc9-7a20-b5ed-557670d2d920",
+      "image_request_id": "exec-a339e706-3166-4664-8bfb-03a3dd0918d9",
+      "image_model_pin": "gpt-image-2"
+    },
+    {
+      "chapter": 3,
+      "object": "Knotted coil of rope",
+      "source_sha256": "1836ba298c509fe2b20b94aa713ac3d8791d2c010d6b8122733868961011562e",
+      "original_sha256": "4706321df62519342a19275a3646b1c176245e7c31a4ae8c5abf18fee4e892fb",
+      "derivative_sha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1",
+      "derivative_bytes": 340882,
+      "original_bytes": 2131951,
+      "provider_request_id": "01a072c9-cf11-7e10-b809-a6ed66eb5162:01a072c9-cf91-7f32-a05d-135cc7256f94",
+      "image_request_id": "exec-405f079b-5bc7-4311-9308-a640258f136e",
+      "image_model_pin": "gpt-image-2"
+    },
+    {
+      "chapter": 4,
+      "object": "Collapsible brass spyglass",
+      "source_sha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d",
+      "original_sha256": "59f72fe3b17e6537b662e4f22eb6b194e65031bdc0f3d5afb63a7f930b391662",
+      "derivative_sha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+      "derivative_bytes": 223452,
+      "original_bytes": 1156936,
+      "provider_request_id": "01a072ca-a151-7130-ba6d-9971b3dd22d8:01a072ca-a1bf-72c3-bad1-a13a9b5f1df9",
+      "image_request_id": "exec-a3926fc9-a6fa-4255-874e-4ff8b9cb1b83",
+      "image_model_pin": "gpt-image-2"
+    }
+  ]
+}

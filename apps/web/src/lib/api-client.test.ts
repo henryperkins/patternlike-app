@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   createBirthProfile,
   ensureTodayReading,
   getAccountProcessingConsent,
+  getPatternPortrait,
+  getPatternPortraitImage,
+  downloadPatternPortrait,
+  startPatternPortraitGeneration,
   getAiSynthesisConsent,
   getReadingEvidence,
   getTiming,
@@ -33,6 +37,46 @@ const TODAY = "/v1/readings/today";
 const TIMING = "/v1/timing";
 const CONSENT = "/v1/consents/ai-synthesis";
 const ACCOUNT_PROCESSING_CONSENT = "/v1/consents/account-processing";
+
+describe("private Pattern portrait transport", () => {
+  it("loads status and explicitly starts the expected revision with an idempotency key", async () => {
+    const body = { status: "generating" };
+    const identity = { chart_id: "chart-1", pattern_id: "pattern-1", generated_at: "2026-09-05T00:00:00Z", confirm: "CREATE MY PORTRAIT" as const, consent_policy_version: "1.0.0" as const };
+    mockApiResponses({
+      "/v1/pattern-portrait": { status: 200, body },
+      "POST /v1/pattern-portrait-generations": { status: 202, body },
+    });
+    const signal = new AbortController().signal;
+    await expect(getPatternPortrait(signal)).resolves.toEqual(body);
+    await expect(startPatternPortraitGeneration(identity, "portrait-key", signal)).resolves.toEqual(body);
+    const [posted] = capturedFor("/v1/pattern-portrait-generations");
+    expect(posted.body).toEqual(identity);
+    expect(posted.headers.get("idempotency-key")).toBe("portrait-key");
+    expect(posted.signal).toBe(signal);
+  });
+
+  it("fetches image bytes through the fixed authenticated route and download as a Blob", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }))
+      .mockResolvedValueOnce(new Response("{}", { headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const signal = new AbortController().signal;
+    const image = await getPatternPortraitImage("ref/with?delimiters", signal);
+    expect(image.type).toBe("image/png");
+    expect(image.size).toBe(3);
+    expect(fetchMock.mock.calls[0][0]).toBe("/v1/pattern-portrait/images/ref%2Fwith%3Fdelimiters");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: "include", cache: "no-store", signal });
+    const download = await downloadPatternPortrait({ chart_id: "chart-1", pattern_id: "pattern-1", generated_at: "2026-09-05T00:00:00Z" }, signal);
+    expect(download.type).toBe("application/json");
+    expect(fetchMock.mock.calls[1][0]).toBe("/v1/pattern-portrait/download?chart_id=chart-1&pattern_id=pattern-1&generated_at=2026-09-05T00%3A00%3A00Z");
+  });
+
+  it("preserves authentication failures and rejects an HTML fallback as an image", async () => {
+    mockApiResponses({ "/v1/pattern-portrait/images/private": { status: 401, body: { error: { code: "unauthorized", message: "Sign in again." } } } });
+    await expect(getPatternPortraitImage("private")).rejects.toMatchObject({ status: 401, code: "unauthorized" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>", { headers: { "content-type": "text/html" } })));
+    await expect(getPatternPortraitImage("private")).rejects.toThrow(/image/i);
+  });
+});
 
 const accountProcessingNotGranted = {
   schema_version: "0.8.0",

@@ -1,6 +1,9 @@
-import type { CodexProviderClient } from "./client.js";
+import { CodexProviderClientError, type CodexProviderClient } from "./client.js";
 import type { CodexInvocationOutcome } from "./codex-cli.js";
 import type { CodexProviderClaim } from "./protocol.js";
+import type { CodexPortraitClient } from "./portrait-client.js";
+import type { PortraitInvocationOutcome } from "./portrait-invocation.js";
+import type { CodexPortraitClaim } from "@patternlike/shared";
 
 export interface RunnerConfiguration {
   apiOrigin: string;
@@ -8,6 +11,7 @@ export interface RunnerConfiguration {
   codexBin: string;
   pollMs: number;
   concurrency: 1;
+  portraitsEnabled?: true;
 }
 
 export type RunnerLogEvent = Readonly<{
@@ -81,13 +85,43 @@ export function parseRunnerConfiguration(env: NodeJS.ProcessEnv): RunnerConfigur
     1,
     "CODEX_RUNNER_CONCURRENCY",
   );
+  if (env.CODEX_RUNNER_PORTRAITS !== undefined && !["0", "1"].includes(env.CODEX_RUNNER_PORTRAITS)) {
+    throw new Error("CODEX_RUNNER_PORTRAITS is invalid");
+  }
   return {
     apiOrigin: url.origin,
     runnerToken,
     codexBin,
     pollMs,
     concurrency: concurrency as 1,
+    ...(env.CODEX_RUNNER_PORTRAITS === "1" ? { portraitsEnabled: true as const } : {}),
   };
+}
+
+export interface PortraitRunnerOptions {
+  client: Pick<CodexPortraitClient, "claim" | "complete" | "fail">;
+  execute: (claim: CodexPortraitClaim) => Promise<PortraitInvocationOutcome>;
+}
+
+export async function runOnePortraitJob(options: PortraitRunnerOptions): Promise<"empty" | "processed"> {
+  const claimed = await options.client.claim();
+  if (claimed.status === "empty") return "empty";
+  let outcome: PortraitInvocationOutcome;
+  try { outcome = await options.execute(claimed.claim); }
+  catch { outcome = { ok: false, code: "generation_failed", fatal: false }; }
+  if (outcome.ok) {
+    try {
+      await options.client.complete(claimed.claim.job_id, outcome.completion);
+    } catch (error) {
+      // A 400 rejects the image before acceptance. Other errors may hide a successful write.
+      if (!(error instanceof CodexProviderClientError) || error.status !== 400) throw error;
+      await options.client.fail(claimed.claim.job_id, { lease_token: claimed.claim.lease_token, code: "image_invalid" });
+    }
+  } else {
+    try { await options.client.fail(claimed.claim.job_id, { lease_token: claimed.claim.lease_token, code: outcome.code }); }
+    finally { if (outcome.fatal) throw new FatalCodexRunnerError(); }
+  }
+  return "processed";
 }
 
 export async function runOneCodexJob(
@@ -162,6 +196,7 @@ export interface CodexPollLoopOptions {
   random?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
   log?: (event: RunnerLogEvent) => void;
+  portraits?: PortraitRunnerOptions;
 }
 
 export async function runCodexPollLoop(options: CodexPollLoopOptions): Promise<void> {
@@ -173,6 +208,9 @@ export async function runCodexPollLoop(options: CodexPollLoopOptions): Promise<v
     let status: "empty" | "processed";
     try {
       status = await runOneCodexJob(options.client, options.execute);
+      if (status === "empty" && options.portraits && !options.signal.aborted) {
+        status = await runOnePortraitJob(options.portraits);
+      }
     } catch (error) {
       if (error instanceof FatalCodexRunnerError) throw error;
       log({ event: "codex_runner_poll_failed" });

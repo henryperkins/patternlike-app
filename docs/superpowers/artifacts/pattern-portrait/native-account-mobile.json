@@ -1,0 +1,65 @@
+{
+  "environment": "Chromium mobile emulation; real web components and generated image bytes; intercepted account API responses",
+  "passed": true,
+  "checks": 34,
+  "viewports": [
+    {
+      "width": 390,
+      "checks": {
+        "no automatic generation": true,
+        "published prose visible before creation": true,
+        "reading remains available during progress": true,
+        "slow status completed without polling starvation": true,
+        "saved graph ready before thumbnails": true,
+        "exactly four private image requests": true,
+        "selected chapter and expression before hydration": true,
+        "selection survives hydration": true,
+        "return preserves selection": true,
+        "sticky chapter switching": true,
+        "all chapters returns index": true,
+        "plain reading and delete preserved": true,
+        "reopen reuses saved assets": true,
+        "four real images decoded": true,
+        "no horizontal overflow": true,
+        "no browser errors": true,
+        "all private blobs revoked on unmount": true
+      },
+      "image_requests": 4,
+      "status_requests": 2,
+      "graph": {
+        "stars": 318,
+        "edges": 326
+      },
+      "errors": []
+    },
+    {
+      "width": 320,
+      "checks": {
+        "no automatic generation": true,
+        "published prose visible before creation": true,
+        "reading remains available during progress": true,
+        "slow status completed without polling starvation": true,
+        "saved graph ready before thumbnails": true,
+        "exactly four private image requests": true,
+        "selected chapter and expression before hydration": true,
+        "selection survives hydration": true,
+        "return preserves selection": true,
+        "sticky chapter switching": true,
+        "all chapters returns index": true,
+        "plain reading and delete preserved": true,
+        "reopen reuses saved assets": true,
+        "four real images decoded": true,
+        "no horizontal overflow": true,
+        "no browser errors": true,
+        "all private blobs revoked on unmount": true
+      },
+      "image_requests": 4,
+      "status_requests": 2,
+      "graph": {
+        "stars": 318,
+        "edges": 326
+      },
+      "errors": []
+    }
+  ]
+}

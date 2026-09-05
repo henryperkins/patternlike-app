@@ -1,0 +1,86 @@
+{
+  "engine_version": "constellation-v1",
+  "positions": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1,
+    0
+  ],
+  "source_indices": [
+    0,
+    1,
+    2,
+    4
+  ],
+  "star_strengths": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "connections": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      3
+    ]
+  ],
+  "color": [
+    0.5,
+    0.5,
+    0.5
+  ],
+  "contributions": [
+    {
+      "index": 0,
+      "aspect": 1,
+      "coverage": 1,
+      "opening_area": 0,
+      "skew": 0,
+      "stars": 1,
+      "interior_lines": 0
+    },
+    {
+      "index": 1,
+      "aspect": 1,
+      "coverage": 1,
+      "opening_area": 0,
+      "skew": 0,
+      "stars": 1,
+      "interior_lines": 0
+    },
+    {
+      "index": 2,
+      "aspect": 1,
+      "coverage": 1,
+      "opening_area": 0,
+      "skew": 0,
+      "stars": 1,
+      "interior_lines": 0
+    },
+    {
+      "index": 3,
+      "aspect": 1,
+      "coverage": 1,
+      "opening_area": 0,
+      "skew": 0,
+      "stars": 1,
+      "interior_lines": 0
+    }
+  ]
+}

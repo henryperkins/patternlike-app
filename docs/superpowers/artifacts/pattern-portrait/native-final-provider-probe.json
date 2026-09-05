@@ -1,0 +1,50 @@
+{
+  "schema_version": "portrait-final-runner-probe/v1",
+  "started_at": "2026-09-05T18:27:03.929Z",
+  "completed_at": "2026-09-05T18:27:44.788Z",
+  "elapsed_ms": 40860,
+  "fictional_chapter_index": 0,
+  "source_sha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9",
+  "prompt_sha256": "05dbb1665426affcc5b015b87f2d7b8840abb6b9aca4feca52472423a367870e",
+  "prompt_version": "portrait-object-v1",
+  "codex_cli_version": "0.153.3",
+  "authentication": "ChatGPT",
+  "orchestration_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "image_model_configured_pin": "gpt-image-2",
+  "independent_image_model_attestation": false,
+  "runner_source_sha256": {
+    "apps/codex-runner/src/portrait-invocation.ts": "4e8b7d91d5dc5cf02a1209e750731e345d8f902fbcc172bd7eb3dd4495640c22",
+    "apps/codex-runner/src/portrait-client.ts": "b8e33986e92b8f4b61880efa8d333fd155917b64345bd2a9bd813214c0429ef5",
+    "apps/codex-runner/src/runner.ts": "5cad5781f1a22880fc2eaf9470ab4659a0e669c675f9017601243a2ee31fcd7f",
+    "apps/codex-runner/src/codex-cli.ts": "12966f4ccbebd4205ee1839bcea2de3e394181ca7ab77adc8b86831e2026ffb7",
+    "apps/api/src/services/pattern-portrait.ts": "a010acd25c17658aa008b8d150238e174c112889d56a6c89fe4d77d50ccad5de"
+  },
+  "final_host_isolation_and_item_filter": true,
+  "result": "completed",
+  "label": "Hinged brass compass",
+  "native_dimensions": [
+    1254,
+    1254
+  ],
+  "image_dimensions": [
+    512,
+    512
+  ],
+  "native_bytes": 2078912,
+  "image_bytes": 338588,
+  "original_sha256": "6da66f8349530bc9c0a124ca83c5192e16ab22a25442dc6fd1304899e77cca13",
+  "image_sha256": "2fcd93089ad4df245bd76878b5176972b65ee23f1193f37cb3aaa4717e01de58",
+  "sample_dimensions": [
+    128,
+    128
+  ],
+  "sample_bytes": 65536,
+  "provider_request_id": "01a072d2-fc0d-7223-83bb-fc6ae74d7bac:01a072d2-fc74-7b40-a225-ab90ef292bad",
+  "image_request_id": "exec-9f4f313b-f731-4a83-b832-67dac21c4f1b",
+  "authoritative_native_item_and_successful_turn": true,
+  "derivative_and_samples_verified": true,
+  "temporary_directories_remaining": [],
+  "original_four_images_unchanged": true,
+  "source_files_unchanged_during_probe": true
+}

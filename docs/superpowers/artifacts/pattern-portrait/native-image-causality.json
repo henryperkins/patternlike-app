@@ -1,0 +1,30 @@
+{
+  "saved_graph_sha256": "9718042abfaf7a7936d3c2953443125e3ae25886ddc912ae6a9cf3a9425e2ea1",
+  "graph_bytes": 29409,
+  "stars": 318,
+  "connections": 326,
+  "roundtrip_valid": true,
+  "all_four_causal": true,
+  "checks": [
+    {
+      "chapter": 1,
+      "own_shape_changed": true,
+      "other_chapter_shapes_preserved": true
+    },
+    {
+      "chapter": 2,
+      "own_shape_changed": true,
+      "other_chapter_shapes_preserved": true
+    },
+    {
+      "chapter": 3,
+      "own_shape_changed": true,
+      "other_chapter_shapes_preserved": true
+    },
+    {
+      "chapter": 4,
+      "own_shape_changed": true,
+      "other_chapter_shapes_preserved": true
+    }
+  ]
+}

@@ -6,26 +6,28 @@ import { sunShapeProfiles } from "../lib/sun-sculpture.js";
 import type { PortraitSource } from "../lib/pattern-portrait.js";
 import { fictionalPattern } from "./pattern-portrait-fixture.js";
 import { imageStudyBindings } from "./image-study.js";
+import { nativeImageBindings, nativePattern } from "./native-image-study.js";
 import "../styles.css";
 import "./pattern-portrait-preview.css";
 
-const objectBindings = imageStudyBindings;
-
 function PortraitPreview() {
+  const [example, setExample] = useState("direction");
   const [sunSign, setSunSign] = useState<ZodiacSignName | null>(null);
   const [accuracy, setAccuracy] = useState<BirthTimeAccuracy>("exact");
   const [status, setStatus] = useState<PortraitSource["status"]>("ready");
   const [replacement, setReplacement] = useState(false);
+  const pattern = example === "direction" ? nativePattern : fictionalPattern;
+  const objectBindings = example === "direction" ? nativeImageBindings : imageStudyBindings;
   const source = useMemo<PortraitSource>(() => {
     if (status !== "ready") return { status };
     return {
       status: "ready",
       sunSign,
       document: {
-        ...fictionalPattern,
-        pattern_id: replacement ? "pat_fictional_replacement" : fictionalPattern.pattern_id,
+        ...pattern,
+        pattern_id: replacement ? "pat_fictional_replacement" : pattern.pattern_id,
         effective_accuracy: accuracy,
-        core_chapters: replacement ? fictionalPattern.core_chapters.slice(1) : fictionalPattern.core_chapters,
+        core_chapters: replacement ? pattern.core_chapters.slice(1) : pattern.core_chapters,
         uncertainty: accuracy === "unknown"
           ? { text: "Example uncertainty: without a birth time, houses and angles would be unavailable." }
           : accuracy === "approximate"
@@ -33,7 +35,7 @@ function PortraitPreview() {
             : null,
       },
     };
-  }, [status, accuracy, replacement, sunSign]);
+  }, [status, accuracy, replacement, sunSign, pattern]);
 
   return (
     <div className="portrait-preview">
@@ -49,11 +51,17 @@ function PortraitPreview() {
         <div className="portrait-preview-intro">
           <h1>Your Pattern,<br />in constellation.</h1>
           <div>
-            <p>Four chapter images, one constellation. Choose a chapter and explore its reading.</p>
-            <p className="portrait-fictional-note">A fictional reading, drawn in stars. Your Sun sign stays on this page.</p>
+            <p>Four chapter images, one constellation.</p>
+            <p className="portrait-fictional-note">Choose a fictional reading to compare. Your choices stay on this page.</p>
           </div>
         </div>
         <div className="portrait-sun-choice">
+          <label htmlFor="portrait-example">Reading
+            <select id="portrait-example" value={example} onChange={(event) => { setExample(event.target.value); setReplacement(false); setStatus("ready"); }}>
+              <option value="direction">Direction &amp; care</option>
+              <option value="space">Space &amp; change</option>
+            </select>
+          </label>
           <label htmlFor="portrait-sun-sign">Your Sun sign
             <select id="portrait-sun-sign" value={sunSign ?? ""} aria-describedby="portrait-sun-help" onChange={(event) => setSunSign(ZODIAC_SIGNS.find((sign) => sign === event.target.value) ?? null)}>
               <option value="">Choose a sign</option>

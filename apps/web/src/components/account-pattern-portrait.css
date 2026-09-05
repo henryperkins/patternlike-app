@@ -1,0 +1,22 @@
+.account-portrait {
+  margin: 1.5rem 0 2rem;
+  padding: clamp(1rem, 3vw, 1.75rem);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--paper-light);
+}
+
+.account-portrait__heading h3 { margin: 0.35rem 0 1rem; }
+.account-portrait p { max-width: 68ch; line-height: 1.65; }
+.account-portrait__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+.account-portrait__detail { font-size: 0.875rem; }
+.account-portrait__error { margin-top: 1rem; }
+.account-portrait__view { min-width: 0; }
+.account-portrait__view > p { line-height: 1.6; }
+.account-portrait__view > p button { margin-inline-start: 0.4rem; min-height: 44px; }
+.account-portrait__view:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+
+@media (max-width: 600px) {
+  .account-portrait__actions { align-items: stretch; flex-direction: column; }
+  .account-portrait .button { min-height: 44px; white-space: normal; }
+}

@@ -187,7 +187,7 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
         </div>
       </section>
 
-      <PatternExperience onUnauthorized={onUnauthorized} />
+      <PatternExperience chartId={chart.id} onUnauthorized={onUnauthorized} />
 
       <details className="evidence-drawer">
         <summary>

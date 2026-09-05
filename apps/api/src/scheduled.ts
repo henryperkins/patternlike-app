@@ -1,3 +1,4 @@
+import { maintainPortraits } from "./services/pattern-portrait.js";
 import type { Env } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
 import { runReadingScheduler } from "./services/run-reading-scheduler.js";
@@ -60,6 +61,11 @@ async function runIncumbentMaintenance(
   }
   try {
     await sweepPatternJobs(env, scheduledAt);
+  } catch (error) {
+    if (laneFailure === undefined) laneFailure = error;
+  }
+  try {
+    await maintainPortraits(env, scheduledAt);
   } catch (error) {
     if (laneFailure === undefined) laneFailure = error;
   }

@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: Pattern portrait v1
+  version: 1.0.0
+paths:
+  /v1/pattern-portrait:
+    get:
+      operationId: getPatternPortrait
+      description: Read the portrait for the authenticated current chart and accepted
+        Pattern. No generation is started.
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/response
+        default:
+          description: Structured error; no private artifact is returned.
+  /v1/pattern-portrait-generations:
+    post:
+      operationId: startPatternPortraitGeneration
+      description: Explicitly create or resume four images for the expected current
+        Pattern. Completed portraits are reused.
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/response
+        default:
+          description: Structured error; no private artifact is returned.
+        '202':
+          description: Four-image work accepted or already in progress
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/response
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/generationRequest
+  /v1/pattern-portrait/images/{referenceId}:
+    get:
+      operationId: getPatternPortraitImage
+      security:
+      - sessionCookie: []
+      parameters:
+      - in: path
+        name: referenceId
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 38
+          pattern: ^ppimg_[a-f0-9]{32}$
+      responses:
+        '200':
+          description: Private PNG derivative for the current accepted portrait
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Image is absent or does not belong to the current account and
+            Pattern
+  /v1/pattern-portrait/download:
+    get:
+      operationId: downloadPatternPortrait
+      description: Download all four saved images and the saved graph. This separate
+        portable bundle supplements the existing frozen account export.
+      security:
+      - sessionCookie: []
+      responses:
+        '200':
+          description: Current private result
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/download
+        default:
+          description: Structured error; no private artifact is returned.
+      parameters:
+      - in: query
+        name: pattern_id
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - in: query
+        name: generated_at
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+          format: date-time
+      - in: query
+        name: chart_id
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+  /codex-provider/v1/portraits/claim:
+    post:
+      operationId: claimCodexPortrait
+      security:
+      - runnerBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              maxProperties: 0
+      responses:
+        '200':
+          description: Bounded chapter claim
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/claim
+        default:
+          description: Structured error without private artifact bytes.
+        '204':
+          description: No eligible pending image job
+  /codex-provider/v1/portraits/{jobId}/complete:
+    post:
+      operationId: completeCodexPortrait
+      security:
+      - runnerBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/completion
+      responses:
+        '200':
+          description: Terminal result accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - schema_version
+                - status
+                properties:
+                  schema_version:
+                    const: codex-portrait-terminal/v1
+                  status:
+                    const: accepted
+        default:
+          description: Structured error without private artifact bytes.
+      parameters:
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          pattern: ^ppjob_[a-f0-9]{32}$
+          maxLength: 38
+  /codex-provider/v1/portraits/{jobId}/fail:
+    post:
+      operationId: failCodexPortrait
+      security:
+      - runnerBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/failure
+      responses:
+        '200':
+          description: Terminal result accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - schema_version
+                - status
+                properties:
+                  schema_version:
+                    const: codex-portrait-terminal/v1
+                  status:
+                    const: accepted
+        default:
+          description: Structured error without private artifact bytes.
+      parameters:
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          pattern: ^ppjob_[a-f0-9]{32}$
+          maxLength: 38
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session
+    runnerBearer:
+      type: http
+      scheme: bearer

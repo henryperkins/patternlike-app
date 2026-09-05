@@ -1,0 +1,155 @@
+{
+  "schema_version": "pattern-portrait-download/v1",
+  "portrait": {
+    "schema_version": "pattern-portrait/v1",
+    "status": "ready",
+    "portrait_id": "ppor_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "pattern_id": "pat_fictional_portrait",
+    "generated_at": "2026-09-05T12:00:00Z",
+    "chart_id": "cht_fictional_portrait",
+    "document_revision": "0.7.0:pat_fictional_portrait:2026-09-05T12:00:00Z",
+    "sun_sign": "aries",
+    "completed_chapters": 4,
+    "retryable": false,
+    "chapters": [
+      {
+        "chapter_id": "chapter-1",
+        "reference_id": "ppimg_00000000000000000000000000000000",
+        "label": "Compass",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source_text": "{\"title\":\"Chapter 1\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-2",
+        "reference_id": "ppimg_11111111111111111111111111111111",
+        "label": "Cup",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "source_text": "{\"title\":\"Chapter 2\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-3",
+        "reference_id": "ppimg_22222222222222222222222222222222",
+        "label": "Anchor",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "source_text": "{\"title\":\"Chapter 3\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      },
+      {
+        "chapter_id": "chapter-4",
+        "reference_id": "ppimg_33333333333333333333333333333333",
+        "label": "Telescope",
+        "rationale": "A fictional object used to verify the contract.",
+        "reference_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "source_text": "{\"title\":\"Chapter 4\",\"summary\":\"Fictional example\",\"sections\":[\"One complete section.\"],\"tensions\":[\"One tension.\"],\"resources\":[\"One resource.\"],\"counterExpression\":\"One alternative.\"}"
+      }
+    ],
+    "graph": {
+      "engine_version": "constellation-v1",
+      "positions": [
+        -1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        -1,
+        0
+      ],
+      "source_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "star_strengths": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "connections": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "contributions": [
+        {
+          "index": 0,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 1,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 2,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        },
+        {
+          "index": 3,
+          "aspect": 1,
+          "coverage": 1,
+          "opening_area": 0,
+          "skew": 0,
+          "stars": 1,
+          "interior_lines": 0
+        }
+      ]
+    }
+  },
+  "images": [
+    {
+      "reference_id": "ppimg_00000000000000000000000000000000",
+      "content_type": "image/png",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "data_base64": "aW1hZ2U="
+    },
+    {
+      "reference_id": "ppimg_11111111111111111111111111111111",
+      "content_type": "image/png",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "data_base64": "aW1hZ2U="
+    },
+    {
+      "reference_id": "ppimg_22222222222222222222222222222222",
+      "content_type": "image/png",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "data_base64": "aW1hZ2U="
+    }
+  ]
+}

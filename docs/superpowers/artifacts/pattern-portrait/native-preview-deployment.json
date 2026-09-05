@@ -1,0 +1,12 @@
+{
+  "url": "https://patternlike-portrait-preview.lfd.workers.dev/",
+  "worker": "patternlike-portrait-preview",
+  "version_id": "bbb3f9cf-1f63-49af-bf0a-7629a64289ad",
+  "deployment_id": "8faf11e1-11a5-4ab0-ad26-0d8ac497bc59",
+  "traffic_percentage": 100,
+  "created_on": "2026-09-05T18:23:10.229013Z",
+  "entry": "pattern-portrait-BHcyDdVR.js",
+  "renderer": "PatternSculpture-B7OuFh02.js",
+  "css": "pattern-portrait-Bv7iidQ8.css",
+  "data": "Two authored fictional readings and their eight generated images; account provider and database rollout remains off"
+}

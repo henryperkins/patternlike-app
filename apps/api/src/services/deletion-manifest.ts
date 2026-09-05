@@ -10,6 +10,17 @@ export interface DeletionArtifactFamily {
 /** User-owned R2 families must be registered here before deletion may ship. */
 export const DELETION_ARTIFACT_FAMILIES: readonly DeletionArtifactFamily[] = [
   {
+    family: "pattern_portraits",
+    prefix: "pattern-portraits/",
+    async collectKeys(env, userId) {
+      // A compatible Worker may be installed with portrait creation off before
+      // 0026. Existing account deletion must not depend on the optional schema.
+      if (!await env.DB.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'pattern_portrait_assets'").first()) return [];
+      const { results } = await env.DB.prepare("SELECT object_key FROM pattern_portrait_assets WHERE user_id = ? ORDER BY object_key").bind(userId).all<{ object_key: string }>();
+      return results.map((row) => row.object_key);
+    },
+  },
+  {
     family: "account_exports",
     prefix: "exports/",
     async collectKeys(env, userId) {
@@ -96,6 +107,9 @@ export const DELETED_USER_TABLES = [
   "natal_feature_sets",
   "natal_features",
   "codex_provider_jobs",
+  "pattern_portrait_assets",
+  "pattern_portrait_jobs",
+  "pattern_portraits",
   "pattern_generation_artifacts",
   "pattern_generation_artifact_keys",
   "pattern_documents",
@@ -152,6 +166,11 @@ export const PORTABLE_USER_TABLES = [
 ] as const;
 
 export const NON_PORTABLE_USER_TABLES = [
+  // Operational inventory; accepted images and graph are available through the
+  // separate private /v1/pattern-portrait/download bundle, not frozen account export.
+  "pattern_portrait_assets",
+  "pattern_portrait_jobs",
+  "pattern_portraits",
   /** Prose evidence links; the reading itself is the portable artifact. */
   "reading_sources",
   /**
@@ -238,8 +257,16 @@ export async function deleteUserRows(
     ).bind(userId),
   ]);
 
+  const optionalPortraitTables = new Set<string>([
+    "pattern_portrait_assets", "pattern_portrait_jobs", "pattern_portraits",
+  ]);
+  const { results: presentPortraitTables } = await env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits')",
+  ).all<{ name: string }>();
+  const present = new Set(presentPortraitTables.map((row) => row.name));
   for (const table of DELETED_USER_TABLES) {
     if (table === "crypto_operations") continue;
+    if (optionalPortraitTables.has(table) && !present.has(table)) continue;
     await env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`)
       .bind(userId)
       .run();

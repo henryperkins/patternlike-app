@@ -42,6 +42,9 @@ export async function main(): Promise<void> {
   });
   log({ event: "codex_runner_started" });
   try {
+    const portraitModules = config.portraitsEnabled ? await Promise.all([
+      import("./portrait-client.js"), import("./portrait-invocation.js"),
+    ]) : null;
     await runCodexPollLoop({
       client,
       pollMs: config.pollMs,
@@ -50,6 +53,12 @@ export async function main(): Promise<void> {
         claim,
         codexBin: config.codexBin,
       }),
+      ...(portraitModules ? { portraits: {
+        client: new portraitModules[0].CodexPortraitClient({ apiOrigin: config.apiOrigin, runnerToken: config.runnerToken }),
+        execute: (claim: import("@patternlike/shared").CodexPortraitClaim) => portraitModules[1].runPortraitInvocation({
+          claim, codexBin: config.codexBin, signal: controller.signal,
+        }),
+      } } : {}),
       log,
     });
     log({ event: "codex_runner_stopped" });

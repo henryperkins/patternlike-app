@@ -1,0 +1,694 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/portrait-v1/portrait.schema.json",
+  "title": "Personalized Pattern portrait v1",
+  "$defs": {
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine_version",
+        "positions",
+        "source_indices",
+        "star_strengths",
+        "connections",
+        "color",
+        "contributions"
+      ],
+      "properties": {
+        "engine_version": {
+          "const": "constellation-v1"
+        },
+        "positions": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 1008,
+          "items": {
+            "type": "number",
+            "minimum": -10,
+            "maximum": 10
+          }
+        },
+        "source_indices": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 336,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "star_strengths": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 336,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "connections": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 1008,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 335
+            }
+          }
+        },
+        "color": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "contributions": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "aspect",
+              "coverage",
+              "opening_area",
+              "skew",
+              "stars",
+              "interior_lines"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "aspect": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 128
+              },
+              "coverage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "opening_area": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "skew": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              },
+              "stars": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 84
+              },
+              "interior_lines": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8
+              }
+            }
+          }
+        }
+      }
+    },
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter_id",
+        "reference_id",
+        "label",
+        "rationale",
+        "reference_sha256",
+        "source_text"
+      ],
+      "properties": {
+        "chapter_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 9,
+          "pattern": "^chapter-[1-4]$"
+        },
+        "reference_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 38,
+          "pattern": "^ppimg_[a-f0-9]{32}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        },
+        "reference_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "portrait_id",
+        "pattern_id",
+        "generated_at",
+        "chart_id",
+        "document_revision",
+        "sun_sign",
+        "completed_chapters",
+        "retryable",
+        "chapters",
+        "graph"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "pattern-portrait/v1"
+        },
+        "status": {
+          "enum": [
+            "unavailable",
+            "not_started",
+            "generating",
+            "failed",
+            "ready"
+          ]
+        },
+        "portrait_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 37,
+              "pattern": "^ppor_[a-f0-9]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pattern_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generated_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "chart_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "document_revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sun_sign": {
+          "anyOf": [
+            {
+              "enum": [
+                "aries",
+                "taurus",
+                "gemini",
+                "cancer",
+                "leo",
+                "virgo",
+                "libra",
+                "scorpio",
+                "sagittarius",
+                "capricorn",
+                "aquarius",
+                "pisces"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completed_chapters": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "chapters": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 4,
+          "items": {
+            "$ref": "https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/chapter"
+          }
+        },
+        "graph": {
+          "anyOf": [
+            {
+              "$ref": "https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/graph"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "portrait_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 37,
+                "pattern": "^ppor_[a-f0-9]{32}$"
+              },
+              "pattern_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "generated_at": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "format": "date-time"
+              },
+              "chart_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "document_revision": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "completed_chapters": {
+                "const": 4
+              },
+              "chapters": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "$ref": "https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/chapter"
+                }
+              },
+              "graph": {
+                "$ref": "https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/graph"
+              },
+              "retryable": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "not": {
+                  "const": "ready"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "graph": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "generationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern_id",
+        "generated_at",
+        "chart_id",
+        "confirm",
+        "consent_policy_version"
+      ],
+      "properties": {
+        "pattern_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "generated_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "format": "date-time"
+        },
+        "chart_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "confirm": {
+          "const": "CREATE MY PORTRAIT"
+        },
+        "consent_policy_version": {
+          "const": "1.0.0"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "job_id",
+        "portrait_id",
+        "chapter_index",
+        "lease_token",
+        "model",
+        "reasoning_effort",
+        "image_model",
+        "prompt_version",
+        "timeout_ms",
+        "prompt",
+        "source_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "codex-portrait-claim/v1"
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 38,
+          "pattern": "^ppjob_[a-f0-9]{32}$"
+        },
+        "portrait_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 37,
+          "pattern": "^ppor_[a-f0-9]{32}$"
+        },
+        "chapter_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "lease_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$"
+        },
+        "reasoning_effort": {
+          "const": "xhigh"
+        },
+        "image_model": {
+          "const": "gpt-image-2"
+        },
+        "prompt_version": {
+          "const": "portrait-object-v1"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 900000
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 262144
+        },
+        "source_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lease_token",
+        "source_sha256",
+        "label",
+        "rationale",
+        "image_base64",
+        "original_sha256",
+        "pixels",
+        "provider_request_id",
+        "image_request_id",
+        "image_model"
+      ],
+      "properties": {
+        "lease_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+        },
+        "source_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        },
+        "image_base64": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2796204,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        },
+        "original_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pixels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height",
+            "rgba_base64"
+          ],
+          "properties": {
+            "width": {
+              "const": 128
+            },
+            "height": {
+              "const": 128
+            },
+            "rgba_base64": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 87384,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            }
+          }
+        },
+        "provider_request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+        },
+        "image_request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+        },
+        "image_model": {
+          "const": "gpt-image-2"
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lease_token",
+        "code"
+      ],
+      "properties": {
+        "lease_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+        },
+        "code": {
+          "enum": [
+            "generation_failed",
+            "generation_refused",
+            "image_invalid",
+            "authentication_failed"
+          ]
+        }
+      }
+    },
+    "download": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "portrait",
+        "images"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "pattern-portrait-download/v1"
+        },
+        "portrait": {
+          "allOf": [
+            {
+              "$ref": "https://patternlike.app/contracts/portrait-v1/portrait.schema.json#/$defs/response"
+            },
+            {
+              "properties": {
+                "status": {
+                  "const": "ready"
+                }
+              }
+            }
+          ]
+        },
+        "images": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reference_id",
+              "content_type",
+              "sha256",
+              "data_base64"
+            ],
+            "properties": {
+              "reference_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 38,
+                "pattern": "^ppimg_[a-f0-9]{32}$"
+              },
+              "content_type": {
+                "const": "image/png"
+              },
+              "sha256": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "data_base64": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2796204,
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

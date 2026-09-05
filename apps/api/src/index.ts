@@ -17,6 +17,7 @@ import { accountProcessingConsentRoutes } from "./routes/account-processing-cons
 import { readingRoutes } from "./routes/readings.js";
 import { timingRoutes } from "./routes/timing.js";
 import { patternRoutes } from "./routes/pattern.js";
+import { patternPortraitRoutes, codexPortraitRoutes } from "./routes/pattern-portrait.js";
 import { patternAiRoutes } from "./routes/pattern-ai.js";
 import { timeTravelRoutes } from "./routes/time-travel.js";
 import { lifeEventRoutes } from "./routes/life-events.js";
@@ -77,6 +78,7 @@ api.route("/", readingRoutes);
 api.route("/", timingRoutes);
 api.route("/", patternAiRoutes);
 api.route("/", patternRoutes);
+api.route("/", patternPortraitRoutes);
 api.route("/", timeTravelRoutes);
 api.route("/", lifeEventRoutes);
 api.route("/", privacyRoutes);
@@ -115,6 +117,7 @@ const codexProvider = new Hono<{
 codexProvider.use("*", configGuard);
 codexProvider.use("*", codexRunnerAuth);
 codexProvider.route("/", codexProviderRoutes);
+codexProvider.route("/", codexPortraitRoutes);
 app.route("/codex-provider", codexProvider);
 
 // Cryptographic maintenance is a sibling authority. It must never inherit the

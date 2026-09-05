@@ -1,0 +1,31 @@
+{
+  "graph_sha256": "4d163d9dc2f9b9a939a46005c9ef82dcf86585cce54f87ac3b5d4510026ae777",
+  "stars": 318,
+  "connections": 326,
+  "hashes": [
+    {
+      "chapter": 1,
+      "source_sha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9",
+      "original_sha256": "f3c0a36549207001e83a68b2c6c3d285c4d143e375da1cda91388e73a49d88bb",
+      "image_sha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32"
+    },
+    {
+      "chapter": 2,
+      "source_sha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70",
+      "original_sha256": "c663d13c3cc2d5612b0d68867f6dc49af5ba25873edf852c221225db6487af0b",
+      "image_sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66"
+    },
+    {
+      "chapter": 3,
+      "source_sha256": "1836ba298c509fe2b20b94aa713ac3d8791d2c010d6b8122733868961011562e",
+      "original_sha256": "4706321df62519342a19275a3646b1c176245e7c31a4ae8c5abf18fee4e892fb",
+      "image_sha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1"
+    },
+    {
+      "chapter": 4,
+      "source_sha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d",
+      "original_sha256": "59f72fe3b17e6537b662e4f22eb6b194e65031bdc0f3d5afb63a7f930b391662",
+      "image_sha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036"
+    }
+  ]
+}

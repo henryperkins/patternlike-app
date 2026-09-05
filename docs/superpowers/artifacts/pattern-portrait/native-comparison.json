@@ -1,0 +1,63 @@
+{
+  "target": "https://patternlike-portrait-preview.lfd.workers.dev/",
+  "passed": true,
+  "same_sun_sign": "sagittarius",
+  "samples": [
+    {
+      "example": "direction",
+      "labels": "01\nFinding your own direction\n+\n02\nMaking room for care\n+\n03\nKeeping what matters\n+\n04\nSeeing beyond the immediate\n+",
+      "stage_sha256": "591fbba6916f65ce50e6179918554d302c6daefbb6bc08e9cce430d11d18a4a4",
+      "images": [
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-01-R7StLI3v.png",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-02-CkReeZ8R.png",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-03-BRPnLTeI.png",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-04-8Zayl9Ke.png",
+          "width": 512,
+          "height": 512
+        }
+      ]
+    },
+    {
+      "example": "space",
+      "labels": "01\nCloseness, with room to breathe\n+\n02\nGiving your ideas a place\n+\n03\nA steadiness of your own\n+\n04\nLetting change take its time\n+",
+      "stage_sha256": "f7b73a38718acbc82f106e974fe3cd64a53a434bbe879bf5a7c4f9c30e19bfe5",
+      "images": [
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-01-BvWRuk_-.png",
+          "width": 1024,
+          "height": 1536
+        },
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-02-BA87dorG.png",
+          "width": 1402,
+          "height": 1122
+        },
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-03-C8B1HNvU.png",
+          "width": 1116,
+          "height": 1410
+        },
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-04-aJYUs4-_.png",
+          "width": 1024,
+          "height": 1536
+        }
+      ]
+    }
+  ],
+  "source_replacement_clears_selection": true,
+  "errors": []
+}

@@ -37,7 +37,7 @@
   .portrait-preview { padding: 0 20px; }
   .portrait-preview-wordmark { font-size: 21px; gap: 8px; }
   .portrait-preview-label { font-size: 11px; }
-  .portrait-preview-intro { padding-top: 20px; }
+  .portrait-preview-intro { padding-top: 16px; padding-bottom: 12px; }
   .portrait-scenario-fields { align-items: stretch; flex-direction: column; }
   .portrait-scenario-fields select { font-size: 16px; }
 }

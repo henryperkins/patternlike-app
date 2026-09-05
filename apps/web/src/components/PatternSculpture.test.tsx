@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BufferGeometry, Float32BufferAttribute, PerspectiveCamera, Sphere, Vector3 } from "three";
+import type { PortraitGraph } from "@patternlike/shared";
 import PatternSculpture, { closestSculptureStar, sculptureCameraFrame } from "./PatternSculpture.js";
 
 const loader = vi.hoisted(() => ({ load: vi.fn() }));
-const models = vi.hoisted(() => ({ create: vi.fn() }));
+const models = vi.hoisted(() => ({ create: vi.fn(), restore: vi.fn() }));
 vi.mock("../lib/portrait-images.js", () => ({ loadPortraitImages: loader.load }));
-vi.mock("../lib/image-sculpture.js", () => ({ createImageSculpture: models.create }));
+vi.mock("../lib/image-sculpture.js", () => ({ createImageSculpture: models.create, sculptureFromGraph: models.restore }));
 
 const renderer = vi.hoisted(() => ({ configure: vi.fn(), render: vi.fn(), unmount: vi.fn() }));
 vi.mock("@react-three/fiber", () => ({
@@ -21,6 +22,7 @@ vi.mock("@react-three/fiber", () => ({
 beforeEach(() => {
   loader.load.mockReset().mockResolvedValue([]);
   models.create.mockReset().mockImplementation(() => trackedModel().model);
+  models.restore.mockReset().mockImplementation(() => trackedModel().model);
   renderer.configure.mockReset();
   renderer.render.mockReset();
   renderer.unmount.mockReset();
@@ -50,6 +52,28 @@ const props = {
   action: { kind: "reset" as const, serial: 0 },
   onReady: vi.fn(),
 };
+
+const savedGraph: PortraitGraph = {
+  engine_version: "constellation-v1", positions: [-1, 0, 0, 0, 1, 0, 1, 0, 0, 0, -1, 0],
+  source_indices: [0, 1, 2, 3], star_strengths: [1, 1, 1, 1], connections: [[0, 1], [1, 2], [2, 3]],
+  color: [0.5, 0.5, 0.5], contributions: [0, 1, 2, 3].map((index) => ({ index, aspect: 1, coverage: 1,
+    opening_area: 0, skew: 0, stars: 1, interior_lines: 0 })),
+};
+
+it("renders a saved graph before thumbnails and retains its buffers during image hydration", async () => {
+  const owned = trackedModel();
+  models.restore.mockReturnValue(owned.model);
+  const view = render(<PatternSculpture {...props} imageUrls={[]} graph={savedGraph} onUnavailable={vi.fn()} />);
+  await waitFor(() => expect(renderer.render).toHaveBeenCalled());
+  expect(loader.load).not.toHaveBeenCalled();
+  expect(models.restore).toHaveBeenCalledExactlyOnceWith(savedGraph);
+  view.rerender(<PatternSculpture {...props} graph={savedGraph} onUnavailable={vi.fn()} />);
+  expect(models.restore).toHaveBeenCalledTimes(1);
+  expect(owned.pointsReleased).not.toHaveBeenCalled();
+  view.unmount();
+  expect(owned.pointsReleased).toHaveBeenCalledOnce();
+  expect(owned.linesReleased).toHaveBeenCalledOnce();
+});
 
 describe("Sculpture camera framing and star picking", () => {
   it("fits the actual bounding sphere with space around it on narrow and wide viewports", () => {

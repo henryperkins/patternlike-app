@@ -77,6 +77,8 @@ export interface Env {
    */
   CONTENT_RELEASE_KEYS?: string;
   ARTIFACTS?: R2Bucket;
+  /** Optional; absent/off never enters portrait creation or polling. */
+  PATTERN_PORTRAIT_ENABLED?: string;
   /**
    * Daily-reading generation. The message is opaque — job id and reserved
    * reading id only; the immutable command itself lives encrypted in

@@ -78,6 +78,12 @@ describe("portrait projection", () => {
     }
   });
 
+  it("accepts owned blob URLs for authenticated chapter images", () => {
+    const manifest = createPortraitManifest(fictionalPattern, imageStudyBindings);
+    manifest.chapters.forEach((chapter, index) => { chapter.object!.imageUrl = `blob:https://pattern.example/${index}`; });
+    expect(portraitImageUrls(manifest)).toEqual(manifest.chapters.map((chapter) => chapter.object!.imageUrl));
+  });
+
   it("passes only ordered image URLs across the modeling boundary", () => {
     const manifest = createPortraitManifest(fictionalPattern, imageStudyBindings);
     const before = portraitImageUrls(manifest);

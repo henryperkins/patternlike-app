@@ -1,0 +1,38 @@
+{
+  "origin": "https://patternlike-portrait-preview.lfd.workers.dev",
+  "passed": true,
+  "images": [
+    {
+      "chapter": 1,
+      "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-01-R7StLI3v.png",
+      "status": 200,
+      "bytes": 324323,
+      "sha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+      "matches_generated_derivative": true
+    },
+    {
+      "chapter": 2,
+      "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-02-CkReeZ8R.png",
+      "status": 200,
+      "bytes": 279754,
+      "sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+      "matches_generated_derivative": true
+    },
+    {
+      "chapter": 3,
+      "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-03-BRPnLTeI.png",
+      "status": 200,
+      "bytes": 340882,
+      "sha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1",
+      "matches_generated_derivative": true
+    },
+    {
+      "chapter": 4,
+      "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/native-04-8Zayl9Ke.png",
+      "status": 200,
+      "bytes": 223452,
+      "sha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+      "matches_generated_derivative": true
+    }
+  ]
+}

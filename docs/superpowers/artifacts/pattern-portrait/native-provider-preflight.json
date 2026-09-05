@@ -1,0 +1,60 @@
+[
+  {
+    "event": "config",
+    "modelProvider": "openai",
+    "chatgptAuth": true,
+    "webSearchDisabled": true,
+    "notifyEmpty": true,
+    "developerEmpty": true,
+    "instructionsEmpty": true,
+    "projectDocsOff": true,
+    "skillsOff": true,
+    "featureFlags": {
+      "network_proxy": null,
+      "apps": false,
+      "auth_elicitation": false,
+      "browser_use": false,
+      "computer_use": false,
+      "hooks": false,
+      "image_generation": true,
+      "memories": false,
+      "multi_agent": false,
+      "omit_app_server_notification_media": false,
+      "plugins": false,
+      "prevent_idle_sleep": true,
+      "remote_control": false,
+      "remote_plugin": false,
+      "shell_tool": false,
+      "skip_host_skill_discovery": true,
+      "tool_suggest": false,
+      "background_paginated_rollout_migration": false,
+      "mcp_2026_07_28": false,
+      "mentions_v2": true
+    },
+    "inheritedMcpCount": 2
+  },
+  {
+    "event": "requirements",
+    "present": false
+  },
+  {
+    "event": "mcp-inventory",
+    "statuses": [
+      {
+        "status": "disabled",
+        "toolCount": 0
+      },
+      {
+        "status": "disabled",
+        "toolCount": 0
+      }
+    ],
+    "nextCursor": null
+  },
+  {
+    "event": "preflight-passed",
+    "model": "gpt-5.6-sol",
+    "effort": "xhigh",
+    "chapterSentToProvider": false
+  }
+]

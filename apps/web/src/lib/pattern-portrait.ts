@@ -1,4 +1,4 @@
-import { ZODIAC_SIGNS, type BirthTimeAccuracy, type PatternResponseV7, type ZodiacSignName } from "@patternlike/shared";
+import { ZODIAC_SIGNS, type BirthTimeAccuracy, type PatternResponseV7, type PatternStatePattern, type ZodiacSignName } from "@patternlike/shared";
 
 export interface PortraitChapter {
   id: string;
@@ -46,6 +46,12 @@ export type PortraitSource =
   | { status: "loading" }
   | { status: "unavailable" };
 
+export function patternMatchesDocument(pattern: PatternStatePattern | null, document: PatternResponseV7): boolean {
+  return pattern !== null && pattern.pattern_id === document.pattern_id
+    && pattern.generated_at === document.generated_at && pattern.locale === document.locale
+    && pattern.effective_accuracy === document.effective_accuracy;
+}
+
 /** Reader metadata stays upstream: only four asset locations cross into image loading. */
 export function portraitImageUrls(manifest: PortraitManifest): readonly string[] | null {
   if (manifest.chapters.length !== 4) return null;
@@ -57,7 +63,7 @@ export function portraitImageUrls(manifest: PortraitManifest): readonly string[]
       || !reference.imageUrl.trim()) return null;
     try {
       const url = new URL(reference.imageUrl, "https://portrait.invalid/");
-      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+      if (url.protocol !== "https:" && url.protocol !== "http:" && url.protocol !== "blob:") return null;
     } catch {
       return null;
     }

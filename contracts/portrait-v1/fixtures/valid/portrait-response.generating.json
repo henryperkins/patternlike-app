@@ -1,0 +1,14 @@
+{
+  "schema_version": "pattern-portrait/v1",
+  "status": "generating",
+  "portrait_id": "ppor_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pattern_id": "pat_fictional_portrait",
+  "generated_at": "2026-09-05T12:00:00Z",
+  "chart_id": "cht_fictional_portrait",
+  "document_revision": "0.7.0:pat_fictional_portrait:2026-09-05T12:00:00Z",
+  "sun_sign": "aries",
+  "completed_chapters": 2,
+  "retryable": false,
+  "chapters": [],
+  "graph": null
+}

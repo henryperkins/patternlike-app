@@ -6,6 +6,7 @@ import type {
   PatternResponseV7,
   PatternState,
   PatternStateDocumentV9,
+  PatternStatePattern,
 } from "@patternlike/shared";
 import {
   ApiError,
@@ -17,9 +18,12 @@ import {
   startPatternGeneration,
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
+import { patternMatchesDocument } from "../lib/pattern-portrait.js";
+import { AccountPatternPortrait } from "./AccountPatternPortrait.js";
 import { PatternConsentTerms } from "./PatternConsent.js";
 
 interface PatternExperienceProps {
+  chartId: string;
   onUnauthorized: () => void;
 }
 
@@ -201,7 +205,11 @@ function PatternRegenerationPanel({
 }
 
 function ReadyDocument({
+  chartId,
   document,
+  pattern,
+  canCreatePortrait,
+  onUnauthorized,
   regeneration,
   onRegenerate,
   onRefresh,
@@ -209,7 +217,11 @@ function ReadyDocument({
   busy,
   error,
 }: {
+  chartId: string;
   document: PatternResponseV7;
+  pattern: PatternStatePattern;
+  canCreatePortrait: boolean;
+  onUnauthorized: () => void;
   regeneration: PatternRegenerationState | null;
   onRegenerate: () => void;
   onRefresh: () => void;
@@ -237,28 +249,30 @@ function ReadyDocument({
         Written for this chart. Chart facts above remain inspectable; individual
         paragraphs do not expose a claim-level evidence list.
       </p>
-      <div className="pattern-chapters__list">
-        {document.core_chapters.map((chapter, index) => (
-          <GeneratedChapter chapter={chapter} index={index} key={`${chapter.title}-${index}`} />
-        ))}
-      </div>
-      {document.additional_signatures.length > 0 ? (
-        <section className="pattern-signatures" aria-labelledby="pattern-signatures-heading">
-          <h3 id="pattern-signatures-heading">Additional signatures</h3>
-          {document.additional_signatures.map((signature) => (
-            <article key={signature.title}>
-              <h4>{signature.title}</h4>
-              <p>{signature.text}</p>
-            </article>
+      <AccountPatternPortrait chartId={chartId} document={document} pattern={pattern} canCreate={canCreatePortrait} onUnauthorized={onUnauthorized}>
+        <div className="pattern-chapters__list">
+          {document.core_chapters.map((chapter, index) => (
+            <GeneratedChapter chapter={chapter} index={index} key={`${chapter.title}-${index}`} />
           ))}
-        </section>
-      ) : null}
-      {document.uncertainty ? (
-        <p className="pattern-chapters__accuracy">
-          <span>Uncertainty</span>
-          {document.uncertainty.text}
-        </p>
-      ) : null}
+        </div>
+        {document.additional_signatures.length > 0 ? (
+          <section className="pattern-signatures" aria-labelledby="pattern-signatures-heading">
+            <h3 id="pattern-signatures-heading">Additional signatures</h3>
+            {document.additional_signatures.map((signature) => (
+              <article key={signature.title}>
+                <h4>{signature.title}</h4>
+                <p>{signature.text}</p>
+              </article>
+            ))}
+          </section>
+        ) : null}
+        {document.uncertainty ? (
+          <p className="pattern-chapters__accuracy">
+            <span>Uncertainty</span>
+            {document.uncertainty.text}
+          </p>
+        ) : null}
+      </AccountPatternPortrait>
       <p className="pattern-provenance">
         AI-generated from your calculated chart · {generatedLabel} · Pattern {document.pattern_id}
       </p>
@@ -336,7 +350,7 @@ function ReadyDocument({
   );
 }
 
-export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
+function CurrentChartPatternExperience({ chartId, onUnauthorized }: PatternExperienceProps) {
   const [state, setState] = useState<PatternStateDocumentV9 | null>(null);
   const [document, setDocument] = useState<PatternResponseV7 | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -347,20 +361,39 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
   const regenerateKey = useRef<string | null>(null);
   const regenerationInFlight = useRef(false);
   const deleteKey = useRef<string | null>(null);
+  const currentDocument = useRef<PatternResponseV7 | null>(null);
 
   const load = useCallback(async (signal: AbortSignal) => {
     setBusy(true);
     try {
       const next = await getPatternState(signal);
       if (signal.aborted) return;
+      if ((next.chart && next.chart.chart_id !== chartId) || (next.state === "ready" && (!next.chart || !next.pattern))) {
+        currentDocument.current = null;
+        setDocument(null);
+        setState(null);
+        throw new Error("This reading no longer matches the current chart. Refresh to load its Pattern.");
+      }
       setState(next);
       setError(null);
       setRequestId(null);
       if (next.state === "ready") {
+        if (currentDocument.current && !patternMatchesDocument(next.pattern, currentDocument.current)) {
+          currentDocument.current = null;
+          setDocument(null);
+        }
         const generated = await getGeneratedPattern(signal);
         if (signal.aborted) return;
-        setDocument(generated);
+        if (!patternMatchesDocument(next.pattern, generated)) {
+          currentDocument.current = null;
+          setDocument(null);
+          throw new Error("This reading no longer matches the current Pattern state. Refresh to load its latest revision.");
+        }
+        // Polling an unchanged reading must not remount its portrait or discard its selection.
+        if (JSON.stringify(currentDocument.current) !== JSON.stringify(generated)) currentDocument.current = generated;
+        setDocument(currentDocument.current);
       } else {
+        currentDocument.current = null;
         setDocument(null);
       }
     } catch (caught) {
@@ -378,7 +411,7 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
     } finally {
       if (!signal.aborted) setBusy(false);
     }
-  }, [onUnauthorized]);
+  }, [chartId, onUnauthorized]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -491,7 +524,7 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
     </div>
   );
 
-  if (error && !state) {
+  if (error && (!state || (state.state === "ready" && !document))) {
     return (
       <section className="pattern-chapters" aria-labelledby="pattern-experience-heading">
         {heading}
@@ -506,7 +539,7 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
     );
   }
 
-  if (!state || (busy && !state)) {
+  if (!state || (state.state === "ready" && !document)) {
     return (
       <section className="pattern-chapters" aria-labelledby="pattern-experience-heading" aria-busy="true">
         {heading}
@@ -515,10 +548,15 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
     );
   }
 
-  if (state.state === "ready" && document) {
+  if (state.state === "ready" && document && state.pattern) {
     return (
       <ReadyDocument
+        key={`${document.pattern_id}:${document.generated_at}`}
+        chartId={chartId}
         document={document}
+        pattern={state.pattern}
+        canCreatePortrait={state.consent?.status === "granted" && !state.regeneration?.generation}
+        onUnauthorized={onUnauthorized}
         regeneration={state.regeneration}
         onRegenerate={() => void regenerate()}
         onRefresh={() => setAttempt((value) => value + 1)}
@@ -601,4 +639,9 @@ export function PatternExperience({ onUnauthorized }: PatternExperienceProps) {
       </div>
     </section>
   );
+}
+
+/** A corrected chart starts an isolated reader and aborts the previous chart's work. */
+export function PatternExperience(props: PatternExperienceProps) {
+  return <CurrentChartPatternExperience key={props.chartId} {...props} />;
 }

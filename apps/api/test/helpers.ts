@@ -125,6 +125,9 @@ const TABLES = [
   "natal_features",
   "codex_provider_response_uploads",
   "codex_provider_jobs",
+  "pattern_portrait_assets",
+  "pattern_portrait_jobs",
+  "pattern_portraits",
   "pattern_generation_artifacts",
   "pattern_generation_artifact_keys",
   "pattern_documents",
@@ -260,6 +263,14 @@ export async function resetDb(): Promise<void> {
     );
   }
 
+  if (env.ARTIFACTS) {
+    let cursor: string | undefined;
+    do {
+      const page = await env.ARTIFACTS.list({ prefix: "pattern-portraits/", cursor });
+      if (page.objects.length) await env.ARTIFACTS.delete(page.objects.map((object) => object.key));
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
   // Export artifacts share ARTIFACTS with immutable editorial releases. Keep
   // cleanup prefix-scoped and paginate so a suite can never erase the release
   // fixtures another suite intentionally installed.

@@ -1,0 +1,14 @@
+{
+  "schema_version": "pattern-portrait/v1",
+  "status": "unavailable",
+  "portrait_id": null,
+  "pattern_id": null,
+  "generated_at": null,
+  "chart_id": null,
+  "document_revision": null,
+  "sun_sign": null,
+  "completed_chapters": 0,
+  "retryable": false,
+  "chapters": [],
+  "graph": null
+}

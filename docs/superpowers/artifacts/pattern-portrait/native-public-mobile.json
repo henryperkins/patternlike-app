@@ -1,0 +1,526 @@
+{
+  "url": "https://patternlike-portrait-preview.lfd.workers.dev/",
+  "renderer": "PatternSculpture-B7OuFh02.js",
+  "passed": true,
+  "total_checks": 66,
+  "checks": [
+    {
+      "name": "390 document ready",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "chunks": [
+          {
+            "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-B7OuFh02.js",
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "name": "390 expected renderer",
+      "passed": true,
+      "evidence": [
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-B7OuFh02.js",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "390 first viewport shows constellation",
+      "passed": true,
+      "evidence": {
+        "top": 460.890625,
+        "bottom": 830.890625,
+        "width": 350,
+        "height": 370,
+        "visible": 370,
+        "viewport": 844,
+        "scrollY": 0,
+        "visibleStarPixels": 1638
+      }
+    },
+    {
+      "name": "390 one row of touch-sized controls",
+      "passed": true,
+      "evidence": [
+        {
+          "text": "Rotate left",
+          "top": 846.890625,
+          "width": 66.796875,
+          "height": 44
+        },
+        {
+          "text": "Rotate right",
+          "top": 846.890625,
+          "width": 66.796875,
+          "height": 44
+        },
+        {
+          "text": "+",
+          "top": 846.890625,
+          "width": 66.796875,
+          "height": 44
+        },
+        {
+          "text": "\u2212",
+          "top": 846.890625,
+          "width": 66.796875,
+          "height": 44
+        },
+        {
+          "text": "Reset view",
+          "top": 846.890625,
+          "width": 66.8125,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "390 four references loaded",
+      "passed": true
+    },
+    {
+      "name": "390 0px star tap selects without scroll",
+      "passed": true,
+      "evidence": {
+        "offset": 0,
+        "point": {
+          "x": 133,
+          "y": 87
+        },
+        "before": 449,
+        "after": {
+          "scrollY": 449,
+          "selection": "02Making room for care\u2212",
+          "selectedLabel": "Chapter 2 of 4Making room for careRead chapter"
+        }
+      }
+    },
+    {
+      "name": "390 -6px star tap selects without scroll",
+      "passed": true,
+      "evidence": {
+        "offset": -6,
+        "point": {
+          "x": 133,
+          "y": 87
+        },
+        "before": 449,
+        "after": {
+          "scrollY": 449,
+          "selection": "02Making room for care\u2212",
+          "selectedLabel": "Chapter 2 of 4Making room for careRead chapter"
+        }
+      }
+    },
+    {
+      "name": "390 -12px star tap selects without scroll",
+      "passed": true,
+      "evidence": {
+        "offset": -12,
+        "point": {
+          "x": 133,
+          "y": 87
+        },
+        "before": 449,
+        "after": {
+          "scrollY": 449,
+          "selection": "02Making room for care\u2212",
+          "selectedLabel": "Chapter 2 of 4Making room for careRead chapter"
+        }
+      }
+    },
+    {
+      "name": "390 contextual read action and compact index",
+      "passed": true
+    },
+    {
+      "name": "390 explicit read focuses nearby reader",
+      "passed": true,
+      "evidence": {
+        "top": 11.890625,
+        "focused": true,
+        "scrollY": 995
+      }
+    },
+    {
+      "name": "390 return preserves chapter and expression",
+      "passed": true
+    },
+    {
+      "name": "390 selected Resources opens complete reading",
+      "passed": true
+    },
+    {
+      "name": "390 3D mode returns to stage preserving Resources",
+      "passed": true,
+      "evidence": {
+        "top": 8.890625,
+        "focused": true
+      }
+    },
+    {
+      "name": "390 reading reopens same expression",
+      "passed": true
+    },
+    {
+      "name": "390 reader header stays reachable",
+      "passed": true,
+      "evidence": {
+        "top": 0,
+        "bottom": 61,
+        "returnHit": true,
+        "chooseHit": true
+      }
+    },
+    {
+      "name": "390 native chapter 1 navigation",
+      "passed": true
+    },
+    {
+      "name": "390 native chapter 2 navigation",
+      "passed": true
+    },
+    {
+      "name": "390 native chapter 3 navigation",
+      "passed": true
+    },
+    {
+      "name": "390 native chapter 4 navigation",
+      "passed": true
+    },
+    {
+      "name": "390 All chapters restores overview",
+      "passed": true
+    },
+    {
+      "name": "390 lost graphics disables camera",
+      "passed": true
+    },
+    {
+      "name": "390 All chapters works after graphics loss",
+      "passed": true
+    },
+    {
+      "name": "390 reset restores chapter index",
+      "passed": true
+    },
+    {
+      "name": "390 horizontal drag rotates without selecting",
+      "passed": true,
+      "evidence": {
+        "beforeY": 449,
+        "afterY": 449,
+        "beforeHash": "0aff0096336f65012234f4f93e00ce3a07315c1e5210e6381a659318e2235859",
+        "afterHash": "e11a5d04169b61269e1a7d30f81ddcd74b6a3d9cb1a9ce54819709fb72285ac4"
+      }
+    },
+    {
+      "name": "390 vertical swipe scrolls without selecting",
+      "passed": true,
+      "evidence": {
+        "scrollBefore": 449,
+        "scrollAfter": 716
+      }
+    },
+    {
+      "name": "390 idle rendering stops",
+      "passed": true,
+      "evidence": {
+        "idleBefore": 526,
+        "idleAfter": 526
+      }
+    },
+    {
+      "name": "390 aries ready",
+      "passed": true
+    },
+    {
+      "name": "390 taurus ready",
+      "passed": true
+    },
+    {
+      "name": "390 pisces ready",
+      "passed": true
+    },
+    {
+      "name": "390 full reading mode",
+      "passed": true
+    },
+    {
+      "name": "390 no overflow",
+      "passed": true
+    },
+    {
+      "name": "390 no runtime errors",
+      "passed": true,
+      "evidence": []
+    },
+    {
+      "name": "390 no external requests",
+      "passed": true,
+      "evidence": []
+    },
+    {
+      "name": "320 document ready",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "chunks": [
+          {
+            "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-B7OuFh02.js",
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "name": "320 expected renderer",
+      "passed": true,
+      "evidence": [
+        {
+          "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-B7OuFh02.js",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "320 first viewport shows constellation",
+      "passed": true,
+      "evidence": {
+        "top": 479.03125,
+        "bottom": 804.625,
+        "width": 280,
+        "height": 325.59375,
+        "visible": 260.96875,
+        "viewport": 740,
+        "scrollY": 0,
+        "visibleStarPixels": 1569
+      }
+    },
+    {
+      "name": "320 one row of touch-sized controls",
+      "passed": true,
+      "evidence": [
+        {
+          "text": "Rotate left",
+          "top": 820.625,
+          "width": 52.796875,
+          "height": 44
+        },
+        {
+          "text": "Rotate right",
+          "top": 820.625,
+          "width": 52.796875,
+          "height": 44
+        },
+        {
+          "text": "+",
+          "top": 820.625,
+          "width": 52.796875,
+          "height": 44
+        },
+        {
+          "text": "\u2212",
+          "top": 820.625,
+          "width": 52.796875,
+          "height": 44
+        },
+        {
+          "text": "Reset view",
+          "top": 820.625,
+          "width": 52.796875,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "320 four references loaded",
+      "passed": true
+    },
+    {
+      "name": "320 0px star tap selects without scroll",
+      "passed": true,
+      "evidence": {
+        "offset": 0,
+        "point": {
+          "x": 168,
+          "y": 82
+        },
+        "before": 467,
+        "after": {
+          "scrollY": 467,
+          "selection": "04Seeing beyond the immediate\u2212",
+          "selectedLabel": "Chapter 4 of 4Seeing beyond the immediateRead chapter"
+        }
+      }
+    },
+    {
+      "name": "320 -6px star tap selects without scroll",
+      "passed": true,
+      "evidence": {
+        "offset": -6,
+        "point": {
+          "x": 168,
+          "y": 82
+        },
+        "before": 467,
+        "after": {
+          "scrollY": 467,
+          "selection": "04Seeing beyond the immediate\u2212",
+          "selectedLabel": "Chapter 4 of 4Seeing beyond the immediateRead chapter"
+        }
+      }
+    },
+    {
+      "name": "320 -12px star tap selects without scroll",
+      "passed": true,
+      "evidence": {
+        "offset": -12,
+        "point": {
+          "x": 168,
+          "y": 82
+        },
+        "before": 467,
+        "after": {
+          "scrollY": 467,
+          "selection": "04Seeing beyond the immediate\u2212",
+          "selectedLabel": "Chapter 4 of 4Seeing beyond the immediateRead chapter"
+        }
+      }
+    },
+    {
+      "name": "320 contextual read action and compact index",
+      "passed": true
+    },
+    {
+      "name": "320 explicit read focuses nearby reader",
+      "passed": true,
+      "evidence": {
+        "top": 11.65625,
+        "focused": true,
+        "scrollY": 987
+      }
+    },
+    {
+      "name": "320 return preserves chapter and expression",
+      "passed": true
+    },
+    {
+      "name": "320 selected Resources opens complete reading",
+      "passed": true
+    },
+    {
+      "name": "320 3D mode returns to stage preserving Resources",
+      "passed": true,
+      "evidence": {
+        "top": 9.03125,
+        "focused": true
+      }
+    },
+    {
+      "name": "320 reading reopens same expression",
+      "passed": true
+    },
+    {
+      "name": "320 reader header stays reachable",
+      "passed": true,
+      "evidence": {
+        "top": 0,
+        "bottom": 61,
+        "returnHit": true,
+        "chooseHit": true
+      }
+    },
+    {
+      "name": "320 native chapter 1 navigation",
+      "passed": true
+    },
+    {
+      "name": "320 native chapter 2 navigation",
+      "passed": true
+    },
+    {
+      "name": "320 native chapter 3 navigation",
+      "passed": true
+    },
+    {
+      "name": "320 native chapter 4 navigation",
+      "passed": true
+    },
+    {
+      "name": "320 All chapters restores overview",
+      "passed": true
+    },
+    {
+      "name": "320 lost graphics disables camera",
+      "passed": true
+    },
+    {
+      "name": "320 All chapters works after graphics loss",
+      "passed": true
+    },
+    {
+      "name": "320 reset restores chapter index",
+      "passed": true
+    },
+    {
+      "name": "320 horizontal drag rotates without selecting",
+      "passed": true,
+      "evidence": {
+        "beforeY": 467,
+        "afterY": 467,
+        "beforeHash": "b354ea54ddcc5280d79da17ad37918fb61e76f6ee038a305a9821439ae7b5724",
+        "afterHash": "9ee2479ed6bda26bc0a2f0dab94971e9a41266f0c6bee7d3c2ae560e5c1e4c80"
+      }
+    },
+    {
+      "name": "320 vertical swipe scrolls without selecting",
+      "passed": true,
+      "evidence": {
+        "scrollBefore": 467,
+        "scrollAfter": 691
+      }
+    },
+    {
+      "name": "320 idle rendering stops",
+      "passed": true,
+      "evidence": {
+        "idleBefore": 536,
+        "idleAfter": 536
+      }
+    },
+    {
+      "name": "320 aries ready",
+      "passed": true
+    },
+    {
+      "name": "320 taurus ready",
+      "passed": true
+    },
+    {
+      "name": "320 pisces ready",
+      "passed": true
+    },
+    {
+      "name": "320 full reading mode",
+      "passed": true
+    },
+    {
+      "name": "320 no overflow",
+      "passed": true
+    },
+    {
+      "name": "320 no runtime errors",
+      "passed": true,
+      "evidence": []
+    },
+    {
+      "name": "320 no external requests",
+      "passed": true,
+      "evidence": []
+    }
+  ]
+}

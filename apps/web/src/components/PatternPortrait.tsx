@@ -5,6 +5,7 @@
  * FINISH: verify real desktop/mobile graphics, reading parity, lifecycle, and a11y before handoff.
  */
 import { Component, Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { isPortraitGraph, type PortraitGraph } from "@patternlike/shared";
 import { createPortraitManifest, portraitImageUrls, type PortraitChapter, type PortraitManifest, type PortraitObjectBinding, type PortraitSource } from "../lib/pattern-portrait.js";
 import { sunShapeProfiles } from "../lib/sun-sculpture.js";
 import type { CameraAction } from "./PatternSculpture.js";
@@ -60,18 +61,22 @@ function CompleteChapter({ chapter }: { chapter: PortraitChapter }) {
   );
 }
 
-function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
+function ReadyPortrait({ manifest, savedGraph }: { manifest: PortraitManifest; savedGraph?: PortraitGraph }) {
   const imageUrls = useMemo(() => portraitImageUrls(manifest), [manifest]);
+  const graph = useMemo(() => savedGraph && isPortraitGraph(savedGraph) && manifest.chapters.length === 4
+    && manifest.chapters.every(({ object }) => object?.referenceId.trim() && /^[a-f0-9]{64}$/i.test(object.referenceSha256))
+    ? savedGraph : undefined, [manifest, savedGraph]);
   const [selected, setSelected] = useState<string | null>(null);
   const [navigation, setNavigation] = useState<{ target: "reader" | "stage"; serial: number } | null>(null);
   const [expression, setExpression] = useState<Expression>("overview");
   const [reading, setReading] = useState(false);
-  const sculptureKey = JSON.stringify([imageUrls, manifest.sunSign]);
+  const sculptureKey = JSON.stringify(graph ? ["saved", graph] : [imageUrls, manifest.sunSign]);
   const sunProfile = manifest.sunSign ? sunShapeProfiles[manifest.sunSign] : null;
   const [readySculptureKey, setReadySculptureKey] = useState<string | null>(null);
   // Even a previously rendered sign needs a fresh renderer after a remount.
   useLayoutEffect(() => setReadySculptureKey(null), [sculptureKey]);
-  const sceneReady = imageUrls !== null && readySculptureKey === sculptureKey;
+  const renderable = Boolean(graph || imageUrls);
+  const sceneReady = renderable && readySculptureKey === sculptureKey;
   const [cameraAction, setCameraAction] = useState<CameraAction>({ kind: "reset", serial: 0 });
   const reducedMotion = useReducedMotion();
   const readerId = useId();
@@ -125,7 +130,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
             <div className="portrait-stage" role="group" aria-label="Interactive 3D constellation" ref={stageRef} tabIndex={-1}>
               <GraphicsBoundary key={sculptureKey} onUnavailable={onUnavailable}>
                 <Suspense fallback={<p className="portrait-graphics-message" role="status">Loading the 3D view. The chapters are ready to read.</p>}>
-                  {imageUrls ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null, false)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to draw this constellation. You can still read every chapter.</p>}
+                  {renderable ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls ?? []} graph={graph} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null, false)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to draw this constellation. You can still read every chapter.</p>}
                 </Suspense>
               </GraphicsBoundary>
             </div>
@@ -134,11 +139,11 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
               <button type="button" onClick={() => navigateTo("reader")}>Read chapter</button>
             </div> : null}
             <div className="portrait-camera-controls" aria-label="Sculpture controls">
-              <button type="button" onClick={() => moveCamera("left")} disabled={!sceneReady || !imageUrls} aria-label="Rotate left">Rotate left</button>
-              <button type="button" onClick={() => moveCamera("right")} disabled={!sceneReady || !imageUrls} aria-label="Rotate right">Rotate right</button>
-              <button type="button" onClick={() => moveCamera("closer")} disabled={!sceneReady || !imageUrls} aria-label="Zoom in">+</button>
-              <button type="button" onClick={() => moveCamera("farther")} disabled={!sceneReady || !imageUrls} aria-label="Zoom out">−</button>
-              <button type="button" onClick={() => { selectChapter(null); moveCamera("reset"); }} disabled={!sceneReady || !imageUrls}>Reset view</button>
+              <button type="button" onClick={() => moveCamera("left")} disabled={!sceneReady} aria-label="Rotate left">Rotate left</button>
+              <button type="button" onClick={() => moveCamera("right")} disabled={!sceneReady} aria-label="Rotate right">Rotate right</button>
+              <button type="button" onClick={() => moveCamera("closer")} disabled={!sceneReady} aria-label="Zoom in">+</button>
+              <button type="button" onClick={() => moveCamera("farther")} disabled={!sceneReady} aria-label="Zoom out">−</button>
+              <button type="button" onClick={() => { selectChapter(null); moveCamera("reset"); }} disabled={!sceneReady}>Reset view</button>
             </div>
             {sunProfile ? <p className="portrait-sun-influence" role="status"><strong>{sunProfile.label} Sun.</strong> {sunProfile.description}</p> : null}
             <p className="portrait-instruction">Drag to turn. Tap a star to choose a chapter.</p>
@@ -146,7 +151,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
               {manifest.chapters.map((item) => (
                 <button key={item.id} type="button" aria-pressed={selected === item.id} aria-controls={readerId} onClick={() => selectChapter(item.id)}>
                   <span className="portrait-chapter-number" aria-hidden="true">{String(item.ordinal).padStart(2, "0")}</span>
-                  {item.object ? <img className="portrait-reference" src={item.object.imageUrl} alt={`Generated chapter object: ${item.object.label}`} width="64" height="76" /> : null}
+                  {item.object?.imageUrl ? <img className="portrait-reference" src={item.object.imageUrl} alt={`Generated chapter object: ${item.object.label}`} width="64" height="76" /> : null}
                   <span>{item.title}</span>
                   <span aria-hidden="true" className="portrait-index-mark">{selected === item.id ? "−" : "+"}</span>
                 </button>
@@ -171,7 +176,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
                 <p className="portrait-summary">{chapter.summary}</p>
                 {chapter.object ? <div className="portrait-object-note" role="note" aria-label="Chapter object">
                   <p><strong>{chapter.object.label}.</strong> {chapter.object.rationale}</p>
-                  <button type="button" disabled={!sceneReady || !imageUrls} onClick={() => navigateTo("stage")}>View the whole constellation</button>
+                  <button type="button" disabled={!sceneReady} onClick={() => navigateTo("stage")}>View the whole constellation</button>
                 </div> : null}
                 <div className="portrait-expressions" aria-label="Chapter expressions">
                   {expressions.map((item) => <button key={item.id} type="button" aria-pressed={expression === item.id} onClick={() => setExpression(item.id)}>{item.label}</button>)}
@@ -205,9 +210,9 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
   );
 }
 
-export function PatternPortrait({ source, objectBindings }: { source: PortraitSource; objectBindings?: readonly PortraitObjectBinding[] }) {
+export function PatternPortrait({ source, objectBindings, graph }: { source: PortraitSource; objectBindings?: readonly PortraitObjectBinding[]; graph?: PortraitGraph }) {
   const manifest = useMemo(() => source.status === "ready" ? createPortraitManifest(source.document, objectBindings, source.sunSign) : null, [source, objectBindings]);
   if (source.status === "loading") return <div className="portrait-empty" role="status"><h2>Loading your Pattern</h2><p>The portrait will appear when its reading is available.</p></div>;
   if (!manifest || manifest.chapters.length === 0) return <div className="portrait-empty" role="status"><h2>No Pattern to display</h2><p>Its portrait and reading have been removed from this view.</p></div>;
-  return <ReadyPortrait key={manifest.revision} manifest={manifest} />;
+  return <ReadyPortrait key={manifest.revision} manifest={manifest} savedGraph={graph} />;
 }

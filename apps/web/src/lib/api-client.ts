@@ -12,6 +12,8 @@ import type {
   PatternConsent,
   PatternGenerationAcceptedV9,
   PatternGenerationStatusV9,
+  PatternPortraitResponse,
+  PatternPortraitGenerationRequest,
   PatternResponse,
   PatternResponseV7,
   PatternStateDocumentV9,
@@ -1263,6 +1265,51 @@ export function getGeneratedPattern(signal?: AbortSignal): Promise<PatternRespon
     headers: requestHeaders(),
     signal,
   });
+}
+
+export function getPatternPortrait(signal?: AbortSignal): Promise<PatternPortraitResponse> {
+  return request<PatternPortraitResponse>("/v1/pattern-portrait", { method: "GET", headers: requestHeaders(), signal });
+}
+
+export function startPatternPortraitGeneration(
+  expected: PatternPortraitGenerationRequest,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<PatternPortraitResponse> {
+  return request<PatternPortraitResponse>("/v1/pattern-portrait-generations", {
+    method: "POST", headers: requestHeaders({ json: true, idempotencyKey }), body: JSON.stringify(expected), signal,
+  });
+}
+
+async function requestPortraitBlob(path: string, contentType: string, maxBytes: number, signal?: AbortSignal): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: "GET", headers: requestHeaders(), credentials: "include", cache: "no-store", signal,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: { code: "unexpected_response", message: `The API returned HTTP ${response.status}.` } })) as ErrorBody;
+    throw new ApiError(response.status, body);
+  }
+  if (response.headers.get("content-type")?.split(";")[0].trim() !== contentType) {
+    throw new Error(contentType === "image/png" ? "The API did not return a chapter image." : "The API did not return a portrait download.");
+  }
+  if (Number(response.headers.get("content-length")) > maxBytes) throw new Error("The portrait file is too large to load.");
+  const blob = await response.blob();
+  signal?.throwIfAborted();
+  if (!blob.size || blob.size > maxBytes) throw new Error("The portrait file has an invalid size.");
+  return blob;
+}
+
+/** The reference ID selects a fixed API route; returned URLs never receive account credentials. */
+export function getPatternPortraitImage(referenceId: string, signal?: AbortSignal): Promise<Blob> {
+  return requestPortraitBlob(`/v1/pattern-portrait/images/${encodeURIComponent(referenceId)}`, "image/png", 8 * 1024 * 1024, signal);
+}
+
+export function downloadPatternPortrait(
+  expected: Pick<PatternPortraitGenerationRequest, "chart_id" | "pattern_id" | "generated_at">,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const query = new URLSearchParams(expected);
+  return requestPortraitBlob(`/v1/pattern-portrait/download?${query}`, "application/json", 48 * 1024 * 1024, signal);
 }
 
 export function getPatternGenerationConsent(signal?: AbortSignal): Promise<PatternConsent> {

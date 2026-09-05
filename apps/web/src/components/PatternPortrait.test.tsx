@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PortraitGraph } from "@patternlike/shared";
 import { fictionalPattern } from "../preview/pattern-portrait-fixture.js";
 import { imageStudyBindings } from "../preview/image-study.js";
 import { PatternPortrait } from "./PatternPortrait.js";
@@ -24,8 +25,41 @@ beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 const ready = { status: "ready" as const, document: fictionalPattern };
+const savedGraph: PortraitGraph = {
+  engine_version: "constellation-v1", positions: [-1, 0, 0, 0, 1, 0, 1, 0, 0, 0, -1, 0],
+  source_indices: [0, 1, 2, 3], star_strengths: [1, 1, 1, 1], connections: [[0, 1], [1, 2], [2, 3]],
+  color: [0.5, 0.5, 0.5], contributions: [0, 1, 2, 3].map((index) => ({ index, aspect: 1, coverage: 1,
+    opening_area: 0, skew: 0, stars: 1, interior_lines: 0 })),
+};
 
 describe("Pattern portrait reader", () => {
+  it("renders the bound saved graph before thumbnails and preserves selection when they arrive", async () => {
+    const user = userEvent.setup();
+    const pendingImages = imageStudyBindings.map((binding) => ({ ...binding, object: { ...binding.object, imageUrl: "" } }));
+    const view = render(<PatternPortrait source={ready} objectBindings={pendingImages} graph={savedGraph} />);
+    await screen.findByTestId("sculpture");
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: /Closeness, with room to breathe/ }));
+    await user.click(screen.getByRole("button", { name: "Resources" }));
+    const previousReadyCallback = graphics.props.mock.lastCall![0].onReady;
+    view.rerender(<PatternPortrait source={ready} objectBindings={imageStudyBindings} graph={savedGraph} />);
+    expect(screen.getAllByRole("img")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Resources" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Rotate left" })).toBeEnabled();
+    expect(graphics.props.mock.lastCall![0].onReady).toBe(previousReadyCallback);
+  });
+
+  it("does not attach a saved graph when a chapter's text binding belongs to another revision", () => {
+    const wrong = imageStudyBindings.map((binding, index) => ({ ...binding,
+      sourceText: index === 0 ? "a different chapter" : binding.sourceText,
+      object: { ...binding.object, imageUrl: "" },
+    }));
+    render(<PatternPortrait source={ready} objectBindings={wrong} graph={savedGraph} />);
+    expect(screen.queryByTestId("sculpture")).not.toBeInTheDocument();
+    expect(screen.getByText(/Four chapter images are needed/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Closeness, with room to breathe/ })).toBeEnabled();
+  });
+
   it("keeps star selection in place until Read chapter is requested, even after earlier navigation", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("max-width"), addEventListener: () => undefined, removeEventListener: () => undefined }));
     const scroll = vi.fn();
