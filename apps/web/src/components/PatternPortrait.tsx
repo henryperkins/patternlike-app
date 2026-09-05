@@ -1,5 +1,5 @@
 /*
- * DIRECTION: extend the Private Observatory with an explorable reading sculpture.
+ * DIRECTION: extend the Private Observatory with an image-derived reading constellation.
  * FIRST VIEWPORT: chapter forms on paper, a chapter index, readable prose.
  * INTERACTION: selecting a form brings its chapter into view; motion is deliberate and bounded.
  * FINISH: verify real desktop/mobile graphics, reading parity, lifecycle, and a11y before handoff.
@@ -63,7 +63,7 @@ function CompleteChapter({ chapter }: { chapter: PortraitChapter }) {
 function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
   const imageUrls = useMemo(() => portraitImageUrls(manifest), [manifest]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [navigation, setNavigation] = useState(0);
+  const [navigation, setNavigation] = useState<{ target: "reader" | "stage"; serial: number } | null>(null);
   const [expression, setExpression] = useState<Expression>("overview");
   const [reading, setReading] = useState(false);
   const sculptureKey = JSON.stringify([imageUrls, manifest.sunSign]);
@@ -81,21 +81,25 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
   const chapter = manifest.chapters.find((item) => item.id === selected) ?? null;
   const onReady = useCallback(() => setReadySculptureKey(sculptureKey), [sculptureKey]);
   const onUnavailable = useCallback(() => setReadySculptureKey(null), []);
-  const selectChapter = useCallback((id: string | null) => {
+  const navigateTo = useCallback((target: "reader" | "stage") => {
+    setNavigation((previous) => ({ target, serial: (previous?.serial ?? 0) + 1 }));
+  }, []);
+  const selectChapter = useCallback((id: string | null, navigate = true) => {
     setSelected(id);
     setExpression("overview");
-    setNavigation((previous) => previous + 1);
+    if (navigate) setNavigation((previous) => ({ target: id ? "reader" : "stage", serial: (previous?.serial ?? 0) + 1 }));
+    else setNavigation(null);
   }, []);
   useLayoutEffect(() => {
-    if (navigation === 0 || reading) return;
-    const destination = selected ? readerRef.current : stageRef.current;
+    if (!navigation || reading) return;
+    const destination = navigation.target === "reader" ? readerRef.current : stageRef.current;
     if (!destination) return;
     const top = destination.getBoundingClientRect().top;
-    if (window.matchMedia?.("(max-width: 850px)").matches || top < 0 || top > window.innerHeight - 150) {
-      destination.focus({ preventScroll: true });
+    destination.focus({ preventScroll: true });
+    if (navigation.target === "stage" || window.matchMedia?.("(max-width: 850px)").matches || top < 0 || top > window.innerHeight - 150) {
       destination.scrollIntoView({ block: "start", behavior: reducedMotion ? "instant" : "smooth" });
     }
-  }, [navigation, selected, reading, reducedMotion]);
+  }, [navigation, reading, reducedMotion]);
   const moveCamera = (kind: CameraAction["kind"]) => setCameraAction((previous) => ({ kind, serial: previous.serial + 1 }));
 
   return (
@@ -103,7 +107,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
       <div className="portrait-toolbar">
         <p>{manifest.chapters.length} chapters, one Pattern</p>
         <div className="portrait-mode" aria-label="Presentation">
-          <button type="button" aria-pressed={!reading} onClick={() => setReading(false)}>3D view</button>
+          <button type="button" aria-pressed={!reading} onClick={() => { setReading(false); navigateTo("stage"); }}>3D view</button>
           <button type="button" aria-pressed={reading} onClick={() => { setReadySculptureKey(null); setReading(true); }}>Reading view</button>
         </div>
       </div>
@@ -116,15 +120,19 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
           {manifest.chapters.map((item) => <CompleteChapter key={item.id} chapter={item} />)}
         </section>
       ) : (
-        <div className="portrait-layout">
+        <div className={`portrait-layout${chapter ? " portrait-layout--selected" : ""}`}>
           <div className="portrait-instrument">
-            <div className="portrait-stage" role="group" aria-label="Interactive 3D sculpture" ref={stageRef} tabIndex={-1}>
+            <div className="portrait-stage" role="group" aria-label="Interactive 3D constellation" ref={stageRef} tabIndex={-1}>
               <GraphicsBoundary key={sculptureKey} onUnavailable={onUnavailable}>
                 <Suspense fallback={<p className="portrait-graphics-message" role="status">Loading the 3D view. The chapters are ready to read.</p>}>
-                  {imageUrls ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to build this sculpture. You can still read every chapter.</p>}
+                  {imageUrls ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null, false)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to draw this constellation. You can still read every chapter.</p>}
                 </Suspense>
               </GraphicsBoundary>
             </div>
+            {chapter ? <div className="portrait-selection" aria-label="Selected chapter">
+              <p><span>Chapter {chapter.ordinal} of {manifest.chapters.length}</span>{chapter.title}</p>
+              <button type="button" onClick={() => navigateTo("reader")}>Read chapter</button>
+            </div> : null}
             <div className="portrait-camera-controls" aria-label="Sculpture controls">
               <button type="button" onClick={() => moveCamera("left")} disabled={!sceneReady || !imageUrls} aria-label="Rotate left">Rotate left</button>
               <button type="button" onClick={() => moveCamera("right")} disabled={!sceneReady || !imageUrls} aria-label="Rotate right">Rotate right</button>
@@ -133,7 +141,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
               <button type="button" onClick={() => { selectChapter(null); moveCamera("reset"); }} disabled={!sceneReady || !imageUrls}>Reset view</button>
             </div>
             {sunProfile ? <p className="portrait-sun-influence" role="status"><strong>{sunProfile.label} Sun.</strong> {sunProfile.description}</p> : null}
-            <p className="portrait-instruction">Drag to turn the whole. Select a chapter image to explore.</p>
+            <p className="portrait-instruction">Drag to turn. Tap a star to choose a chapter.</p>
             <nav className="portrait-chapter-index" aria-label="Pattern chapters">
               {manifest.chapters.map((item) => (
                 <button key={item.id} type="button" aria-pressed={selected === item.id} aria-controls={readerId} onClick={() => selectChapter(item.id)}>
@@ -144,20 +152,26 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
                 </button>
               ))}
             </nav>
-            <p className="portrait-legend">Four chapter images shape one sculpture.{sunProfile ? " Your Sun sign adds an artistic influence to its contours and curvature." : " Their contours blend into an abstract form."} Select an image to return to its reading.</p>
+            <p className="portrait-legend">Four images trace one connected constellation. Their edges become stars and lines, with depth composed for this portrait.{sunProfile ? " Your Sun sign guides the arrangement." : ""} This is an artistic composition, not a map of the sky.</p>
           </div>
           <section className={`portrait-reader${chapter ? " portrait-reader--selected" : ""}`} id={readerId} aria-labelledby={headingId} ref={readerRef} tabIndex={-1}>
             {chapter ? (
               <>
-                <button className="portrait-back" type="button" onClick={() => selectChapter(null)}>Back to the whole</button>
+                <div className="portrait-reader-nav">
+                  <button className="portrait-back" type="button" aria-label="Back to constellation" onClick={() => navigateTo("stage")}>
+                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m8 4-6 6 6 6M2 10h16" /></svg>
+                    Constellation
+                  </button>
+                  <select aria-label="Choose chapter" value={chapter.id} onChange={(event) => selectChapter(event.target.value || null)}>
+                    <option value="">All chapters</option>
+                    {manifest.chapters.map((item) => <option key={item.id} value={item.id}>{item.ordinal}. {item.title}</option>)}
+                  </select>
+                </div>
                 <h2 id={headingId}>{chapter.title}</h2>
                 <p className="portrait-summary">{chapter.summary}</p>
                 {chapter.object ? <div className="portrait-object-note" role="note" aria-label="Chapter object">
                   <p><strong>{chapter.object.label}.</strong> {chapter.object.rationale}</p>
-                  <button type="button" disabled={!sceneReady || !imageUrls} onClick={() => {
-                    stageRef.current?.focus({ preventScroll: true });
-                    stageRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion ? "instant" : "smooth" });
-                  }}>View the whole sculpture</button>
+                  <button type="button" disabled={!sceneReady || !imageUrls} onClick={() => navigateTo("stage")}>View the whole constellation</button>
                 </div> : null}
                 <div className="portrait-expressions" aria-label="Chapter expressions">
                   {expressions.map((item) => <button key={item.id} type="button" aria-pressed={expression === item.id} onClick={() => setExpression(item.id)}>{item.label}</button>)}

@@ -47,21 +47,20 @@ function PortraitPreview() {
       </header>
       <main id="portrait-main">
         <div className="portrait-preview-intro">
-          <h1>Your Pattern,<br />given form.</h1>
+          <h1>Your Pattern,<br />in constellation.</h1>
           <div>
-            <p>A different way to find your way through a reading. Take a closer look at one theme, then see it as part of the whole.</p>
-            <p className="portrait-fictional-note">These chapters are fictional examples. Your Sun sign selection stays in this page.</p>
-            <p className="portrait-fictional-note">Four generated objects become one unified sculpture. Add your Sun sign to influence its contours, proportions, and curvature.</p>
+            <p>Four chapter images, one constellation. Choose a chapter and explore its reading.</p>
+            <p className="portrait-fictional-note">A fictional reading, drawn in stars. Your Sun sign stays on this page.</p>
           </div>
         </div>
         <div className="portrait-sun-choice">
           <label htmlFor="portrait-sun-sign">Your Sun sign
             <select id="portrait-sun-sign" value={sunSign ?? ""} aria-describedby="portrait-sun-help" onChange={(event) => setSunSign(ZODIAC_SIGNS.find((sign) => sign === event.target.value) ?? null)}>
-              <option value="">Choose your Sun sign</option>
+              <option value="">Choose a sign</option>
               {ZODIAC_SIGNS.map((sign) => <option key={sign} value={sign}>{sunShapeProfiles[sign].label}</option>)}
             </select>
           </label>
-          <p id="portrait-sun-help">Choose the sign from your birth chart. This preview uses the sign you provide; each shape is an artistic interpretation.</p>
+          <p id="portrait-sun-help">Optional. Your sign guides an artistic arrangement.</p>
         </div>
         <PatternPortrait source={source} objectBindings={objectBindings} />
         <details className="portrait-preview-scenarios">

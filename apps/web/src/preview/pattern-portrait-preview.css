@@ -22,16 +22,22 @@
 .portrait-preview-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding: 10px 0 38px; color: var(--ink-soft); font-size: 12px; }
 @media (max-width: 850px) {
   .portrait-preview { padding: 0 28px; }
-  .portrait-preview-header { min-height: 82px; }
-  .portrait-preview-intro { grid-template-columns: 1fr; gap: 24px; padding: 38px 0 30px; }
+  .portrait-preview-header { min-height: 64px; }
+  .portrait-preview-intro { grid-template-columns: 1fr; gap: 12px; padding: 24px 0 20px; }
   .portrait-preview-intro p { max-width: 60ch; }
+  .portrait-preview-intro h1 { font-size: clamp(36px, 8vw, 52px); }
+  .portrait-preview-intro p { margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+  .portrait-preview-intro .portrait-fictional-note { font-size: 11px; }
+  .portrait-sun-choice { display: grid; gap: 6px; padding-bottom: 16px; }
+  .portrait-sun-choice label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .portrait-sun-choice select { flex: 1; max-width: 65%; }
+  .portrait-sun-choice p { font-size: 11px; line-height: 1.5; }
 }
 @media (max-width: 440px) {
   .portrait-preview { padding: 0 20px; }
   .portrait-preview-wordmark { font-size: 21px; gap: 8px; }
   .portrait-preview-label { font-size: 11px; }
-  .portrait-preview-intro { padding-top: 30px; }
-  .portrait-preview-intro p { font-size: 15px; }
+  .portrait-preview-intro { padding-top: 20px; }
   .portrait-scenario-fields { align-items: stretch; flex-direction: column; }
   .portrait-scenario-fields select { font-size: 16px; }
 }

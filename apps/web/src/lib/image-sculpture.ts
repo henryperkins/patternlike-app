@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { ZodiacSignName } from "@patternlike/shared";
-import { applySunShape } from "./sun-sculpture.js";
+import { applySunLayout } from "./sun-sculpture.js";
 
 export interface ImagePixels {
   width: number;
@@ -9,33 +9,147 @@ export interface ImagePixels {
 }
 
 type Point = [number, number];
-type Hole = { x: number; y: number; radiusX: number; radiusY: number; area: number };
+type Contour = { points: Point[]; area: number };
+type FeatureLine = { a: Point; b: Point; strength: number };
 type Evidence = {
+  width: number;
+  height: number;
+  bounds: [number, number, number, number];
+  mask: Uint8Array;
+  luminance: Float32Array;
+  contours: Contour[];
+  lines: FeatureLine[];
   aspect: number;
   coverage: number;
-  radii: number[];
-  color: [number, number, number];
-  hole: Hole | null;
+  openingArea: number;
   skew: number;
+  color: [number, number, number];
 };
 
-const SEGMENTS = 192;
-const SECTIONS = 64;
-const TAU = Math.PI * 2;
+const MAX_STARS = 84;
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
+const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-function smooth(values: number[], passes: number): number[] {
-  let result = values;
-  for (let pass = 0; pass < passes; pass += 1) {
-    result = result.map((_, i) => {
-      let sum = 0;
-      for (let delta = -2; delta <= 2; delta += 1) {
-        sum += result[(i + delta + result.length) % result.length]! * (3 - Math.abs(delta));
+/** Follow actual pixel boundaries, retaining concavities and interior loops. */
+function traceContours(mask: Uint8Array, width: number, height: number): Contour[] {
+  const stride = width + 1;
+  const edges = new Map<number, number[]>();
+  const add = (x: number, y: number, nx: number, ny: number) => {
+    const from = y * stride + x;
+    const to = ny * stride + nx;
+    const outgoing = edges.get(from) ?? [];
+    outgoing.push(to);
+    edges.set(from, outgoing);
+  };
+  const filled = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height && mask[y * width + x];
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (!filled(x, y)) continue;
+    if (!filled(x, y - 1)) add(x, y, x + 1, y);
+    if (!filled(x + 1, y)) add(x + 1, y, x + 1, y + 1);
+    if (!filled(x, y + 1)) add(x + 1, y + 1, x, y + 1);
+    if (!filled(x - 1, y)) add(x, y + 1, x, y);
+  }
+  const contours: Contour[] = [];
+  for (const [start, outgoing] of edges) {
+    while (outgoing.length) {
+      const points: Point[] = [];
+      let current = start;
+      do {
+        points.push([current % stride, Math.floor(current / stride)]);
+        const next = edges.get(current)?.pop();
+        if (next === undefined) break;
+        current = next;
+      } while (current !== start && points.length <= width * height * 4);
+      if (points.length < 8 || current !== start) continue;
+      let area = 0;
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i]!; const b = points[(i + 1) % points.length]!;
+        area += a[0] * b[1] - a[1] * b[0];
       }
-      return sum / 9;
-    });
+      if (Math.abs(area) >= 8) contours.push({ points, area: area / 2 });
+    }
+  }
+  return contours.sort((a, b) => Math.abs(b.area) - Math.abs(a.area));
+}
+
+function blur(source: Float32Array, width: number, height: number): Float32Array {
+  const kernel = [1, 4, 6, 4, 1];
+  const horizontal = new Float32Array(source.length);
+  const result = new Float32Array(source.length);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    for (let offset = -2; offset <= 2; offset++) {
+      horizontal[y * width + x] += source[y * width + clamp(x + offset, 0, width - 1)]! * kernel[offset + 2]! / 16;
+    }
+  }
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    for (let offset = -2; offset <= 2; offset++) {
+      result[y * width + x] += horizontal[clamp(y + offset, 0, height - 1) * width + x]! * kernel[offset + 2]! / 16;
+    }
   }
   return result;
+}
+
+/** Sparse, supported interior edges. Blurring and line support reject grain. */
+function interiorLines(luma: Float32Array, mask: Uint8Array, width: number, height: number): FeatureLine[] {
+  const samples: Array<{ x: number; y: number; gx: number; gy: number; magnitude: number }> = [];
+  for (let y = 3; y < height - 3; y++) for (let x = 3; x < width - 3; x++) {
+    if (!mask[y * width + x] || !mask[y * width + x - 2] || !mask[y * width + x + 2]
+      || !mask[(y - 2) * width + x] || !mask[(y + 2) * width + x]) continue;
+    const gx = (luma[y * width + x + 1]! - luma[y * width + x - 1]!) / 2;
+    const gy = (luma[(y + 1) * width + x]! - luma[(y - 1) * width + x]!) / 2;
+    const magnitude = Math.hypot(gx, gy);
+    if (magnitude >= 0.018) samples.push({ x, y, gx, gy, magnitude });
+  }
+  if (!samples.length) return [];
+  const angles = 90;
+  const radius = Math.ceil(Math.hypot(width, height));
+  const bins = radius * 2 + 1;
+  const votes = new Float32Array(angles * bins);
+  const cosine = Array.from({ length: angles }, (_, i) => Math.cos(i * Math.PI / angles));
+  const sine = Array.from({ length: angles }, (_, i) => Math.sin(i * Math.PI / angles));
+  for (const sample of samples) {
+    const normal = (Math.atan2(sample.gy, sample.gx) + Math.PI) % Math.PI;
+    const center = Math.round(normal / Math.PI * angles) % angles;
+    for (let delta = -2; delta <= 2; delta++) {
+      const angle = (center + delta + angles) % angles;
+      const bin = Math.round(sample.x * cosine[angle]! + sample.y * sine[angle]!) + radius;
+      votes[angle * bins + bin] += sample.magnitude;
+    }
+  }
+  const peaks = Array.from({ length: votes.length }, (_, i) => i).filter((i) => votes[i]! > 0.15)
+    .sort((a, b) => votes[b]! - votes[a]! || a - b).slice(0, 180);
+  const lines: FeatureLine[] = [];
+  for (const peak of peaks) {
+    const angle = Math.floor(peak / bins);
+    const rho = peak % bins - radius;
+    const nx = cosine[angle]!; const ny = sine[angle]!;
+    const supported = samples.filter((sample) => Math.abs(sample.x * nx + sample.y * ny - rho) < 1.3
+      && Math.abs((sample.gx * nx + sample.gy * ny) / sample.magnitude) > 0.85)
+      .map((sample) => ({ t: -sample.x * ny + sample.y * nx, strength: sample.magnitude }))
+      .sort((a, b) => a.t - b.t);
+    let start = 0;
+    for (let end = 1; end <= supported.length; end++) {
+      if (end < supported.length && supported[end]!.t - supported[end - 1]!.t < 3.5) continue;
+      const first = supported[start]; const last = supported[end - 1];
+      if (first && last && end - start >= 6 && last.t - first.t >= 9) {
+        const a: Point = [nx * rho - ny * first.t, ny * rho + nx * first.t];
+        const b: Point = [nx * rho - ny * last.t, ny * rho + nx * last.t];
+        const length = distance(a, b);
+        const duplicate = lines.some((line) => {
+          const lx = line.b[0] - line.a[0]; const ly = line.b[1] - line.a[1];
+          if (Math.abs((-ny * lx + nx * ly) / distance(line.a, line.b)) < 0.96) return false;
+          const midpoint: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          const oldMidpoint: Point = [(line.a[0] + line.b[0]) / 2, (line.a[1] + line.b[1]) / 2];
+          return Math.abs((midpoint[0] - oldMidpoint[0]) * nx + (midpoint[1] - oldMidpoint[1]) * ny) < 4
+            && Math.abs(-(midpoint[0] - oldMidpoint[0]) * ny + (midpoint[1] - oldMidpoint[1]) * nx) < (length + distance(line.a, line.b)) * 0.45;
+        });
+        if (!duplicate) lines.push({ a, b, strength: Math.min(1, votes[peak]! / Math.max(1, length) * 8) });
+      }
+      start = end;
+    }
+    if (lines.length >= 8) break;
+  }
+  return lines.slice(0, 8);
 }
 
 function measure(image: ImagePixels, index: number): Evidence {
@@ -44,262 +158,199 @@ function measure(image: ImagePixels, index: number): Evidence {
     || !(image.data instanceof Uint8ClampedArray) || image.data.length !== image.width * image.height * 4) {
     throw new Error(`Image ${index + 1} requires valid dimensions and a complete RGBA pixel buffer`);
   }
-  const scale = Math.min(1, 192 / Math.max(image.width, image.height));
+  const scale = Math.min(1, 128 / Math.max(image.width, image.height));
   const width = Math.max(8, Math.round(image.width * scale));
   const height = Math.max(8, Math.round(image.height * scale));
-  const sampled = new Uint8ClampedArray(width * height * 4);
+  const rgba = new Uint8ClampedArray(width * height * 4);
   const border: number[][] = [[], [], []];
   let borderCount = 0;
   let visible = 0;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const source = (Math.min(image.height - 1, Math.floor((y + 0.5) * image.height / height)) * image.width
-        + Math.min(image.width - 1, Math.floor((x + 0.5) * image.width / width))) * 4;
-      const target = (y * width + x) * 4;
-      sampled.set(image.data.subarray(source, source + 4), target);
-      if (sampled[target + 3]! > 32) visible += 1;
-      if (x < 2 || y < 2 || x >= width - 2 || y >= height - 2) {
-        borderCount += 1;
-        if (sampled[target + 3]! > 32) {
-          for (let channel = 0; channel < 3; channel += 1) border[channel]!.push(sampled[target + channel]!);
-        }
-      }
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const source = (Math.min(image.height - 1, Math.floor((y + 0.5) * image.height / height)) * image.width
+      + Math.min(image.width - 1, Math.floor((x + 0.5) * image.width / width))) * 4;
+    const target = (y * width + x) * 4;
+    rgba.set(image.data.subarray(source, source + 4), target);
+    if (rgba[target + 3]! > 32) visible++;
+    if (x < 2 || y < 2 || x >= width - 2 || y >= height - 2) {
+      borderCount++;
+      if (rgba[target + 3]! > 32) for (let channel = 0; channel < 3; channel++) border[channel]!.push(rgba[target + channel]!);
     }
   }
   if (visible < width * height * 0.005) throw new Error(`Image ${index + 1} is blank or has no visible pixels`);
   const background = border.map((channel) => channel.sort((a, b) => a - b)[Math.floor(channel.length / 2)] ?? 255);
   const transparentBackground = border[0]!.length < borderCount * 0.25;
   const mask = new Uint8Array(width * height);
-  let minX = width;
-  let minY = height;
-  let maxX = 0;
-  let maxY = 0;
-  let count = 0;
+  const luminance = new Float32Array(mask.length);
   const color: [number, number, number] = [0, 0, 0];
-  for (let i = 0; i < mask.length; i += 1) {
+  let minX = width; let minY = height; let maxX = 0; let maxY = 0; let count = 0; let skew = 0;
+  for (let i = 0; i < mask.length; i++) {
     const offset = i * 4;
-    const alpha = sampled[offset + 3]!;
-    const difference = Math.hypot(sampled[offset]! - background[0]!, sampled[offset + 1]! - background[1]!, sampled[offset + 2]! - background[2]!);
+    const alpha = rgba[offset + 3]!;
+    const difference = Math.hypot(rgba[offset]! - background[0]!, rgba[offset + 1]! - background[1]!, rgba[offset + 2]! - background[2]!);
+    luminance[i] = (rgba[offset]! * 0.2126 + rgba[offset + 1]! * 0.7152 + rgba[offset + 2]! * 0.0722) / 255;
     if (alpha > 32 && (transparentBackground || difference > 34)) {
       mask[i] = 1;
-      const x = i % width;
-      const y = Math.floor(i / width);
+      const x = i % width; const y = Math.floor(i / width);
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-      for (let channel = 0; channel < 3; channel += 1) color[channel] = color[channel]! + sampled[offset + channel]! / 255;
-      count += 1;
+      for (let channel = 0; channel < 3; channel++) color[channel] = color[channel]! + rgba[offset + channel]! / 255;
+      count++;
     }
   }
   if (count < width * height * 0.006 || maxX - minX < 3 || maxY - minY < 3) {
     throw new Error(`Image ${index + 1} has insufficient foreground contrast or is blank`);
   }
-  const boxWidth = maxX - minX + 1;
-  const boxHeight = maxY - minY + 1;
-  const aspect = boxWidth / boxHeight;
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-  const unit = 3.5 / boxHeight;
-  const radii = Array<number>(SEGMENTS).fill(0);
-  let skew = 0;
-  for (let i = 0; i < mask.length; i += 1) {
-    if (!mask[i]) continue;
-    const x = (i % width - centerX) * unit;
-    const y = (centerY - Math.floor(i / width)) * unit;
-    const angle = (Math.atan2(y, x) + TAU) % TAU;
-    const bin = Math.round(angle / TAU * SEGMENTS) % SEGMENTS;
-    radii[bin] = Math.max(radii[bin]!, Math.hypot(x, y));
-    skew += x * y;
+  const boxWidth = maxX - minX + 1; const boxHeight = maxY - minY + 1;
+  for (let i = 0; i < mask.length; i++) if (mask[i]) {
+    skew += ((i % width) - (minX + maxX) / 2) * ((minY + maxY) / 2 - Math.floor(i / width)) / (boxHeight * boxHeight);
   }
-  // The outer envelope may bridge a concavity; it is a contour abstraction,
-  // not a claim that these unrelated images recover a physical object.
-  for (let i = 0; i < SEGMENTS; i += 1) {
-    if (radii[i]! > 0) continue;
-    let previous = 1;
-    let next = 1;
-    while (!radii[(i - previous + SEGMENTS) % SEGMENTS] && previous < SEGMENTS) previous += 1;
-    while (!radii[(i + next) % SEGMENTS] && next < SEGMENTS) next += 1;
-    radii[i] = (radii[(i - previous + SEGMENTS) % SEGMENTS]! * next + radii[(i + next) % SEGMENTS]! * previous) / (next + previous);
-  }
-
-  // Flood background components. Only a sizeable enclosed component is
-  // allowed to create a through opening; brightness alone is not depth.
-  const visited = new Uint8Array(mask.length);
-  let hole: Hole | null = null;
-  for (let start = 0; start < mask.length; start += 1) {
-    if (mask[start] || visited[start]) continue;
-    const queue = [start];
-    visited[start] = 1;
-    let touchesEdge = false;
-    let sumX = 0;
-    let sumY = 0;
-    let hMinX = width; let hMaxX = 0;
-    let hMinY = height; let hMaxY = 0;
-    for (const point of queue) {
-      const x = point % width;
-      const y = Math.floor(point / width);
-      touchesEdge ||= x === 0 || y === 0 || x === width - 1 || y === height - 1;
-      sumX += x; sumY += y;
-      hMinX = Math.min(hMinX, x); hMaxX = Math.max(hMaxX, x);
-      hMinY = Math.min(hMinY, y); hMaxY = Math.max(hMaxY, y);
-      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
-        if (nx! < 0 || nx! >= width || ny! < 0 || ny! >= height) continue;
-        const neighbor = ny! * width + nx!;
-        if (!mask[neighbor] && !visited[neighbor]) { visited[neighbor] = 1; queue.push(neighbor); }
-      }
-    }
-    const area = queue.length / (boxWidth * boxHeight);
-    if (!touchesEdge && area > 0.012 && (!hole || area > hole.area)) {
-      hole = {
-        x: (sumX / queue.length - centerX) * unit,
-        y: (centerY - sumY / queue.length) * unit,
-        radiusX: (hMaxX - hMinX + 1) * unit * 0.44,
-        radiusY: (hMaxY - hMinY + 1) * unit * 0.44,
-        area,
-      };
-    }
-  }
+  const contours = traceContours(mask, width, height);
+  if (!contours.length) throw new Error(`Image ${index + 1} has no usable foreground contour`);
+  const smoothed = blur(luminance, width, height);
   return {
-    aspect, coverage: count / (boxWidth * boxHeight), radii: smooth(radii, 4), hole,
-    color: color.map((channel) => channel / count) as [number, number, number],
+    width, height, bounds: [minX, minY, maxX + 1, maxY + 1], mask, luminance: smoothed, contours,
+    lines: interiorLines(smoothed, mask, width, height),
+    aspect: boxWidth / boxHeight, coverage: count / (boxWidth * boxHeight),
+    openingArea: contours.filter((contour) => contour.area < 0).reduce((sum, contour) => sum + Math.abs(contour.area), 0) / (boxWidth * boxHeight),
     skew: clamp(skew / count, -0.3, 0.3),
+    color: color.map((channel) => channel / count) as [number, number, number],
   };
 }
 
-function weights(angle: number): number[] {
-  const directional = Array.from({ length: 4 }, (_, index) => Math.exp(1.4 * Math.cos(angle - index * Math.PI / 2 - Math.PI / 4)));
-  const total = directional.reduce((sum, value) => sum + value, 0);
-  return directional.map((value) => 0.14 + 0.44 * value / total);
-}
-
-function rayBoundary(origin: Point, angle: number, boundary: Point[]): number {
-  const dx = Math.cos(angle);
-  const dy = Math.sin(angle);
-  let distance = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < boundary.length; i += 1) {
-    const a = boundary[i]!;
-    const b = boundary[(i + 1) % boundary.length]!;
-    const ex = b[0] - a[0]; const ey = b[1] - a[1];
-    const denominator = dx * ey - dy * ex;
-    if (Math.abs(denominator) < 1e-10) continue;
-    const ax = a[0] - origin[0]; const ay = a[1] - origin[1];
-    const ray = (ax * ey - ay * ex) / denominator;
-    const segment = (ax * dy - ay * dx) / denominator;
-    if (ray > 0 && segment >= 0 && segment <= 1) distance = Math.min(distance, ray);
+function sampleContour(points: Point[], count: number): Point[] {
+  const lengths = points.map((point, i) => distance(point, points[(i + 1) % points.length]!));
+  const perimeter = lengths.reduce((sum, length) => sum + length, 0);
+  const result: Point[] = [];
+  let edge = 0; let travelled = 0;
+  for (let sample = 0; sample < count; sample++) {
+    const target = perimeter * sample / count;
+    while (edge < lengths.length - 1 && travelled + lengths[edge]! < target) travelled += lengths[edge++]!;
+    const fraction = (target - travelled) / lengths[edge]!;
+    const a = points[edge]!; const b = points[(edge + 1) % points.length]!;
+    result.push([a[0] + (b[0] - a[0]) * fraction, a[1] + (b[1] - a[1]) * fraction]);
   }
-  return Number.isFinite(distance) ? distance : 0;
+  return result;
 }
 
 /**
- * Synthesize one connected sculpture from exactly four decoded pixel images.
- * The algorithm measures foreground envelopes, aspect, skew, and enclosed
- * background. It blends the envelopes into a single contour and rounds its
- * depth into a continuous surface. A measured opening becomes one aperture.
- * It does not classify subjects or interpret the inputs as camera views.
- * An optional Sun sign applies a separate artistic deformation to that surface.
- * Caller owns the returned geometry and must dispose it.
+ * Build an open constellation from four images, keeping each source's outline,
+ * holes and supported interior edges. No semantic labels, random positions, or
+ * radial averages enter this graph. Depth is an artistic relief from measured
+ * luminance and image coordinates, not a reconstruction of hidden surfaces.
+ * Caller owns and must dispose both returned geometries.
  */
 export function createImageSculpture(images: readonly ImagePixels[], sunSign: ZodiacSignName | null = null): {
   geometry: THREE.BufferGeometry;
+  lineGeometry: THREE.BufferGeometry;
+  connections: Array<[number, number]>;
   color: [number, number, number];
-  contributions: Array<{ index: number; aspect: number; coverage: number; openingArea: number; skew: number }>;
+  contributions: Array<{ index: number; aspect: number; coverage: number; openingArea: number; skew: number; stars: number; interiorLines: number }>;
 } {
   if (!Array.isArray(images) || images.length !== 4) throw new Error("Image sculpture requires exactly four images");
   const evidence = Array.from(images, measure);
-  const boundary: Point[] = Array.from({ length: SEGMENTS }, (_, i) => {
-    const angle = i * TAU / SEGMENTS;
-    const blend = weights(angle);
-    const radius = evidence.reduce((sum, source, sourceIndex) => sum + source.radii[i]! * blend[sourceIndex]!, 0);
-    return [Math.cos(angle) * radius, Math.sin(angle) * radius];
-  });
-  const minY = Math.min(...boundary.map((point) => point[1]));
-  const maxY = Math.max(...boundary.map((point) => point[1]));
-  for (const point of boundary) point[1] = (point[1] - (maxY + minY) / 2) * 3.5 / (maxY - minY);
-  const strongestHole = evidence.map((source) => source.hole).filter((hole): hole is Hole => hole !== null).sort((a, b) => b.area - a.area)[0];
-  const origin: Point = strongestHole ? [clamp(strongestHole.x, -0.2, 0.2), clamp(strongestHole.y, -1, 1)] : [0, 0];
-  let outer = boundary.map((_, i) => rayBoundary(origin, i * TAU / SEGMENTS, boundary));
-  if (outer.some((distance) => distance < 0.08)) {
-    origin[0] = 0; origin[1] = 0;
-    outer = boundary.map((_, i) => rayBoundary(origin, i * TAU / SEGMENTS, boundary));
-  }
-  outer = smooth(outer, 2);
-  const inner = strongestHole ? outer.map((distance, i) => {
-    const angle = i * TAU / SEGMENTS;
-    const ellipse = 1 / Math.hypot(Math.cos(angle) / strongestHole.radiusX, Math.sin(angle) / strongestHole.radiusY);
-    return Math.min(ellipse, distance * 0.7);
-  }) : null;
-  const positions: number[] = [];
-  const sourceIndices: number[] = [];
-  const indices: number[] = [];
-  const meanSkew = evidence.reduce((sum, item) => sum + item.skew, 0) / 4;
-  function addVertex(angleIndex: number, fraction: number, side: number) {
-    const angle = angleIndex * TAU / SEGMENTS;
-    const blend = weights(angle);
-    const radius = inner ? inner[angleIndex]! + (outer[angleIndex]! - inner[angleIndex]!) * fraction : outer[angleIndex]! * fraction;
-    const x = origin[0] + Math.cos(angle) * radius;
-    const y = origin[1] + Math.sin(angle) * radius;
-    const fullness = evidence.reduce((sum, item, i) => sum + blend[i]! * (0.3 + 0.22 * item.coverage + 0.13 * Math.min(item.aspect, 1.4)), 0);
-    const thickness = inner ? fullness * (0.6 + 0.4 * Math.min(1.3, outer[angleIndex]! - inner[angleIndex]!)) : fullness;
-    const z = side * thickness + meanSkew * y * 0.7;
-    positions.push(x, y, z);
-    sourceIndices.push(blend.indexOf(Math.max(...blend)));
-  }
-  if (inner) {
-    // Periodic in both directions: one welded genus-one surface, without
-    // independent meshes, Boolean seams, caps, or coincident edge vertices.
-    for (let i = 0; i < SEGMENTS; i += 1) {
-      for (let j = 0; j < SECTIONS; j += 1) {
-        const phase = j * TAU / SECTIONS;
-        addVertex(i, (1 + Math.cos(phase)) / 2, Math.sin(phase));
+  const positions: number[] = []; const sourceIndices: number[] = []; const strengths: number[] = [];
+  const connections: Array<[number, number]> = [];
+  const keys = new Set<string>();
+  const groups: number[][] = [];
+  const connect = (a: number, b: number) => {
+    const key = `${Math.min(a, b)}:${Math.max(a, b)}`;
+    if (a !== b && !keys.has(key)) { keys.add(key); connections.push([a, b]); }
+  };
+  for (let sourceIndex = 0; sourceIndex < 4; sourceIndex++) {
+    const source = evidence[sourceIndex]!;
+    const group: number[] = []; const localPoints: Point[] = [];
+    groups.push(group);
+    const [minX, minY, maxX, maxY] = source.bounds;
+    const unit = Math.min(1.2 / (maxY - minY), 1.3 / (maxX - minX));
+    const addStar = (point: Point, strength: number) => {
+      const duplicate = localPoints.findIndex((other) => distance(point, other) < 0.65);
+      if (duplicate >= 0) return group[duplicate]!;
+      if (group.length >= MAX_STARS) return -1;
+      const x = (point[0] - (minX + maxX) / 2) * unit;
+      const y = ((minY + maxY) / 2 - point[1]) * unit;
+      const px = clamp(Math.round(point[0]), 0, source.width - 1);
+      const py = clamp(Math.round(point[1]), 0, source.height - 1);
+      const light = source.luminance[py * source.width + px]!;
+      // A shallow, continuous curved relief keeps the drawing spatial during
+      // rotation. Its bends follow the actual sampled positions and luminance.
+      const z = 0.07 * Math.sin(x * Math.PI / 1.3) * Math.cos(y * Math.PI / 1.2) + (light - 0.5) * 0.04;
+      const positioned = applySunLayout([x, y, z], sourceIndex, sunSign);
+      const index = positions.length / 3;
+      positions.push(...positioned); sourceIndices.push(sourceIndex); strengths.push(clamp(strength, 0, 1));
+      group.push(index); localPoints.push(point);
+      return index;
+    };
+    const main = source.contours[0]!;
+    const loops = [main, ...source.contours.slice(1).filter((contour) => Math.abs(contour.area) > Math.abs(main.area) * 0.012).slice(0, 2)];
+    for (let loopIndex = 0; loopIndex < loops.length; loopIndex++) {
+      const points = sampleContour(loops[loopIndex]!.points, loopIndex === 0 ? 40 : 12);
+      const vertices = points.map((point, i) => {
+        const before = points[(i + points.length - 1) % points.length]!;
+        const after = points[(i + 1) % points.length]!;
+        const turn = 1 - ((point[0] - before[0]) * (after[0] - point[0]) + (point[1] - before[1]) * (after[1] - point[1]))
+          / Math.max(0.001, distance(before, point) * distance(point, after));
+        return addStar(point, 0.3 + Math.min(0.6, turn * 0.8));
+      });
+      for (let i = 0; i < vertices.length; i++) if (vertices[i]! >= 0 && vertices[(i + 1) % vertices.length]! >= 0) connect(vertices[i]!, vertices[(i + 1) % vertices.length]!);
+    }
+    for (const line of source.lines) {
+      const count = Math.min(6, Math.max(3, Math.ceil(distance(line.a, line.b) / 10)));
+      if (group.length + count > MAX_STARS) continue;
+      let previous = -1;
+      for (let i = 0; i < count; i++) {
+        const fraction = i / (count - 1);
+        const point: Point = [line.a[0] + (line.b[0] - line.a[0]) * fraction, line.a[1] + (line.b[1] - line.a[1]) * fraction];
+        const index = addStar(point, (i === 0 || i === count - 1 ? 0.58 : 0.28) + line.strength * 0.32);
+        if (previous >= 0 && index >= 0) connect(previous, index);
+        previous = index;
       }
     }
-    for (let i = 0; i < SEGMENTS; i += 1) {
-      for (let j = 0; j < SECTIONS; j += 1) {
-        const a = i * SECTIONS + j;
-        const b = ((i + 1) % SEGMENTS) * SECTIONS + j;
-        const c = ((i + 1) % SEGMENTS) * SECTIONS + (j + 1) % SECTIONS;
-        const d = i * SECTIONS + (j + 1) % SECTIONS;
-        indices.push(a, b, d, b, c, d);
-      }
+    // Join separate measured feature paths with the minimum number of shortest
+    // links. Retain their contours, rather than triangulating their interiors.
+    const parent = new Map(group.map((index) => [index, index]));
+    const root = (index: number): number => {
+      while (parent.get(index) !== index) index = parent.get(index)!;
+      return index;
+    };
+    for (const [a, b] of connections) if (parent.has(a) && parent.has(b)) parent.set(root(a), root(b));
+    const candidates: Array<{ a: number; b: number; length: number }> = [];
+    for (let a = 0; a < group.length; a++) for (let b = a + 1; b < group.length; b++) {
+      candidates.push({ a: group[a]!, b: group[b]!, length: distance(localPoints[a]!, localPoints[b]!) });
     }
-  } else {
-    // One front pole, shared perimeter rings, one back pole.
-    addVertex(0, 0, 1);
-    for (let j = 1; j < SECTIONS; j += 1) {
-      const phase = j * Math.PI / SECTIONS;
-      for (let i = 0; i < SEGMENTS; i += 1) addVertex(i, Math.sin(phase), Math.cos(phase));
-    }
-    addVertex(0, 0, -1);
-    const last = positions.length / 3 - 1;
-    for (let i = 0; i < SEGMENTS; i += 1) {
-      const next = (i + 1) % SEGMENTS;
-      indices.push(0, 1 + i, 1 + next);
-      for (let j = 0; j < SECTIONS - 2; j += 1) {
-        const a = 1 + j * SEGMENTS + i;
-        const b = 1 + j * SEGMENTS + next;
-        const c = b + SEGMENTS;
-        const d = a + SEGMENTS;
-        indices.push(a, d, b, b, d, c);
-      }
-      indices.push(last, last - SEGMENTS + next, last - SEGMENTS + i);
+    candidates.sort((a, b) => a.length - b.length || a.a - b.a || a.b - b.b);
+    for (const candidate of candidates) if (root(candidate.a) !== root(candidate.b)) {
+      connect(candidate.a, candidate.b); parent.set(root(candidate.a), root(candidate.b));
     }
   }
-  if (sunSign !== null) applySunShape(positions, sunSign);
-  let maximumRadius = 0;
-  for (let i = 0; i < positions.length; i += 3) maximumRadius = Math.max(maximumRadius, Math.hypot(positions[i]!, positions[i + 1]!, positions[i + 2]!));
-  if (maximumRadius > 2.19) {
-    const fit = 2.19 / maximumRadius;
-    for (let i = 0; i < positions.length; i += 1) positions[i] = positions[i]! * fit;
+  // A single ordered spine ties the four image fragments into one composition.
+  for (let source = 0; source < 3; source++) {
+    let pair: [number, number] = [groups[source]![0]!, groups[source + 1]![0]!];
+    let minimum = Infinity;
+    for (const a of groups[source]!) for (const b of groups[source + 1]!) {
+      const length = Math.hypot(positions[a * 3]! - positions[b * 3]!, positions[a * 3 + 1]! - positions[b * 3 + 1]!, positions[a * 3 + 2]! - positions[b * 3 + 2]!);
+      if (length < minimum) { minimum = length; pair = [a, b]; }
+    }
+    connect(...pair);
+    strengths[pair[0]] = 1; strengths[pair[1]] = 1;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("sourceIndex", new THREE.Float32BufferAttribute(sourceIndices, 1));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
+  geometry.setAttribute("starStrength", new THREE.Float32BufferAttribute(strengths, 1));
+  geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+  const linePositions: number[] = []; const lineSources: number[] = [];
+  for (const edge of connections) for (const vertex of edge) {
+    linePositions.push(positions[vertex * 3]!, positions[vertex * 3 + 1]!, positions[vertex * 3 + 2]!);
+    lineSources.push(sourceIndices[vertex]!);
+  }
+  const lineGeometry = new THREE.BufferGeometry();
+  lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3));
+  lineGeometry.setAttribute("sourceIndex", new THREE.Float32BufferAttribute(lineSources, 1));
+  lineGeometry.computeBoundingBox(); lineGeometry.computeBoundingSphere();
   return {
-    geometry,
-    color: [0, 1, 2].map((channel) => evidence.reduce((sum, item) => sum + item.color[channel]!, 0) / 4) as [number, number, number],
-    contributions: evidence.map((item, index) => ({ index, aspect: item.aspect, coverage: item.coverage, openingArea: item.hole?.area ?? 0, skew: item.skew })),
+    geometry, lineGeometry, connections,
+    color: [0, 1, 2].map((channel) => evidence.reduce((sum, source) => sum + source.color[channel]!, 0) / 4) as [number, number, number],
+    contributions: evidence.map((source, index) => ({ index, aspect: source.aspect, coverage: source.coverage,
+      openingArea: source.openingArea, skew: source.skew, stars: groups[index]!.length, interiorLines: source.lines.length })),
   };
 }

@@ -1,0 +1,1003 @@
+{
+  "preview_url": "https://patternlike-portrait-preview.lfd.workers.dev",
+  "version_id": "a336a569-d55c-42d3-bcd4-c6f9a30f06ed",
+  "deployment_id": "487bb813-992c-40fe-9020-60e69bfea0c0",
+  "traffic_percent": 100,
+  "deployed_at": "2026-09-05T15:58:41.730903Z",
+  "source_base_commit": "25c8b66503df326fcf4619942ba1abcf95fbf417",
+  "source_note": "Full local CI passed on this feature-branch working tree. A final reading-to-3D focus correction and test stub followed the CI web lane; frontend typecheck, production build, and all 438 web tests were rerun successfully. These hashes identify the final implementation tested in public browsers and deployed. This receipt and the source are committed together.",
+  "source_files": {
+    "apps/web/src/components/PatternPortrait.test.tsx": "de81a6a76ac17994a247c658b2b53777813ec892b1d6c38f71a4e331d1a3c7f7",
+    "apps/web/src/components/PatternPortrait.tsx": "a5a022d941f421d6d9485bce9c1099044113cde84a5be4dc5581eccbeb8ce460",
+    "apps/web/src/components/PatternSculpture.test.tsx": "79e1d5f6cb7d69360a92fbb3ef9bf9295ca80fdf31e355350bf4b6bc83519a1b",
+    "apps/web/src/components/PatternSculpture.tsx": "cdba1db09f7545643263ad47a4d6405b90e60d1f20f97e925987d4571e8228de",
+    "apps/web/src/components/pattern-portrait.css": "a6aa9efdcbd71ef227f309c0f93ddf19b644979313f197e242dc7b48acdb3fd9",
+    "apps/web/src/lib/image-sculpture.test.ts": "361996da762cdf35be2d5df1d1a9936cf34b08d65effa568d0a1c253ec8ba8d7",
+    "apps/web/src/lib/image-sculpture.ts": "d8b1aa708c5d5381b0290e15199ce15a1956b7afea5ec987faa04a6523f64d00",
+    "apps/web/src/lib/sun-sculpture.test.ts": "0ecf1615a3ae2e2e0ab9b819bbe76cd4eacb628a41d5442293a0d0a6366230aa",
+    "apps/web/src/lib/sun-sculpture.ts": "6735ba21ac09d4a28310bdd4a6ca728cfa59ebc583c58f163a848b0e6e92b3fa",
+    "apps/web/src/preview/pattern-portrait-preview.css": "b85972dbbde6630f41a1802001342c265718b09555c9467bd7980215c31738fc",
+    "apps/web/src/preview/pattern-portrait-preview.tsx": "ccde51926c48e186603ec4c4144fed36e89a7fb2d64e45d69ad5086ec379d4fc"
+  },
+  "built_entry": "pattern-portrait-z_p0qTll.js",
+  "built_renderer": "PatternSculpture-Coi5m8PK.js",
+  "built_css": "pattern-portrait-yav6X_ed.css",
+  "public_assets": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "sha256": "2e446244d3ba7a70573ed39abbf4f90fff2516506c301f783d3c6dce67009dae"
+    },
+    {
+      "file": "pattern-portrait.html",
+      "status": 200,
+      "sha256": "2e446244d3ba7a70573ed39abbf4f90fff2516506c301f783d3c6dce67009dae"
+    },
+    {
+      "file": "assets/PatternSculpture-Coi5m8PK.js",
+      "status": 200,
+      "sha256": "4e139e5791a2463ad97943fbbcbae373de6e52de518933a8a572b919c98d0955"
+    },
+    {
+      "file": "assets/image-01-BvWRuk_-.png",
+      "status": 200,
+      "sha256": "ee538fd3fdcf347be36ce018148a2aa49d632aa1cf46536b7792cacf90deceec"
+    },
+    {
+      "file": "assets/image-02-BA87dorG.png",
+      "status": 200,
+      "sha256": "ee4869af09af9e297be7e51051d69f4ef79aaa63b456a3cff7b8f6047a784566"
+    },
+    {
+      "file": "assets/image-03-C8B1HNvU.png",
+      "status": 200,
+      "sha256": "72371f5dc29b6674fb3d54c5a76695bcdc84e5c984de2726b6c1c27139aa11ec"
+    },
+    {
+      "file": "assets/image-04-aJYUs4-_.png",
+      "status": 200,
+      "sha256": "8499fcfed178887d431ddba28035bd1bc5df829e0e1dc4f4e24100ab526f8d5d"
+    },
+    {
+      "file": "assets/pattern-portrait-yav6X_ed.css",
+      "status": 200,
+      "sha256": "cd7aa0e676a70334eca3f5f17f64269cd43fa9bbe6ace9545a296a4f89a687a3"
+    },
+    {
+      "file": "assets/pattern-portrait-z_p0qTll.js",
+      "status": 200,
+      "sha256": "c75d4ee66336cbe96251c99d23b519ffa9077dc24dcec87ba7a02fd6cd260dff"
+    }
+  ],
+  "desktop": {
+    "url": "https://patternlike-portrait-preview.lfd.workers.dev",
+    "title": "Pattern portrait \u00b7 Pattern/Like preview",
+    "viewport": "1440x1050",
+    "drawn": {
+      "points": 3,
+      "lines": 3,
+      "triangles": 0,
+      "pointCount": 305,
+      "lineCount": 620
+    },
+    "brightCount": 821,
+    "refs": [
+      {
+        "src": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-01-BvWRuk_-.png",
+        "loaded": true
+      },
+      {
+        "src": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-02-BA87dorG.png",
+        "loaded": true
+      },
+      {
+        "src": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-03-C8B1HNvU.png",
+        "loaded": true
+      },
+      {
+        "src": "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-04-aJYUs4-_.png",
+        "loaded": true
+      }
+    ],
+    "hashes": [
+      {
+        "sign": "aries",
+        "hash": "5887f7b52141bdb8d9b5ddf78b3b786d4f86251a19571c89dfea477cccd9f652"
+      },
+      {
+        "sign": "taurus",
+        "hash": "8a4052f0e1dba25956ffc0b7877c778ffe8517d78ce2b4ec2fb9739747d56cb3"
+      },
+      {
+        "sign": "gemini",
+        "hash": "8bbeec09312313221c30aa00928689419f2ebd6ba6a03407a1de0bccaa30ec96"
+      },
+      {
+        "sign": "cancer",
+        "hash": "53bf2a0a347bfba8e1f0eec0eabd3eff0bf76a0840fedb4bb99f9f1472462d3a"
+      },
+      {
+        "sign": "leo",
+        "hash": "58a075387973343213c632afc5d3c5ae7a5cac3e9b1389034db6e9350c9df9bd"
+      },
+      {
+        "sign": "virgo",
+        "hash": "60c8a8e8ae5131db3a468b7e468a895954f6b797f4d1cf69f2862df567afd7dd"
+      },
+      {
+        "sign": "libra",
+        "hash": "1922783a440f3e359a382d6e58740129e504898bb0735dd521b47a5048e9af5f"
+      },
+      {
+        "sign": "scorpio",
+        "hash": "0783627805da1cb683880936b4a33c7bcf5907e76e5d9ac467729d065c3a834d"
+      },
+      {
+        "sign": "sagittarius",
+        "hash": "f7b73a38718acbc82f106e974fe3cd64a53a434bbe879bf5a7c4f9c30e19bfe5"
+      },
+      {
+        "sign": "capricorn",
+        "hash": "8f331cac1d823adc819cf797537c3677640208a9a3a0658ed88088bd0f297bac"
+      },
+      {
+        "sign": "aquarius",
+        "hash": "9d3acf516bd8a6135f1f1d1eb04da9217dda2387502d520169c5f6d4368ba786"
+      },
+      {
+        "sign": "pisces",
+        "hash": "e675fbeb27bbad541d27af89f6e2d98b0a60fb248de25facb005a68b1ecadffd"
+      }
+    ],
+    "checks": [
+      "all 12 distinct canvas renders",
+      "four image URLs unchanged",
+      "chapter selection preserved",
+      "rotation",
+      "removing sign clears solar influence",
+      "rapid sign return awaits renderer",
+      "reading view and sign switch",
+      "no overflow",
+      "axe zero violations"
+    ],
+    "errors": [],
+    "expectedCancellations": [
+      "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-01-BvWRuk_-.png: net::ERR_ABORTED",
+      "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-02-BA87dorG.png: net::ERR_ABORTED",
+      "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-03-C8B1HNvU.png: net::ERR_ABORTED",
+      "https://patternlike-portrait-preview.lfd.workers.dev/assets/image-04-aJYUs4-_.png: net::ERR_ABORTED"
+    ],
+    "a11y": []
+  },
+  "mobile": {
+    "widths": [
+      390,
+      320
+    ],
+    "passed": 66,
+    "total": 66,
+    "report": {
+      "url": "https://patternlike-portrait-preview.lfd.workers.dev/",
+      "expectedChunk": "PatternSculpture-Coi5m8PK.js",
+      "checks": [
+        {
+          "name": "390 document ready",
+          "passed": true,
+          "evidence": {
+            "status": 200,
+            "chunks": [
+              {
+                "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-Coi5m8PK.js",
+                "status": 200
+              }
+            ]
+          }
+        },
+        {
+          "name": "390 expected renderer",
+          "passed": true,
+          "evidence": [
+            {
+              "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-Coi5m8PK.js",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "name": "390 first viewport shows constellation",
+          "passed": true,
+          "evidence": {
+            "top": 443.890625,
+            "bottom": 813.890625,
+            "width": 350,
+            "height": 370,
+            "visible": 370,
+            "viewport": 844,
+            "scrollY": 0,
+            "visibleStarPixels": 1178
+          }
+        },
+        {
+          "name": "390 one row of touch-sized controls",
+          "passed": true,
+          "evidence": [
+            {
+              "text": "Rotate left",
+              "top": 829.890625,
+              "width": 66.796875,
+              "height": 44
+            },
+            {
+              "text": "Rotate right",
+              "top": 829.890625,
+              "width": 66.796875,
+              "height": 44
+            },
+            {
+              "text": "+",
+              "top": 829.890625,
+              "width": 66.796875,
+              "height": 44
+            },
+            {
+              "text": "\u2212",
+              "top": 829.890625,
+              "width": 66.796875,
+              "height": 44
+            },
+            {
+              "text": "Reset view",
+              "top": 829.890625,
+              "width": 66.8125,
+              "height": 44
+            }
+          ]
+        },
+        {
+          "name": "390 four references loaded",
+          "passed": true
+        },
+        {
+          "name": "390 0px star tap selects without scroll",
+          "passed": true,
+          "evidence": {
+            "offset": 0,
+            "point": {
+              "x": 241,
+              "y": 77
+            },
+            "before": 432,
+            "after": {
+              "scrollY": 432,
+              "selection": "04Letting change take its time\u2212",
+              "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+            }
+          }
+        },
+        {
+          "name": "390 -6px star tap selects without scroll",
+          "passed": true,
+          "evidence": {
+            "offset": -6,
+            "point": {
+              "x": 241,
+              "y": 77
+            },
+            "before": 432,
+            "after": {
+              "scrollY": 432,
+              "selection": "04Letting change take its time\u2212",
+              "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+            }
+          }
+        },
+        {
+          "name": "390 -12px star tap selects without scroll",
+          "passed": true,
+          "evidence": {
+            "offset": -12,
+            "point": {
+              "x": 241,
+              "y": 77
+            },
+            "before": 432,
+            "after": {
+              "scrollY": 432,
+              "selection": "04Letting change take its time\u2212",
+              "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+            }
+          }
+        },
+        {
+          "name": "390 contextual read action and compact index",
+          "passed": true
+        },
+        {
+          "name": "390 explicit read focuses nearby reader",
+          "passed": true,
+          "evidence": {
+            "top": 11.890625,
+            "focused": true,
+            "scrollY": 978
+          }
+        },
+        {
+          "name": "390 return preserves chapter and expression",
+          "passed": true
+        },
+        {
+          "name": "390 selected Resources opens complete reading",
+          "passed": true
+        },
+        {
+          "name": "390 3D mode returns to stage preserving Resources",
+          "passed": true,
+          "evidence": {
+            "top": 8.890625,
+            "focused": true
+          }
+        },
+        {
+          "name": "390 reading reopens same expression",
+          "passed": true
+        },
+        {
+          "name": "390 reader header stays reachable",
+          "passed": true,
+          "evidence": {
+            "top": 0,
+            "bottom": 61,
+            "returnHit": true,
+            "chooseHit": true
+          }
+        },
+        {
+          "name": "390 native chapter 1 navigation",
+          "passed": true
+        },
+        {
+          "name": "390 native chapter 2 navigation",
+          "passed": true
+        },
+        {
+          "name": "390 native chapter 3 navigation",
+          "passed": true
+        },
+        {
+          "name": "390 native chapter 4 navigation",
+          "passed": true
+        },
+        {
+          "name": "390 All chapters restores overview",
+          "passed": true
+        },
+        {
+          "name": "390 lost graphics disables camera",
+          "passed": true
+        },
+        {
+          "name": "390 All chapters works after graphics loss",
+          "passed": true
+        },
+        {
+          "name": "390 reset restores chapter index",
+          "passed": true
+        },
+        {
+          "name": "390 horizontal drag rotates without selecting",
+          "passed": true,
+          "evidence": {
+            "beforeY": 432,
+            "afterY": 432,
+            "beforeHash": "4ef0e34e623fdd6042e809bea6d078455277a3e9306aeebba40d4d308b578205",
+            "afterHash": "0e9cdee89b59a1ede97c09df6e8f19544da4b3f58e39e8bc6de41360825f13cb"
+          }
+        },
+        {
+          "name": "390 vertical swipe scrolls without selecting",
+          "passed": true,
+          "evidence": {
+            "scrollBefore": 432,
+            "scrollAfter": 698
+          }
+        },
+        {
+          "name": "390 idle rendering stops",
+          "passed": true,
+          "evidence": {
+            "idleBefore": 524,
+            "idleAfter": 524
+          }
+        },
+        {
+          "name": "390 aries ready",
+          "passed": true
+        },
+        {
+          "name": "390 taurus ready",
+          "passed": true
+        },
+        {
+          "name": "390 pisces ready",
+          "passed": true
+        },
+        {
+          "name": "390 full reading mode",
+          "passed": true
+        },
+        {
+          "name": "390 no overflow",
+          "passed": true
+        },
+        {
+          "name": "390 no runtime errors",
+          "passed": true,
+          "evidence": []
+        },
+        {
+          "name": "390 no external requests",
+          "passed": true,
+          "evidence": []
+        },
+        {
+          "name": "320 document ready",
+          "passed": true,
+          "evidence": {
+            "status": 200,
+            "chunks": [
+              {
+                "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-Coi5m8PK.js",
+                "status": 200
+              }
+            ]
+          }
+        },
+        {
+          "name": "320 expected renderer",
+          "passed": true,
+          "evidence": [
+            {
+              "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-Coi5m8PK.js",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "name": "320 first viewport shows constellation",
+          "passed": true,
+          "evidence": {
+            "top": 462.03125,
+            "bottom": 787.625,
+            "width": 280,
+            "height": 325.59375,
+            "visible": 277.96875,
+            "viewport": 740,
+            "scrollY": 0,
+            "visibleStarPixels": 1169
+          }
+        },
+        {
+          "name": "320 one row of touch-sized controls",
+          "passed": true,
+          "evidence": [
+            {
+              "text": "Rotate left",
+              "top": 803.625,
+              "width": 52.796875,
+              "height": 44
+            },
+            {
+              "text": "Rotate right",
+              "top": 803.625,
+              "width": 52.796875,
+              "height": 44
+            },
+            {
+              "text": "+",
+              "top": 803.625,
+              "width": 52.796875,
+              "height": 44
+            },
+            {
+              "text": "\u2212",
+              "top": 803.625,
+              "width": 52.796875,
+              "height": 44
+            },
+            {
+              "text": "Reset view",
+              "top": 803.625,
+              "width": 52.796875,
+              "height": 44
+            }
+          ]
+        },
+        {
+          "name": "320 four references loaded",
+          "passed": true
+        },
+        {
+          "name": "320 0px star tap selects without scroll",
+          "passed": true,
+          "evidence": {
+            "offset": 0,
+            "point": {
+              "x": 192,
+              "y": 75
+            },
+            "before": 450,
+            "after": {
+              "scrollY": 450,
+              "selection": "04Letting change take its time\u2212",
+              "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+            }
+          }
+        },
+        {
+          "name": "320 -6px star tap selects without scroll",
+          "passed": true,
+          "evidence": {
+            "offset": -6,
+            "point": {
+              "x": 192,
+              "y": 75
+            },
+            "before": 450,
+            "after": {
+              "scrollY": 450,
+              "selection": "04Letting change take its time\u2212",
+              "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+            }
+          }
+        },
+        {
+          "name": "320 -12px star tap selects without scroll",
+          "passed": true,
+          "evidence": {
+            "offset": -12,
+            "point": {
+              "x": 192,
+              "y": 75
+            },
+            "before": 450,
+            "after": {
+              "scrollY": 450,
+              "selection": "04Letting change take its time\u2212",
+              "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+            }
+          }
+        },
+        {
+          "name": "320 contextual read action and compact index",
+          "passed": true
+        },
+        {
+          "name": "320 explicit read focuses nearby reader",
+          "passed": true,
+          "evidence": {
+            "top": 11.65625,
+            "focused": true,
+            "scrollY": 970
+          }
+        },
+        {
+          "name": "320 return preserves chapter and expression",
+          "passed": true
+        },
+        {
+          "name": "320 selected Resources opens complete reading",
+          "passed": true
+        },
+        {
+          "name": "320 3D mode returns to stage preserving Resources",
+          "passed": true,
+          "evidence": {
+            "top": 9.03125,
+            "focused": true
+          }
+        },
+        {
+          "name": "320 reading reopens same expression",
+          "passed": true
+        },
+        {
+          "name": "320 reader header stays reachable",
+          "passed": true,
+          "evidence": {
+            "top": 0,
+            "bottom": 61,
+            "returnHit": true,
+            "chooseHit": true
+          }
+        },
+        {
+          "name": "320 native chapter 1 navigation",
+          "passed": true
+        },
+        {
+          "name": "320 native chapter 2 navigation",
+          "passed": true
+        },
+        {
+          "name": "320 native chapter 3 navigation",
+          "passed": true
+        },
+        {
+          "name": "320 native chapter 4 navigation",
+          "passed": true
+        },
+        {
+          "name": "320 All chapters restores overview",
+          "passed": true
+        },
+        {
+          "name": "320 lost graphics disables camera",
+          "passed": true
+        },
+        {
+          "name": "320 All chapters works after graphics loss",
+          "passed": true
+        },
+        {
+          "name": "320 reset restores chapter index",
+          "passed": true
+        },
+        {
+          "name": "320 horizontal drag rotates without selecting",
+          "passed": true,
+          "evidence": {
+            "beforeY": 450,
+            "afterY": 450,
+            "beforeHash": "a3e9e8e7b27f9da24cf9c8671cc8847c90591bbea872eecdf4d40b12c1766085",
+            "afterHash": "f8f228f1e1882735be57b01f6cdddd506e09bd55d05dae8238052c5f1ae93b33"
+          }
+        },
+        {
+          "name": "320 vertical swipe scrolls without selecting",
+          "passed": true,
+          "evidence": {
+            "scrollBefore": 450,
+            "scrollAfter": 676
+          }
+        },
+        {
+          "name": "320 idle rendering stops",
+          "passed": true,
+          "evidence": {
+            "idleBefore": 540,
+            "idleAfter": 540
+          }
+        },
+        {
+          "name": "320 aries ready",
+          "passed": true
+        },
+        {
+          "name": "320 taurus ready",
+          "passed": true
+        },
+        {
+          "name": "320 pisces ready",
+          "passed": true
+        },
+        {
+          "name": "320 full reading mode",
+          "passed": true
+        },
+        {
+          "name": "320 no overflow",
+          "passed": true
+        },
+        {
+          "name": "320 no runtime errors",
+          "passed": true,
+          "evidence": []
+        },
+        {
+          "name": "320 no external requests",
+          "passed": true,
+          "evidence": []
+        }
+      ],
+      "pages": [
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "errors": [],
+          "warnings": [
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "[.WebGL-0xa3c001ad000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+            "[.WebGL-0xa3c001ad000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+            "[.WebGL-0xa3c001ad000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+            "[.WebGL-0xa3c001ad000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+          ],
+          "failedRequests": [],
+          "externalRequests": [],
+          "chunks": [
+            {
+              "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-Coi5m8PK.js",
+              "status": 200
+            }
+          ],
+          "probes": [
+            {
+              "offset": 0,
+              "point": {
+                "x": 241,
+                "y": 77
+              },
+              "before": 432,
+              "after": {
+                "scrollY": 432,
+                "selection": "04Letting change take its time\u2212",
+                "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+              }
+            },
+            {
+              "offset": -6,
+              "point": {
+                "x": 241,
+                "y": 77
+              },
+              "before": 432,
+              "after": {
+                "scrollY": 432,
+                "selection": "04Letting change take its time\u2212",
+                "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+              }
+            },
+            {
+              "offset": -12,
+              "point": {
+                "x": 241,
+                "y": 77
+              },
+              "before": 432,
+              "after": {
+                "scrollY": 432,
+                "selection": "04Letting change take its time\u2212",
+                "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+              }
+            }
+          ],
+          "snapshot": "- link \"Skip to the portrait\":\n  - /url: \"#portrait-main\"\n- banner:\n  - link \"Pattern/Like portrait preview\":\n    - /url: /pattern-portrait.html\n    - text: Pattern/Like\n  - text: Fictional preview\n- main:\n  - heading \"Your Pattern, in constellation.\" [level=1]\n  - paragraph: Four chapter images, one constellation. Choose a chapter and explore its reading.\n  - paragraph: A fictional reading, drawn in stars. Your Sun sign stays on this page.\n  - text: Your Sun sign\n  - combobox \"Your Sun sign\":\n    - option \"Choose a sign\" [selected]\n    - option \"Aries\"\n    - option \"Taurus\"\n    - option \"Gemini\"\n    - option \"Cancer\"\n    - option \"Leo\"\n    - option \"Virgo\"\n    - option \"Libra\"\n    - option \"Scorpio\"\n    - option \"Sagittarius\"\n    - option \"Capricorn\"\n    - option \"Aquarius\"\n    - option \"Pisces\"\n  - paragraph: Optional. Your sign guides an artistic arrangement.\n  - region \"Pattern portrait\":\n    - paragraph: 4 chapters, one Pattern\n    - button \"3D view\" [pressed]\n    - button \"Reading view\"\n    - text: Exact birth time\n    - group \"Interactive 3D constellation\":\n      - img \"Rotatable constellation of the Pattern chapters. Use the chapter buttons for keyboard access.\"\n    - button \"Rotate left\"\n    - button \"Rotate right\"\n    - button \"Zoom in\": +\n    - button \"Zoom out\": \u2212\n    - button \"Reset view\"\n    - paragraph: Drag to turn. Tap a star to choose a chapter.\n    - navigation \"Pattern chapters\":\n      - 'button \"Generated chapter object: Door Closeness, with room to breathe\"':\n        - 'img \"Generated chapter object: Door\"'\n        - text: Closeness, with room to breathe\n      - 'button \"Generated chapter object: Notebook Giving your ideas a place\"':\n        - 'img \"Generated chapter object: Notebook\"'\n        - text: Giving your ideas a place\n      - 'button \"Generated chapter object: Metronome A steadiness of your own\"':\n        - 'img \"Generated chapter object: Metronome\"'\n        - text: A steadiness of your own\n      - 'button \"Generated chapter object: Lantern Letting change take its time\"':\n        - 'img \"Generated chapter object: Lantern\"'\n        - text: Letting change take its time\n    - paragraph: Four images trace one connected constellation. Their edges become stars and lines, with depth composed for this portrait. This is an artistic composition, not a map of the sky.\n    - region \"A little room to explore\":\n      - heading \"A little room to explore\" [level=2]\n      - paragraph: There is more than one way to read your Pattern.\n      - paragraph: Start with a chapter that catches your attention. Turn it over, explore what can feel difficult, and notice what you can draw on.\n      - paragraph: Each chapter leaves room for another expression. You can return to the whole whenever you like.\n      - button \"Explore the first chapter\"\n    - status: Whole Pattern. Choose a chapter to explore.\n  - group: Preview scenarios\n- contentinfo: A spatial reading study Pattern/Like \u00b7 September 2026",
+          "arrival": {
+            "top": 443.890625,
+            "bottom": 813.890625,
+            "width": 350,
+            "height": 370,
+            "visible": 370,
+            "viewport": 844,
+            "scrollY": 0
+          },
+          "reader": {
+            "top": 11.890625,
+            "focused": true,
+            "scrollY": 978
+          },
+          "sticky": {
+            "top": 0,
+            "bottom": 61,
+            "returnHit": true,
+            "chooseHit": true
+          }
+        },
+        {
+          "viewport": {
+            "width": 320,
+            "height": 740
+          },
+          "errors": [],
+          "warnings": [
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+            "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+          ],
+          "failedRequests": [],
+          "externalRequests": [],
+          "chunks": [
+            {
+              "url": "https://patternlike-portrait-preview.lfd.workers.dev/assets/PatternSculpture-Coi5m8PK.js",
+              "status": 200
+            }
+          ],
+          "probes": [
+            {
+              "offset": 0,
+              "point": {
+                "x": 192,
+                "y": 75
+              },
+              "before": 450,
+              "after": {
+                "scrollY": 450,
+                "selection": "04Letting change take its time\u2212",
+                "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+              }
+            },
+            {
+              "offset": -6,
+              "point": {
+                "x": 192,
+                "y": 75
+              },
+              "before": 450,
+              "after": {
+                "scrollY": 450,
+                "selection": "04Letting change take its time\u2212",
+                "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+              }
+            },
+            {
+              "offset": -12,
+              "point": {
+                "x": 192,
+                "y": 75
+              },
+              "before": 450,
+              "after": {
+                "scrollY": 450,
+                "selection": "04Letting change take its time\u2212",
+                "selectedLabel": "Chapter 4 of 4Letting change take its timeRead chapter"
+              }
+            }
+          ],
+          "snapshot": "- link \"Skip to the portrait\":\n  - /url: \"#portrait-main\"\n- banner:\n  - link \"Pattern/Like portrait preview\":\n    - /url: /pattern-portrait.html\n    - text: Pattern/Like\n  - text: Fictional preview\n- main:\n  - heading \"Your Pattern, in constellation.\" [level=1]\n  - paragraph: Four chapter images, one constellation. Choose a chapter and explore its reading.\n  - paragraph: A fictional reading, drawn in stars. Your Sun sign stays on this page.\n  - text: Your Sun sign\n  - combobox \"Your Sun sign\":\n    - option \"Choose a sign\" [selected]\n    - option \"Aries\"\n    - option \"Taurus\"\n    - option \"Gemini\"\n    - option \"Cancer\"\n    - option \"Leo\"\n    - option \"Virgo\"\n    - option \"Libra\"\n    - option \"Scorpio\"\n    - option \"Sagittarius\"\n    - option \"Capricorn\"\n    - option \"Aquarius\"\n    - option \"Pisces\"\n  - paragraph: Optional. Your sign guides an artistic arrangement.\n  - region \"Pattern portrait\":\n    - paragraph: 4 chapters, one Pattern\n    - button \"3D view\" [pressed]\n    - button \"Reading view\"\n    - text: Exact birth time\n    - group \"Interactive 3D constellation\":\n      - img \"Rotatable constellation of the Pattern chapters. Use the chapter buttons for keyboard access.\"\n    - button \"Rotate left\"\n    - button \"Rotate right\"\n    - button \"Zoom in\": +\n    - button \"Zoom out\": \u2212\n    - button \"Reset view\"\n    - paragraph: Drag to turn. Tap a star to choose a chapter.\n    - navigation \"Pattern chapters\":\n      - 'button \"Generated chapter object: Door Closeness, with room to breathe\"':\n        - 'img \"Generated chapter object: Door\"'\n        - text: Closeness, with room to breathe\n      - 'button \"Generated chapter object: Notebook Giving your ideas a place\"':\n        - 'img \"Generated chapter object: Notebook\"'\n        - text: Giving your ideas a place\n      - 'button \"Generated chapter object: Metronome A steadiness of your own\"':\n        - 'img \"Generated chapter object: Metronome\"'\n        - text: A steadiness of your own\n      - 'button \"Generated chapter object: Lantern Letting change take its time\"':\n        - 'img \"Generated chapter object: Lantern\"'\n        - text: Letting change take its time\n    - paragraph: Four images trace one connected constellation. Their edges become stars and lines, with depth composed for this portrait. This is an artistic composition, not a map of the sky.\n    - region \"A little room to explore\":\n      - heading \"A little room to explore\" [level=2]\n      - paragraph: There is more than one way to read your Pattern.\n      - paragraph: Start with a chapter that catches your attention. Turn it over, explore what can feel difficult, and notice what you can draw on.\n      - paragraph: Each chapter leaves room for another expression. You can return to the whole whenever you like.\n      - button \"Explore the first chapter\"\n    - status: Whole Pattern. Choose a chapter to explore.\n  - group: Preview scenarios\n- contentinfo: A spatial reading study Pattern/Like \u00b7 September 2026",
+          "arrival": {
+            "top": 462.03125,
+            "bottom": 787.625,
+            "width": 280,
+            "height": 325.59375,
+            "visible": 277.96875,
+            "viewport": 740,
+            "scrollY": 0
+          },
+          "reader": {
+            "top": 11.65625,
+            "focused": true,
+            "scrollY": 970
+          },
+          "sticky": {
+            "top": 0,
+            "bottom": 61,
+            "returnHit": true,
+            "chooseHit": true
+          }
+        }
+      ],
+      "passed": true
+    },
+    "axe_320": [
+      {
+        "state": "overview",
+        "violations": []
+      },
+      {
+        "state": "reader",
+        "violations": []
+      },
+      {
+        "state": "sticky-reader",
+        "violations": []
+      }
+    ]
+  },
+  "image_causality": {
+    "decoder": "Chromium createImageBitmap + canvas, max128, same as viewer",
+    "stars": 305,
+    "segments": 310,
+    "contributions": [
+      {
+        "index": 0,
+        "aspect": 0.3504273504273504,
+        "coverage": 0.9508025849489264,
+        "openingArea": 0,
+        "skew": 8.415080458435723e-05,
+        "stars": 66,
+        "interiorLines": 8
+      },
+      {
+        "index": 1,
+        "aspect": 1.1585365853658536,
+        "coverage": 0.7098844672657253,
+        "openingArea": 0,
+        "skew": 0.011490794896261052,
+        "stars": 75,
+        "interiorLines": 7
+      },
+      {
+        "index": 2,
+        "aspect": 0.5648148148148148,
+        "coverage": 0.6311475409836066,
+        "openingArea": 0.0037947783849423193,
+        "skew": -0.0014498985049396574,
+        "stars": 82,
+        "interiorLines": 8
+      },
+      {
+        "index": 3,
+        "aspect": 0.48598130841121495,
+        "coverage": 0.4931703810208483,
+        "openingArea": 0.19626168224299065,
+        "skew": 0.0007841054268556167,
+        "stars": 82,
+        "interiorLines": 8
+      }
+    ],
+    "bounds": {
+      "min": [
+        -1.194754958152771,
+        -1.3309800624847412,
+        -0.23344363272190094
+      ],
+      "max": [
+        1.2497118711471558,
+        1.4398573637008667,
+        0.323665976524353
+      ]
+    },
+    "substitutions": [
+      {
+        "source": 0,
+        "replacement": 1,
+        "changedSourceGeometry": true,
+        "otherSourcePositionsUnchanged": true
+      },
+      {
+        "source": 1,
+        "replacement": 2,
+        "changedSourceGeometry": true,
+        "otherSourcePositionsUnchanged": true
+      },
+      {
+        "source": 2,
+        "replacement": 3,
+        "changedSourceGeometry": true,
+        "otherSourcePositionsUnchanged": true
+      },
+      {
+        "source": 3,
+        "replacement": 0,
+        "changedSourceGeometry": true,
+        "otherSourcePositionsUnchanged": true
+      }
+    ]
+  },
+  "limits": [
+    "Fictional four-image fixture; no authenticated chart integration.",
+    "Artistic image relief and sign arrangement, not reconstructed objects or astronomical coordinates.",
+    "Software WebGL and touch emulation; no physical-device claim.",
+    "Superseded rapid-switch image fetches cancel as expected."
+  ],
+  "ci": {
+    "status": "passed",
+    "lanes_passed": 14,
+    "exit_code": 0,
+    "log": "/tmp/pattern-portrait-constellation-ci.log",
+    "summary": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 SUMMARY \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\ncommit  25c8b66 on codex/pattern-portrait\nnode    v22.23.2   npm 10.9.8   python 3.14.4\nnote    local 3.14.4, ci.yml pinned 3.12\n\n  pass   contracts: npm run test:contracts\n  pass   monorepo: npm ci --dry-run (lockfile agrees with package.json)\n  pass   monorepo: ephemeris download\n  pass   monorepo: npm run typecheck\n  pass   monorepo: test @patternlike/shared\n  pass   monorepo: test @patternlike/reading-engine\n  pass   monorepo: test @patternlike/calc-stub\n  pass   monorepo: test @patternlike/ontology-signer\n  pass   monorepo: test @patternlike/api\n  pass   monorepo: test @patternlike/web\n  pass   monorepo: npm run build\n  pass   extra: test @patternlike/pattern-engine\n  pass   extra: test @patternlike/codex-runner\n  pass   extra: npm run test:content\n\nALL STEPS PASSED \u2014 safe to merge on local evidence.",
+    "final_frontend": {
+      "typecheck": "passed",
+      "build": "passed",
+      "test_files": 34,
+      "tests_passed": 438,
+      "exit_code": 0,
+      "log": "/tmp/pattern-portrait-mobile-polish/final-web.log"
+    }
+  },
+  "screenshots": {
+    "constellation-desktop.png": "f7613d50077e8fb85729d31c660d7b2012fd7b95f28da10d80250aaae95b8189",
+    "constellation-mobile.png": "bf25ce011ef0f7343a28721e539f0f776f133c82cba4237c152a1e5d0b2b2c76",
+    "constellation-mobile-selection.png": "2540ebad59d5e66d559868ccc1b9339e9ec8e3261a1a11dda9642e9d4d214f9b",
+    "constellation-mobile-reader.png": "c35ec9cc71298badbcf68ee1efbef46af78f169460adf5ae5bd51a153c616d23"
+  }
+}

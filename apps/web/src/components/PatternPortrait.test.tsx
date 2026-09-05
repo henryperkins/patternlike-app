@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fictionalPattern } from "../preview/pattern-portrait-fixture.js";
@@ -17,10 +17,51 @@ vi.mock("./PatternSculpture.js", () => ({
   },
 }));
 
-beforeEach(() => { graphics.fail = false; graphics.ready = true; });
+beforeEach(() => {
+  graphics.fail = false;
+  graphics.ready = true;
+  // jsdom has no native scrolling; mode changes now intentionally use it.
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+});
 const ready = { status: "ready" as const, document: fictionalPattern };
 
 describe("Pattern portrait reader", () => {
+  it("keeps star selection in place until Read chapter is requested, even after earlier navigation", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("max-width"), addEventListener: () => undefined, removeEventListener: () => undefined }));
+    const scroll = vi.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    try {
+      const user = userEvent.setup();
+      render(<PatternPortrait source={ready} objectBindings={imageStudyBindings} />);
+      await screen.findByTestId("sculpture");
+      await user.click(screen.getByRole("button", { name: /Giving your ideas a place/ }));
+      scroll.mockClear();
+      act(() => graphics.props.mock.lastCall![0].onSelect(0));
+      expect(scroll).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Read chapter" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Read chapter" }));
+      expect(screen.getByRole("region", { name: "Closeness, with room to breathe" })).toHaveFocus();
+      expect(scroll).toHaveBeenCalledOnce();
+      await user.click(screen.getByRole("button", { name: "Resources" }));
+      await user.click(screen.getByRole("button", { name: "Back to constellation" }));
+      expect(screen.getByRole("group", { name: "Interactive 3D constellation" })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Resources" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("heading", { name: "Closeness, with room to breathe" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Read chapter" }));
+      await user.click(screen.getByRole("button", { name: "Reading view" }));
+      await user.click(screen.getByRole("button", { name: "3D view" }));
+      expect(screen.getByRole("group", { name: "Interactive 3D constellation" })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Resources" })).toHaveAttribute("aria-pressed", "true");
+      await user.selectOptions(screen.getByRole("combobox", { name: "Choose chapter" }), "chapter-3");
+      expect(screen.getByRole("heading", { name: "A steadiness of your own" })).toBeInTheDocument();
+      await user.selectOptions(screen.getByRole("combobox", { name: "Choose chapter" }), "");
+      expect(screen.queryByRole("button", { name: "Read chapter" })).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "A little room to explore" })).toBeInTheDocument();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
   it("waits for a fresh renderer when a quick sign change returns to the last ready sign", async () => {
     const { rerender } = render(<PatternPortrait source={{ ...ready, sunSign: "aries" }} objectBindings={imageStudyBindings} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Rotate left" })).toBeEnabled());
@@ -74,14 +115,14 @@ describe("Pattern portrait reader", () => {
       const { rerender } = render(<PatternPortrait source={ready} objectBindings={imageStudyBindings} />);
       await user.click(screen.getByRole("button", { name: /Closeness, with room to breathe/ }));
       expect(screen.getByRole("note", { name: "Chapter object" })).toHaveTextContent(imageStudyBindings[0].object.rationale);
-      await user.click(screen.getByRole("button", { name: "View the whole sculpture" }));
-      expect(screen.getByRole("group", { name: "Interactive 3D sculpture" })).toHaveFocus();
+      await user.click(screen.getByRole("button", { name: "View the whole constellation" }));
+      expect(screen.getByRole("group", { name: "Interactive 3D constellation" })).toHaveFocus();
       expect(screen.getByRole("button", { name: /Closeness, with room to breathe/ })).toHaveAttribute("aria-pressed", "true");
       expect(scroll).toHaveBeenCalled();
       rerender(<PatternPortrait source={{ status: "ready", document: { ...fictionalPattern, pattern_id: "replacement" } }} objectBindings={imageStudyBindings} />);
       await user.click(screen.getByRole("button", { name: /Closeness, with room to breathe/ }));
       expect(screen.queryByRole("note", { name: "Chapter object" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "View the whole sculpture" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "View the whole constellation" })).not.toBeInTheDocument();
     } finally {
       HTMLElement.prototype.scrollIntoView = original;
     }

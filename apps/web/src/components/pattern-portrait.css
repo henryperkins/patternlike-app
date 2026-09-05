@@ -10,11 +10,18 @@
 .portrait-accuracy p { margin: 0; max-width: 75ch; }
 .portrait-layout { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
 .portrait-instrument { min-width: 0; padding: 0 32px 24px 0; }
-.portrait-stage { height: clamp(350px, 38vw, 500px); position: relative; }
+.portrait-stage { height: clamp(400px, 43vw, 560px); position: relative; margin: 20px 0 8px; background: #091923; color: #e5e8e5; }
 .portrait-stage > div { min-height: 0; }
 .portrait-canvas { width: 100%; height: 100%; overflow: hidden; }
 .portrait-canvas canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
-.portrait-graphics-message { padding: 70px 24px; color: var(--ink-soft); font-size: 15px; line-height: 1.65; }
+.portrait-stage, .portrait-reader { scroll-margin-top: 12px; }
+.portrait-selection { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #091923; color: #e5e8e5; margin-top: -8px; padding: 14px 18px; }
+.portrait-selection p { margin: 0; font-family: var(--serif); font-size: 18px; line-height: 1.35; }
+.portrait-selection p span { display: block; margin-bottom: 4px; font-family: var(--sans); font-size: 11px; color: #c2d1d7; }
+.portrait-selection button { flex-shrink: 0; min-height: 44px; padding: 8px 12px; border: 1px solid #879ca8; border-radius: 0; background: transparent; color: #e5e8e5; cursor: pointer; font-size: 12px; }
+.portrait-selection button:hover { background: #213b49; }
+.portrait-selection button:focus-visible { outline: 2px solid #e9cf96; outline-offset: 3px; }
+.portrait-graphics-message { padding: 70px 24px; color: #c2d1d7; font-size: 15px; line-height: 1.65; }
 .portrait-camera-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 4px; }
 .portrait-camera-controls button { border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--ink-soft); min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 12px; cursor: pointer; }
 .portrait-camera-controls button:hover:enabled { color: var(--ink); border-bottom-color: var(--line-dark); background: var(--paper-deep); }
@@ -39,7 +46,10 @@
 .portrait-object-note strong { font-weight: 600; color: var(--ink); }
 .portrait-object-note button { min-height: 44px; padding: 8px 0; border: 0; background: none; color: var(--forest); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 .portrait-object-note button:disabled { opacity: 0.5; cursor: default; }
-.portrait-back { display: block; padding: 0; min-height: 44px; color: var(--ink-soft); border: 0; background: none; cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 4px; margin: -44px 0 16px; }
+.portrait-reader-nav { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin: -44px 0 20px; padding: 8px 0; background: var(--paper); }
+.portrait-back { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 0 8px 0 0; min-height: 44px; color: var(--forest); border: 0; background: none; cursor: pointer; font-size: 12px; }
+.portrait-back:hover { text-decoration: underline; text-underline-offset: 4px; }
+.portrait-reader-nav select { min-width: 0; max-width: 60%; min-height: 44px; padding: 8px; border: 1px solid var(--line-dark); border-radius: 0; background: var(--paper-light); color: var(--ink); font-size: 14px; }
 .portrait-expressions { display: flex; flex-wrap: wrap; gap: 4px 14px; border-bottom: 1px solid var(--line); margin: 28px 0 22px; }
 .portrait-expressions button { border: 0; border-bottom: 2px solid transparent; color: var(--ink-soft); background: none; cursor: pointer; min-height: 44px; padding: 8px 0; font-size: 12px; }
 .portrait-expressions button[aria-pressed="true"] { color: var(--forest); border-bottom-color: var(--forest); }
@@ -64,19 +74,33 @@
 @media (max-width: 850px) {
   .portrait-layout { grid-template-columns: minmax(0, 1fr); }
   .portrait-instrument { padding: 0 0 26px; }
-  .portrait-stage { height: 370px; }
+  .portrait-stage { height: clamp(300px, 44svh, 430px); margin-top: 12px; }
   .portrait-reader { border-left: 0; border-top: 1px solid var(--line); padding: 36px 0; }
   .portrait-reader--selected { padding-top: 68px; }
+  .portrait-layout--selected .portrait-instrument { padding-bottom: 4px; }
+  .portrait-layout--selected .portrait-chapter-index, .portrait-layout--selected .portrait-legend { display: none; }
+  .portrait-reader-nav { position: sticky; top: 0; z-index: 2; gap: 8px; margin-top: -60px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .portrait-reader-nav select { flex: 1; max-width: 65%; font-size: 16px; }
+  .portrait-object-note button { display: none; }
+  .portrait-camera-controls { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px 0; }
+  .portrait-camera-controls button { padding: 6px 2px; line-height: 1.25; border: 1px solid var(--line); }
+  .portrait-camera-controls button:active:enabled { background: var(--forest-light); }
+  .portrait-sun-influence { margin: 6px auto; font-size: 12px; }
   .portrait-reader h2 { max-width: 20ch; }
   .portrait-instruction { margin-bottom: 20px; }
 }
 @media (max-width: 440px) {
-  .portrait-toolbar { align-items: flex-start; flex-direction: column; gap: 12px; }
-  .portrait-stage { height: 310px; }
+  .portrait-toolbar { align-items: center; gap: 8px; padding: 12px 0; }
+  .portrait-toolbar > p { max-width: 90px; font-size: 12px; line-height: 1.4; }
+  .portrait-mode button { padding: 0 12px; font-size: 12px; }
+  .portrait-accuracy { font-size: 11px; padding-bottom: 10px; }
+  .portrait-stage { height: clamp(290px, 44svh, 370px); }
+  .portrait-selection { padding: 12px; gap: 10px; }
+  .portrait-selection p { font-size: 16px; }
   .portrait-chapter-index button { font-size: 17px; gap: 8px; }
   .portrait-reader .portrait-summary { font-size: 23px; }
-  .portrait-camera-controls { gap: 0; }
-  .portrait-camera-controls button { padding: 0 6px; }
+  .portrait-camera-controls { gap: 4px; }
+  .portrait-camera-controls button { padding: 6px 2px; }
 }
 
 .portrait-reference { width: 64px; height: 76px; object-fit: contain; mix-blend-mode: multiply; }
