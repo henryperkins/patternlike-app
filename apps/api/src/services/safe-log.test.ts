@@ -9,6 +9,42 @@ afterEach(() => {
 });
 
 describe("safe logging", () => {
+  it("logs Daily validation codes without candidate text or extra failure fields", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    safeLog({
+      event: "reading_candidate_rejected",
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      prompt_version: "1.0.2",
+      validation_policy_version: "1.0.0",
+      provider_response_hash: `sha256:${"a".repeat(64)}`,
+      failures: [{
+        code: "echo",
+        detail_code: "local_date_mismatch",
+        text: SENTINEL,
+        fact_ids: [SENTINEL],
+      }],
+      candidate: SENTINEL,
+      user_id: SENTINEL,
+      reading_id: SENTINEL,
+    } as unknown as SafeLogEvent);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]).toEqual([
+      "reading_candidate_rejected",
+      {
+        trace_id: expect.stringMatching(/^trc_[0-9a-f]{32}$/),
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        prompt_version: "1.0.2",
+        validation_policy_version: "1.0.0",
+        provider_response_hash: `sha256:${"a".repeat(64)}`,
+        failures: [{ code: "echo", detail_code: "local_date_mismatch" }],
+      },
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(SENTINEL);
+  });
+
   it("projects only closed Codex control-plane completion metadata", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const hostile = {

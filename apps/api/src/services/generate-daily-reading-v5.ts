@@ -7,6 +7,7 @@ import {
   VALIDATION_POLICY_VERSION,
   prepareConstrainedReadingInput,
   validateReadingCandidate,
+  type CandidateFailure,
   type ConstrainedContextSignalInput,
   type ConstrainedContextSourceInput,
 } from "@patternlike/reading-engine";
@@ -692,11 +693,27 @@ export async function generateDailyReadingV5(
     output_tokens: publisher.metadata.output_tokens,
     provider_response_hash: publisher.metadata.provider_response_hash,
   });
+  // The queue persists only the broad failure class, and terminal Daily
+  // exchanges are purged. Preserve the validator's content-free codes here,
+  // correlated to the completed call by its existing response hash.
+  const logRejection = (failures: readonly CandidateFailure[]): void => {
+    safeLog({
+      event: "reading_candidate_rejected",
+      provider: publisher.metadata.provider,
+      model: publisher.metadata.model,
+      prompt_version: command.publisher.prompt_version,
+      validation_policy_version: command.publisher.validation_policy_version,
+      provider_response_hash: publisher.metadata.provider_response_hash,
+      failures,
+    });
+  };
   if (!validateOutputSchema(publisher.candidate)) {
+    logRejection([{ code: "schema_shape", detail_code: "schema_mismatch" }]);
     return fail("publisher_output_invalid", "schema_mismatch");
   }
   const validated = validateReadingCandidate(publisher.candidate, prepared);
   if (!validated.ok) {
+    logRejection(validated.failures);
     const detail = validated.failures[0];
     return fail(
       "publisher_output_invalid",

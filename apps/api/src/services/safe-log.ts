@@ -3,6 +3,7 @@ import {
   type NatalFeatureClass,
   type ReadingPublisherProvider,
 } from "@patternlike/shared";
+import type { CandidateFailure } from "@patternlike/reading-engine";
 import type { EnsureTodayFailureReason } from "./ensure-today-reading.js";
 import type { GenerationFailureCode } from "./generation-failures.js";
 import type { OntologyVerdictDimension } from "./ontology-publisher.js";
@@ -283,6 +284,15 @@ export type SafeLogEvent =
       provider_response_hash: string;
     }
   | {
+      event: "reading_candidate_rejected";
+      provider: ReadingPublisherProvider;
+      model: string;
+      prompt_version: string;
+      validation_policy_version: string;
+      provider_response_hash: string;
+      failures: readonly CandidateFailure[];
+    }
+  | {
       event: "publisher_attempt_failed";
       provider: ReadingPublisherProvider;
       model: string;
@@ -378,6 +388,17 @@ export function safeLog(input: SafeLogEvent): string {
         input_tokens: input.input_tokens,
         output_tokens: input.output_tokens,
         provider_response_hash: input.provider_response_hash,
+      });
+      break;
+    case "reading_candidate_rejected":
+      console.warn(input.event, {
+        trace_id,
+        provider: input.provider,
+        model: input.model,
+        prompt_version: input.prompt_version,
+        validation_policy_version: input.validation_policy_version,
+        provider_response_hash: input.provider_response_hash,
+        failures: input.failures.map(({ code, detail_code }) => ({ code, detail_code })),
       });
       break;
     case "publisher_attempt_failed":

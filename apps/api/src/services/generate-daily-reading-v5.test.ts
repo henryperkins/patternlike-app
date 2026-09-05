@@ -584,6 +584,47 @@ describe("V5 execution", () => {
     expect(providerCalls).toBe(1);
   });
 
+  it.each([
+    [
+      "output schema",
+      (candidate: ReadingGenerationOutput) => ({ ...candidate, extra: "private output" }),
+      [{ code: "schema_shape", detail_code: "schema_mismatch" }],
+    ],
+    [
+      "candidate policy",
+      (candidate: ReadingGenerationOutput) => ({ ...candidate, local_date: "2001-01-01" }),
+      [{ code: "echo", detail_code: "local_date_mismatch" }],
+    ],
+  ] as const)("records the %s rejection without exposing the reading", async (_label, mutate, failures) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { enqueued, claim } = await claimReserved();
+    const privateText = "A private thought that stays with the reader.";
+    const { result, providerCalls } = await withProvider(
+      (candidate) => mutate({
+        ...candidate,
+        lead: { ...candidate.lead, text: privateText },
+      }),
+      () => dispatchGeneration(enabledEnv(), claim),
+    );
+
+    expect(result).toMatchObject({ ok: false, reason: "publisher_output_invalid" });
+    expect(providerCalls).toBe(1);
+    const rejections = warn.mock.calls.filter(([event]) => event === "reading_candidate_rejected");
+    expect(rejections).toHaveLength(1);
+    expect(rejections[0]![1]).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      prompt_version: "1.0.2",
+      validation_policy_version: "1.0.0",
+      provider_response_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      failures,
+    });
+    const serialized = JSON.stringify(rejections);
+    for (const forbidden of [privateText, "private output", USER_A, claim.jobId, enqueued.readingId]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
   it("rejects a missing required uncertainty note", async () => {
     const { claim } = await claimReserved({ accuracy: "unknown" });
     const { result, providerCalls } = await withProvider(
