@@ -193,7 +193,7 @@ describe("V2 command", () => {
     expect(built.command.publisher).toMatchObject({
       provider: READING_PUBLISHER_PROVIDER,
       model: OPENAI_READING_MODEL,
-      reasoning_effort: "high",
+      reasoning_effort: "xhigh",
       output_schema: "daily-reading-v5",
       max_output_tokens: 4000,
       context_max_bytes: 98304,
