@@ -6,6 +6,7 @@
  */
 import { Component, Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortraitManifest, portraitImageUrls, type PortraitChapter, type PortraitManifest, type PortraitObjectBinding, type PortraitSource } from "../lib/pattern-portrait.js";
+import { sunShapeProfiles } from "../lib/sun-sculpture.js";
 import type { CameraAction } from "./PatternSculpture.js";
 import "./pattern-portrait.css";
 
@@ -65,9 +66,12 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
   const [navigation, setNavigation] = useState(0);
   const [expression, setExpression] = useState<Expression>("overview");
   const [reading, setReading] = useState(false);
-  const imageKey = JSON.stringify(imageUrls);
-  const [readyImageKey, setReadyImageKey] = useState<string | null>(null);
-  const sceneReady = imageUrls !== null && readyImageKey === imageKey;
+  const sculptureKey = JSON.stringify([imageUrls, manifest.sunSign]);
+  const sunProfile = manifest.sunSign ? sunShapeProfiles[manifest.sunSign] : null;
+  const [readySculptureKey, setReadySculptureKey] = useState<string | null>(null);
+  // Even a previously rendered sign needs a fresh renderer after a remount.
+  useLayoutEffect(() => setReadySculptureKey(null), [sculptureKey]);
+  const sceneReady = imageUrls !== null && readySculptureKey === sculptureKey;
   const [cameraAction, setCameraAction] = useState<CameraAction>({ kind: "reset", serial: 0 });
   const reducedMotion = useReducedMotion();
   const readerId = useId();
@@ -75,8 +79,8 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
   const readerRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const chapter = manifest.chapters.find((item) => item.id === selected) ?? null;
-  const onReady = useCallback(() => setReadyImageKey(imageKey), [imageKey]);
-  const onUnavailable = useCallback(() => setReadyImageKey(null), []);
+  const onReady = useCallback(() => setReadySculptureKey(sculptureKey), [sculptureKey]);
+  const onUnavailable = useCallback(() => setReadySculptureKey(null), []);
   const selectChapter = useCallback((id: string | null) => {
     setSelected(id);
     setExpression("overview");
@@ -100,7 +104,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
         <p>{manifest.chapters.length} chapters, one Pattern</p>
         <div className="portrait-mode" aria-label="Presentation">
           <button type="button" aria-pressed={!reading} onClick={() => setReading(false)}>3D view</button>
-          <button type="button" aria-pressed={reading} onClick={() => { setReadyImageKey(null); setReading(true); }}>Reading view</button>
+          <button type="button" aria-pressed={reading} onClick={() => { setReadySculptureKey(null); setReading(true); }}>Reading view</button>
         </div>
       </div>
       <div className="portrait-accuracy">
@@ -115,9 +119,9 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
         <div className="portrait-layout">
           <div className="portrait-instrument">
             <div className="portrait-stage" role="group" aria-label="Interactive 3D sculpture" ref={stageRef} tabIndex={-1}>
-              <GraphicsBoundary key={imageKey} onUnavailable={onUnavailable}>
+              <GraphicsBoundary key={sculptureKey} onUnavailable={onUnavailable}>
                 <Suspense fallback={<p className="portrait-graphics-message" role="status">Loading the 3D view. The chapters are ready to read.</p>}>
-                  {imageUrls ? <PatternSculpture key={JSON.stringify(imageUrls)} imageUrls={imageUrls} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to build this sculpture. You can still read every chapter.</p>}
+                  {imageUrls ? <PatternSculpture key={sculptureKey} imageUrls={imageUrls} sunSign={manifest.sunSign} selectedIndex={manifest.chapters.findIndex((item) => item.id === selected)} onSelect={(index) => selectChapter(index === null ? null : manifest.chapters[index]?.id ?? null)} reducedMotion={reducedMotion} action={cameraAction} onReady={onReady} onUnavailable={onUnavailable} /> : <p className="portrait-graphics-message" role="status">Four chapter images are needed to build this sculpture. You can still read every chapter.</p>}
                 </Suspense>
               </GraphicsBoundary>
             </div>
@@ -128,6 +132,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
               <button type="button" onClick={() => moveCamera("farther")} disabled={!sceneReady || !imageUrls} aria-label="Zoom out">−</button>
               <button type="button" onClick={() => { selectChapter(null); moveCamera("reset"); }} disabled={!sceneReady || !imageUrls}>Reset view</button>
             </div>
+            {sunProfile ? <p className="portrait-sun-influence" role="status"><strong>{sunProfile.label} Sun.</strong> {sunProfile.description}</p> : null}
             <p className="portrait-instruction">Drag to turn the whole. Select a chapter image to explore.</p>
             <nav className="portrait-chapter-index" aria-label="Pattern chapters">
               {manifest.chapters.map((item) => (
@@ -139,7 +144,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
                 </button>
               ))}
             </nav>
-            <p className="portrait-legend">Four chapter images shape one sculpture. Their contours blend into an abstract form; select an image to return to its reading.</p>
+            <p className="portrait-legend">Four chapter images shape one sculpture.{sunProfile ? " Your Sun sign adds an artistic influence to its contours and curvature." : " Their contours blend into an abstract form."} Select an image to return to its reading.</p>
           </div>
           <section className={`portrait-reader${chapter ? " portrait-reader--selected" : ""}`} id={readerId} aria-labelledby={headingId} ref={readerRef} tabIndex={-1}>
             {chapter ? (
@@ -187,7 +192,7 @@ function ReadyPortrait({ manifest }: { manifest: PortraitManifest }) {
 }
 
 export function PatternPortrait({ source, objectBindings }: { source: PortraitSource; objectBindings?: readonly PortraitObjectBinding[] }) {
-  const manifest = useMemo(() => source.status === "ready" ? createPortraitManifest(source.document, objectBindings) : null, [source, objectBindings]);
+  const manifest = useMemo(() => source.status === "ready" ? createPortraitManifest(source.document, objectBindings, source.sunSign) : null, [source, objectBindings]);
   if (source.status === "loading") return <div className="portrait-empty" role="status"><h2>Loading your Pattern</h2><p>The portrait will appear when its reading is available.</p></div>;
   if (!manifest || manifest.chapters.length === 0) return <div className="portrait-empty" role="status"><h2>No Pattern to display</h2><p>Its portrait and reading have been removed from this view.</p></div>;
   return <ReadyPortrait key={manifest.revision} manifest={manifest} />;

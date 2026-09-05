@@ -1,7 +1,8 @@
 import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { BirthTimeAccuracy } from "@patternlike/shared";
+import { ZODIAC_SIGNS, type BirthTimeAccuracy, type ZodiacSignName } from "@patternlike/shared";
 import { PatternPortrait } from "../components/PatternPortrait.js";
+import { sunShapeProfiles } from "../lib/sun-sculpture.js";
 import type { PortraitSource } from "../lib/pattern-portrait.js";
 import { fictionalPattern } from "./pattern-portrait-fixture.js";
 import { imageStudyBindings } from "./image-study.js";
@@ -11,6 +12,7 @@ import "./pattern-portrait-preview.css";
 const objectBindings = imageStudyBindings;
 
 function PortraitPreview() {
+  const [sunSign, setSunSign] = useState<ZodiacSignName | null>(null);
   const [accuracy, setAccuracy] = useState<BirthTimeAccuracy>("exact");
   const [status, setStatus] = useState<PortraitSource["status"]>("ready");
   const [replacement, setReplacement] = useState(false);
@@ -18,6 +20,7 @@ function PortraitPreview() {
     if (status !== "ready") return { status };
     return {
       status: "ready",
+      sunSign,
       document: {
         ...fictionalPattern,
         pattern_id: replacement ? "pat_fictional_replacement" : fictionalPattern.pattern_id,
@@ -30,7 +33,7 @@ function PortraitPreview() {
             : null,
       },
     };
-  }, [status, accuracy, replacement]);
+  }, [status, accuracy, replacement, sunSign]);
 
   return (
     <div className="portrait-preview">
@@ -47,9 +50,18 @@ function PortraitPreview() {
           <h1>Your Pattern,<br />given form.</h1>
           <div>
             <p>A different way to find your way through a reading. Take a closer look at one theme, then see it as part of the whole.</p>
-            <p className="portrait-fictional-note">These chapters are fictional examples. No birth details or personal account are used.</p>
-            <p className="portrait-fictional-note">Four generated objects become one unified sculpture. Only the images’ visible contours determine its shape.</p>
+            <p className="portrait-fictional-note">These chapters are fictional examples. Your Sun sign selection stays in this page.</p>
+            <p className="portrait-fictional-note">Four generated objects become one unified sculpture. Add your Sun sign to influence its contours, proportions, and curvature.</p>
           </div>
+        </div>
+        <div className="portrait-sun-choice">
+          <label htmlFor="portrait-sun-sign">Your Sun sign
+            <select id="portrait-sun-sign" value={sunSign ?? ""} aria-describedby="portrait-sun-help" onChange={(event) => setSunSign(ZODIAC_SIGNS.find((sign) => sign === event.target.value) ?? null)}>
+              <option value="">Choose your Sun sign</option>
+              {ZODIAC_SIGNS.map((sign) => <option key={sign} value={sign}>{sunShapeProfiles[sign].label}</option>)}
+            </select>
+          </label>
+          <p id="portrait-sun-help">Choose the sign from your birth chart. This preview uses the sign you provide; each shape is an artistic interpretation.</p>
         </div>
         <PatternPortrait source={source} objectBindings={objectBindings} />
         <details className="portrait-preview-scenarios">

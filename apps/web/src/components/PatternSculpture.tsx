@@ -4,6 +4,7 @@ import { AmbientLight, DirectionalLight, Color, Float32BufferAttribute, Group, H
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createImageSculpture } from "../lib/image-sculpture.js";
 import { loadPortraitImages } from "../lib/portrait-images.js";
+import type { ZodiacSignName } from "@patternlike/shared";
 
 export interface CameraAction {
   kind: "left" | "right" | "closer" | "farther" | "reset";
@@ -11,6 +12,7 @@ export interface CameraAction {
 }
 interface SculptureProps {
   imageUrls: readonly string[];
+  sunSign: ZodiacSignName | null;
   selectedIndex: number;
   onSelect: (index: number | null) => void;
   reducedMotion: boolean;
@@ -255,11 +257,11 @@ function SculptureCanvas(props: CanvasProps) {
     : <div className="portrait-canvas" ref={host} />;
 }
 
-/** Geometry receives pixels only. Reading metadata never crosses this boundary. */
+/** Geometry receives image pixels and an explicit Sun sign; never reading metadata. */
 export default function PatternSculpture(props: SculptureProps) {
-  const imageKey = JSON.stringify(props.imageUrls);
+  const sculptureKey = JSON.stringify([props.imageUrls, props.sunSign]);
   const [loaded, setLoaded] = useState<{ key: string; model: SculptureModel } | null>(null);
-  const model = loaded?.key === imageKey ? loaded.model : null;
+  const model = loaded?.key === sculptureKey ? loaded.model : null;
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -268,11 +270,11 @@ export default function PatternSculpture(props: SculptureProps) {
     setFailed(false);
     void loadPortraitImages(props.imageUrls, controller.signal).then((images) => {
       if (controller.signal.aborted) return;
-      owned = createImageSculpture(images);
-      setLoaded({ key: imageKey, model: owned });
+      owned = createImageSculpture(images, props.sunSign);
+      setLoaded({ key: sculptureKey, model: owned });
     }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => { controller.abort(); owned?.geometry.dispose(); };
-  }, [imageKey]);
+  }, [sculptureKey]);
   useEffect(() => { if (failed) props.onUnavailable(); }, [failed, props.onUnavailable]);
   if (failed) return <p className="portrait-graphics-message" role="status">The four images could not be shaped into a sculpture. You can still read every chapter.</p>;
   return model ? <SculptureCanvas {...props} model={model} /> : <p className="portrait-graphics-message" role="status">Shaping the four chapter images…</p>;

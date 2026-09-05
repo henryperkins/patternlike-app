@@ -19,6 +19,8 @@
 .portrait-camera-controls button { border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--ink-soft); min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 12px; cursor: pointer; }
 .portrait-camera-controls button:hover:enabled { color: var(--ink); border-bottom-color: var(--line-dark); background: var(--paper-deep); }
 .portrait-camera-controls button:disabled { opacity: 0.5; cursor: default; }
+.portrait-sun-influence { margin: 10px auto; max-width: 52ch; padding: 0 14px; text-align: center; color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+.portrait-sun-influence strong { color: var(--ink); font-weight: 600; }
 .portrait-instruction { font-size: 12px; color: var(--ink-soft); text-align: center; margin: 10px 0 26px; }
 .portrait-chapter-index { display: grid; border-top: 1px solid var(--line); }
 .portrait-chapter-index button { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) 18px; align-items: center; gap: 12px; text-align: left; min-height: 62px; padding: 12px 10px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; font-family: var(--serif); font-size: 18px; line-height: 1.3; }

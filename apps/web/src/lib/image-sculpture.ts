@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { ZodiacSignName } from "@patternlike/shared";
+import { applySunShape } from "./sun-sculpture.js";
 
 export interface ImagePixels {
   width: number;
@@ -193,9 +195,10 @@ function rayBoundary(origin: Point, angle: number, boundary: Point[]): number {
  * background. It blends the envelopes into a single contour and rounds its
  * depth into a continuous surface. A measured opening becomes one aperture.
  * It does not classify subjects or interpret the inputs as camera views.
+ * An optional Sun sign applies a separate artistic deformation to that surface.
  * Caller owns the returned geometry and must dispose it.
  */
-export function createImageSculpture(images: readonly ImagePixels[]): {
+export function createImageSculpture(images: readonly ImagePixels[], sunSign: ZodiacSignName | null = null): {
   geometry: THREE.BufferGeometry;
   color: [number, number, number];
   contributions: Array<{ index: number; aspect: number; coverage: number; openingArea: number; skew: number }>;
@@ -280,6 +283,7 @@ export function createImageSculpture(images: readonly ImagePixels[]): {
       indices.push(last, last - SEGMENTS + next, last - SEGMENTS + i);
     }
   }
+  if (sunSign !== null) applySunShape(positions, sunSign);
   let maximumRadius = 0;
   for (let i = 0; i < positions.length; i += 3) maximumRadius = Math.max(maximumRadius, Math.hypot(positions[i]!, positions[i + 1]!, positions[i + 2]!));
   if (maximumRadius > 2.19) {

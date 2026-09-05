@@ -1,4 +1,4 @@
-import type { BirthTimeAccuracy, PatternResponseV7 } from "@patternlike/shared";
+import { ZODIAC_SIGNS, type BirthTimeAccuracy, type PatternResponseV7, type ZodiacSignName } from "@patternlike/shared";
 
 export interface PortraitChapter {
   id: string;
@@ -36,12 +36,13 @@ export interface PortraitManifest {
   revision: string;
   accuracy: BirthTimeAccuracy;
   uncertainty: string | null;
+  sunSign: ZodiacSignName | null;
   chapters: PortraitChapter[];
   signatures: Array<{ title: string; text: string }>;
 }
 
 export type PortraitSource =
-  | { status: "ready"; document: PatternResponseV7 }
+  | { status: "ready"; document: PatternResponseV7; sunSign?: ZodiacSignName | null }
   | { status: "loading" }
   | { status: "unavailable" };
 
@@ -66,11 +67,17 @@ export function portraitImageUrls(manifest: PortraitManifest): readonly string[]
 }
 
 /** Local presentation only. Never copy evidence, provider packets, or inferred links. */
-export function createPortraitManifest(document: PatternResponseV7, bindings: readonly PortraitObjectBinding[] = []): PortraitManifest {
+export function createPortraitManifest(
+  document: PatternResponseV7,
+  bindings: readonly PortraitObjectBinding[] = [],
+  sunSign?: ZodiacSignName | null,
+): PortraitManifest {
   const manifest: PortraitManifest = {
     revision: `${document.schema_version}:${document.pattern_id}:${document.generated_at}`,
     accuracy: document.effective_accuracy,
     uncertainty: document.uncertainty?.text ?? null,
+    // Supplied by the caller from chart facts or an explicitly labeled preview control.
+    sunSign: typeof sunSign === "string" && ZODIAC_SIGNS.includes(sunSign) ? sunSign : null,
     chapters: document.core_chapters.map((chapter, index) => ({
       id: `chapter-${index + 1}`,
       ordinal: index + 1,

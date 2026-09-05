@@ -1,9 +1,43 @@
 import { describe, expect, it } from "vitest";
+import type { ZodiacSignName } from "@patternlike/shared";
 import { fictionalPattern } from "../preview/pattern-portrait-fixture.js";
 import { createPortraitManifest, portraitImageUrls } from "./pattern-portrait.js";
 import { imageStudyBindings } from "../preview/image-study.js";
 
 describe("portrait projection", () => {
+  it.each([
+    "aries", "taurus", "gemini", "cancer", "leo", "virgo",
+    "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces",
+  ] as const)("accepts the supplied %s Sun sign", (sunSign) => {
+    expect(createPortraitManifest(fictionalPattern, imageStudyBindings, sunSign).sunSign).toBe(sunSign);
+  });
+
+  it("leaves Sun-sign influence absent for missing or unsupported input", () => {
+    expect(createPortraitManifest(fictionalPattern).sunSign).toBeNull();
+    for (const sunSign of [undefined, null, "", "Aries", "aries ", "ophiuchus", 0, {}, ["aries"]]) {
+      const manifest = createPortraitManifest(fictionalPattern, imageStudyBindings, sunSign as ZodiacSignName | null | undefined);
+      expect(manifest.sunSign).toBeNull();
+      expect(portraitImageUrls(manifest)).toEqual(imageStudyBindings.map((binding) => binding.object.imageUrl));
+    }
+  });
+
+  it("preserves the document identity and chapter images when the Sun sign changes", () => {
+    const initial = createPortraitManifest(fictionalPattern, imageStudyBindings, "aries");
+    const replacement = createPortraitManifest(fictionalPattern, imageStudyBindings, "pisces");
+    expect(replacement.sunSign).toBe("pisces");
+    expect(replacement.revision).toBe(initial.revision);
+    expect(replacement.chapters).toEqual(initial.chapters);
+    expect(portraitImageUrls(replacement)).toEqual(imageStudyBindings.map((binding) => binding.object.imageUrl));
+  });
+
+  it("never infers a Sun sign from published prose", () => {
+    const document = structuredClone(fictionalPattern);
+    document.core_chapters[0].title = "Sun in Aries";
+    document.core_chapters[0].summary = "Your Sun sign is Aries.";
+    expect(createPortraitManifest(document).sunSign).toBeNull();
+    expect(createPortraitManifest(document, [], "taurus").sunSign).toBe("taurus");
+  });
+
   it("binds all four generated images to the exact reference document", () => {
     const manifest = createPortraitManifest(fictionalPattern, imageStudyBindings);
     expect(manifest.chapters.map((chapter) => chapter.object?.label)).toEqual(["Door", "Notebook", "Metronome", "Lantern"]);

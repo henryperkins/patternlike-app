@@ -2,7 +2,7 @@ import type { ImagePixels } from "./image-sculpture.js";
 
 const MAX_IMAGE_SIDE = 128;
 
-/** Decode the four references; the modeling function receives pixels, never metadata. */
+/** Decode four references independently of Sun sign or reading metadata. */
 export async function loadPortraitImages(urls: readonly string[], signal: AbortSignal): Promise<ImagePixels[]> {
   if (urls.length !== 4 || urls.some((url) => !url.trim())) {
     throw new Error("A portrait requires four image references.");

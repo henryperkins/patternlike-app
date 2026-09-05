@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZODIAC_SIGNS } from "@patternlike/shared";
 import { createImageSculpture, type ImagePixels } from "./image-sculpture.js";
 
 function pixels(halfWidth = 20, opening = false, taper = 0): ImagePixels {
@@ -71,6 +72,49 @@ function widthOf(result: ReturnType<typeof createImageSculpture>): number {
 }
 
 describe("createImageSculpture", () => {
+  it("changes the actual vertices distinctly for each Sun sign while keeping the image evidence", () => {
+    const images = [pixels(), pixels(29), pixels(26, false, 0.5), pixels(24, true)];
+    const original = createImageSculpture(images);
+    const baseline = Array.from(original.geometry.getAttribute("position").array);
+    const variants = new Set<string>();
+    for (const sign of ZODIAC_SIGNS) {
+      const shaped = createImageSculpture(images, sign);
+      const positions = Array.from(shaped.geometry.getAttribute("position").array);
+      expect(positions).not.toEqual(baseline);
+      variants.add(JSON.stringify(positions));
+      expect(shaped.contributions).toEqual(original.contributions);
+      expect(shaped.color).toEqual(original.color);
+      expect(Array.from(shaped.geometry.getAttribute("sourceIndex").array)).toEqual(Array.from(original.geometry.getAttribute("sourceIndex").array));
+      const repeat = createImageSculpture(images, sign);
+      expect(Array.from(repeat.geometry.getAttribute("position").array)).toEqual(positions);
+      shaped.geometry.dispose();
+      repeat.geometry.dispose();
+    }
+    expect(variants.size).toBe(12);
+    const noSign = createImageSculpture(images, null);
+    expect(Array.from(noSign.geometry.getAttribute("position").array)).toEqual(baseline);
+    noSign.geometry.dispose();
+    original.geometry.dispose();
+  });
+
+  it.each(ZODIAC_SIGNS)("keeps the %s sculpture closed, connected, finite, and within the viewer", (sign) => {
+    for (const opening of [false, true]) {
+      const model = createImageSculpture([pixels(), pixels(29), pixels(26, false, 0.5), pixels(24, opening)], sign);
+      expect(topology(model)).toBe(opening ? 0 : 2);
+      model.geometry.dispose();
+    }
+  });
+
+  it.each([0, 1, 2, 3])("still uses image %i structurally with a Sun sign applied", (imageIndex) => {
+    const images = [pixels(18), pixels(18), pixels(18), pixels(18)];
+    const before = createImageSculpture(images, "leo");
+    images[imageIndex] = pixels(30);
+    const after = createImageSculpture(images, "leo");
+    expect(widthOf(after)).toBeGreaterThan(widthOf(before) + 0.05);
+    before.geometry.dispose();
+    after.geometry.dispose();
+  });
+
   it("requires exactly four complete visible pixel buffers", () => {
     expect(() => createImageSculpture([])).toThrow(/four|4/i);
     expect(() => createImageSculpture(new Array<ImagePixels>(4))).toThrow(/image 1/i);

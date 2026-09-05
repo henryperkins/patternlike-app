@@ -7,6 +7,10 @@
 .portrait-preview-intro h1 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(45px, 5.7vw, 74px); line-height: 0.99; letter-spacing: -0.04em; }
 .portrait-preview-intro p { max-width: 52ch; font-size: 16px; line-height: 1.7; margin: 0 0 16px; color: var(--ink-soft); }
 .portrait-preview-intro .portrait-fictional-note { margin-bottom: 0; font-size: 12px; line-height: 1.65; }
+.portrait-sun-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 0 0 24px; }
+.portrait-sun-choice label { display: grid; gap: 8px; font-size: 13px; }
+.portrait-sun-choice select { min-height: 44px; padding: 8px 32px 8px 12px; border: 1px solid var(--line-dark); border-radius: 0; color: var(--ink); background: var(--paper-light); font-size: 16px; }
+.portrait-sun-choice p { margin: 0; max-width: 48ch; color: var(--ink-soft); font-size: 12px; line-height: 1.65; }
 .portrait-preview-scenarios { margin: 48px 0 30px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0 0 8px; color: var(--ink-soft); }
 .portrait-preview-scenarios summary { cursor: pointer; padding: 18px 0 10px; min-height: 48px; font-size: 13px; }
 .portrait-preview-scenarios p { max-width: 70ch; font-size: 13px; line-height: 1.65; }

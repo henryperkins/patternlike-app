@@ -21,6 +21,33 @@ beforeEach(() => { graphics.fail = false; graphics.ready = true; });
 const ready = { status: "ready" as const, document: fictionalPattern };
 
 describe("Pattern portrait reader", () => {
+  it("waits for a fresh renderer when a quick sign change returns to the last ready sign", async () => {
+    const { rerender } = render(<PatternPortrait source={{ ...ready, sunSign: "aries" }} objectBindings={imageStudyBindings} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rotate left" })).toBeEnabled());
+    graphics.ready = false;
+    rerender(<PatternPortrait source={{ ...ready, sunSign: "pisces" }} objectBindings={imageStudyBindings} />);
+    expect(screen.getByRole("button", { name: "Rotate left" })).toBeDisabled();
+    rerender(<PatternPortrait source={{ ...ready, sunSign: "aries" }} objectBindings={imageStudyBindings} />);
+    expect(screen.getByRole("button", { name: "Rotate left" })).toBeDisabled();
+  });
+
+  it("passes the supplied Sun sign to the shape and preserves the selected chapter when it changes", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<PatternPortrait source={{ ...ready, sunSign: "aries" }} objectBindings={imageStudyBindings} />);
+    await screen.findByTestId("sculpture");
+    expect(graphics.props.mock.lastCall![0].sunSign).toBe("aries");
+    await user.click(screen.getByRole("button", { name: /Giving your ideas a place/ }));
+    graphics.ready = false;
+    rerender(<PatternPortrait source={{ ...ready, sunSign: "pisces" }} objectBindings={imageStudyBindings} />);
+    expect(graphics.props.mock.lastCall![0].sunSign).toBe("pisces");
+    expect(screen.getByRole("heading", { name: "Giving your ideas a place" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rotate left" })).toBeDisabled();
+    expect(screen.getByText(/Pisces Sun/)).toBeInTheDocument();
+    rerender(<PatternPortrait source={ready} objectBindings={imageStudyBindings} />);
+    expect(graphics.props.mock.lastCall![0].sunSign).toBeNull();
+    expect(screen.queryByText(/Pisces Sun/)).not.toBeInTheDocument();
+  });
+
   it("shows all four image references and gives the renderer no reading or object metadata", async () => {
     render(<PatternPortrait source={ready} objectBindings={imageStudyBindings} />);
     await screen.findByTestId("sculpture");

@@ -27,6 +27,7 @@ beforeEach(() => {
 
 const props = {
   imageUrls: ["1.png", "2.png", "3.png", "4.png"],
+  sunSign: null,
   selectedIndex: -1,
   onSelect: vi.fn(),
   reducedMotion: true,
