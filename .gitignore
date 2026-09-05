@@ -31,3 +31,6 @@ __pycache__/
 spec-bundle/_analyze*
 spec-bundle/_analysis*
 spec-bundle/_docx*
+.impeccable/review/
+.playwright-cli/
+apps/web/dist-portrait/

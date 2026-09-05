@@ -1,0 +1,49 @@
+{
+  "prompt_version": "chapter-object-v2",
+  "prompt_document": "docs/superpowers/specs/2026-09-05-chapter-image-prompts.json",
+  "generation_tool": "built-in image_gen",
+  "asset_preparation": "Original PNG pixel streams retained; ancillary provenance chunks omitted for neutral modeling inputs.",
+  "modeling_contract": "Four decoded RGBA images only; chapter text, subjects, rationale and hashes are not geometry inputs.",
+  "images": [
+    {
+      "input": "image-01.png",
+      "source_sha256": "da65f6152386c7903d48301567e428cf0668e6e1143b31f3522a6418a12b78cd",
+      "input_sha256": "ee538fd3fdcf347be36ce018148a2aa49d632aa1cf46536b7792cacf90deceec",
+      "idat_sha256": "20d2ae601606902c2517ce5e35e5753c2f480cf418f19e7e8fe8b16a016df3c6",
+      "dimensions": [
+        1024,
+        1536
+      ]
+    },
+    {
+      "input": "image-02.png",
+      "source_sha256": "be6dea9b6f2dbb4107ace8a09d5c21701af142b9861895cd3c88e541e0adca90",
+      "input_sha256": "ee4869af09af9e297be7e51051d69f4ef79aaa63b456a3cff7b8f6047a784566",
+      "idat_sha256": "df53a4a7284426cc5d27f03c3d0742a76afabaa1adc06153fa2648a4a7727d2e",
+      "dimensions": [
+        1402,
+        1122
+      ]
+    },
+    {
+      "input": "image-03.png",
+      "source_sha256": "784cda95e03ff5e925b94c83008b85f58d6d1b4e62c937b35194afa532d1c9a7",
+      "input_sha256": "72371f5dc29b6674fb3d54c5a76695bcdc84e5c984de2726b6c1c27139aa11ec",
+      "idat_sha256": "ede41b55d5268355268aad99fe50cd8682ce6580873173236950e077b6b0882d",
+      "dimensions": [
+        1116,
+        1410
+      ]
+    },
+    {
+      "input": "image-04.png",
+      "source_sha256": "cf425a99197b81cf8b8afcf5d7793a4dcaacb5225e725bcd59f253ad39f63f53",
+      "input_sha256": "8499fcfed178887d431ddba28035bd1bc5df829e0e1dc4f4e24100ab526f8d5d",
+      "idat_sha256": "d2cae0864628b4424c3619218674def3664e777d7a69adc083df73e4bfc7e137",
+      "dimensions": [
+        1024,
+        1536
+      ]
+    }
+  ]
+}

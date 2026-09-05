@@ -1,0 +1,21 @@
+════════════════════ SUMMARY ════════════════════
+commit  f658b6c on codex/pattern-portrait
+node    v22.23.2   npm 10.9.8   python 3.14.4
+note    local 3.14.4, ci.yml pinned 3.12
+
+  pass   contracts: npm run test:contracts
+  pass   monorepo: npm ci --dry-run (lockfile agrees with package.json)
+  pass   monorepo: ephemeris download
+  pass   monorepo: npm run typecheck
+  pass   monorepo: test @patternlike/shared
+  pass   monorepo: test @patternlike/reading-engine
+  pass   monorepo: test @patternlike/calc-stub
+  pass   monorepo: test @patternlike/ontology-signer
+  pass   monorepo: test @patternlike/api
+  pass   monorepo: test @patternlike/web
+  pass   monorepo: npm run build
+  pass   extra: test @patternlike/pattern-engine
+  pass   extra: test @patternlike/codex-runner
+  pass   extra: npm run test:content
+
+ALL STEPS PASSED — safe to merge on local evidence.

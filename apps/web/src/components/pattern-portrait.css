@@ -1,0 +1,82 @@
+.pattern-portrait { color: var(--ink); }
+.portrait-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 0; border-top: 1px solid var(--line-dark); }
+.portrait-toolbar > p { margin: 0; font-size: 14px; }
+.portrait-mode { display: flex; border: 1px solid var(--line-dark); }
+.portrait-mode button { min-height: 44px; padding: 0 18px; border: 0; background: transparent; color: var(--ink); cursor: pointer; font-size: 13px; }
+.portrait-mode button[aria-pressed="true"] { background: var(--forest); color: var(--paper-light); }
+.portrait-mode button:hover:not([aria-pressed="true"]) { background: var(--forest-light); }
+.portrait-accuracy { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; color: var(--ink-soft); font-size: 12px; padding-bottom: 18px; }
+.portrait-accuracy span { flex-shrink: 0; }
+.portrait-accuracy p { margin: 0; max-width: 75ch; }
+.portrait-layout { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
+.portrait-instrument { min-width: 0; padding: 0 32px 24px 0; }
+.portrait-stage { height: clamp(350px, 38vw, 500px); position: relative; }
+.portrait-stage > div { min-height: 0; }
+.portrait-canvas { width: 100%; height: 100%; overflow: hidden; }
+.portrait-canvas canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
+.portrait-graphics-message { padding: 70px 24px; color: var(--ink-soft); font-size: 15px; line-height: 1.65; }
+.portrait-camera-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 4px; }
+.portrait-camera-controls button { border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--ink-soft); min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 12px; cursor: pointer; }
+.portrait-camera-controls button:hover:enabled { color: var(--ink); border-bottom-color: var(--line-dark); background: var(--paper-deep); }
+.portrait-camera-controls button:disabled { opacity: 0.5; cursor: default; }
+.portrait-instruction { font-size: 12px; color: var(--ink-soft); text-align: center; margin: 10px 0 26px; }
+.portrait-chapter-index { display: grid; border-top: 1px solid var(--line); }
+.portrait-chapter-index button { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) 18px; align-items: center; gap: 12px; text-align: left; min-height: 62px; padding: 12px 10px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; font-family: var(--serif); font-size: 18px; line-height: 1.3; }
+.portrait-chapter-index button:hover { background: var(--paper-deep); }
+.portrait-chapter-index button[aria-pressed="true"] { background: var(--forest-light); }
+.portrait-chapter-number { font-family: var(--sans); font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.portrait-index-mark { color: var(--ink-soft); font-family: var(--sans); font-size: 19px; }
+.portrait-chapter-index button[aria-pressed="true"] .portrait-chapter-number { color: var(--coral-ink); }
+.portrait-legend { max-width: 64ch; margin: 18px 10px 0; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
+.portrait-reader { border-left: 1px solid var(--line); padding: 68px 0 32px 42px; min-width: 0; }
+.portrait-reader h2 { font-family: var(--serif); font-size: clamp(31px, 3.1vw, 45px); line-height: 1.1; font-weight: 400; letter-spacing: -0.035em; text-wrap: balance; margin: 0 0 24px; }
+.portrait-reader p, .portrait-full-chapter > p { font-family: var(--serif); font-size: 18px; line-height: 1.65; max-width: 68ch; }
+.portrait-reader .portrait-summary, .portrait-summary { font-family: var(--serif); font-size: 24px; line-height: 1.45; letter-spacing: -0.015em; margin: 0 0 28px; }
+.portrait-object-note { padding: 14px 0; border-block: 1px solid var(--line); }
+.portrait-object-note p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink-soft); }
+.portrait-object-note strong { font-weight: 600; color: var(--ink); }
+.portrait-object-note button { min-height: 44px; padding: 8px 0; border: 0; background: none; color: var(--forest); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.portrait-object-note button:disabled { opacity: 0.5; cursor: default; }
+.portrait-back { display: block; padding: 0; min-height: 44px; color: var(--ink-soft); border: 0; background: none; cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 4px; margin: -44px 0 16px; }
+.portrait-expressions { display: flex; flex-wrap: wrap; gap: 4px 14px; border-bottom: 1px solid var(--line); margin: 28px 0 22px; }
+.portrait-expressions button { border: 0; border-bottom: 2px solid transparent; color: var(--ink-soft); background: none; cursor: pointer; min-height: 44px; padding: 8px 0; font-size: 12px; }
+.portrait-expressions button[aria-pressed="true"] { color: var(--forest); border-bottom-color: var(--forest); }
+.portrait-expressions button:hover { color: var(--ink); }
+.portrait-prose { min-height: 150px; }
+.portrait-prose p:first-child { margin-top: 0; }
+.portrait-begin, .portrait-next button { background: var(--forest); color: var(--paper-light); border: 1px solid var(--forest); min-height: 48px; padding: 12px 22px; cursor: pointer; font-size: 13px; }
+.portrait-begin:hover, .portrait-next button:hover { background: #0f3028; }
+.portrait-begin { margin-top: 24px; }
+.portrait-next { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--line); }
+.portrait-next span { font-size: 12px; color: var(--ink-soft); }
+.portrait-complete { max-width: 760px; margin: 12px auto 0; }
+.portrait-full-chapter { padding: 34px 0 40px; border-top: 1px solid var(--line); }
+.portrait-full-chapter h3 { font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.15; letter-spacing: -0.025em; margin: 0 0 22px; }
+.portrait-full-chapter h4 { font-family: var(--sans); font-size: 14px; margin: 28px 0 10px; font-weight: 600; }
+.portrait-signatures { max-width: 760px; margin: 24px auto; border-top: 1px solid var(--line); font-family: var(--serif); }
+.portrait-signatures h3 { font-size: 25px; font-weight: 400; }
+.portrait-signatures p { font-size: 18px; line-height: 1.65; }
+.portrait-empty { min-height: 460px; padding: 90px 24px; border-top: 1px solid var(--line); text-align: center; }
+.portrait-empty h2 { font-family: var(--serif); font-size: 38px; font-weight: 400; }
+.portrait-empty p { color: var(--ink-soft); line-height: 1.65; }
+@media (max-width: 850px) {
+  .portrait-layout { grid-template-columns: minmax(0, 1fr); }
+  .portrait-instrument { padding: 0 0 26px; }
+  .portrait-stage { height: 370px; }
+  .portrait-reader { border-left: 0; border-top: 1px solid var(--line); padding: 36px 0; }
+  .portrait-reader--selected { padding-top: 68px; }
+  .portrait-reader h2 { max-width: 20ch; }
+  .portrait-instruction { margin-bottom: 20px; }
+}
+@media (max-width: 440px) {
+  .portrait-toolbar { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .portrait-stage { height: 310px; }
+  .portrait-chapter-index button { font-size: 17px; gap: 8px; }
+  .portrait-reader .portrait-summary { font-size: 23px; }
+  .portrait-camera-controls { gap: 0; }
+  .portrait-camera-controls button { padding: 0 6px; }
+}
+
+.portrait-reference { width: 64px; height: 76px; object-fit: contain; mix-blend-mode: multiply; }
+.portrait-chapter-index button:not(:has(.portrait-reference)) { grid-template-columns: 28px minmax(0, 1fr) 18px; }
+@media (max-width: 440px) { .portrait-chapter-index button { grid-template-columns: 20px 48px minmax(0, 1fr) 14px; } .portrait-reference { width: 48px; height: 66px; } }

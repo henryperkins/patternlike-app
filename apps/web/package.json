@@ -5,6 +5,9 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "dev:portrait": "vite --config vite.portrait.config.ts",
+    "build:portrait": "tsc -p tsconfig.json --noEmit && vite build --config vite.portrait.config.ts",
+    "preview:portrait": "vite preview --config vite.portrait.config.ts",
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -15,8 +18,10 @@
   "dependencies": {
     "@auth0/auth0-react": "^2.24.1",
     "@patternlike/shared": "0.2.0",
+    "@react-three/fiber": "9.7.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "0.185.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -24,6 +29,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "0.185.4",
     "@vitejs/plugin-react": "^6.0.5",
     "axe-core": "^4.12.1",
     "jsdom": "^30.0.1",

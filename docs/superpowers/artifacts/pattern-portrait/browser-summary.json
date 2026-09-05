@@ -1,0 +1,33 @@
+{
+  "build": [
+    "http://127.0.0.1:4174/assets/pattern-portrait-DNEelpn3.js"
+  ],
+  "environment": {
+    "url": "http://127.0.0.1:4174/pattern-portrait.html",
+    "browser": "Chromium 1237 headless with --enable-unsafe-swiftshader; software WebGL, not real device",
+    "routing": "Browser plugin not available; existing Playwright library, no new dependencies"
+  },
+  "passed": 86,
+  "total": 86,
+  "unexpected_errors": [],
+  "expected_failure_probe_error": "Initial WebGL denial emits THREE.WebGLRenderer: Error creating WebGL context; reading remains available.",
+  "warnings": "Three.Clock deprecation from dependency and SwiftShader ReadPixels performance messages; explicit context-loss probe can emit unsupported-extension warning during teardown.",
+  "limitations": "Headless software WebGL and emulated mobile/touch; no physical device or hardware-GPU performance validation. Initial readiness timings are observations during local testing, not production benchmarks.",
+  "artifacts": [
+    "report.json",
+    "parity.json",
+    "resources.json",
+    "desktop-whole.png",
+    "desktop-selected.png",
+    "desktop-whole-stage.png",
+    "sculpture-front.png",
+    "sculpture-left-4.png",
+    "sculpture-left-8.png",
+    "mobile-390-stage-front.png",
+    "mobile-390-stage-side.png",
+    "mobile-390-stage-back.png",
+    "mobile-320-stage-front.png",
+    "mobile-320-stage-side.png",
+    "mobile-320-stage-back.png"
+  ]
+}

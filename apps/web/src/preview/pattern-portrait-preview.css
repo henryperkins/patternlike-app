@@ -1,0 +1,33 @@
+.portrait-preview { max-width: 1280px; margin: 0 auto; padding: 0 52px; }
+.portrait-preview-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 102px; border-bottom: 1px solid var(--line); }
+.portrait-preview-wordmark { display: flex; align-items: center; gap: 12px; text-decoration: none; font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -0.03em; }
+.portrait-wordmark-light { font-weight: 400; }
+.portrait-preview-label { color: var(--ink-soft); font-size: 12px; }
+.portrait-preview-intro { display: grid; grid-template-columns: 1.22fr 1fr; align-items: end; gap: 42px; padding: 56px 0 42px; }
+.portrait-preview-intro h1 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(45px, 5.7vw, 74px); line-height: 0.99; letter-spacing: -0.04em; }
+.portrait-preview-intro p { max-width: 52ch; font-size: 16px; line-height: 1.7; margin: 0 0 16px; color: var(--ink-soft); }
+.portrait-preview-intro .portrait-fictional-note { margin-bottom: 0; font-size: 12px; line-height: 1.65; }
+.portrait-preview-scenarios { margin: 48px 0 30px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0 0 8px; color: var(--ink-soft); }
+.portrait-preview-scenarios summary { cursor: pointer; padding: 18px 0 10px; min-height: 48px; font-size: 13px; }
+.portrait-preview-scenarios p { max-width: 70ch; font-size: 13px; line-height: 1.65; }
+.portrait-scenario-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 18px; padding: 12px 0 24px; }
+.portrait-scenario-fields label { display: grid; gap: 8px; font-size: 12px; }
+.portrait-scenario-fields select, .portrait-scenario-fields button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-dark); border-radius: 0; color: var(--ink); background: var(--paper-light); font-size: 14px; }
+.portrait-scenario-fields button { cursor: pointer; }
+.portrait-scenario-fields button:hover { background: var(--forest-light); }
+.portrait-preview-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding: 10px 0 38px; color: var(--ink-soft); font-size: 12px; }
+@media (max-width: 850px) {
+  .portrait-preview { padding: 0 28px; }
+  .portrait-preview-header { min-height: 82px; }
+  .portrait-preview-intro { grid-template-columns: 1fr; gap: 24px; padding: 38px 0 30px; }
+  .portrait-preview-intro p { max-width: 60ch; }
+}
+@media (max-width: 440px) {
+  .portrait-preview { padding: 0 20px; }
+  .portrait-preview-wordmark { font-size: 21px; gap: 8px; }
+  .portrait-preview-label { font-size: 11px; }
+  .portrait-preview-intro { padding-top: 30px; }
+  .portrait-preview-intro p { font-size: 15px; }
+  .portrait-scenario-fields { align-items: stretch; flex-direction: column; }
+  .portrait-scenario-fields select { font-size: 16px; }
+}
