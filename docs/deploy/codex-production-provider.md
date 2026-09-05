@@ -1,5 +1,36 @@
 # Codex production provider runbook
 
+## Sol reasoning and priority upgrade (2026-09-05)
+
+The selected execution profile is `gpt-5.6-sol` with `xhigh` reasoning. The
+runner passes `service_tier="priority"` and enables `fast_mode` explicitly on
+every `codex exec`, using its existing ChatGPT login. Sol advertises the
+`priority` tier as Fast in the runner account's model catalog. This requests
+priority processing; the provider controls the tier actually served and may
+apply its documented fallback behavior. Fast mode consumes increased usage.
+
+Migration `0025_codex_xhigh_reasoning.sql` admits `high` and `xhigh`, preserving
+every existing provider job and response-upload row. The runner accepts both;
+new Daily, Pattern, and ontology commands freeze `xhigh`, while supported
+legacy commands retain their original `high` effort. The M5 contract's additive
+freeze amendment includes both vocabularies. Ontology regression execution and
+report verification derive their reasoning profile from the frozen command,
+so existing signed `high` reports keep their original configuration hash.
+Model, prompt, output ceilings,
+call budgets, consent checks, and ontology rollout state retain their existing
+settings.
+
+Release order: run the full local gate; install the compatible runner on the
+approved host; export and rehearse a production D1 backup; apply only `0025`;
+verify row preservation, indexes, foreign keys, and integrity; then deploy the
+Worker that freezes `xhigh`. Verify the live Worker version, production flags,
+runner health, and a content-free CLI call using the selected profile. Do not
+reissue terminal user jobs or rewrite published documents as part of this
+configuration upgrade.
+
+References: [Codex speed](https://learn.chatgpt.com/docs/agent-configuration/speed)
+and [API Fast mode](https://developers.openai.com/api/docs/guides/fast-mode).
+
 **Status (reconciled 2026-08-26):** the last recorded production inventory
 (2026-08-25) found migrations through `0015` applied, 124 terminal Codex provider
 jobs, ontology rollout `internal` / `codex`, Pattern rollout `off`, and the runner

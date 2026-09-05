@@ -5,7 +5,7 @@
   "status": "narrow_successor",
   "predecessor": {
     "package": "contracts/m8",
-    "manifest_sha256": "6aecb0a84f74b1e174ee060cc4497cf0d0673896d913eceaebf2e78d6a88512e"
+    "manifest_sha256": "9e81e38c3c417728f5230de9e36f13f774d15b3d3a33717a6593be2df4ddc136"
   },
   "supersedes": ["m8:geocoder-consent.schema.json"],
   "schemas": ["geocoder-consent.schema.json"],

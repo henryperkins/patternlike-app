@@ -390,6 +390,8 @@ describe("V5 execution", () => {
     const claimed = await claimReadingJob();
     expect(claimed).not.toBeNull();
     expect(claimed!.job.model).toBe(command.publisher.model);
+    expect(command.publisher.reasoning_effort).toBe("xhigh");
+    expect(claimed!.job.reasoningEffort).toBe("xhigh");
     expect(claimed!.job.promptVersion).toBe(command.publisher.prompt_version);
     expect(claimed!.job.model).not.toBe("a-new-current-model");
     expect(command.publisher.prompt_version).toBe("1.0.2");

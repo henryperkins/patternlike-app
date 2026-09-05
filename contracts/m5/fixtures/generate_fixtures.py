@@ -590,6 +590,15 @@ CODEX_COMMAND = copy.deepcopy(COMMAND)
 CODEX_COMMAND["publisher"]["provider"] = "codex"
 write(V + "generation-command.codex.json", CODEX_COMMAND)
 
+# New xhigh commands coexist with the byte-identical legacy high fixture.
+XHIGH_CODEX_COMMAND = copy.deepcopy(CODEX_COMMAND)
+XHIGH_CODEX_COMMAND["publisher"]["reasoning_effort"] = "xhigh"
+write(V + "generation-command.codex-xhigh.json", XHIGH_CODEX_COMMAND)
+
+bad = copy.deepcopy(CODEX_COMMAND)
+bad["publisher"]["reasoning_effort"] = "max"
+write(I + "generation-command.unapproved-reasoning.json", bad)
+
 bad = copy.deepcopy(COMMAND)
 bad["publisher"]["provider"] = "anthropic"
 write(I + "generation-command.unknown-provider.json", bad)

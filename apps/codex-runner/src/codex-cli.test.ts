@@ -139,48 +139,54 @@ if (mode !== "missing-usage") {
   };
 }
 
-test("invokes Codex with the exact safe argument surface and stdin-only prompt", async () => {
-  const f = await fixture();
-  try {
-    const result = await runCodexInvocation({
-      claim: claim(),
-      codexBin: f.executable,
-      tempRoot: f.tempRoot,
-      env: f.childEnv,
-    });
-    assert.deepEqual(result, {
-      ok: true,
-      output: OUTPUT,
-      providerRequestId: "thread_123",
-      inputTokens: 17,
-      outputTokens: 9,
-    });
-    const args = JSON.parse(await readFile(join(f.recordRoot, "args.json"), "utf8"));
-    assert.equal(args[0], "exec");
-    assert.deepEqual(args.slice(1, 9), [
-      "--ephemeral",
-      "--sandbox",
-      "read-only",
-      "--json",
-      "--model",
-      "gpt-5.6-sol",
-      "--config",
-      'model_reasoning_effort="high"',
-    ]);
-    assert.equal(args[9], "--output-schema");
-    assert.equal(args[11], "-o");
-    assert.equal(args[13], "-");
-    assert.equal(args.length, 14);
-    assert.equal(await readFile(join(f.recordRoot, "stdin.txt"), "utf8"), PROMPT);
-    assert.deepEqual(
-      JSON.parse(await readFile(join(f.recordRoot, "modes.json"), "utf8")),
-      { directory: 0o700, schema: 0o600, output: 0o600 },
-    );
-    assert.deepEqual(await readdir(f.tempRoot), []);
-  } finally {
-    await f.cleanup();
-  }
-});
+for (const reasoningEffort of ["high", "xhigh"] as const) {
+  test(`invokes Sol with ${reasoningEffort}, priority processing, and a stdin-only prompt`, async () => {
+    const f = await fixture();
+    try {
+      const result = await runCodexInvocation({
+        claim: claim({ reasoning_effort: reasoningEffort }),
+        codexBin: f.executable,
+        tempRoot: f.tempRoot,
+        env: f.childEnv,
+      });
+      assert.deepEqual(result, {
+        ok: true,
+        output: OUTPUT,
+        providerRequestId: "thread_123",
+        inputTokens: 17,
+        outputTokens: 9,
+      });
+      const args = JSON.parse(await readFile(join(f.recordRoot, "args.json"), "utf8"));
+      assert.equal(args[0], "exec");
+      assert.deepEqual(args.slice(1, 13), [
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "--json",
+        "--model",
+        "gpt-5.6-sol",
+        "--config",
+        `model_reasoning_effort="${reasoningEffort}"`,
+        "--config",
+        'service_tier="priority"',
+        "--enable",
+        "fast_mode",
+      ]);
+      assert.equal(args[13], "--output-schema");
+      assert.equal(args[15], "-o");
+      assert.equal(args[17], "-");
+      assert.equal(args.length, 18);
+      assert.equal(await readFile(join(f.recordRoot, "stdin.txt"), "utf8"), PROMPT);
+      assert.deepEqual(
+        JSON.parse(await readFile(join(f.recordRoot, "modes.json"), "utf8")),
+        { directory: 0o700, schema: 0o600, output: 0o600 },
+      );
+      assert.deepEqual(await readdir(f.tempRoot), []);
+    } finally {
+      await f.cleanup();
+    }
+  });
+}
 
 for (const mode of ["missing-thread", "missing-usage"] as const) {
   test(`fails closed for ${mode}`, async () => {

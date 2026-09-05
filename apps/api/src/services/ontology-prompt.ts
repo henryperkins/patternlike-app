@@ -360,7 +360,7 @@ export interface OntologyGeneratorResponsesRequest {
   store: false;
   instructions: string;
   input: OntologyResponsesInputMessage[];
-  reasoning: { effort: "high" };
+  reasoning: { effort: "high" | "xhigh" };
   text: { verbosity: "low"; format: OntologyResponsesFormat };
   max_output_tokens: number;
 }
@@ -370,7 +370,7 @@ export interface OntologyEvaluatorResponsesRequest {
   store: false;
   instructions: string;
   input: OntologyResponsesInputMessage[];
-  reasoning: { effort: "high" };
+  reasoning: { effort: "high" | "xhigh" };
   text: { verbosity: "low"; format: OntologyResponsesFormat };
   /** Absent on the Codex backend, which rejects the parameter outright. */
   max_output_tokens?: number;

@@ -18,6 +18,7 @@ import { enqueueConstrainedReading, resolveV5TargetDate } from "./enqueue.js";
 import { codexProviderOwnerIsCurrent } from "./codex-provider-domain.js";
 import {
   OPENAI_READING_MODEL,
+  OPENAI_READING_REASONING,
   READING_PROMPT_VERSION,
 } from "./reading-publisher.js";
 
@@ -64,7 +65,7 @@ function providerJob(
     },
     response: null,
     model: OPENAI_READING_MODEL,
-    reasoningEffort: "high",
+    reasoningEffort: OPENAI_READING_REASONING,
     promptVersion: READING_PROMPT_VERSION,
     timeoutMs: 900_000,
     dailyCallLimit: 250,

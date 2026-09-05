@@ -44,17 +44,17 @@ const PATTERN: Partial<Env> = {
   PATTERN_INPUT_MAX_BYTES: "98304",
   PATTERN_ARTIFACT_RETENTION_DAYS: "30",
   OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
-  OPENAI_PATTERN_PLANNER_REASONING: "high",
+  OPENAI_PATTERN_PLANNER_REASONING: "xhigh",
   OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
   OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
-  OPENAI_PATTERN_WRITER_REASONING: "high",
+  OPENAI_PATTERN_WRITER_REASONING: "xhigh",
   OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.2",
   OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
-  OPENAI_PATTERN_VERIFIER_REASONING: "high",
+  OPENAI_PATTERN_VERIFIER_REASONING: "xhigh",
   OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
   OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
@@ -70,7 +70,7 @@ const enabled: Partial<Env> = {
   READING_V5_ROLLOUT: "hybrid",
   READING_PUBLISHER: "codex",
   OPENAI_READING_MODEL,
-  OPENAI_READING_REASONING: "high",
+  OPENAI_READING_REASONING: "xhigh",
   OPENAI_READING_PROMPT_VERSION: "1.0.2",
   OPENAI_READING_TIMEOUT_MS: "900000",
   OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
@@ -98,7 +98,7 @@ describe("Codex-only Daily publisher configuration", () => {
     expect(resolved.rollout).toBe("hybrid");
     expect(resolved.config?.pin.provider).toBe("codex");
     expect(resolved.config?.pin.model).toBe(OPENAI_READING_MODEL);
-    expect(resolved.config?.pin.reasoning_effort).toBe("high");
+    expect(resolved.config?.pin.reasoning_effort).toBe("xhigh");
     expect(resolved.config?.pin.prompt_version).toBe("1.0.2");
     expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
     expect(resolved.config?.pin.max_output_tokens).toBe(

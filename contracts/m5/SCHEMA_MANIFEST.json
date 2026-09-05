@@ -369,6 +369,19 @@
         "common.schema.json"
       ],
       "implemented_by": "apps/api/src/services/generation-failures.ts adds the code to V5FailureCode, V5ReplacementReason, V5_FAILURE_CODES, V5_REPLACEMENT_REASONS, and V5_AUTOMATIC_REPLACEMENT_FAILURE_CODES, and deliberately leaves it out of queueDisposition's retry branches; apps/api/src/services/generate-daily-reading-v5.ts detects the stale pin before packet construction, calculation replay, or any R2 access."
+    },
+    {
+      "date": "2026-09-05",
+      "kind": "additive_reasoning_effort",
+      "summary": "Admit xhigh in the frozen Codex publisher pin while retaining all legacy reasoning values.",
+      "detail": "The approved Sol upgrade freezes xhigh for new Daily commands. Existing high commands retain their original effort and remain executable; stored commands, published evidence, and historical fixtures are not rewritten. This additive amendment preserves every previously valid instance, required field, schema_version, and $id. The exact enum still rejects max, ultra, and unknown values. Provider transport claims and D1 accept only high or xhigh; low and medium remain solely to describe historical command records. Priority service tier is explicitly requested by the runner for every invocation and does not rewrite a frozen reasoning pin.",
+      "files": [
+        "common.schema.json"
+      ],
+      "fixtures": [
+        "fixtures/valid/generation-command.codex-xhigh.json",
+        "fixtures/invalid/generation-command.unapproved-reasoning.json"
+      ]
     }
   ]
 }

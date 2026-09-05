@@ -4,12 +4,13 @@
     "the live lane safe to point at a real key. Every candidate below is a frozen string a model could",
     "have produced; the corpus pins which ones this deployment accepts and which it refuses.",
     "Changing the model, reasoning effort, response ceiling, prompt, selection policy, or validation policy requires re-running this",
-    "corpus, incrementing corpus_version, and updating gates."
+    "corpus, incrementing corpus_version, and updating gates.",
+    "Version 1.0.3 revalidates the same synthetic candidates for Sol/xhigh; prompts and scoring policies are unchanged."
   ],
-  "corpus_version": "1.0.2",
+  "corpus_version": "1.0.3",
   "gates": {
     "model": "gpt-5.6-sol",
-    "reasoning_effort": "high",
+    "reasoning_effort": "xhigh",
     "max_output_tokens": 4000,
     "prompt_version": "1.0.2",
     "selection_policy_version": "1.0.0",

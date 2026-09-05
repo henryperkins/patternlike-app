@@ -2543,15 +2543,15 @@ M8_PREDECESSOR_HASHES = {
     "contracts/m0": "75b447fedca2824543f8e304a7bdcc0c83766786f33cb93135b1887de73d8226",
     "contracts/m3": "c63af426f6213be034546cee10a34acfd80bcad3bf297ffb41bf5a48fd0feb52",
     "contracts/m4": "c65c6f2b5cf02cda91b0cdc062f12783e8c775f46be1756d55ae86e8976e311c",
-    "contracts/m5": "1fb5228da8488a78e9a4e3dead4e9eb175cf41442b48eee42f2271079c397757",
-    "contracts/m6": "03037cdf6a3d92965bd5cc4513950c4ba92c0ff6ab24c81ec24550badab6d221",
-    "contracts/m7": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
+    "contracts/m5": "838ed53bdcd560725f9e92c719dc4a583e0833bca17c70c2261b7c1fc4879e24",
+    "contracts/m6": "f331457d0cd0738ac4a053654f563eddd84a5a93f34d01cc1965cb664d4d7c78",
+    "contracts/m7": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
 }
 
 M9_SCHEMA_VERSION = "0.9.0"
 M9_PREDECESSOR_HASHES = {
-    "contracts/m7": "45e39fdc422b6a4297408eb3e9d4900a7431af6ea02ddd025dc0eef324f4d684",
-    "contracts/m8": "6aecb0a84f74b1e174ee060cc4497cf0d0673896d913eceaebf2e78d6a88512e",
+    "contracts/m7": "72bede9d3081faa265db04c2a6554552c4a71df587e9f54ee283ad1e300abc5f",
+    "contracts/m8": "9e81e38c3c417728f5230de9e36f13f774d15b3d3a33717a6593be2df4ddc136",
 }
 M9_REQUIRED_VALID_FIXTURES = {
     "pattern-generation-accepted.source-update.json",

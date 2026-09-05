@@ -57,11 +57,13 @@ import {
 import { leaseDisposition, type V5FailureCode } from "./generation-failures.js";
 import { currentAiConsentMatches } from "./reading-current-owner.js";
 import { createCodexReadingPublisher } from "./codex-reading-publisher.js";
-import { CODEX_PROVIDER_TIMEOUT_MS } from "./codex-provider-contract.js";
+import {
+  CODEX_PROVIDER_TIMEOUT_MS,
+  isCodexProviderReasoningEffort,
+} from "./codex-provider-contract.js";
 import {
   OPENAI_READING_MAX_OUTPUT_TOKENS,
   OPENAI_READING_MODEL,
-  OPENAI_READING_REASONING,
   READING_CONTEXT_MAX_BYTES,
   READING_PUBLISHER_PROVIDER,
 } from "./reading-publisher.js";
@@ -181,7 +183,7 @@ function supportedCommand(command: GenerateDailyReadingCommandV2): boolean {
       LOCAL_DAY_RESOLUTION_POLICY_VERSION &&
     command.publisher.provider === READING_PUBLISHER_PROVIDER &&
     command.publisher.model === OPENAI_READING_MODEL &&
-    command.publisher.reasoning_effort === OPENAI_READING_REASONING &&
+    isCodexProviderReasoningEffort(command.publisher.reasoning_effort) &&
     command.publisher.prompt_version === READING_PROMPT_VERSION &&
     command.publisher.output_schema === "daily-reading-v5" &&
     command.publisher.selection_policy_version === SELECTION_POLICY_VERSION &&

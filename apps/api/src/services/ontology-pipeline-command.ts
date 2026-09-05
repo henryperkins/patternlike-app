@@ -79,14 +79,14 @@ export interface OntologyPipelineCommand {
   };
   generator: {
     model: string;
-    reasoning: "high";
+    reasoning: "high" | "xhigh";
     prompt_version: string;
     timeout_ms: number;
     max_output_tokens: number;
   };
   evaluator: {
     model: string;
-    reasoning: "high";
+    reasoning: "high" | "xhigh";
     prompt_version: string;
     timeout_ms: number;
     max_output_tokens: number;

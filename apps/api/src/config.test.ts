@@ -30,17 +30,17 @@ const PATTERN_CODEX_VARS = {
     '{"version":1,"keys":{"k":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"}}',
   ARTIFACTS: {} as never,
   OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
-  OPENAI_PATTERN_PLANNER_REASONING: "high",
+  OPENAI_PATTERN_PLANNER_REASONING: "xhigh",
   OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
   OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
-  OPENAI_PATTERN_WRITER_REASONING: "high",
+  OPENAI_PATTERN_WRITER_REASONING: "xhigh",
   OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.2",
   OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
-  OPENAI_PATTERN_VERIFIER_REASONING: "high",
+  OPENAI_PATTERN_VERIFIER_REASONING: "xhigh",
   OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
   OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
@@ -314,7 +314,7 @@ describe("publisher configuration", () => {
     READING_V5_ROLLOUT: "internal",
     READING_PUBLISHER: "codex",
     OPENAI_READING_MODEL: OPENAI_READING_MODEL,
-    OPENAI_READING_REASONING: "high",
+    OPENAI_READING_REASONING: "xhigh",
     OPENAI_READING_PROMPT_VERSION: "1.0.2",
     OPENAI_READING_TIMEOUT_MS: "900000",
     OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
@@ -343,7 +343,7 @@ describe("publisher configuration", () => {
     if (!resolved.ok) return;
     expect(resolved.rollout).toBe("internal");
     expect(resolved.config?.pin.model).toBe(OPENAI_READING_MODEL);
-    expect(resolved.config?.pin.reasoning_effort).toBe("high");
+    expect(resolved.config?.pin.reasoning_effort).toBe("xhigh");
     expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
     expect(resolved.config?.pin.max_output_tokens).toBe(4000);
     expect(resolved.config?.pin.provider).toBe("codex");
@@ -671,12 +671,12 @@ describe("ontology pipeline configuration", () => {
     BIRTH_CALC_DAILY_LIMIT: "5",
     ONTOLOGY_PIPELINE_ROLLOUT: "internal",
     OPENAI_ONTOLOGY_GENERATOR_MODEL: "gpt-5.6-sol",
-    OPENAI_ONTOLOGY_GENERATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_GENERATOR_REASONING: "xhigh",
     OPENAI_ONTOLOGY_GENERATOR_PROMPT_VERSION: "1.0.5",
     OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_GENERATOR_MAX_OUTPUT_TOKENS: "8000",
     OPENAI_ONTOLOGY_EVALUATOR_MODEL: "gpt-5.6-sol",
-    OPENAI_ONTOLOGY_EVALUATOR_REASONING: "high",
+    OPENAI_ONTOLOGY_EVALUATOR_REASONING: "xhigh",
     OPENAI_ONTOLOGY_EVALUATOR_PROMPT_VERSION: "1.0.0-evaluator",
     OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS: "120000",
     OPENAI_ONTOLOGY_EVALUATOR_MAX_OUTPUT_TOKENS: "4000",

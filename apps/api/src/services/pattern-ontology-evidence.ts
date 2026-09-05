@@ -8,6 +8,7 @@ import {
   ONTOLOGY_PIPELINE_EQUAL_MODEL_REGRESSION_MINIMUM_PASS_RATE,
 } from "../middleware/config-guard.js";
 import { hashesEqual } from "./content-release.js";
+import { isCodexProviderReasoningEffort } from "./codex-provider-contract.js";
 import {
   PatternOntologyCorpusError,
   readVerifiedPatternOntologyCorpus,
@@ -621,6 +622,10 @@ async function verifyRegressionReport(
     canonicalJson(command) !== run.configuration_json ||
     commandHash !== run.configuration_hash ||
     (command.provider !== "openai" && command.provider !== "codex") ||
+    !isRecord(command.generator) ||
+    !isRecord(command.evaluator) ||
+    !isCodexProviderReasoningEffort(command.generator.reasoning) ||
+    command.generator.reasoning !== command.evaluator.reasoning ||
     typeof command.configuration_equal !== "boolean" ||
     command.candidate_ontology_version !== run.candidate_ontology_version ||
     !isRecord(command.corpus) ||
@@ -639,6 +644,7 @@ async function verifyRegressionReport(
   try {
     const configurationHash = await ontologyRegressionConfigurationHash(
       command.provider,
+      command.generator.reasoning,
     );
     await parseCanonicalOntologyRegressionReport(plaintext, {
       ontologyVersion: expected.ontologyVersion,

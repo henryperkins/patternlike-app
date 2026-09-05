@@ -21,6 +21,10 @@ import {
   PATTERN_PUBLISHER_OPENAI,
   type PatternPublisherPin,
 } from "./pattern-publisher.js";
+import {
+  isCodexProviderReasoningEffort,
+  type CodexProviderReasoningEffort,
+} from "./codex-provider-contract.js";
 
 import manifestDocument from "../../../../contracts/m7/fixtures/corpus/manifest.json";
 import exact01 from "../../../../contracts/m7/fixtures/corpus/en-US/exact-01.json";
@@ -241,13 +245,29 @@ export function evaluateOntologyRegressionThresholds(
   };
 }
 
-export async function ontologyRegressionConfigurationHash(
+export function ontologyRegressionPatternPin(
   publisher: "openai" | "codex",
-): Promise<string> {
-  return contentHash(canonicalJson({
+  reasoning: CodexProviderReasoningEffort,
+): PatternPublisherPin {
+  if (!isCodexProviderReasoningEffort(reasoning)) {
+    throw new OntologyRegressionReportError("regression_report_invalid");
+  }
+  // V5 runs froze the shared reasoning profile in generator/evaluator. Keep
+  // that profile for regression too, including reports signed before xhigh.
+  return {
     ...ONTOLOGY_REGRESSION_PATTERN_PIN,
     publisher,
-  }));
+    planner_reasoning: reasoning,
+    writer_reasoning: reasoning,
+    verifier_reasoning: reasoning,
+  };
+}
+
+export async function ontologyRegressionConfigurationHash(
+  publisher: "openai" | "codex",
+  reasoning: CodexProviderReasoningEffort,
+): Promise<string> {
+  return contentHash(canonicalJson(ontologyRegressionPatternPin(publisher, reasoning)));
 }
 
 interface CreateOntologyRegressionReportInput {

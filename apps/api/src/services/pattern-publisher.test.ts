@@ -46,17 +46,17 @@ function env(overrides: Record<string, unknown> = {}) {
     CODEX_PROVIDER_ARTIFACT_KEYRING: CODEX_PATTERN_ARTIFACT_KEYRING,
     ARTIFACTS: {},
     OPENAI_PATTERN_PLANNER_MODEL: "gpt-5.6-sol",
-    OPENAI_PATTERN_PLANNER_REASONING: "high",
+    OPENAI_PATTERN_PLANNER_REASONING: "xhigh",
     OPENAI_PATTERN_PLANNER_PROMPT_VERSION: "1.0.1",
     OPENAI_PATTERN_PLANNER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
-    OPENAI_PATTERN_WRITER_REASONING: "high",
+    OPENAI_PATTERN_WRITER_REASONING: "xhigh",
     OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.2",
     OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
     OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
-    OPENAI_PATTERN_VERIFIER_REASONING: "high",
+    OPENAI_PATTERN_VERIFIER_REASONING: "xhigh",
     OPENAI_PATTERN_VERIFIER_PROMPT_VERSION: "1.0.0-verifier",
     OPENAI_PATTERN_VERIFIER_TIMEOUT_MS: "900000",
     OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
@@ -144,7 +144,9 @@ describe("Pattern publisher configuration", () => {
     if (!outcome.ok) return;
     expect(outcome.config.pin.publisher).toBe(PATTERN_PUBLISHER_CODEX);
     expect(outcome.config.pin.planner_model).toBe("gpt-5.6-sol");
-    expect(outcome.config.pin.planner_reasoning).toBe("high");
+    expect(outcome.config.pin.planner_reasoning).toBe("xhigh");
+    expect(outcome.config.pin.writer_reasoning).toBe("xhigh");
+    expect(outcome.config.pin.verifier_reasoning).toBe("xhigh");
     expect(outcome.config.pin.planner_prompt_version).toBe("1.0.1");
     expect(outcome.config.pin.writer_prompt_version).toBe("1.0.2");
     expect(outcome.config.pin.verifier_prompt_version).toBe("1.0.0-verifier");

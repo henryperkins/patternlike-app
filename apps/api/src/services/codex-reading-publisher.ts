@@ -33,6 +33,7 @@ import {
 } from "./codex-provider-artifacts.js";
 import {
   CODEX_PROVIDER_TIMEOUT_MS,
+  isCodexProviderReasoningEffort,
   invocationFromResponsesRequest,
 } from "./codex-provider-contract.js";
 import { buildResponsesRequest } from "./reading-prompt.js";
@@ -95,14 +96,13 @@ export function createCodexReadingPublisher(
     ): Promise<CodexPublisherResult> {
       const coordinate = options.codexJob;
       // The deadline is the Codex contract's, and the reasoning pin is the one
-      // the runner's own claim schema accepts. A command frozen under either
-      // of the old values names an execution this path cannot perform, so it
-      // is refused rather than silently executed under different ones.
+      // the runner's claim schema accepts. Execute supported legacy high
+      // commands with their frozen effort, and reject unsupported profiles.
       if (
         !coordinate ||
         coordinate.pipeline !== "reading" ||
         options.timeoutMs !== CODEX_PROVIDER_TIMEOUT_MS ||
-        options.configuration.reasoning_effort !== "high"
+        !isCodexProviderReasoningEffort(options.configuration.reasoning_effort)
       ) {
         return unavailable();
       }
@@ -110,7 +110,7 @@ export function createCodexReadingPublisher(
       const body = buildResponsesRequest(request, options.configuration);
       const converted = invocationFromResponsesRequest(body, {
         model: options.configuration.model,
-        reasoningEffort: "high",
+        reasoningEffort: options.configuration.reasoning_effort,
       });
       // The conversion also enforces the 256KB prompt-plus-schema ceiling, so
       // an oversize packet fails here rather than at the runner, where it would
@@ -159,7 +159,7 @@ export function createCodexReadingPublisher(
             stageAttempt: coordinate.stageAttempt,
             request: artifact.artifact,
             model: options.configuration.model,
-            reasoningEffort: "high",
+            reasoningEffort: options.configuration.reasoning_effort,
             promptVersion: options.configuration.prompt_version,
             timeoutMs: CODEX_PROVIDER_TIMEOUT_MS,
             dailyCallLimit: coordinate.dailyCallLimit,
