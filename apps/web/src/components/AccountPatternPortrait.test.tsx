@@ -5,7 +5,7 @@ import { webcrypto } from "node:crypto";
 import { Blob as NodeBlob } from "node:buffer";
 import type { PatternPortraitResponse, PatternResponseV7, PatternStatePattern, PortraitGraph } from "@patternlike/shared";
 import { ApiError, downloadPatternPortrait, getPatternPortrait, getPatternPortraitImage, startPatternPortraitGeneration } from "../lib/api-client.js";
-import { AccountPatternPortrait } from "./AccountPatternPortrait.js";
+import { LegacyAccountPatternPortrait as AccountPatternPortrait } from "./AccountPatternPortrait.js";
 import { PatternPortrait } from "./PatternPortrait.js";
 
 vi.mock("../lib/api-client.js", async (original) => ({ ...await original<typeof import("../lib/api-client.js")>(), getPatternPortrait: vi.fn(), getPatternPortraitImage: vi.fn(), startPatternPortraitGeneration: vi.fn(), downloadPatternPortrait: vi.fn() }));

@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-09-06T05:57:48.544558+00:00",
+  "scope": "Private production D1 export restored locally, then unchanged0026/0027 applied locally only; no production migration yet",
+  "backup_sha256": "cacb2f9b9a906cae19d34bcf12f33c01c73b1f7b3e35e8e112b3f365eab1d4cf",
+  "backup_bytes": 8416228,
+  "backup_mode": "0o600",
+  "existing_tables": 57,
+  "existing_row_counts_preserved": true,
+  "foreign_key_check_before_and_after": 0,
+  "integrity_check_before_and_after": "ok",
+  "migrations": [
+    {
+      "name": "0026_pattern_portraits.sql",
+      "sha256": "56f8be8110fd8488c2bd5843e71960966733ed8fcf3766726558e02b93542902"
+    },
+    {
+      "name": "0027_portrait_mesh_automation.sql",
+      "sha256": "eb1e09412c117db6dcf631f4b4912ad9c53c1c703f80020d8752cb44a8032e0b"
+    }
+  ],
+  "new_tables": {
+    "pattern_portraits": 0,
+    "pattern_portrait_jobs": 0,
+    "pattern_portrait_assets": 0,
+    "portrait_automation_grants": 0,
+    "portrait_start_outbox": 0,
+    "portrait_mesh_jobs": 0,
+    "portrait_mesh_assets": 0
+  }
+}

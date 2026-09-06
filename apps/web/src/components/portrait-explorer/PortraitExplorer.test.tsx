@@ -31,6 +31,17 @@ async function chapter(user: ReturnType<typeof userEvent.setup>, ordinal = 1) {
 }
 
 describe("Portrait exploration", () => {
+  it("identifies a personal source-bound explorer as a private portrait", async () => {
+    const bindings = nativeImageBindings.map((binding, index) => ({ ...binding, object: { ...binding.object, imageUrl: `blob:private-image-${index}` } }));
+    const personal: PortraitMeshBundle = { ...bundle, authoring: "codex-parametric/v1", assets: bundle.assets.map((asset, index) => ({ ...asset, url: `blob:private-model-${index}`, provenance: {
+      authoring: "codex-parametric/v1", documentRevision: manifest.revision, compilerVersion: "portrait-mesh-compiler/v1", programSha256: "b".repeat(64), sourceTextSha256: "c".repeat(64),
+    } })) };
+    render(<PortraitExplorer source={source} objectBindings={bindings} meshBundle={personal} />);
+    await screen.findByTestId("scene");
+    expect(screen.queryByText(/fictional/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Private portrait")).toBeInTheDocument();
+  });
+
   it("keeps named chapters visible and links facets to actual source passages", async () => {
     const user = userEvent.setup(); mount();
     await screen.findByTestId("scene");

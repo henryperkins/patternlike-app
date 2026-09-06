@@ -1,0 +1,13 @@
+{
+  "audit": {
+    "schema_version": "portrait-mesh-audit/v1",
+    "accepted": true,
+    "recognizable": true,
+    "substantial": true,
+    "source_correspondence": true,
+    "no_severe_intersections": true,
+    "view_count": 4,
+    "notes": "All four views show a coherent, substantial lantern with a tiered circular base, luminous central chamber, surrounding posts, upper vent openings, domed cap, finial, and arched carrying handle. The side and three-quarter views confirm genuine depth and a constructed rear rather than a flat facade. It is visibly simplified relative to the ornate reference, but retains the reference's major structure and proportions sufficiently for clear recognition. The light-bearing lantern is a plausible interpretation of the chapter's theme of maintaining a modest guiding light or practice through uncertainty. No severe collapse or unintended intersections are visible; the edge-on handle in the side view and joined supports appear structurally intentional."
+  },
+  "provider_request_id": "01a07535-7f0a-7950-b72f-78fb03ddc107:01a07535-7f5c-75f0-a8f8-6e01766e68ca"
+}

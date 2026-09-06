@@ -1,0 +1,37 @@
+{
+  "checked_at": "2026-09-06T05:52:09.676747+00:00",
+  "checks": [
+    {
+      "canary": "compass-02",
+      "unchanged_program": true,
+      "final_compiler_hash_matches_original_canary": true,
+      "glb_sha256": "871933cc364cf212679bd0558204e38d54e099e360bd64a2fac6d50063773255",
+      "triangles": 10188,
+      "glb_bytes": 206084
+    },
+    {
+      "canary": "bench-02",
+      "unchanged_program": true,
+      "final_compiler_hash_matches_original_canary": true,
+      "glb_sha256": "688a79309b59105307232c64e1f2fdbda2b547e4333ca5a4d6fb7bd50c9afd8a",
+      "triangles": 7676,
+      "glb_bytes": 170688
+    },
+    {
+      "canary": "lantern-01",
+      "unchanged_program": true,
+      "final_compiler_hash_matches_original_canary": true,
+      "glb_sha256": "253a8af5d004300f5d858a2e10b5aadcaf406361dd2113d11aa6c8edb29b2471",
+      "triangles": 12752,
+      "glb_bytes": 257716
+    },
+    {
+      "canary": "spyglass-01",
+      "unchanged_program": true,
+      "final_compiler_hash_matches_original_canary": true,
+      "glb_sha256": "4dd183de32c3fa9c511543b467b16c391924d4bb099c04d6df86c7112c7fe7ef",
+      "triangles": 16608,
+      "glb_bytes": 316436
+    }
+  ]
+}

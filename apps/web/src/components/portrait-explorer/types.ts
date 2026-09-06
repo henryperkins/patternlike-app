@@ -15,11 +15,18 @@ export interface PortraitMeshAsset {
   sha256: string;
   sourceImageSha256: string;
   sourceText: string;
+  provenance?: {
+    authoring: "codex-parametric/v1";
+    documentRevision: string;
+    sourceTextSha256: string;
+    programSha256: string;
+    compilerVersion: "portrait-mesh-compiler/v1";
+  };
 }
 export interface PortraitMeshBundle {
   version: "portrait-mesh-1";
   documentRevision: string;
-  authoring: "authored-fictional-fixtures";
+  authoring: "authored-fictional-fixtures" | "codex-parametric/v1";
   assets: readonly PortraitMeshAsset[];
 }
 export type SceneStatus = "loading" | "ready" | "unavailable";

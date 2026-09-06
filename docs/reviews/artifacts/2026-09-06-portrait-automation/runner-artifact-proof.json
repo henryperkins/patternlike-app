@@ -1,0 +1,98 @@
+{
+  "verified_at_utc": "2026-09-06T05:54:34Z",
+  "scope": "Local standalone runner packaging; no production deployment or real provider calls.",
+  "provider_calls": 0,
+  "production_deployed": false,
+  "build": {
+    "node": "v22.23.2",
+    "command": "npm run build -w @patternlike/codex-runner",
+    "exit_code": 0,
+    "typecheck_before_bundle": true,
+    "format": "Node 22 ESM",
+    "bundler": "esbuild@0.28.2",
+    "workspace_shared_inlined": true,
+    "external_production_dependencies": {
+      "sharp": "0.35.2",
+      "three": "0.185.1"
+    }
+  },
+  "tests": [
+    {
+      "node": "v22.23.2",
+      "command": "npm test -w @patternlike/codex-runner",
+      "passed": 117,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    {
+      "node": "v24.19.0",
+      "command": "./node_modules/.bin/tsx --test apps/codex-runner/src/build-artifact.test.ts",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0
+    }
+  ],
+  "artifact_regression": {
+    "file": "apps/codex-runner/src/build-artifact.test.ts",
+    "scope": "Build and stage outside the repository; import both entries; check direct CLI guards; process a PNG through Sharp and geometry through Three/addons; run the built canary with a deterministic local fake Codex to compile a real GLB and render four previews.",
+    "real_provider_contacted": false
+  },
+  "standalone_install": {
+    "directory": "/tmp/patternlike-runner-release.E4u4Ea",
+    "outside_repository": true,
+    "commands": [
+      "stage_dir=$(mktemp -d /tmp/patternlike-runner-release.XXXXXX)",
+      "cp -R apps/codex-runner/dist/. \"$stage_dir/\"",
+      "npm install --prefix \"$stage_dir\" --omit=dev --no-audit --no-fund"
+    ],
+    "install_node": "v22.23.2",
+    "install_exit_code": 0,
+    "packages_added": 10,
+    "optional_native_dependencies_retained": true,
+    "private_workspace_package_required": false,
+    "installed_files_match_build_hashes": true,
+    "runtime_checks": [
+      {
+        "node": "v22.23.2",
+        "both_entry_imports": true,
+        "sharp_png_encode_decode": true,
+        "three_geometry_and_addon": true,
+        "content_free_cli_guards": true,
+        "exit_code": 0
+      },
+      {
+        "node": "v24.19.0",
+        "both_entry_imports": true,
+        "sharp_png_encode_decode": true,
+        "three_geometry_and_addon": true,
+        "exit_code": 0
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "apps/codex-runner/dist/index.js",
+      "bytes": 121181,
+      "sha256": "55224f7a088c6b0b87fea382d7add68b0a3b64f22b1cef696059de62f9064c0e"
+    },
+    {
+      "path": "apps/codex-runner/dist/portrait-mesh-canary.js",
+      "bytes": 65818,
+      "sha256": "6b30c8276e6b5c9631b82c62fc753012b316fda653908ea5318fd58ba06066f7"
+    },
+    {
+      "path": "apps/codex-runner/dist/package.json",
+      "bytes": 311,
+      "sha256": "90bfa2df71e35eaee77c5e148da6d00cafbf9186e23090e1497d3a30c056f65d"
+    }
+  ],
+  "release_copy_commands_not_executed": [
+    "runner_release=/opt/patternlike-codex-runner/releases/VERIFIED_COMMIT",
+    "install -d \"$runner_release/dist\"",
+    "cp -R apps/codex-runner/dist/. \"$runner_release/dist/\"",
+    "npm install --prefix \"$runner_release/dist\" --omit=dev"
+  ],
+  "release_guidance": "Use the generated dist/package.json, retain optional dependencies, and point the stable service dist path at the verified release. See apps/codex-runner/README.md and docs/deploy/codex-production-provider.md."
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.dev/contracts/portrait-mesh-v1/automation-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chart_id",
+    "enabled",
+    "consent_policy_version",
+    "confirm"
+  ],
+  "properties": {
+    "chart_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "consent_policy_version": {
+      "const": "1.1.0"
+    },
+    "confirm": {
+      "enum": [
+        "ENABLE AUTOMATIC PORTRAITS",
+        "DISABLE AUTOMATIC PORTRAITS"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "confirm": {
+            "const": "ENABLE AUTOMATIC PORTRAITS"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "confirm": {
+            "const": "DISABLE AUTOMATIC PORTRAITS"
+          }
+        }
+      }
+    }
+  ]
+}

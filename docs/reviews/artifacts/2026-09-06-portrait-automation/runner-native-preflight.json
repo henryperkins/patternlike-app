@@ -1,0 +1,136 @@
+{
+  "schema_version": "portrait-runner-native-preflight/v1",
+  "fictional": true,
+  "host": {
+    "service_account": "patternlike-codex",
+    "uid": 997,
+    "home": "/var/lib/patternlike-codex-runner",
+    "node_binary": "/opt/patternlike-codex-runner/bin/node",
+    "node_version": "v24.19.0",
+    "codex_version": "codex-cli 0.153.3",
+    "temporary_codex_binary": "/tmp/portrait-codex-0.153.3/node_modules/.bin/codex",
+    "existing_chatgpt_login_verified": true
+  },
+  "invocation": {
+    "helper": "runPortraitInvocation",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh",
+    "declared_image_model": "gpt-image-2",
+    "prompt_version": "portrait-object-v1",
+    "timeout_ms": 300000,
+    "source_sha256": "1f6e64c740191b1427d5fd0e28febcee97efa24dfc7b8b02a5d43f56afbaae8a",
+    "source_kind": "complete fictional chapter JSON",
+    "command": "sudo -n -H -u patternlike-codex env PATH=/opt/patternlike-codex-runner/bin:/usr/local/bin:/usr/bin:/bin /opt/patternlike-codex-runner/bin/node /tmp/portrait-runner-native-preflight.wg1Pbl/smoke.mjs",
+    "source_file": "service-native-image/source.txt"
+  },
+  "result": {
+    "started_at_utc": "2026-09-06T06:13:14.151Z",
+    "finished_at_utc": "2026-09-06T06:13:54.821Z",
+    "elapsed_ms": 40670,
+    "outcome": "passed",
+    "events": {
+      "methods": {
+        "remoteControl/status/changed": 1,
+        "thread/started": 1,
+        "warning": 1,
+        "thread/status/changed": 2,
+        "turn/started": 1,
+        "item/started": 5,
+        "item/completed": 5,
+        "thread/tokenUsage/updated": 2,
+        "account/rateLimits/updated": 2,
+        "item/agentMessage/delta": 40,
+        "turn/completed": 1
+      },
+      "completed_item_types": {
+        "userMessage": 1,
+        "reasoning": 2,
+        "imageGeneration": 1,
+        "agentMessage": 1
+      },
+      "native_image_events": [
+        {
+          "type": "imageGeneration",
+          "status": "completed",
+          "result_base64_present": true,
+          "saved_path_present": true,
+          "saved_path_matches_managed_thread": true
+        }
+      ],
+      "invalid_event_json": false,
+      "child_exit_code": 0,
+      "child_signal": null,
+      "arguments_exactly_forwarded": true
+    },
+    "isolated_run_directory_cleaned": true,
+    "exit_code": 0,
+    "completion_validated": true,
+    "label": "Collapsible lantern",
+    "rationale": "Its steady glow embodies a dependable small practice, while its flexible body shows how the form can change—or fold away—without losing its guiding purpose.",
+    "original": {
+      "sha256": "2f0c8b1a9340c5ff45310f7013a518c2e12bf6168af048167304551458012130",
+      "bytes": 1594514,
+      "width": 1254,
+      "height": 1254,
+      "format": "png"
+    },
+    "reference": {
+      "file": "service-native-image/reference.png",
+      "sha256": "f90f95b1f76db51f081e1ac9b6db7ca14889255e8554a381bf143fa3d1d77485",
+      "bytes": 258015,
+      "width": 512,
+      "height": 512,
+      "format": "png",
+      "exif_present": false
+    },
+    "pixels": {
+      "width": 128,
+      "height": 128,
+      "rgba_bytes": 65536
+    },
+    "provider_request_id_sha256": "1cea6650a8040a7ca9769f300d7116b002fc3987356f06afd33e313ca6509769",
+    "image_request_id_sha256": "1938392d75c367f299572edd0673f117feab4d4b788c628022290a811188aacd",
+    "managed_image_thread_directory_cleaned": true
+  },
+  "scope": "One authorized fictional native-image generation under the actual service account and existing ChatGPT login, through the unchanged strict native image helper. No account data or real job claims.",
+  "isolation_checks": {
+    "basis": "Successful completion of the unchanged helper requires the configuration, MCP, thread, native event, source identity, image bytes, and cleanup checks below.",
+    "cli_pin_and_existing_chatgpt_login": true,
+    "expected_codex_home_and_no_global_agent_instructions": true,
+    "openai_provider_expected_model_and_chatgpt_backend": true,
+    "read_only_sandbox_and_never_approval": true,
+    "fresh_ephemeral_thread_requested": true,
+    "host_instructions_skills_hooks_notifications_and_web_search_disabled": true,
+    "native_image_generation_enabled": true,
+    "inherited_mcp_servers_disabled_with_no_tools": true,
+    "exactly_one_completed_native_image_event": true,
+    "no_other_tool_item_events_observed": true,
+    "managed_saved_file_matches_native_result_bytes": true,
+    "source_hash_matches_complete_fictional_chapter": true,
+    "sanitized_derivative_and_pixels_validated": true,
+    "managed_image_and_attempt_directories_cleaned": true
+  },
+  "visual_inspection": {
+    "inspected": true,
+    "observation": "A single recognizable collapsible lantern with a handle and warm light on a plain light background; no visible lettering, diagrams, or collage."
+  },
+  "source_sha256": {
+    "apps/codex-runner/src/portrait-invocation.ts": "75df696c6a29cfd76235a742e0163d74f8a2c2b81051fae4d19cb2dfb4515623",
+    "apps/codex-runner/src/portrait-client.ts": "b8e33986e92b8f4b61880efa8d333fd155917b64345bd2a9bd813214c0429ef5",
+    "apps/codex-runner/src/codex-cli.ts": "12966f4ccbebd4205ee1839bcea2de3e394181ca7ab77adc8b86831e2026ffb7",
+    "/tmp/portrait-runner-native-preflight.wg1Pbl/smoke.mjs": "a2882585b47fd801407bc7d15378af3836bdf0ac6898ed06f08ffa3a8274505e",
+    "/tmp/portrait-runner-native-preflight.wg1Pbl/codex-monitor.mjs": "1c2158bcd40c839fdd10c2ca19200994c31c5a8a36edc3749d671716a165f922"
+  },
+  "limitations": "The native imageGeneration event and managed-file bytes were verified. gpt-image-2 is the claim declaration; the native event does not independently attest an underlying image-model identifier. This receipt proves fictional service-account image capability, not a deployed account workflow.",
+  "boundaries": {
+    "real_provider_turns": 1,
+    "native_image_generations": 1,
+    "account_content_sent": false,
+    "credentials_copied_or_changed": false,
+    "host_auth_or_configuration_changed": false,
+    "live_service_install_or_swap": false,
+    "polling_enabled_or_jobs_claimed": false,
+    "production_deployment_performed": false,
+    "repository_source_changed": false
+  }
+}

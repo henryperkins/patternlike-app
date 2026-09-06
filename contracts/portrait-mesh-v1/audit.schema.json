@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.dev/contracts/portrait-mesh-v1/audit.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "accepted",
+    "recognizable",
+    "substantial",
+    "source_correspondence",
+    "no_severe_intersections",
+    "view_count",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "portrait-mesh-audit/v1"
+    },
+    "accepted": {
+      "const": true
+    },
+    "recognizable": {
+      "const": true
+    },
+    "substantial": {
+      "const": true
+    },
+    "source_correspondence": {
+      "const": true
+    },
+    "no_severe_intersections": {
+      "const": true
+    },
+    "view_count": {
+      "const": 4
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  }
+}

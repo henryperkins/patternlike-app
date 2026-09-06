@@ -1,0 +1,13 @@
+{
+  "audit": {
+    "schema_version": "portrait-mesh-audit/v1",
+    "accepted": false,
+    "recognizable": false,
+    "substantial": false,
+    "source_correspondence": true,
+    "no_severe_intersections": false,
+    "view_count": 4,
+    "notes": "The looped, coiled linework loosely suggests a rope and therefore plausibly represents commitment, grounding, and release. However, it lacks the reference's thick braided construction and recognizable central knot, reading instead as sparse wire-like rings. Large faceted brown masses obscure and intersect the coil, with another mass visibly floating apart above it; the side view collapses the rope into an extremely thin profile between disconnected polygonal forms. The result is incomplete, poorly constructed from the rear and side, and substantially mismatched to the reference."
+  },
+  "provider_request_id": "01a07540-c8d1-7cb2-bea8-75496331552d:01a07540-c926-79e0-a11d-fcb5e6047c96"
+}

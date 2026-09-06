@@ -8,6 +8,11 @@ import {
   getPatternPortraitImage,
   downloadPatternPortrait,
   startPatternPortraitGeneration,
+  getPortraitAutomation,
+  setPortraitAutomation,
+  getPatternPortraitExplorer,
+  getPatternPortraitModel,
+  downloadPatternPortraitExplorer,
   getAiSynthesisConsent,
   getReadingEvidence,
   getTiming,
@@ -39,6 +44,40 @@ const CONSENT = "/v1/consents/ai-synthesis";
 const ACCOUNT_PROCESSING_CONSENT = "/v1/consents/account-processing";
 
 describe("private Pattern portrait transport", () => {
+  it("records an explicit chart-scoped automation choice and loads explorer progress", async () => {
+    const preference = { schema_version: "portrait-automation/v1", available: true, chart_id: "chart-1", enabled: false, consent_policy_version: "1.1.0" };
+    const input = { chart_id: "chart-1", enabled: true, consent_policy_version: "1.1.0" as const, confirm: "ENABLE AUTOMATIC PORTRAITS" as const };
+    mockApiResponses({
+      "/v1/pattern-portrait/automation": { status: 200, body: preference },
+      "PUT /v1/pattern-portrait/automation": { status: 200, body: { ...preference, enabled: true } },
+      "/v1/pattern-portrait/explorer": { status: 200, body: { status: "generating", completed_models: 2 } },
+    });
+    await expect(getPortraitAutomation()).resolves.toEqual(preference);
+    await expect(setPortraitAutomation(input, "automation-key")).resolves.toMatchObject({ enabled: true });
+    expect(capturedFor("/v1/pattern-portrait/automation").at(-1)?.body).toEqual(input);
+    await expect(getPatternPortraitExplorer()).resolves.toMatchObject({ completed_models: 2 });
+  });
+
+  it("delivers model bytes and the complete portrait download through fixed authenticated routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "model/gltf-binary" } }))
+      .mockResolvedValueOnce(new Response("{}", { headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const signal = new AbortController().signal;
+    expect((await getPatternPortraitModel("opaque/model", signal)).size).toBe(3);
+    expect(fetchMock.mock.calls[0][0]).toBe("/v1/pattern-portrait/models/opaque%2Fmodel");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: "include", cache: "no-store", signal });
+    await downloadPatternPortraitExplorer({ chart_id: "chart-1", pattern_id: "pattern-1", generated_at: "now" }, signal);
+    expect(fetchMock.mock.calls[1][0]).toBe("/v1/pattern-portrait/explorer/download?chart_id=chart-1&pattern_id=pattern-1&generated_at=now");
+  });
+
+  it("cancels oversized streamed models without trusting a missing length header", async () => {
+    const cancel = vi.fn();
+    const stream = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(750001)); }, cancel });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream, { headers: { "content-type": "model/gltf-binary" } })));
+    await expect(getPatternPortraitModel("oversized")).rejects.toThrow(/large|size/);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("loads status and explicitly starts the expected revision with an idempotency key", async () => {
     const body = { status: "generating" };
     const identity = { chart_id: "chart-1", pattern_id: "pattern-1", generated_at: "2026-09-05T00:00:00Z", confirm: "CREATE MY PORTRAIT" as const, consent_policy_version: "1.0.0" as const };

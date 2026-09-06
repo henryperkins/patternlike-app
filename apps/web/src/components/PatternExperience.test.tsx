@@ -8,8 +8,15 @@ import type {
   PatternStateDocumentV9,
 } from "@patternlike/shared";
 import { PATTERN_GENERATION_CONSENT_POLICY_VERSION } from "@patternlike/shared";
-import { capturedFor, deferred, mockApiResponses } from "../test/api-mock.js";
+import { capturedFor, deferred, mockApiResponses as apiResponses, type MockResponse } from "../test/api-mock.js";
 import { PatternExperience } from "./PatternExperience.js";
+
+// Older deployments have no mesh/automation routes; keep that fallback explicit.
+const mockApiResponses = (responses: Record<string, MockResponse>) => apiResponses({
+  "/v1/pattern-portrait/automation": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
+  "/v1/pattern-portrait/explorer": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
+  ...responses,
+});
 
 const STATE = "/v1/pattern-state";
 const PATTERN = "/v1/pattern";
@@ -89,6 +96,25 @@ const generated: PatternResponseV7 = {
 const noop = () => undefined;
 
 describe("PatternExperience", () => {
+  it("finishes saving a selected automation preference before enabling Pattern generation", async () => {
+    const gate = deferred();
+    const preference = { schema_version: "portrait-automation/v1", available: true, chart_id: "cht_pattern_ai_0001", enabled: false, consent_policy_version: "1.1.0" };
+    mockApiResponses({
+      [STATE]: { status: 200, body: stateDoc({ state: "consent_required" }) },
+      "GET /v1/pattern-portrait/automation": { status: 200, body: preference },
+      "PUT /v1/pattern-portrait/automation": { status: 200, body: { ...preference, enabled: true }, gate: gate.promise },
+    });
+    render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
+    const choice = await screen.findByRole("checkbox", { name: "Automatically create my 3D portrait" });
+    const generate = screen.getByRole("button", { name: "Generate my Pattern" });
+    expect(choice).not.toBeChecked(); expect(generate).toBeEnabled();
+    await userEvent.click(choice);
+    expect(generate).toBeDisabled();
+    expect(capturedFor(GENERATIONS)).toHaveLength(0);
+    await act(async () => gate.release());
+    expect(choice).toBeChecked(); expect(generate).toBeEnabled();
+  });
+
   it("renders the generated flow for a state document, never an editorial catalogue", async () => {
     // `editorial_catalog` survives in the wire enum for clients and documents
     // written while it was emitted. Nothing emits it now, and the client has no

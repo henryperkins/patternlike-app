@@ -14,6 +14,9 @@ import type {
   PatternGenerationStatusV9,
   PatternPortraitResponse,
   PatternPortraitGenerationRequest,
+  PatternPortraitExplorerResponse,
+  PortraitAutomationPreference,
+  PortraitAutomationRequest,
   PatternResponse,
   PatternResponseV7,
   PatternStateDocumentV9,
@@ -1271,6 +1274,28 @@ export function getPatternPortrait(signal?: AbortSignal): Promise<PatternPortrai
   return request<PatternPortraitResponse>("/v1/pattern-portrait", { method: "GET", headers: requestHeaders(), signal });
 }
 
+export function getPortraitAutomation(signal?: AbortSignal): Promise<PortraitAutomationPreference> {
+  return request<PortraitAutomationPreference>("/v1/pattern-portrait/automation", { method: "GET", headers: requestHeaders(), signal });
+}
+
+export function setPortraitAutomation(input: PortraitAutomationRequest, idempotencyKey: string, signal?: AbortSignal): Promise<PortraitAutomationPreference> {
+  return request<PortraitAutomationPreference>("/v1/pattern-portrait/automation", {
+    method: "PUT", headers: requestHeaders({ json: true, idempotencyKey }), body: JSON.stringify(input), signal,
+  });
+}
+
+export function getPatternPortraitExplorer(signal?: AbortSignal): Promise<PatternPortraitExplorerResponse> {
+  return request<PatternPortraitExplorerResponse>("/v1/pattern-portrait/explorer", { method: "GET", headers: requestHeaders(), signal });
+}
+
+export function getPatternPortraitModel(referenceId: string, signal?: AbortSignal): Promise<Blob> {
+  return requestPortraitBlob(`/v1/pattern-portrait/models/${encodeURIComponent(referenceId)}`, "model/gltf-binary", 750000, signal);
+}
+
+export function downloadPatternPortraitExplorer(expected: Pick<PatternPortraitGenerationRequest, "chart_id" | "pattern_id" | "generated_at">, signal?: AbortSignal): Promise<Blob> {
+  return requestPortraitBlob(`/v1/pattern-portrait/explorer/download?${new URLSearchParams(expected)}`, "application/json", 48 * 1024 * 1024, signal);
+}
+
 export function startPatternPortraitGeneration(
   expected: PatternPortraitGenerationRequest,
   idempotencyKey: string,
@@ -1290,10 +1315,29 @@ async function requestPortraitBlob(path: string, contentType: string, maxBytes: 
     throw new ApiError(response.status, body);
   }
   if (response.headers.get("content-type")?.split(";")[0].trim() !== contentType) {
-    throw new Error(contentType === "image/png" ? "The API did not return a chapter image." : "The API did not return a portrait download.");
+    throw new Error(contentType === "image/png" ? "The API did not return a chapter image." : contentType === "model/gltf-binary" ? "The API did not return a 3D model." : "The API did not return a portrait download.");
   }
   if (Number(response.headers.get("content-length")) > maxBytes) throw new Error("The portrait file is too large to load.");
-  const blob = await response.blob();
+  const reader = response.body?.getReader();
+  let blob: Blob;
+  if (reader) {
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    let length = 0;
+    try {
+      while (true) {
+        signal?.throwIfAborted();
+        const next = await reader.read();
+        if (next.done) break;
+        length += next.value.byteLength;
+        if (length > maxBytes) throw new Error("The portrait file is too large to load.");
+        chunks.push(new Uint8Array(next.value));
+      }
+      blob = new Blob(chunks, { type: contentType });
+    } catch (error) {
+      await reader.cancel().catch(() => {});
+      throw error;
+    } finally { reader.releaseLock(); }
+  } else blob = await response.blob();
   signal?.throwIfAborted();
   if (!blob.size || blob.size > maxBytes) throw new Error("The portrait file has an invalid size.");
   return blob;

@@ -1,0 +1,69 @@
+{
+  "schema_version": "portrait-mesh-canary/v1",
+  "fictional": true,
+  "automatic_authoring": true,
+  "manual_model_edits": false,
+  "codex_cli_version": "0.153.3",
+  "configured_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "source_text_sha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70",
+  "source_image_sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+  "document_revision": "fictional-canary/v1",
+  "elapsed_ms": 137976,
+  "compiled": {
+    "program_sha256": "419d311dbb7304aed1dbb8094066471c6f05cea476d8f75dfdaad984f4eef0ee",
+    "glb_sha256": "688a79309b59105307232c64e1f2fdbda2b547e4333ca5a4d6fb7bd50c9afd8a",
+    "glb_bytes": 170688,
+    "triangles": 7676,
+    "bounds": {
+      "min": [
+        -0.9001143574714661,
+        -1,
+        -0.699624240398407
+      ],
+      "max": [
+        0.9001143574714661,
+        1,
+        0.699624240398407
+      ]
+    },
+    "compiler_version": "portrait-mesh-compiler/v1",
+    "views": [
+      {
+        "label": "front",
+        "sha256": "11435c0bf40d9f81def7ed991e3d2e90a5023b8c7f3e7d9a94ee1d5f941eb760",
+        "bytes": 7133
+      },
+      {
+        "label": "rear",
+        "sha256": "be8748d5de8f2692d6b87624cc217ec6766d09423186d2fbd82ee6bd11ec0209",
+        "bytes": 6446
+      },
+      {
+        "label": "side",
+        "sha256": "c9edf3176f8215092c13866b00711bd5f88e4741c289e10aba961c27ac7a9b1b",
+        "bytes": 16150
+      },
+      {
+        "label": "three-quarter",
+        "sha256": "5e8f326ff966b00d720d5aa12367cc1e3e5473ef3208bcc1d90714f73704d727",
+        "bytes": 27160
+      }
+    ]
+  },
+  "result": {
+    "ok": true,
+    "audit": {
+      "schema_version": "portrait-mesh-audit/v1",
+      "accepted": true,
+      "recognizable": true,
+      "substantial": true,
+      "source_correspondence": true,
+      "no_severe_intersections": true,
+      "view_count": 4,
+      "notes": "All four views show a complete, recognizable two-person wooden rocking bench with paired arched slatted backs, two defined seat sections, armrests, posts, legs, and continuous curved rockers. The side, rear, and three-quarter views confirm real depth and coherent supporting construction rather than a flat facade. Its shared two-seat form plausibly expresses making room for another person while retaining a distinct place for oneself, matching the chapter's care-and-reciprocity theme. The model is simpler and more angular than the reference, but preserves the major structure and proportions, with no visible severe collapse or destructive intersections."
+    },
+    "provider_request_id": "01a07532-505a-7c62-97bc-b8a85bb80840:01a07532-50b2-7762-912e-484460577307",
+    "audit_request_id": "01a07534-3421-7e20-9ff2-54a2f56e5cac:01a07534-3474-7c01-9251-9be34a8b08ac"
+  }
+}

@@ -1,11 +1,11 @@
 import { Box3, Mesh, Texture, Vector3, type Object3D, type Material } from "three";
-import type { CameraBookmark, Point3 } from "./types.js";
+import type { CameraBookmark, Point3, PortraitMeshAsset } from "./types.js";
 
 export const MAX_GLB_BYTES = 12 * 1024 * 1024;
 export const HOME_DIRECTION = new Vector3(0.15, 0.76, 1).normalize();
 
 /** Inspect the container before GLTFLoader can follow a buffer or image URL. */
-export function validateGlb(bytes: ArrayBuffer, chapterId?: string): void {
+export function validateGlb(bytes: ArrayBuffer, chapterId?: string, source?: PortraitMeshAsset): void {
   if (bytes.byteLength < 20 || bytes.byteLength > MAX_GLB_BYTES) throw new Error("Invalid GLB size");
   const view = new DataView(bytes);
   if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2
@@ -38,7 +38,7 @@ export function validateGlb(bytes: ArrayBuffer, chapterId?: string): void {
     const identity = document as {
       scene?: number;
       scenes?: Array<{ nodes?: number[] }>;
-      nodes?: Array<{ name?: string; extras?: { chapterId?: unknown } }>;
+      nodes?: Array<{ name?: string; extras?: Record<string, unknown> }>;
     };
     const roots = identity.scenes?.[0]?.nodes;
     const rootIndex = roots?.[0];
@@ -47,6 +47,10 @@ export function validateGlb(bytes: ArrayBuffer, chapterId?: string): void {
       || !Array.isArray(roots) || roots.length !== 1 || !Number.isInteger(rootIndex)
       || !Array.isArray(identity.nodes) || root?.name !== chapterId || root.extras?.chapterId !== chapterId) {
       throw new Error("Model chapter identity mismatch");
+    }
+    if (source?.provenance) {
+      const expected = { ...source.provenance, chapterId: source.chapterId, sourceImageSha256: source.sourceImageSha256 };
+      if (Object.entries(expected).some(([key, value]) => root.extras?.[key] !== value)) throw new Error("Model source provenance mismatch");
     }
     for (const [index, node] of identity.nodes.entries()) {
       // Inspect raw names before GLTFLoader makes duplicate node names unique.
@@ -58,12 +62,17 @@ export function validateGlb(bytes: ArrayBuffer, chapterId?: string): void {
   }
 }
 
-export async function verifyGlbAsset(bytes: ArrayBuffer, expected: string, chapterId?: string): Promise<void> {
+export async function verifyGlbAsset(bytes: ArrayBuffer, expected: string, chapterId?: string, source?: PortraitMeshAsset): Promise<void> {
   if (!/^[a-f0-9]{64}$/.test(expected)) throw new Error("Invalid model hash");
-  validateGlb(bytes, chapterId);
+  validateGlb(bytes, chapterId, source);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   if (actual !== expected) throw new Error("Model hash mismatch");
+  if (source?.provenance) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source.sourceText));
+    const sourceHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    if (sourceHash !== source.provenance.sourceTextSha256) throw new Error("Model source text hash mismatch");
+  }
 }
 
 /** A camera-space fit leaves room for native labels while retaining all four forms. */
@@ -90,7 +99,7 @@ export function cameraFrame(boxes: readonly Box3[], selected: readonly number[],
   return { position: target.clone().addScaledVector(HOME_DIRECTION, distance).toArray(), target: target.toArray() };
 }
 
-/** Fixture composition, indexed in published chapter order; model Y is seated separately. */
+/** Four-chapter composition in published order; model Y is seated separately. */
 export function chapterLayout(index: number, unfolded: boolean): Point3 {
   const layouts: Point3[] = [[1.13, 0, 1.05], [-1.15, 0, -1.08], [1.2, 0, -1.12], [-1.18, 0, 1.24]];
   const source = layouts[index] ?? [0, 0, 0];

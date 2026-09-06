@@ -1,0 +1,238 @@
+{
+  "schema_version": "portrait-production-preflight/v1",
+  "scope": "Read-only production Worker settings, deployment allocation, D1 schema and aggregate metadata; no account content or credentials.",
+  "observation_window": {
+    "database": "2026-09-06T05:53:47.479Z",
+    "worker": "2026-09-06T05:54:10.087Z"
+  },
+  "worker": {
+    "observed_at": "2026-09-06T05:54:10.087Z",
+    "worker": "patternlike-api-production",
+    "deployment": {
+      "id": "f013eb12-75b2-4afe-a79e-a235934ab4e9",
+      "created_on": "2026-09-06T04:42:56.378881Z",
+      "strategy": "percentage",
+      "versions": [
+        {
+          "version_id": "c818499d-c88b-4194-a7eb-4cb1f9fa5b81",
+          "percentage": 100
+        }
+      ]
+    },
+    "versions": [
+      {
+        "success": true,
+        "status": 200,
+        "id": "c818499d-c88b-4194-a7eb-4cb1f9fa5b81",
+        "number": 296,
+        "created_on": "2026-09-06T04:42:54.811436Z",
+        "source": "wrangler",
+        "annotations": {
+          "workers/triggered_by": "version_upload"
+        },
+        "percentage": 100,
+        "db_id": "1305a75d-0a8a-4a21-b201-d94fda0aaf93"
+      }
+    ],
+    "flags": {
+      "PATTERN_PORTRAIT_ENABLED": null,
+      "PATTERN_PORTRAIT_MESH_ENABLED": null,
+      "GEOCODER_ROLLOUT": "enabled",
+      "ONTOLOGY_PIPELINE_PUBLISHER": "codex",
+      "ONTOLOGY_PIPELINE_ROLLOUT": "off",
+      "PATTERN_PUBLISHER": "codex",
+      "READING_PUBLISHER": "codex",
+      "READING_V5_ROLLOUT": "hybrid"
+    },
+    "binding_types": [
+      {
+        "name": "ARTIFACTS",
+        "type": "r2_bucket"
+      },
+      {
+        "name": "DB",
+        "type": "d1"
+      },
+      {
+        "name": "ONTOLOGY_PIPELINE_QUEUE",
+        "type": "queue"
+      },
+      {
+        "name": "ONTOLOGY_SIGNER",
+        "type": "service"
+      },
+      {
+        "name": "PATTERN_QUEUE",
+        "type": "queue"
+      },
+      {
+        "name": "PATTERN_REPLAY_LEDGER",
+        "type": "r2_bucket"
+      },
+      {
+        "name": "PLACE_SEARCH_RATE_LIMITER",
+        "type": "ratelimit"
+      },
+      {
+        "name": "PRIVACY_QUEUE",
+        "type": "queue"
+      },
+      {
+        "name": "READING_QUEUE",
+        "type": "queue"
+      }
+    ],
+    "secret_names": [
+      "CALC_SERVICE_AUTH_TOKEN",
+      "CODEX_PROVIDER_ARTIFACT_KEYRING",
+      "CODEX_RUNNER_TOKEN",
+      "GEOAPIFY_API_KEY",
+      "ONTOLOGY_PIPELINE_ARTIFACT_KEYRING",
+      "OPENAI_API_KEY",
+      "PATTERN_REPLAY_LEDGER_KEYS",
+      "PATTERN_REPLAY_LEDGER_SIGNING_KEY",
+      "ROOT_KEK",
+      "SERVICE_AUTH_TOKEN"
+    ],
+    "ontology_key_binding_present": true,
+    "compatibility_date": "2025-05-01",
+    "compatibility_flags": [
+      "nodejs_compat",
+      "allow_eval_during_startup"
+    ],
+    "commit_sha": null,
+    "commit_sha_note": "Cloudflare version metadata exposes no source commit SHA; deployed source compatibility is not established by these observations."
+  },
+  "database": {
+    "name": "patternlike-ops",
+    "id": "1305a75d-0a8a-4a21-b201-d94fda0aaf93",
+    "binding_matches_current_worker": true,
+    "migration_summary": {
+      "applied_migration_count": 25,
+      "latest_migration": "0025_codex_xhigh_reasoning.sql"
+    },
+    "required_migrations_applied": {
+      "0026": false,
+      "0027": false
+    },
+    "portrait_tables_present": [],
+    "checked_portrait_tables": [
+      "pattern_portraits",
+      "pattern_portrait_jobs",
+      "pattern_portrait_assets",
+      "portrait_automation_grants",
+      "portrait_start_outbox",
+      "portrait_mesh_jobs",
+      "portrait_mesh_assets"
+    ],
+    "aggregates": {
+      "users": 4,
+      "pattern_documents": 2,
+      "accepted_documents_with_active_account_and_chart": 2,
+      "latest_consent_states": [
+        {
+          "kind": "account_processing",
+          "status": "granted",
+          "count": 3,
+          "current_unexpired_granted_count": 3
+        },
+        {
+          "kind": "pattern_generation",
+          "status": "granted",
+          "count": 3,
+          "current_unexpired_granted_count": 3
+        }
+      ],
+      "pattern_claim_states": [
+        {
+          "status": "accepted",
+          "count": 2
+        },
+        {
+          "status": "available",
+          "count": 1
+        },
+        {
+          "status": "superseded",
+          "count": 2
+        }
+      ],
+      "pattern_generation_states": [
+        {
+          "stage": "failed",
+          "count": 5
+        },
+        {
+          "stage": "succeeded",
+          "count": 6
+        }
+      ],
+      "codex_provider_job_states": [
+        {
+          "status": "completed",
+          "count": 189
+        }
+      ]
+    },
+    "aggregate_limitations": [
+      "Accepted-document count checks active accounts, user-confirmed locale, matching accepted claim/document fingerprint hashes, an active chart/profile, and no recalled document ontology. It does not hash each current chart fingerprint or project encrypted documents.",
+      "Consent counts describe latest status, grant timestamp, and expiry only. They do not prove complete policy/permission validity or consent association with a particular accepted document.",
+      "currentPattern requires exactly four projected chapters; that runtime predicate was not evaluated because account content was excluded.",
+      "Absent portrait tables imply no stored image/mesh rows in those tables; row counts are not reported as zero for nonexistent tables."
+    ],
+    "read_only_evidence": {
+      "all_queries_successful": true,
+      "rows_written": 0,
+      "any_changed_db": false
+    },
+    "executed_sql": "SELECT COUNT(*) AS accepted_documents_with_active_account_and_chart FROM pattern_documents d JOIN users u ON u.id=d.user_id AND u.status='active' AND u.locale_source='user_confirmed' JOIN pattern_generation_claims g ON g.id=d.claim_id AND g.status='accepted' AND g.chart_fingerprint_hash=d.chart_fingerprint_hash WHERE EXISTS (SELECT 1 FROM chart_snapshots c JOIN birth_profiles b ON b.user_id=c.user_id AND b.version=c.profile_version AND b.status='active' WHERE c.user_id=d.user_id AND c.status='active') AND NOT EXISTS (SELECT 1 FROM pattern_ontology_releases r WHERE r.version=d.ontology_version AND r.status='recalled');\nWITH latest AS (SELECT kind,status,granted_at,expires_at,policy_version,ROW_NUMBER() OVER(PARTITION BY user_id,kind ORDER BY version DESC,created_at DESC,id DESC) AS row_number FROM consents WHERE kind IN ('account_processing','pattern_generation')) SELECT kind,status,COUNT(*) AS count,SUM(CASE WHEN status='granted' AND granted_at IS NOT NULL AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN 1 ELSE 0 END) AS current_unexpired_granted_count FROM latest WHERE row_number=1 GROUP BY kind,status;\nSELECT COUNT(*) AS applied_migration_count,MAX(name) AS latest_migration FROM d1_migrations;\nSELECT name FROM sqlite_master WHERE type='table' AND name IN ('pattern_portraits','pattern_portrait_jobs','pattern_portrait_assets','portrait_automation_grants','portrait_start_outbox','portrait_mesh_jobs','portrait_mesh_assets') ORDER BY name;\nSELECT p.active_version,r.status,r.locale,r.bundle_hash,r.recalled_at,(SELECT COUNT(*) FROM pattern_ontology_pipeline_evidence e WHERE e.ontology_version=r.version) AS pipeline_evidence_count FROM pattern_ontology_pointer p LEFT JOIN pattern_ontology_releases r ON r.version=p.active_version;\nSELECT COUNT(*) AS users_count FROM users;\nSELECT COUNT(*) AS pattern_documents_count FROM pattern_documents;\nSELECT status,COUNT(*) AS count FROM pattern_generation_claims GROUP BY status;\nSELECT stage,COUNT(*) AS count FROM pattern_generation_jobs GROUP BY stage;\nSELECT status,COUNT(*) AS count FROM codex_provider_jobs GROUP BY status;"
+  },
+  "ontology": {
+    "active": {
+      "active_version": "pattern-ontology-en-us-internal-0.1.0",
+      "status": "active",
+      "locale": "en-US",
+      "bundle_hash": "sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84",
+      "recalled_at": null,
+      "pipeline_evidence_count": 0
+    },
+    "documented_origin": "synthetic_internal",
+    "origin_evidence": "docs/deploy/openai-pattern-rollout.md superseding decision (2026-08-27), referring to the same active version. Signed R2 release bytes were not fetched or reverified.",
+    "source_gate": "apps/api/src/db/pattern-ontology.ts ontologyServesAccount: synthetic_internal is admitted; machine_pipeline requires public activation scope.",
+    "assessment": "Zero pipeline evidence does not block the documented authored release under current source policy. No new ontology release or public machine-pipeline activation is required solely for portrait enablement.",
+    "runtime_verification": "Not invoked against an authenticated account; live release signature/content verification and currentPattern eligibility remain outside this read-only aggregate check."
+  },
+  "activation_prerequisites": [
+    "Complete final repository merge gate on frozen intended source.",
+    "Back up production D1 and apply additive migrations 0026 then 0027 before enabling compatible API features.",
+    "Deploy and verify the compatible API/frontend revision; observed version metadata alone does not identify its source commit.",
+    "Deploy the standalone codex-runner artifact and production dependencies; verify pinned Codex CLI 0.153.3, existing ChatGPT authentication and content-free preflight on the runner host.",
+    "Enable API PATTERN_PORTRAIT_ENABLED=1 and PATTERN_PORTRAIT_MESH_ENABLED=1 with runner CODEX_RUNNER_PORTRAITS=1 and CODEX_RUNNER_MESHES=1 only after compatible schema and code are live.",
+    "Use an explicitly authorized automation grant and verify image-to-mesh completion, authenticated retrieval, source identity, and the full Reading view on a current four-chapter account Pattern."
+  ],
+  "not_performed": [
+    "Database mutations or migrations",
+    "Worker or runner deployments",
+    "Feature-flag changes",
+    "Provider invocations",
+    "Authentication or consent changes",
+    "Account content reads or decryption",
+    "Secret value output",
+    "Remote runner host verification"
+  ],
+  "local_sources": [
+    "apps/api/src/services/pattern-portrait.ts",
+    "apps/api/src/services/pattern-state.ts",
+    "apps/api/src/db/pattern-ontology.ts",
+    "apps/api/src/db/pattern-consents.ts",
+    "apps/api/src/db/account-processing-consents.ts",
+    "docs/deploy/openai-pattern-rollout.md",
+    "apps/codex-runner/README.md"
+  ],
+  "cloudflare_api_sources": [
+    "GET /accounts/{account_id}/workers/scripts/patternlike-api-production/settings",
+    "GET /accounts/{account_id}/workers/scripts/patternlike-api-production/deployments",
+    "GET /accounts/{account_id}/workers/scripts/patternlike-api-production/versions/c818499d-c88b-4194-a7eb-4cb1f9fa5b81",
+    "POST /accounts/{account_id}/d1/database/1305a75d-0a8a-4a21-b201-d94fda0aaf93/query (SELECT/PRAGMA only)"
+  ]
+}

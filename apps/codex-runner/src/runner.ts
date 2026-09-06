@@ -3,7 +3,9 @@ import type { CodexInvocationOutcome } from "./codex-cli.js";
 import type { CodexProviderClaim } from "./protocol.js";
 import type { CodexPortraitClient } from "./portrait-client.js";
 import type { PortraitInvocationOutcome } from "./portrait-invocation.js";
-import type { CodexPortraitClaim } from "@patternlike/shared";
+import type { CodexPortraitMeshClient } from "./portrait-mesh-client.js";
+import type { PortraitMeshInvocationOutcome } from "./portrait-mesh-invocation.js";
+import type { CodexPortraitClaim, CodexPortraitMeshClaim } from "@patternlike/shared";
 
 export interface RunnerConfiguration {
   apiOrigin: string;
@@ -12,6 +14,7 @@ export interface RunnerConfiguration {
   pollMs: number;
   concurrency: 1;
   portraitsEnabled?: true;
+  meshesEnabled?: true;
 }
 
 export type RunnerLogEvent = Readonly<{
@@ -88,6 +91,9 @@ export function parseRunnerConfiguration(env: NodeJS.ProcessEnv): RunnerConfigur
   if (env.CODEX_RUNNER_PORTRAITS !== undefined && !["0", "1"].includes(env.CODEX_RUNNER_PORTRAITS)) {
     throw new Error("CODEX_RUNNER_PORTRAITS is invalid");
   }
+  if (env.CODEX_RUNNER_MESHES !== undefined && !["0", "1"].includes(env.CODEX_RUNNER_MESHES)) {
+    throw new Error("CODEX_RUNNER_MESHES is invalid");
+  }
   return {
     apiOrigin: url.origin,
     runnerToken,
@@ -95,6 +101,7 @@ export function parseRunnerConfiguration(env: NodeJS.ProcessEnv): RunnerConfigur
     pollMs,
     concurrency: concurrency as 1,
     ...(env.CODEX_RUNNER_PORTRAITS === "1" ? { portraitsEnabled: true as const } : {}),
+    ...(env.CODEX_RUNNER_MESHES === "1" ? { meshesEnabled: true as const } : {}),
   };
 }
 
@@ -116,6 +123,31 @@ export async function runOnePortraitJob(options: PortraitRunnerOptions): Promise
       // A 400 rejects the image before acceptance. Other errors may hide a successful write.
       if (!(error instanceof CodexProviderClientError) || error.status !== 400) throw error;
       await options.client.fail(claimed.claim.job_id, { lease_token: claimed.claim.lease_token, code: "image_invalid" });
+    }
+  } else {
+    try { await options.client.fail(claimed.claim.job_id, { lease_token: claimed.claim.lease_token, code: outcome.code }); }
+    finally { if (outcome.fatal) throw new FatalCodexRunnerError(); }
+  }
+  return "processed";
+}
+
+export interface PortraitMeshRunnerOptions {
+  client: Pick<CodexPortraitMeshClient, "claim" | "complete" | "fail">;
+  execute: (claim: CodexPortraitMeshClaim) => Promise<PortraitMeshInvocationOutcome>;
+}
+
+export async function runOnePortraitMeshJob(options: PortraitMeshRunnerOptions): Promise<"empty" | "processed"> {
+  const claimed = await options.client.claim();
+  if (claimed.status === "empty") return "empty";
+  let outcome: PortraitMeshInvocationOutcome;
+  try { outcome = await options.execute(claimed.claim); }
+  catch { outcome = { ok: false, code: "generation_failed", fatal: false }; }
+  if (outcome.ok) {
+    try { await options.client.complete(claimed.claim.job_id, outcome.completion); }
+    catch (error) {
+      // Only definitive pre-acceptance rejection permits a failure write under this lease.
+      if (!(error instanceof CodexProviderClientError) || error.status !== 400) throw error;
+      await options.client.fail(claimed.claim.job_id, { lease_token: claimed.claim.lease_token, code: "model_invalid" });
     }
   } else {
     try { await options.client.fail(claimed.claim.job_id, { lease_token: claimed.claim.lease_token, code: outcome.code }); }
@@ -197,6 +229,7 @@ export interface CodexPollLoopOptions {
   sleep?: (milliseconds: number) => Promise<void>;
   log?: (event: RunnerLogEvent) => void;
   portraits?: PortraitRunnerOptions;
+  meshes?: PortraitMeshRunnerOptions;
 }
 
 export async function runCodexPollLoop(options: CodexPollLoopOptions): Promise<void> {
@@ -210,6 +243,9 @@ export async function runCodexPollLoop(options: CodexPollLoopOptions): Promise<v
       status = await runOneCodexJob(options.client, options.execute);
       if (status === "empty" && options.portraits && !options.signal.aborted) {
         status = await runOnePortraitJob(options.portraits);
+      }
+      if (status === "empty" && options.meshes && !options.signal.aborted) {
+        status = await runOnePortraitMeshJob(options.meshes);
       }
     } catch (error) {
       if (error instanceof FatalCodexRunnerError) throw error;

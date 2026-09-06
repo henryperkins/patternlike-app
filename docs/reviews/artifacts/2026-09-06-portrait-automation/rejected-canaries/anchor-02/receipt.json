@@ -1,0 +1,59 @@
+{
+  "schema_version": "portrait-mesh-canary/v1",
+  "fictional": true,
+  "automatic_authoring": true,
+  "manual_model_edits": false,
+  "codex_cli_version": "0.153.3",
+  "configured_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "source_text_sha256": "1836ba298c509fe2b20b94aa713ac3d8791d2c010d6b8122733868961011562e",
+  "source_image_sha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1",
+  "document_revision": "fictional-canary/v1",
+  "elapsed_ms": 522197,
+  "compiled": {
+    "program_sha256": "cf460b01850bc581297bbc0501b3ce41257b99b4f5cf0ff0d13a31e3d6967ff0",
+    "glb_sha256": "25c6de9adf1ae71c058ce39276d5e990a75eccf03b0bbc202a8ff334e80848da",
+    "glb_bytes": 229700,
+    "triangles": 12352,
+    "bounds": {
+      "min": [
+        -0.8247028589248657,
+        -0.9999999403953552,
+        -0.34522950649261475
+      ],
+      "max": [
+        0.8247028589248657,
+        0.9999999403953552,
+        0.34522950649261475
+      ]
+    },
+    "compiler_version": "portrait-mesh-compiler/v1",
+    "views": [
+      {
+        "label": "front",
+        "sha256": "eade1ebf27fdb814c00ae97443d939f1ef33e81379eea24f672c5947f5f52e6e",
+        "bytes": 26274
+      },
+      {
+        "label": "rear",
+        "sha256": "9deef93c20de4f9bd41ab48a4ea9b45d3a4160e4f270a667b23e3123f855900f",
+        "bytes": 26682
+      },
+      {
+        "label": "side",
+        "sha256": "1e341d97ae0cdee49cfc4a1c6782d87ca98b87fd8a529dd2a3ff4061bb7d6060",
+        "bytes": 9966
+      },
+      {
+        "label": "three-quarter",
+        "sha256": "5040aeee651af8636058a786a86b91a8b7c45a5ec261d4e26b561d03e7c1678a",
+        "bytes": 22119
+      }
+    ]
+  },
+  "result": {
+    "ok": false,
+    "code": "visual_check_failed",
+    "fatal": false
+  }
+}

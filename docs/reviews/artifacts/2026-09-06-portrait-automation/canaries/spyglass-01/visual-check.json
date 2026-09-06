@@ -1,0 +1,13 @@
+{
+  "audit": {
+    "schema_version": "portrait-mesh-audit/v1",
+    "accepted": true,
+    "recognizable": true,
+    "substantial": true,
+    "source_correspondence": true,
+    "no_severe_intersections": true,
+    "view_count": 4,
+    "notes": "The four views consistently show a substantial, recognizable collapsible brass telescope with a dark cylindrical grip, stepped draw tubes, raised collars, a textured main ring, end caps, and a meaningful open eyepiece/aperture. Its major silhouette and proportions correspond well to the reference, with coherent axial and three-quarter construction and no visible collapse or severe intersections. Some surface detailing and material variation are simplified, but the telescope remains clearly articulated rather than a featureless primitive. As an instrument for looking farther and shifting perspective, it plausibly expresses the chapter's theme of seeing beyond immediate pressure."
+  },
+  "provider_request_id": "01a07545-4337-7f62-b57f-a6fe57f4f280:01a07545-4388-7c72-8aad-f24764093374"
+}

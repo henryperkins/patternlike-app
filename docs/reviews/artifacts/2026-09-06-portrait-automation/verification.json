@@ -1,0 +1,15 @@
+{
+  "verified_at": "2026-09-06T06:40:56.283785+00:00",
+  "command": "npm run ci:local -- --clean",
+  "exit_code": 0,
+  "lanes_passed": 14,
+  "source_manifest_sha256": "8c9d5e3aababcf8ffcabbc3876a9ae480b2765105a7ce7e0ee85aa9fe266ac70",
+  "frozen_file_count": 1183,
+  "changed_frozen_files": [],
+  "api_main_tests": 2305,
+  "web_tests": 556,
+  "runner_tests": 117,
+  "browser_checks": 146,
+  "python_note": "Local 3.14.4; ci.yml pins 3.12",
+  "diagnostic_note": "Vitest/workerd emitted EnvironmentTeardownError diagnostics during teardown; all test suites and the aggregate command exited successfully."
+}

@@ -212,8 +212,28 @@ On the approved host:
 
 1. Create an unprivileged service account whose home is under
    `/var/lib/patternlike-codex-runner`.
-2. Install the runner's `dist/` directory and `package.json` read-only under
-   `/opt/patternlike-codex-runner`.
+2. Copy the generated `apps/codex-runner/dist/` contents into a fresh release
+   directory, including **`dist/package.json`**, and install its production
+   dependencies on the target host. Do not copy the source workspace manifest.
+   The standalone package contains bundled shared code and only public Sharp/Three
+   dependencies. Keep optional dependencies enabled for Sharp's native packages:
+
+   ```bash
+   runner_release=/opt/patternlike-codex-runner/releases/VERIFIED_COMMIT
+   install -d "$runner_release/dist"
+   cp -R apps/codex-runner/dist/. "$runner_release/dist/"
+   npm install --prefix "$runner_release/dist" --omit=dev
+   ```
+
+   While the service is stopped, publish a real directory copy at
+   `/opt/patternlike-codex-runner/dist`; the systemd `ExecStart` below keeps that
+   stable path. Do not use a directory symlink: the direct-entry guard compares
+   the module URL with the invoked filename. Install the release files read-only
+   for the service account and keep the previous directory for rollback. A Node 22 ESM import of
+   both `index.js` and `portrait-mesh-canary.js` from this installed directory
+   must succeed without a TypeScript loader or repository `node_modules`.
+   The [runner build documentation](../../apps/codex-runner/README.md#standalone-release-artifact)
+   describes the offline artifact regression and release boundaries.
 3. Create `/var/lib/patternlike-codex-runner/workspace` as an empty Git
    repository owned by the service account. It contains no application data;
    it is only the Codex working directory.

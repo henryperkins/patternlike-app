@@ -1,0 +1,13 @@
+{
+  "audit": {
+    "schema_version": "portrait-mesh-audit/v1",
+    "accepted": true,
+    "recognizable": true,
+    "substantial": true,
+    "source_correspondence": true,
+    "no_severe_intersections": true,
+    "view_count": 4,
+    "notes": "The three-quarter view clearly shows a substantial compass: a thick round housing, recessed dial, concentric raised rings, central hub, blue directional needle, perimeter markers, and a side adjustment knob. The other views confirm coherent casing depth, base construction, and knob placement rather than a flat façade. Its compass interpretation plausibly expresses choosing and adjusting direction while preserving purpose. Detail and material fidelity are simpler than the ornate brass reference, and the needle orientation differs, but the major structure and proportions remain recognizable. No severe collapse or visibly destructive intersections are present."
+  },
+  "provider_request_id": "01a07534-745f-71a0-854d-db3045deedbf:01a07534-74b6-7b10-a04b-25925593d8b1"
+}

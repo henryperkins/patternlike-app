@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-09-06T06:07:51.769014+00:00",
+  "runtime_source_unchanged": true,
+  "changes": [
+    {
+      "path": "apps/codex-runner/README.md",
+      "before": "c17e52cfe5adfa373ac962297b0c86eba3b374a93d1c591d2eb8eca9c2bd9937",
+      "after": "968e8e9b4be61deb06a07a96773a3ca11b0ab38df9ebc0fae44f4ee70e8f455c"
+    },
+    {
+      "path": "docs/deploy/codex-production-provider.md",
+      "before": "ea979fb9b36c43c9c0b126960a4541ea52329e299b8062c79bcc426ccfdb62d3",
+      "after": "dd5634dc8f02b85cab3a9a972c2be2b1702cee20948b33b00defac0179b7fa6a"
+    }
+  ],
+  "reason": "Clarify real-directory runner installation and the migration-before-enabled-API release order. Documentation only; runtime, configuration, lockfile, schemas, tests and build scripts remain at the gate freeze."
+}

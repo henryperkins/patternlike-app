@@ -11,6 +11,8 @@ export * from "./m8-place-types.js";
 export * from "./m8-reading-history-types.js";
 export * from "./m9-types.js";
 export * from "./portrait-types.js";
+export * from "./portrait-mesh-program.js";
+export * from "./portrait-mesh-protocol.js";
 export * from "./portrait-graph.js";
 export * from "./portrait-sun-layout.js";
 export * from "./jcs.js";

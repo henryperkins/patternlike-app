@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { PORTRAIT_CONSENT_POLICY_VERSION, PORTRAIT_SCHEMA_VERSION, isPortraitGraph, type PatternPortraitResponse, type PatternResponseV7, type PatternStatePattern } from "@patternlike/shared";
+import { PORTRAIT_CONSENT_POLICY_VERSION, type PatternPortraitResponse, type PatternResponseV7, type PatternStatePattern } from "@patternlike/shared";
 import { ApiError, downloadPatternPortrait, getPatternPortrait, getPatternPortraitImage, newIdempotencyKey, startPatternPortraitGeneration } from "../lib/api-client.js";
-import { createPortraitManifest, patternMatchesDocument, type PortraitObjectBinding } from "../lib/pattern-portrait.js";
+import { patternMatchesDocument } from "../lib/pattern-portrait.js";
 import { withRequestId } from "../lib/api-status.js";
+import { bindingsFor, validateResponse, verifyImage } from "../lib/account-portrait.js";
+import { AccountPortraitExplorer } from "./AccountPortraitExplorer.js";
 import { PatternPortrait } from "./PatternPortrait.js";
 import "./account-pattern-portrait.css";
 
@@ -13,41 +15,6 @@ interface AccountPatternPortraitProps {
   canCreate: boolean;
   onUnauthorized: () => void;
   children: ReactNode;
-}
-
-const mismatchMessage = "This constellation no longer matches the current Pattern. Refresh its status to continue.";
-
-function bindingsFor(response: PatternPortraitResponse, urls: readonly string[] = []): PortraitObjectBinding[] {
-  return response.chapters.map((chapter, index) => ({
-    documentRevision: response.document_revision!, chapterId: chapter.chapter_id, sourceText: chapter.source_text,
-    object: { label: chapter.label, rationale: chapter.rationale, referenceId: chapter.reference_id, referenceSha256: chapter.reference_sha256, imageUrl: urls[index] ?? "" },
-  }));
-}
-
-function validateResponse(response: PatternPortraitResponse, chartId: string, document: PatternResponseV7): void {
-  if (response.schema_version !== PORTRAIT_SCHEMA_VERSION) throw new Error("This constellation format is not supported.");
-  if (response.status === "unavailable") return;
-  const manifest = createPortraitManifest(document);
-  if (response.chart_id !== chartId || response.pattern_id !== document.pattern_id
-    || response.generated_at !== document.generated_at || response.document_revision !== manifest.revision) throw new Error(mismatchMessage);
-  if (!["not_started", "generating", "failed", "ready"].includes(response.status)) throw new Error("This constellation status is not supported.");
-  if (response.status !== "ready") return;
-  if (!response.portrait_id || response.completed_chapters !== 4 || response.chapters.length !== 4
-    || new Set(response.chapters.map((chapter) => chapter.chapter_id)).size !== 4
-    || new Set(response.chapters.map((chapter) => chapter.reference_id)).size !== 4
-    || !isPortraitGraph(response.graph)) throw new Error(mismatchMessage);
-  const bound = createPortraitManifest(document, bindingsFor(response));
-  if (bound.chapters.length !== 4 || bound.chapters.some((chapter) => !chapter.object
-    || !chapter.object.referenceId.trim() || !chapter.object.label.trim() || !chapter.object.rationale.trim()
-    || !/^[a-f0-9]{64}$/i.test(chapter.object.referenceSha256))) throw new Error(mismatchMessage);
-}
-
-async function verifyImage(blob: Blob, expectedHash: string, signal: AbortSignal): Promise<Blob> {
-  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-  signal.throwIfAborted();
-  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  if (hash !== expectedHash.toLowerCase()) throw new Error("A chapter image did not match its saved reference.");
-  return blob;
 }
 
 function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnauthorized, children }: AccountPatternPortraitProps) {
@@ -222,8 +189,13 @@ function CurrentAccountPortrait({ chartId, document, pattern, canCreate, onUnaut
   </>;
 }
 
-export function AccountPatternPortrait(props: AccountPatternPortraitProps) {
+export function LegacyAccountPatternPortrait(props: AccountPatternPortraitProps) {
   // Metadata and published prose both belong to this mounted account revision.
   const revision = JSON.stringify([props.chartId, props.document, props.pattern]);
   return <CurrentAccountPortrait key={revision} {...props} />;
+}
+
+export function AccountPatternPortrait(props: AccountPatternPortraitProps) {
+  const revision = JSON.stringify([props.chartId, props.document, props.pattern]);
+  return <AccountPortraitExplorer key={revision} {...props} legacy={<LegacyAccountPatternPortrait {...props} />} />;
 }

@@ -1,0 +1,69 @@
+{
+  "schema_version": "portrait-mesh-canary/v1",
+  "fictional": true,
+  "automatic_authoring": true,
+  "manual_model_edits": false,
+  "codex_cli_version": "0.153.3",
+  "configured_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "source_text_sha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d",
+  "source_image_sha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+  "document_revision": "fictional-canary/v1",
+  "elapsed_ms": 159124,
+  "compiled": {
+    "program_sha256": "2d69a8014ccf1b70b8f5d286e31baaafda0f405d79cf95134ce6193354c0c90c",
+    "glb_sha256": "4dd183de32c3fa9c511543b467b16c391924d4bb099c04d6df86c7112c7fe7ef",
+    "glb_bytes": 316436,
+    "triangles": 16608,
+    "bounds": {
+      "min": [
+        -1,
+        -0.2104664295911789,
+        -0.2104664295911789
+      ],
+      "max": [
+        1,
+        0.2104664295911789,
+        0.2104664295911789
+      ]
+    },
+    "compiler_version": "portrait-mesh-compiler/v1",
+    "views": [
+      {
+        "label": "front",
+        "sha256": "3018a0a591b44e29177487dfa75ef65d6ba4e438afc46a99a1223b960759ce34",
+        "bytes": 11548
+      },
+      {
+        "label": "rear",
+        "sha256": "c8bfbc4b163f1c65b1ab96c05c8f0fbd9964954e87f6018c2c1b8ee85523f573",
+        "bytes": 11715
+      },
+      {
+        "label": "side",
+        "sha256": "4429a8f680e5fb23bb4f769262617bfce9ec091eb42e8ceeed3c489e61f3ae92",
+        "bytes": 8349
+      },
+      {
+        "label": "three-quarter",
+        "sha256": "ab5a1447ae29c1f2ddaa2dd28d317d63f2ef90410fe4ce2578ecb0d23a69922f",
+        "bytes": 17157
+      }
+    ]
+  },
+  "result": {
+    "ok": true,
+    "audit": {
+      "schema_version": "portrait-mesh-audit/v1",
+      "accepted": true,
+      "recognizable": true,
+      "substantial": true,
+      "source_correspondence": true,
+      "no_severe_intersections": true,
+      "view_count": 4,
+      "notes": "The four views consistently show a substantial, recognizable collapsible brass telescope with a dark cylindrical grip, stepped draw tubes, raised collars, a textured main ring, end caps, and a meaningful open eyepiece/aperture. Its major silhouette and proportions correspond well to the reference, with coherent axial and three-quarter construction and no visible collapse or severe intersections. Some surface detailing and material variation are simplified, but the telescope remains clearly articulated rather than a featureless primitive. As an instrument for looking farther and shifting perspective, it plausibly expresses the chapter's theme of seeing beyond immediate pressure."
+    },
+    "provider_request_id": "01a07542-f77b-7a01-9951-6d57947f4cbb:01a07542-f7d4-7010-85d2-da56b80365a3",
+    "audit_request_id": "01a07545-4337-7f62-b57f-a6fe57f4f280:01a07545-4388-7c72-8aad-f24764093374"
+  }
+}

@@ -40,7 +40,7 @@ async function loadForm(asset: PortraitSceneProps["assets"][number], signal: Abo
     bytes = joined.buffer;
   } else bytes = await response.arrayBuffer();
   if (signal.aborted) throw new Error("Model loading cancelled");
-  await verifyGlbAsset(bytes, asset.sha256, asset.chapterId);
+  await verifyGlbAsset(bytes, asset.sha256, asset.chapterId, asset);
   if (signal.aborted) throw new Error("Model loading cancelled");
   const manager = new LoadingManager();
   // Embedded image bufferViews become blob URLs inside GLTFLoader.
@@ -432,7 +432,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
   const latest = useRef(props);
   latest.current = props;
   const [status, setStatus] = useState<SceneStatus>("loading");
-  const assetKey = JSON.stringify(props.assets.map(asset => [asset.chapterId, asset.url, asset.sha256, asset.sourceImageSha256]));
+  const assetKey = JSON.stringify(props.assets.map(asset => [asset.chapterId, asset.url, asset.sha256, asset.sourceImageSha256, asset.provenance]));
 
   useLayoutEffect(() => {
     runtime.current?.update(props);

@@ -30,12 +30,12 @@ interface JobRow {
   lease_hash: string | null; lease_expires_at: string | null; completion_hash: string | null;
   image_asset_id: string | null; sample_asset_id: string | null; failure_code: string | null;
 }
-interface AssetRow { id: string; portrait_id: string; user_id: string; job_id: string | null; role: "image" | "sample" | "graph"; object_key: string; plaintext_sha256: string; byte_length: number; cleanup_at: string | null }
+export interface AssetRow { id: string; portrait_id: string; user_id: string; job_id: string | null; role: "image" | "sample" | "graph"; object_key: string; plaintext_sha256: string; byte_length: number; cleanup_at: string | null }
 interface Sample {
   label: string; rationale: string; original_sha256: string; provider_request_id: string; image_request_id: string;
   image_model: "gpt-image-2"; pixels: CodexPortraitCompletion["pixels"];
 }
-type Current = NonNullable<Awaited<ReturnType<typeof currentPattern>>>;
+export type Current = NonNullable<Awaited<ReturnType<typeof currentPattern>>>;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
 async function bytesHash(bytes: Uint8Array): Promise<string> {
@@ -49,7 +49,7 @@ export function portraitEmpty(status: "unavailable" | "not_started" = "unavailab
 function chapterText(chapter: PatternResponseV7["core_chapters"][number]): string {
   return JSON.stringify({ title: chapter.title, summary: chapter.summary, sections: chapter.sections.map((unit) => unit.text), tensions: chapter.tensions.map((unit) => unit.text), resources: chapter.resources.map((unit) => unit.text), counterExpression: chapter.counter_expression.text });
 }
-async function currentPattern(env: Env, userId: string) {
+export async function currentPattern(env: Env, userId: string) {
   const identity = await loadUserIdentity(env, userId);
   if (!identity || identity.status !== "active") return null;
   const chart = await loadActiveChart(env, userId);
@@ -70,14 +70,14 @@ async function currentPattern(env: Env, userId: string) {
   const sunSign = typeof longitude === "number" && Number.isFinite(longitude) ? ZODIAC_SIGNS[Math.floor(((longitude % 360 + 360) % 360) / 30)]! : null;
   return { identity, chart, document, published, fingerprint, documentHash: metadata.content_hash, sunSign, revision: `${published.schema_version}:${published.pattern_id}:${published.generated_at}`, sources: published.core_chapters.map(chapterText) };
 }
-async function patternKey(env: Env, current: Current) {
+export async function patternKey(env: Env, current: Current) {
   const d = current.document;
   return unwrapContentKey(env, current.identity, d.id, "pattern_documents.wrapped_document_key_enc", { key_version: d.wrapped_document_key_version, nonce: d.wrapped_document_key_nonce, ciphertext: b64(d.wrapped_document_key_enc) });
 }
 function matches(row: PortraitRow, current: Current) {
   return row.pattern_id === current.document.id && row.chart_id === current.chart.id && row.document_hash === current.documentHash && row.document_revision === current.revision && row.status !== "cancelled";
 }
-async function authorizedCurrent(env: Env, row: PortraitRow, now: Date) {
+export async function authorizedCurrent(env: Env, row: PortraitRow, now: Date) {
   const current = await currentPattern(env, row.user_id);
   if (!current || !matches(row, current)) return null;
   const processing = await loadLiveAccountProcessingGrant(env, row.user_id, now);
@@ -85,7 +85,7 @@ async function authorizedCurrent(env: Env, row: PortraitRow, now: Date) {
   return processing?.consentId === row.processing_consent_id && pattern?.consentId === row.pattern_consent_id ? current : null;
 }
 /** Repeat all authorization inside each write transaction; prior reads are hints. */
-function guards(env: Env, row: PortraitRow, current: Current, now: Date): D1PreparedStatement[] {
+export function guards(env: Env, row: PortraitRow, current: Current, now: Date): D1PreparedStatement[] {
   return [
     buildCryptoWriteFence(env, { userId: row.user_id, keyVersion: current.document.wrapped_document_key_version, allowedStatuses: ["active"] }),
     assertExactCurrentAccountProcessingGrant(env, row.user_id, row.processing_consent_id, now),
@@ -107,7 +107,7 @@ function guards(env: Env, row: PortraitRow, current: Current, now: Date): D1Prep
       )`).bind(row.pattern_consent_id, row.user_id, row.pattern_id, row.document_hash, row.generated_at, row.chart_fingerprint_hash, row.chart_id, current.chart.fingerprint, PATTERN_GENERATION_CONSENT_POLICY_VERSION, now.toISOString()),
   ];
 }
-async function portraitById(env: Env, id: string) { return env.DB.prepare("SELECT * FROM pattern_portraits WHERE id = ?").bind(id).first<PortraitRow>(); }
+export async function portraitById(env: Env, id: string) { return env.DB.prepare("SELECT * FROM pattern_portraits WHERE id = ?").bind(id).first<PortraitRow>(); }
 async function jobsFor(env: Env, id: string) { return (await env.DB.prepare("SELECT * FROM pattern_portrait_jobs WHERE portrait_id = ? ORDER BY chapter_index").bind(id).all<JobRow>()).results; }
 async function cancel(env: Env, id: string) {
   // Key rotation temporarily freezes accounts. Refused admission during that
@@ -118,7 +118,7 @@ async function cancel(env: Env, id: string) {
     )`).bind(id).run();
 }
 
-export async function startPortrait(env: Env, identity: UserIdentity, input: PatternPortraitGenerationRequest): Promise<PatternPortraitResponse> {
+export async function startPortrait(env: Env, identity: UserIdentity, input: PatternPortraitGenerationRequest, automationGrantId?: string): Promise<PatternPortraitResponse> {
   if (!portraitEnabled(env)) throw new PortraitError(503, "portrait_unavailable");
   const current = await currentPattern(env, identity.userId);
   if (!current || input.chart_id !== current.chart.id || input.pattern_id !== current.document.id || input.generated_at !== current.document.generated_at) throw new PortraitError(409, "portrait_revision_conflict");
@@ -126,17 +126,18 @@ export async function startPortrait(env: Env, identity: UserIdentity, input: Pat
   const processing = await loadLiveAccountProcessingGrant(env, identity.userId, now);
   const pattern = await loadPatternGenerationGrant(env, identity.userId, now);
   if (!processing || !pattern) throw new PortraitError(409, "portrait_consent_required");
+  const automationFence = automationGrantId ? [env.DB.prepare("INSERT INTO assertion_probe(id,reason) SELECT 1, 'portrait automation withdrawn' WHERE NOT EXISTS(SELECT 1 FROM portrait_automation_grants WHERE id=? AND user_id=? AND chart_id=? AND enabled=1)").bind(automationGrantId,identity.userId,current.chart.id)] : [];
   const existing = await env.DB.prepare("SELECT * FROM pattern_portraits WHERE pattern_id = ? AND user_id = ?").bind(current.document.id, identity.userId).first<PortraitRow>();
   if (existing) {
     if (!matches(existing, current)) throw new PortraitError(409, "portrait_revision_conflict");
     // The same Pattern has one bounded budget; explicit retry never resets attempts.
     if (existing.status === "failed") {
-      await env.DB.batch([...guards(env, existing, current, now), env.DB.prepare("UPDATE pattern_portrait_jobs SET status = 'pending', retry_at = ?, failure_code = NULL WHERE portrait_id = ? AND status = 'failed' AND attempts < ?").bind(now.toISOString(), existing.id, PORTRAIT_MAX_ATTEMPTS), env.DB.prepare("UPDATE pattern_portraits SET status = 'generating' WHERE id = ? AND EXISTS (SELECT 1 FROM pattern_portrait_jobs WHERE portrait_id = ? AND status IN ('pending','running'))").bind(existing.id, existing.id)]);
+      await env.DB.batch([...automationFence,...guards(env, existing, current, now), env.DB.prepare("UPDATE pattern_portrait_jobs SET status = 'pending', retry_at = ?, failure_code = NULL WHERE portrait_id = ? AND (status = 'failed' OR (? = 1 AND status = 'cancelled')) AND attempts < ?").bind(now.toISOString(), existing.id, automationGrantId ? 1 : 0, PORTRAIT_MAX_ATTEMPTS), env.DB.prepare("UPDATE pattern_portraits SET status = 'generating' WHERE id = ? AND EXISTS (SELECT 1 FROM pattern_portrait_jobs WHERE portrait_id = ? AND status IN ('pending','running'))").bind(existing.id, existing.id)]);
     }
     return readPortrait(env, identity.userId);
   }
   const row: PortraitRow = { id: opaque("ppor"), user_id: identity.userId, pattern_id: current.document.id, generation_id: current.document.generation_id, chart_id: current.chart.id, chart_fingerprint_hash: current.fingerprint, document_revision: current.revision, document_hash: current.documentHash, generated_at: current.document.generated_at, ontology_version: current.document.ontology_version, processing_consent_id: processing.consentId, pattern_consent_id: pattern.consentId, sun_sign: current.sunSign, status: "generating", graph_asset_id: null };
-  const statements = [...guards(env, row, current, now), env.DB.prepare(`INSERT INTO pattern_portraits (id,user_id,pattern_id,generation_id,chart_id,chart_fingerprint_hash,document_revision,document_hash,generated_at,ontology_version,processing_consent_id,pattern_consent_id,consent_policy_version,sun_sign,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'generating',?,?)`).bind(row.id,row.user_id,row.pattern_id,row.generation_id,row.chart_id,row.chart_fingerprint_hash,row.document_revision,row.document_hash,row.generated_at,row.ontology_version,row.processing_consent_id,row.pattern_consent_id,PORTRAIT_CONSENT_POLICY_VERSION,row.sun_sign,now.toISOString(),now.toISOString())];
+  const statements = [...automationFence,...guards(env, row, current, now), env.DB.prepare(`INSERT INTO pattern_portraits (id,user_id,pattern_id,generation_id,chart_id,chart_fingerprint_hash,document_revision,document_hash,generated_at,ontology_version,processing_consent_id,pattern_consent_id,consent_policy_version,sun_sign,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'generating',?,?)`).bind(row.id,row.user_id,row.pattern_id,row.generation_id,row.chart_id,row.chart_fingerprint_hash,row.document_revision,row.document_hash,row.generated_at,row.ontology_version,row.processing_consent_id,row.pattern_consent_id,PORTRAIT_CONSENT_POLICY_VERSION,row.sun_sign,now.toISOString(),now.toISOString())];
   for (let index = 0; index < 4; index++) statements.push(env.DB.prepare(`INSERT INTO pattern_portrait_jobs (id,portrait_id,user_id,chapter_index,source_sha256,status,retry_at,created_at,updated_at) VALUES (?,?,?,?,?,'pending',?,?,?)`).bind(opaque("ppjob"), row.id, row.user_id, index, await sha256Hex(current.sources[index]!), now.toISOString(), now.toISOString(), now.toISOString()));
   try { await env.DB.batch(statements); } catch {
     const winner = await env.DB.prepare("SELECT id FROM pattern_portraits WHERE pattern_id = ? AND user_id = ?").bind(row.pattern_id,row.user_id).first();
@@ -212,9 +213,9 @@ export async function readPortrait(env: Env, userId: string): Promise<PatternPor
   return response;
 }
 
-async function assetById(env: Env,id: string) { return env.DB.prepare("SELECT * FROM pattern_portrait_assets WHERE id = ? AND cleanup_at IS NULL").bind(id).first<AssetRow>(); }
+export async function assetById(env: Env,id: string) { return env.DB.prepare("SELECT * FROM pattern_portrait_assets WHERE id = ? AND cleanup_at IS NULL").bind(id).first<AssetRow>(); }
 function aad(asset: Pick<AssetRow,"id" | "portrait_id" | "role">) { return encoder.encode(JSON.stringify(["patternlike.portrait",1,asset.portrait_id,asset.id,asset.role])); }
-async function readAsset(env: Env,asset: AssetRow,keyBytes: Uint8Array): Promise<Uint8Array> {
+export async function readAsset(env: Env,asset: AssetRow,keyBytes: Uint8Array): Promise<Uint8Array> {
   const object = await env.ARTIFACTS!.get(asset.object_key);
   if (!object || object.size !== asset.byte_length + 28) throw new Error("portrait artifact missing");
   const bytes = new Uint8Array(await object.arrayBuffer());

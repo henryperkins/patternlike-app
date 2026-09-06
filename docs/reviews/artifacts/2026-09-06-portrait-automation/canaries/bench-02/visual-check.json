@@ -1,0 +1,13 @@
+{
+  "audit": {
+    "schema_version": "portrait-mesh-audit/v1",
+    "accepted": true,
+    "recognizable": true,
+    "substantial": true,
+    "source_correspondence": true,
+    "no_severe_intersections": true,
+    "view_count": 4,
+    "notes": "All four views show a complete, recognizable two-person wooden rocking bench with paired arched slatted backs, two defined seat sections, armrests, posts, legs, and continuous curved rockers. The side, rear, and three-quarter views confirm real depth and coherent supporting construction rather than a flat facade. Its shared two-seat form plausibly expresses making room for another person while retaining a distinct place for oneself, matching the chapter's care-and-reciprocity theme. The model is simpler and more angular than the reference, but preserves the major structure and proportions, with no visible severe collapse or destructive intersections."
+  },
+  "provider_request_id": "01a07534-3421-7e20-9ff2-54a2f56e5cac:01a07534-3474-7c01-9251-9be34a8b08ac"
+}

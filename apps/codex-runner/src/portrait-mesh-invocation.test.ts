@@ -1,0 +1,75 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile, readdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import test from "node:test";
+import sharp from "sharp";
+import type { CodexPortraitMeshClaim, PortraitMeshProgram } from "@patternlike/shared";
+import { jsonFixture } from "./portrait-mesh-test-fixture.js";
+import { runPortraitMeshInvocation } from "./portrait-mesh-invocation.js";
+
+export const SIMPLE_PROGRAM: PortraitMeshProgram = { version: "portrait-mesh-program/v1", materials: [{ id: "oak", color: "#ad8151", metalness: 0, roughness: 0.7 }], parts: [{ name: "solid body", material: "oak", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], repeat: null, geometry: { kind: "box", size: [1, 1.3, 0.7], bevel: 0.04 } }] };
+const AUDIT = { schema_version: "portrait-mesh-audit/v1", accepted: true, recognizable: true, substantial: true, source_correspondence: true, no_severe_intersections: true, view_count: 4, notes: "All four views depict a solid fictional wooden block." };
+const sha = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
+async function fixture(program: unknown = SIMPLE_PROGRAM, audit: unknown = AUDIT) {
+  const f = await jsonFixture("success", [program, audit]);
+  const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#ad8151" } }).png().toBuffer();
+  const source = "Fictional chapter. A substantial wooden keepsake holds the thread of a thought.\n\nFinal paragraph must survive exactly.";
+  const claim: CodexPortraitMeshClaim = { schema_version: "codex-portrait-mesh-claim/v1", job_id: `ppmesh_${"a".repeat(32)}`, portrait_id: `ppor_${"b".repeat(32)}`, chapter_index: 0, chapter_id: "chapter-1", lease_token: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", model: "gpt-5.6-sol", reasoning_effort: "xhigh", prompt_version: "portrait-mesh/v1", timeout_ms: 10_000, source_text: source, source_text_sha256: sha(source), source_image_sha256: sha(png), document_revision: "accepted-revision-1", image_base64: png.toString("base64"), compiler_version: "portrait-mesh-compiler/v1" };
+  return { ...f, png, claim, options: { claim, codexBin: f.executable, env: f.options.env, tempRoot: f.options.tempRoot } };
+}
+
+test("mesh generation binds complete text/image, compiles unchanged program, and independently checks four views before completion", async () => {
+  const f = await fixture();
+  try {
+    const out = await runPortraitMeshInvocation(f.options);
+    assert.equal(out.ok, true); if (!out.ok) return;
+    assert.deepEqual(out.completion.program, SIMPLE_PROGRAM);
+    const glb = Buffer.from(out.completion.glb_base64, "base64");
+    assert.equal(glb.toString("ascii", 0, 4), "glTF"); assert.equal(sha(glb), out.completion.glb_sha256);
+    const document = JSON.parse(glb.toString("utf8", 20, 20 + glb.readUInt32LE(12)).trim());
+    assert.equal(document.nodes[0].extras.chapterId, f.claim.chapter_id);
+    assert.equal(document.nodes[0].extras.sourceTextSha256, f.claim.source_text_sha256);
+    assert.equal(document.nodes[0].extras.sourceImageSha256, f.claim.source_image_sha256);
+    const author = JSON.parse(await readFile(join(f.root, "turn-0.json"), "utf8"));
+    const check = JSON.parse(await readFile(join(f.root, "turn-1.json"), "utf8"));
+    assert(author.input[0].text.includes(JSON.stringify(f.claim.source_text)));
+    assert(check.input[0].text.includes(JSON.stringify(f.claim.source_text)));
+    assert.deepEqual(author.input[1], { type: "image", url: `data:image/png;base64,${f.claim.image_base64}` });
+    assert.equal(check.input.filter((input: { type: string }) => input.type === "image").length, 5);
+    assert.notEqual(author.threadId, check.threadId);
+    assert(!JSON.stringify(check.input).includes("solid body"), "audit must not receive the author's self-description");
+    assert.equal(out.completion.audit.view_count, 4);
+    assert.notEqual(out.completion.provider_request_id, out.completion.audit_request_id);
+    assert.deepEqual(await readdir(join(f.root, "attempts")), []);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+for (const change of [{ source_text_sha256: "d".repeat(64) }, { source_image_sha256: "e".repeat(64) }, { compiler_version: "unknown" }, { chapter_id: "chapter-2" }, { image_base64: Buffer.from("not png").toString("base64"), source_image_sha256: sha("not png") }]) {
+  test(`wrong claim source or compiler fails before provider launch: ${Object.keys(change)[0]}`, async () => {
+    const f = await fixture();
+    try {
+      const out = await runPortraitMeshInvocation({ ...f.options, claim: { ...f.claim, ...change } });
+      assert.equal(out.ok, false);
+      await assert.rejects(readFile(join(f.root, "launched")), { code: "ENOENT" });
+    } finally { await rm(f.root, { recursive: true, force: true }); }
+  });
+}
+
+test("invalid programs never reach the visual checker or return a completion", async () => {
+  const f = await fixture({ ...SIMPLE_PROGRAM, script: "fetch('private')" });
+  try {
+    assert.deepEqual(await runPortraitMeshInvocation(f.options), { ok: false, code: "program_invalid", fatal: false });
+    assert.equal(await readFile(join(f.root, "count"), "utf8"), "1");
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+for (const change of [{ accepted: false }, { recognizable: false }, { substantial: false }, { source_correspondence: false }, { no_severe_intersections: false }, { view_count: 3 }, { extra: "unexpected" }]) {
+  test(`visual rejection has no completion or hidden retry: ${Object.keys(change)[0]}`, async () => {
+    const f = await fixture(SIMPLE_PROGRAM, { ...AUDIT, ...change });
+    try {
+      assert.deepEqual(await runPortraitMeshInvocation(f.options), { ok: false, code: "visual_check_failed", fatal: false });
+      assert.equal(await readFile(join(f.root, "count"), "utf8"), "2");
+    } finally { await rm(f.root, { recursive: true, force: true }); }
+  });
+}

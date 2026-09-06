@@ -1,0 +1,69 @@
+{
+  "schema_version": "portrait-mesh-canary/v1",
+  "fictional": true,
+  "automatic_authoring": true,
+  "manual_model_edits": false,
+  "codex_cli_version": "0.153.3",
+  "configured_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "source_text_sha256": "1f6e64c740191b1427d5fd0e28febcee97efa24dfc7b8b02a5d43f56afbaae8a",
+  "source_image_sha256": "332a140fa886a06a7df288009ec40b6a6633df3b3bf87a1466ae570b690f77c3",
+  "document_revision": "fictional-canary/v1",
+  "elapsed_ms": 218782,
+  "compiled": {
+    "program_sha256": "077c920161d74e3d5ee21e8d73a63b8e23815c8e842db6fdca3412ee04aef731",
+    "glb_sha256": "253a8af5d004300f5d858a2e10b5aadcaf406361dd2113d11aa6c8edb29b2471",
+    "glb_bytes": 257716,
+    "triangles": 12752,
+    "bounds": {
+      "min": [
+        -0.4845222234725952,
+        -1,
+        -0.4845222234725952
+      ],
+      "max": [
+        0.4845222234725952,
+        1,
+        0.4845222234725952
+      ]
+    },
+    "compiler_version": "portrait-mesh-compiler/v1",
+    "views": [
+      {
+        "label": "front",
+        "sha256": "99337e2805df845bc358d1bceeb94a7cd3d84be89cb4bb837a2e5effffcc3aa1",
+        "bytes": 22953
+      },
+      {
+        "label": "rear",
+        "sha256": "ec20958422ecd848bc19074529776cdf74c3b4a74ebd3c09df6ed4a16237ee21",
+        "bytes": 22860
+      },
+      {
+        "label": "side",
+        "sha256": "9295512f18dda95bcc06450a06f2c605b0c9fe59a185fdf72b87f8ae4be04e73",
+        "bytes": 19578
+      },
+      {
+        "label": "three-quarter",
+        "sha256": "9cb3ab3c658c77317bb395e12c9f1f14d8eff741c661e311ea6b707d3beec3d7",
+        "bytes": 32160
+      }
+    ]
+  },
+  "result": {
+    "ok": true,
+    "audit": {
+      "schema_version": "portrait-mesh-audit/v1",
+      "accepted": true,
+      "recognizable": true,
+      "substantial": true,
+      "source_correspondence": true,
+      "no_severe_intersections": true,
+      "view_count": 4,
+      "notes": "All four views show a coherent, substantial lantern with a tiered circular base, luminous central chamber, surrounding posts, upper vent openings, domed cap, finial, and arched carrying handle. The side and three-quarter views confirm genuine depth and a constructed rear rather than a flat facade. It is visibly simplified relative to the ornate reference, but retains the reference's major structure and proportions sufficiently for clear recognition. The light-bearing lantern is a plausible interpretation of the chapter's theme of maintaining a modest guiding light or practice through uncertainty. No severe collapse or unintended intersections are visible; the edge-on handle in the side view and joined supports appear structurally intentional."
+    },
+    "provider_request_id": "01a07532-4d5a-7ff2-a3cd-ed77202a7731:01a07532-4dac-7943-9c34-70ce3634b901",
+    "audit_request_id": "01a07535-7f0a-7950-b72f-78fb03ddc107:01a07535-7f5c-75f0-a8f8-6e01766e68ca"
+  }
+}

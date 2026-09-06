@@ -1,0 +1,2072 @@
+{
+  "program": {
+    "version": "portrait-mesh-program/v1",
+    "materials": [
+      {
+        "id": "antique_brass",
+        "color": "#9A7128",
+        "metalness": 0.82,
+        "roughness": 0.3
+      },
+      {
+        "id": "blue_black_enamel",
+        "color": "#07141D",
+        "metalness": 0.62,
+        "roughness": 0.22
+      },
+      {
+        "id": "warm_frosted_glass",
+        "color": "#FFD78A",
+        "metalness": 0,
+        "roughness": 0.34
+      },
+      {
+        "id": "underside_dark",
+        "color": "#241A11",
+        "metalness": 0.18,
+        "roughness": 0.58
+      }
+    ],
+    "parts": [
+      {
+        "name": "underside_recessed_pad",
+        "material": "underside_dark",
+        "position": [
+          0,
+          0.065,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.76,
+          "radiusBottom": 0.76,
+          "height": 0.05,
+          "segments": 28
+        }
+      },
+      {
+        "name": "broad_brass_plinth",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0.25,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.19
+            ],
+            [
+              0.83,
+              -0.19
+            ],
+            [
+              0.97,
+              -0.15
+            ],
+            [
+              1.05,
+              -0.08
+            ],
+            [
+              1.08,
+              0.02
+            ],
+            [
+              1.05,
+              0.11
+            ],
+            [
+              0.98,
+              0.17
+            ],
+            [
+              0.87,
+              0.23
+            ],
+            [
+              0.005,
+              0.23
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "lower_enamel_step",
+        "material": "blue_black_enamel",
+        "position": [
+          0,
+          0.5,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.13
+            ],
+            [
+              0.79,
+              -0.13
+            ],
+            [
+              0.9,
+              -0.08
+            ],
+            [
+              0.95,
+              0.01
+            ],
+            [
+              0.94,
+              0.08
+            ],
+            [
+              0.88,
+              0.14
+            ],
+            [
+              0.8,
+              0.19
+            ],
+            [
+              0.005,
+              0.19
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "lower_plinth_trim",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0.17,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 1.02,
+          "tube": 0.035,
+          "segments": 28
+        }
+      },
+      {
+        "name": "upper_plinth_trim",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0.44,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.98,
+          "tube": 0.045,
+          "segments": 28
+        }
+      },
+      {
+        "name": "raised_enamel_pedestal",
+        "material": "blue_black_enamel",
+        "position": [
+          0,
+          0.69,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.12
+            ],
+            [
+              0.7,
+              -0.12
+            ],
+            [
+              0.8,
+              -0.08
+            ],
+            [
+              0.85,
+              -0.01
+            ],
+            [
+              0.84,
+              0.08
+            ],
+            [
+              0.78,
+              0.15
+            ],
+            [
+              0.68,
+              0.2
+            ],
+            [
+              0.005,
+              0.2
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "pedestal_brass_band",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0.78,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.79,
+          "tube": 0.04,
+          "segments": 28
+        }
+      },
+      {
+        "name": "lamp_floor",
+        "material": "blue_black_enamel",
+        "position": [
+          0,
+          0.87,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.62,
+          "radiusBottom": 0.62,
+          "height": 0.11,
+          "segments": 28
+        }
+      },
+      {
+        "name": "lower_glass_bezel",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0.91,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.53,
+              -0.07
+            ],
+            [
+              0.69,
+              -0.07
+            ],
+            [
+              0.72,
+              -0.035
+            ],
+            [
+              0.72,
+              0.035
+            ],
+            [
+              0.69,
+              0.07
+            ],
+            [
+              0.53,
+              0.07
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "frosted_light_chamber",
+        "material": "warm_frosted_glass",
+        "position": [
+          0,
+          1.605,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.53,
+          "radiusBottom": 0.53,
+          "height": 1.33,
+          "segments": 32
+        }
+      },
+      {
+        "name": "lower_glass_highlight_ring",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0.96,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.585,
+          "tube": 0.022,
+          "segments": 28
+        }
+      },
+      {
+        "name": "upper_glass_bezel",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.26,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.53,
+              -0.065
+            ],
+            [
+              0.68,
+              -0.065
+            ],
+            [
+              0.71,
+              -0.03
+            ],
+            [
+              0.71,
+              0.03
+            ],
+            [
+              0.68,
+              0.065
+            ],
+            [
+              0.53,
+              0.065
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "upper_enamel_collar",
+        "material": "blue_black_enamel",
+        "position": [
+          0,
+          2.39,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.72,
+          "radiusBottom": 0.72,
+          "height": 0.18,
+          "segments": 28
+        }
+      },
+      {
+        "name": "upper_collar_lower_trim",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.3,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.7,
+          "tube": 0.032,
+          "segments": 28
+        }
+      },
+      {
+        "name": "upper_collar_top_trim",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.48,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.75,
+          "tube": 0.038,
+          "segments": 28
+        }
+      },
+      {
+        "name": "shallow_upper_canopy",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.49,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.08
+            ],
+            [
+              0.72,
+              -0.08
+            ],
+            [
+              0.82,
+              -0.05
+            ],
+            [
+              0.86,
+              0
+            ],
+            [
+              0.78,
+              0.06
+            ],
+            [
+              0.65,
+              0.11
+            ],
+            [
+              0.46,
+              0.16
+            ],
+            [
+              0.23,
+              0.2
+            ],
+            [
+              0.005,
+              0.22
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "front_left_guard_post",
+        "material": "antique_brass",
+        "position": [
+          -0.65,
+          1.585,
+          0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.915
+            ],
+            [
+              0.075,
+              -0.915
+            ],
+            [
+              0.1,
+              -0.875
+            ],
+            [
+              0.1,
+              -0.81
+            ],
+            [
+              0.076,
+              -0.755
+            ],
+            [
+              0.063,
+              -0.66
+            ],
+            [
+              0.047,
+              -0.59
+            ],
+            [
+              0.047,
+              0.59
+            ],
+            [
+              0.063,
+              0.66
+            ],
+            [
+              0.076,
+              0.755
+            ],
+            [
+              0.1,
+              0.81
+            ],
+            [
+              0.1,
+              0.875
+            ],
+            [
+              0.075,
+              0.915
+            ],
+            [
+              0.005,
+              0.915
+            ]
+          ],
+          "segments": 16
+        }
+      },
+      {
+        "name": "front_right_guard_post",
+        "material": "antique_brass",
+        "position": [
+          0.65,
+          1.585,
+          0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.915
+            ],
+            [
+              0.075,
+              -0.915
+            ],
+            [
+              0.1,
+              -0.875
+            ],
+            [
+              0.1,
+              -0.81
+            ],
+            [
+              0.076,
+              -0.755
+            ],
+            [
+              0.063,
+              -0.66
+            ],
+            [
+              0.047,
+              -0.59
+            ],
+            [
+              0.047,
+              0.59
+            ],
+            [
+              0.063,
+              0.66
+            ],
+            [
+              0.076,
+              0.755
+            ],
+            [
+              0.1,
+              0.81
+            ],
+            [
+              0.1,
+              0.875
+            ],
+            [
+              0.075,
+              0.915
+            ],
+            [
+              0.005,
+              0.915
+            ]
+          ],
+          "segments": 16
+        }
+      },
+      {
+        "name": "rear_left_guard_post",
+        "material": "antique_brass",
+        "position": [
+          -0.65,
+          1.585,
+          -0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.915
+            ],
+            [
+              0.075,
+              -0.915
+            ],
+            [
+              0.1,
+              -0.875
+            ],
+            [
+              0.1,
+              -0.81
+            ],
+            [
+              0.076,
+              -0.755
+            ],
+            [
+              0.063,
+              -0.66
+            ],
+            [
+              0.047,
+              -0.59
+            ],
+            [
+              0.047,
+              0.59
+            ],
+            [
+              0.063,
+              0.66
+            ],
+            [
+              0.076,
+              0.755
+            ],
+            [
+              0.1,
+              0.81
+            ],
+            [
+              0.1,
+              0.875
+            ],
+            [
+              0.075,
+              0.915
+            ],
+            [
+              0.005,
+              0.915
+            ]
+          ],
+          "segments": 16
+        }
+      },
+      {
+        "name": "rear_right_guard_post",
+        "material": "antique_brass",
+        "position": [
+          0.65,
+          1.585,
+          -0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.915
+            ],
+            [
+              0.075,
+              -0.915
+            ],
+            [
+              0.1,
+              -0.875
+            ],
+            [
+              0.1,
+              -0.81
+            ],
+            [
+              0.076,
+              -0.755
+            ],
+            [
+              0.063,
+              -0.66
+            ],
+            [
+              0.047,
+              -0.59
+            ],
+            [
+              0.047,
+              0.59
+            ],
+            [
+              0.063,
+              0.66
+            ],
+            [
+              0.076,
+              0.755
+            ],
+            [
+              0.1,
+              0.81
+            ],
+            [
+              0.1,
+              0.875
+            ],
+            [
+              0.075,
+              0.915
+            ],
+            [
+              0.005,
+              0.915
+            ]
+          ],
+          "segments": 16
+        }
+      },
+      {
+        "name": "front_left_canopy_finial",
+        "material": "antique_brass",
+        "position": [
+          -0.65,
+          2.61,
+          0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.13
+            ],
+            [
+              0.055,
+              -0.13
+            ],
+            [
+              0.075,
+              -0.095
+            ],
+            [
+              0.07,
+              -0.055
+            ],
+            [
+              0.105,
+              -0.015
+            ],
+            [
+              0.11,
+              0.025
+            ],
+            [
+              0.085,
+              0.065
+            ],
+            [
+              0.075,
+              0.11
+            ],
+            [
+              0.045,
+              0.14
+            ],
+            [
+              0.005,
+              0.14
+            ]
+          ],
+          "segments": 14
+        }
+      },
+      {
+        "name": "front_right_canopy_finial",
+        "material": "antique_brass",
+        "position": [
+          0.65,
+          2.61,
+          0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.13
+            ],
+            [
+              0.055,
+              -0.13
+            ],
+            [
+              0.075,
+              -0.095
+            ],
+            [
+              0.07,
+              -0.055
+            ],
+            [
+              0.105,
+              -0.015
+            ],
+            [
+              0.11,
+              0.025
+            ],
+            [
+              0.085,
+              0.065
+            ],
+            [
+              0.075,
+              0.11
+            ],
+            [
+              0.045,
+              0.14
+            ],
+            [
+              0.005,
+              0.14
+            ]
+          ],
+          "segments": 14
+        }
+      },
+      {
+        "name": "rear_left_canopy_finial",
+        "material": "antique_brass",
+        "position": [
+          -0.65,
+          2.61,
+          -0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.13
+            ],
+            [
+              0.055,
+              -0.13
+            ],
+            [
+              0.075,
+              -0.095
+            ],
+            [
+              0.07,
+              -0.055
+            ],
+            [
+              0.105,
+              -0.015
+            ],
+            [
+              0.11,
+              0.025
+            ],
+            [
+              0.085,
+              0.065
+            ],
+            [
+              0.075,
+              0.11
+            ],
+            [
+              0.045,
+              0.14
+            ],
+            [
+              0.005,
+              0.14
+            ]
+          ],
+          "segments": 14
+        }
+      },
+      {
+        "name": "rear_right_canopy_finial",
+        "material": "antique_brass",
+        "position": [
+          0.65,
+          2.61,
+          -0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.13
+            ],
+            [
+              0.055,
+              -0.13
+            ],
+            [
+              0.075,
+              -0.095
+            ],
+            [
+              0.07,
+              -0.055
+            ],
+            [
+              0.105,
+              -0.015
+            ],
+            [
+              0.11,
+              0.025
+            ],
+            [
+              0.085,
+              0.065
+            ],
+            [
+              0.075,
+              0.11
+            ],
+            [
+              0.045,
+              0.14
+            ],
+            [
+              0.005,
+              0.14
+            ]
+          ],
+          "segments": 14
+        }
+      },
+      {
+        "name": "ventilator_enamel_plinth",
+        "material": "blue_black_enamel",
+        "position": [
+          0,
+          2.69,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.49,
+          "radiusBottom": 0.49,
+          "height": 0.12,
+          "segments": 28
+        }
+      },
+      {
+        "name": "ventilator_lower_ring",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.75,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.39,
+              -0.065
+            ],
+            [
+              0.51,
+              -0.065
+            ],
+            [
+              0.54,
+              -0.035
+            ],
+            [
+              0.54,
+              0.035
+            ],
+            [
+              0.51,
+              0.065
+            ],
+            [
+              0.39,
+              0.065
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "vent_strut_front",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.97,
+          0.455
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_front_right",
+        "material": "antique_brass",
+        "position": [
+          0.267,
+          2.97,
+          0.368
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_right_front",
+        "material": "antique_brass",
+        "position": [
+          0.433,
+          2.97,
+          0.141
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_right_rear",
+        "material": "antique_brass",
+        "position": [
+          0.433,
+          2.97,
+          -0.141
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_rear_right",
+        "material": "antique_brass",
+        "position": [
+          0.267,
+          2.97,
+          -0.368
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_rear",
+        "material": "antique_brass",
+        "position": [
+          0,
+          2.97,
+          -0.455
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_rear_left",
+        "material": "antique_brass",
+        "position": [
+          -0.267,
+          2.97,
+          -0.368
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_left_rear",
+        "material": "antique_brass",
+        "position": [
+          -0.433,
+          2.97,
+          -0.141
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_left_front",
+        "material": "antique_brass",
+        "position": [
+          -0.433,
+          2.97,
+          0.141
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "vent_strut_front_left",
+        "material": "antique_brass",
+        "position": [
+          -0.267,
+          2.97,
+          0.368
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.034,
+          "radiusBottom": 0.034,
+          "height": 0.35,
+          "segments": 12
+        }
+      },
+      {
+        "name": "ventilator_upper_ring",
+        "material": "antique_brass",
+        "position": [
+          0,
+          3.14,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.39,
+              -0.065
+            ],
+            [
+              0.51,
+              -0.065
+            ],
+            [
+              0.54,
+              -0.035
+            ],
+            [
+              0.54,
+              0.035
+            ],
+            [
+              0.51,
+              0.065
+            ],
+            [
+              0.39,
+              0.065
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "ventilator_roof_lip",
+        "material": "antique_brass",
+        "position": [
+          0,
+          3.18,
+          0
+        ],
+        "rotation": [
+          1.570796,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.54,
+          "tube": 0.036,
+          "segments": 28
+        }
+      },
+      {
+        "name": "ventilator_domical_roof",
+        "material": "antique_brass",
+        "position": [
+          0,
+          3.18,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.08
+            ],
+            [
+              0.5,
+              -0.08
+            ],
+            [
+              0.58,
+              -0.045
+            ],
+            [
+              0.61,
+              0
+            ],
+            [
+              0.57,
+              0.055
+            ],
+            [
+              0.5,
+              0.115
+            ],
+            [
+              0.4,
+              0.175
+            ],
+            [
+              0.28,
+              0.235
+            ],
+            [
+              0.14,
+              0.28
+            ],
+            [
+              0.005,
+              0.3
+            ]
+          ],
+          "segments": 28
+        }
+      },
+      {
+        "name": "roof_finial_stem",
+        "material": "antique_brass",
+        "position": [
+          0,
+          3.49,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "cylinder",
+          "radiusTop": 0.048,
+          "radiusBottom": 0.055,
+          "height": 0.14,
+          "segments": 16
+        }
+      },
+      {
+        "name": "roof_finial_knob",
+        "material": "antique_brass",
+        "position": [
+          0,
+          3.58,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "ellipsoid",
+          "radii": [
+            0.12,
+            0.06,
+            0.12
+          ],
+          "segments": 18
+        }
+      },
+      {
+        "name": "arched_carrying_handle",
+        "material": "antique_brass",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "path",
+          "points": [
+            [
+              -0.8,
+              2.98,
+              -0.14
+            ],
+            [
+              -0.86,
+              3.24,
+              -0.14
+            ],
+            [
+              -0.89,
+              3.55,
+              -0.14
+            ],
+            [
+              -0.86,
+              3.84,
+              -0.14
+            ],
+            [
+              -0.76,
+              4.05,
+              -0.14
+            ],
+            [
+              -0.6,
+              4.23,
+              -0.14
+            ],
+            [
+              -0.4,
+              4.36,
+              -0.14
+            ],
+            [
+              -0.2,
+              4.43,
+              -0.14
+            ],
+            [
+              0,
+              4.45,
+              -0.14
+            ],
+            [
+              0.2,
+              4.43,
+              -0.14
+            ],
+            [
+              0.4,
+              4.36,
+              -0.14
+            ],
+            [
+              0.6,
+              4.23,
+              -0.14
+            ],
+            [
+              0.76,
+              4.05,
+              -0.14
+            ],
+            [
+              0.86,
+              3.84,
+              -0.14
+            ],
+            [
+              0.89,
+              3.55,
+              -0.14
+            ],
+            [
+              0.86,
+              3.24,
+              -0.14
+            ],
+            [
+              0.8,
+              2.98,
+              -0.14
+            ]
+          ],
+          "radius": 0.048,
+          "segments": 12,
+          "closed": false
+        }
+      },
+      {
+        "name": "left_handle_pivot",
+        "material": "antique_brass",
+        "position": [
+          -0.64,
+          2.98,
+          -0.14
+        ],
+        "rotation": [
+          0,
+          0,
+          1.570796
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.16
+            ],
+            [
+              0.06,
+              -0.16
+            ],
+            [
+              0.085,
+              -0.125
+            ],
+            [
+              0.085,
+              -0.075
+            ],
+            [
+              0.115,
+              -0.04
+            ],
+            [
+              0.12,
+              0.02
+            ],
+            [
+              0.095,
+              0.065
+            ],
+            [
+              0.09,
+              0.12
+            ],
+            [
+              0.055,
+              0.16
+            ],
+            [
+              0.005,
+              0.16
+            ]
+          ],
+          "segments": 16
+        }
+      },
+      {
+        "name": "right_handle_pivot",
+        "material": "antique_brass",
+        "position": [
+          0.64,
+          2.98,
+          -0.14
+        ],
+        "rotation": [
+          0,
+          0,
+          1.570796
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "lathe",
+          "profile": [
+            [
+              0.005,
+              -0.16
+            ],
+            [
+              0.06,
+              -0.16
+            ],
+            [
+              0.085,
+              -0.125
+            ],
+            [
+              0.085,
+              -0.075
+            ],
+            [
+              0.115,
+              -0.04
+            ],
+            [
+              0.12,
+              0.02
+            ],
+            [
+              0.095,
+              0.065
+            ],
+            [
+              0.09,
+              0.12
+            ],
+            [
+              0.055,
+              0.16
+            ],
+            [
+              0.005,
+              0.16
+            ]
+          ],
+          "segments": 16
+        }
+      },
+      {
+        "name": "left_pivot_enamel_washer",
+        "material": "blue_black_enamel",
+        "position": [
+          -0.545,
+          2.98,
+          -0.14
+        ],
+        "rotation": [
+          0,
+          1.570796,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.098,
+          "tube": 0.026,
+          "segments": 20
+        }
+      },
+      {
+        "name": "right_pivot_enamel_washer",
+        "material": "blue_black_enamel",
+        "position": [
+          0.545,
+          2.98,
+          -0.14
+        ],
+        "rotation": [
+          0,
+          1.570796,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "repeat": null,
+        "geometry": {
+          "kind": "torus",
+          "radius": 0.098,
+          "tube": 0.026,
+          "segments": 20
+        }
+      }
+    ]
+  },
+  "provider_request_id": "01a07532-4d5a-7ff2-a3cd-ed77202a7731:01a07532-4dac-7943-9c34-70ce3634b901"
+}

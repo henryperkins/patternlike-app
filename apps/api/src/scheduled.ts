@@ -1,3 +1,4 @@
+import { maintainPortraitMeshes } from "./services/pattern-portrait-mesh.js";
 import { maintainPortraits } from "./services/pattern-portrait.js";
 import type { Env } from "./env.js";
 import { checkSecureConfig } from "./middleware/config-guard.js";
@@ -66,6 +67,11 @@ async function runIncumbentMaintenance(
   }
   try {
     await maintainPortraits(env, scheduledAt);
+  } catch (error) {
+    if (laneFailure === undefined) laneFailure = error;
+  }
+  try {
+    await maintainPortraitMeshes(env, scheduledAt);
   } catch (error) {
     if (laneFailure === undefined) laneFailure = error;
   }

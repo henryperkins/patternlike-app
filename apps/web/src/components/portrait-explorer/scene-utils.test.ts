@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { webcrypto } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector3 } from "three";
 import { cameraFrame, chapterLayout, disposeModel, isCameraBookmark, TapTracker, validateGlb, verifyGlbAsset } from "./scene-utils.js";
 
@@ -19,6 +19,25 @@ function glb(json: unknown) {
 }
 
 describe("verified self-contained GLBs", () => {
+  it("rejects a correctly hashed personal model with stale source provenance", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    try {
+      const sourceText = "Complete chapter source";
+      const provenance = { authoring: "codex-parametric/v1" as const, documentRevision: "current", compilerVersion: "portrait-mesh-compiler/v1" as const,
+        programSha256: "a".repeat(64), sourceTextSha256: createHash("sha256").update(sourceText).digest("hex") };
+      const asset = { chapterId: "chapter-1", url: "blob:https://pattern.example/model", sha256: "", sourceImageSha256: "b".repeat(64), sourceText, provenance };
+      const extras = { ...provenance, chapterId: asset.chapterId, sourceImageSha256: asset.sourceImageSha256 };
+      const model = (metadata: unknown) => glb({ asset: { version: "2.0" }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: "chapter-1", extras: metadata }] });
+      const good = model(extras);
+      await expect(verifyGlbAsset(good, createHash("sha256").update(new Uint8Array(good)).digest("hex"), asset.chapterId, asset)).resolves.toBeUndefined();
+      for (const changed of [{ documentRevision: "old" }, { sourceImageSha256: "c".repeat(64) }, { programSha256: "c".repeat(64) }, { compilerVersion: "unknown" }]) {
+        const bytes = model({ ...extras, ...changed });
+        await expect(verifyGlbAsset(bytes, createHash("sha256").update(new Uint8Array(bytes)).digest("hex"), asset.chapterId, asset)).rejects.toThrow(/provenance/);
+      }
+      await expect(verifyGlbAsset(good, createHash("sha256").update(new Uint8Array(good)).digest("hex"), asset.chapterId, { ...asset, sourceText: "Different chapter" })).rejects.toThrow(/source/);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("rejects every external buffer, image, and nested extension resource before parsing", () => {
     for (const json of [
       { buffers: [{ uri: "https://example.invalid/private.bin" }] },

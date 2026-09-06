@@ -45,6 +45,9 @@ export async function main(): Promise<void> {
     const portraitModules = config.portraitsEnabled ? await Promise.all([
       import("./portrait-client.js"), import("./portrait-invocation.js"),
     ]) : null;
+    const meshModules = config.meshesEnabled ? await Promise.all([
+      import("./portrait-mesh-client.js"), import("./portrait-mesh-invocation.js"),
+    ]) : null;
     await runCodexPollLoop({
       client,
       pollMs: config.pollMs,
@@ -56,6 +59,12 @@ export async function main(): Promise<void> {
       ...(portraitModules ? { portraits: {
         client: new portraitModules[0].CodexPortraitClient({ apiOrigin: config.apiOrigin, runnerToken: config.runnerToken }),
         execute: (claim: import("@patternlike/shared").CodexPortraitClaim) => portraitModules[1].runPortraitInvocation({
+          claim, codexBin: config.codexBin, signal: controller.signal,
+        }),
+      } } : {}),
+      ...(meshModules ? { meshes: {
+        client: new meshModules[0].CodexPortraitMeshClient({ apiOrigin: config.apiOrigin, runnerToken: config.runnerToken }),
+        execute: (claim: import("@patternlike/shared").CodexPortraitMeshClaim) => meshModules[1].runPortraitMeshInvocation({
           claim, codexBin: config.codexBin, signal: controller.signal,
         }),
       } } : {}),

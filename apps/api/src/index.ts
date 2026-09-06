@@ -1,3 +1,4 @@
+import { portraitMeshRoutes, codexPortraitMeshRoutes } from "./routes/pattern-portrait-mesh.js";
 import { Hono } from "hono";
 import type { Env } from "./env.js";
 import {
@@ -79,6 +80,7 @@ api.route("/", timingRoutes);
 api.route("/", patternAiRoutes);
 api.route("/", patternRoutes);
 api.route("/", patternPortraitRoutes);
+api.route("/", portraitMeshRoutes);
 api.route("/", timeTravelRoutes);
 api.route("/", lifeEventRoutes);
 api.route("/", privacyRoutes);
@@ -118,6 +120,7 @@ codexProvider.use("*", configGuard);
 codexProvider.use("*", codexRunnerAuth);
 codexProvider.route("/", codexProviderRoutes);
 codexProvider.route("/", codexPortraitRoutes);
+codexProvider.route("/", codexPortraitMeshRoutes);
 app.route("/codex-provider", codexProvider);
 
 // Cryptographic maintenance is a sibling authority. It must never inherit the

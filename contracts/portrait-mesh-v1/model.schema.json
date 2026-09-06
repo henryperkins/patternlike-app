@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.dev/contracts/portrait-mesh-v1/model.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chapter_id",
+    "reference_id",
+    "sha256",
+    "source_image_sha256",
+    "source_text_sha256",
+    "source_text",
+    "program_sha256",
+    "compiler_version",
+    "authoring",
+    "document_revision"
+  ],
+  "properties": {
+    "chapter_id": {
+      "enum": [
+        "chapter-1",
+        "chapter-2",
+        "chapter-3",
+        "chapter-4"
+      ]
+    },
+    "reference_id": {
+      "type": "string",
+      "pattern": "^ppmodel_[a-f0-9]{32}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_image_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_text_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536
+    },
+    "program_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "compiler_version": {
+      "const": "portrait-mesh-compiler/v1"
+    },
+    "authoring": {
+      "const": "codex-parametric/v1"
+    },
+    "document_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

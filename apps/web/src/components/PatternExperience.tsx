@@ -20,6 +20,7 @@ import {
 import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument } from "../lib/pattern-portrait.js";
 import { AccountPatternPortrait } from "./AccountPatternPortrait.js";
+import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { PatternConsentTerms } from "./PatternConsent.js";
 
 interface PatternExperienceProps {
@@ -351,6 +352,7 @@ function ReadyDocument({
 }
 
 function CurrentChartPatternExperience({ chartId, onUnauthorized }: PatternExperienceProps) {
+  const [portraitPreferenceSaving, setPortraitPreferenceSaving] = useState(false);
   const [state, setState] = useState<PatternStateDocumentV9 | null>(null);
   const [document, setDocument] = useState<PatternResponseV7 | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -617,11 +619,12 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized }: PatternExper
         {canGenerate && consent ? (
           <>
             <PatternConsentTerms consent={consent} privacyLink />
+            <PortraitAutomationControl chartId={chartId} onUnauthorized={onUnauthorized} onSavingChange={setPortraitPreferenceSaving} />
             <button
               className="button"
               type="button"
               onClick={() => void generate(consent, reason)}
-              disabled={busy}
+              disabled={busy || portraitPreferenceSaving}
             >
               Generate my Pattern
             </button>

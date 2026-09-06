@@ -227,9 +227,9 @@ it("keeps an accepted portrait readable after a later locale preference change",
 });
 
 it("keeps account deletion working before 0026 when portrait rollout is absent",async () => {
-  const triggers=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'pattern_portrait_%'").all<{name:string}>()).results;
-  const migration=env.TEST_MIGRATIONS.find((item)=>item.name === "0026_pattern_portraits.sql")!;
-  await env.DB.batch([...triggers.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
+  const triggers=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND (name LIKE 'pattern_portrait_%' OR name LIKE 'portrait_mesh_%' OR name LIKE 'portrait_automation_%')").all<{name:string}>()).results;
+  const migrations=env.TEST_MIGRATIONS.filter((item)=>["0026_pattern_portraits.sql","0027_portrait_mesh_automation.sql"].includes(item.name));
+  await env.DB.batch([...triggers.map(({name})=>env.DB.prepare(`DROP TRIGGER ${name}`)),...['portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants','pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits'].map((table)=>env.DB.prepare(`DROP TABLE ${table}`))]);
   try {
     const disabled=Object.defineProperty(Object.create(env),"PATTERN_PORTRAIT_ENABLED",{value:undefined});
     const response=await app.fetch(new Request("https://api.test/v1/account",{method:"DELETE",headers:{"x-user-id":USER_A,"content-type":"application/json","idempotency-key":"portrait-premigration-delete"},body:JSON.stringify({confirm:"DELETE"})}),disabled);
@@ -237,7 +237,7 @@ it("keeps account deletion working before 0026 when portrait rollout is absent",
     expect(await processDeletionMessage(disabled,{kind:"privacy",job_id:accepted.job_id,job_type:"delete_account"})).toBe("ack");
     expect((await env.DB.prepare("SELECT status FROM users WHERE id = ?").bind(USER_A).first<{status:string}>())?.status).toBe("deleted");
   } finally {
-    await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
+    for (const migration of migrations) await env.DB.batch(migration.queries.map((query)=>env.DB.prepare(query)));
   }
 });
 

@@ -10,6 +10,14 @@ export interface DeletionArtifactFamily {
 /** User-owned R2 families must be registered here before deletion may ship. */
 export const DELETION_ARTIFACT_FAMILIES: readonly DeletionArtifactFamily[] = [
   {
+    family: "pattern_portrait_meshes",
+    prefix: "portrait-meshes/",
+    collectKeys: async (env: Env, userId: string): Promise<string[]> => {
+      if (!await env.DB.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='portrait_mesh_assets'").first()) return [];
+      const { results } = await env.DB.prepare("SELECT object_key FROM portrait_mesh_assets WHERE user_id=? ORDER BY object_key").bind(userId).all<{object_key:string}>();return results.map(row=>row.object_key);
+    },
+  },
+  {
     family: "pattern_portraits",
     prefix: "pattern-portraits/",
     async collectKeys(env, userId) {
@@ -107,6 +115,10 @@ export const DELETED_USER_TABLES = [
   "natal_feature_sets",
   "natal_features",
   "codex_provider_jobs",
+  "portrait_mesh_assets",
+  "portrait_mesh_jobs",
+  "portrait_start_outbox",
+  "portrait_automation_grants",
   "pattern_portrait_assets",
   "pattern_portrait_jobs",
   "pattern_portraits",
@@ -168,6 +180,10 @@ export const PORTABLE_USER_TABLES = [
 export const NON_PORTABLE_USER_TABLES = [
   // Operational inventory; accepted images and graph are available through the
   // separate private /v1/pattern-portrait/download bundle, not frozen account export.
+  "portrait_mesh_assets",
+  "portrait_mesh_jobs",
+  "portrait_start_outbox",
+  "portrait_automation_grants",
   "pattern_portrait_assets",
   "pattern_portrait_jobs",
   "pattern_portraits",
@@ -259,9 +275,10 @@ export async function deleteUserRows(
 
   const optionalPortraitTables = new Set<string>([
     "pattern_portrait_assets", "pattern_portrait_jobs", "pattern_portraits",
+    "portrait_mesh_assets", "portrait_mesh_jobs", "portrait_start_outbox", "portrait_automation_grants",
   ]);
   const { results: presentPortraitTables } = await env.DB.prepare(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits')",
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('pattern_portrait_assets','pattern_portrait_jobs','pattern_portraits','portrait_mesh_assets','portrait_mesh_jobs','portrait_start_outbox','portrait_automation_grants')",
   ).all<{ name: string }>();
   const present = new Set(presentPortraitTables.map((row) => row.name));
   for (const table of DELETED_USER_TABLES) {

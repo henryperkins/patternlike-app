@@ -41,6 +41,13 @@
 .explorer-scene-message { position:absolute; inset:26% 8% auto; padding:24px; text-align:center; z-index:1; color:#fbf7e9; background:#12332ce8; border-radius:8px; }
 .explorer-scene-message p:first-child { font-family:Georgia,serif; font-size:24px; }
 .explorer-scene-message button { border-color:#adc49c; }
+/* Let wrapped fallback copy determine the height; fixed overlays can hide retry on phones. */
+.explorer-scene:has(> .explorer-scene-message) { height:auto; min-height:330px; display:flex; flex-direction:column; gap:16px; padding:10px; }
+.explorer-expanded-dialog .explorer-scene:has(> .explorer-scene-message) { height:auto; min-height:330px; }
+.explorer-scene:has(> .explorer-scene-message) > .explorer-scene-renderer { display:none; }
+.explorer-scene:has(> .explorer-scene-message) > .explorer-scene-top,
+.explorer-scene:has(> .explorer-scene-message) > .explorer-scene-toolbar { position:static; width:auto; max-width:100%; flex-wrap:wrap; }
+.explorer-scene:has(> .explorer-scene-message) > .explorer-scene-message { position:static; margin:auto 0; padding:16px; }
 .explorer-loading { position:absolute; bottom:86px; left:0; right:0; text-align:center; pointer-events:none; font-size:13px; }
 .explorer-chapters { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-bottom:1px solid var(--explorer-rule); padding:16px 0; gap:8px; }
 .explorer-chapters button { display:flex; align-items:flex-start; text-align:left; gap:9px; font-size:12px; line-height:1.4; padding:10px 8px; min-width:0; }

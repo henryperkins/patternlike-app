@@ -38,7 +38,7 @@ function chapterSourceText({ title, summary, sections, tensions, resources, coun
 
 /** Metadata gate only: the renderer separately verifies the downloaded GLB bytes and structure. */
 export function validateMeshBundle(manifest: PortraitManifest, bundle: PortraitMeshBundle): boolean {
-  if (!manifest || !bundle || bundle.version !== "portrait-mesh-1" || bundle.authoring !== "authored-fictional-fixtures"
+  if (!manifest || !bundle || bundle.version !== "portrait-mesh-1" || !["authored-fictional-fixtures", "codex-parametric/v1"].includes(bundle.authoring)
     || typeof manifest.revision !== "string" || !manifest.revision.trim() || bundle.documentRevision !== manifest.revision
     || !Array.isArray(manifest.chapters) || manifest.chapters.length !== 4 || !manifest.chapters.every(isSourceChapter)
     || !Array.isArray(bundle.assets) || bundle.assets.length !== 4) return false;
@@ -55,6 +55,12 @@ export function validateMeshBundle(manifest: PortraitManifest, bundle: PortraitM
     if (!chapter || !reference || typeof reference.referenceId !== "string" || !reference.referenceId.trim()
       || !isHash(reference.referenceSha256) || reference.referenceSha256.toLowerCase() !== asset.sourceImageSha256.toLowerCase()
       || !assetUrl(reference.imageUrl) || !url || seenUrls.has(url) || asset.sourceText !== chapterSourceText(chapter)) return false;
+    if (bundle.authoring === "codex-parametric/v1") {
+      const provenance = asset.provenance;
+      if (!provenance || provenance.authoring !== bundle.authoring || provenance.documentRevision !== manifest.revision
+        || provenance.compilerVersion !== "portrait-mesh-compiler/v1" || !isHash(provenance.programSha256)
+        || !isHash(provenance.sourceTextSha256) || !url.startsWith("blob:") || !reference.imageUrl.startsWith("blob:")) return false;
+    } else if (asset.provenance) return false;
     seenChapters.add(asset.chapterId);
     seenUrls.add(url);
   }

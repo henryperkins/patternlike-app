@@ -34,11 +34,11 @@ export interface PortraitInvocationOptions {
   /** Explicit local inspection hook; the production poller never retains originals. */
   onVerifiedImage?: (bytes: Buffer) => Promise<void>;
 }
-class PortraitError extends Error {
+export class PortraitError extends Error {
   constructor(readonly code: CodexPortraitFailure["code"], readonly fatal = false) { super(code); }
 }
 
-async function inspectCli(binary: string, args: string[], env: NodeJS.ProcessEnv): Promise<string> {
+export async function inspectCli(binary: string, args: string[], env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolveValue, reject) => {
     const child = spawn(binary, args, { env, shell: false, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let output = ""; let failed = false;
@@ -71,11 +71,11 @@ export async function preparePortraitImage(bytes: Buffer): Promise<Pick<CodexPor
 }
 
 type NativeResult = { threadId: string; turnId: string; imageId: string; image: string; savedPath: string | null; label: string; rationale: string };
-const DISABLED_FEATURES = ["shell_tool", "apps", "plugins", "hooks", "browser_use", "computer_use", "multi_agent", "memories", "remote_control", "remote_plugin", "tool_suggest", "auth_elicitation", "omit_app_server_notification_media"];
+export const DISABLED_FEATURES = ["shell_tool", "apps", "plugins", "hooks", "browser_use", "computer_use", "multi_agent", "memories", "remote_control", "remote_plugin", "tool_suggest", "auth_elicitation", "omit_app_server_notification_media"];
 const PASSIVE_ITEMS = new Set(["userMessage", "agentMessage", "reasoning", "functionCallOutput", "plan"]);
-const CHATGPT_BASE_URL = "https://chatgpt.com/backend-api/";
+export const CHATGPT_BASE_URL = "https://chatgpt.com/backend-api/";
 
-async function requireCleanHostInstructions(home: string): Promise<void> {
+export async function requireCleanHostInstructions(home: string): Promise<void> {
   for (const name of ["AGENTS.md", "AGENTS.override.md"]) {
     try {
       const stat = await lstat(join(home, name));
@@ -86,13 +86,13 @@ async function requireCleanHostInstructions(home: string): Promise<void> {
   }
 }
 
-function isolatedMcpConfiguration(value: unknown, instructionsFile: string): Record<string, { enabled: false; required: false }> {
+export function isolatedMcpConfiguration(value: unknown, instructionsFile: string, imageGeneration = true): Record<string, { enabled: false; required: false }> {
   if (!record(value) || value.model_provider !== "openai" || value.forced_login_method !== "chatgpt"
     || value.web_search !== "disabled" || !Array.isArray(value.notify) || value.notify.length !== 0
     || value.developer_instructions !== "" || value.instructions !== "" || value.project_doc_max_bytes !== 0
     || value.skills?.include_instructions !== false || value.model_instructions_file !== instructionsFile
     || value.experimental_compact_prompt_file !== instructionsFile || value.chatgpt_base_url !== CHATGPT_BASE_URL
-    || value.features?.image_generation !== true || value.features?.skip_host_skill_discovery !== true
+    || value.features?.image_generation !== imageGeneration || value.features?.skip_host_skill_discovery !== true
     || DISABLED_FEATURES.some((feature) => value.features?.[feature] !== false)) throw new PortraitError("generation_failed", true);
   if (value.mcp_servers !== undefined && !record(value.mcp_servers)) throw new PortraitError("generation_failed", true);
   const names = Object.keys(value.mcp_servers ?? {});

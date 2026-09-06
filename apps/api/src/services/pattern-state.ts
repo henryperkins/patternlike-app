@@ -29,7 +29,7 @@ import {
 import type { PatternDocumentInternal } from "@patternlike/shared";
 import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
 
-interface DocumentRow {
+export interface DocumentRow {
   id: string;
   claim_id: string;
   generation_id: string;

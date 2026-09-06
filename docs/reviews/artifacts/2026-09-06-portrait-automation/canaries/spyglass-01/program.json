@@ -1,0 +1,1293 @@
+{
+  "version": "portrait-mesh-program/v1",
+  "materials": [
+    {
+      "id": "aged_brass",
+      "color": "#A87932",
+      "metalness": 0.78,
+      "roughness": 0.34
+    },
+    {
+      "id": "dark_brass",
+      "color": "#62451F",
+      "metalness": 0.68,
+      "roughness": 0.43
+    },
+    {
+      "id": "brown_leather",
+      "color": "#3B271B",
+      "metalness": 0.04,
+      "roughness": 0.78
+    },
+    {
+      "id": "optical_black",
+      "color": "#11100D",
+      "metalness": 0.12,
+      "roughness": 0.32
+    }
+  ],
+  "parts": [
+    {
+      "name": "tapered_leather_main_barrel",
+      "material": "brown_leather",
+      "position": [
+        -1.86,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.62,
+            -1.29
+          ],
+          [
+            0.65,
+            -1.18
+          ],
+          [
+            0.64,
+            1.15
+          ],
+          [
+            0.6,
+            1.29
+          ],
+          [
+            0.005,
+            1.29
+          ],
+          [
+            0.005,
+            -1.29
+          ]
+        ],
+        "segments": 28
+      }
+    },
+    {
+      "name": "leather_underside_seam",
+      "material": "dark_brass",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "path",
+        "points": [
+          [
+            -3.03,
+            -0.646,
+            0
+          ],
+          [
+            -2.25,
+            -0.642,
+            0
+          ],
+          [
+            -1.45,
+            -0.63,
+            0
+          ],
+          [
+            -0.69,
+            -0.607,
+            0
+          ]
+        ],
+        "radius": 0.012,
+        "segments": 60,
+        "closed": false
+      }
+    },
+    {
+      "name": "objective_housing",
+      "material": "aged_brass",
+      "position": [
+        -3.25,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.68,
+            -0.18
+          ],
+          [
+            0.74,
+            -0.11
+          ],
+          [
+            0.72,
+            0.1
+          ],
+          [
+            0.67,
+            0.18
+          ],
+          [
+            0.56,
+            0.18
+          ],
+          [
+            0.56,
+            -0.18
+          ]
+        ],
+        "segments": 28
+      }
+    },
+    {
+      "name": "objective_bore_lining",
+      "material": "optical_black",
+      "position": [
+        -3.32,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.557,
+            -0.09
+          ],
+          [
+            0.557,
+            0.09
+          ],
+          [
+            0.525,
+            0.09
+          ],
+          [
+            0.525,
+            -0.09
+          ]
+        ],
+        "segments": 24
+      }
+    },
+    {
+      "name": "recessed_objective_glass",
+      "material": "optical_black",
+      "position": [
+        -3.215,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "ellipsoid",
+        "radii": [
+          0.022,
+          0.524,
+          0.524
+        ],
+        "segments": 18
+      }
+    },
+    {
+      "name": "objective_outer_rolled_lip",
+      "material": "aged_brass",
+      "position": [
+        -3.425,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.66,
+        "tube": 0.08,
+        "segments": 20
+      }
+    },
+    {
+      "name": "objective_inner_retainer",
+      "material": "dark_brass",
+      "position": [
+        -3.414,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.545,
+        "tube": 0.019,
+        "segments": 18
+      }
+    },
+    {
+      "name": "objective_rear_trim",
+      "material": "dark_brass",
+      "position": [
+        -3.14,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.645,
+        "tube": 0.041,
+        "segments": 20
+      }
+    },
+    {
+      "name": "objective_body_transition",
+      "material": "aged_brass",
+      "position": [
+        -3.075,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.623,
+        "tube": 0.027,
+        "segments": 18
+      }
+    },
+    {
+      "name": "main_collar_core",
+      "material": "aged_brass",
+      "position": [
+        -0.38,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "cylinder",
+        "radiusTop": 0.625,
+        "radiusBottom": 0.64,
+        "height": 0.58,
+        "segments": 28
+      }
+    },
+    {
+      "name": "collar_rear_shoulder",
+      "material": "aged_brass",
+      "position": [
+        -0.645,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.604,
+        "tube": 0.065,
+        "segments": 20
+      }
+    },
+    {
+      "name": "knurled_collar_base",
+      "material": "dark_brass",
+      "position": [
+        -0.42,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "cylinder",
+        "radiusTop": 0.66,
+        "radiusBottom": 0.66,
+        "height": 0.36,
+        "segments": 28
+      }
+    },
+    {
+      "name": "knurl_right_hand_ridges",
+      "material": "aged_brass",
+      "position": [
+        -0.42,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": {
+        "count": 3,
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          2.094395,
+          0,
+          0
+        ]
+      },
+      "geometry": {
+        "kind": "path",
+        "points": [
+          [
+            -0.17,
+            0.67,
+            0
+          ],
+          [
+            -0.1417,
+            0.335,
+            0.5802
+          ],
+          [
+            -0.1133,
+            -0.335,
+            0.5802
+          ],
+          [
+            -0.085,
+            -0.67,
+            0
+          ],
+          [
+            -0.0567,
+            -0.335,
+            -0.5802
+          ],
+          [
+            -0.0283,
+            0.335,
+            -0.5802
+          ],
+          [
+            0,
+            0.67,
+            0
+          ],
+          [
+            0.0283,
+            0.335,
+            0.5802
+          ],
+          [
+            0.0567,
+            -0.335,
+            0.5802
+          ],
+          [
+            0.085,
+            -0.67,
+            0
+          ],
+          [
+            0.1133,
+            -0.335,
+            -0.5802
+          ],
+          [
+            0.1417,
+            0.335,
+            -0.5802
+          ],
+          [
+            0.17,
+            0.67,
+            0
+          ]
+        ],
+        "radius": 0.011,
+        "segments": 60,
+        "closed": false
+      }
+    },
+    {
+      "name": "knurl_left_hand_ridges",
+      "material": "aged_brass",
+      "position": [
+        -0.42,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": {
+        "count": 3,
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          2.094395,
+          0,
+          0
+        ]
+      },
+      "geometry": {
+        "kind": "path",
+        "points": [
+          [
+            -0.17,
+            0.67,
+            0
+          ],
+          [
+            -0.1417,
+            0.335,
+            -0.5802
+          ],
+          [
+            -0.1133,
+            -0.335,
+            -0.5802
+          ],
+          [
+            -0.085,
+            -0.67,
+            0
+          ],
+          [
+            -0.0567,
+            -0.335,
+            0.5802
+          ],
+          [
+            -0.0283,
+            0.335,
+            0.5802
+          ],
+          [
+            0,
+            0.67,
+            0
+          ],
+          [
+            0.0283,
+            0.335,
+            -0.5802
+          ],
+          [
+            0.0567,
+            -0.335,
+            -0.5802
+          ],
+          [
+            0.085,
+            -0.67,
+            0
+          ],
+          [
+            0.1133,
+            -0.335,
+            0.5802
+          ],
+          [
+            0.1417,
+            0.335,
+            0.5802
+          ],
+          [
+            0.17,
+            0.67,
+            0
+          ]
+        ],
+        "radius": 0.011,
+        "segments": 60,
+        "closed": false
+      }
+    },
+    {
+      "name": "knurl_circumferential_grooves",
+      "material": "dark_brass",
+      "position": [
+        -0.57,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": {
+        "count": 5,
+        "translation": [
+          0.075,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.656,
+        "tube": 0.008,
+        "segments": 18
+      }
+    },
+    {
+      "name": "knurl_rear_border",
+      "material": "aged_brass",
+      "position": [
+        -0.605,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.63,
+        "tube": 0.044,
+        "segments": 20
+      }
+    },
+    {
+      "name": "knurl_front_border",
+      "material": "aged_brass",
+      "position": [
+        -0.235,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.63,
+        "tube": 0.044,
+        "segments": 20
+      }
+    },
+    {
+      "name": "collar_front_rounded_bead",
+      "material": "aged_brass",
+      "position": [
+        -0.11,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.57,
+        "tube": 0.095,
+        "segments": 22
+      }
+    },
+    {
+      "name": "first_telescoping_tube",
+      "material": "aged_brass",
+      "position": [
+        0.47,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.455,
+            -0.6
+          ],
+          [
+            0.455,
+            -0.54
+          ],
+          [
+            0.425,
+            0.54
+          ],
+          [
+            0.42,
+            0.6
+          ],
+          [
+            0.005,
+            0.6
+          ],
+          [
+            0.005,
+            -0.6
+          ]
+        ],
+        "segments": 28
+      }
+    },
+    {
+      "name": "first_joint_sleeve",
+      "material": "dark_brass",
+      "position": [
+        1.075,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "cylinder",
+        "radiusTop": 0.442,
+        "radiusBottom": 0.448,
+        "height": 0.18,
+        "segments": 26
+      }
+    },
+    {
+      "name": "first_joint_rear_line",
+      "material": "dark_brass",
+      "position": [
+        0.995,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.414,
+        "tube": 0.021,
+        "segments": 18
+      }
+    },
+    {
+      "name": "first_joint_raised_ring",
+      "material": "aged_brass",
+      "position": [
+        1.08,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.407,
+        "tube": 0.043,
+        "segments": 20
+      }
+    },
+    {
+      "name": "first_joint_front_line",
+      "material": "dark_brass",
+      "position": [
+        1.155,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.385,
+        "tube": 0.022,
+        "segments": 18
+      }
+    },
+    {
+      "name": "second_telescoping_tube",
+      "material": "aged_brass",
+      "position": [
+        1.65,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.388,
+            -0.57
+          ],
+          [
+            0.385,
+            -0.51
+          ],
+          [
+            0.355,
+            0.51
+          ],
+          [
+            0.35,
+            0.57
+          ],
+          [
+            0.005,
+            0.57
+          ],
+          [
+            0.005,
+            -0.57
+          ]
+        ],
+        "segments": 28
+      }
+    },
+    {
+      "name": "second_joint_sleeve",
+      "material": "dark_brass",
+      "position": [
+        2.18,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "cylinder",
+        "radiusTop": 0.379,
+        "radiusBottom": 0.387,
+        "height": 0.18,
+        "segments": 26
+      }
+    },
+    {
+      "name": "second_joint_raised_ring",
+      "material": "aged_brass",
+      "position": [
+        2.17,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.348,
+        "tube": 0.041,
+        "segments": 20
+      }
+    },
+    {
+      "name": "second_joint_front_line",
+      "material": "dark_brass",
+      "position": [
+        2.255,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.326,
+        "tube": 0.02,
+        "segments": 18
+      }
+    },
+    {
+      "name": "third_telescoping_tube",
+      "material": "aged_brass",
+      "position": [
+        2.68,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.328,
+            -0.49
+          ],
+          [
+            0.325,
+            -0.43
+          ],
+          [
+            0.29,
+            0.43
+          ],
+          [
+            0.285,
+            0.49
+          ],
+          [
+            0.005,
+            0.49
+          ],
+          [
+            0.005,
+            -0.49
+          ]
+        ],
+        "segments": 28
+      }
+    },
+    {
+      "name": "ocular_mount_ring",
+      "material": "dark_brass",
+      "position": [
+        3.105,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.286,
+        "tube": 0.036,
+        "segments": 18
+      }
+    },
+    {
+      "name": "hollow_ocular_sleeve",
+      "material": "aged_brass",
+      "position": [
+        3.28,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.29,
+            -0.19
+          ],
+          [
+            0.31,
+            -0.14
+          ],
+          [
+            0.31,
+            0.12
+          ],
+          [
+            0.325,
+            0.19
+          ],
+          [
+            0.205,
+            0.19
+          ],
+          [
+            0.205,
+            -0.19
+          ]
+        ],
+        "segments": 28
+      }
+    },
+    {
+      "name": "ocular_black_bore_lining",
+      "material": "optical_black",
+      "position": [
+        3.34,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "lathe",
+        "profile": [
+          [
+            0.204,
+            -0.11
+          ],
+          [
+            0.204,
+            0.11
+          ],
+          [
+            0.182,
+            0.11
+          ],
+          [
+            0.182,
+            -0.11
+          ]
+        ],
+        "segments": 24
+      }
+    },
+    {
+      "name": "recessed_ocular_glass",
+      "material": "optical_black",
+      "position": [
+        3.218,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "ellipsoid",
+        "radii": [
+          0.02,
+          0.181,
+          0.181
+        ],
+        "segments": 18
+      }
+    },
+    {
+      "name": "ocular_rolled_outer_lip",
+      "material": "aged_brass",
+      "position": [
+        3.462,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.27,
+        "tube": 0.065,
+        "segments": 20
+      }
+    },
+    {
+      "name": "ocular_inner_retaining_ring",
+      "material": "dark_brass",
+      "position": [
+        3.449,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "repeat": null,
+      "geometry": {
+        "kind": "torus",
+        "radius": 0.203,
+        "tube": 0.018,
+        "segments": 18
+      }
+    }
+  ]
+}

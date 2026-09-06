@@ -11,6 +11,7 @@ import {
   runCodexPollLoop,
   runOneCodexJob,
   runOnePortraitJob,
+  runOnePortraitMeshJob,
 } from "./runner.js";
 
 const CLAIM: CodexProviderClaim = {
@@ -232,5 +233,44 @@ test("accepted or uncertain portrait completions are never overwritten with imag
     if (completionError) await assert.rejects(run, (error) => error === completionError);
     else assert.equal(await run, "processed");
     assert.deepEqual(calls, ["complete"]);
+  }
+});
+
+test("mesh polling is separately opt-in and preserves text then image queue priority", async () => {
+  const env = { PATTERNLIKE_API_ORIGIN: "https://api.example.test", CODEX_RUNNER_TOKEN: "runner_0123456789abcdefghijklmnopqrstuvwxyz" };
+  assert.equal(parseRunnerConfiguration(env).meshesEnabled, undefined);
+  assert.equal(parseRunnerConfiguration({ ...env, CODEX_RUNNER_MESHES: "1" }).meshesEnabled, true);
+  assert.throws(() => parseRunnerConfiguration({ ...env, CODEX_RUNNER_MESHES: "yes" }), /CODEX_RUNNER_MESHES/);
+  const abort = new AbortController(); const order: string[] = []; let polls = 0;
+  await runCodexPollLoop({
+    client: { claim: async () => { order.push("text"); return ++polls === 1 ? { status: "claimed", claim: CLAIM } : { status: "empty" }; }, complete: async () => undefined, fail: async () => assert.fail("text failure") },
+    execute: async () => ({ ok: true, output: "{}", providerRequestId: "thread", inputTokens: 0, outputTokens: 0 }),
+    portraits: { client: { claim: async () => { order.push("image"); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() }, execute: async () => assert.fail() },
+    meshes: { client: { claim: async () => { order.push("mesh"); abort.abort(); return { status: "empty" }; }, complete: async () => assert.fail(), fail: async () => assert.fail() }, execute: async () => assert.fail() },
+    signal: abort.signal, pollMs: 250, sleep: async () => undefined,
+  });
+  assert.deepEqual(order, ["text", "text", "image", "mesh"]);
+});
+
+test("mesh visual failure reports once; fatal authentication reports before exit", async () => {
+  const claim = { job_id: `ppmesh_${"a".repeat(32)}`, lease_token: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee" } as import("@patternlike/shared").CodexPortraitMeshClaim;
+  for (const fatal of [false, true]) {
+    const calls: unknown[] = [];
+    const code = fatal ? "authentication_failed" as const : "visual_check_failed" as const;
+    const run = runOnePortraitMeshJob({ client: { claim: async () => ({ status: "claimed", claim }), complete: async () => assert.fail("no completion"), fail: async (job, body) => { calls.push({ job, body }); } }, execute: async () => ({ ok: false, code, fatal }) });
+    if (fatal) await assert.rejects(run, /authentication or executable/); else assert.equal(await run, "processed");
+    assert.deepEqual(calls, [{ job: claim.job_id, body: { lease_token: claim.lease_token, code } }]);
+  }
+});
+
+test("mesh definitive rejection fails same lease and uncertain completion never overwrites acceptance", async () => {
+  const claim = { job_id: `ppmesh_${"a".repeat(32)}`, lease_token: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee" } as import("@patternlike/shared").CodexPortraitMeshClaim;
+  for (const status of [200, 400, 409, 503, undefined]) {
+    const error = new CodexProviderClientError("safe transport error", status); const calls: unknown[] = [];
+    const run = runOnePortraitMeshJob({ client: { claim: async () => ({ status: "claimed", claim }), complete: async () => { calls.push("complete"); throw error; }, fail: async (job, body) => { calls.push({ job, body }); } }, execute: async () => ({ ok: true, completion: {} as import("@patternlike/shared").CodexPortraitMeshCompletion }) });
+    if (status === 400) {
+      assert.equal(await run, "processed");
+      assert.deepEqual(calls, ["complete", { job: claim.job_id, body: { lease_token: claim.lease_token, code: "model_invalid" } }]);
+    } else { await assert.rejects(run, (cause) => cause === error); assert.deepEqual(calls, ["complete"]); }
   }
 });

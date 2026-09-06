@@ -1,0 +1,69 @@
+{
+  "schema_version": "portrait-mesh-canary/v1",
+  "fictional": true,
+  "automatic_authoring": true,
+  "manual_model_edits": false,
+  "codex_cli_version": "0.153.3",
+  "configured_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "source_text_sha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9",
+  "source_image_sha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+  "document_revision": "fictional-canary/v1",
+  "elapsed_ms": 188972,
+  "compiled": {
+    "program_sha256": "e77fd069f079e4c40cd3af4362a64b16898e98c020ff01265d6e2828a30dcd54",
+    "glb_sha256": "871933cc364cf212679bd0558204e38d54e099e360bd64a2fac6d50063773255",
+    "glb_bytes": 206084,
+    "triangles": 10188,
+    "bounds": {
+      "min": [
+        -1,
+        -0.22859999537467957,
+        -0.889236569404602
+      ],
+      "max": [
+        1,
+        0.22859999537467957,
+        0.889236569404602
+      ]
+    },
+    "compiler_version": "portrait-mesh-compiler/v1",
+    "views": [
+      {
+        "label": "front",
+        "sha256": "5f98ea002aee992a9d8d0a4750473041213cd4d1e5f74e552d8e6226c36a272e",
+        "bytes": 12657
+      },
+      {
+        "label": "rear",
+        "sha256": "6ccf63a4cb1bfc5bf9baf99fc597e733c8fc47264e4da1ed1733cd029ec949b9",
+        "bytes": 12699
+      },
+      {
+        "label": "side",
+        "sha256": "434d7d5cfc755d4caaaa6296471aa5637ba73f2d16084f59415b70357b04a802",
+        "bytes": 12789
+      },
+      {
+        "label": "three-quarter",
+        "sha256": "b0083070ce9a608efb149708e211c56f39ae24c694ee49ba38814220faa97342",
+        "bytes": 34778
+      }
+    ]
+  },
+  "result": {
+    "ok": true,
+    "audit": {
+      "schema_version": "portrait-mesh-audit/v1",
+      "accepted": true,
+      "recognizable": true,
+      "substantial": true,
+      "source_correspondence": true,
+      "no_severe_intersections": true,
+      "view_count": 4,
+      "notes": "The three-quarter view clearly shows a substantial compass: a thick round housing, recessed dial, concentric raised rings, central hub, blue directional needle, perimeter markers, and a side adjustment knob. The other views confirm coherent casing depth, base construction, and knob placement rather than a flat façade. Its compass interpretation plausibly expresses choosing and adjusting direction while preserving purpose. Detail and material fidelity are simpler than the ornate brass reference, and the needle orientation differs, but the major structure and proportions remain recognizable. No severe collapse or visibly destructive intersections are present."
+    },
+    "provider_request_id": "01a07531-b60c-7553-817b-9478bb0b335b:01a07531-b65e-7551-ae2b-4e8ff62ab067",
+    "audit_request_id": "01a07534-745f-71a0-854d-db3045deedbf:01a07534-74b6-7b10-a04b-25925593d8b1"
+  }
+}

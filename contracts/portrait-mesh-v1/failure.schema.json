@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.dev/contracts/portrait-mesh-v1/failure.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lease_token",
+    "code"
+  ],
+  "properties": {
+    "lease_token": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "code": {
+      "enum": [
+        "generation_failed",
+        "generation_refused",
+        "program_invalid",
+        "model_invalid",
+        "visual_check_failed",
+        "authentication_failed"
+      ]
+    }
+  }
+}

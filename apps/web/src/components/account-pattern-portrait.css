@@ -16,6 +16,12 @@
 .account-portrait__view > p button { margin-inline-start: 0.4rem; min-height: 44px; }
 .account-portrait__view:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 
+.portrait-automation { margin-block: 1.5rem; max-width: 68ch; }
+.portrait-automation__choice { display: flex; align-items: center; gap: 0.75rem; min-height: 44px; font-weight: 600; cursor: pointer; }
+.portrait-automation__choice input { flex: none; width: 1.25rem; height: 1.25rem; accent-color: var(--ink); }
+.portrait-automation__terms { font-size: 0.925rem; line-height: 1.6; }
+.portrait-automation__terms p { margin-block: 0.6rem; }
+
 @media (max-width: 600px) {
   .account-portrait__actions { align-items: stretch; flex-direction: column; }
   .account-portrait .button { min-height: 44px; white-space: normal; }

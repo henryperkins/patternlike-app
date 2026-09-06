@@ -34,6 +34,43 @@ describe("portrait explorer source projection", () => {
 });
 
 describe("portrait mesh source binding", () => {
+  function personalFixture() {
+    const { manifest, bundle } = fixture();
+    const personal = {
+      ...bundle,
+      authoring: "codex-parametric/v1",
+      assets: bundle.assets.map((asset) => ({
+        ...asset,
+        url: `blob:https://pattern.example/model-${asset.chapterId}`,
+        provenance: { authoring: "codex-parametric/v1", documentRevision: manifest.revision,
+          compilerVersion: "portrait-mesh-compiler/v1", programSha256: "a".repeat(64), sourceTextSha256: "b".repeat(64) },
+      })),
+    };
+    for (const chapter of manifest.chapters) chapter.object!.imageUrl = `blob:https://pattern.example/image-${chapter.id}`;
+    return { manifest, bundle: personal as unknown as PortraitMeshBundle };
+  }
+
+  it("accepts authenticated personal models with complete compiler and source provenance", () => {
+    const { manifest, bundle } = personalFixture();
+    expect(validateMeshBundle(manifest, bundle)).toBe(true);
+  });
+
+  it("rejects personal models without provenance or with unverified remote asset locations", () => {
+    for (const update of [
+      { provenance: undefined },
+      { url: "https://public.example/model.glb" },
+      { provenance: { authoring: "codex-parametric/v1", documentRevision: "old", compilerVersion: "portrait-mesh-compiler/v1", programSha256: "a".repeat(64), sourceTextSha256: "b".repeat(64) } },
+      { provenance: { authoring: "codex-parametric/v1", documentRevision: "pattern-1:2026-09-06", compilerVersion: "unknown", programSha256: "a".repeat(64), sourceTextSha256: "b".repeat(64) } },
+    ]) {
+      const { manifest, bundle } = personalFixture();
+      Object.assign(bundle.assets[0], update);
+      expect(validateMeshBundle(manifest, bundle)).toBe(false);
+    }
+    const { manifest, bundle } = personalFixture();
+    manifest.chapters[0].object!.imageUrl = "https://public.example/source.png";
+    expect(validateMeshBundle(manifest, bundle)).toBe(false);
+  });
+
   it("accepts four complete source-bound assets without depending on asset order", () => {
     const { manifest, bundle } = fixture();
     expect(validateMeshBundle(manifest, bundle)).toBe(true);

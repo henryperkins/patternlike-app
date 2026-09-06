@@ -1,0 +1,78 @@
+{
+  "schema_version": "portrait-runner-host-preflight/v1",
+  "scope": "One authorized, content-free JSON provider turn under the actual runner service account, using a temporary Codex CLI and a temporary bundle of the current isolated invocation helper.",
+  "source_head": "9b45db00005833918bff719e6d86cb9d17598add",
+  "host": {
+    "service_account": "patternlike-codex",
+    "uid": 997,
+    "home": "/var/lib/patternlike-codex-runner",
+    "node_binary": "/opt/patternlike-codex-runner/bin/node",
+    "node_version": "v24.19.0",
+    "temporary_codex_binary": "/tmp/portrait-codex-0.153.3/node_modules/.bin/codex",
+    "codex_version": "codex-cli 0.153.3",
+    "existing_chatgpt_login_verified": true,
+    "codex_home_override_present": false,
+    "global_agent_instruction_files_present": false,
+    "openai_api_key_present_in_smoke_environment": false
+  },
+  "invocation": {
+    "command": "sudo -n -H -u patternlike-codex env PATH=/opt/patternlike-codex-runner/bin:/usr/local/bin:/usr/bin:/bin /opt/patternlike-codex-runner/bin/node /tmp/portrait-runner-host-preflight.sGTGbl/smoke.mjs",
+    "helper": "runIsolatedCodexJson",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh",
+    "max_output_bytes": 64,
+    "timeout_ms": 180000,
+    "input": "Return exactly {\"ok\":true}.",
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean", "const": true }
+      }
+    }
+  },
+  "result": {
+    "started_at_utc": "2026-09-06T06:01:28.108Z",
+    "finished_at_utc": "2026-09-06T06:01:32.374Z",
+    "elapsed_ms": 4266,
+    "outcome": "passed",
+    "exit_code": 0,
+    "value": { "ok": true },
+    "provider_request_id_sha256": "9f9e14864aca919f19c4a2d401d721051f1eeefd79475f48cb24df3fbef4fc84",
+    "isolated_run_directory_cleaned": true
+  },
+  "isolation_checks": {
+    "basis": "Successful completion of the unchanged invocation helper requires every listed configuration, thread, MCP status, and event check to pass.",
+    "cli_version_and_chatgpt_login": true,
+    "expected_codex_home": true,
+    "openai_provider_and_expected_model": true,
+    "chatgpt_backend_url": true,
+    "fresh_ephemeral_thread_requested": true,
+    "read_only_sandbox_and_never_approval": true,
+    "empty_execution_environments_requested": true,
+    "host_instructions_skills_hooks_and_notifications_disabled": true,
+    "web_search_and_image_generation_disabled": true,
+    "model_tool_features_disabled": true,
+    "plan_and_user_input_tools_disabled_in_effective_session_layer": true,
+    "all_inherited_mcp_servers_disabled_with_no_tools": true,
+    "only_passive_user_agent_and_reasoning_events": true,
+    "bounded_completed_json_output": true
+  },
+  "source_sha256": {
+    "apps/codex-runner/src/isolated-codex-json.ts": "223ffda9415bb5200a7d078c04b512dd37b0e00d8a3acb03ccd4e2fc0569530d",
+    "apps/codex-runner/src/portrait-invocation.ts": "75df696c6a29cfd76235a742e0163d74f8a2c2b81051fae4d19cb2dfb4515623",
+    "apps/codex-runner/src/codex-cli.ts": "12966f4ccbebd4205ee1839bcea2de3e394181ca7ab77adc8b86831e2026ffb7",
+    "/tmp/portrait-runner-host-preflight.sGTGbl/smoke.mjs": "4f81b66e3b590044d20010c424dd183083661618df873a8d022b74d8bb35349c"
+  },
+  "boundaries": {
+    "real_provider_turns": 1,
+    "account_content_sent": false,
+    "credentials_copied_or_changed": false,
+    "host_auth_or_configuration_changed": false,
+    "live_service_install_or_swap": false,
+    "polling_enabled_or_jobs_claimed": false,
+    "production_deployment_performed": false,
+    "repository_source_changed": false
+  }
+}

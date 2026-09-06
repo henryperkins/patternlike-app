@@ -1,0 +1,830 @@
+{
+  "scope": "Actual PatternExperience with intercepted fictional account API; no live backend or account delivery claim",
+  "manualModelEdits": false,
+  "reports": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "checks": {
+        "initial_automation_off": true,
+        "complete_prose_before_generation": true,
+        "only_opt_in_mutation": true,
+        "complete_prose_during_generation": true,
+        "no_generation_post": true,
+        "four_private_image_gets": true,
+        "four_private_model_gets": true,
+        "real_webgl_canvas": true,
+        "personal_provenance_label": true,
+        "keyboard_camera_controls": true,
+        "graphics_loss_supported": true,
+        "graphics_loss_disables_camera": true,
+        "graphics_loss_keeps_complete_reading": true,
+        "graphics_retry_recovers_canvas": true,
+        "unfolds": true,
+        "chapter_1": true,
+        "chapter_2": true,
+        "chapter_3": true,
+        "chapter_4": true,
+        "facet_Tensions": true,
+        "facet_prose_Tensions": true,
+        "facet_Resources": true,
+        "facet_prose_Resources": true,
+        "facet_Another expression": true,
+        "facet_prose_Another expression": true,
+        "facet_Overview": true,
+        "facet_prose_Overview": true,
+        "keyboard_tab_left": true,
+        "keyboard_tab_end": true,
+        "compare_two_chapters": true,
+        "comparison_preserves_facet": true,
+        "native_image_decodes": true,
+        "image_dialog_traps_focus": true,
+        "image_dialog_restores_focus": true,
+        "guide_advances": true,
+        "complete_full_reading": true,
+        "uncertainty_preserved": true,
+        "expanded_scene": true,
+        "expanded_graphics_pointer_retry": true,
+        "expanded_dialog_traps_focus": true,
+        "expanded_dialog_restores_focus": true,
+        "complete_download_name": true,
+        "complete_download_fixture": true,
+        "plain_reading_preserved": true,
+        "reopen_reuses_assets": true,
+        "no_horizontal_overflow": true,
+        "source_change_revokes_private_blobs": true,
+        "source_change_removes_old_canvas": true,
+        "unmount_revokes_every_blob": true,
+        "no_browser_errors": true
+      },
+      "errors": [],
+      "warnings": [],
+      "requests": [
+        {
+          "path": "/v1/pattern-state",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "PUT",
+          "body": "{\"chart_id\":\"cht_automated_canary\",\"enabled\":true,\"consent_policy_version\":\"1.1.0\",\"confirm\":\"ENABLE AUTOMATIC PORTRAITS\"}"
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000001",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000001",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000002",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000002",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000003",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000003",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000004",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000004",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer/download",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-state",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        }
+      ],
+      "blobStats": {
+        "created": [
+          {
+            "url": "blob:http://127.0.0.1:4187/74c07daa-b407-4310-95df-6686007b9561",
+            "type": "image/png",
+            "size": 324323
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/029b21c9-11ee-4b10-bb0c-2b5d06487526",
+            "type": "image/png",
+            "size": 279754
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/875de2fd-20a5-47f1-bd06-17e8c8c82203",
+            "type": "image/png",
+            "size": 204674
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/828f864a-36ea-476c-abd8-b0149995cfc6",
+            "type": "image/png",
+            "size": 223452
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/8d39a458-32ac-4c99-bfe8-f5b31c33d1ff",
+            "type": "model/gltf-binary",
+            "size": 206116
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/845d4c87-c783-43c6-8be0-b422d186d789",
+            "type": "model/gltf-binary",
+            "size": 170720
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/b2e6ad8f-c128-4e03-93ff-22737ac71b63",
+            "type": "model/gltf-binary",
+            "size": 257748
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/e5fc77b7-d959-439b-9aa4-2a837d2ef4c9",
+            "type": "model/gltf-binary",
+            "size": 316468
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/ad7a0850-0fc6-4078-8ade-72bd91b495da",
+            "type": "application/json",
+            "size": 2731332
+          }
+        ],
+        "revoked": [
+          "blob:http://127.0.0.1:4187/ad7a0850-0fc6-4078-8ade-72bd91b495da",
+          "blob:http://127.0.0.1:4187/74c07daa-b407-4310-95df-6686007b9561",
+          "blob:http://127.0.0.1:4187/029b21c9-11ee-4b10-bb0c-2b5d06487526",
+          "blob:http://127.0.0.1:4187/875de2fd-20a5-47f1-bd06-17e8c8c82203",
+          "blob:http://127.0.0.1:4187/828f864a-36ea-476c-abd8-b0149995cfc6",
+          "blob:http://127.0.0.1:4187/8d39a458-32ac-4c99-bfe8-f5b31c33d1ff",
+          "blob:http://127.0.0.1:4187/845d4c87-c783-43c6-8be0-b422d186d789",
+          "blob:http://127.0.0.1:4187/b2e6ad8f-c128-4e03-93ff-22737ac71b63",
+          "blob:http://127.0.0.1:4187/e5fc77b7-d959-439b-9aa4-2a837d2ef4c9"
+        ]
+      },
+      "compiledEvidence": [
+        {
+          "chapterId": "chapter-1",
+          "programUnchanged": true,
+          "triangles": 10188,
+          "bytes": 206116,
+          "programSha256": "e77fd069f079e4c40cd3af4362a64b16898e98c020ff01265d6e2828a30dcd54",
+          "canary": "/tmp/portrait-automation-compass-02",
+          "sourceImageSha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+          "sourceTextSha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9"
+        },
+        {
+          "chapterId": "chapter-2",
+          "programUnchanged": true,
+          "triangles": 7676,
+          "bytes": 170720,
+          "programSha256": "419d311dbb7304aed1dbb8094066471c6f05cea476d8f75dfdaad984f4eef0ee",
+          "canary": "/tmp/portrait-automation-bench-02",
+          "sourceImageSha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+          "sourceTextSha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70"
+        },
+        {
+          "chapterId": "chapter-3",
+          "programUnchanged": true,
+          "triangles": 12752,
+          "bytes": 257748,
+          "programSha256": "077c920161d74e3d5ee21e8d73a63b8e23815c8e842db6fdca3412ee04aef731",
+          "canary": "/tmp/portrait-automation-lantern-01",
+          "sourceImageSha256": "332a140fa886a06a7df288009ec40b6a6633df3b3bf87a1466ae570b690f77c3",
+          "sourceTextSha256": "1f6e64c740191b1427d5fd0e28febcee97efa24dfc7b8b02a5d43f56afbaae8a"
+        },
+        {
+          "chapterId": "chapter-4",
+          "programUnchanged": true,
+          "triangles": 16608,
+          "bytes": 316468,
+          "programSha256": "2d69a8014ccf1b70b8f5d286e31baaafda0f405d79cf95134ce6193354c0c90c",
+          "canary": "/tmp/portrait-automation-spyglass-01",
+          "sourceImageSha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+          "sourceTextSha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d"
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "checks": {
+        "initial_automation_off": true,
+        "complete_prose_before_generation": true,
+        "only_opt_in_mutation": true,
+        "complete_prose_during_generation": true,
+        "no_generation_post": true,
+        "four_private_image_gets": true,
+        "four_private_model_gets": true,
+        "real_webgl_canvas": true,
+        "personal_provenance_label": true,
+        "keyboard_camera_controls": true,
+        "graphics_loss_supported": true,
+        "graphics_loss_disables_camera": true,
+        "graphics_loss_keeps_complete_reading": true,
+        "graphics_retry_recovers_canvas": true,
+        "unfolds": true,
+        "chapter_1": true,
+        "chapter_2": true,
+        "chapter_3": true,
+        "chapter_4": true,
+        "facet_Tensions": true,
+        "facet_prose_Tensions": true,
+        "facet_Resources": true,
+        "facet_prose_Resources": true,
+        "facet_Another expression": true,
+        "facet_prose_Another expression": true,
+        "facet_Overview": true,
+        "facet_prose_Overview": true,
+        "keyboard_tab_left": true,
+        "keyboard_tab_end": true,
+        "compare_two_chapters": true,
+        "comparison_preserves_facet": true,
+        "native_image_decodes": true,
+        "image_dialog_traps_focus": true,
+        "image_dialog_restores_focus": true,
+        "guide_advances": true,
+        "complete_full_reading": true,
+        "uncertainty_preserved": true,
+        "expanded_scene": true,
+        "expanded_graphics_pointer_retry": true,
+        "expanded_dialog_traps_focus": true,
+        "expanded_dialog_restores_focus": true,
+        "complete_download_name": true,
+        "complete_download_fixture": true,
+        "plain_reading_preserved": true,
+        "reopen_reuses_assets": true,
+        "no_horizontal_overflow": true,
+        "unmount_revokes_every_blob": true,
+        "no_browser_errors": true
+      },
+      "errors": [],
+      "warnings": [],
+      "requests": [
+        {
+          "path": "/v1/pattern-state",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "PUT",
+          "body": "{\"chart_id\":\"cht_automated_canary\",\"enabled\":true,\"consent_policy_version\":\"1.1.0\",\"confirm\":\"ENABLE AUTOMATIC PORTRAITS\"}"
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000001",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000001",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000002",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000002",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000003",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000003",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000004",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000004",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer/download",
+          "method": "GET",
+          "body": null
+        }
+      ],
+      "blobStats": {
+        "created": [
+          {
+            "url": "blob:http://127.0.0.1:4187/bf7b6425-c2d4-4ca6-8116-140388623e60",
+            "type": "image/png",
+            "size": 324323
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/4cc4208a-9d5c-47ef-a3d0-80dd4138a036",
+            "type": "image/png",
+            "size": 279754
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/c4266ed4-f7c2-487b-80f7-e21217fb8f83",
+            "type": "image/png",
+            "size": 204674
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/535d1dcf-45fc-498e-95c4-15e668f7f4cb",
+            "type": "image/png",
+            "size": 223452
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/c54c1deb-3497-48bd-8a82-16b90fa5a184",
+            "type": "model/gltf-binary",
+            "size": 206116
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/493f11fe-05c0-450d-bc71-3b10cc4fc200",
+            "type": "model/gltf-binary",
+            "size": 170720
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/36c6a2c2-f0aa-4cc7-acf3-d5be9bb29efe",
+            "type": "model/gltf-binary",
+            "size": 257748
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/a1b825bc-0622-4182-ab4f-4bbceec20918",
+            "type": "model/gltf-binary",
+            "size": 316468
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/cad2a67a-0d19-4748-a124-9921ea0d01c6",
+            "type": "application/json",
+            "size": 2731332
+          }
+        ],
+        "revoked": [
+          "blob:http://127.0.0.1:4187/cad2a67a-0d19-4748-a124-9921ea0d01c6",
+          "blob:http://127.0.0.1:4187/bf7b6425-c2d4-4ca6-8116-140388623e60",
+          "blob:http://127.0.0.1:4187/4cc4208a-9d5c-47ef-a3d0-80dd4138a036",
+          "blob:http://127.0.0.1:4187/c4266ed4-f7c2-487b-80f7-e21217fb8f83",
+          "blob:http://127.0.0.1:4187/535d1dcf-45fc-498e-95c4-15e668f7f4cb",
+          "blob:http://127.0.0.1:4187/c54c1deb-3497-48bd-8a82-16b90fa5a184",
+          "blob:http://127.0.0.1:4187/493f11fe-05c0-450d-bc71-3b10cc4fc200",
+          "blob:http://127.0.0.1:4187/36c6a2c2-f0aa-4cc7-acf3-d5be9bb29efe",
+          "blob:http://127.0.0.1:4187/a1b825bc-0622-4182-ab4f-4bbceec20918"
+        ]
+      },
+      "compiledEvidence": [
+        {
+          "chapterId": "chapter-1",
+          "programUnchanged": true,
+          "triangles": 10188,
+          "bytes": 206116,
+          "programSha256": "e77fd069f079e4c40cd3af4362a64b16898e98c020ff01265d6e2828a30dcd54",
+          "canary": "/tmp/portrait-automation-compass-02",
+          "sourceImageSha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+          "sourceTextSha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9"
+        },
+        {
+          "chapterId": "chapter-2",
+          "programUnchanged": true,
+          "triangles": 7676,
+          "bytes": 170720,
+          "programSha256": "419d311dbb7304aed1dbb8094066471c6f05cea476d8f75dfdaad984f4eef0ee",
+          "canary": "/tmp/portrait-automation-bench-02",
+          "sourceImageSha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+          "sourceTextSha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70"
+        },
+        {
+          "chapterId": "chapter-3",
+          "programUnchanged": true,
+          "triangles": 12752,
+          "bytes": 257748,
+          "programSha256": "077c920161d74e3d5ee21e8d73a63b8e23815c8e842db6fdca3412ee04aef731",
+          "canary": "/tmp/portrait-automation-lantern-01",
+          "sourceImageSha256": "332a140fa886a06a7df288009ec40b6a6633df3b3bf87a1466ae570b690f77c3",
+          "sourceTextSha256": "1f6e64c740191b1427d5fd0e28febcee97efa24dfc7b8b02a5d43f56afbaae8a"
+        },
+        {
+          "chapterId": "chapter-4",
+          "programUnchanged": true,
+          "triangles": 16608,
+          "bytes": 316468,
+          "programSha256": "2d69a8014ccf1b70b8f5d286e31baaafda0f405d79cf95134ce6193354c0c90c",
+          "canary": "/tmp/portrait-automation-spyglass-01",
+          "sourceImageSha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+          "sourceTextSha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "height": 844,
+      "checks": {
+        "initial_automation_off": true,
+        "complete_prose_before_generation": true,
+        "only_opt_in_mutation": true,
+        "complete_prose_during_generation": true,
+        "no_generation_post": true,
+        "four_private_image_gets": true,
+        "four_private_model_gets": true,
+        "real_webgl_canvas": true,
+        "personal_provenance_label": true,
+        "keyboard_camera_controls": true,
+        "graphics_loss_supported": true,
+        "graphics_loss_disables_camera": true,
+        "graphics_loss_keeps_complete_reading": true,
+        "graphics_retry_recovers_canvas": true,
+        "unfolds": true,
+        "chapter_1": true,
+        "chapter_2": true,
+        "chapter_3": true,
+        "chapter_4": true,
+        "facet_Tensions": true,
+        "facet_prose_Tensions": true,
+        "facet_Resources": true,
+        "facet_prose_Resources": true,
+        "facet_Another expression": true,
+        "facet_prose_Another expression": true,
+        "facet_Overview": true,
+        "facet_prose_Overview": true,
+        "keyboard_tab_left": true,
+        "keyboard_tab_end": true,
+        "compare_two_chapters": true,
+        "comparison_preserves_facet": true,
+        "native_image_decodes": true,
+        "image_dialog_traps_focus": true,
+        "image_dialog_restores_focus": true,
+        "guide_advances": true,
+        "complete_full_reading": true,
+        "uncertainty_preserved": true,
+        "expanded_scene": true,
+        "expanded_graphics_pointer_retry": true,
+        "expanded_dialog_traps_focus": true,
+        "expanded_dialog_restores_focus": true,
+        "complete_download_name": true,
+        "complete_download_fixture": true,
+        "plain_reading_preserved": true,
+        "reopen_reuses_assets": true,
+        "no_horizontal_overflow": true,
+        "unmount_revokes_every_blob": true,
+        "no_browser_errors": true
+      },
+      "errors": [],
+      "warnings": [],
+      "requests": [
+        {
+          "path": "/v1/pattern-state",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/automation",
+          "method": "PUT",
+          "body": "{\"chart_id\":\"cht_automated_canary\",\"enabled\":true,\"consent_policy_version\":\"1.1.0\",\"confirm\":\"ENABLE AUTOMATIC PORTRAITS\"}"
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000001",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000001",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000002",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000002",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000003",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000003",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/images/ppimg_00000000000000000000000000000004",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/models/ppmodel_00000000000000000000000000000004",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "path": "/v1/pattern-portrait/explorer/download",
+          "method": "GET",
+          "body": null
+        }
+      ],
+      "blobStats": {
+        "created": [
+          {
+            "url": "blob:http://127.0.0.1:4187/9eba95e3-1611-46fc-bfd0-7086452464b2",
+            "type": "image/png",
+            "size": 324323
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/32fcb5a5-732e-436c-aaec-68a37f26047b",
+            "type": "image/png",
+            "size": 279754
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/648b2815-c604-4f2b-8da7-a87232b250ef",
+            "type": "image/png",
+            "size": 204674
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/19a48c24-ea6e-4409-8140-dcf7dbc05966",
+            "type": "image/png",
+            "size": 223452
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/d70515f0-c04d-4111-8bd9-18d2dc8c099d",
+            "type": "model/gltf-binary",
+            "size": 206116
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/04d53381-9101-4524-a784-7fb4f1ed7b7f",
+            "type": "model/gltf-binary",
+            "size": 170720
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/0bd16155-e596-4358-91d6-5c89a928a745",
+            "type": "model/gltf-binary",
+            "size": 257748
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/b73651a1-f4c6-42df-a9b5-7e4d6660fe87",
+            "type": "model/gltf-binary",
+            "size": 316468
+          },
+          {
+            "url": "blob:http://127.0.0.1:4187/8224cdbf-084c-4e56-bbe8-d47917dcb79a",
+            "type": "application/json",
+            "size": 2731332
+          }
+        ],
+        "revoked": [
+          "blob:http://127.0.0.1:4187/8224cdbf-084c-4e56-bbe8-d47917dcb79a",
+          "blob:http://127.0.0.1:4187/9eba95e3-1611-46fc-bfd0-7086452464b2",
+          "blob:http://127.0.0.1:4187/32fcb5a5-732e-436c-aaec-68a37f26047b",
+          "blob:http://127.0.0.1:4187/648b2815-c604-4f2b-8da7-a87232b250ef",
+          "blob:http://127.0.0.1:4187/19a48c24-ea6e-4409-8140-dcf7dbc05966",
+          "blob:http://127.0.0.1:4187/d70515f0-c04d-4111-8bd9-18d2dc8c099d",
+          "blob:http://127.0.0.1:4187/04d53381-9101-4524-a784-7fb4f1ed7b7f",
+          "blob:http://127.0.0.1:4187/0bd16155-e596-4358-91d6-5c89a928a745",
+          "blob:http://127.0.0.1:4187/b73651a1-f4c6-42df-a9b5-7e4d6660fe87"
+        ]
+      },
+      "compiledEvidence": [
+        {
+          "chapterId": "chapter-1",
+          "programUnchanged": true,
+          "triangles": 10188,
+          "bytes": 206116,
+          "programSha256": "e77fd069f079e4c40cd3af4362a64b16898e98c020ff01265d6e2828a30dcd54",
+          "canary": "/tmp/portrait-automation-compass-02",
+          "sourceImageSha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+          "sourceTextSha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9"
+        },
+        {
+          "chapterId": "chapter-2",
+          "programUnchanged": true,
+          "triangles": 7676,
+          "bytes": 170720,
+          "programSha256": "419d311dbb7304aed1dbb8094066471c6f05cea476d8f75dfdaad984f4eef0ee",
+          "canary": "/tmp/portrait-automation-bench-02",
+          "sourceImageSha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+          "sourceTextSha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70"
+        },
+        {
+          "chapterId": "chapter-3",
+          "programUnchanged": true,
+          "triangles": 12752,
+          "bytes": 257748,
+          "programSha256": "077c920161d74e3d5ee21e8d73a63b8e23815c8e842db6fdca3412ee04aef731",
+          "canary": "/tmp/portrait-automation-lantern-01",
+          "sourceImageSha256": "332a140fa886a06a7df288009ec40b6a6633df3b3bf87a1466ae570b690f77c3",
+          "sourceTextSha256": "1f6e64c740191b1427d5fd0e28febcee97efa24dfc7b8b02a5d43f56afbaae8a"
+        },
+        {
+          "chapterId": "chapter-4",
+          "programUnchanged": true,
+          "triangles": 16608,
+          "bytes": 316468,
+          "programSha256": "2d69a8014ccf1b70b8f5d286e31baaafda0f405d79cf95134ce6193354c0c90c",
+          "canary": "/tmp/portrait-automation-spyglass-01",
+          "sourceImageSha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+          "sourceTextSha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d"
+        }
+      ]
+    }
+  ],
+  "verifiedAt": "2026-09-06T06:02:10.681396+00:00",
+  "browser": {
+    "name": "Chromium",
+    "version": "152.0.7977.8",
+    "graphics": "ANGLE SwiftShader",
+    "session": "portrait-automation",
+    "reducedMotion": "reduce"
+  },
+  "retryEvidence": {
+    "finalRun": "Ordinary Playwright pointer clicks, without force, on Try 3D again in normal and expanded scenes at 1440, 390, and 320 pixels.",
+    "supersededWorkaround": "An interim run used keyboard Enter for retry while a mobile toolbar overlap was being fixed. That run is not the final pass reported here.",
+    "initialFailure": "At 390 pixels, the toolbar overlapped the retry button and intercepted pointer events. The final CSS places message and controls in normal flow."
+  },
+  "downloadEvidence": {
+    "filename": "pattern-portrait-complete.json",
+    "bytes": 2731332,
+    "sha256": "20fc47a3a8cc418fbb275dcdf404dd341b9e2d018c3a258411ae3aa166a9615e",
+    "jsonExactlyEqualsPreparedCompletePayload": true,
+    "bytesExactlyEqualPreparedCompletePayload": true,
+    "completeReadingPreserved": true,
+    "imageCount": 4,
+    "modelCount": 4,
+    "programAndAcceptedAuditForEveryModel": true,
+    "base64PayloadOmittedFromCommittedEvidence": true
+  },
+  "scopeLimitations": [
+    "The real PatternExperience React component ran against intercepted fictional /v1 account responses. This is not a live account or backend delivery check.",
+    "Only the opt-in PUT mutated intercepted state; no generation POST was sent. Pending-to-ready responses were controlled by the test.",
+    "Four accepted provider-authored programs were recompiled unchanged against the combined fictional document identity. No geometry was manually repaired.",
+    "The optional chart-replacement and unmount hooks exist only in the temporary browser harness."
+  ],
+  "artifactSha256": {
+    "account-1440-whole.png": "f7c9038c26f0a71c81a101b679bac0e3d561fd04f0fd18f2dd8118609b592748",
+    "account-1440-compare.png": "058739dc9e64e469e29c3be15dcc2ba87279d5e5c3be21b44dd81a8fdce2d529",
+    "account-1440-reading.png": "58f1266ace1155c3b953b10fa2b9d2f02fb183e69d2e9d410ed58ba24dd8f626",
+    "account-390-whole.png": "2b421ab3427348a1253d78f774d27bde6d3764af419bc7dcdfca29009aad839e",
+    "account-390-graphics-fallback.png": "4b09ae12f6ddf1940d10e0688331e32ad8d7a821275ec65001d0f9b9c5ebdb1b",
+    "account-320-whole.png": "9a00c3fb7e72a4d62c6f6ce371d12d0eb7c5d8cbbd0ed313d8339495d8847e4d",
+    "account-320-graphics-fallback.png": "f1d5d71daab02134270bdc5cbf974c7833b3b3d7a72af0e2a122f1e1e03f932e",
+    "account-1440-expanded-fallback.png": "934fb5f793fb5cf9deceb31003b286e585499e42e1d89a55e43fbdd6af69163b",
+    "account-390-expanded-fallback.png": "577a80fceba18583bcf1556a83e9f52672eb485b80d00e550bb38d42eb2f5aef",
+    "account-320-expanded-fallback.png": "b680e9a46a137013e0c2dc7b97a92efc34d1ac5a4be7d249484d6c2f17d10ae7",
+    "account-proof.js": "347985f645260c9b695c72d2e77a7b15a83e9860ae82bf88d44b7e314cb4713f",
+    "fixture.mts": "d79fd53a16a2683f986d2e5b4b9cd936e3093f23ba209bceaf716a4b14dc5bbd",
+    "harness-main.tsx": "1967b4d97a88fad96987134550cec1cfa2a943b7c25797c9d1e6bf8061c3b0a5",
+    "harness-vite.config.mjs": "bd745806793cacca710fd7778321de590360e0ea3f0bccdf7fc1b04d546a7387"
+  }
+}

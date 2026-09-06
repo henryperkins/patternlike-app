@@ -300,6 +300,10 @@ name = "patternlike-api-production"
 crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 
 [env.production.vars]
+# Per-chart explicit portrait consent is still required. Apply migrations 0026
+# and 0027 and install the compatible image/mesh runner before this release.
+PATTERN_PORTRAIT_ENABLED = "1"
+PATTERN_PORTRAIT_MESH_ENABLED = "1"
 ENVIRONMENT = "production"
 # Geoapify birthplace search. Missing GEOAPIFY_API_KEY disables only place
 # requests and new geocoder grants; the rest of the product stays available.

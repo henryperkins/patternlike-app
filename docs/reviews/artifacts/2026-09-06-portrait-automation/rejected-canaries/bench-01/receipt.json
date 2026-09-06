@@ -1,0 +1,19 @@
+{
+  "schema_version": "portrait-mesh-canary/v1",
+  "fictional": true,
+  "automatic_authoring": true,
+  "manual_model_edits": false,
+  "codex_cli_version": "0.153.3",
+  "configured_model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "source_text_sha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70",
+  "source_image_sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+  "document_revision": "fictional-canary/v1",
+  "elapsed_ms": 545,
+  "compiled": null,
+  "result": {
+    "ok": false,
+    "code": "generation_failed",
+    "fatal": true
+  }
+}

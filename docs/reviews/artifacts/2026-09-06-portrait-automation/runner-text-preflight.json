@@ -1,0 +1,90 @@
+{
+  "schema_version": "portrait-runner-text-preflight/v1",
+  "scope": "One authorized, content-free legacy codex exec provider turn through the unchanged runCodexInvocation helper and a locally validated synthetic claim. This is separate from the app-server JSON isolation smoke.",
+  "host": {
+    "service_account": "patternlike-codex",
+    "uid": 997,
+    "home": "/var/lib/patternlike-codex-runner",
+    "node_binary": "/opt/patternlike-codex-runner/bin/node",
+    "node_version": "v24.19.0",
+    "temporary_codex_binary": "/tmp/portrait-codex-0.153.3/node_modules/.bin/codex",
+    "codex_version": "codex-cli 0.153.3",
+    "existing_chatgpt_login_verified": true,
+    "authentication_preflight": "runner-host-preflight.json"
+  },
+  "invocation": {
+    "command": "sudo -n -H -u patternlike-codex env PATH=/opt/patternlike-codex-runner/bin:/usr/local/bin:/usr/bin:/bin /opt/patternlike-codex-runner/bin/node /tmp/portrait-runner-exec-preflight.0EfrnH/smoke.mjs",
+    "helper": "runCodexInvocation",
+    "transport": "codex exec JSONL and private output file",
+    "local_claim_validated": true,
+    "profile": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "xhigh",
+      "service_tier": "priority",
+      "fast_mode": true
+    },
+    "arguments_with_temporary_path_placeholders": [
+      "exec", "--ephemeral", "--sandbox", "read-only", "--json",
+      "--model", "gpt-5.6-sol",
+      "--config", "model_reasoning_effort=\"xhigh\"",
+      "--config", "service_tier=\"priority\"",
+      "--enable", "fast_mode",
+      "--output-schema", "TEMP_OUTPUT_SCHEMA_JSON",
+      "-o", "TEMP_OUTPUT_JSON", "-"
+    ],
+    "arguments_exactly_forwarded": true,
+    "cwd": "Fresh empty service-owned temporary Git repository",
+    "timeout_ms": 120000,
+    "prompt": "This is a content-free compatibility smoke. Do not use any tools, read files, browse, or call other services. Return exactly {\"ok\":true}.",
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean", "const": true }
+      }
+    }
+  },
+  "result": {
+    "started_at_utc": "2026-09-06T06:09:26.259Z",
+    "finished_at_utc": "2026-09-06T06:09:30.903Z",
+    "elapsed_ms": 4644,
+    "outcome": "passed",
+    "exit_code": 0,
+    "child_exit_code": 0,
+    "child_signal": null,
+    "value": { "ok": true },
+    "input_tokens": 13876,
+    "output_tokens": 15,
+    "provider_request_id_sha256": "8b00087c47d0f05c3f982e4fcf31f748088e60a49bb5ec1db4dae99c731351e9",
+    "isolated_run_directory_cleaned": true,
+    "event_types": {
+      "thread.started": 1,
+      "turn.started": 1,
+      "item.completed": 1,
+      "turn.completed": 1
+    },
+    "item_types": {
+      "agent_message": 1
+    },
+    "nonpassive_item_events": 0,
+    "invalid_event_json": false
+  },
+  "source_sha256": {
+    "apps/codex-runner/src/codex-cli.ts": "12966f4ccbebd4205ee1839bcea2de3e394181ca7ab77adc8b86831e2026ffb7",
+    "apps/codex-runner/src/protocol.ts": "3b24edc9a6cfb41726c7b944be3b0ca4e34af8859aed730fcf5f1c40864fbd38",
+    "/tmp/portrait-runner-exec-preflight.0EfrnH/smoke.mjs": "f41a7dbbe89060b11a95cc7d4342aa9c0def73d0f1d8ca00542382933254c623",
+    "/tmp/portrait-runner-exec-preflight.0EfrnH/codex-monitor.mjs": "919e6fc6c755748d6d7b569bb0fb1f79d7c27084509395cfa1b0d81094bd00c4"
+  },
+  "limitations": "The legacy helper uses its existing exec settings and was observed to make no tool calls. This receipt does not claim the stronger effective configuration and MCP checks provided by the separate app-server JSON helper.",
+  "boundaries": {
+    "real_provider_turns": 1,
+    "account_content_sent": false,
+    "credentials_copied_or_changed": false,
+    "host_auth_or_configuration_changed": false,
+    "live_service_install_or_swap": false,
+    "polling_enabled_or_jobs_claimed": false,
+    "production_deployment_performed": false,
+    "repository_source_changed": false
+  }
+}
