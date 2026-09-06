@@ -22,6 +22,7 @@ import {
   seedChart,
   seedUser,
   READING_CODEX_PUBLISHER_VARS,
+  SILENT_READING_QUEUE,
 } from "../../test/helpers.js";
 import {
   CYCLE_FP_EMPTY,
@@ -147,11 +148,16 @@ async function putToday<T = unknown>(userId: string | null = USER_A) {
   return { status: res.status, body: (await res.json()) as T };
 }
 
+/** Fixture delivery is explicit; the local consumer otherwise races assertions. */
+function manualDeliveryEnv(): typeof env {
+  return { ...env, READING_QUEUE: SILENT_READING_QUEUE };
+}
+
 function enabledEnv(
   overrides: Partial<typeof env> = {},
 ): typeof env {
   return {
-    ...env,
+    ...manualDeliveryEnv(),
     READING_V5_ROLLOUT: "first_open",
     ...READING_CODEX_PUBLISHER_VARS,
     ...overrides,
@@ -207,13 +213,13 @@ async function deliver(messages: GenerationMessage[]) {
     })),
   );
   const ctx = createExecutionContext();
-  await worker.queue(batch, env);
+  await worker.queue(batch, manualDeliveryEnv());
   return getQueueResult(batch, ctx);
 }
 
 /** Enqueue and deliver in one step, returning the reserved reading id. */
 async function publish(userId: string, now?: Date): Promise<string> {
-  const enqueued = await enqueueDailyReading(env, userId, now);
+  const enqueued = await enqueueDailyReading(manualDeliveryEnv(), userId, now);
   if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason} ${enqueued.detail}`);
   await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
   return enqueued.readingId;
@@ -388,7 +394,7 @@ describe("PUT /v1/readings/today", () => {
   });
 
   it("returns a reader-safe terminal failure without stored generation detail", async () => {
-    const enqueued = await enqueueDailyReading(env, USER_A);
+    const enqueued = await enqueueDailyReading(manualDeliveryEnv(), USER_A);
     if (!enqueued.ok) throw new Error(`enqueue failed: ${enqueued.reason}`);
     await rows(
       `UPDATE daily_readings SET status = 'failed' WHERE id = ?`,
@@ -958,17 +964,28 @@ describe("GET /v1/readings/today", () => {
   });
 
   it("does not serve a reservation that has not been published", async () => {
-    const enqueued = await enqueueDailyReading(env, USER_A);
+    const enqueued = await enqueueDailyReading(manualDeliveryEnv(), USER_A);
     if (!enqueued.ok) throw new Error("enqueue failed");
-    // Deliberately not delivered: the row is `pending` and carries no ciphertext.
+    // The silent queue guarantees that only an explicit deliver() can publish.
+    const reservation = () => rows(
+      "SELECT status, reading_enc FROM daily_readings WHERE id = ?",
+      enqueued.readingId,
+    );
+    expect(await reservation()).toEqual([{ status: "pending", reading_enc: null }]);
 
     const { status, body } = await get("/v1/readings/today");
     expect(status).toBe(404);
     expect((body as ErrorEnvelope).error.code).toBe("reading_not_generated");
+    expect(await reservation()).toEqual([{ status: "pending", reading_enc: null }]);
+
+    await deliver([{ job_id: enqueued.jobId, reading_id: enqueued.readingId }]);
+    const published = await get<TodayBody>("/v1/readings/today");
+    expect(published.status).toBe(200);
+    expect(published.body.reading.reading_id).toBe(enqueued.readingId);
   });
 
   it("does not serve a failed reservation", async () => {
-    const enqueued = await enqueueDailyReading(env, USER_A);
+    const enqueued = await enqueueDailyReading(manualDeliveryEnv(), USER_A);
     if (!enqueued.ok) throw new Error("enqueue failed");
     await rows(
       "UPDATE daily_readings SET status = 'failed', active_generation_job_id = NULL WHERE id = ?",
@@ -1080,7 +1097,7 @@ describe("GET /v1/readings/today", () => {
 
   it("serves the live revision after a reissue", async () => {
     const first = await publish(USER_A);
-    const reissued = await enqueueReissue(env, USER_A, first, "defect_repair");
+    const reissued = await enqueueReissue(manualDeliveryEnv(), USER_A, first, "defect_repair");
     if (!reissued.ok) throw new Error(`reissue failed: ${reissued.reason}`);
     await deliver([{ job_id: reissued.jobId, reading_id: reissued.readingId }]);
 
@@ -1158,7 +1175,7 @@ describe("GET /v1/readings/:id/evidence", () => {
   });
 
   it("does not serve evidence for a reservation with no artifact", async () => {
-    const enqueued = await enqueueDailyReading(env, USER_A);
+    const enqueued = await enqueueDailyReading(manualDeliveryEnv(), USER_A);
     if (!enqueued.ok) throw new Error("enqueue failed");
 
     const { status, body } = await get(`/v1/readings/${enqueued.readingId}/evidence`);
@@ -1168,7 +1185,7 @@ describe("GET /v1/readings/:id/evidence", () => {
 
   it("still serves evidence for a superseded reading", async () => {
     const first = await publish(USER_A);
-    const reissued = await enqueueReissue(env, USER_A, first, "safety_correction");
+    const reissued = await enqueueReissue(manualDeliveryEnv(), USER_A, first, "safety_correction");
     if (!reissued.ok) throw new Error(`reissue failed: ${reissued.reason}`);
     await deliver([{ job_id: reissued.jobId, reading_id: reissued.readingId }]);
 

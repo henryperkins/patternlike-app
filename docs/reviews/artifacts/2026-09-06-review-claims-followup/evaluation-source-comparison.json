@@ -1,0 +1,15 @@
+{
+  "schema_version": "review-evaluation-source-comparison.v1",
+  "final_replay_source_sha256": "e51870f0be4df2529a5f8b1a979d0e5009fa7ab86429e2cbae31503d3f6ffdb6",
+  "verifier_source_sha256": "2d8cbd711311da18066db4ca0dc9bd16281443d1b320a4588197c92e4c6d7fa6",
+  "changed_since_verifier_run": [
+    "apps/api/src/services/generate-daily-reading-v5.test.ts",
+    "package.json",
+    "packages/reading-engine/src/candidate-validation.test.ts",
+    "packages/reading-engine/src/claim-support.ts"
+  ],
+  "verifier_prompt_or_input_source_changed": false,
+  "final_daily_replay_count": 18,
+  "final_daily_invocations_match_original": true,
+  "deployment_observed": false
+}

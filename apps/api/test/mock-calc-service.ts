@@ -648,11 +648,9 @@ function validPatternPlan(document: PatternPlannerRequestDocument): PatternPlann
 }
 
 function validPatternWriter(document: PatternWriterRequestDocument): PatternWriterOutput {
-  const rulesByAlias = new Map<string, string[]>();
   const featureClassByAlias = new Map<string, PatternFactPacketFeature["feature_class"]>();
   for (const assignment of [...document.assignments, ...document.signature_assignments]) {
     for (const fact of assignment.facts) {
-      rulesByAlias.set(fact.alias, assignment.ontology_rule_ids);
       featureClassByAlias.set(fact.alias, fact.feature_class);
     }
   }
@@ -711,12 +709,12 @@ function validPatternWriter(document: PatternWriterRequestDocument): PatternWrit
     })),
     uncertainty_note:
       document.uncertainty.required_language_rule_ids.length > 0 && noteAlias
-        ? unit(
+        ? { ...unit(
             "uncertainty",
             [noteAlias],
-            rulesByAlias.get(noteAlias) ?? document.uncertainty.required_language_rule_ids,
+            document.uncertainty.required_language_rule_ids,
             50,
-          )
+          ), text: `Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. ${fixedWords(35)}` }
         : null,
   };
 }

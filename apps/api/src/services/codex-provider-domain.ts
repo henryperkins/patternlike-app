@@ -1,6 +1,6 @@
 import type { Env } from "../env.js";
 import type { CodexProviderJob } from "../db/codex-provider-jobs.js";
-import { loadClaimForFingerprint, isConsumedStatus } from "../db/pattern-claims.js";
+import { loadClaimForFingerprint } from "../db/pattern-claims.js";
 import { loadPatternGenerationGrant } from "../db/pattern-consents.js";
 import { loadPreferences } from "../db/preferences.js";
 import { loadUserIdentity } from "../db/users.js";
@@ -22,6 +22,9 @@ import {
   readingProviderOwnerIsCurrent,
 } from "./reading-current-owner.js";
 import { JOB_TYPE as DAILY_JOB_TYPE } from "../db/generation.js";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
+import type { PatternReservationReason } from "./pattern-command.js";
 
 interface PatternOwnerRow {
   generation_id: string;
@@ -34,11 +37,8 @@ interface PatternOwnerRow {
   locale_revision: number;
   consent_id: string;
   ontology_version: string;
-  reservation_reason:
-    | "first_open"
-    | "first_open_retry"
-    | "failed_attempt_retry"
-    | "chart_correction";
+  pattern_source_hash: string;
+  reservation_reason: PatternReservationReason;
   stage: string;
   stage_generation: number;
   planner_attempts: number;
@@ -62,7 +62,7 @@ async function loadPatternOwner(
   return env.DB.prepare(
     `SELECT generation_id, job_id, user_id, claim_id, chart_id,
             chart_fingerprint_hash, locale, locale_revision, consent_id,
-            ontology_version, reservation_reason, stage, stage_generation,
+            ontology_version, pattern_source_hash, reservation_reason, stage, stage_generation,
             planner_attempts, writer_attempts, verifier_attempts
      FROM pattern_generation_jobs WHERE generation_id = ?`,
   ).bind(generationId).first<PatternOwnerRow>();
@@ -125,7 +125,8 @@ async function patternDomainIsCurrent(
   now: Date,
 ): Promise<boolean> {
   const owner = await loadPatternOwner(env, job.ownerId);
-  if (!owner || owner.user_id !== job.userId) return false;
+  if (!owner || owner.user_id !== job.userId ||
+    owner.pattern_source_hash !== PATTERN_CREATION_SOURCE_HASH) return false;
   const attempt = job.pass === "planner"
     ? owner.planner_attempts
     : job.pass === "writer"
@@ -175,9 +176,16 @@ async function patternDomainIsCurrent(
     owner.user_id,
     owner.chart_fingerprint_hash,
   );
-  return !!claim &&
-    claim.id === owner.claim_id &&
-    (!isConsumedStatus(claim.status) || claim.status === "accepted");
+  if (!claim || claim.id !== owner.claim_id) return false;
+  if (owner.reservation_reason !== "source_update") {
+    return claim.status === "reserved" && claim.active_generation_id === owner.generation_id;
+  }
+  if (claim.status !== "accepted" || claim.pending_regeneration_id !== owner.generation_id) return false;
+  return await env.DB.prepare(
+    `SELECT 1 AS present FROM pattern_documents
+     WHERE user_id = ? AND claim_id = ? AND chart_fingerprint_hash = ?`,
+  ).bind(owner.user_id, owner.claim_id, owner.chart_fingerprint_hash)
+    .first<{ present: number }>() !== null;
 }
 
 function ontologyConfigurationIsCurrent(
@@ -274,6 +282,7 @@ export async function codexProviderOwnerIsCurrent(
 
 export type CodexProviderNudgeOutcome =
   | "sent"
+  | "paused"
   | "not_current"
   | "still_owned"
   | "send_failed";
@@ -345,6 +354,7 @@ export async function nudgeCodexProviderOwner(
   job: CodexProviderJob,
   now = new Date(),
 ): Promise<CodexProviderNudgeOutcome> {
+  if (job.pipeline === "pattern" && !patternGenerationIsEnabled(env)) return "paused";
   if (!await codexProviderOwnerIsCurrent(env, job, now)) {
     return "not_current";
   }

@@ -57,21 +57,27 @@ describe("Pattern consent terms", () => {
     // that retention was thirty days, and that granting turned training off.
     // None of the three is something this grant controls.
     expect(text).not.toContain("provider-side storage turned off");
-    expect(text).not.toContain("30 days");
     expect(text).not.toMatch(/retention is (?:necessarily )?30/i);
+    expect(text).not.toContain("sent once");
+    expect(text).not.toContain("granting this leaves both of them off");
   });
 
   it("states who governs training and retention, and what Pattern/Like deletes", () => {
     render(<PatternConsentTerms consent={consent()} />);
     const text = terms();
 
-    expect(text).toContain("sent once, to Codex, run by OpenAI");
+    expect(text).toContain("Codex, operated by OpenAI");
+    expect(text).toContain("multiple requests");
+    expect(text).toContain("limited number of retries");
     expect(text).toContain("not consent to train a model");
     expect(text).toContain("account and workspace");
     expect(text).toContain("agreement");
     expect(text).toContain(
-      "deletes its own encrypted copies of the request and the response",
+      "eligible for deletion 30 days after each request finishes, fails, or is cancelled",
     );
+    expect(text).toContain("no active generation needs them");
+    expect(text).toContain("pending uploads are resolved");
+    expect(text).toContain("failed cleanup is retried");
   });
 
   it("keeps the input list, the exclusion list, and the purpose", () => {

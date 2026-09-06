@@ -1190,14 +1190,40 @@ describe("POST /v1/birth-profiles — operational guards", () => {
 
   it("lets only one concurrent retry claim the next attempt and invocation", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const command = retryCommand();
+    command.submitted.birthplace.label = TRIGGER_CALC_ERROR_RACE;
+    command.effective.birthplace.label = TRIGGER_CALC_ERROR_RACE;
+    const request = {
+      ...RETRY_REQUEST,
+      birthplace: {
+        ...RETRY_REQUEST.birthplace!,
+        label: TRIGGER_CALC_ERROR_RACE,
+      },
+    };
     await seedFailedBirthAttempt(
       "key-concurrent-retry",
-      retryCommand(),
+      command,
     );
-    const [first, second] = await Promise.all([
-      postBirthProfile(USER_A, "key-concurrent-retry", RETRY_REQUEST),
-      postBirthProfile(USER_A, "key-concurrent-retry", RETRY_REQUEST),
-    ]);
+    const retries = [
+      postBirthProfile(USER_A, "key-concurrent-retry", request),
+      postBirthProfile(USER_A, "key-concurrent-retry", request),
+    ];
+
+    // Keep the winning calculation open until the competing caller returns.
+    // An immediate failure can finish before the second request reads the job,
+    // in which case it correctly starts a subsequent, sequential retry.
+    expect((await Promise.race(retries)).status).toBe(202);
+    // This direct request reaches only the hermetic outbound calculator mock.
+    // Its peer barrier releases the winner without creating another API job,
+    // charge, profile, or invocation event.
+    const peer = await fetch(`${env.CALC_SERVICE_URL}/v1/calculate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ place_label: TRIGGER_CALC_ERROR_RACE }),
+    });
+    expect(peer.status).toBe(400);
+    await peer.arrayBuffer();
+    const [first, second] = await Promise.all(retries);
 
     expect([first.status, second.status].filter((status) => status === 502))
       .toHaveLength(1);

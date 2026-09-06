@@ -14,10 +14,10 @@ export const PATTERN_CONSENT_PURPOSE =
   "Writing one Pattern for this chart, and nothing else.";
 
 export const PATTERN_CONSENT_PROCESSOR_NOTE =
-  "The minimized content below is sent once, to Codex, run by OpenAI, to write one Pattern for this chart.";
+  "Pattern/Like sends the minimized content below to Codex, operated by OpenAI, to plan, write, and check one Pattern for this chart. This takes multiple requests, with a limited number of retries.";
 
 export const PATTERN_CONSENT_TRAINING_NOTE =
-  "This is not consent to train a model. Research and model training are separate permissions inside Pattern/Like, and granting this leaves both of them off. It does not switch anything off at the processor: whether OpenAI trains on this content is governed by the account and workspace Pattern/Like sends it under, and by the agreement covering that account.";
+  "This is not consent to train a model. Research and model training are separate permissions inside Pattern/Like; granting this does not grant or change either permission. Whether OpenAI uses content for training depends on the agreement and data-use settings for the account and workspace Pattern/Like uses. This grant does not control those settings.";
 
 export const PATTERN_CONSENT_INPUT_NOTE =
   "Birth date, time, place, and coordinates are not sent as fields. Calculated natal features are still sensitive derived data and may support inferences about birth timing. Pattern/Like does not describe the provider packet as anonymous.";
@@ -26,7 +26,7 @@ export const PATTERN_CONSENT_EXCLUSION_NOTE =
   "Daily check-ins, life events, journal entries, prior readings, and a biography are not sent. Pattern generation uses chart facts, uncertainty, your confirmed language, and the activated interpretation meanings only.";
 
 export const PATTERN_CONSENT_RETENTION_NOTE =
-  "Pattern/Like deletes its own encrypted copies of the request and the response once the generation reaches a terminal state. How long the processor keeps request content is not something this grant controls; it follows the same account and workspace controls and agreement.";
+  "For routine cleanup, Pattern/Like's encrypted request and response copies become eligible for deletion 30 days after each request finishes, fails, or is cancelled. Removal also waits until no active generation needs them and pending uploads are resolved, and failed cleanup is retried. OpenAI's retention follows the agreement and settings for the account and workspace Pattern/Like uses.";
 
 export const PATTERN_CONSENT_REVOKE_NOTE =
   "You can withdraw this at any time in Context & privacy. Withdrawing stops unfinished and future Pattern generation. An already accepted Pattern stays readable until you delete it.";

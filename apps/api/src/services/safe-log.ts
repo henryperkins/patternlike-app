@@ -42,6 +42,7 @@ export type ConfigurationCode =
   | "time_travel_misconfigured"
   | "pattern_rollout_invalid"
   | "pattern_publisher_misconfigured"
+  | "pattern_generation_control_invalid"
   | "ontology_pipeline_rollout_invalid"
   | "ontology_pipeline_misconfigured"
   | "codex_runner_authority_aliased"
@@ -259,7 +260,7 @@ export type SafeLogEvent =
   | {
       event: "codex_provider_nudge_observed";
       pipeline: CodexProviderPipeline;
-      outcome: "sent" | "not_current" | "still_owned" | "send_failed";
+      outcome: "sent" | "paused" | "not_current" | "still_owned" | "send_failed";
     }
   | {
       event: "codex_provider_dispatch_failed";

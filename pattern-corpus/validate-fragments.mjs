@@ -12,6 +12,8 @@
 // Usage: node validate-fragments.mjs fragments.json
 
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { provenanceProblems } from "./provenance.mjs";
 
 const CLOSED_PROHIBITED_ASSERTION =
   /\b(?:diagnos(?:is|e|ed|ing)|predict(?:ion|s|ed|ing|ive)?|caus(?:e|es|ed|ing|ation|al)|inevitab(?:le|ly|ility)|fate|biograph(?:y|ical|ic)|life[\s_-]*events?)\b/i;
@@ -39,12 +41,21 @@ const PROPOSITION_MAX = 200;
 const MIN_EXCLUSIONS = 2;
 
 const path = process.argv[2] ?? "fragments.json";
-const fragments = JSON.parse(readFileSync(path, "utf8"));
+const content = readFileSync(path, "utf8");
+const fragments = JSON.parse(content);
 
 const failures = [];
 const warnings = [];
 const seenRefs = new Set();
 const licenseClasses = new Set();
+
+let provenance;
+try {
+  provenance = JSON.parse(readFileSync(join(dirname(path), "provenance.json"), "utf8"));
+} catch {
+  failures.push("provenance record missing or invalid");
+}
+if (provenance !== undefined) failures.push(...provenanceProblems(content, provenance));
 
 const fail = (ref, msg) => failures.push(`${ref}: ${msg}`);
 const warn = (ref, msg) => warnings.push(`${ref}: ${msg}`);
@@ -175,3 +186,4 @@ console.log(
     [...licenseClasses][0] === "licensed_excerpt" ? 1 : 0
   })`,
 );
+console.log("Provenance integrity checked. Historical generation fields unverified; human editorial certification incomplete; public activation evidence unverified.");

@@ -6,6 +6,7 @@ import { resolvePublisherConfiguration } from "../services/reading-publisher.js"
 import { resolveCheckInRetentionMonths } from "../services/check-in-retention.js";
 import { safeLog, type ConfigurationCode } from "../services/safe-log.js";
 import { checkPatternPublisherValues } from "../services/pattern-publisher.js";
+import { resolvePatternGenerationControl } from "../services/pattern-generation-control.js";
 import { resolveTimeTravelConfiguration } from "../services/time-travel-config.js";
 import {
   resolveAiGatewayRoute,
@@ -511,6 +512,11 @@ export function checkSecureConfig(
 
   const patternPublisher = checkPatternPublisherValues(env);
   if (patternPublisher) return patternPublisher;
+
+  const patternGeneration = resolvePatternGenerationControl(env);
+  if (!patternGeneration.ok) {
+    return { code: patternGeneration.code, message: patternGeneration.message };
+  }
 
   const ontologyPipeline = resolveOntologyPipelineConfiguration(env);
   if (!ontologyPipeline.ok) {

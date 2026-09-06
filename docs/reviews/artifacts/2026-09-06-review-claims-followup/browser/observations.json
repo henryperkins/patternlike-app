@@ -1,0 +1,46 @@
+{
+  "schema_version": "review-browser-observations.v1",
+  "observed_at": "2026-09-06T15:46:24.878506+00:00",
+  "environment": "Vite development app, local Chromium, intercepted fictional /v1 responses",
+  "live_account_exercised": false,
+  "provider_invoked": false,
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844,
+      "horizontal_document_width": 390
+    },
+    {
+      "width": 1280,
+      "height": 900,
+      "horizontal_document_width": 1280
+    }
+  ],
+  "observed_flows": [
+    "Signed-out calculation versus generated interpretation disclosure",
+    "Daily consent grant and withdrawal update status and preserve terms",
+    "Pattern consent disclosure before fictional generation",
+    "Fictional Pattern admission reaches Checking the draft status"
+  ],
+  "console_errors": [
+    {
+      "url": "/v1/pattern-portrait/automation",
+      "status": 404,
+      "explanation": "Deliberately unavailable unrelated feature in intercepted fixture"
+    }
+  ],
+  "screenshots_inspected": [
+    "signedout-desktop",
+    "signedout-mobile",
+    "daily-disclosure-mobile",
+    "pattern-disclosure-mobile",
+    "pattern-disclosure-desktop",
+    "checking-desktop",
+    "checking-mobile"
+  ],
+  "limitations": [
+    "No production sign-in, storage, publication, provider, or portrait lifecycle exercised",
+    "Element screenshots with sticky-header capture artifacts were excluded; retained images show the actual viewport",
+    "Development-only auth-stub note is visible on signed-out captures"
+  ]
+}

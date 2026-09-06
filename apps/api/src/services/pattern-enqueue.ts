@@ -51,6 +51,7 @@ import {
 import { markDispatched } from "../db/generation.js";
 import { safeLog } from "./safe-log.js";
 import { randomKey, wrapContentKey } from "./pattern-crypto.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 
 export type PatternEnqueueFailure =
   | { ok: false; status: 400 | 409 | 503; code: string; message: string }
@@ -126,10 +127,9 @@ export async function enqueuePatternGeneration(
   },
   now = new Date(),
 ): Promise<PatternEnqueueFailure> {
-  // Admission is the eligibility ladder below and nothing else: an active
-  // chart, a user-confirmed locale, the reader's own current consent, a
-  // public-capable active ontology, and an unused chart-fingerprint claim.
-  // No account, cohort, allowlist, or product switch takes part.
+  // Existing reservations remain readable during an operational pause. New
+  // reservations additionally require the shared generation switch to be on.
+  // Account eligibility stays chart, locale, consent, ontology and claim based.
   if (input.consentPolicyVersion !== PATTERN_GENERATION_CONSENT_POLICY_VERSION) {
     return {
       ok: false,
@@ -158,6 +158,15 @@ export async function enqueuePatternGeneration(
         existing.generationId,
         existing.stage,
       ),
+    };
+  }
+
+  if (!patternGenerationIsEnabled(env)) {
+    return {
+      ok: false,
+      status: 503,
+      code: "pattern_generation_paused",
+      message: "Pattern generation is temporarily paused",
     };
   }
 

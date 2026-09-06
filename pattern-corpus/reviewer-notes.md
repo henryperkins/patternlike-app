@@ -5,6 +5,23 @@
 **`license_class`:** `licensed_excerpt` on all 60. Product/operator approval of the rights classification was recorded on 2026-08-22 in `ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md`; counsel review and the exact generating-model record remain separate public-activation conditions.
 **Validation:** `node validate-fragments.mjs fragments.json` — 60 fragments, no failures, no warnings.
 
+**Provenance inventory (2026-09-06):** [`provenance.json`](./provenance.json)
+binds these 60 fragments and the rights decision by hash. Provider, model,
+model version, account context, and historical generation date are explicitly
+unknown. Human editorial certification is incomplete: no fragment-level
+certifications are recorded. The notes below are drafting/review material,
+not a named human's certification. The integrity validator now checks the
+sidecar as well as the existing fragment rules; its passing result preserves
+these unresolved statuses. See [the provenance guide](./README.md).
+
+**Review workflow (2026-09-06):** use the guide's `review.mjs packet` command to
+prepare full fragments and blank criteria, then obtain a named independent
+reviewer's externally signed response. `review.mjs record` validates the
+signature against an operator-enrolled key, and `status` reports signed coverage
+separately from the limits of human attribution. The registry is empty and this
+implementation supplies no human judgments. The first-person drafting notes
+below do not become a certification through this tooling.
+
 > Product/operator approval authorizes this edition for the production-shaped Gate 7B pipeline run. It is not a claim that counsel or a human editor has certified every fragment for public activation.
 
 | | |

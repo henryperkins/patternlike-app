@@ -1,0 +1,124 @@
+{
+  "schema_version": "review-focused-verification.v1",
+  "observed_at": "2026-09-06T16:24:04.176Z",
+  "verification_scope": "changed_problem_areas",
+  "full_gate_status": "incomplete_stopped_at_user_direction",
+  "user_direction": "Stop the full gate and focus on actual problem areas.",
+  "source_snapshot_sha256": "e51870f0be4df2529a5f8b1a979d0e5009fa7ab86429e2cbae31503d3f6ffdb6",
+  "base_commit": "50f452a66fb1cc6c7f88f95b297b3bc7b0b1e01b",
+  "file_count": 1237,
+  "source_comparison_with_completed_gate_03": {
+    "ok": false,
+    "changed": [
+      "apps/api/src/services/generate-daily-reading-v5.test.ts"
+    ],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "final_replay_source_matches": true,
+  "final_replay": {
+    "sample_count": 18,
+    "accepted": 18,
+    "provider_invoked": false,
+    "request_hashes_match": true
+  },
+  "focused": [
+    {
+      "area": "Daily candidate grammar and cited fact support",
+      "tests": 73,
+      "passed": 73,
+      "exit_code": 0,
+      "operator_log": "/tmp/patternlike-utc-today-green.log",
+      "sha256": "fef2eb64c582f0d4911392d169db4cf02010cad1fe2f71c3e3741d0253cedb9b"
+    },
+    {
+      "area": "Daily execution, frozen evidence, prompt and evaluation",
+      "tests": 121,
+      "passed": 121,
+      "exit_code": 0,
+      "operator_log": "/tmp/patternlike-followup-api-policy-focus.log",
+      "sha256": "f1b7903ca3c235c5f15314c168f4d68675a82f6c171371ef4ecdf96e4cdc976e"
+    },
+    {
+      "area": "API source, model, corpus, release and configuration helper tests",
+      "exit_code": 0,
+      "operator_log": "/tmp/patternlike-followup-api-aux.log",
+      "sha256": "7ea92171a2099cf8ce52629309a683fc81a2c7e72dc72d5265566f49c9ad9741"
+    }
+  ],
+  "completed_gate_03": {
+    "receipt": "local-gate-03.json",
+    "passed": false,
+    "api_passed": 2481,
+    "api_failed": 1,
+    "failed_test": "generate-daily-reading-v5.test.ts: publication evidence policy assertion expected 1.1.0 instead of 1.1.1",
+    "correction_verified_in_focused_tests": true,
+    "other_passed_lanes": [
+      {
+        "name": "contracts: npm run test:contracts",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: npm ci --dry-run (lockfile agrees with package.json)",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: ephemeris download",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: npm run typecheck",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: test @patternlike/shared",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: test @patternlike/reading-engine",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: test @patternlike/calc-stub",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: test @patternlike/ontology-signer",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: test @patternlike/web",
+        "result": "pass"
+      },
+      {
+        "name": "monorepo: npm run build",
+        "result": "pass"
+      },
+      {
+        "name": "extra: test @patternlike/pattern-engine",
+        "result": "pass"
+      },
+      {
+        "name": "extra: test @patternlike/codex-runner",
+        "result": "pass"
+      },
+      {
+        "name": "extra: npm run test:content",
+        "result": "pass"
+      }
+    ],
+    "web_passed": 582,
+    "runner_passed": 137,
+    "content_passed": 65
+  },
+  "interrupted_gate_04": {
+    "receipt": "local-gate-04.json",
+    "passed": false,
+    "exit_code": null,
+    "source_unchanged": true
+  },
+  "deployment_status": "unverified",
+  "committed": false,
+  "pushed": false
+}

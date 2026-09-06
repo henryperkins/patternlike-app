@@ -27,7 +27,7 @@ export const AI_CONSENT_PURPOSE =
   "Writing your daily reading, and nothing else.";
 
 export const AI_CONSENT_SERVICE_NOTE =
-  "Your reading is written by Codex, a service operated by OpenAI. What is sent goes there for that one purpose and is used for nothing else.";
+  "Your reading is written by Codex, a service operated by OpenAI. Pattern/Like sends the enabled content for the purpose of writing your daily reading. This can involve more than one request when a draft needs another attempt.";
 
 /**
  * The training statement, corrected.
@@ -38,7 +38,7 @@ export const AI_CONSENT_SERVICE_NOTE =
  * a promise the product can keep and one it cannot.
  */
 export const AI_CONSENT_TRAINING_NOTE =
-  "This is not consent to train a model. Pattern/Like requires training and data sharing to be switched off on the account its Codex runner signs in with — but that is Pattern/Like's setting to hold, and granting this does not change anything in an account of your own.";
+  "This is not consent to train a model. Pattern/Like's policy requires training and data sharing to be switched off on its Codex account. This grant does not verify or change those settings, or change anything in an account of your own.";
 
 export const AI_CONSENT_FREE_TEXT_NOTE =
   "Personal context you enable is sent as you wrote it, so it can name people and places. The product does not claim that text is anonymous.";
@@ -52,7 +52,7 @@ export const AI_CONSENT_FREE_TEXT_NOTE =
  * the only retention this product controls is its own.
  */
 export const AI_CONSENT_RETENTION_NOTE =
-  "How long OpenAI keeps what is sent is governed by the agreement and settings on that account, not by this screen. Pattern/Like deletes its own encrypted copy of each request and response once the reading it belongs to is finished.";
+  "Pattern/Like's encrypted copies of each request and response become eligible for scheduled deletion after the reading is finished or stopped and no unfinished work needs them. Cleanup may take longer if a deletion needs to be retried. OpenAI's retention follows the agreement and settings on the account Pattern/Like uses.";
 
 export const AI_CONSENT_REVOKE_NOTE =
   "You can withdraw this at any time in Context & privacy. Withdrawing stops any reading still being written as well as every future one; readings already published stay readable until you export or delete them.";

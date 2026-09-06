@@ -233,17 +233,14 @@ export interface ActiveOntology {
  * on every read from evidence and receipt agreement rather than trusted from a
  * stored flag.
  *
- * The two origins carry different assurance, and the difference is the reason
- * this function is not simply a null check. A `machine_pipeline` release earns
- * `public` scope only by producing the whole evidence chain, and the evaluator
- * verdict and the regression hard gates -- `suppressed_feature_leak`,
- * `uncited_astrological_claim`, `source_dependency_failure`, `prohibited_claim`,
- * `mandatory_feature_omission`, `private_projection_leak`, `semantic_refusal` --
- * run nowhere else in the product. A `synthetic_internal` release skips both.
- * What it does carry is publication rights: every record is `source_supported`
- * against a `licensed_excerpt` corpus and cites the fragment it came from, it is
- * signed by the isolated signer, and it compiles. That is the whole of its
- * assurance, and serving it is a deliberate trade, not an oversight.
+ * The origins carry different release evidence. A `machine_pipeline` release
+ * earns `public` scope through the evaluator and regression corpus evidence
+ * chain. An authored `synthetic_internal` release carries source-supported
+ * records, licensed source rights, a signature, and compilation evidence; it
+ * does not acquire the machine release's evaluator or corpus regression proof.
+ * Every newly generated document from either origin subsequently passes the
+ * same deterministic publication safety policy and model semantic verifier.
+ * Corpus release checks and a passing individual document are distinct proof.
  *
  * Enqueue, pattern-state, `GET /v1/pattern`, and the Codex current-owner check
  * all call this, so the client can never be offered a generate action the API

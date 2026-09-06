@@ -2,13 +2,13 @@ import { spawn } from "node:child_process";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { buildCodexChildEnvironment } from "./codex-cli.js";
+import { buildCodexChildEnvironment } from "./codex-environment.js";
 import { CHATGPT_BASE_URL, DISABLED_FEATURES, PORTRAIT_CODEX_CLI_VERSION, PortraitError, inspectCli, isolatedMcpConfiguration, requireCleanHostInstructions } from "./portrait-invocation.js";
 
 export interface IsolatedCodexJsonOptions {
   codexBin: string;
   model: string;
-  effort: "xhigh";
+  effort: "high" | "xhigh";
   timeoutMs: number;
   instructions: string;
   input: Array<{ type: "text"; text: string; text_elements: never[] } | { type: "image"; url: string }>;
@@ -17,6 +17,17 @@ export interface IsolatedCodexJsonOptions {
   env?: NodeJS.ProcessEnv;
   tempRoot?: string;
   signal?: AbortSignal;
+  requireUsage?: boolean;
+  serviceTier?: "priority";
+}
+export interface IsolatedCodexJsonResult {
+  value: unknown;
+  outputText: string;
+  providerRequestId: string;
+  usage: { inputTokens: number; outputTokens: number } | null;
+}
+export class IsolatedCodexJsonError extends PortraitError {
+  constructor(readonly reason: "invalid" | "timeout" | "cleanup", fatal = false) { super("generation_failed", fatal); }
 }
 const record = (value: unknown): value is Record<string, any> => value !== null && typeof value === "object" && !Array.isArray(value);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
@@ -24,7 +35,7 @@ const THREAD = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const PASSIVE_ITEMS = new Set(["userMessage", "agentMessage", "reasoning"]);
 // Verified against `codex 0.153.3 features list`; environments:[] additionally removes apply_patch.
 const JSON_DISABLED_FEATURES = ["view_image", "sleep_tool", "code_mode", "code_mode_host", "code_mode_only", "code_mode_prewarm", "goals", "request_permissions_tool", "default_mode_request_user_input", "deferred_executor", "token_budget", "skill_search", "skill_mcp_dependency_install", "workspace_dependencies", "shell_snapshot", "tool_call_mcp_elicitation", "artifact", "external_agent_memory_import", "context_management", "realtime_conversation"];
-const fail = (fatal = false) => new PortraitError("generation_failed", fatal);
+const fail = (fatal = false) => new IsolatedCodexJsonError("invalid", fatal);
 
 function verifyToolOverrides(response: Record<string, any>): void {
   // 0.153.3's typed merged Config omits these tool fields. Raw layer origins expose their effective values.
@@ -38,17 +49,23 @@ function verifyToolOverrides(response: Record<string, any>): void {
 }
 
 /** A fresh process/thread for every stage: no conversation, model tools, or host instructions carry across. */
-export async function runIsolatedCodexJson(options: IsolatedCodexJsonOptions): Promise<{ value: unknown; providerRequestId: string }> {
+export async function runIsolatedCodexJson(options: IsolatedCodexJsonOptions): Promise<IsolatedCodexJsonResult> {
   if (options.signal?.aborted || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs <= 0 || options.timeoutMs > 900_000
-    || !Number.isSafeInteger(options.maxOutputBytes) || options.maxOutputBytes <= 0 || options.maxOutputBytes > 65536) throw fail();
+    || !Number.isSafeInteger(options.maxOutputBytes) || options.maxOutputBytes <= 0 || options.maxOutputBytes > 1024 * 1024) throw fail();
   const deadline = Date.now() + options.timeoutMs;
   const env = buildCodexChildEnvironment(options.env ?? process.env);
   const home = env.CODEX_HOME ?? (env.HOME ? join(env.HOME, ".codex") : "");
   if (!isAbsolute(home)) throw new PortraitError("authentication_failed", true);
   await requireCleanHostInstructions(home);
-  if (await inspectCli(options.codexBin, ["--version"], env) !== `codex-cli ${PORTRAIT_CODEX_CLI_VERSION}`
-    || await inspectCli(options.codexBin, ["login", "status"], env) !== "Logged in using ChatGPT") throw new PortraitError("authentication_failed", true);
-  if (options.signal?.aborted || Date.now() >= deadline) throw fail();
+  try {
+    if (await inspectCli(options.codexBin, ["--version"], env, Math.max(1, deadline - Date.now())) !== `codex-cli ${PORTRAIT_CODEX_CLI_VERSION}`
+      || await inspectCli(options.codexBin, ["login", "status"], env, Math.max(1, deadline - Date.now())) !== "Logged in using ChatGPT") throw new PortraitError("authentication_failed", true);
+  } catch (error) {
+    if (Date.now() >= deadline) throw new IsolatedCodexJsonError("timeout");
+    throw error;
+  }
+  if (Date.now() >= deadline) throw new IsolatedCodexJsonError("timeout");
+  if (options.signal?.aborted) throw fail();
   const parent = options.tempRoot ?? tmpdir(); await mkdir(parent, { recursive: true, mode: 0o700 });
   const directory = await mkdtemp(join(parent, "patternlike-mesh-"));
   try {
@@ -57,23 +74,26 @@ export async function runIsolatedCodexJson(options: IsolatedCodexJsonOptions): P
     await writeFile(instructionsFile, options.instructions, { mode: 0o600 });
     return await jsonTurn(options, env, home, directory, instructionsFile, deadline - Date.now());
   } finally {
-    try { await rm(directory, { recursive: true, force: true }); } catch { throw fail(true); }
+    try { await rm(directory, { recursive: true, force: true }); } catch { throw new IsolatedCodexJsonError("cleanup", true); }
   }
 }
 
-function jsonTurn(options: IsolatedCodexJsonOptions, env: NodeJS.ProcessEnv, home: string, cwd: string, instructionsFile: string, timeoutMs: number): Promise<{ value: unknown; providerRequestId: string }> {
+function jsonTurn(options: IsolatedCodexJsonOptions, env: NodeJS.ProcessEnv, home: string, cwd: string, instructionsFile: string, timeoutMs: number): Promise<IsolatedCodexJsonResult> {
   return new Promise((resolveValue, reject) => {
     const args = ["app-server", "--stdio", "-c", 'model_provider="openai"', "-c", 'forced_login_method="chatgpt"',
       "-c", 'web_search="disabled"', "-c", "notify=[]", "-c", 'instructions=""', "-c", 'developer_instructions=""',
       "-c", "project_doc_max_bytes=0", "-c", "skills.include_instructions=false", "-c", `model_instructions_file=${JSON.stringify(instructionsFile)}`,
       "-c", `experimental_compact_prompt_file=${JSON.stringify(instructionsFile)}`, "-c", `chatgpt_base_url=${JSON.stringify(CHATGPT_BASE_URL)}`,
       "-c", "tools.update_plan.enabled=false", "-c", "tools.experimental_request_user_input.enabled=false",
-      "--enable", "skip_host_skill_discovery", "--disable", "image_generation", ...[...DISABLED_FEATURES, ...JSON_DISABLED_FEATURES].flatMap((feature) => ["--disable", feature])];
+      "--enable", "skip_host_skill_discovery", "--disable", "image_generation",
+      ...(options.serviceTier ? ["--enable", "fast_mode", "-c", 'service_tier="priority"'] : []),
+      ...[...DISABLED_FEATURES, ...JSON_DISABLED_FEATURES].flatMap((feature) => ["--disable", feature])];
     const child = spawn(options.codexBin, args, { cwd, env, shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
     let pending = ""; let eventBytes = 0; let threadId = ""; let turnId = ""; let expectedResponse = 1;
     let configuration: Record<string, { enabled: false; required: false }> | null = null;
-    let finalValue: unknown; let hasFinal = false;
-    let result: { value: unknown; providerRequestId: string } | null = null;
+    let finalValue: unknown; let finalText = ""; let hasFinal = false;
+    let usage: IsolatedCodexJsonResult["usage"] = null;
+    let result: IsolatedCodexJsonResult | null = null;
     let error: Error | null = null; let stopping = false; let killTimer: NodeJS.Timeout | undefined;
     const send = (id: number, method: string, params: unknown) => { expectedResponse = id; child.stdin.write(`${JSON.stringify({ id, method, params })}\n`); };
     const stop = (cause?: Error) => {
@@ -81,7 +101,7 @@ function jsonTurn(options: IsolatedCodexJsonOptions, env: NodeJS.ProcessEnv, hom
       if (stopping) return; stopping = true; child.stdin.end(); child.kill("SIGTERM");
       killTimer = setTimeout(() => child.kill("SIGKILL"), 1_000); killTimer.unref();
     };
-    const timer = setTimeout(() => stop(fail()), Math.max(1, timeoutMs)); timer.unref();
+    const timer = setTimeout(() => stop(new IsolatedCodexJsonError("timeout")), Math.max(1, timeoutMs)); timer.unref();
     const abort = () => stop(fail()); options.signal?.addEventListener("abort", abort, { once: true });
     child.stdin.on("error", () => undefined);
     child.once("error", () => { error = fail(true); });
@@ -104,17 +124,19 @@ function jsonTurn(options: IsolatedCodexJsonOptions, env: NodeJS.ProcessEnv, hom
           const requirements = response.requirements;
           if (!configuration || (requirements !== null && (!record(requirements) || requirements.additionalDeveloperInstructions || requirements.hooks
             || (requirements.chatgptBaseUrl && requirements.chatgptBaseUrl !== CHATGPT_BASE_URL)))) throw fail(true);
-          send(2, "thread/start", { model: options.model, modelProvider: "openai", cwd, approvalPolicy: "never", sandbox: "read-only", ephemeral: true, environments: [],
+          send(2, "thread/start", { model: options.model, modelProvider: "openai", ...(options.serviceTier ? { serviceTier: options.serviceTier } : {}), cwd, approvalPolicy: "never", sandbox: "read-only", ephemeral: true, environments: [],
             baseInstructions: options.instructions, developerInstructions: "", config: { model_reasoning_effort: options.effort, forced_login_method: "chatgpt", mcp_servers: configuration } });
         } else if (message.id === 2) {
           if (!THREAD.test(response.thread?.id ?? "") || response.model !== options.model || response.modelProvider !== "openai"
-            || response.sandbox?.type !== "readOnly" || response.approvalPolicy !== "never") throw fail(true);
+            || response.sandbox?.type !== "readOnly" || response.approvalPolicy !== "never"
+            || (options.requireUsage && response.reasoningEffort !== options.effort)
+            || (options.serviceTier && response.serviceTier !== options.serviceTier)) throw fail(true);
           threadId = response.thread.id;
           send(6, "mcpServerStatus/list", { threadId, limit: 257, detail: "toolsAndAuthOnly" });
         } else if (message.id === 6) {
           if (!threadId || response.nextCursor !== null || !Array.isArray(response.data) || response.data.length > 256
             || response.data.some((server: unknown) => !record(server) || server.runtimeStatus !== "disabled" || !record(server.tools) || Object.keys(server.tools).length !== 0)) throw fail(true);
-          send(3, "turn/start", { threadId, input: options.input, model: options.model, effort: options.effort, outputSchema: options.outputSchema });
+          send(3, "turn/start", { threadId, input: options.input, model: options.model, effort: options.effort, ...(options.serviceTier ? { serviceTier: options.serviceTier } : {}), outputSchema: options.outputSchema });
         } else if (message.id === 3) {
           const id = response.turn?.id;
           if (typeof id !== "string" || !ID.test(id) || (turnId && id !== turnId)) throw fail();
@@ -124,6 +146,16 @@ function jsonTurn(options: IsolatedCodexJsonOptions, env: NodeJS.ProcessEnv, hom
       }
       if (typeof message.method !== "string" || !record(message.params)) throw fail();
       const params = message.params;
+      // A rerouted model is not the frozen model requested by this generation.
+      if (message.method === "model/rerouted") throw fail();
+      if (message.method === "thread/tokenUsage/updated" && options.requireUsage) {
+        const total = params.tokenUsage?.total;
+        if (!threadId || params.threadId !== threadId || !turnId || params.turnId !== turnId || !record(total)
+          || !Number.isSafeInteger(total.inputTokens) || total.inputTokens < 0
+          || !Number.isSafeInteger(total.outputTokens) || total.outputTokens < 0
+          || (usage && (total.inputTokens < usage.inputTokens || total.outputTokens < usage.outputTokens))) throw fail();
+        usage = { inputTokens: total.inputTokens, outputTokens: total.outputTokens };
+      }
       if (["turn/started", "item/started", "item/completed", "turn/completed"].includes(message.method)) {
         const id = message.method.startsWith("turn/") ? params.turn?.id : params.turnId;
         if (!threadId || params.threadId !== threadId || typeof id !== "string" || !ID.test(id) || (turnId && turnId !== id)) throw fail();
@@ -134,12 +166,13 @@ function jsonTurn(options: IsolatedCodexJsonOptions, env: NodeJS.ProcessEnv, hom
         if (message.method === "item/completed" && params.item.type === "agentMessage" && params.item.phase !== "commentary") {
           if (hasFinal || typeof params.item.text !== "string" || Buffer.byteLength(params.item.text) > options.maxOutputBytes) throw fail();
           try { finalValue = JSON.parse(params.item.text); } catch { throw fail(); }
+          finalText = params.item.text;
           hasFinal = true;
         }
       }
       if (message.method === "turn/completed") {
-        if (expectedResponse !== 0 || params.turn?.status !== "completed" || params.turn?.error || !hasFinal) throw fail();
-        result = { value: finalValue, providerRequestId: `${threadId}:${turnId}` }; stop();
+        if (expectedResponse !== 0 || params.turn?.status !== "completed" || params.turn?.error || !hasFinal || (options.requireUsage && !usage)) throw fail();
+        result = { value: finalValue, outputText: finalText, providerRequestId: `${threadId}:${turnId}`, usage }; stop();
       }
     };
     child.stdout.setEncoding("utf8");

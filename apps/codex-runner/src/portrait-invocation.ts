@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
 import type { CodexPortraitClaim, CodexPortraitCompletion, CodexPortraitFailure } from "@patternlike/shared";
-import { buildCodexChildEnvironment } from "./codex-cli.js";
+import { buildCodexChildEnvironment } from "./codex-environment.js";
 import { decodePortraitBase64, parsePortraitClaim } from "./portrait-client.js";
 
 /** Reviewed native-tool pin, not an independently attested image-model ID. */
@@ -38,12 +38,12 @@ export class PortraitError extends Error {
   constructor(readonly code: CodexPortraitFailure["code"], readonly fatal = false) { super(code); }
 }
 
-export async function inspectCli(binary: string, args: string[], env: NodeJS.ProcessEnv): Promise<string> {
+export async function inspectCli(binary: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs = 10_000): Promise<string> {
   return new Promise((resolveValue, reject) => {
     const child = spawn(binary, args, { env, shell: false, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let output = ""; let failed = false;
     const stop = () => { failed = true; child.kill("SIGKILL"); };
-    const timer = setTimeout(stop, 10_000); timer.unref();
+    const timer = setTimeout(stop, timeoutMs); timer.unref();
     const collect = (chunk: Buffer) => { output += chunk.toString("utf8"); if (Buffer.byteLength(output) > 8192) stop(); };
     child.stdout.on("data", collect); child.stderr.on("data", collect);
     child.once("error", () => { failed = true; });
@@ -280,7 +280,14 @@ export async function runPortraitInvocation(options: PortraitInvocationOptions):
     await options.onVerifiedImage?.(bytes);
     outcome = { ok: true, completion: { lease_token: options.claim.lease_token, source_sha256: options.claim.source_sha256,
       label: native.label, rationale: native.rationale, ...prepared, provider_request_id: `${native.threadId}:${native.turnId}`,
-      image_request_id: native.imageId, image_model: options.claim.image_model } };
+      image_request_id: native.imageId, image_model: options.claim.image_model,
+      image_model_provenance: {
+        schema_version: "portrait-image-model-provenance/v1",
+        requested_image_model: options.claim.image_model,
+        observed_image_model: null,
+        observation_status: "not_exposed",
+        codex_cli_version: PORTRAIT_CODEX_CLI_VERSION,
+      } } };
   } catch (error) {
     outcome = { ok: false, code: error instanceof PortraitError ? error.code : "generation_failed", fatal: error instanceof PortraitError && error.fatal };
   }

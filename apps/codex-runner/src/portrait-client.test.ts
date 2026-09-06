@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CodexPortraitClient, decodePortraitBase64 } from "./portrait-client.js";
-import type { CodexPortraitClaim } from "@patternlike/shared";
+import { CodexPortraitClient, decodePortraitBase64, validPortraitCompletion } from "./portrait-client.js";
+import type { CodexPortraitClaim, CodexPortraitCompletion } from "@patternlike/shared";
 
 const claim: CodexPortraitClaim = {
   schema_version: "codex-portrait-claim/v1", job_id: `ppjob_${"a".repeat(32)}`, portrait_id: `ppor_${"b".repeat(32)}`,
@@ -10,6 +10,34 @@ const claim: CodexPortraitClaim = {
 };
 const options = { apiOrigin: "https://api.example.test", runnerToken: "machine-token" };
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { "content-type": "application/json" } });
+
+test("completion transport preserves a qualified image request without claiming observed model identity", async () => {
+  const legacy: CodexPortraitCompletion = {
+    lease_token: claim.lease_token, source_sha256: claim.source_sha256,
+    label: "Blue cube", rationale: "A simple object.", original_sha256: "d".repeat(64),
+    image_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1kAAAAASUVORK5CYII=",
+    pixels: { width: 128, height: 128, rgba_base64: Buffer.alloc(128 * 128 * 4).toString("base64") },
+    provider_request_id: "thread:turn", image_request_id: "image-call-1", image_model: "gpt-image-2",
+  };
+  const provenance = {
+    schema_version: "portrait-image-model-provenance/v1", requested_image_model: "gpt-image-2",
+    observed_image_model: null, observation_status: "not_exposed", codex_cli_version: "0.153.3",
+  } as const;
+  const qualified = { ...legacy, image_model_provenance: provenance };
+  const bodies: unknown[] = [];
+  const client = new CodexPortraitClient({ ...options, fetchImpl: async (_url, init) => {
+    bodies.push(JSON.parse(String(init!.body)));
+    return json({ schema_version: "codex-portrait-terminal/v1", status: "accepted" });
+  } });
+  await client.complete(claim.job_id, qualified);
+  await client.complete(claim.job_id, legacy);
+  assert.deepEqual(bodies, [qualified, legacy]);
+  for (const invalid of [
+    { observed_image_model: "gpt-image-2" }, { requested_image_model: "other" },
+    { observation_status: "provider_attested" }, { observation_status: "legacy_unrecorded", codex_cli_version: null },
+    { codex_cli_version: "0.153.4" }, { provider_attested: true },
+  ]) assert.equal(validPortraitCompletion({ ...qualified, image_model_provenance: { ...provenance, ...invalid } } as unknown as CodexPortraitCompletion), false);
+});
 
 test("portrait transport uses dedicated auth, exact paths and claim/terminal schemas", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];

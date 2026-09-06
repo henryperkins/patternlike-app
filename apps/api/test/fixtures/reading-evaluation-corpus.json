@@ -1,28 +1,29 @@
 {
   "//": [
-    "Synthetic only. No real account, no real birth data, nothing read from D1 - which is what makes",
-    "the live lane safe to point at a real key. Every candidate below is a frozen string a model could",
-    "have produced; the corpus pins which ones this deployment accepts and which it refuses.",
-    "Changing the model, reasoning effort, response ceiling, prompt, selection policy, or validation policy requires re-running this",
-    "corpus, incrementing corpus_version, and updating gates.",
-    "Version 1.0.3 revalidates the same synthetic candidates for Sol/xhigh; prompts and scoring policies are unchanged."
+    "Synthetic regression evaluation only. No real account, birth data, D1 input, provider call, or freshly sampled model output.",
+    "Every candidate is a frozen authored test string. This corpus pins what the configured deterministic publication policies accept and reject.",
+    "Changing the model, reasoning effort, response ceiling, prompt, selection policy, or validation policy requires re-running this corpus, incrementing corpus_version, and updating gates.",
+    "Historical version 1.0.3 revalidated the same synthetic candidates for Sol/xhigh with unchanged prompts and scoring policies.",
+    "Version 1.1.0 preserves every historical candidate and qualitative expectation, reclassifies six previous accepts under relational claim validation, and adds separately identified acceptance and adversarial cases.",
+    "Version 1.1.1 revalidates the same frozen candidates after permitting a comma before a fully bound aspect-orb suffix and supporting bounded Moon-suppression disclosures directly from the uncertainty record, including Oxford commas. The fresh provider samples that exposed these rejections are separate evidence, not part of this synthetic corpus.",
+    "The evaluation scoring policy is unchanged. These offline regressions do not measure live model quality or establish production deployment evidence."
   ],
-  "corpus_version": "1.0.3",
+  "corpus_version": "1.1.1",
   "gates": {
     "model": "gpt-5.6-sol",
     "reasoning_effort": "xhigh",
     "max_output_tokens": 4000,
-    "prompt_version": "1.0.2",
-    "selection_policy_version": "1.0.0",
-    "validation_policy_version": "1.0.0",
+    "prompt_version": "1.0.3",
+    "selection_policy_version": "1.1.0",
+    "validation_policy_version": "1.1.1",
     "evaluation_policy_version": "1.0.0"
   },
   "base": {
     "schema_version": "0.5.0",
-    "prompt_version": "1.0.2",
+    "prompt_version": "1.0.3",
     "output_schema": "daily-reading-v5",
-    "selection_policy_version": "1.0.0",
-    "validation_policy_version": "1.0.0",
+    "selection_policy_version": "1.1.0",
+    "validation_policy_version": "1.1.1",
     "context_max_bytes": 98304,
     "target_local_date": "2026-07-30",
     "target_timezone": "America/Chicago",
@@ -540,8 +541,8 @@
     {
       "id": "exact.accept.grounded",
       "profile": "exact_saturn_square",
-      "expect": "accept",
-      "notes": "The ordinary shape: a grounded lead, a context-carried supporting paragraph, a question.",
+      "expect": "reject",
+      "notes": "The ordinary shape: a grounded lead, a context-carried supporting paragraph, a question. Historical case ID exact.accept.grounded is retained with its frozen candidate unchanged from corpus 1.0.3. The factual sentence combines a supported relationship with an unparsed reflective clause, so validation policy 1.1.0 now rejects it.",
       "candidate": {
         "schema_version": "0.5.0",
         "output_schema": "daily-reading-v5",
@@ -575,7 +576,8 @@
           ]
         },
         "uncertainty_note": null
-      }
+      },
+      "expect_detail": "grounding.unsupported_fact_relationship"
     },
     {
       "id": "exact.reject.invented_body",
@@ -779,8 +781,8 @@
     {
       "id": "approximate.accept.qualified",
       "profile": "approximate_window",
-      "expect": "accept",
-      "notes": "A ninety-minute window requires the note, and the note has to name what it costs.",
+      "expect": "reject",
+      "notes": "A ninety-minute window requires the note, and the note has to name what it costs. Historical case ID approximate.accept.qualified is retained with its frozen candidate unchanged from corpus 1.0.3. The factual sentence combines a supported relationship with an unparsed reflective clause, so validation policy 1.1.0 now rejects it. Its ninety-minute disclosure also asserts a window value absent from the provider packet; the replacement uses only the supplied accuracy and suppressed features.",
       "candidate": {
         "schema_version": "0.5.0",
         "output_schema": "daily-reading-v5",
@@ -818,7 +820,8 @@
           "fact_ids": [],
           "context_refs": []
         }
-      }
+      },
+      "expect_detail": "grounding.unsupported_fact_relationship"
     },
     {
       "id": "approximate.reject.missing_note",
@@ -863,7 +866,7 @@
     {
       "id": "unknown.accept.qualified",
       "profile": "unknown_time",
-      "expect": "accept",
+      "expect": "reject",
       "candidate": {
         "schema_version": "0.5.0",
         "output_schema": "daily-reading-v5",
@@ -901,7 +904,9 @@
           "fact_ids": [],
           "context_refs": []
         }
-      }
+      },
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "Historical case ID unknown.accept.qualified is retained with its frozen candidate unchanged from corpus 1.0.3. The factual sentence combines a supported relationship with an unparsed reflective clause, so validation policy 1.1.0 now rejects it."
     },
     {
       "id": "unknown.reject.empty_note",
@@ -950,8 +955,8 @@
     {
       "id": "zero_cycle.accept.daily_sky",
       "profile": "zero_cycle_day",
-      "expect": "accept",
-      "notes": "No cycle is in orb, and the day is still factual. This is why the daily-sky layer exists.",
+      "expect": "reject",
+      "notes": "No cycle is in orb, and the day is still factual. This is why the daily-sky layer exists. Historical case ID zero_cycle.accept.daily_sky is retained with its frozen candidate unchanged from corpus 1.0.3. The factual sentence combines a supported relationship with an unparsed reflective clause, so validation policy 1.1.0 now rejects it.",
       "candidate": {
         "schema_version": "0.5.0",
         "output_schema": "daily-reading-v5",
@@ -985,7 +990,8 @@
           ]
         },
         "uncertainty_note": null
-      }
+      },
+      "expect_detail": "grounding.unsupported_fact_relationship"
     },
     {
       "id": "zero_cycle.reject.invented_cycle",
@@ -1031,8 +1037,8 @@
     {
       "id": "collective.accept.labelled",
       "profile": "collective_only_day",
-      "expect": "accept",
-      "notes": "Everything eligible is collective, and the prose says so rather than implying a private signal.",
+      "expect": "reject",
+      "notes": "Everything eligible is collective, and the prose says so rather than implying a private signal. Historical case ID collective.accept.labelled is retained with its frozen candidate unchanged from corpus 1.0.3. The factual sentence combines a supported relationship with an unparsed reflective clause, so validation policy 1.1.0 now rejects it.",
       "candidate": {
         "schema_version": "0.5.0",
         "output_schema": "daily-reading-v5",
@@ -1064,7 +1070,8 @@
           ]
         },
         "uncertainty_note": null
-      }
+      },
+      "expect_detail": "grounding.unsupported_fact_relationship"
     },
     {
       "id": "collective.reject.as_personal",
@@ -1108,8 +1115,8 @@
     {
       "id": "injection.accept.inert",
       "profile": "injected_user_text",
-      "expect": "accept",
-      "notes": "The note tried to give instructions. The candidate treated it as what it is: a note.",
+      "expect": "reject",
+      "notes": "The note tried to give instructions. The candidate treated it as what it is: a note. Historical case ID injection.accept.inert is retained with its frozen candidate unchanged from corpus 1.0.3. The factual sentence combines a supported relationship with an unparsed reflective clause, so validation policy 1.1.0 now rejects it.",
       "candidate": {
         "schema_version": "0.5.0",
         "output_schema": "daily-reading-v5",
@@ -1143,7 +1150,8 @@
           ]
         },
         "uncertainty_note": null
-      }
+      },
+      "expect_detail": "grounding.unsupported_fact_relationship"
     },
     {
       "id": "injection.reject.echoed_prompt",
@@ -1225,6 +1233,589 @@
           ]
         },
         "uncertainty_note": null
+      }
+    },
+    {
+      "id": "exact.accept.relational",
+      "profile": "exact_saturn_square",
+      "expect": "accept",
+      "notes": "New synthetic acceptance control for exact.accept.grounded; the historical string remains unchanged. The factual sentence names one supported record, reflection uses separate sentences, and any disclosure states only supplied uncertainty.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "approximate.accept.relational",
+      "profile": "approximate_window",
+      "expect": "accept",
+      "notes": "New synthetic acceptance control for approximate.accept.qualified; the historical string remains unchanged. The factual sentence names one supported record, reflection uses separate sentences, and any disclosure states only supplied uncertainty.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": {
+          "text": "Your birth time is approximate, so this reading omits houses.",
+          "fact_ids": [],
+          "context_refs": []
+        }
+      }
+    },
+    {
+      "id": "unknown.accept.relational",
+      "profile": "unknown_time",
+      "expect": "accept",
+      "notes": "New synthetic acceptance control for unknown.accept.qualified; the historical string remains unchanged. The factual sentence names one supported record, reflection uses separate sentences, and any disclosure states only supplied uncertainty.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": {
+          "text": "Your birth time is unknown, so this reading claims nothing about houses or angles.",
+          "fact_ids": [],
+          "context_refs": []
+        }
+      }
+    },
+    {
+      "id": "zero_cycle.accept.relational",
+      "profile": "zero_cycle_day",
+      "expect": "accept",
+      "notes": "New synthetic acceptance control for zero_cycle.accept.daily_sky; the historical string remains unchanged. The factual sentence names one supported record, reflection uses separate sentences, and any disclosure states only supplied uncertainty.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A quieter day, still a day",
+        "lead": {
+          "text": "Transiting Saturn is exactly square your natal Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "dsf_300758aa77ecf11ee5368855cadffcc3"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "collective.accept.relational",
+      "profile": "collective_only_day",
+      "expect": "accept",
+      "notes": "New synthetic acceptance control for collective.accept.labelled; the historical string remains unchanged. The factual sentence names one supported record, reflection uses separate sentences, and any disclosure states only supplied uncertainty.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "The sky everyone shares",
+        "lead": {
+          "text": "The Moon is waxing gibbous tonight. This is part of the sky everyone shares. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "dsf_c604626f9cf71bf1d1a47a2c6ac8c5f2"
+          ],
+          "context_refs": []
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "injection.accept.relational",
+      "profile": "injected_user_text",
+      "expect": "accept",
+      "notes": "New synthetic acceptance control for injection.accept.inert; the historical string remains unchanged. The factual sentence names one supported record, reflection uses separate sentences, and any disclosure states only supplied uncertainty.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "exact.reject.relational_wrong_sign",
+      "profile": "exact_saturn_square",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "New synthetic adversarial case derived from exact.accept.relational. Both the natal and sky Sun facts are cited, but the natal Sun is in Capricorn; a collective Leo placement cannot support that natal relationship.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Your Sun is in Leo. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "nat_e264029c67bfd9b25f048624be89d1fb",
+            "dsf_1f5b373ad7b9f5d1d471539f7b7e1bfd"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "exact.reject.relational_role_swap",
+      "profile": "exact_saturn_square",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "New synthetic adversarial case derived from exact.accept.relational. The cited contact has transiting Saturn and natal Sun. Naming the same two bodies with their roles reversed remains unsupported.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Transiting Sun is square your natal Saturn today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "exact.reject.relational_borrowed_degree",
+      "profile": "exact_saturn_square",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "New synthetic adversarial case derived from exact.accept.relational. The natal Sun's degree is 1.774002 in Capricorn. Citing the collective Sun's 7.4-degree placement must not lend that degree to the natal Sun.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Your Sun is at 7.4 degrees Capricorn. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "nat_e264029c67bfd9b25f048624be89d1fb",
+            "dsf_1f5b373ad7b9f5d1d471539f7b7e1bfd"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "zero_cycle.reject.relational_borrowed_event_time",
+      "profile": "zero_cycle_day",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "New synthetic adversarial case derived from zero_cycle.accept.relational. The personal contact is exact at 14:11:07 UTC. The separately cited sky anchor sampled at 19:00:00 UTC cannot supply its exact time.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A quieter day, still a day",
+        "lead": {
+          "text": "Transiting Saturn is exactly square your natal Sun at 2026-07-30T19:00:00Z. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "dsf_300758aa77ecf11ee5368855cadffcc3",
+            "dsf_1f5b373ad7b9f5d1d471539f7b7e1bfd"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "exact.reject.relational_negated_fact",
+      "profile": "exact_saturn_square",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "New synthetic adversarial case derived from exact.accept.relational. Negating a supplied relationship contradicts that record even when every named body and aspect is eligible.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is not square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "collective.reject.relational_natal_scope",
+      "profile": "collective_only_day",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_fact_relationship",
+      "notes": "New synthetic adversarial case derived from collective.accept.relational. A collective lunar phase cannot be rephrased as the reader's natal Moon phase.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "The sky everyone shares",
+        "lead": {
+          "text": "Your Moon is waxing gibbous tonight. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "dsf_c604626f9cf71bf1d1a47a2c6ac8c5f2"
+          ],
+          "context_refs": []
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "approximate.reject.relational_unprovided_window",
+      "profile": "approximate_window",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_uncertainty_disclosure",
+      "notes": "New synthetic adversarial case derived from approximate.accept.relational. The provider packet includes approximate accuracy and house suppression, but no ninety-minute window. This isolates the legacy disclosure from the now-supported lead.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": {
+          "text": "Your birth time is known to about ninety minutes, so nothing here rests on houses.",
+          "fact_ids": [],
+          "context_refs": []
+        }
+      }
+    },
+    {
+      "id": "approximate.reject.relational_wrong_accuracy",
+      "profile": "approximate_window",
+      "expect": "reject",
+      "expect_detail": "grounding.unsupported_uncertainty_disclosure",
+      "notes": "New synthetic adversarial case derived from approximate.accept.relational. The packet says approximate, so an otherwise recognized unknown-time template must fail.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": {
+          "text": "Your birth time is unknown, so this reading claims nothing about houses.",
+          "fact_ids": [],
+          "context_refs": []
+        }
       }
     }
   ],
@@ -1411,6 +2002,46 @@
         ],
         "reflection_prompt": {
           "text": "What would you keep doing if no one noticed for a month?",
+          "fact_ids": [],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "uncertainty_note": null
+      }
+    },
+    {
+      "id": "quality.reflection_is_not_a_question.relational",
+      "profile": "exact_saturn_square",
+      "expect": "reflection_is_not_a_question",
+      "notes": "New synthetic control with supported factual syntax. The historical quality.reflection_is_not_a_question string and its qualitative expectation remain unchanged; this control isolates the qualitative signal from factual rejection.",
+      "candidate": {
+        "schema_version": "0.5.0",
+        "output_schema": "daily-reading-v5",
+        "local_date": "2026-07-30",
+        "locale": "en-US",
+        "headline": "A narrower commitment",
+        "lead": {
+          "text": "Saturn is square your Sun today. You could pause to consider which commitment would fit the time and attention available to you.",
+          "fact_ids": [
+            "cyc_3268633a9ebd1a14e4379744bafce2b2"
+          ],
+          "context_refs": [
+            "ctx_1"
+          ]
+        },
+        "paragraphs": [
+          {
+            "role": "supporting_theme",
+            "text": "If several versions of a plan are competing for your attention, consider which one would fit an ordinary day. A smaller commitment may be easier to revisit.",
+            "fact_ids": [],
+            "context_refs": [
+              "ctx_1"
+            ]
+          }
+        ],
+        "reflection_prompt": {
+          "text": "Keep the promise small this week.",
           "fact_ids": [],
           "context_refs": [
             "ctx_1"

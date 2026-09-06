@@ -10,6 +10,7 @@ import { markDispatched } from "../db/generation.js";
 import type { Env } from "../env.js";
 import { releaseUnconsumedPatternClaim } from "../db/pattern-claim-transitions.js";
 import { safeLog } from "./safe-log.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 
 /**
  * Claims one job may take across every stage before the sweep stops re-arming
@@ -23,6 +24,7 @@ const MAX_STAGE_CLAIMS = 16;
 
 export type PatternReconcileResult =
   | { ok: false; status: 404; code: "not_found" }
+  | { ok: false; status: 503; code: "pattern_generation_paused" }
   | {
       ok: true;
       status: 202;
@@ -67,6 +69,10 @@ export async function reconcilePatternGeneration(
     };
   }
 
+  if (!patternGenerationIsEnabled(env)) {
+    return { ok: false, status: 503, code: "pattern_generation_paused" };
+  }
+
   if (row.job_status === "queued" || row.job_status === "running") {
     try {
       await env.PATTERN_QUEUE.send({
@@ -90,48 +96,23 @@ export async function reconcilePatternGeneration(
   };
 }
 
-/**
- * Recover Pattern jobs that committed but were never sent, and drop expired
- * generation artifacts. Cron does not enter Hono, so the caller already ran
- * checkSecureConfig.
- */
-/**
- * Bounded compatibility repair for Pattern jobs parked by the removed rollout.
- *
- * These rows are historical: nothing can create a new `rollout_paused` Pattern
- * job now that there is no rollout to pause for. The repair is unconditional
- * because the condition it used to have -- "the rollout is back on" -- no
- * longer exists, and a replacement condition would be the flag again under
- * another name.
- *
- * It decides nothing about the reader. Consent, ontology, account state, and
- * claim state are re-checked by the ordinary current-owner and eligibility
- * paths after redelivery, which is what turns a recovered row into either a
- * continued generation or a cancellation. All this does is return the row to
- * the outbox lane the pause removed it from.
- *
- * Bounded, and never a theft: `LIMIT` keeps one tick's repair proportional to a
- * tick, and a row whose lease is still live is left to the consumer that holds
- * it. A job parked mid-flight was parked while `status = 'running'`, so
- * repairing only `'queued'` rows would leave it in the running lane for the
- * expired-lease sweep to re-send on every tick forever.
- *
- * `dispatched_at` stays NULL on purpose. The outbox is what sends it, so a
- * repair that also claimed to have dispatched would strand the row again.
- */
-export async function recoverLegacyPausedPatternJobs(
+/** Return one bounded pause class to the outbox; normal execution rechecks eligibility. */
+async function recoverPatternPauseClass(
   env: Env,
-  limit = 50,
-  now = new Date(),
+  resultClass: "rollout_paused" | "pattern_generation_paused",
+  limit: number,
+  now: Date,
 ): Promise<number> {
+  if (!patternGenerationIsEnabled(env)) return 0;
   const nowIso = now.toISOString();
   const updated = await env.DB.prepare(
     `UPDATE jobs
-     SET available_at = ?, result_class = NULL, status = 'queued',
+     SET available_at = CASE WHEN available_at IS NULL OR available_at < ? THEN ? ELSE available_at END,
+         result_class = NULL, status = 'queued', dispatched_at = NULL,
          claim_token = NULL, lease_expires_at = NULL
      WHERE id IN (
        SELECT id FROM jobs
-       WHERE job_type = ? AND result_class = 'rollout_paused'
+       WHERE job_type = ? AND result_class = ?
          AND (
            status = 'queued'
            OR (status = 'running' AND (lease_expires_at IS NULL OR lease_expires_at < ?))
@@ -140,11 +121,19 @@ export async function recoverLegacyPausedPatternJobs(
        LIMIT ?
      )`,
   )
-    .bind(nowIso, PATTERN_JOB_TYPE, nowIso, Math.max(0, limit))
+    .bind(nowIso, nowIso, PATTERN_JOB_TYPE, resultClass, nowIso, Math.max(0, limit))
     .run();
   return updated.meta.changes ?? 0;
 }
 
+/** Historical cohort rollout rows obey the current operational pause too. */
+export async function recoverLegacyPausedPatternJobs(
+  env: Env,
+  limit = 50,
+  now = new Date(),
+): Promise<number> {
+  return recoverPatternPauseClass(env, "rollout_paused", limit, now);
+}
 
 /**
  * Terminal state for a job whose stage has been claimed MAX_STAGE_CLAIMS times
@@ -285,11 +274,12 @@ async function prunePatternJobRetention(env: Env, nowIso: string): Promise<void>
   }
 }
 
-export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void> {
+async function dispatchPatternJobs(env: Env, now: Date): Promise<void> {
   // Every maintenance tick, and cheap when there is nothing left to repair:
   // it spends no provider budget by itself, and converges because a repaired
   // row no longer matches the class it selects on.
   await recoverLegacyPausedPatternJobs(env, 50, now);
+  await recoverPatternPauseClass(env, "pattern_generation_paused", 50, now);
   const nowIso = now.toISOString();
   const { results: undispatched } = await env.DB.prepare(
     `SELECT j.id AS job_id, p.generation_id, p.stage_generation
@@ -297,6 +287,7 @@ export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void
      JOIN pattern_generation_jobs p ON p.job_id = j.id
      WHERE j.job_type = ? AND j.status = 'queued' AND j.dispatched_at IS NULL
        AND j.result_class IS NOT 'rollout_paused'
+       AND j.result_class IS NOT 'pattern_generation_paused'
        AND (j.available_at IS NULL OR j.available_at <= ?)
      ORDER BY j.created_at, j.id
      LIMIT 50`,
@@ -327,6 +318,7 @@ export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void
      JOIN pattern_generation_jobs p ON p.job_id = j.id
      WHERE j.job_type = ? AND j.status = 'running' AND j.lease_expires_at < ?
        AND j.result_class IS NOT 'rollout_paused'
+       AND j.result_class IS NOT 'pattern_generation_paused'
      ORDER BY j.lease_expires_at, j.id
      LIMIT 50`,
   )
@@ -367,7 +359,12 @@ export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void
       safeLog({ event: "pattern_dispatch_failed" });
     }
   }
+}
 
+/** Pause dispatch and attempt recovery, while retention and erasure continue. */
+export async function sweepPatternJobs(env: Env, now = new Date()): Promise<void> {
+  if (patternGenerationIsEnabled(env)) await dispatchPatternJobs(env, now);
+  const nowIso = now.toISOString();
   await prunePatternJobRetention(env, nowIso);
 
   const { results: expired } = await env.DB.prepare(

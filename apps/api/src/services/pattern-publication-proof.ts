@@ -1,17 +1,27 @@
 import {
   contentHash,
+  canonicalJson,
+  sha256Hex,
+  type PatternDocumentInternal,
   type PatternPlan,
   type PatternSemanticVerdict,
   type PatternWriterOutput,
 } from "@patternlike/shared";
+import { projectPublicPattern } from "@patternlike/pattern-engine";
+import {
+  evaluatePatternPublicationSafety,
+  type PatternPublicationSafetyInput,
+  type PatternPublicationSafetyResult,
+} from "./pattern-publication-safety.js";
 
 import type {
   GeneratePatternCommand,
   PatternReservationReason,
 } from "./pattern-command.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
-import type { PatternJobRow } from "./pattern-stage-protocol.js";
+import type { PatternAttemptCoordinate, PatternJobRow } from "./pattern-stage-protocol.js";
 import type { Env } from "../env.js";
+import { hashesEqual } from "./content-release.js";
 
 export interface PatternPublicationProof {
   generationId: string;
@@ -31,15 +41,23 @@ export interface PatternPublicationProof {
   executedWriterPin: PatternPublisherPin;
   patternSourceHash: string;
   reservationReason: PatternReservationReason;
+  safety: {
+    policyVersion: PatternPublicationSafetyResult["policyVersion"];
+    candidateHash: string;
+    resultHash: string;
+  };
 }
 
 export interface PatternPublicationBundle {
   proof: PatternPublicationProof;
   plan: PatternPlan;
   writer: PatternWriterOutput;
+  document: PatternDocumentInternal;
+  generatedAt: string;
 }
 
 export type PatternPublicationArtifactClass =
+  | "fact_packet"
   | "planner_response"
   | "validated_plan"
   | "writer_response"
@@ -61,6 +79,14 @@ export class PatternPublicationProofError extends Error {
   }
 }
 
+export class PatternPublicationSafetyError extends Error {
+  readonly code = "publication_safety_failed";
+  constructor(readonly result: PatternPublicationSafetyResult, readonly plan: PatternPlan) {
+    super("publication_safety_failed");
+    this.name = "PatternPublicationSafetyError";
+  }
+}
+
 function pinsEqual(left: PatternPublisherPin, right: PatternPublisherPin): boolean {
   const leftRecord = left as unknown as Record<string, unknown>;
   const rightRecord = right as unknown as Record<string, unknown>;
@@ -79,7 +105,12 @@ export async function buildPatternPublicationProof(input: {
   command: GeneratePatternCommand;
   job: PatternJobRow;
   executedWriterPin: PatternPublisherPin;
-  readArtifact: (artifactClass: PatternPublicationArtifactClass) => Promise<unknown | null>;
+  safety: Omit<PatternPublicationSafetyInput, "writer" | "plan" | "verdict" | "publicProjection">;
+  publication: { generatedAt: string; provider: string; modelFamily: string };
+  readArtifact: (
+    artifactClass: PatternPublicationArtifactClass,
+    coordinate?: Pick<PatternAttemptCoordinate, "stageGeneration" | "attempt">,
+  ) => Promise<unknown | null>;
 }): Promise<PatternPublicationBundle> {
   const { command, job, executedWriterPin } = input;
   if (
@@ -99,13 +130,17 @@ export async function buildPatternPublicationProof(input: {
     throw new PatternPublicationProofError("writer_pin_mismatch");
   }
 
-  const [plannerValue, planValue, writerValue, verdictValue] = await Promise.all([
+  const [plannerValue, planValue, writerValue, verdictValue, packetValue] = await Promise.all([
     input.readArtifact("planner_response"),
     input.readArtifact("validated_plan"),
     input.readArtifact("writer_response"),
-    input.readArtifact("semantic_verdict"),
+    input.readArtifact("semantic_verdict", {
+      stageGeneration: job.stage_generation,
+      attempt: job.verifier_attempts,
+    }),
+    input.readArtifact("fact_packet"),
   ]);
-  if (!plannerValue || !planValue || !writerValue || !verdictValue) {
+  if (!plannerValue || !planValue || !writerValue || !verdictValue || !packetValue) {
     throw new PatternPublicationProofError("publication_artifact_missing");
   }
 
@@ -113,8 +148,17 @@ export async function buildPatternPublicationProof(input: {
   const writer = writerValue as PatternWriterOutput;
   const verdict = verdictValue as PatternSemanticVerdict;
   const planHash = await contentHash(JSON.stringify(plannerValue));
-  if (job.plan_hash !== planHash || plan.plan_hash !== planHash) {
+  if (job.plan_hash !== planHash || plan.plan_hash !== planHash ||
+    canonicalJson(plan) !== canonicalJson({
+      ...plannerValue as PatternPlan,
+      plan_hash: planHash,
+      sparse_pattern: input.safety.packet.selection_constraints.sparse_pattern,
+    })) {
     throw new PatternPublicationProofError("plan_hash_mismatch");
+  }
+  if (canonicalJson(packetValue) !== canonicalJson(input.safety.packet) ||
+    !hashesEqual(input.safety.selectionManifest.feature_set_hash, command.feature_set_hash)) {
+    throw new PatternPublicationProofError("publication_coordinate_mismatch");
   }
   const candidateHash = await contentHash(JSON.stringify(writerValue));
   if (job.candidate_hash !== candidateHash) {
@@ -130,6 +174,54 @@ export async function buildPatternPublicationProof(input: {
   if (verdict.verdict !== "pass") {
     throw new PatternPublicationProofError("semantic_verdict_not_pass");
   }
+
+  const patternId = `pat_${(await sha256Hex(
+    `pattern-document-v1:${command.generation_id}`,
+  )).slice(0, 32)}`;
+  const document: PatternDocumentInternal = {
+    schema_version: "0.7.0",
+    pattern_id: patternId,
+    generation_id: command.generation_id,
+    locale: command.locale,
+    effective_accuracy: input.safety.packet.effective_accuracy,
+    plan_hash: planHash,
+    candidate_hash: candidateHash,
+    semantic_verdict_hash: semanticVerdictHash,
+    artifact: writer,
+    compact_provenance: {
+      assembly_mode: "constrained_model",
+      provider: input.publication.provider,
+      model_family: input.publication.modelFamily,
+      raw_birth_details_sent: false,
+      ontology_version: command.ontology_version,
+      selection_policy_version: executedWriterPin.selection_policy_version,
+    },
+  };
+  const publicProjection = projectPublicPattern(document, input.publication.generatedAt);
+  const safetyResult = evaluatePatternPublicationSafety({
+    ...input.safety,
+    writer,
+    plan,
+    verdict,
+    publicProjection,
+  });
+  if (safetyResult.failures.length > 0) throw new PatternPublicationSafetyError(safetyResult, plan);
+  const safety = {
+    policyVersion: safetyResult.policyVersion,
+    candidateHash,
+    resultHash: await contentHash(JSON.stringify({
+      ...safetyResult,
+      candidateHash,
+      planHash,
+      semanticVerdictHash,
+      featureSetHash: command.feature_set_hash,
+      ontologyBundleHash: command.ontology_bundle_hash,
+      sourceFragmentIds: [...input.safety.sourceFragmentIds].sort(),
+      publicProjectionHash: await contentHash(JSON.stringify(publicProjection)),
+      packet: input.safety.packet,
+      selectionManifest: input.safety.selectionManifest,
+    })),
+  };
 
   return {
     proof: {
@@ -150,9 +242,12 @@ export async function buildPatternPublicationProof(input: {
       executedWriterPin,
       patternSourceHash: command.pattern_source_hash,
       reservationReason: command.reservation_reason,
+      safety,
     },
     plan,
     writer,
+    document,
+    generatedAt: input.publication.generatedAt,
   };
 }
 

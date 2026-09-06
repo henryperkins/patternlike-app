@@ -1,0 +1,226 @@
+{
+  "schema_version": "fresh-reading-replay-review.v1",
+  "observed_at": "2026-09-06T15:57:41.794Z",
+  "mode": "deterministic_replay_of_retained_fresh_provider_output",
+  "provider_invoked": false,
+  "independent_editorial_review": "unverified",
+  "source_snapshot_sha256": "725b0a1806a641b6203dd1da5c5e4b72ecc9b07bef1f0ef80d10e616024067f0",
+  "source_comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "pin": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh",
+    "prompt_version": "1.0.3",
+    "output_schema": "daily-reading-v5",
+    "selection_policy_version": "1.1.0",
+    "validation_policy_version": "1.1.1",
+    "max_output_tokens": 4000,
+    "context_max_bytes": 98304
+  },
+  "runs": [
+    {
+      "id": "daily-01",
+      "original_report_sha256": "cefc1c29b140300b0dc89bfedaae57991bbaf7441ffe69c390580e3ed1bcfa70",
+      "originally_accepted": 4,
+      "originally_rejected": 2,
+      "original_source_snapshot_sha256": "bf00ab29ff575e0036463015b1ee22a8391b99b5be0b1b831b0f1165825d9e58",
+      "samples": [
+        {
+          "id": "exact_saturn_square-1",
+          "output_sha256": "298259ec5ed6686097f4e1f01286b1ac336735236d9859e62840c0b8b5de9f67",
+          "private_sample_sha256": "6a52d24c7060d25ebddc2e66e1fcd2e74deac13b47baba5253f78580fcaebf72",
+          "originally_accepted": false,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "approximate_window-1",
+          "output_sha256": "d08732720c6bce80802d06af5cf042af007ece9035f63bd88dbde01249d87114",
+          "private_sample_sha256": "72e8920d7306ae5bd45d0ce19337f615617d716cec3ea034606d3fb7c284048f",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "unknown_time-1",
+          "output_sha256": "f98c198dea5867a5cb55c8f28833dfbfe78f4b7832f456e9cee15d29cbd8615a",
+          "private_sample_sha256": "87e7f9c90d735e4f4e8e1d43263a8955024bd985597ae53664078153bf857554",
+          "originally_accepted": false,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": false,
+          "findings": [
+            {
+              "code": "grounding",
+              "detail_code": "unsupported_fact_relationship"
+            }
+          ]
+        },
+        {
+          "id": "zero_cycle_day-1",
+          "output_sha256": "52a1316fe4d41947d417e4a6d302372f7bd6da53780d05635d945a2169f33351",
+          "private_sample_sha256": "402ce7f76d960b62cc9b1d5bc139d35f36fe8875af33b43446cd1cbee7cbacc7",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "collective_only_day-1",
+          "output_sha256": "bbc4ed0ce8305e46ba38931b5f9e9b214333b0d3658282fdce824b85e1de5dad",
+          "private_sample_sha256": "f39849784480bb8f1d14c80d5b2a8f4ff01f1d8318b48048611c8781a1e92436",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "injected_user_text-1",
+          "output_sha256": "2dbf74726fc024c23551cd487a2866a885ba62782407508dd35232f314c361d9",
+          "private_sample_sha256": "8eae2dc7e579f066bbeb54d02500baec2e0cd4bd0a394ba567d0409260a300f2",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        }
+      ]
+    },
+    {
+      "id": "daily-02",
+      "original_report_sha256": "64cab310598fef12d247b63270c71a365df0dd423440fd22da9c209181b749fe",
+      "originally_accepted": 5,
+      "originally_rejected": 1,
+      "original_source_snapshot_sha256": "2d8cbd711311da18066db4ca0dc9bd16281443d1b320a4588197c92e4c6d7fa6",
+      "samples": [
+        {
+          "id": "exact_saturn_square-1",
+          "output_sha256": "1e31ab0ec6f43fff92ec99e66a3f2dda804aafb6909d51df9e47e5f2ce8f7de2",
+          "private_sample_sha256": "158692944b5c8077d2a797caf0420e548ea4558e140ca371603b9f62eac08707",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "approximate_window-1",
+          "output_sha256": "4e4dbfc44d081c28f1ad59e03d9812ac8346493fe0c5fa7ce5bf4e1639f38f1c",
+          "private_sample_sha256": "0722474ed8290932658b0218c632f7638f79aaf92b123ea525629665b4a77d61",
+          "originally_accepted": false,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "unknown_time-1",
+          "output_sha256": "60669206bed00c8d5ca89cd5ecdb693e656a4dd033f9187696adb36340ee9dc8",
+          "private_sample_sha256": "e468419824c022c75ba4a8c8cc656976d74eb1e41e8f490f417b28d68d2ddf07",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "zero_cycle_day-1",
+          "output_sha256": "467b53e586e2933f1d00bda1e5f11b97a75572c2197e5ffc86132e65a881fdd4",
+          "private_sample_sha256": "e458958e6360e5a66a2d5f4a6fa640bdaf78086ef8f62b42fa6aa5d082a6d3d4",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "collective_only_day-1",
+          "output_sha256": "27b213f72015e324b191807e841b76718c522a1b0f3f37381f58d8cee880ebd3",
+          "private_sample_sha256": "08363b7c03b166825c089372387e62a7fc0be27645459019e4db942e68011338",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "injected_user_text-1",
+          "output_sha256": "c41265c5e77e494b6be07ff671f41e46b3bd56006000272233154978e79128d2",
+          "private_sample_sha256": "5ca9325d293e60f3dc8e13cca81466b1c52f8f1a35079a2a42c3a21e08d42b59",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        }
+      ]
+    },
+    {
+      "id": "daily-03",
+      "original_report_sha256": "80b6dc2c343e7b866a51395bb4b9225d224ef013020e0d4b7605505865589cf2",
+      "originally_accepted": 5,
+      "originally_rejected": 1,
+      "original_source_snapshot_sha256": "3a5b0af73c4bba172ecc49207a0f71ae48cb0cb79ad792afcc38a302d1995c01",
+      "samples": [
+        {
+          "id": "exact_saturn_square-1",
+          "output_sha256": "61d7918583299d570614a87b73cd3596edf20a4d022c59c5de8d6bb46d9c651a",
+          "private_sample_sha256": "b82fa78523d5deb1ee1c3196ac2dc041c8a27753f0d019fba73df8e37b2386d7",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "approximate_window-1",
+          "output_sha256": "b16c1c926297ece6392a8c2b63a0bd5360080823aeb4d79a50399e53f2b0281a",
+          "private_sample_sha256": "af12ab1f7921b52b54f9c06ebdabb22ae1bc9bf7b63aee4fa988eb2d4f178845",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "unknown_time-1",
+          "output_sha256": "19fa71845e4ca849ee52c70f00dc5397a984f89f0ee52bb2e8e6a70fa0c8ec49",
+          "private_sample_sha256": "b5580dd681784efc4f5665de4d0112b1e4e3d955b3a94eea5d53a9dd5573e652",
+          "originally_accepted": false,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "zero_cycle_day-1",
+          "output_sha256": "6ab30eba0cabda2409f8ae018ed8b2c239bc8a59fcf96c60fdac33dd48c41057",
+          "private_sample_sha256": "f63e579811833a43d36070400aac9b6c895a05f1e3d9de0dd6af35427e77fad0",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "collective_only_day-1",
+          "output_sha256": "694c10c64db09ef067f22af37bd6064dd9a44b7658d509831e1f1f17c78b4288",
+          "private_sample_sha256": "ebaccdb04aa837dd8b1dca38c2c2d93a717a46f93b53c28858bfc592dfbd8eae",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        },
+        {
+          "id": "injected_user_text-1",
+          "output_sha256": "9f8aed93deceb6d9970181563985cfde18d0e54a53eef5f1fa8e56569cca5b50",
+          "private_sample_sha256": "d32590e98a1037c0340857e37895ed2cda9339a782bac328a13c4660b5e1974f",
+          "originally_accepted": true,
+          "current_invocation_matches_original": true,
+          "accepted_on_replay": true,
+          "findings": []
+        }
+      ]
+    }
+  ],
+  "sample_count": 18,
+  "accepted_on_replay": 17,
+  "current_invocations_all_match_original": true,
+  "passed": false
+}

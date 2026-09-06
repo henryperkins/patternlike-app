@@ -1,7 +1,6 @@
 import {
   contentHash,
   newId,
-  sha256Hex,
   type PatternPlan,
   type PatternPlannerOutput,
   type PatternSemanticVerdict,
@@ -36,6 +35,7 @@ import {
   type GeneratePatternCommand,
 } from "./pattern-command.js";
 import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 import {
   buildPatternTransitionStatements,
   commitPatternTransition,
@@ -92,9 +92,12 @@ import {
 } from "./pattern-replay-ledger.js";
 import {
   buildPatternPublicationProof,
+  PatternPublicationSafetyError,
   patternPublicationAuthorizationGuard,
   type PatternPublicationBundle,
 } from "./pattern-publication-proof.js";
+
+import { readRegisteredOntologyCorpus } from "./ontology-corpus.js";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
@@ -240,6 +243,7 @@ async function nudgeNextStage(
   job: PatternJobRow,
   nextStageGeneration: number,
 ): Promise<void> {
+  if (!patternGenerationIsEnabled(env)) return;
   try {
     await env.PATTERN_QUEUE.send({
       kind: "pattern_generation",
@@ -271,7 +275,7 @@ async function commitAndNudgePatternTransition(
 
 export type PatternExecuteOutcome =
   | { ok: true; terminal: boolean }
-  | { ok: false; reason: "duplicate" | "retry" | "terminal"; failureClass: string };
+  | { ok: false; reason: "duplicate" | "retry" | "terminal" | "paused"; failureClass: string };
 
 /**
  * Did this message name a stage the job has already moved past?
@@ -323,6 +327,7 @@ async function claimStage(
       `UPDATE jobs
        SET status = 'running', claim_token = ?, lease_expires_at = ?,
            available_at = NULL, started_at = COALESCE(started_at, ?),
+           result_class = CASE WHEN result_class = 'pattern_generation_paused' THEN NULL ELSE result_class END,
            attempts = attempts + 1, dispatched_at = COALESCE(dispatched_at, ?)
        WHERE id = ? AND job_type = ?
          AND (available_at IS NULL OR available_at <= ?)
@@ -899,6 +904,14 @@ async function handlePassFailure(
   attemptsMax: number,
   failure: { code: string; safe_detail_code: string; retry_after_seconds: number | null },
 ): Promise<PatternExecuteOutcome> {
+  if (!patternGenerationIsEnabled(env)) {
+    return parkPatternGeneration(env, {
+      kind: "pattern_generation",
+      job_id: job.job_id,
+      generation_id: job.generation_id,
+      stage_generation: job.stage_generation,
+    }, new Date(), token);
+  }
   const failureClass = passFailureClass(failure.code, failure.safe_detail_code);
   const retryable =
     passFailureIsRetryable(failure.code, failure.safe_detail_code) && attempt + 1 < attemptsMax;
@@ -974,12 +987,39 @@ export interface PatternExecuteOverrides {
   }) => PatternPublisher;
 }
 
+/** Park only this delivery's coordinate, without borrowing a live executor lease. */
+async function parkPatternGeneration(
+  env: Env,
+  message: PatternGenerationMessage,
+  now: Date,
+  claimToken: string | null = null,
+): Promise<PatternExecuteOutcome> {
+  await env.DB.prepare(
+    `UPDATE jobs
+     SET status = 'queued', claim_token = NULL, lease_expires_at = NULL,
+         dispatched_at = NULL, result_class = 'pattern_generation_paused'
+     WHERE id = ? AND job_type = ?
+       AND (
+         (status = 'queued' AND claim_token IS NULL)
+         OR (status = 'running' AND lease_expires_at > ? AND claim_token = ?)
+       )
+       AND EXISTS (
+         SELECT 1 FROM pattern_generation_jobs p
+         WHERE p.job_id = jobs.id AND p.generation_id = ? AND p.stage_generation = ?
+           AND p.stage NOT IN ('succeeded', 'failed', 'cancelled')
+       )`,
+  ).bind(message.job_id, PATTERN_JOB_TYPE, now.toISOString(), claimToken,
+    message.generation_id, message.stage_generation).run();
+  return { ok: false, reason: "paused", failureClass: "pattern_generation_paused" };
+}
+
 export async function executePatternJob(
   env: Env,
   message: PatternGenerationMessage,
   now = new Date(),
   overrides: PatternExecuteOverrides = {},
 ): Promise<PatternExecuteOutcome> {
+  if (!patternGenerationIsEnabled(env)) return parkPatternGeneration(env, message, now);
   const claim = await claimStage(env, message, now);
   if (claim.status === "retry") {
     return { ok: false, reason: "retry", failureClass: "claim_failed" };
@@ -1597,13 +1637,75 @@ export async function executePatternJob(
         });
         return { ok: false, reason: "terminal", failureClass: "semantic_verification_failed" };
       }
-      const publicationProof = await buildPatternPublicationProof({
-        command,
-        job: claimed.job,
-        executedWriterPin: pin,
-        readArtifact: (artifactClass) =>
-          getArtifact(env, identity, command.generation_id, artifactClass),
-      });
+      // Source IDs must come from the registered corpus bytes, independently
+      // verified against the same hash as the signed frozen ontology.
+      const corpusRow = await env.DB.prepare(
+        `SELECT corpus_release_id FROM pattern_source_corpus_releases WHERE corpus_hash = ?`,
+      ).bind(frozenOntology.corpusReleaseHash).first<{ corpus_release_id: string }>();
+      let sourceFragmentIds: ReadonlySet<string> = new Set();
+      if (corpusRow) {
+        try {
+          const corpus = await readRegisteredOntologyCorpus(env, corpusRow.corpus_release_id);
+          if (corpus.release.corpus_hash === frozenOntology.corpusReleaseHash &&
+            corpus.release.locale === command.locale) {
+            sourceFragmentIds = new Set(corpus.fragmentIndex.keys());
+          }
+        } catch {
+          // A missing or unverifiable corpus cannot authorize a source claim.
+        }
+      }
+      const publisherProvenance = provenanceFromExecutedPin(pin);
+      let publicationProof: PatternPublicationBundle;
+      try {
+        publicationProof = await buildPatternPublicationProof({
+          command,
+          job: claimed.job,
+          executedWriterPin: pin,
+          safety: {
+            features: features.features,
+            selectionManifest: selected.manifest,
+            packet: selected.packet,
+            ontology: records,
+            sourceFragmentIds,
+          },
+          publication: {
+            generatedAt: now.toISOString(),
+            provider: publisherProvenance.provider,
+            modelFamily: publisherProvenance.model_family,
+          },
+          readArtifact: async (artifactClass, artifactCoordinate) => artifactCoordinate
+            ? (await getArtifactAt(env, identity, command.generation_id, artifactClass,
+                artifactCoordinate.stageGeneration, artifactCoordinate.attempt))?.value ?? null
+            : getArtifact(env, identity, command.generation_id, artifactClass),
+        });
+      } catch (error) {
+        if (!(error instanceof PatternPublicationSafetyError)) throw error;
+        const transition = { kind: "return_to_writer", availableAt: null } as const;
+        const planned = planPatternTransition(claimed.job, transition);
+        // Broken source authority cannot improve through a writer rewrite.
+        const correctable = !error.result.failures.some((failure) =>
+          failure.code === "source_dependency_failure");
+        if (correctable && planned.next.writer_attempts < command.writer_attempts_max) {
+          const correction = buildCorrectionDocument(error.plan, {
+            deterministic: error.result.failures.map((failure) => ({
+              code: failure.code,
+              message: failure.targetKey ?? "",
+            })),
+          }, planned.next.writer_attempts);
+          await putArtifact(env, identity, claimed.job, "correction_document", correction,
+            expiresAt, planned.next.writer_attempts, planned.next.stage_generation);
+          if (!(await commitAndNudgePatternTransition(env, claimed.job, claimed.token, transition))) {
+            return { ok: false, reason: "duplicate", failureClass: "duplicate" };
+          }
+          return { ok: true, terminal: false };
+        }
+        await commitPatternTransition(env, claimed.job, claimed.token, {
+          kind: "fail",
+          failureClass: "publication_safety_failed",
+          publicStage: "checking_claims",
+        });
+        return { ok: false, reason: "terminal", failureClass: "publication_safety_failed" };
+      }
       const publication = await publishPattern(
         env,
         identity,
@@ -1611,6 +1713,9 @@ export async function executePatternJob(
         publicationProof,
         now,
       );
+      if (publication.status === "paused") {
+        return parkPatternGeneration(env, message, new Date(), claimed.token);
+      }
       if (publication.status === "retry") {
         await commitPatternTransition(env, claimed.job, claimed.token, {
           kind: "publication_retry",
@@ -1650,13 +1755,12 @@ async function publishPattern(
   now: Date,
 ): Promise<
   | { status: "published" }
+  | { status: "paused" }
   | { status: "retry"; failureClass: string }
 > {
-  const { proof, writer } = publication;
-  const patternId = `pat_${(await sha256Hex(
-    `pattern-document-v1:${proof.generationId}`,
-  )).slice(0, 32)}`;
-  const generatedAt = now.toISOString();
+  if (!patternGenerationIsEnabled(env)) return { status: "paused" };
+  const { proof, document: internal, generatedAt } = publication;
+  const patternId = internal.pattern_id;
   const sourceUpdate = proof.reservationReason === "source_update";
   const priorDocument = sourceUpdate
     ? await env.DB.prepare(
@@ -1676,34 +1780,6 @@ async function publishPattern(
   }
   const documentKey = randomKey();
   const nonce = randomNonce();
-  const publisherProvenance = provenanceFromExecutedPin(proof.executedWriterPin);
-  const internal = {
-    schema_version: "0.7.0" as const,
-    pattern_id: patternId,
-    generation_id: proof.generationId,
-    locale: proof.locale,
-    effective_accuracy: (await env.DB.prepare(
-      `SELECT chart.birth_accuracy
-       FROM pattern_generation_jobs generation
-       JOIN chart_snapshots chart
-         ON chart.id = generation.chart_id AND chart.user_id = generation.user_id
-       WHERE generation.generation_id = ? AND generation.user_id = ?`,
-    )
-      .bind(proof.generationId, identity.userId)
-      .first<{ birth_accuracy: "exact" | "approximate" | "unknown" }>())?.birth_accuracy ?? "exact",
-    plan_hash: proof.planHash,
-    candidate_hash: proof.candidateHash,
-    semantic_verdict_hash: proof.semanticVerdictHash,
-    artifact: writer,
-    compact_provenance: {
-      assembly_mode: "constrained_model" as const,
-      provider: publisherProvenance.provider,
-      model_family: publisherProvenance.model_family,
-      raw_birth_details_sent: false as const,
-      ontology_version: proof.ontologyVersion,
-      selection_policy_version: proof.executedWriterPin.selection_policy_version,
-    },
-  };
   const aad = new TextEncoder().encode(
     JSON.stringify(["patternlike.pattern-document", 1, patternId, proof.generationId]),
   );
@@ -1720,8 +1796,14 @@ async function publishPattern(
   const compactProvenance = {
     ...internal.compact_provenance,
     pattern_source_hash: proof.patternSourceHash,
+    publication_safety: {
+      policy_version: proof.safety.policyVersion,
+      candidate_hash: proof.safety.candidateHash,
+      result_hash: proof.safety.resultHash,
+    },
   };
   const accuracy = internal.effective_accuracy;
+  if (!patternGenerationIsEnabled(env)) return { status: "paused" };
   let replay;
   try {
     replay = await writePatternReplayIntent(env, sourceUpdate
@@ -1806,6 +1888,7 @@ async function publishPattern(
           at: generatedAt,
         })
       : [];
+    if (!patternGenerationIsEnabled(env)) return { status: "paused" };
     await env.DB.batch([
       buildCryptoWriteFence(env, {
         userId: identity.userId,

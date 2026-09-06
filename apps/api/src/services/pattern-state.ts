@@ -28,6 +28,7 @@ import {
 } from "./pattern-stage-protocol.js";
 import type { PatternDocumentInternal } from "@patternlike/shared";
 import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 
 export interface DocumentRow {
   id: string;
@@ -245,6 +246,7 @@ export async function buildPatternState(
     }
     const sourceChanged = document.pattern_source_hash !== PATTERN_CREATION_SOURCE_HASH;
     const canRegenerate =
+      patternGenerationIsEnabled(env) &&
       sourceChanged &&
       consent.status === "granted" &&
       ontologyServesAccount(ontology);

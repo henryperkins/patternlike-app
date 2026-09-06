@@ -1,4 +1,4 @@
-import type { CodexPortraitClaim, CodexPortraitCompletion, CodexPortraitFailure } from "@patternlike/shared";
+import { isRecordedPortraitImageModelProvenance, type CodexPortraitClaim, type CodexPortraitCompletion, type CodexPortraitFailure } from "@patternlike/shared";
 import { CodexProviderClientError, type CodexProviderClientOptions } from "./client.js";
 
 export const PORTRAIT_MAX_CLAIM_BYTES = 272 * 1024;
@@ -33,7 +33,8 @@ export function decodePortraitBase64(value: unknown, maximumBytes: number): Buff
 
 export function validPortraitCompletion(value: CodexPortraitCompletion): boolean {
   const object = value as unknown;
-  if (!record(object) || !exact(object, ["lease_token", "source_sha256", "label", "rationale", "image_base64", "original_sha256", "pixels", "provider_request_id", "image_request_id", "image_model"])) return false;
+  if (!record(object) || !exact(object, ["lease_token", "source_sha256", "label", "rationale", "image_base64", "original_sha256", "pixels", "provider_request_id", "image_request_id", "image_model", ...(Object.hasOwn(object, "image_model_provenance") ? ["image_model_provenance"] : [])])
+    || (Object.hasOwn(object, "image_model_provenance") && !isRecordedPortraitImageModelProvenance(object.image_model_provenance))) return false;
   const image = decodePortraitBase64(value.image_base64, 2 * 1024 * 1024);
   const pixels = record(value.pixels) && exact(value.pixels, ["width", "height", "rgba_base64"])
     ? decodePortraitBase64(value.pixels.rgba_base64, 128 * 128 * 4) : null;

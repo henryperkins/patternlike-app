@@ -1,0 +1,306 @@
+{
+  "schema_version": "pattern-corpus-provenance.v1",
+  "recorded_at": "2026-09-06",
+  "corpus_release_id": "pattern-ontology-source-manual-en-us-0.1.0",
+  "title": "Pattern Ontology Source Manual",
+  "edition": "0.1 (2026)",
+  "locale": "en-US",
+  "origin": "model_generated_first_party",
+  "origin_status": "recorded",
+  "origin_evidence_path": "pattern-corpus/ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md",
+  "origin_evidence_sha256": "85bee06d1de62f45056c426032c804db83b507877b2ae60db827b7dcea26e413",
+  "content_path": "pattern-corpus/fragments.json",
+  "content_sha256": "a19f5e35d2595fb6da76f5cacfc0c0f6fd21330c1df5706fd2961f830b1aed7e",
+  "fragment_hash_format": "sha256 of UTF-8 canonical JSON; sorted object keys; full fragment including ref",
+  "fragment_count": 60,
+  "generation": {
+    "provider": {
+      "status": "unverified",
+      "value": null
+    },
+    "model": {
+      "status": "unverified",
+      "value": null
+    },
+    "model_version": {
+      "status": "unverified",
+      "value": null
+    },
+    "account_context": {
+      "status": "unverified",
+      "value": null
+    },
+    "generated_at": {
+      "status": "unverified",
+      "value": null
+    }
+  },
+  "generation_record_note": "The exact historical generation record is not present. Current runtime model or account settings must not be substituted for it.",
+  "source_material_review": {
+    "status": "unverified",
+    "no_unpublished_third_party_source_supplied": null
+  },
+  "license": {
+    "license_class": "licensed_excerpt",
+    "operator_authorization_status": "recorded",
+    "counsel_review_status": "unverified",
+    "generating_account_terms_status": "unverified"
+  },
+  "human_review": {
+    "status": "incomplete",
+    "certified_fragment_count": 0,
+    "certifications": []
+  },
+  "public_activation": {
+    "status": "unverified",
+    "outstanding": [
+      "historical_generation_record",
+      "applicable_generating_account_terms",
+      "counsel_review",
+      "human_editorial_certification_for_all_60_fragments",
+      "authorized_release_and_lifecycle_evidence"
+    ]
+  },
+  "fragments": [
+    {
+      "ref": "mars-body-initiation",
+      "sha256": "fb58c56d8b836dd6cae88dbc0cc80860585b7b038d006de2505034347138e9e8"
+    },
+    {
+      "ref": "virgo-sign-improvement",
+      "sha256": "b84d80c716c853139ecbf47e05146cb37153256f05a31d84cb8d1b18c96aeb12"
+    },
+    {
+      "ref": "tenth-house-visibility",
+      "sha256": "8d70476558bfc7df0c860bf48d7547646017b029351d6d8c34e30f21ca6fa610"
+    },
+    {
+      "ref": "square-aspect-structural-friction",
+      "sha256": "4b353b8d948772045642548715d0b40857740ca594cb9e6c5741dd910cb220b0"
+    },
+    {
+      "ref": "ascendant-angle-approach",
+      "sha256": "b82fb3a92536d89e4d473d8a20d21ae096f31183dbef40334296d2dec1236744"
+    },
+    {
+      "ref": "pattern-concentration-weight",
+      "sha256": "e4e0148ec421d6393b6a865a8020a063a49e46ee51fb3a031b9b701479e2fcca"
+    },
+    {
+      "ref": "uncertainty-unknown-birth-time",
+      "sha256": "b12f779ebfed9eb66239ed80994489ae0922014ba5a3ea78afa5534f9b7f9a57"
+    },
+    {
+      "ref": "crosscutting-two-tempos",
+      "sha256": "b8c94636e26057c4f77dda57c474b3e624d42bcf56ababd19fcc6b7250491016"
+    },
+    {
+      "ref": "sun-body-organizing-motive",
+      "sha256": "8b57139d6d5e352ad2e117a8309e8aacceb0c54c7324768b1a829912e5eb902e"
+    },
+    {
+      "ref": "moon-body-settling",
+      "sha256": "603c2b21aff60f59a694b3e17751faf424cd1339f44b353373ad527bd6576b22"
+    },
+    {
+      "ref": "mercury-body-handling-information",
+      "sha256": "43e2b15b692a957199167eac4503897bd9596829f50303e64cf12d1f83765ec5"
+    },
+    {
+      "ref": "venus-body-worth-and-terms",
+      "sha256": "f77936c3ce27aba6ca6dce0836a1fc61446dca94bca19246583ebd236f0efffb"
+    },
+    {
+      "ref": "jupiter-body-scale-and-enough",
+      "sha256": "8936ca94f5387f4b832e74ec79e25ebbb3b98f20976b31ad4642316e7cffa507"
+    },
+    {
+      "ref": "saturn-body-testing-before-accepting",
+      "sha256": "22b134a559a4227cb04eada54758811867344adcccd0df310e9ddd211d1d3d61"
+    },
+    {
+      "ref": "uranus-body-arrangement-stops-fitting",
+      "sha256": "0acb6e201561153df1677be6fac2a799916f321c4596d099353f3a9fdc9bdd45"
+    },
+    {
+      "ref": "neptune-body-indistinct-edges",
+      "sha256": "7f9a536bb01f7b68f3d5c64bc671ff7fe5b550195b36e30fd37967919e50e772"
+    },
+    {
+      "ref": "pluto-body-refuses-casual",
+      "sha256": "527ecefef950f63e58d603203a46d786bd3da9eeeec76c5a99566a5a28467746"
+    },
+    {
+      "ref": "true-node-body-unfamiliar-direction",
+      "sha256": "5808b0ba1ab5b890b8331b387d77e973d653875cfb438260ae52bcbc937ac2e5"
+    },
+    {
+      "ref": "aries-sign-from-scratch",
+      "sha256": "860837a2dac46cb04b5d5bb223dfe484426a5eadc247cd88c02520fec41804ce"
+    },
+    {
+      "ref": "taurus-sign-rate-of-change",
+      "sha256": "9ed45d2f3cbb246b8c79fa9a71feb05f2614f46c47bb75595e0ac6bf580199fe"
+    },
+    {
+      "ref": "gemini-sign-holding-several",
+      "sha256": "2caf2019cb4669a9310a1a70905f14a910f9a330eb836ff30e2180a4e71fb0ff"
+    },
+    {
+      "ref": "cancer-sign-tending",
+      "sha256": "d7266ef37c94bd413618b39f00273c42aa2f4882535b6e706fd7c2bf4f5b39bf"
+    },
+    {
+      "ref": "leo-sign-taking-the-part",
+      "sha256": "957493ce1b8d6dc5736d2e417f7271cffbb2589723d18fe046212b9f83075f20"
+    },
+    {
+      "ref": "libra-sign-weighing-against",
+      "sha256": "b7b5d6dab2a6316ad697e325d1af39573e514f4111634491de12b1f4f89d4d4e"
+    },
+    {
+      "ref": "scorpio-sign-to-the-bottom",
+      "sha256": "e9dd6711e961260e50d720ef626da7ffc6ab480e3c06427943cfef145739310e"
+    },
+    {
+      "ref": "sagittarius-sign-widening-the-frame",
+      "sha256": "29bff6a7b3fcc0dd30c38b9a7bee17d7a302a892a38fd1fdf8fb8c02448cdb23"
+    },
+    {
+      "ref": "capricorn-sign-sequencing",
+      "sha256": "900f6ddd04e5e6bdc009a4e95fb606a945e4969a917fe4c64ede7aa53e2f832e"
+    },
+    {
+      "ref": "aquarius-sign-standing-outside",
+      "sha256": "cb0036f09be08b96bf34cec6f2e3b35a459a132a5b9588de285677809caf5e1f"
+    },
+    {
+      "ref": "pisces-sign-permeability",
+      "sha256": "b3a5719bdc26efcc935d69cbad7ccb9c80121a1b65443d5087de422720d2c834"
+    },
+    {
+      "ref": "first-house-immediate-arena",
+      "sha256": "4eca57ec497767508c46caf4dc2657db81497bffda42d755a4cad60194388839"
+    },
+    {
+      "ref": "second-house-own-terms",
+      "sha256": "31c184587b837b854ad26298aa3d7c0e0af77ee68985d16fdaa5f93f46693c4b"
+    },
+    {
+      "ref": "third-house-near-circuit",
+      "sha256": "adfb0c40174c5221b25e3ece689c08b4163657f189db32b1c806e6a40f78f282"
+    },
+    {
+      "ref": "fourth-house-the-base",
+      "sha256": "ec53f79135a191fe812c1b30578ca7fbd5a3c24150b925b37cce2661aea36f6e"
+    },
+    {
+      "ref": "fifth-house-made-for-its-own-sake",
+      "sha256": "641ffb2b098131cd6103582b46a77d90738a041b6a274f7064cf9fd168630e67"
+    },
+    {
+      "ref": "sixth-house-repeated-work",
+      "sha256": "faf961278e752f266c99348bfb87b1f10ed6b88f55996b3176093f05fd98b7ac"
+    },
+    {
+      "ref": "seventh-house-the-counterpart",
+      "sha256": "80f23d3bde9889ca4d56bb0ed2a83d8af2c248f0c163ef18b8ef64a685987cd2"
+    },
+    {
+      "ref": "eighth-house-held-jointly",
+      "sha256": "e8cd604820a1864baef716f713e31492f0aa30f9c1190bb38980eb97ae7afc4c"
+    },
+    {
+      "ref": "ninth-house-beyond-direct-experience",
+      "sha256": "3101550e54325e59cbc12d7209aedf5391191692ac69a4dedb7f85b59df4307a"
+    },
+    {
+      "ref": "eleventh-house-the-wider-network",
+      "sha256": "617650c04b92f55cdd12e850389eab0cb35f75650db1cdb20ec83bfb74bc5cb4"
+    },
+    {
+      "ref": "twelfth-house-unwitnessed",
+      "sha256": "1d3bab056110e09d04a719678e6ade7ec0a218ff10d56846cf12035f3938447f"
+    },
+    {
+      "ref": "conjunction-aspect-single-instrument",
+      "sha256": "af4d920b1a1ea6f936a62ac0f699d54cb0184b9d2680db767a0526e47dd4ee19"
+    },
+    {
+      "ref": "sextile-aspect-available-not-automatic",
+      "sha256": "5059d919fad3305583795b69e650f6be2a53aca2d0c83dd079bc69df988bf0ee"
+    },
+    {
+      "ref": "trine-aspect-runs-unattended",
+      "sha256": "06ce81a01d48b115734de6bd1ef1206a35feda002fed1d4ef6b7064991f47d49"
+    },
+    {
+      "ref": "opposition-aspect-across-a-gap",
+      "sha256": "25c00b50c55aa971e7a076ed08debae06a58c40cf07a037da0bc45073927a619"
+    },
+    {
+      "ref": "midheaven-angle-what-is-recorded",
+      "sha256": "e19f8c29e2731ae30ab80534f226c18c98b5f131c6d9808066bf928869feb2bb"
+    },
+    {
+      "ref": "descendant-angle-what-arrives-as-other",
+      "sha256": "9ff90e6640ac3d8006b10a0b39760555d5c097a77966d8a5a0230b1b00a71a2b"
+    },
+    {
+      "ref": "imum-coeli-angle-the-private-floor",
+      "sha256": "0122bc73ba9ea841c4a7e87517b566fa581bc00e27f04a75f3e3fa6965e63ced"
+    },
+    {
+      "ref": "pattern-axis-across-the-chart",
+      "sha256": "7873e5121363860219f43ae233e891d92f3a6517eb20cd0c2354715736df9a2e"
+    },
+    {
+      "ref": "pattern-reinforcing-loop",
+      "sha256": "1b4b653a9d4c157cf8e556af5865805d313b5d2bf51c45d96166882f56311d6a"
+    },
+    {
+      "ref": "pattern-isolated-factor",
+      "sha256": "7ee51cc29a270ebcf1c408ab560e699836b7b7bd5576faf6cbe586e1f721cef2"
+    },
+    {
+      "ref": "uncertainty-approximate-birth-time",
+      "sha256": "906a9ddd33289a896f900a04cf605a960232997ee3cca91523974e94e36ea55c"
+    },
+    {
+      "ref": "uncertainty-sparse-feature-set",
+      "sha256": "5b5a41e7047c7bea91241460380a08f9a020696743c69c178558f690ffef361a"
+    },
+    {
+      "ref": "uncertainty-qualified-location",
+      "sha256": "2ffb5353eb2b94c6d95de8c54500487d978dd962a2da2b3d64a3eae7b43ed0c2"
+    },
+    {
+      "ref": "crosscutting-collective-material",
+      "sha256": "9a158bd8d1314a4972687e68c1f43a390a82c6f7ef8ac862aa5a38d042a4066a"
+    },
+    {
+      "ref": "crosscutting-absence-is-not-deficit",
+      "sha256": "5ef82351b915c81fa4205357e4d2c5990991ebc6045eb417af882c59c1187012"
+    },
+    {
+      "ref": "crosscutting-convergence",
+      "sha256": "128b015b26cdb02c8cc5a1e0603ae0141ad77b2aa01294923e3fdefbf1f5d7aa"
+    },
+    {
+      "ref": "crosscutting-contradiction-is-ordinary",
+      "sha256": "9f4834623b7fed476e3deb5dfbf885cf2d82a6f23505351d29117ee0bf93ae1c"
+    },
+    {
+      "ref": "crosscutting-description-not-instruction",
+      "sha256": "e16831ea0822460320a49be48465e84cd43c37d8c128b4761b51efba088b16ee"
+    },
+    {
+      "ref": "crosscutting-strength-is-not-frequency",
+      "sha256": "a5415ec2d8df721e9b9bbd7319e9d9141ef4fc9a39fe6e24998a763e78fdaebd"
+    },
+    {
+      "ref": "crosscutting-no-ranking-between-charts",
+      "sha256": "9a6cefd61b402ca2e23ef3990c8abaef187f13716cbef48f7f670cd6eaf0754d"
+    }
+  ]
+}

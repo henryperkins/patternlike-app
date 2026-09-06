@@ -8,4 +8,11 @@ Consumer routes are `GET/PUT /v1/pattern-portrait/automation`, `GET /v1/pattern-
 
 Automation policy 1.1.0 is a separate explicit active-chart grant. It covers future accepted Patterns for that chart until withdrawal; it does not infer or replace account-processing or written-Pattern consent. Withdrawal stops unfinished/future work while accepted artifacts retain existing source/account erasure semantics. The complete download includes the accepted reading (including uncertainty and additional signatures), all source images, all models, the viewing metadata, declarative programs, visual audit receipts and provider request identities.
 
+Source images and the explorer's saved chapters include the optional versioned
+`image_model_provenance` projection defined by the portrait contract. New image
+receipts state that observed image-model identity was not exposed; legacy images
+remain `legacy_unrecorded`. No current model or CLI version is substituted into
+historical receipts. The complete download preserves these fields directly from
+the authenticated image download; no browser reconstruction supplies provenance.
+
 A new explicit grant after withdrawal resumes only unfinished work within its original three-attempt budget. Repeating an already enabled grant is idempotent. Accepted images/models are retained; accepted source/account erasure still removes them. While any automatic chapter work remains, explorer status is `generating`; once all work settles, any terminal chapter failure produces `failed`.

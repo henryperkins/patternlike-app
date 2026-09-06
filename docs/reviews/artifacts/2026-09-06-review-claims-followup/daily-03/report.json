@@ -1,0 +1,161 @@
+{
+  "schema_version": "fresh-reading-evaluation.v1",
+  "execution_kind": "codex_process",
+  "provider_samples_observed": true,
+  "input_origin": "fixed_fictional_profiles",
+  "production_account_exercised": false,
+  "started_at": "2026-09-06T15:47:45.546Z",
+  "completed_at": "2026-09-06T15:53:55.706Z",
+  "source_snapshot_sha256": "3a5b0af73c4bba172ecc49207a0f71ae48cb0cb79ad792afcc38a302d1995c01",
+  "base_commit": "50f452a66fb1cc6c7f88f95b297b3bc7b0b1e01b",
+  "worktree_has_changes": true,
+  "source_comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "loaded_source_comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "pin": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh",
+    "prompt_version": "1.0.3",
+    "output_schema": "daily-reading-v5",
+    "selection_policy_version": "1.1.0",
+    "validation_policy_version": "1.1.1",
+    "max_output_tokens": 4000,
+    "context_max_bytes": 98304
+  },
+  "corpus_version": "1.1.1",
+  "text_isolation_version": "1.0.0",
+  "planned": 6,
+  "accepted": 5,
+  "rejected": 1,
+  "transport_failures": 0,
+  "not_attempted": 0,
+  "samples": [
+    {
+      "id": "exact_saturn_square-1",
+      "profile": "exact_saturn_square",
+      "shape": "exact_time",
+      "started_at": "2026-09-06T15:47:45.546Z",
+      "completed_at": "2026-09-06T15:48:37.243Z",
+      "invocation_sha256": "fa54b2f2adb8348232c074fa7b569ab488a2262e5744b3ecec24d06c6c3305e2",
+      "sample_file": "exact_saturn_square-1.json",
+      "status": "accepted",
+      "output_sha256": "61d7918583299d570614a87b73cd3596edf20a4d022c59c5de8d6bb46d9c651a",
+      "provider_request_sha256": "f25a42ff300d458f9f1ead7d600b666e197cfdee23dce7561336cbf3327ae478",
+      "input_tokens": 6447,
+      "output_tokens": 3526,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "approximate_window-1",
+      "profile": "approximate_window",
+      "shape": "approximate_time",
+      "started_at": "2026-09-06T15:48:37.262Z",
+      "completed_at": "2026-09-06T15:50:04.837Z",
+      "invocation_sha256": "6cad2b943ff2f043e78fb5e78684f83f24d8fbc04d0a2b553088bab2cc304ead",
+      "sample_file": "approximate_window-1.json",
+      "status": "accepted",
+      "output_sha256": "b16c1c926297ece6392a8c2b63a0bd5360080823aeb4d79a50399e53f2b0281a",
+      "provider_request_sha256": "b6ebef602cf97ffc6360dbd4e4abbbe22c29dc210f0b9ced3a0d5e5fcc7340e5",
+      "input_tokens": 6450,
+      "output_tokens": 4036,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "unknown_time-1",
+      "profile": "unknown_time",
+      "shape": "unknown_time",
+      "started_at": "2026-09-06T15:50:04.844Z",
+      "completed_at": "2026-09-06T15:51:16.573Z",
+      "invocation_sha256": "c34950194b17791493636819942cd768a816e234139143620a572c4fab199fba",
+      "sample_file": "unknown_time-1.json",
+      "status": "rejected",
+      "output_sha256": "19fa71845e4ca849ee52c70f00dc5397a984f89f0ee52bb2e8e6a70fa0c8ec49",
+      "provider_request_sha256": "7dd02a40359669b9a3dd5a6712d6331895898c11a5e04649e85b52ad449ba681",
+      "input_tokens": 6455,
+      "output_tokens": 3424,
+      "findings": [
+        {
+          "code": "grounding",
+          "detail_code": "unsupported_fact_relationship"
+        }
+      ],
+      "qualitative": []
+    },
+    {
+      "id": "zero_cycle_day-1",
+      "profile": "zero_cycle_day",
+      "shape": "zero_cycle_day",
+      "started_at": "2026-09-06T15:51:16.580Z",
+      "completed_at": "2026-09-06T15:52:21.378Z",
+      "invocation_sha256": "bd069785d2c2bff583fc98b0f338f1df2b8e0852a8ad8da33e21a268ea9b6342",
+      "sample_file": "zero_cycle_day-1.json",
+      "status": "accepted",
+      "output_sha256": "6ab30eba0cabda2409f8ae018ed8b2c239bc8a59fcf96c60fdac33dd48c41057",
+      "provider_request_sha256": "b23a9cedc08693109eff841b67155074955c5aa7c1ba4e9b49c94b3cea8f52a9",
+      "input_tokens": 6248,
+      "output_tokens": 3196,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "collective_only_day-1",
+      "profile": "collective_only_day",
+      "shape": "collective_only_day",
+      "started_at": "2026-09-06T15:52:21.383Z",
+      "completed_at": "2026-09-06T15:53:34.477Z",
+      "invocation_sha256": "7eab946aa27897b7bd9e4bb0f2f42e9b81bcda5fa1290b1981a0800fbb19cc92",
+      "sample_file": "collective_only_day-1.json",
+      "status": "accepted",
+      "output_sha256": "694c10c64db09ef067f22af37bd6064dd9a44b7658d509831e1f1f17c78b4288",
+      "provider_request_sha256": "8c0c4bfbfbabee9930f985f25ed65fc9e74c49afa1ccc89f0e29ee177655b039",
+      "input_tokens": 6052,
+      "output_tokens": 3102,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "injected_user_text-1",
+      "profile": "injected_user_text",
+      "shape": "injected_user_text",
+      "started_at": "2026-09-06T15:53:34.481Z",
+      "completed_at": "2026-09-06T15:53:55.556Z",
+      "invocation_sha256": "e5826dfb453ced91cfa371f4db217627274643b900e32ba2519b4c2dc1867ae5",
+      "sample_file": "injected_user_text-1.json",
+      "status": "accepted",
+      "output_sha256": "9f8aed93deceb6d9970181563985cfde18d0e54a53eef5f1fa8e56569cca5b50",
+      "provider_request_sha256": "c679aeb483d4e72a873d750c5700522fe64f985c68228a79bc15894e6af4a499",
+      "input_tokens": 6451,
+      "output_tokens": 1324,
+      "findings": [],
+      "qualitative": [
+        "context_supplied_but_unused"
+      ]
+    }
+  ],
+  "independent_review": {
+    "status": "unverified",
+    "criteria": [
+      "fact_to_sentence_support",
+      "uncertainty",
+      "safety",
+      "context_attribution",
+      "usefulness"
+    ],
+    "note": "Automatic acceptance does not establish psychological truth or independent editorial approval."
+  },
+  "passed": false
+}

@@ -19,16 +19,19 @@ import {
 } from "@patternlike/reading-engine";
 
 /**
- * The quality gate a model, prompt, selection-policy, or validation-policy
- * change has to pass before it can be deployed.
+ * Offline corpus revalidation for a model, prompt, selection-policy, or
+ * validation-policy change.
  *
- * Entirely offline. Every candidate here is a frozen string that a real model
- * once could have produced; the point is not to ask a provider anything, it is
+ * Entirely offline. Every candidate here is a frozen synthetic regression
+ * string, not a freshly sampled model response. The point is
  * to pin exactly which candidates this deployment accepts and which it refuses,
  * so a policy change that quietly widens either is a failing test rather than a
- * discovery on a reader's reading. The live counterpart is a real generation
- * through the production Codex runner, which is a separately authorized
- * deployment gate rather than a script in this workspace.
+ * discovery on a reader's reading. Fresh samples use
+ * `scripts/pattern-release/fresh-reading-evaluation.mjs` and the same prepared
+ * fictional profiles through the existing isolated Codex transport. That run
+ * has separate source-bound evidence and no production publication; see
+ * `docs/deploy/fresh-reading-evaluation.md`. Neither lane establishes an
+ * independent editorial assessment.
  */
 
 const corpus = loadEvaluationCorpus();
@@ -48,8 +51,8 @@ describe("the evaluation corpus", () => {
       validation_policy_version: VALIDATION_POLICY_VERSION,
       evaluation_policy_version: EVALUATION_POLICY_VERSION,
     });
-    expect(corpus.corpus_version).toBe("1.0.3");
-    expect(corpus.base.prompt_version).toBe("1.0.2");
+    expect(corpus.corpus_version).toBe("1.1.1");
+    expect(corpus.base.prompt_version).toBe("1.0.3");
   });
 
   it("covers every profile shape the design names", () => {
@@ -79,6 +82,28 @@ describe("the evaluation corpus", () => {
         forProfile.some((entry) => entry.expect === "reject"),
         `profile ${profileId} has no rejected candidate`,
       ).toBe(true);
+    }
+  });
+
+  it("retains historical candidates as rejections and gives every profile a relational acceptance control", () => {
+    for (const id of [
+      "exact.accept.grounded",
+      "approximate.accept.qualified",
+      "unknown.accept.qualified",
+      "zero_cycle.accept.daily_sky",
+      "collective.accept.labelled",
+      "injection.accept.inert",
+    ]) {
+      const historical = corpus.cases.find((entry) => entry.id === id);
+      expect(historical, id).toMatchObject({
+        expect: "reject",
+        expect_detail: "grounding.unsupported_fact_relationship",
+      });
+      expect(historical?.notes, id).toContain(id);
+    }
+    for (const profile of Object.keys(corpus.profiles)) {
+      expect(corpus.cases.some((entry) => entry.profile === profile
+        && entry.id.endsWith(".accept.relational") && entry.expect === "accept"), profile).toBe(true);
     }
   });
 
@@ -194,7 +219,9 @@ describe("bounded qualitative checks", () => {
     // quality signals, not correctness. A reading that repeats yesterday's
     // framing is worse; it is not wrong, and refusing to publish it would mean
     // an honest unavailable state instead of a slightly dull reading.
-    const flagged = corpus.qualitative.find((entry) => entry.expect !== "clean")!;
+    const flagged = corpus.qualitative.find(
+      (entry) => entry.id === "quality.reflection_is_not_a_question.relational",
+    )!;
     const prepared = prepareProfile(corpus, flagged.profile);
 
     expect(qualitativeFindings(prepared, flagged.candidate).length).toBeGreaterThan(0);

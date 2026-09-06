@@ -1,0 +1,229 @@
+{
+  "schema_version": "offline-release-observations.v1",
+  "gate_receipt_sha256": null,
+  "expected": null,
+  "records": {
+    "source_mapping": {
+      "path": null,
+      "sha256": null
+    },
+    "worker": {
+      "path": null,
+      "sha256": null
+    },
+    "runner": {
+      "path": null,
+      "sha256": null
+    },
+    "execution": {
+      "path": null,
+      "sha256": null
+    },
+    "migrations": {
+      "path": null,
+      "sha256": null
+    },
+    "authorization": {
+      "path": null,
+      "sha256": null
+    },
+    "completion": {
+      "path": null,
+      "sha256": null
+    },
+    "saved_reuse": {
+      "path": null,
+      "sha256": null
+    },
+    "withdrawal": {
+      "path": null,
+      "sha256": null
+    },
+    "deletion": {
+      "path": null,
+      "sha256": null
+    },
+    "late_upload": {
+      "path": null,
+      "sha256": null
+    }
+  },
+  "record_templates": {
+    "source_mapping": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "source_mapping",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "gate_source_snapshot_sha256": null,
+        "released_source_snapshot_sha256": null
+      }
+    },
+    "worker": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "worker",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "source_snapshot_sha256": null,
+        "version_id": null,
+        "allocation_complete": null,
+        "versions": [],
+        "artifact_files": null
+      }
+    },
+    "runner": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "runner",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "source_snapshot_sha256": null,
+        "inventory_complete": null,
+        "artifact_files": null,
+        "installed_files_sha256": null,
+        "node_version": null,
+        "dependency_lock_sha256": null,
+        "dependency_inventory": null,
+        "dependency_inventory_sha256": null
+      }
+    },
+    "execution": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "execution",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "worker_version_id": null,
+        "runner_files_sha256": null,
+        "repository_pins": null,
+        "tuples": null,
+        "image_provider_observed_model": null,
+        "image_provider_observation_status": null
+      }
+    },
+    "migrations": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "migrations",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "inventory_complete": null,
+        "applied_files": null,
+        "applied_files_sha256": null,
+        "manifest_sha256": null,
+        "integrity_check": null,
+        "foreign_key_violations": null
+      }
+    },
+    "authorization": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "authorization",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "authorized": null,
+        "scope": null,
+        "exercise_id": null
+      }
+    },
+    "completion": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "completion",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "worker_version_id": null,
+        "runner_files_sha256": null,
+        "exercise_id": null,
+        "authorization_sha256": null,
+        "state": null,
+        "saved_images": null,
+        "saved_models": null,
+        "reader_visible": null,
+        "complete_source_preserved": null,
+        "saved_assets": null
+      }
+    },
+    "saved_reuse": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "saved_reuse",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "worker_version_id": null,
+        "runner_files_sha256": null,
+        "exercise_id": null,
+        "authorization_sha256": null,
+        "saved_assets": null,
+        "new_provider_requests": null,
+        "reader_visible": null
+      }
+    },
+    "withdrawal": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "withdrawal",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "worker_version_id": null,
+        "runner_files_sha256": null,
+        "exercise_id": null,
+        "authorization_sha256": null,
+        "unfinished_work_stopped": null,
+        "accepted_assets_preserved": null,
+        "late_completion_published": null,
+        "fresh_requests_blocked": null,
+        "saved_assets_sha256": null
+      }
+    },
+    "deletion": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "deletion",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "worker_version_id": null,
+        "runner_files_sha256": null,
+        "exercise_id": null,
+        "authorization_sha256": null,
+        "deletion_scope": null,
+        "deletion_completed": null,
+        "access_denied": null,
+        "jobs_invalidated": null,
+        "inventory_retained": null,
+        "encrypted_artifacts_remaining": null,
+        "saved_assets_sha256": null
+      }
+    },
+    "late_upload": {
+      "schema_version": "offline-release-record.v1",
+      "kind": "late_upload",
+      "source_kind": "operator_record",
+      "recorded_at": null,
+      "data": {
+        "released_commit": null,
+        "worker_version_id": null,
+        "runner_files_sha256": null,
+        "exercise_id": null,
+        "authorization_sha256": null,
+        "late_upload_attempted": null,
+        "late_upload_published": null,
+        "cleanup_rerun_completed": null,
+        "late_object_absent": null,
+        "access_denied": null,
+        "inventory_retained": null,
+        "late_object_sha256": null
+      }
+    }
+  }
+}

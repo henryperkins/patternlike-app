@@ -1,10 +1,34 @@
 # Codex production provider runbook
 
+For the source-inspected text/image/mesh processing boundaries and the account
+privacy evidence still outstanding, see
+[`codex-provider-privacy-evidence.md`](./codex-provider-privacy-evidence.md)
+(2026-09-06). Its local evidence does not certify current upstream account
+settings or installed production configuration.
+
+## Current source transport and pause control (2026-09-06)
+
+The source now runs ordinary text work through isolated `codex app-server`
+turns, shared with mesh JSON authoring. Each attempt verifies CLI `0.153.3`,
+ChatGPT authentication, effective configuration, frozen model/effort, and
+provider-reported usage. It creates an ephemeral thread in a private temporary
+directory, disables tools/MCP/skills and execution environments, rejects host
+instructions and model rerouting, and treats failed local cleanup as fatal.
+`CODEX_TEXT_ISOLATION_VERSION=1.0.0` identifies this transport contract. See the
+[fresh Daily evaluation](./fresh-reading-evaluation.md) for a bounded fictional
+provider check. This source change is not a deployment record.
+
+`PATTERN_GENERATION_ENABLED=0` now pauses new and unfinished Pattern work while
+preserving accepted reading access and deletion. Follow the
+[pause and resume runbook](./pattern-generation-pause.md); a currently leased,
+still-eligible response can be saved during the pause but cannot be published.
+Historical `codex exec` and containment records below describe earlier releases.
+
 ## Sol reasoning and priority upgrade (2026-09-05)
 
 The selected execution profile is `gpt-5.6-sol` with `xhigh` reasoning. The
 runner passes `service_tier="priority"` and enables `fast_mode` explicitly on
-every `codex exec`, using its existing ChatGPT login. Sol advertises the
+every invocation (originally `codex exec`), using its existing ChatGPT login. Sol advertises the
 `priority` tier as Fast in the runner account's model catalog. This requests
 priority processing; the provider controls the tier actually served and may
 apply its documented fallback behavior. Fast mode consumes increased usage.
@@ -45,7 +69,7 @@ activation, or rollout advance.
 This runbook operates the supported Codex CLI provider for **daily readings**,
 Pattern generation, and the ontology pipeline. The API Worker owns durable jobs,
 budgets, validation, signing, publication, and encrypted artifacts. An approved
-non-AGPL host performs inference through `codex exec` using its local ChatGPT
+non-AGPL host performs inference through isolated `codex app-server` turns using its local ChatGPT
 login.
 
 Daily joined this control plane on 2026-08-27 and has no other transport: the
@@ -82,12 +106,13 @@ Confirm the local CLI surface before installation:
 
 ```bash
 codex --version
-codex exec --help
+codex app-server --help
 codex login status
 ```
 
-The deployed runner uses `--ephemeral`, `--sandbox read-only`, `--json`, and
-`--output-schema`. Do not replace this with a private HTTP endpoint.
+The source requires the pinned CLI and uses ephemeral, read-only app-server
+threads with a strict output schema. Confirm the installed runner matches the
+tested artifact; do not infer deployment from this source description.
 
 ## 2. Verify and back up before migration
 
@@ -178,15 +203,14 @@ Before deploying, confirm the production variables contain:
 
 ```toml
 ONTOLOGY_PIPELINE_ROLLOUT = "off"
+PATTERN_GENERATION_ENABLED = "0"
 ```
 
-Pattern has no rollout variable to check. What decides whether any Pattern can
-be generated is the reader's own eligibility ladder — an active chart, a
-confirmed locale, their current consent, an unused claim — plus one thing an
-operator does control: whether a public-capable ontology is active. Until one
-is, `GET /v1/pattern-state` answers `ontology_unavailable` for every account and
-no reservation is accepted. Confirm the active ontology pointer is null before
-this deploy if you intend no Pattern generation to be possible.
+Keep Pattern paused until compatible artifacts and the intended ontology are
+verified. Enabling the switch does not bypass reader eligibility: an active
+chart, confirmed locale, current consent, an available claim, and a serving
+ontology remain necessary. A missing switch preserves the legacy enabled
+behavior, so an intended pause must set it explicitly.
 
 Deploy through the normal root command:
 
@@ -388,10 +412,10 @@ margin. There are no OpenAI 120000-ms values left to inherit: a deployment
 carrying them fails `checkSecureConfig` on every request rather than running
 long.
 
-Containment during the canary is the runner and the deployed version, not an
-account list. `PATTERN_DAILY_PROVIDER_CALL_LIMIT` bounds the day's spend, and
-stopping the runner stops every outbound pass; neither is advertised as a
-product switch, and neither denies one account while serving another.
+`PATTERN_GENERATION_ENABLED=0` is the dedicated Pattern pause control.
+`PATTERN_DAILY_PROVIDER_CALL_LIMIT` separately bounds the day's spend. Stopping
+the shared runner also stops other provider domains; use the dedicated control
+when only Pattern work needs to pause.
 
 Use the normal authenticated, confirmed first-use flow. It creates the current
 Pattern-generation grant and reservation atomically; only chart-correction
@@ -506,15 +530,13 @@ deploy/restart, and verify idle polling. Never reuse an old service token.
 
 The safe rollback is:
 
-1. set the affected rollouts to `off` and deploy — `READING_V5_ROLLOUT` for
-   Daily and `ONTOLOGY_PIPELINE_ROLLOUT` for the pipeline; they are independent
-   switches and stopping one need not stop the other. **Pattern has no such
-   switch.** Roll the Worker back to the last known-good version and, if
-   generation itself must stop, stop the runner: in-flight provider work is
-   then cancelled by the ordinary current-owner checks at claim time rather
-   than by an account gate. Do not reintroduce one;
-2. stop and disable the runner if the fault is the runner itself, or if Pattern
-   generation must stop while the Worker version stands;
+1. set the affected controls and deploy: `READING_V5_ROLLOUT=off` for Daily,
+   `ONTOLOGY_PIPELINE_ROLLOUT=off` for the ontology pipeline, or
+   `PATTERN_GENERATION_ENABLED=0` for Pattern. These controls are independent.
+   Follow the pause runbook for retained leases and resume behavior;
+2. stop and disable the runner if the fault is the runner itself. If rolling
+   back to Worker code without the Pattern pause control, verify containment
+   through the runner and ontology policy before returning traffic;
 3. leave migrations `0013`, `0014`, and `0017` and encrypted artifacts in place;
 4. investigate using only safe state, hashes, counters, and closed codes;
 5. redeploy the last known-good Worker only if its schema is compatible with

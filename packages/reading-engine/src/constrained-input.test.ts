@@ -355,6 +355,26 @@ test("facts are ordered by (lane_rank, fact_id) and lanes follow reading priorit
   assert.deepEqual(ALL_FACT_IDS(prepared), ordered.map((f) => f.fact_id));
 });
 
+test("internal support keeps calculation roles and a detached source record off the provider wire", () => {
+  const contact = structuredClone(CONTACT_FACT);
+  const prepared = prepareConstrainedReadingInput(baseInput({
+    daily_sky_facts: [SUN_ANCHOR, LUNAR_PHASE_FACT, contact],
+  }));
+  const support = prepared.selected_facts.find((fact) => fact.fact_id === contact.fact_id)!.support;
+  assert.equal(support.kind, "daily_sky");
+  if (support.kind !== "daily_sky") return;
+  assert.deepEqual(support.value.detail, CONTACT_FACT.detail);
+  contact.detail = { ...MOON_CONTACT_FACT.detail };
+  assert.deepEqual(support.value.detail, CONTACT_FACT.detail);
+  for (const fact of prepared.request.facts) {
+    assert.equal("support" in fact, false);
+    assert.ok(fact.label.length <= 200);
+  }
+  const cycle = prepared.request.facts.find((fact) => fact.fact_id === CYCLE.id)!;
+  assert.match(cycle.label, /configured orb limit/);
+  assert.ok(cycle.attributes.timestamps.includes(CYCLE.exact_at));
+});
+
 test("a zero-cycle day is still a factual day", () => {
   const prepared = prepareConstrainedReadingInput(baseInput({ cycles: [] }));
 

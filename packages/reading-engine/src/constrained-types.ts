@@ -50,14 +50,14 @@ import type {
  * `generation_input_id`.
  */
 export const SELECTION_POLICY_ID = "constrained-context-selection" as const;
-export const SELECTION_POLICY_VERSION = "1.0.0" as const;
+export const SELECTION_POLICY_VERSION = "1.1.0" as const;
 
 /**
  * Bump for ANY change to what a candidate must satisfy. Stored in v5 evidence,
  * so a reader can tell which rule set a published reading actually passed.
  */
 export const VALIDATION_POLICY_ID = "constrained-candidate-validation" as const;
-export const VALIDATION_POLICY_VERSION = "1.0.0" as const;
+export const VALIDATION_POLICY_VERSION = "1.1.1" as const;
 
 /** Domain-separation tags. Two preimages over the same selection, two digests. */
 export const GENERATION_INPUT_IDENTITY_PROFILE = "patternlike.generation-input-id.v1" as const;
@@ -231,6 +231,18 @@ export interface ConstrainedReadingInput {
 
 export type ConstrainedFactOrigin = "cycle_scan" | "daily_sky" | "natal";
 
+/**
+ * Authoritative relationship data, retained only inside the engine. Unlike the
+ * provider's vocabulary arrays, these records preserve transit/natal roles,
+ * ingress direction, degree kind, and start/exact/end instants. The frozen
+ * chart/calculation digests bind these inputs; they never enter the provider
+ * request or an additional unversioned wire shape.
+ */
+export type ConstrainedFactSupport =
+  | { kind: "cycle"; value: NormalizedCycle }
+  | { kind: "daily_sky"; value: DailySkyFact }
+  | { kind: "natal"; value: ConstrainedNatalFactInput };
+
 export interface ConstrainedFact {
   fact_id: string;
   fact_class: M5FactClass;
@@ -238,6 +250,7 @@ export interface ConstrainedFact {
   lane_rank: LaneRank;
   label: string;
   attributes: FactAttributes;
+  support: ConstrainedFactSupport;
   origin: ConstrainedFactOrigin;
   /** The calculation service's digest when it supplied one. */
   content_digest: string | null;
@@ -277,6 +290,8 @@ export interface PreparedConstrainedReadingInput {
   selected_prior_readings: ConstrainedPriorReading[];
   rejections: Rejection[];
   request: ReadingGenerationRequest;
+  /** Frozen local-day bounds for interpreting "today" without a timezone guess. */
+  day_window: { start_at: string; end_at: string };
   /** UTF-8 length of the canonical packet. Never exceeds `context_max_bytes`. */
   packet_bytes: number;
   input_manifest_canonical: string;

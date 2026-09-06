@@ -5,7 +5,7 @@ import { contentHash } from "@patternlike/shared";
 import { decryptPatternDocument, loadAnyPatternDocument } from "../services/pattern-state.js";
 import { encryptUnderContentKey, randomNonce, unwrapContentKey } from "../services/pattern-crypto.js";
 import { b64 } from "../crypto.js";
-import { maintainPortraits, nextPortraitMaintenanceBatch, claimPortrait, PORTRAIT_LEASE_MS } from "../services/pattern-portrait.js";
+import { maintainPortraits, nextPortraitMaintenanceBatch, claimPortrait, PORTRAIT_LEASE_MS, assetById, currentPattern, patternKey, readAsset } from "../services/pattern-portrait.js";
 import { processDeletionMessage } from "../services/account-deletion.js";
 import { applyPatternReplayEvent, writePatternReplayIntent } from "../services/pattern-replay-ledger.js";
 import { collectDeletionArtifactKeys } from "../services/deletion-manifest.js";
@@ -107,6 +107,63 @@ async function finish(claim: CodexPortraitClaim) { const res=await machine(`/${c
 async function ready() { await start();for(let i=0;i<4;i++) await finish(await take());return await (await user("/v1/pattern-portrait")).json() as PatternPortraitResponse; }
 
 describe("portrait durable completion and privacy",() => {
+  it("retains qualified image-model evidence through encrypted storage, reads and image downloads", async () => {
+    await start();
+    const provenance = {
+      schema_version: "portrait-image-model-provenance/v1", requested_image_model: "gpt-image-2",
+      observed_image_model: null, observation_status: "not_exposed", codex_cli_version: "0.153.3",
+    };
+    for (let index = 0; index < 4; index++) {
+      const claim = await take();
+      const completion = { ...completed(claim), image_model_provenance: provenance };
+      expect((await machine(`/${claim.job_id}/complete`, completion)).status).toBe(200);
+      expect((await machine(`/${claim.job_id}/complete`, completion)).status).toBe(200);
+      expect((await machine(`/${claim.job_id}/complete`, completed(claim))).status).toBe(409);
+    }
+    const portrait = await (await user("/v1/pattern-portrait")).json() as PatternPortraitResponse;
+    expect(portrait.status).toBe("ready");
+    for (const chapter of portrait.chapters) expect(chapter.image_model_provenance).toEqual(provenance);
+    const sampleId = await env.DB.prepare("SELECT sample_asset_id FROM pattern_portrait_jobs WHERE portrait_id = ? ORDER BY chapter_index LIMIT 1").bind(portrait.portrait_id).first<{ sample_asset_id: string }>();
+    const sample = await assetById(enabledEnv(), sampleId!.sample_asset_id);
+    const key = await patternKey(enabledEnv(), (await currentPattern(enabledEnv(), USER_A))!);
+    const metadata = JSON.parse(new TextDecoder().decode(await readAsset(enabledEnv(), sample!, key)));
+    expect(metadata.image_model_provenance).toEqual(provenance);
+    const download = await user(`/v1/pattern-portrait/download?${new URLSearchParams({ pattern_id: document.pattern_id, chart_id: chartId, generated_at: document.generated_at })}`);
+    const bundle = await download.json() as { portrait: PatternPortraitResponse; images: Array<{ image_model_provenance: unknown }> };
+    expect(download.status).toBe(200);
+    expect(bundle.portrait).toEqual(portrait);
+    expect(bundle.images).toHaveLength(4);
+    for (const image of bundle.images) expect(image.image_model_provenance).toEqual(provenance);
+  });
+  it("projects legacy receipts as unrecorded without rewriting saved samples or inventing a CLI version", async () => {
+    const portrait = await ready();
+    expect(portrait.status).toBe("ready");
+    const sampleId = await env.DB.prepare("SELECT sample_asset_id FROM pattern_portrait_jobs WHERE portrait_id = ? ORDER BY chapter_index LIMIT 1").bind(portrait.portrait_id).first<{ sample_asset_id: string }>();
+    const sample = await assetById(enabledEnv(), sampleId!.sample_asset_id);
+    const key = await patternKey(enabledEnv(), (await currentPattern(enabledEnv(), USER_A))!);
+    const original = await readAsset(enabledEnv(), sample!, key);
+    expect(JSON.parse(new TextDecoder().decode(original))).not.toHaveProperty("image_model_provenance");
+    for (const chapter of portrait.chapters) expect(chapter.image_model_provenance).toEqual({
+      schema_version: "portrait-image-model-provenance/v1", requested_image_model: "gpt-image-2",
+      observed_image_model: null, observation_status: "legacy_unrecorded", codex_cli_version: null,
+    });
+    await user("/v1/pattern-portrait");
+    expect(await readAsset(enabledEnv(), sample!, key)).toEqual(original);
+  });
+  it("rejects unsupported provider attestations and inconsistent image-model evidence before accepting assets", async () => {
+    await start();
+    const claim = await take();
+    const provenance = {
+      schema_version: "portrait-image-model-provenance/v1", requested_image_model: "gpt-image-2",
+      observed_image_model: null, observation_status: "not_exposed", codex_cli_version: "0.153.3",
+    };
+    for (const change of [
+      { observed_image_model: "gpt-image-2" }, { requested_image_model: "different" },
+      { observation_status: "provider_attested" }, { codex_cli_version: null },
+      { observation_status: "legacy_unrecorded", codex_cli_version: null },
+    ]) expect((await machine(`/${claim.job_id}/complete`, { ...completed(claim), image_model_provenance: { ...provenance, ...change } })).status).toBe(400);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM pattern_portrait_assets").first()).toEqual({ n: 0 });
+  });
   it("saves exactly four images and a stable encrypted graph, with private image and download routes",async () => {
     const result=await ready();expect(result.status).toBe("ready");expect(result.completed_chapters).toBe(4);expect(result.chapters).toHaveLength(4);expect(result.graph?.engine_version).toBe("constellation-v1");
     const reopen=await (await user("/v1/pattern-portrait")).json() as PatternPortraitResponse;

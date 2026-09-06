@@ -107,7 +107,7 @@ describe("Context & privacy", () => {
 
     const panel = consentPanel();
     expect(await within(panel).findByText("OpenAI")).toBeInTheDocument();
-    expect(within(panel).getByText(/Writing your daily reading/i)).toBeInTheDocument();
+    expect(within(panel).getByText("Writing your daily reading, and nothing else.")).toBeInTheDocument();
     expect(within(panel).getByText(`v${consentNotGranted.policy_version}`)).toBeInTheDocument();
 
     const listed = [...panel.querySelectorAll(".ai-consent-categories li")].map(
@@ -123,7 +123,7 @@ describe("Context & privacy", () => {
 
     expect(within(panel).getByText(/not consent to train a model/i)).toBeInTheDocument();
     expect(within(panel).getByText(/can name people and places/i)).toBeInTheDocument();
-    expect(within(panel).getByText(/governed by the agreement and settings/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/OpenAI's retention follows the agreement and settings/i)).toBeInTheDocument();
     // The details surface does not link to itself.
     expect(
       within(panel).queryByRole("link", { name: /full privacy details/i }),

@@ -1,0 +1,73 @@
+{
+  "schema_version": "review-commit-verification.v1",
+  "observed_at": "2026-09-06T16:42:24.132Z",
+  "stage": "before_commit_and_push",
+  "base_commit": "50f452a66fb1cc6c7f88f95b297b3bc7b0b1e01b",
+  "source_snapshot_sha256": "3c25c5f5f276f322538392c99954d84122f8a812e6ebb64bd66088d80a2d8d37",
+  "file_count": 1237,
+  "comparison_to_implementation_verification": {
+    "ok": false,
+    "changed": [
+      "CLAUDE.md",
+      "apps/api/src/generated/pattern-creation-source.ts",
+      "apps/codex-runner/src/codex-environment.ts"
+    ],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "changed_source_explanation": "CLAUDE.md corrects the validation version and stale no-kill-switch claim. The runner environment file loses only an extra blank line at EOF, and the generated Pattern creation fingerprint is updated to match those bytes. No execution logic or test changed. The focused runner and fingerprint checks below follow normalization; Daily checks precede this formatting and generated-metadata-only change.",
+  "focused": [
+    {
+      "area": "Daily candidate grammar and cited fact support",
+      "tests": 73,
+      "passed": 73,
+      "exit_code": 0,
+      "command": "npm exec -w @patternlike/reading-engine -- tsx --test src/candidate-validation.test.ts",
+      "operator_log": "/tmp/patternlike-main-push-reading-focus-node.log",
+      "sha256": "3f8aacceffc5d6965d3b5c4a88827df167dfc42ebfacf3ad1247446b5a91d7da"
+    },
+    {
+      "area": "Daily execution, frozen evidence, prompt and evaluation",
+      "tests": 121,
+      "passed": 121,
+      "exit_code": 0,
+      "command": "npm exec -w @patternlike/api -- vitest run src/services/generate-daily-reading-v5.test.ts src/services/reading-evaluation.test.ts src/services/reading-prompt.test.ts",
+      "operator_log": "/tmp/patternlike-main-push-api-focus.log",
+      "sha256": "7909b9887296b94e2f6ad58ec99a24d6e12478cf12a433f22e73dcc2f7a7fe25"
+    },
+    {
+      "area": "Isolated text invocation and environment controls",
+      "tests": 26,
+      "passed": 26,
+      "exit_code": 0,
+      "command": "npm exec -w @patternlike/codex-runner -- tsx --test src/codex-cli.test.ts src/codex-isolation.test.ts",
+      "operator_log": "/tmp/patternlike-main-push-runner-focus.log",
+      "sha256": "5fbd3ad281023e5185df864d7be8bd1316aa6219eb0081dd50008d33c43f6799"
+    },
+    {
+      "area": "Pattern source fingerprint regressions",
+      "tests": 3,
+      "passed": 3,
+      "exit_code": 0,
+      "command": "npm run test:pattern-source -w @patternlike/api",
+      "operator_log": "/tmp/patternlike-main-push-source-tests.log",
+      "sha256": "d544d8318c7568122badd522808bfdd89e9629c7a6c55371b99124bf0f9e1a9b"
+    }
+  ],
+  "superseded_verification_attempt": {
+    "command": "npm exec -w @patternlike/reading-engine -- vitest run src/candidate-validation.test.ts",
+    "exit_code": 1,
+    "reason": "Incorrect runner for a node:test suite; corrected to the repository tsx --test runner above.",
+    "operator_log": "/tmp/patternlike-main-push-reading-focus.log"
+  },
+  "full_gate_status": "not_rerun_at_user_direction",
+  "deployment_status": "unverified",
+  "source_fingerprint_check": {
+    "exit_code": 0,
+    "command": "npm run check:pattern-source -w @patternlike/api",
+    "operator_log": "/tmp/patternlike-main-push-source-check.log",
+    "sha256": "f0cb241345ff1ae3cd9d75626f4ce46fb1ad76ef7f0b5a01a1518e8875608cb4",
+    "pattern_creation_source_hash": "sha256:b1c8ff83924dfc7010c86fcfba37e2bb0f2eb09c0022dd5ee5169dfbc3fdce39"
+  }
+}

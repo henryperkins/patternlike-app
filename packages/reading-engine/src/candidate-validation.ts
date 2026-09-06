@@ -3,9 +3,10 @@
  *
  * There is no human review and no second model behind this file: what it
  * accepts is published. It therefore answers one question per check, and every
- * check is mechanical — the accepted astrology vocabulary is the union of what
- * the supplied facts declare, not a judgement about whether a particular
- * sentence sounds plausible.
+ * check is mechanical. Vocabulary containment is followed by sentence-level
+ * checks of the cited records' relationships, roles, quantities, and times.
+ * These enforce a bounded English factual contract; they do not establish the
+ * truth of generated psychological interpretation.
  *
  * A candidate that fails one check is rejected whole. It is never partially
  * published and never repaired with deterministic prose, because there is none.
@@ -51,6 +52,7 @@ import {
   firstMatch,
   type UnitKind,
 } from "./candidate-policy.js";
+import { validateFactSupport } from "./claim-support.js";
 
 interface CandidateUnit {
   kind: UnitKind;
@@ -378,15 +380,30 @@ export function validateReadingCandidate(
       }
     }
     const substantive = hasAstrologyClaim(unit.text);
-    if ((substantive || unit.kind === "lead") && unit.fact_ids.length === 0) {
+    // A bounded uncertainty disclosure is supported by the packet's accuracy
+    // and suppression record. It must not invent a fact for withheld data.
+    // validateFactSupport below still rejects every other sentence in this unit.
+    if (unit.kind !== "uncertainty_note" && (substantive || unit.kind === "lead") && unit.fact_ids.length === 0) {
       fail("grounding", "astrology_without_fact");
     }
   }
 
   // Vocabulary --------------------------------------------------------------
-  for (const text of [candidate.headline, ...units.map((u) => u.text)]) {
+  for (const text of [candidate.headline, ...units.filter((unit) =>
+    // A validated omission names suppressed data, which can be absent from
+    // selected facts. Only the closed uncertainty grammar grants this exception.
+    unit.kind !== "uncertainty_note" || validateFactSupport(unit.text, [], prepared, unit.kind) !== null,
+  ).map((unit) => unit.text)]) {
     const reason = vocabularyFailure(text, vocabulary);
     if (reason) fail("vocabulary", reason);
+  }
+
+  const headlineSupport = validateFactSupport(candidate.headline, [], prepared, "headline");
+  if (headlineSupport) fail("grounding", headlineSupport);
+  for (const unit of units) {
+    const cited = unit.fact_ids.map((id) => factIndex.get(id)).filter((fact): fact is ConstrainedFact => !!fact);
+    const reason = validateFactSupport(unit.text, cited, prepared, unit.kind);
+    if (reason) fail("grounding", reason);
   }
 
   // Uncertainty -------------------------------------------------------------

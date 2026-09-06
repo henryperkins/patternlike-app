@@ -1,0 +1,31 @@
+{
+  "compared_head": "eccddccfc48b50231228730534a84bde4b7fa32e",
+  "frozen_base_commit": "9b45db00005833918bff719e6d86cb9d17598add",
+  "recorded_file_count": 1183,
+  "entries_compared": 1183,
+  "matched": 1179,
+  "changed": [
+    {
+      "path": "CLAUDE.md",
+      "frozen_sha256": "492da2e9b09b2a7afc58a5b086cfd1b24a44417965e00805b44ee928893ae0d0",
+      "current_sha256": "3cd25d1c6e12dfda6ac96196643fac7fb921f6db91e278bdbed950b4432a070d"
+    },
+    {
+      "path": "apps/codex-runner/src/portrait-mesh-invocation.test.ts",
+      "frozen_sha256": "3476c791966d1e3a39305f6d667a7ad3f1c5c50edb5b9e45b74c6313ad5c888b",
+      "current_sha256": "39edd4675574e8d44b59e0357c4a48b3ee19020f041b4d0db5ceef917c044c95"
+    },
+    {
+      "path": "apps/codex-runner/src/portrait-mesh-invocation.ts",
+      "frozen_sha256": "929029cbaa440c98fd4fa1adf433dbe7093d36ae8f8a0d11e845446127127bef",
+      "current_sha256": "dfd1612a160c7c4504f53ea93cc002a8219c335cbf2ee1facc4c4c936eed533b"
+    },
+    {
+      "path": "db/d1/MIGRATIONS.json",
+      "frozen_sha256": "5dc91a90a0552475d781ba3386c3a82ab31e635ef324e4104fc5496f6a302eda",
+      "current_sha256": "9dcf244716ead2a410b4f0385307aef0385de640b5f6abc98b827d12667f9414"
+    }
+  ],
+  "missing": [],
+  "scope": "Only manifest-listed paths were compared; excluded and later-added files are not covered."
+}

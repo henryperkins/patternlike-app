@@ -1,0 +1,23 @@
+{
+  "lease_token": "12345678-1234-4234-9234-123456789abc",
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "label": "Compass",
+  "rationale": "A recognizable object selected from one full fictional chapter.",
+  "image_base64": "aW1hZ2U=",
+  "original_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "pixels": {
+    "width": 128,
+    "height": 128,
+    "rgba_base64": "AAAAAA=="
+  },
+  "provider_request_id": "thread:turn",
+  "image_request_id": "call_image",
+  "image_model": "gpt-image-2",
+  "image_model_provenance": {
+    "schema_version": "portrait-image-model-provenance/v1",
+    "requested_image_model": "gpt-image-2",
+    "observed_image_model": null,
+    "observation_status": "legacy_unrecorded",
+    "codex_cli_version": null
+  }
+}

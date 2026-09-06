@@ -1,0 +1,8 @@
+{
+  "compared_commit": "ce524431ee18f955a7105bfb2ba573000eb5b625",
+  "recorded_file_count": 1183,
+  "matched": 1183,
+  "changed": [],
+  "missing": [],
+  "scope": "Manifest-listed paths only. This compares source bytes, not a running Worker or installed runner."
+}

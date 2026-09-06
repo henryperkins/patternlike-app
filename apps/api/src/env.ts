@@ -241,12 +241,14 @@ export interface Env {
   // M7 AI-generated Pattern
   // -------------------------------------------------------------------------
 
+  /** Reversible all-account generation pause: 0 pauses; 1 or absent enables. */
+  PATTERN_GENERATION_ENABLED?: string;
   /**
    * Test-only semantic reject hook. Honored only when AUTH_STUB=1 so a
    * production deploy cannot accidentally refuse every Pattern.
    */
   PATTERN_SEMANTIC_FORCE_REJECT?: string;
-  /** `openai` in production; `synthetic` is refused outside development. */
+  /** The only deployable Pattern publisher is `codex`. */
   PATTERN_PUBLISHER?: string;
   OPENAI_PATTERN_PLANNER_MODEL?: string;
   OPENAI_PATTERN_PLANNER_REASONING?: string;

@@ -1,4 +1,4 @@
-import type { PatternPortraitResponse } from "./portrait-types.js";
+import type { PatternPortraitDownload, PatternPortraitResponse } from "./portrait-types.js";
 import type { PatternResponseV7 } from "./m7-types.js";
 import type { PortraitMeshProgram } from "./portrait-mesh-program.js";
 
@@ -92,12 +92,7 @@ export interface PatternPortraitExplorerDownload {
   schema_version: "pattern-portrait-explorer-download/v1";
   reading: PatternResponseV7;
   explorer: PatternPortraitExplorerResponse;
-  images: Array<{
-    reference_id: string;
-    content_type: "image/png";
-    sha256: string;
-    data_base64: string;
-  }>;
+  images: PatternPortraitDownload["images"];
   models: Array<{
     reference_id: string;
     content_type: "model/gltf-binary";

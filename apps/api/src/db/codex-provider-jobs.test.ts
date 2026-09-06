@@ -189,6 +189,28 @@ describe("Codex provider durable jobs", () => {
     await resetDb();
   });
 
+  it("skips paused Pattern work while continuing to lease Daily and ontology work", async () => {
+    await seedUser(IDENTITY_A);
+    const now = new Date("2026-08-24T00:00:00.000Z");
+    const pattern = await enqueueCodexProviderJob(env, {
+      ...enqueueInput(), pipeline: "pattern", pass: "planner", userId: USER_A,
+      ownerId: "pgen_pause_claim_selection",
+      request: { ...requestArtifact(), nonce: "BBBBBBBBBBBBBBBB", objectKey: "codex-provider-jobs/cpjob_pause_pattern/request.json.enc" },
+    }, new Date(now.getTime() - 1000));
+    const ontology = await enqueueCodexProviderJob(env, enqueueInput(), now);
+    const reading = await enqueueCodexProviderJob(env, {
+      ...readingEnqueueInput(),
+      request: { ...requestArtifact(), nonce: "CCCCCCCCCCCCCCCC", objectKey: "codex-provider-jobs/cpjob_pause_reading/request.json.enc" },
+    }, new Date(now.getTime() + 1));
+    const paused = { ...env, PATTERN_GENERATION_ENABLED: "0" };
+    const ready = new Date(now.getTime() + 2);
+    expect(await claimCodexProviderJob(paused, ready)).toMatchObject({ status: "claimed", job: { id: ontology.job.id } });
+    expect(await claimCodexProviderJob(paused, ready)).toMatchObject({ status: "claimed", job: { id: reading.job.id } });
+    expect(await claimCodexProviderJob(paused, ready)).toEqual({ status: "empty" });
+    expect(await claimCodexProviderJob({ ...env, PATTERN_GENERATION_ENABLED: "1" }, ready))
+      .toMatchObject({ status: "claimed", job: { id: pattern.job.id } });
+  });
+
   it("creates once and adopts an identical immutable coordinate", async () => {
     const now = new Date("2026-08-24T00:00:00.000Z");
     const first = await enqueueCodexProviderJob(env, enqueueInput(), now);

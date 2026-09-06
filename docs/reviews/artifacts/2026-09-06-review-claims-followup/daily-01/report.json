@@ -1,0 +1,159 @@
+{
+  "schema_version": "fresh-reading-evaluation.v1",
+  "execution_kind": "codex_process",
+  "provider_samples_observed": true,
+  "input_origin": "fixed_fictional_profiles",
+  "production_account_exercised": false,
+  "started_at": "2026-09-06T15:15:41.317Z",
+  "completed_at": "2026-09-06T15:21:14.905Z",
+  "source_snapshot_sha256": "bf00ab29ff575e0036463015b1ee22a8391b99b5be0b1b831b0f1165825d9e58",
+  "base_commit": "50f452a66fb1cc6c7f88f95b297b3bc7b0b1e01b",
+  "worktree_has_changes": true,
+  "source_comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "pin": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh",
+    "prompt_version": "1.0.3",
+    "output_schema": "daily-reading-v5",
+    "selection_policy_version": "1.1.0",
+    "validation_policy_version": "1.1.0",
+    "max_output_tokens": 4000,
+    "context_max_bytes": 98304
+  },
+  "corpus_version": "1.1.0",
+  "text_isolation_version": "1.0.0",
+  "planned": 6,
+  "accepted": 4,
+  "rejected": 2,
+  "transport_failures": 0,
+  "not_attempted": 0,
+  "samples": [
+    {
+      "id": "exact_saturn_square-1",
+      "profile": "exact_saturn_square",
+      "shape": "exact_time",
+      "started_at": "2026-09-06T15:15:41.317Z",
+      "completed_at": "2026-09-06T15:17:03.219Z",
+      "invocation_sha256": "fa54b2f2adb8348232c074fa7b569ab488a2262e5744b3ecec24d06c6c3305e2",
+      "sample_file": "exact_saturn_square-1.json",
+      "status": "rejected",
+      "output_sha256": "298259ec5ed6686097f4e1f01286b1ac336735236d9859e62840c0b8b5de9f67",
+      "provider_request_sha256": "3d921c1b18ebcd69a012beb859b062004e2df2185ffb8f7ded79fb15207b93eb",
+      "input_tokens": 6447,
+      "output_tokens": 4029,
+      "findings": [
+        {
+          "code": "grounding",
+          "detail_code": "unsupported_fact_relationship"
+        }
+      ],
+      "qualitative": []
+    },
+    {
+      "id": "approximate_window-1",
+      "profile": "approximate_window",
+      "shape": "approximate_time",
+      "started_at": "2026-09-06T15:17:03.280Z",
+      "completed_at": "2026-09-06T15:18:21.498Z",
+      "invocation_sha256": "6cad2b943ff2f043e78fb5e78684f83f24d8fbc04d0a2b553088bab2cc304ead",
+      "sample_file": "approximate_window-1.json",
+      "status": "accepted",
+      "output_sha256": "d08732720c6bce80802d06af5cf042af007ece9035f63bd88dbde01249d87114",
+      "provider_request_sha256": "bbd48c291eece3d7a49ed1fbc981828b72b557dbee1beef1e49983be0aaeecfa",
+      "input_tokens": 6450,
+      "output_tokens": 5055,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "unknown_time-1",
+      "profile": "unknown_time",
+      "shape": "unknown_time",
+      "started_at": "2026-09-06T15:18:21.506Z",
+      "completed_at": "2026-09-06T15:19:10.041Z",
+      "invocation_sha256": "c34950194b17791493636819942cd768a816e234139143620a572c4fab199fba",
+      "sample_file": "unknown_time-1.json",
+      "status": "rejected",
+      "output_sha256": "f98c198dea5867a5cb55c8f28833dfbfe78f4b7832f456e9cee15d29cbd8615a",
+      "provider_request_sha256": "e3d1eb2c440de7ee5880b5965d474312070fc92619ebe0ecfd1e3aee07142443",
+      "input_tokens": 6455,
+      "output_tokens": 2955,
+      "findings": [
+        {
+          "code": "grounding",
+          "detail_code": "astrology_without_fact"
+        }
+      ],
+      "qualitative": []
+    },
+    {
+      "id": "zero_cycle_day-1",
+      "profile": "zero_cycle_day",
+      "shape": "zero_cycle_day",
+      "started_at": "2026-09-06T15:19:10.049Z",
+      "completed_at": "2026-09-06T15:20:19.238Z",
+      "invocation_sha256": "bd069785d2c2bff583fc98b0f338f1df2b8e0852a8ad8da33e21a268ea9b6342",
+      "sample_file": "zero_cycle_day-1.json",
+      "status": "accepted",
+      "output_sha256": "52a1316fe4d41947d417e4a6d302372f7bd6da53780d05635d945a2169f33351",
+      "provider_request_sha256": "766fdc1e6e0e723f7b1fe44c8a472a51f395feffe18094b49ead163fb6c727a1",
+      "input_tokens": 6248,
+      "output_tokens": 2935,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "collective_only_day-1",
+      "profile": "collective_only_day",
+      "shape": "collective_only_day",
+      "started_at": "2026-09-06T15:20:19.243Z",
+      "completed_at": "2026-09-06T15:20:54.330Z",
+      "invocation_sha256": "7eab946aa27897b7bd9e4bb0f2f42e9b81bcda5fa1290b1981a0800fbb19cc92",
+      "sample_file": "collective_only_day-1.json",
+      "status": "accepted",
+      "output_sha256": "bbc4ed0ce8305e46ba38931b5f9e9b214333b0d3658282fdce824b85e1de5dad",
+      "provider_request_sha256": "0828aeefab4835bb5deca4a1e1c93d59733fdf87997aed34691c0049d41c9483",
+      "input_tokens": 6052,
+      "output_tokens": 2102,
+      "findings": [],
+      "qualitative": []
+    },
+    {
+      "id": "injected_user_text-1",
+      "profile": "injected_user_text",
+      "shape": "injected_user_text",
+      "started_at": "2026-09-06T15:20:54.335Z",
+      "completed_at": "2026-09-06T15:21:14.750Z",
+      "invocation_sha256": "e5826dfb453ced91cfa371f4db217627274643b900e32ba2519b4c2dc1867ae5",
+      "sample_file": "injected_user_text-1.json",
+      "status": "accepted",
+      "output_sha256": "2dbf74726fc024c23551cd487a2866a885ba62782407508dd35232f314c361d9",
+      "provider_request_sha256": "c402ee511893737f4a3fd730c0ee0c6beaff6e1db91f66329cb831162823e90c",
+      "input_tokens": 6451,
+      "output_tokens": 1356,
+      "findings": [],
+      "qualitative": [
+        "context_supplied_but_unused"
+      ]
+    }
+  ],
+  "independent_review": {
+    "status": "unverified",
+    "criteria": [
+      "fact_to_sentence_support",
+      "uncertainty",
+      "safety",
+      "context_attribution",
+      "usefulness"
+    ],
+    "note": "Automatic acceptance does not establish psychological truth or independent editorial approval."
+  },
+  "passed": false
+}

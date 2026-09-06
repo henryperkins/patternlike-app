@@ -55,6 +55,7 @@ export async function main(): Promise<void> {
       execute: (claim) => runCodexInvocation({
         claim,
         codexBin: config.codexBin,
+        signal: controller.signal,
       }),
       ...(portraitModules ? { portraits: {
         client: new portraitModules[0].CodexPortraitClient({ apiOrigin: config.apiOrigin, runnerToken: config.runnerToken }),

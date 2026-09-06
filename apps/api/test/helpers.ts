@@ -3,6 +3,7 @@ import {
   CALC_CONTRACT_ID,
   CALC_CONTRACT_VERSION,
   canonicalJson,
+  contentHash,
   sha256Hex,
   type BirthProfileRequest,
   type BirthTimeAccuracy,
@@ -33,6 +34,7 @@ import type {
 } from "../src/services/pattern-publisher.js";
 import { storeOntologyRelease } from "../src/db/pattern-ontology.js";
 import { computeOntologyBundleHash } from "../src/services/pattern-ontology-verify.js";
+import { registerOntologyCorpus } from "../src/services/ontology-corpus.js";
 import {
   OPENAI_READING_MODEL,
   READING_PROMPT_VERSION,
@@ -802,6 +804,30 @@ async function testDigest(seed: string): Promise<string> {
  * with all of it — rather than a flag. A fixture that skipped any one of them
  * would activate an ontology production would refuse.
  */
+/** Real registry/R2 authority for the explicitly synthetic test ontology. */
+export async function seedPatternOntologyCorpus(release: PatternOntologyRelease): Promise<PatternOntologyRelease> {
+  const corpusReleaseId = `corpus-${release.ontology_version}`;
+  const payload = {
+    schema_version: "0.7.0" as const,
+    corpus_release_id: corpusReleaseId,
+    locale: release.locale,
+    license_resolved: true as const,
+    fragments: [...new Set(release.records.flatMap((record) => record.source_fragment_ids))]
+      .map((id) => ({
+        id,
+        corpus_release_id: corpusReleaseId,
+        locale: release.locale,
+        normalized_proposition: "Hermetic test corpus proposition.",
+        excerpt: "Hermetic test corpus excerpt.",
+        license_class: "licensed_excerpt" as const,
+        allowed_transformations: [],
+      })),
+  };
+  const corpusHash = await contentHash(canonicalJson(payload));
+  await registerOntologyCorpus(env, { ...payload, corpus_hash: corpusHash });
+  return { ...release, corpus_release_hash: corpusHash };
+}
+
 export async function seedActiveOntology(
   version = "ont-test-1",
   options: SeedOntologyOptions = {},
@@ -833,7 +859,7 @@ export async function seedActiveOntology(
   const regressionStageGeneration = 5;
   const regressionStageAttempt = 0;
 
-  const release = syntheticOntologyRelease(version) as PatternOntologyRelease & {
+  const release = await seedPatternOntologyCorpus(syntheticOntologyRelease(version)) as PatternOntologyRelease & {
     provenance?: { origin: string };
   };
   release.provenance = { origin: "machine_pipeline" };
@@ -884,19 +910,6 @@ export async function seedActiveOntology(
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE pattern_ontology_releases SET status = 'superseded' WHERE status = 'active'`,
-    ),
-    env.DB.prepare(
-      `INSERT INTO pattern_source_corpus_releases (
-         corpus_release_id, corpus_hash, locale, object_key, fragment_count,
-         license_class, public_capable, created_at, registered_at
-       ) VALUES (?, ?, ?, ?, 12, 'licensed_excerpt', 1, ?, ?)`,
-    ).bind(
-      corpusReleaseId,
-      release.corpus_release_hash,
-      release.locale,
-      `pattern-corpus/${corpusReleaseId}.json`,
-      earlierIso,
-      earlierIso,
     ),
     // A run may only be inserted `reserved` at generation 0 and may only walk
     // its stages one at a time, so the fixture takes the same path the pipeline

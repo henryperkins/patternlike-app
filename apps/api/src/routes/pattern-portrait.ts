@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { isUsablePortraitImage, PORTRAIT_CONSENT_POLICY_VERSION, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest } from "@patternlike/shared";
+import { isUsablePortraitImage, isRecordedPortraitImageModelProvenance, PORTRAIT_CONSENT_POLICY_VERSION, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import { loadUserIdentity } from "../db/users.js";
@@ -44,7 +44,8 @@ function png(bytes: Uint8Array): boolean {
   return false;
 }
 function completion(value: unknown): CodexPortraitCompletion {
-  if (!record(value) || !exact(value,["lease_token","source_sha256","label","rationale","image_base64","original_sha256","pixels","provider_request_id","image_request_id","image_model"]) || !text(value.lease_token,36) || !leasePattern.test(value.lease_token) || !text(value.source_sha256,71) || !hashPattern.test(value.source_sha256) || !text(value.original_sha256,71) || !hashPattern.test(value.original_sha256) || !text(value.label,80) || !text(value.rationale,800) || !text(value.provider_request_id,256) || !text(value.image_request_id,256) || value.image_model !== "gpt-image-2" || !record(value.pixels) || !exact(value.pixels,["width","height","rgba_base64"]) || value.pixels.width !== 128 || value.pixels.height !== 128) throw new PortraitError(400,"invalid_request");
+  if (!record(value) || !exact(value,["lease_token","source_sha256","label","rationale","image_base64","original_sha256","pixels","provider_request_id","image_request_id","image_model",...(Object.hasOwn(value,"image_model_provenance") ? ["image_model_provenance"] : [])]) || !text(value.lease_token,36) || !leasePattern.test(value.lease_token) || !text(value.source_sha256,71) || !hashPattern.test(value.source_sha256) || !text(value.original_sha256,71) || !hashPattern.test(value.original_sha256) || !text(value.label,80) || !text(value.rationale,800) || !text(value.provider_request_id,256) || !text(value.image_request_id,256) || value.image_model !== "gpt-image-2" || !record(value.pixels) || !exact(value.pixels,["width","height","rgba_base64"]) || value.pixels.width !== 128 || value.pixels.height !== 128
+    || (Object.hasOwn(value,"image_model_provenance") && !isRecordedPortraitImageModelProvenance(value.image_model_provenance))) throw new PortraitError(400,"invalid_request");
   const pixels = decode64(value.pixels.rgba_base64,128*128*4);
   if (!png(decode64(value.image_base64,2*1024*1024)) || pixels.length !== 128*128*4 || !isUsablePortraitImage({width:128,height:128,data:new Uint8ClampedArray(pixels)})) throw new PortraitError(400,"invalid_image");
   return value as unknown as CodexPortraitCompletion;

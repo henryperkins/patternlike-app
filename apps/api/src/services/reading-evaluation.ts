@@ -8,8 +8,8 @@ import type { ReadingGenerationOutput } from "@patternlike/shared";
 import corpusJson from "../../test/fixtures/reading-evaluation-corpus.json";
 
 /**
- * The quality gate for a model, reasoning/output configuration, prompt,
- * selection-policy, or validation-policy change.
+ * Shared preparation and scoring for offline corpus revalidation and fresh
+ * Daily output evaluation after a model, prompt, or policy change.
  *
  * The ordinary suite scores frozen candidates offline, so a policy change that
  * quietly widens or narrows what publishes is a failing test. It duplicates no
@@ -18,10 +18,12 @@ import corpusJson from "../../test/fixtures/reading-evaluation-corpus.json";
  * of what the product accepts, and the copy that drifted would be the one
  * nobody ran.
  *
- * The live half of this gate no longer has a direct-API script, because Daily
- * no longer has a direct-API path. Its replacement is a real generation through
- * the same packaged runner and protocol production uses, which the deployment
- * runbook owns rather than this workspace.
+ * `scripts/pattern-release/fresh-reading-evaluation.mjs` prepares these fixed
+ * fictional profiles, builds the actual current request, and obtains fresh
+ * output through the existing isolated Codex transport. It does not reuse the
+ * frozen candidate strings or exercise production publication. Its runbook is
+ * `docs/deploy/fresh-reading-evaluation.md`; independent editorial assessment
+ * remains unverified even when every automatic check accepts the fresh output.
  *
  * The corpus is entirely synthetic. It contains no real account, no real birth
  * data, and nothing read from D1.
@@ -107,9 +109,9 @@ export function prepareProfile(
 }
 
 /**
- * The hard gates: exactly what publication requires, and nothing this module
- * invented. A candidate that passes here is a candidate the Worker would have
- * published.
+ * The actual publication candidate validator, without a second set of rules.
+ * Passing this boundary does not establish consent, durable publication, reader
+ * visibility, or independent editorial approval.
  */
 export function hardGateFindings(
   prepared: PreparedConstrainedReadingInput,
@@ -212,8 +214,8 @@ export interface CorpusReport {
  * An aggregate report, safe to print.
  *
  * Ids, verdicts, counts, and failure CODES only. No prompt, no candidate prose,
- * no context — the same rule the Worker's own logs follow, and the reason this
- * can be run against a real key and pasted into a rollout record.
+ * no context — the same rule the Worker's own logs follow. This summarizes
+ * frozen-corpus revalidation; fresh output has a separate source-bound report.
  */
 export function summarize(
   corpus: EvaluationCorpus,

@@ -1,0 +1,156 @@
+### Page
+- Page URL: http://127.0.0.1:5176/#pattern
+- Page Title: Pattern/Like
+- Console: 1 errors, 0 warnings
+### Snapshot
+```yaml
+- generic [ref=f4e3]:
+  - link "Skip to content" [ref=f4e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=f4e5]:
+    - link "Pattern Like home" [ref=f4e6] [cursor=pointer]:
+      - /url: "#pattern"
+      - generic [ref=f4e9]: Pattern/Like
+    - navigation "Desktop navigation" [ref=f4e10]:
+      - link "Today M3" [ref=f4e11] [cursor=pointer]:
+        - /url: "#today"
+        - generic [ref=f4e15]: Today
+        - generic [ref=f4e16]: M3
+      - link "History" [ref=f4e17] [cursor=pointer]:
+        - /url: "#history"
+      - link "Your pattern" [ref=f4e22] [cursor=pointer]:
+        - /url: "#pattern"
+      - link "Timing M3" [ref=f4e27] [cursor=pointer]:
+        - /url: "#timing"
+        - generic [ref=f4e31]: Timing
+        - generic [ref=f4e32]: M3
+      - link "Time travel M4" [ref=f4e33] [cursor=pointer]:
+        - /url: "#travel"
+        - generic [ref=f4e37]: Time travel
+        - generic [ref=f4e38]: M4
+      - link "Privacy" [ref=f4e39] [cursor=pointer]:
+        - /url: "#privacy"
+    - generic [ref=f4e44]:
+      - generic [ref=f4e45]: Chart verified
+      - paragraph [ref=f4e48]: Private by design.Inspectable by default.
+  - main [ref=f4e49]:
+    - generic [ref=f4e50]:
+      - generic [ref=f4e51]:
+        - generic [ref=f4e52]:
+          - paragraph [ref=f4e53]: Your pattern / Calculation layer
+          - heading "The architecture of your chart." [level=1] [ref=f4e54]: The architectureof your chart.
+        - generic [ref=f4e55]:
+          - generic [ref=f4e56]: Last calculated
+          - strong [ref=f4e57]: Jul 30, 2026, 3:00 PM
+          - generic [ref=f4e58]: Contract 0.2.0
+      - region "Chart anchors" [ref=f4e59]:
+        - article [ref=f4e60]:
+          - generic [ref=f4e61]: "01"
+          - generic [ref=f4e62]:
+            - paragraph [ref=f4e63]: Sun
+            - strong [ref=f4e64]: Taurus 24.1 deg
+            - generic [ref=f4e65]: House 10
+        - article [ref=f4e66]:
+          - generic [ref=f4e67]: "02"
+          - generic [ref=f4e68]:
+            - paragraph [ref=f4e69]: Moon
+            - strong [ref=f4e70]: Libra 21.4 deg
+            - generic [ref=f4e71]: House 3
+        - article [ref=f4e72]:
+          - generic [ref=f4e73]: "03"
+          - generic [ref=f4e74]:
+            - paragraph [ref=f4e75]: Ascendant
+            - strong [ref=f4e76]: Aries 10.0 deg
+            - generic [ref=f4e77]: House 1
+      - generic [ref=f4e78]:
+        - region [ref=f4e79]:
+          - generic [ref=f4e80]:
+            - generic [ref=f4e81]:
+              - paragraph [ref=f4e82]: Normalized facts
+              - heading "Calculation map" [level=2] [ref=f4e83]
+            - generic [ref=f4e84]: TROPICAL / GEOCENTRIC
+          - img "Natal chart calculation map Planetary longitudes, major aspects, and available house cusps arranged around the ecliptic." [ref=f4e85]:
+            - generic [ref=f4e90]: ARI
+            - generic [ref=f4e92]: TAU
+            - generic [ref=f4e95]: GEM
+            - generic [ref=f4e98]: CAN
+            - generic [ref=f4e100]: LEO
+            - generic [ref=f4e103]: VIR
+            - generic [ref=f4e106]: LIB
+            - generic [ref=f4e108]: SCO
+            - generic [ref=f4e111]: SAG
+            - generic [ref=f4e114]: CAP
+            - generic [ref=f4e116]: AQU
+            - generic [ref=f4e119]: PIS
+            - generic [ref=f4e122]: "1"
+            - generic [ref=f4e125]: "2"
+            - generic [ref=f4e128]: "3"
+            - generic [ref=f4e131]: "4"
+            - generic [ref=f4e134]: "5"
+            - generic [ref=f4e137]: "6"
+            - generic [ref=f4e140]: "7"
+            - generic [ref=f4e143]: "8"
+            - generic [ref=f4e146]: "9"
+            - generic [ref=f4e149]: "10"
+            - generic [ref=f4e152]: "11"
+            - generic [ref=f4e155]: "12"
+            - generic [ref=f4e158]: SU
+            - generic [ref=f4e164]: MO
+            - generic [ref=f4e170]: AC
+            - generic [ref=f4e177]: ECLIPTIC
+            - generic [ref=f4e178]: TROPICAL
+          - generic [aria-hidden] [ref=f4e179]:
+            - generic [ref=f4e180]: Flowing aspect
+            - generic [ref=f4e182]: Dynamic aspect
+            - generic [ref=f4e184]: Body position
+        - complementary [ref=f4e186]:
+          - generic [ref=f4e187]:
+            - generic [ref=f4e188]: exact time
+            - heading "What this chart can support" [level=2] [ref=f4e193]
+            - paragraph [ref=f4e194]: Birth time is exact; houses and angles are included.
+            - generic [ref=f4e195]:
+              - generic [ref=f4e196]:
+                - term [ref=f4e197]: Houses
+                - definition [ref=f4e198]: placidus
+              - generic [ref=f4e199]:
+                - term [ref=f4e200]: Angles
+                - definition [ref=f4e201]: Available
+              - generic [ref=f4e202]:
+                - term [ref=f4e203]: Qualified facts
+                - definition [ref=f4e204]: "0"
+          - generic [ref=f4e205]:
+            - paragraph [ref=f4e206]: Interpretation boundary
+            - heading "Facts first. Meaning second." [level=2] [ref=f4e207]
+            - paragraph [ref=f4e208]: The facts on this page are calculated. The Pattern below them is written from those facts after you agree — never generic sign filler, and never from check-ins, life events, or a biography.
+            - link "See the daily layer status" [ref=f4e209] [cursor=pointer]:
+              - /url: "#today"
+      - region [ref=f4e212]:
+        - generic [ref=f4e213]:
+          - generic [ref=f4e214]:
+            - paragraph [ref=f4e215]: Inspectable evidence
+            - heading "Planetary positions" [level=2] [ref=f4e216]
+          - generic [ref=f4e217]: 2 BODIES
+        - generic [ref=f4e218]:
+          - article [ref=f4e219]:
+            - generic [ref=f4e220]: Sun
+            - strong [ref=f4e221]: Taurus 24.1 deg
+            - generic [ref=f4e222]: House 10
+            - generic [ref=f4e223]: Direct
+          - article [ref=f4e224]:
+            - generic [ref=f4e225]: Moon
+            - strong [ref=f4e226]: Libra 21.4 deg
+            - generic [ref=f4e227]: House 3
+            - generic [ref=f4e228]: Direct
+      - region [ref=f4e229]:
+        - generic [ref=f4e231]:
+          - paragraph [ref=f4e232]: Your Pattern
+          - heading "A private reading of this chart" [level=2] [ref=f4e233]
+        - status [ref=f4e234]: Checking the draft
+        - paragraph [ref=f4e235]: This usually takes a short while. You can leave and come back.
+      - group [ref=f4e236]:
+        - generic "Technical evidence Reproduce this calculation Open" [ref=f4e237] [cursor=pointer]:
+          - generic [ref=f4e238]:
+            - generic [ref=f4e239]: Technical evidence
+            - text: Reproduce this calculation
+          - generic [ref=f4e240]: Open
+```

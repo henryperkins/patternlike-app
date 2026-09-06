@@ -261,7 +261,7 @@ export interface DateMention {
 
 export function extractDates(text: string): DateMention[] {
   const found: DateMention[] = [];
-  for (const match of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) {
+  for (const match of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})(?=t|\b)/gi)) {
     found.push({ key: `${match[1]}-${match[2]}-${match[3]}`, hasYear: true });
   }
   const monthFirst = new RegExp(
@@ -292,7 +292,7 @@ function monthDay(month: string, day: string, year: string | undefined): DateMen
 /** A clock time, normalized to zero-padded `HH:MM`. */
 export function extractClockTimes(text: string): string[] {
   const found: string[] = [];
-  for (const match of text.matchAll(/\b(\d{1,2}):(\d{2})\b/g)) {
+  for (const match of text.matchAll(/(?:\b|t)(\d{1,2}):(\d{2})(?::\d{2})?/gi)) {
     found.push(`${match[1]!.padStart(2, "0")}:${match[2]}`);
   }
   return found;

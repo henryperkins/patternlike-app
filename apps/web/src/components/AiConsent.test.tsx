@@ -40,6 +40,7 @@ describe("the AI-synthesis consent terms", () => {
     // Retention follows the account agreement, which is not something this
     // screen sets.
     expect(text).not.toContain("granting this leaves both of them off");
+    expect(text).not.toContain("is used for nothing else");
   });
 
   it("keeps the training statement honest about who controls the setting", () => {
@@ -47,17 +48,18 @@ describe("the AI-synthesis consent terms", () => {
     const text = document.body.textContent ?? "";
 
     expect(text).toContain("This is not consent to train a model.");
-    // The distinction the old copy blurred: Pattern/Like holds the account
-    // whose training controls are off. The reader's grant does not reach it.
+    // A policy requirement is not an observation of the service account.
     expect(text).toMatch(/Pattern\/Like/);
-    expect(text).toMatch(/does not change/i);
+    expect(text).toMatch(/does not verify or change/i);
   });
 
   it("says what Pattern/Like does with its own copy of the exchange", () => {
     render(<AiConsentTerms consent={consentNotGranted} />);
     expect(document.body.textContent ?? "").toMatch(
-      /deletes its own encrypted copy/i,
+      /encrypted copies.*eligible for scheduled deletion/i,
     );
+    expect(document.body.textContent ?? "").toMatch(/unfinished work needs them/i);
+    expect(document.body.textContent ?? "").toMatch(/deletion needs to be retried/i);
   });
 
   it("keeps the categories, the purpose, the free-text warning, and revocation", () => {

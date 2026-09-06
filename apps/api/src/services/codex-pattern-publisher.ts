@@ -14,6 +14,7 @@ import {
   invocationFromResponsesRequest,
 } from "./codex-provider-contract.js";
 import { buildPatternResponsesRequest } from "./pattern-prompt.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 import {
   PATTERN_PUBLISHER_CODEX,
   type PatternPassOptions,
@@ -39,7 +40,7 @@ function unavailable<T>(): PatternPassOutcome<T> {
 }
 
 export function createCodexPatternPublisher(
-  env: Pick<Env, "DB" | "ARTIFACTS" | "CODEX_PROVIDER_ARTIFACT_KEYRING">,
+  env: Pick<Env, "DB" | "ARTIFACTS" | "CODEX_PROVIDER_ARTIFACT_KEYRING" | "PATTERN_GENERATION_ENABLED">,
 ): PatternPublisher {
   async function run<T>(
     pass: PatternStageClass,
@@ -51,6 +52,7 @@ export function createCodexPatternPublisher(
     if (!coordinate || options.timeoutMs !== CODEX_PROVIDER_TIMEOUT_MS) {
       return unavailable<T>();
     }
+    if (coordinate.pipeline === "pattern" && !patternGenerationIsEnabled(env)) return unavailable<T>();
     const body = buildPatternResponsesRequest(
       pass,
       input,

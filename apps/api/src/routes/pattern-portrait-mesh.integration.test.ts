@@ -470,10 +470,16 @@ describe("private durable models", () => {
       `/v1/pattern-portrait/explorer/download?${url}`,
     );
     expect(download.status).toBe(200);
-    expect(await download.json()).toMatchObject({
+    const bundle = await download.json() as { images: Array<{ image_model_provenance: unknown }> };
+    expect(bundle).toMatchObject({
       reading: document,
       models: expect.any(Array),
       images: expect.any(Array),
+    });
+    expect(bundle.images).toHaveLength(4);
+    for (const image of bundle.images) expect(image.image_model_provenance).toEqual({
+      schema_version: "portrait-image-model-provenance/v1", requested_image_model: "gpt-image-2",
+      observed_image_model: null, observation_status: "legacy_unrecorded", codex_cli_version: null,
     });
   });
   it("withdrawal cancels meshes after the legacy graph is ready and rejects late completion", async () => {

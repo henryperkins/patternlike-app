@@ -304,12 +304,12 @@ describe("V5 execution", () => {
       model: {
         provider: "codex",
         model: OPENAI_READING_MODEL,
-        prompt_version: "1.0.2",
+        prompt_version: "1.0.3",
         provider_request_id: expect.any(String),
         input_tokens: 4210,
         output_tokens: 512,
       },
-      validation: { status: "passed", policy_version: "1.0.0" },
+      validation: { status: "passed", policy_version: "1.1.1" },
     });
     expect(await rows("SELECT id FROM reading_sources WHERE reading_id = ?", enqueued.readingId))
       .toHaveLength(stored.reading.paragraphs.length);
@@ -394,7 +394,7 @@ describe("V5 execution", () => {
     expect(claimed!.job.reasoningEffort).toBe("xhigh");
     expect(claimed!.job.promptVersion).toBe(command.publisher.prompt_version);
     expect(claimed!.job.model).not.toBe("a-new-current-model");
-    expect(command.publisher.prompt_version).toBe("1.0.2");
+    expect(command.publisher.prompt_version).toBe("1.0.3");
     expect(claimed!.packet.prompt_version).toBe(command.publisher.prompt_version);
   });
 
@@ -586,6 +586,39 @@ describe("V5 execution", () => {
     expect(providerCalls).toBe(1);
   });
 
+  it.each(["borrowed placement", "reversed aspect roles"] as const)(
+    "does not publish a provider candidate with %s despite valid citations",
+    async (variant) => {
+      const { enqueued, claim } = await claimReserved();
+      const { result, providerCalls } = await withProvider((candidate, packet) => {
+        if (variant === "borrowed placement") {
+          const placement = packet.facts.find((fact) => fact.fact_class === "anchor_position" && fact.attributes.signs.length)!;
+          expect(placement).toBeDefined();
+          const other = packet.facts.find((fact) => fact.attributes.signs.some((sign) => sign !== placement.attributes.signs[0]))!;
+          expect(other).toBeDefined();
+          const sign = other.attributes.signs.find((value) => value !== placement.attributes.signs[0]);
+          return { ...candidate, lead: {
+            text: `The ${placement.attributes.bodies[0]} is in ${sign}.`,
+            fact_ids: [placement.fact_id, other.fact_id], context_refs: [],
+          } };
+        }
+        const cycle = packet.facts.find((fact) => fact.fact_class === "cycle_instance")!;
+        expect(cycle).toBeDefined();
+        // The fixture's true relationship is transiting Saturn to natal Sun.
+        expect(cycle.label).toContain("Transiting Saturn square natal Sun");
+        return { ...candidate, lead: {
+          text: "Transiting Sun is square your natal Saturn.",
+          fact_ids: [cycle.fact_id], context_refs: [],
+        } };
+      }, () => dispatchGeneration(enabledEnv(), claim));
+      expect(result).toMatchObject({ ok: false, reason: "publisher_output_invalid" });
+      expect(providerCalls).toBe(1);
+      expect(await rows("SELECT id FROM reading_sources WHERE reading_id = ?", enqueued.readingId)).toEqual([]);
+      expect(await rows("SELECT reading_enc FROM daily_readings WHERE id = ?", enqueued.readingId))
+        .toEqual([{ reading_enc: null }]);
+    },
+  );
+
   it.each([
     [
       "output schema",
@@ -616,8 +649,8 @@ describe("V5 execution", () => {
     expect(rejections[0]![1]).toMatchObject({
       provider: "codex",
       model: "gpt-5.6-sol",
-      prompt_version: "1.0.2",
-      validation_policy_version: "1.0.0",
+      prompt_version: "1.0.3",
+      validation_policy_version: "1.1.1",
       provider_response_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       failures,
     });
@@ -639,6 +672,15 @@ describe("V5 execution", () => {
 
   it("refuses unsupported frozen policy and compiler pins before OpenAI", async () => {
     const mutations: Array<(command: GenerateDailyReadingCommandV2) => void> = [
+      (command) => {
+        command.publisher.prompt_version = "1.0.2";
+      },
+      (command) => {
+        command.publisher.selection_policy_version = "1.0.0";
+      },
+      (command) => {
+        command.publisher.validation_policy_version = "1.0.0";
+      },
       (command) => {
         command.publisher.provider = "not-openai" as "openai";
       },

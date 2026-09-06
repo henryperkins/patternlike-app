@@ -4,6 +4,26 @@ export const PORTRAIT_SCHEMA_VERSION = "pattern-portrait/v1" as const;
 export const PORTRAIT_CONSENT_POLICY_VERSION = "1.0.0" as const;
 export const PORTRAIT_ENGINE_VERSION = "constellation-v1" as const;
 
+/** The CLI version is locally verified; native image identity is not exposed. */
+export interface RecordedPortraitImageModelProvenance {
+  schema_version: "portrait-image-model-provenance/v1";
+  requested_image_model: "gpt-image-2";
+  observed_image_model: null;
+  observation_status: "not_exposed";
+  codex_cli_version: "0.153.3";
+}
+
+/** A read projection of historical metadata, never a new provider attestation. */
+export interface LegacyPortraitImageModelProvenance {
+  schema_version: "portrait-image-model-provenance/v1";
+  requested_image_model: string | null;
+  observed_image_model: null;
+  observation_status: "legacy_unrecorded";
+  codex_cli_version: null;
+}
+
+export type PortraitImageModelProvenance = RecordedPortraitImageModelProvenance | LegacyPortraitImageModelProvenance;
+
 export interface PortraitGraph {
   engine_version: typeof PORTRAIT_ENGINE_VERSION;
   positions: number[];
@@ -29,6 +49,8 @@ export interface PatternPortraitChapter {
   rationale: string;
   reference_sha256: string;
   source_text: string;
+  /** Optional only for compatibility with older API responses. */
+  image_model_provenance?: PortraitImageModelProvenance;
 }
 
 export interface PatternPortraitResponse {
@@ -62,6 +84,7 @@ export interface PatternPortraitDownload {
     content_type: "image/png";
     sha256: string;
     data_base64: string;
+    image_model_provenance?: PortraitImageModelProvenance;
   }>;
 }
 
@@ -74,6 +97,7 @@ export interface CodexPortraitClaim {
   lease_token: string;
   model: string;
   reasoning_effort: "xhigh";
+  /** Requested/configured image model; the native tool does not attest it. */
   image_model: "gpt-image-2";
   prompt_version: string;
   timeout_ms: number;
@@ -92,7 +116,10 @@ export interface CodexPortraitCompletion {
   pixels: { width: number; height: number; rgba_base64: string };
   provider_request_id: string;
   image_request_id: string;
+  /** Legacy wire alias for the requested model, never observed identity. */
   image_model: "gpt-image-2";
+  /** Absent on legacy completions; the Worker must not backfill observation. */
+  image_model_provenance?: RecordedPortraitImageModelProvenance;
 }
 
 export interface CodexPortraitFailure {

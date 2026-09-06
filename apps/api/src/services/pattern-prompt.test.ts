@@ -39,7 +39,7 @@ function pin(): PatternPublisherPin {
     planner_max_output_tokens: 4000,
     writer_model: "gpt-5.6-sol",
     writer_reasoning: "high",
-    writer_prompt_version: "1.0.2",
+    writer_prompt_version: "1.0.3",
     writer_max_output_tokens: 8000,
     verifier_model: "gpt-5.6-sol",
     verifier_reasoning: "high",
@@ -396,8 +396,10 @@ describe("Pattern prompt module", () => {
       }
     });
 
-    it("exempts only the uncertainty note", () => {
+    it("checks the uncertainty note and supplies a permitted disclosure", () => {
       expect(PATTERN_SYSTEM_POLICY.writer).toContain("uncertainty note");
+      expect(PATTERN_SYSTEM_POLICY.writer).toContain("No field is exempt from publication safety checks");
+      expect(PATTERN_SYSTEM_POLICY.writer).toContain("Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims.");
     });
 
     it("carries the rule into the correction attempt", () => {
@@ -411,7 +413,7 @@ describe("Pattern prompt module", () => {
   describe("prompt versions", () => {
     it("re-exports the compiled versions the configuration pins against", () => {
       expect(PATTERN_PLANNER_PROMPT_VERSION).toBe("1.0.1");
-      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.2");
+      expect(PATTERN_WRITER_PROMPT_VERSION).toBe("1.0.3");
       expect(PATTERN_VERIFIER_PROMPT_VERSION).toBe("1.0.0-verifier");
     });
 

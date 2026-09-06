@@ -50,7 +50,7 @@ const PATTERN: Partial<Env> = {
   OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
   OPENAI_PATTERN_WRITER_REASONING: "xhigh",
-  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.2",
+  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.3",
   OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
@@ -71,7 +71,7 @@ const enabled: Partial<Env> = {
   READING_PUBLISHER: "codex",
   OPENAI_READING_MODEL,
   OPENAI_READING_REASONING: "xhigh",
-  OPENAI_READING_PROMPT_VERSION: "1.0.2",
+  OPENAI_READING_PROMPT_VERSION: "1.0.3",
   OPENAI_READING_TIMEOUT_MS: "900000",
   OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
   READING_CONTEXT_MAX_BYTES: "98304",
@@ -99,7 +99,7 @@ describe("Codex-only Daily publisher configuration", () => {
     expect(resolved.config?.pin.provider).toBe("codex");
     expect(resolved.config?.pin.model).toBe(OPENAI_READING_MODEL);
     expect(resolved.config?.pin.reasoning_effort).toBe("xhigh");
-    expect(resolved.config?.pin.prompt_version).toBe("1.0.2");
+    expect(resolved.config?.pin.prompt_version).toBe("1.0.3");
     expect(resolved.config?.pin.output_schema).toBe("daily-reading-v5");
     expect(resolved.config?.pin.max_output_tokens).toBe(
       OPENAI_READING_MAX_OUTPUT_TOKENS,

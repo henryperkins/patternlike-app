@@ -1,7 +1,7 @@
 {
   "package": "contracts/portrait-v1",
   "schema_version": "pattern-portrait/v1",
-  "document_date": "2026-09-05",
+  "document_date": "2026-09-06",
   "status": "additive_preview",
   "schemas": [
     "portrait.schema.json"
@@ -9,5 +9,5 @@
   "openapi": [
     "openapi/openapi.yaml"
   ],
-  "note": "Additive account portrait endpoints; M0-M9 and geocoder-v2 wire contracts are unchanged. Codex native image-model name is a configured pin, not independent provider attestation. Graph connectivity, slot uniqueness, pixel byte lengths, PNG decoding, hashes and revision joins are enforced in runtime validation."
+  "note": "Additive account portrait endpoints; M0-M9 and geocoder-v2 wire contracts are unchanged. Optional portrait-image-model-provenance/v1 distinguishes configured/requested image model from unknown observed identity and unrecorded legacy evidence. Old payloads remain valid; deploy the compatible Worker before a new runner. Graph connectivity, slot uniqueness, pixel byte lengths, PNG decoding, hashes and revision joins are enforced in runtime validation."
 }

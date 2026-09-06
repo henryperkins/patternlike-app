@@ -16,7 +16,7 @@ const STRONG_KEK = "a-real-root-kek-with-enough-entropy-32+";
 /**
  * The complete Codex Pattern posture every deployment carries.
  *
- * Pattern has no rollout and exactly one deployable publisher, so an incomplete
+ * Pattern has no cohort rollout and exactly one deployable publisher, so an incomplete
  * Pattern block is a refusal on every path. Cases about an unrelated rule spread
  * this in so their refusal names the rule they are actually about.
  */
@@ -36,7 +36,7 @@ const PATTERN_CODEX_VARS = {
   OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_WRITER_MODEL: "gpt-5.6-sol",
   OPENAI_PATTERN_WRITER_REASONING: "xhigh",
-  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.2",
+  OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.3",
   OPENAI_PATTERN_WRITER_TIMEOUT_MS: "900000",
   OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS: "32000",
   OPENAI_PATTERN_VERIFIER_MODEL: "gpt-5.6-sol",
@@ -121,6 +121,17 @@ describe("secure configuration guard", () => {
       ).toBeNull();
     },
   );
+});
+
+describe("Pattern generation control", () => {
+  it.each([undefined, "1", "0"])("accepts the compatible or explicit switch value %s", (value) => {
+    expect(guard({ ENVIRONMENT: "development", PATTERN_GENERATION_ENABLED: value })).toBeNull();
+  });
+
+  it.each(["", "false", "off", "enabled", "2", null, false, true, 0, 1])("refuses the malformed switch value %s", (value) => {
+    expect(guard({ ENVIRONMENT: "development", PATTERN_GENERATION_ENABLED: value })?.code)
+      .toBe("pattern_generation_control_invalid");
+  });
 });
 
 describe("Pattern publisher configuration guard", () => {
@@ -315,7 +326,7 @@ describe("publisher configuration", () => {
     READING_PUBLISHER: "codex",
     OPENAI_READING_MODEL: OPENAI_READING_MODEL,
     OPENAI_READING_REASONING: "xhigh",
-    OPENAI_READING_PROMPT_VERSION: "1.0.2",
+    OPENAI_READING_PROMPT_VERSION: "1.0.3",
     OPENAI_READING_TIMEOUT_MS: "900000",
     OPENAI_READING_MAX_OUTPUT_TOKENS: "4000",
     READING_CONTEXT_MAX_BYTES: "98304",

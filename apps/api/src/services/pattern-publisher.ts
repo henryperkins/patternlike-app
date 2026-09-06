@@ -54,13 +54,13 @@ export const OPENAI_PATTERN_PLANNER_MAX_OUTPUT_TOKENS = 32000;
 export const OPENAI_PATTERN_WRITER_MODEL = "gpt-5.6-sol";
 export const OPENAI_PATTERN_WRITER_REASONING = "xhigh" as const;
 /**
- * `1.0.2` adds the warm, direct, emotionally attentive voice contract while
- * keeping emotion traceable to authorized material. See `WRITER_POLICY` in
+ * `1.0.3` aligns every prose field with the universal publication safety gate,
+ * including uncertainty disclosures and citation scope. See `WRITER_POLICY` in
  * `pattern-prompt.ts`; the pin moves with the text because provenance that
  * names one version for two different prompts is provenance that proves
  * nothing.
  */
-export const OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.2";
+export const OPENAI_PATTERN_WRITER_PROMPT_VERSION = "1.0.3";
 export const OPENAI_PATTERN_WRITER_TIMEOUT_MS = 120_000;
 export const OPENAI_PATTERN_WRITER_MAX_OUTPUT_TOKENS = 32000;
 

@@ -5,6 +5,7 @@ import {
 } from "@patternlike/shared";
 
 import type { Env } from "../env.js";
+import { patternGenerationIsEnabled } from "../services/pattern-generation-control.js";
 import {
   CODEX_PROVIDER_LEASE_MS,
   type CodexProviderReasoningEffort,
@@ -421,7 +422,7 @@ function newLeaseToken(): string {
 }
 
 export async function claimCodexProviderJob(
-  env: Pick<Env, "DB">,
+  env: Pick<Env, "DB" | "PATTERN_GENERATION_ENABLED">,
   now: Date,
 ): Promise<
   | { status: "claimed"; job: CodexProviderJob; leaseToken: string }
@@ -431,14 +432,13 @@ export async function claimCodexProviderJob(
   for (let conflict = 0; conflict < 4; conflict += 1) {
     const candidate = await env.DB.prepare(
       `SELECT id FROM codex_provider_jobs
-       WHERE (
-         status = 'pending' AND available_at <= ?
-       ) OR (
-         status = 'leased' AND lease_expires_at <= ?
+       WHERE (? = 1 OR pipeline != 'pattern') AND (
+         (status = 'pending' AND available_at <= ?)
+         OR (status = 'leased' AND lease_expires_at <= ?)
        )
        ORDER BY available_at, created_at, id
        LIMIT 1`,
-    ).bind(nowIso, nowIso).first<{ id: string }>();
+    ).bind(patternGenerationIsEnabled(env) ? 1 : 0, nowIso, nowIso).first<{ id: string }>();
     if (!candidate) return { status: "empty" };
 
     const leaseToken = newLeaseToken();
@@ -453,7 +453,7 @@ export async function claimCodexProviderJob(
        WHERE id = ? AND (
          (status = 'pending' AND available_at <= ?)
          OR (status = 'leased' AND lease_expires_at <= ?)
-       )`,
+       ) AND (? = 1 OR pipeline != 'pattern')`,
     ).bind(
       leaseTokenHash,
       leaseExpiresAt,
@@ -461,6 +461,7 @@ export async function claimCodexProviderJob(
       candidate.id,
       nowIso,
       nowIso,
+      patternGenerationIsEnabled(env) ? 1 : 0,
     ).run();
     if (updated.meta.changes !== 1) continue;
     const row = await loadById(env, candidate.id);

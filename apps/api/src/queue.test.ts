@@ -395,7 +395,7 @@ describe("ontology queue admission", () => {
 describe("Pattern queue admission", () => {
   const PATTERN_QUEUE = "patternlike-pattern-generation-dev";
 
-  it("never parks a Pattern delivery as rollout_paused", async () => {
+  it.each(["1", "0"])("acknowledges Pattern delivery with generation enabled %s without creating a legacy pause", async (enabled) => {
     // The class exists only as historical data. There is no rollout left to
     // pause for, so a delivery either does its stage's work or fails/cancels on
     // an ordinary check — it must never re-create the state the compatibility
@@ -428,13 +428,17 @@ describe("Pattern queue admission", () => {
           generation_id: generationId,
           stage_generation: job!.stage_generation,
         }],
-        env,
+        { ...env, PATTERN_GENERATION_ENABLED: enabled },
       );
       expect(result.retryMessages).toEqual([]);
 
       expect(await env.DB.prepare(
         `SELECT COUNT(*) AS n FROM jobs WHERE result_class = 'rollout_paused'`,
       ).first<{ n: number }>()).toEqual({ n: 0 });
+      if (enabled === "0") {
+        expect(await env.DB.prepare("SELECT attempts, result_class FROM jobs WHERE id = ?")
+          .bind(job!.job_id).first()).toEqual({ attempts: 0, result_class: "pattern_generation_paused" });
+      }
     } finally {
       disablePatternAi();
     }

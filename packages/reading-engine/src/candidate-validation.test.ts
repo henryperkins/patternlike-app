@@ -261,20 +261,20 @@ function candidate(
     locale: "en-US",
     headline: "A narrower commitment",
     lead: {
-      text: "Saturn is square your Sun today, and the pressure is asking for a smaller promise rather than a larger effort.",
+      text: "Saturn is square your Sun today. The pressure may call for a smaller promise rather than a larger effort.",
       fact_ids: [CYCLE_ID],
       context_refs: [ref("life_domain_selection")],
     },
     paragraphs: [
       {
         role: "supporting_theme",
-        text: "The contact is exact today, which is why the week's low hum finally has a name.",
+        text: "Transiting Saturn is exactly square your natal Sun today. A recurring concern may feel easier to name.",
         fact_ids: [CONTACT_ID],
         context_refs: [],
       },
       {
         role: "collective_context",
-        text: "A waxing gibbous Moon is doing the same thing for everyone tonight: more light than yesterday, still short of full.",
+        text: "The Moon is waxing gibbous tonight. Leave room to revise a small plan.",
         fact_ids: [LUNAR_ID],
         context_refs: [],
       },
@@ -301,6 +301,194 @@ function reject(
     `expected check ${expectedCode}, got ${result.failures.map((f) => f.code).join(", ")}`,
   );
 }
+
+const REVIEW_SUN_ID = "nat_" + hex32("review-sun-aries");
+const REVIEW_MOON_ID = "nat_" + hex32("review-moon-taurus");
+const REVIEW_CONTACT_ID = "dsf_" + hex32("review-other-contact");
+const REVIEW_INGRESS_ID = "dsf_" + hex32("review-ingress");
+
+function relationshipInput() {
+  return prepareConstrainedReadingInput(input({
+    natal_facts: [
+      { fact_id: REVIEW_SUN_ID, fact_class: "natal_position", body: "sun", target: null, aspect: null, sign: "aries", degree_deg: 10, house: 2 },
+      { fact_id: REVIEW_MOON_ID, fact_class: "natal_position", body: "moon", target: null, aspect: null, sign: "taurus", degree_deg: 20, house: 3 },
+    ],
+    daily_sky_facts: [ANCHOR, LUNAR, CONTACT, {
+      ...CONTACT,
+      fact_id: REVIEW_CONTACT_ID,
+      effective_at: "2026-07-30T17:00:00Z",
+      label: "Transiting Mars exactly trine natal Moon",
+      detail: { ...CONTACT.detail, transiting_body: "mars", natal_target: "moon", aspect: "trine" },
+    }, {
+      ...skyBase,
+      fact_id: REVIEW_INGRESS_ID,
+      content_digest: hex64("review-ingress"),
+      kind: "sign_ingress",
+      scope: "collective",
+      effective_at: "2026-07-30T22:05:31Z",
+      label: "Mercury enters Virgo from Leo",
+      precision: { longitude_decimals: null, instant_resolution_seconds: 1 },
+      detail: { body: "mercury", from_sign: "leo", to_sign: "virgo", direction: "direct" },
+    }],
+  }));
+}
+
+for (const { name, text, ids } of [
+  { name: "swapped placement", text: "Your Sun is in Taurus.", ids: [REVIEW_SUN_ID] },
+  { name: "swapped placement with both facts cited", text: "Your Sun is in Taurus.", ids: [REVIEW_SUN_ID, REVIEW_MOON_ID] },
+  { name: "wrong aspect participant", text: "Saturn is square your Moon today.", ids: [CYCLE_ID] },
+  { name: "reversed transit and natal roles", text: "The transiting Sun is square your natal Saturn today.", ids: [CYCLE_ID] },
+  { name: "borrowed degree", text: "Your Sun is at 20 degrees Aries.", ids: [REVIEW_SUN_ID, REVIEW_MOON_ID] },
+  { name: "borrowed house", text: "Your Sun is in the third house.", ids: [REVIEW_SUN_ID, REVIEW_MOON_ID] },
+  { name: "borrowed timestamp", text: "Saturn is square your Sun, exact at 17:00 UTC on 2026-07-30.", ids: [CONTACT_ID, REVIEW_CONTACT_ID] },
+  { name: "irrelevant existing citation", text: "Saturn is square your Sun today.", ids: [REVIEW_SUN_ID] },
+  { name: "cycle start date used as exact date", text: "Saturn is square your Sun, exact on 2026-07-19.", ids: [CYCLE_ID] },
+  { name: "cycle exact date used as end date", text: "Saturn's square to your Sun ends on 2026-08-02.", ids: [CYCLE_ID] },
+  { name: "orb used as a placement degree", text: "Saturn is at 0.42 degrees.", ids: [CYCLE_ID] },
+  { name: "position degree used as an orb", text: "Your Sun has an orb of 10 degrees.", ids: [REVIEW_SUN_ID] },
+  { name: "wrong timestamp seconds", text: "Saturn is square your Sun, exact at 14:11:08 UTC on 2026-07-30.", ids: [CONTACT_ID] },
+  { name: "wrong ISO timestamp date", text: "Saturn is square your Sun, exact at 2026-08-02T14:11:07Z.", ids: [CONTACT_ID] },
+  { name: "lunar phase assigned to the Sun", text: "The Sun is waxing gibbous tonight.", ids: [LUNAR_ID] },
+  { name: "reversed ingress", text: "Mercury enters Leo from Virgo today.", ids: [REVIEW_INGRESS_ID] },
+  { name: "mixed-citation collective laundering", text: "Your Sun is at 7.4 degrees Leo.", ids: [ANCHOR_ID, REVIEW_SUN_ID] },
+  { name: "negated true placement", text: "Your Sun is not in Aries.", ids: [REVIEW_SUN_ID] },
+  { name: "anaphoric swapped placement", text: "Your Sun is in Aries. It is in Taurus.", ids: [REVIEW_SUN_ID, REVIEW_MOON_ID] },
+  { name: "reflexive aspect", text: "Saturn squares itself beside your Sun.", ids: [CYCLE_ID] },
+  { name: "extra reflexive aspect clause", text: "Saturn squares your Sun; your Sun squares itself.", ids: [CYCLE_ID] },
+  { name: "longitude substituted for sign degree", text: "The Sun has a longitude of 7.4 degrees.", ids: [ANCHOR_ID] },
+  { name: "declination substituted for sign degree", text: "Your Sun is at 10 degrees of declination.", ids: [REVIEW_SUN_ID] },
+  { name: "collective placement with remote natal qualifier", text: "The Sun is at 7.4 degrees Leo in your own natal chart.", ids: [ANCHOR_ID] },
+  { name: "unparsed past-tense event", text: "Saturn's square to your Sun ended on 2026-08-02.", ids: [CYCLE_ID] },
+  { name: "predicative wrong lunar phase", text: "The Moon is full tonight.", ids: [LUNAR_ID] },
+  { name: "unprovided illumination", text: "A waxing gibbous Moon is 10 percent illuminated tonight.", ids: [LUNAR_ID] },
+  { name: "UTC offset masquerading as UTC", text: "Saturn is square your Sun, exact at 14:11:07 UTC+9 on 2026-07-30.", ids: [CONTACT_ID] },
+  { name: "unparsed calendar date", text: "Mercury enters Virgo on 07/30/2035.", ids: [REVIEW_INGRESS_ID] },
+  { name: "clause retracting a fact", text: "Your Sun is in Aries, except it is not.", ids: [REVIEW_SUN_ID] },
+  { name: "anaphoric unbound event", text: "Saturn is square your Sun. It begins in 2035.", ids: [CYCLE_ID] },
+  { name: "unbound exact pass", text: "Saturn is square your Sun. Its exact pass happens next Monday.", ids: [CYCLE_ID] },
+  { name: "cycle envelope orb as measured separation", text: "Saturn is square your Sun with an orb of 0.42 degrees.", ids: [CYCLE_ID] },
+  { name: "comma does not authorize a borrowed orb", text: "Transiting Saturn is square your natal Sun, with a configured orb limit of 7.5 degrees.", ids: [CYCLE_ID] },
+  { name: "comma does not authorize extra factual prose", text: "Transiting Saturn is square your natal Sun, with a configured orb limit of 0.42 degrees and your Sun in Taurus.", ids: [CYCLE_ID, REVIEW_MOON_ID] },
+  { name: "current cycle phase assigned to future exact pass", text: "Saturn is square your Sun in the building phase, exact on 2026-08-02.", ids: [CYCLE_ID] },
+  { name: "exact contact relabelled as sampled", text: "Saturn is square your Sun, sampled at 14:11:07 UTC on 2026-07-30.", ids: [CONTACT_ID] },
+  { name: "future exact pass as implicitly present", text: "Saturn is exactly square your Sun.", ids: [CYCLE_ID] },
+  { name: "future exact pass without its date", text: "Saturn is square your Sun, exact at 14:11:07 UTC.", ids: [CYCLE_ID] },
+  { name: "unbound exact assertion", text: "Saturn is square your Sun. Exact tonight.", ids: [CYCLE_ID] },
+]) {
+  test(`claim support rejects ${name}`, () => {
+    const result = validateReadingCandidate(candidate({
+      lead: { text, fact_ids: ids, context_refs: [] },
+    }), relationshipInput());
+    assert.equal(result.ok, false, text);
+    if (!result.ok) assert.ok(result.failures.some((failure) => failure.code === "grounding"), JSON.stringify(result.failures));
+  });
+}
+
+test("claim support accepts separate, accurately cited factual sentences", () => {
+  for (const [text, ids] of [
+    ["Your Sun is at 10 degrees Aries in the second house. Your Moon is in Taurus.", [REVIEW_SUN_ID, REVIEW_MOON_ID]],
+    ["Saturn is square your Sun, exact at 14:11:07 UTC on 2026-07-30.", [CONTACT_ID]],
+    ["Saturn is square your Sun, exact at 2026-07-30T14:11:07Z.", [CONTACT_ID]],
+    ["Saturn's square to your Sun ends on 2027-01-26.", [CYCLE_ID]],
+    ["Saturn is square your Sun with a configured orb limit of 0.42 degrees.", [CYCLE_ID]],
+    ["Transiting Saturn is square your natal Sun, with a configured orb limit of 0.42 degrees.", [CYCLE_ID]],
+    ["Mercury enters Virgo from Leo today.", [REVIEW_INGRESS_ID]],
+  ] as Array<[string, string[]]>) {
+    const result = validateReadingCandidate(candidate({
+      lead: { text, fact_ids: ids, context_refs: [] },
+    }), relationshipInput());
+    assert.equal(result.ok, true, `${text}: ${JSON.stringify(result)}`);
+  }
+});
+
+test("headlines cannot make uncited factual assertions", () => {
+  const result = validateReadingCandidate(candidate({ headline: "Your Sun in Leo" }), prepared);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.ok(result.failures.some((failure) => failure.code === "grounding"));
+});
+
+test("timestamp support normalizes UTC offsets and respects the half-open local day", () => {
+  for (const [instant, text, expected] of [
+    ["2026-07-30T09:11:07-05:00", "Saturn is square your Sun, exact at 14:11:07 UTC on 2026-07-30.", true],
+    ["2026-07-30T09:11:07-05:00", "Saturn is square your Sun, exact at 14:11:07 UTC today.", true],
+    ["2026-07-30T09:11:07-05:00", "Saturn is square your Sun, exact at 09:11:07 UTC on 2026-07-30.", false],
+    ["2026-07-30T05:00:00.000Z", "Saturn is square your Sun, exact today.", true],
+    ["2026-07-31T05:00:00.000Z", "Saturn is square your Sun, exact today.", false],
+    ["2026-07-31T05:00:00.000Z", "Saturn is square your Sun, exact at 05:00 UTC today.", false],
+    ["2026-07-31T05:00:00.000Z", "Saturn is square your Sun today.", false],
+    ["2026-07-31T05:00:00.000Z", "Saturn is square your Sun.", false],
+  ] as const) {
+    const calculated = prepareConstrainedReadingInput(input({
+      daily_sky_facts: [ANCHOR, LUNAR, { ...CONTACT, effective_at: instant }],
+    }));
+    const result = validateReadingCandidate(candidate({
+      lead: { text, fact_ids: [CONTACT_ID], context_refs: [] },
+      paragraphs: [candidate().paragraphs[1]!],
+    }), calculated);
+    assert.equal(result.ok, expected, `${instant}: ${JSON.stringify(result)}`);
+  }
+});
+
+test("a cycle or sampled position supplies its own timestamp vocabulary", () => {
+  const calculated = prepareConstrainedReadingInput(input({ daily_sky_facts: [ANCHOR, LUNAR] }));
+  for (const [text, factId] of [
+    ["Saturn is square your Sun, exact at 14:11:07 UTC on 2026-08-02.", CYCLE_ID],
+    ["The Sun is at 7.4 degrees Leo, sampled at 17:00 UTC on 2026-07-30.", ANCHOR_ID],
+  ]) {
+    const result = validateReadingCandidate(candidate({
+      lead: { text: text!, fact_ids: [factId!], context_refs: [] },
+      paragraphs: [candidate().paragraphs[1]!],
+    }), calculated);
+    assert.equal(result.ok, true, JSON.stringify(result));
+  }
+});
+
+test("a concise cycle-phase clause stays bound to its own cycle record", () => {
+  for (const [text, factId, expected] of [
+    ["Transiting Saturn is square your natal Sun, building today.", CYCLE_ID, true],
+    ["Transiting Saturn is square your natal Sun building today.", CYCLE_ID, true],
+    ["Transiting Saturn is square your natal Sun, waning today.", CYCLE_ID, false],
+    ["Transiting Saturn is square your natal Sun, building today.", CONTACT_ID, false],
+    ["Transiting Saturn is square your natal Sun, building today, and your Moon is in Taurus.", CYCLE_ID, false],
+  ] as const) {
+    const result = validateReadingCandidate(candidate({ lead: { text, fact_ids: [factId], context_refs: [] } }), prepared);
+    assert.equal(result.ok, expected, `${text}: ${JSON.stringify(result.ok ? [] : result.failures)}`);
+  }
+});
+
+test("an explicit shared-sky prefix retains the cited lunar phase and collective scope", () => {
+  for (const [text, factId, expected] of [
+    ["In today's shared sky, the Moon is waxing gibbous.", LUNAR_ID, true],
+    ["In the collective sky, the Moon is waxing gibbous.", LUNAR_ID, true],
+    ["In today's shared sky, the Moon is full.", LUNAR_ID, false],
+    ["In today's shared sky, your natal Sun is at 1.77 degrees Capricorn.", NATAL_ID, false],
+    ["In today's shared sky, the Moon is waxing gibbous and your Sun is in Leo.", LUNAR_ID, false],
+  ] as const) {
+    const result = validateReadingCandidate(candidate({
+      paragraphs: [{ role: "collective_context", text, fact_ids: [factId], context_refs: [] }],
+    }), prepared);
+    assert.equal(result.ok, expected, `${text}: ${JSON.stringify(result.ok ? [] : result.failures)}`);
+  }
+});
+
+test("qualified approximate data supports an honest note without inventing suppression", () => {
+  const base = input();
+  const calculated = prepareConstrainedReadingInput({
+    ...base,
+    chart: { ...base.chart, effective_accuracy: "approximate", uncertainty: {
+      accuracy: "approximate", window_plus_minus_minutes: 30,
+      suppressed_features: [], qualified_features: [{ feature_id: "houses", qualification: "approximate_only" }],
+    } },
+  });
+  for (const [text, expected] of [
+    ["Your birth time is approximate, so time-sensitive details remain uncertain.", true],
+    ["Your birth time is approximate, so this reading omits houses.", false],
+    ["Your birth time is unknown, so time-sensitive details remain uncertain.", false],
+  ] as const) {
+    const result = validateReadingCandidate(candidate({ uncertainty_note: { text, fact_ids: [], context_refs: [] } }), calculated);
+    assert.equal(result.ok, expected, JSON.stringify(result));
+  }
+});
 
 // ---------------------------------------------------------------------------
 // The happy path
@@ -539,9 +727,9 @@ test("vocabulary the facts do license is accepted", () => {
   const base = candidate();
   const ok = [
     "Saturn is square your Sun today.",
-    "The Sun sits at 7.40 degrees Leo, which is where the pressure lands.",
+    "The Sun sits at 7.40 degrees Leo. Consider where the pressure lands.",
     "Saturn's square to your Sun runs out on 2027-01-26.",
-    "A waxing gibbous Moon is not full yet.",
+    "The Moon is waxing gibbous tonight.",
   ];
   for (const text of ok) {
     const result = validateReadingCandidate(
@@ -555,13 +743,13 @@ test("vocabulary the facts do license is accepted", () => {
   }
 });
 
-test("a natal degree is licensed at its rendered precision as well as its full precision", () => {
+test("a natal degree can be followed by a separately supported transit sentence", () => {
   const base = candidate();
   const result = validateReadingCandidate(
     candidate({
       lead: {
         ...base.lead,
-        text: "Your natal Sun at 1.77 degrees Capricorn is what Saturn is squaring.",
+        text: "Your natal Sun is at 1.77 degrees Capricorn. Saturn is square your Sun.",
         fact_ids: [NATAL_ID, CYCLE_ID],
       },
       paragraphs: [base.paragraphs[1]!],
@@ -761,6 +949,37 @@ test("diagnosis, medical causation, guarantees, fatalism, and advice replacement
 // Uncertainty
 // ---------------------------------------------------------------------------
 
+test("a bounded suppressed-Moon disclosure uses the uncertainty record without inventing a fact citation", () => {
+  const withNote = prepareConstrainedReadingInput(input({
+    daily_sky_facts: [ANCHOR, CONTACT],
+    chart: { ...input().chart, effective_accuracy: "unknown", uncertainty: {
+      accuracy: "unknown", window_plus_minus_minutes: null, qualified_features: [],
+      suppressed_features: (["houses", "angles", "moon_time_sensitive"] as const).map((feature_class) => ({
+        feature_class, feature_id: null, reason: "unknown_birth_time",
+      })),
+    } },
+  }));
+  const base = candidate({
+    lead: { ...candidate().lead, context_refs: [] },
+    reflection_prompt: { ...candidate().reflection_prompt, context_refs: [] },
+    paragraphs: [candidate().paragraphs[0], {
+      role: "collective_context", fact_ids: [ANCHOR_ID], context_refs: [],
+      text: "The Sun is at 7.4 degrees Leo, sampled at 17:00 UTC on 2026-07-30. Leave room to revise a small plan.",
+    }],
+  });
+  assert.equal(JSON.stringify(withNote.selected_facts).includes("moon"), false);
+  for (const [text, expected] of [
+    ["Your birth time is unknown, so this reading omits angles, houses, and time-sensitive Moon details.", true],
+    ["Your birth time is unknown, so this reading omits time-sensitive Moon details.", true],
+    ["Your birth time is exact, so this reading omits time-sensitive Moon details.", false],
+    ["Your birth time is unknown, so this reading omits time-sensitive Moon details, and the Moon is in Aries.", false],
+    ["Your birth time is unknown, so this reading omits time-sensitive Moon details. The Moon is waxing gibbous.", false],
+  ] as const) {
+    const result = validateReadingCandidate({ ...base, uncertainty_note: { text, fact_ids: [], context_refs: [] } }, withNote);
+    assert.equal(result.ok, expected, `${text}: ${JSON.stringify(result.ok ? [] : result.failures)}`);
+  }
+});
+
 test("a required uncertainty note must be present and must name what is missing", () => {
   const withNote = prepareConstrainedReadingInput(
     input({
@@ -823,6 +1042,23 @@ test("a required uncertainty note must be present and must name what is missing"
   assert.equal(named.ok, true);
   if (named.ok) {
     assert.deepEqual(named.units.at(-1)!.role, "uncertainty_notice");
+  }
+  for (const tail of [
+    "The Moon is full tonight.",
+    "The Moon is retrograde today.",
+    "Every birth house is still precisely known.",
+  ]) {
+    const result = validateReadingCandidate({
+      ...base,
+      uncertainty_note: {
+        text: `Without a confirmed birth time this reading leaves houses out entirely. ${tail}`,
+        fact_ids: [LUNAR_ID],
+        context_refs: [],
+      },
+    }, withNote);
+    assert.equal(result.ok, false, tail);
+    if (!result.ok) assert.ok(result.failures.some((failure) =>
+      failure.code === "grounding" && failure.detail_code === "unsupported_uncertainty_disclosure"));
   }
 });
 

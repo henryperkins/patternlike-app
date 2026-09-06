@@ -31,7 +31,7 @@ interface PatternExperienceProps {
 const PROGRESS: Record<"organizing_evidence" | "writing" | "checking_claims", string> = {
   organizing_evidence: "Organizing the evidence",
   writing: "Writing your Pattern",
-  checking_claims: "Checking every claim",
+  checking_claims: "Checking the draft",
 };
 
 function isProgress(state: PatternState): state is "organizing_evidence" | "writing" | "checking_claims" {

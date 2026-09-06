@@ -1,0 +1,245 @@
+### Page
+- Page URL: http://127.0.0.1:5176/#privacy
+- Page Title: Pattern/Like
+### Snapshot
+```yaml
+- generic [ref=f3e3]:
+  - link "Skip to content" [ref=f3e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=f3e5]:
+    - link "Pattern Like home" [ref=f3e6] [cursor=pointer]:
+      - /url: "#pattern"
+      - generic [ref=f3e9]: Pattern/Like
+  - main [ref=f3e12]:
+    - generic [ref=f3e13]:
+      - generic [ref=f3e14]:
+        - generic [ref=f3e15]:
+          - paragraph [ref=f3e16]: Context & privacy
+          - heading "Your data has clear edges." [level=1] [ref=f3e17]: Your data hasclear edges.
+        - paragraph [ref=f3e18]: See what is active, what each source is allowed to do, and what remains outside the product. Context may frame a reading. It never changes chart facts.
+      - generic [ref=f3e19]:
+        - article [ref=f3e20]:
+          - generic [ref=f3e24]: Data posture
+          - strong [ref=f3e25]: Chart data present
+          - paragraph [ref=f3e26]: Check-in permission is shown below.
+        - article [ref=f3e27]:
+          - paragraph [ref=f3e28]: The governing rule
+          - blockquote [ref=f3e29]: Context can rank or frame a valid interpretation. It cannot alter the chart or be presented as something astrology discovered.
+      - region [ref=f3e30]:
+        - generic [ref=f3e31]:
+          - generic [ref=f3e32]:
+            - paragraph [ref=f3e33]: Reading generation
+            - heading "Who writes your reading" [level=2] [ref=f3e34]
+          - generic [ref=f3e35]: Granted
+        - paragraph [ref=f3e272]: Granted Sep 6, 2026, 12:00 PM.
+        - generic [ref=f3e37]:
+          - generic [ref=f3e38]:
+            - generic [ref=f3e39]:
+              - term [ref=f3e40]: Processor
+              - definition [ref=f3e41]: OpenAI
+            - generic [ref=f3e42]:
+              - term [ref=f3e43]: Purpose
+              - definition [ref=f3e44]: Writing your daily reading, and nothing else.
+            - generic [ref=f3e45]:
+              - term [ref=f3e46]: Policy
+              - definition [ref=f3e47]: v1.1.0
+          - paragraph [ref=f3e48]: What may be sent
+          - list [ref=f3e49]:
+            - listitem [ref=f3e50]: Birth-time accuracy and what it rules out
+            - listitem [ref=f3e51]: Calculated facts from your natal chart
+            - listitem [ref=f3e52]: Your active calculated cycles
+            - listitem [ref=f3e53]: The calculated sky for your day
+            - listitem [ref=f3e54]: Personal context you have enabled
+            - listitem [ref=f3e55]: Recent readings, so today does not repeat them
+            - listitem [ref=f3e56]: Feedback you have given on readings
+          - paragraph [ref=f3e57]: Your reading is written by Codex, a service operated by OpenAI. Pattern/Like sends the enabled content for the purpose of writing your daily reading. This can involve more than one request when a draft needs another attempt.
+          - paragraph [ref=f3e58]: Personal context you enable is sent as you wrote it, so it can name people and places. The product does not claim that text is anonymous.
+          - paragraph [ref=f3e59]: This is not consent to train a model. Pattern/Like's policy requires training and data sharing to be switched off on its Codex account. This grant does not verify or change those settings, or change anything in an account of your own.
+          - paragraph [ref=f3e60]: Pattern/Like's encrypted copies of each request and response become eligible for scheduled deletion after the reading is finished or stopped and no unfinished work needs them. Cleanup may take longer if a deletion needs to be retried. OpenAI's retention follows the agreement and settings on the account Pattern/Like uses.
+          - paragraph [ref=f3e61]: You can withdraw this at any time in Context & privacy. Withdrawing stops any reading still being written as well as every future one; readings already published stay readable until you export or delete them.
+        - button "Withdraw permission" [ref=f3e273] [cursor=pointer]
+        - status
+      - region [ref=f3e65]:
+        - generic [ref=f3e66]:
+          - generic [ref=f3e67]:
+            - paragraph [ref=f3e68]: Birth calculation
+            - heading "Birth calculation permission" [level=2] [ref=f3e69]
+          - generic [ref=f3e70]: Granted
+        - paragraph [ref=f3e72]: Pattern/Like uses the birth date, local birth time, accuracy choice, place label, coordinates, and timezone you submit to calculate your natal chart, timing cycles, and uncertainty. The API sends those values to Pattern/Like's calculation service; it does not send them to a generative model. Pattern/Like encrypts the submitted profile and retained birth fields under your account key while retaining the calculated chart facts needed by the product. Separate permissions govern generated readings, Your Pattern, research, and model training. You may withdraw this permission at any time. Withdrawal retains the account data but stops serving it by freezing the account; regrant, export, and account deletion remain available.
+        - paragraph [ref=f3e73]:
+          - text: Policy
+          - code [ref=f3e74]: account-processing-v1-2026-08-28
+          - text: .
+          - link "Terms" [ref=f3e75] [cursor=pointer]:
+            - /url: /terms.html
+          - link "Privacy policy" [ref=f3e76] [cursor=pointer]:
+            - /url: /privacy.html
+        - paragraph [ref=f3e77]: Granted Aug 28, 2026, 12:00 PM.
+        - button "Withdraw calculation permission" [ref=f3e78] [cursor=pointer]
+        - status "Birth calculation permission status"
+      - region [ref=f3e82]:
+        - generic [ref=f3e83]:
+          - generic [ref=f3e84]:
+            - paragraph [ref=f3e85]: Optional external processing
+            - heading "Geoapify birthplace search" [level=2] [ref=f3e86]
+          - generic [ref=f3e87]: Not granted
+        - paragraph [ref=f3e89]: Geoapify birthplace search is optional. If you enable it, Pattern/Like sends the city or place text you type and your language preference (when available) to Geoapify. After you choose a suggestion, it sends the selected Geoapify place identifier and language preference to retrieve the place. Pattern/Like does not send your birth date or time, device location, user, account, birth-profile, or consent identifiers, or the app-owned search session token. Geoapify also receives Pattern/Like's API credential and network metadata such as the server IP. Geoapify logs API requests for access control, usage counting, troubleshooting, and performance; its privacy policy says successful request logs are generally kept no longer than 24 hours. Pattern/Like does not store your query or unselected suggestions. It encrypts the selected place and coordinates under your account key, retaining the selection handoff for up to 24 hours and the saved values in your birth profile. Deleting your Pattern/Like account does not delete Geoapify's separate records. You can decline or withdraw this permission and enter the place, coordinates, and time zone manually.
+        - paragraph [ref=f3e90]:
+          - link "Terms" [ref=f3e91] [cursor=pointer]:
+            - /url: /terms.html
+          - link "Privacy" [ref=f3e92] [cursor=pointer]:
+            - /url: /privacy.html
+          - link "Geoapify terms" [ref=f3e93] [cursor=pointer]:
+            - /url: https://www.geoapify.com/terms-and-conditions/
+          - link "Geoapify privacy" [ref=f3e94] [cursor=pointer]:
+            - /url: https://www.geoapify.com/privacy-policy/
+        - button "Grant Geoapify search permission" [ref=f3e95] [cursor=pointer]
+        - status
+      - region [ref=f3e98]:
+        - generic [ref=f3e99]:
+          - generic [ref=f3e100]:
+            - paragraph [ref=f3e101]: Pattern generation
+            - heading "Who writes your Pattern" [level=2] [ref=f3e102]
+          - generic [ref=f3e103]: NOT GRANTED
+        - paragraph [ref=f3e104]: Grant this from Your Pattern. This page only withdraws an existing grant.
+        - generic [ref=f3e105]:
+          - generic [ref=f3e106]:
+            - generic [ref=f3e107]:
+              - term [ref=f3e108]: Processor
+              - definition [ref=f3e109]: OpenAI
+            - generic [ref=f3e110]:
+              - term [ref=f3e111]: Generation service
+              - definition [ref=f3e112]: Codex
+            - generic [ref=f3e113]:
+              - term [ref=f3e114]: Purpose
+              - definition [ref=f3e115]: Writing one Pattern for this chart, and nothing else.
+            - generic [ref=f3e116]:
+              - term [ref=f3e117]: Policy
+              - definition [ref=f3e118]: v1.1.0
+          - list [ref=f3e119]:
+            - listitem [ref=f3e120]: Calculated facts from your natal chart
+            - listitem [ref=f3e121]: Birth-time accuracy and what it rules out
+            - listitem [ref=f3e122]: The language you confirmed for content
+            - listitem [ref=f3e123]: The activated interpretation meanings
+            - listitem [ref=f3e124]: The Pattern plan and draft, so they can be checked
+          - paragraph [ref=f3e125]: Pattern/Like sends the minimized content below to Codex, operated by OpenAI, to plan, write, and check one Pattern for this chart. This takes multiple requests, with a limited number of retries.
+          - paragraph [ref=f3e126]: Birth date, time, place, and coordinates are not sent as fields. Calculated natal features are still sensitive derived data and may support inferences about birth timing. Pattern/Like does not describe the provider packet as anonymous.
+          - paragraph [ref=f3e127]: Daily check-ins, life events, journal entries, prior readings, and a biography are not sent. Pattern generation uses chart facts, uncertainty, your confirmed language, and the activated interpretation meanings only.
+          - paragraph [ref=f3e128]: This is not consent to train a model. Research and model training are separate permissions inside Pattern/Like; granting this does not grant or change either permission. Whether OpenAI uses content for training depends on the agreement and data-use settings for the account and workspace Pattern/Like uses. This grant does not control those settings.
+          - paragraph [ref=f3e129]: For routine cleanup, Pattern/Like's encrypted request and response copies become eligible for deletion 30 days after each request finishes, fails, or is cancelled. Removal also waits until no active generation needs them and pending uploads are resolved, and failed cleanup is retried. OpenAI's retention follows the agreement and settings for the account and workspace Pattern/Like uses.
+          - paragraph [ref=f3e130]: You can withdraw this at any time in Context & privacy. Withdrawing stops unfinished and future Pattern generation. An already accepted Pattern stays readable until you delete it.
+          - paragraph [ref=f3e131]: A successful Pattern is not a rerollable reading. If Pattern/Like's creation source changes, you can explicitly replace it with one written by the updated source.
+          - paragraph [ref=f3e132]: Deleting your Pattern is permanent.
+        - status
+      - region [ref=f3e133]:
+        - generic [ref=f3e134]:
+          - generic [ref=f3e135]:
+            - paragraph [ref=f3e136]: USR-05
+            - heading "Topics to leave aside" [level=2] [ref=f3e137]
+          - generic [ref=f3e138]: THEME FILTER
+        - paragraph [ref=f3e139]: Readings will not interpret the areas you mark here. Chart facts are unchanged. Notifications about these topics are also withheld when notifications exist.
+        - generic [ref=f3e140]:
+          - group "Do not interpret" [ref=f3e141]:
+            - generic [ref=f3e143] [cursor=pointer]:
+              - checkbox "Self" [ref=f3e144]
+              - generic [ref=f3e145]: Self
+            - generic [ref=f3e146] [cursor=pointer]:
+              - checkbox "Relationships" [ref=f3e147]
+              - generic [ref=f3e148]: Relationships
+            - generic [ref=f3e149] [cursor=pointer]:
+              - checkbox "Work" [ref=f3e150]
+              - generic [ref=f3e151]: Work
+            - generic [ref=f3e152] [cursor=pointer]:
+              - checkbox "Creativity" [ref=f3e153]
+              - generic [ref=f3e154]: Creativity
+            - generic [ref=f3e155] [cursor=pointer]:
+              - checkbox "Home" [ref=f3e156]
+              - generic [ref=f3e157]: Home
+            - generic [ref=f3e158] [cursor=pointer]:
+              - checkbox "Body and energy" [ref=f3e159]
+              - generic [ref=f3e160]: Body and energy
+            - generic [ref=f3e161] [cursor=pointer]:
+              - checkbox "Money and resources" [ref=f3e162]
+              - generic [ref=f3e163]: Money and resources
+            - generic [ref=f3e164] [cursor=pointer]:
+              - checkbox "Learning" [ref=f3e165]
+              - generic [ref=f3e166]: Learning
+            - generic [ref=f3e167] [cursor=pointer]:
+              - checkbox "Community" [ref=f3e168]
+              - generic [ref=f3e169]: Community
+            - generic [ref=f3e170] [cursor=pointer]:
+              - checkbox "Caregiving" [ref=f3e171]
+              - generic [ref=f3e172]: Caregiving
+            - generic [ref=f3e173] [cursor=pointer]:
+              - checkbox "Meaning" [ref=f3e174]
+              - generic [ref=f3e175]: Meaning
+          - button "Save exclusions" [ref=f3e177] [cursor=pointer]
+      - region [ref=f3e178]:
+        - generic [ref=f3e179]:
+          - generic [ref=f3e180]:
+            - paragraph [ref=f3e181]: Permission ledger
+            - heading "Active and available sources" [level=2] [ref=f3e182]
+          - generic [ref=f3e183]: USR-06 CONTROL
+        - generic [ref=f3e184]:
+          - article "Birth details" [ref=f3e185]:
+            - generic [ref=f3e186]: Encrypted
+            - generic [ref=f3e188]:
+              - heading "Birth details" [level=3] [ref=f3e189]
+              - paragraph [ref=f3e190]: Used only to calculate your chart. The values are not shown again after calculation.
+            - button "Correct birth details" [ref=f3e192] [cursor=pointer]: Correct
+          - article [ref=f3e193]:
+            - generic [ref=f3e194]: Active
+            - generic [ref=f3e196]:
+              - heading "Calculated chart facts" [level=3] [ref=f3e197]
+              - paragraph [ref=f3e198]: Deterministic placements and aspects. Context cannot change them.
+            - generic [ref=f3e199]: Derived data
+          - article "Daily check-in" [ref=f3e200]:
+            - generic [ref=f3e201]: Unavailable
+            - generic [ref=f3e203]:
+              - heading "Daily check-in" [level=3] [ref=f3e204]
+              - paragraph [ref=f3e205]: This API version does not offer this source yet.
+            - status [ref=f3e206]
+          - article "Life-event timeline" [ref=f3e207]:
+            - generic [ref=f3e208]: Unavailable
+            - generic [ref=f3e210]:
+              - heading "Life-event timeline" [level=3] [ref=f3e211]
+              - paragraph [ref=f3e212]: This API version does not offer this source yet.
+            - status [ref=f3e213]
+          - article [ref=f3e214]:
+            - generic [ref=f3e215]: "Off"
+            - generic [ref=f3e217]:
+              - heading "Calendar, health, and device data" [level=3] [ref=f3e218]
+              - paragraph [ref=f3e219]: Not connected and not read by PatternLike.
+            - generic [ref=f3e220]: Unavailable
+      - region [ref=f3e221]:
+        - generic [ref=f3e222]:
+          - paragraph [ref=f3e223]: Account data
+          - heading "Portable in. Portable out." [level=2] [ref=f3e224]
+          - paragraph [ref=f3e225]: Exports are encrypted while they are prepared, available for seven days, and downloaded directly through this origin. Deletion locks the account as soon as the request is accepted and is irreversible when key erasure completes.
+        - generic [ref=f3e226]:
+          - generic [ref=f3e227]:
+            - button "Request export" [ref=f3e228] [cursor=pointer]
+            - status "Export status" [ref=f3e229]
+          - generic [ref=f3e230]:
+            - button "Delete account" [ref=f3e231] [cursor=pointer]
+            - status "Deletion status" [ref=f3e232]
+      - region [ref=f3e233]:
+        - generic [ref=f3e234]:
+          - paragraph [ref=f3e235]: Session
+          - heading "Finished on this device?" [level=2] [ref=f3e236]
+          - paragraph [ref=f3e237]: Sign out to end this browser session and protect your account on a shared device.
+        - button "Sign out" [ref=f3e238] [cursor=pointer]
+  - navigation "Mobile navigation" [ref=f3e241]:
+    - link "Today" [ref=f3e242] [cursor=pointer]:
+      - /url: "#today"
+    - link "History" [ref=f3e247] [cursor=pointer]:
+      - /url: "#history"
+    - link "Pattern" [ref=f3e252] [cursor=pointer]:
+      - /url: "#pattern"
+    - link "Timing" [ref=f3e257] [cursor=pointer]:
+      - /url: "#timing"
+    - link "Time travel" [ref=f3e262] [cursor=pointer]:
+      - /url: "#travel"
+    - link "Privacy" [ref=f3e267] [cursor=pointer]:
+      - /url: "#privacy"
+```

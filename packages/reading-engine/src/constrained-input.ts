@@ -190,6 +190,10 @@ function dateOf(instant: string): string {
   return instant.slice(0, 10);
 }
 
+function utcInstant(instant: string): string {
+  return new Date(instant).toISOString().replace(/\.000Z$/, "Z");
+}
+
 // ---------------------------------------------------------------------------
 // Fact lanes
 // ---------------------------------------------------------------------------
@@ -251,17 +255,24 @@ function projectCycleFact(cycle: NormalizedCycle, midpoint: string): Constrained
   attributes.aspect = cycle.aspect;
   attributes.degrees = [cycle.orb_deg];
   attributes.dates = uniqueSorted([
-    dateOf(cycle.start_at),
-    ...cycle.passes.map((p) => dateOf(p.exact_at)),
-    dateOf(cycle.end_at),
+    dateOf(utcInstant(cycle.start_at)),
+    ...cycle.passes.map((p) => dateOf(utcInstant(p.exact_at))),
+    dateOf(utcInstant(cycle.end_at)),
+  ]);
+  attributes.timestamps = uniqueSorted([
+    utcInstant(cycle.start_at),
+    ...cycle.passes.map((pass) => utcInstant(pass.exact_at)),
+    utcInstant(cycle.end_at),
   ]);
   if (phase) attributes.phase = phase;
 
   const bodyLabel = body ? BODY_LABEL[body] : cycle.body;
   const targetLabel = target ? BODY_LABEL[target] : cycle.target;
   const label =
-    `${bodyLabel} ${ASPECT_LABEL[cycle.aspect]} your ${targetLabel}` +
-    (phase ? `, ${phase}` : "");
+    `Transiting ${bodyLabel} ${ASPECT_LABEL[cycle.aspect]} natal ${targetLabel}` +
+    (phase ? `, ${phase}` : "") +
+    `; configured orb limit ${degrees(cycle.orb_deg)}°` +
+    `; starts ${dateOf(utcInstant(cycle.start_at))}; exact ${utcInstant(cycle.exact_at)}; ends ${dateOf(utcInstant(cycle.end_at))}`;
 
   return {
     fact_id: cycle.id,
@@ -270,6 +281,7 @@ function projectCycleFact(cycle: NormalizedCycle, midpoint: string): Constrained
     lane_rank: LANE_RANK.cycle_instance,
     label,
     attributes,
+    support: { kind: "cycle", value: structuredClone(cycle) },
     origin: "cycle_scan",
     content_digest: null,
     category: FACT_CATEGORY.cycle_instance,
@@ -278,7 +290,9 @@ function projectCycleFact(cycle: NormalizedCycle, midpoint: string): Constrained
 
 function projectSkyFact(fact: DailySkyFact): ConstrainedFact {
   const attributes = emptyAttributes();
+  attributes.timestamps = [utcInstant(fact.effective_at)];
   const detail = fact.detail;
+  const timing = `; ${["anchor_position", "lunar_phase", "house_placement"].includes(fact.kind) ? "sampled" : "exact"} ${utcInstant(fact.effective_at)}`;
 
   switch (fact.kind) {
     case "anchor_position": {
@@ -298,21 +312,18 @@ function projectSkyFact(fact: DailySkyFact): ConstrainedFact {
       const d = detail as Extract<DailySkyFact["detail"], { natal_target: CelestialBody }>;
       attributes.bodies = uniqueSorted([d.transiting_body, d.natal_target]);
       attributes.aspect = d.aspect;
-      attributes.timestamps = [fact.effective_at];
       break;
     }
     case "sign_ingress": {
       const d = detail as Extract<DailySkyFact["detail"], { from_sign: ZodiacSignName }>;
       attributes.bodies = [d.body];
       attributes.signs = uniqueSorted([d.from_sign, d.to_sign]);
-      attributes.timestamps = [fact.effective_at];
       break;
     }
     case "collective_exact_aspect": {
       const d = detail as Extract<DailySkyFact["detail"], { other_body: CelestialBody }>;
       attributes.bodies = uniqueSorted([d.body, d.other_body]);
       attributes.aspect = d.aspect;
-      attributes.timestamps = [fact.effective_at];
       break;
     }
     case "house_placement": {
@@ -328,8 +339,9 @@ function projectSkyFact(fact: DailySkyFact): ConstrainedFact {
     fact_class: fact.kind,
     scope: fact.scope,
     lane_rank: LANE_RANK[fact.kind],
-    label: fact.label,
+    label: fact.label.length + timing.length <= 200 ? `${fact.label}${timing}` : fact.label,
     attributes,
+    support: { kind: "daily_sky", value: structuredClone(fact) },
     origin: "daily_sky",
     content_digest: fact.content_digest,
     category: FACT_CATEGORY[fact.kind],
@@ -367,6 +379,7 @@ function projectNatalFact(fact: ConstrainedNatalFactInput): ConstrainedFact {
     lane_rank: LANE_RANK[fact.fact_class],
     label,
     attributes,
+    support: { kind: "natal", value: { ...fact } },
     origin: "natal",
     content_digest: null,
     category: FACT_CATEGORY[fact.fact_class],
@@ -1043,6 +1056,7 @@ export function prepareConstrainedReadingInput(
     selected_prior_readings: selectedPriorReadings,
     rejections,
     request,
+    day_window: { start_at: input.day.day_start_at, end_at: input.day.day_end_at },
     packet_bytes: bytes,
     input_manifest_canonical,
     identity_canonical,

@@ -274,7 +274,7 @@ export async function queue(
   for (const { message, body } of patternMessages) {
     try {
       const outcome = await executePatternJob(env, body);
-      if (outcome.ok || outcome.reason === "duplicate" || outcome.reason === "terminal") {
+      if (outcome.ok || outcome.reason === "duplicate" || outcome.reason === "terminal" || outcome.reason === "paused") {
         message.ack();
       } else {
         message.retry({ delaySeconds: RETRY_DELAY_SECONDS });

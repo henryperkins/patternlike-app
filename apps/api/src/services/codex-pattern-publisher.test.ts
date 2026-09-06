@@ -81,6 +81,25 @@ describe("Codex Pattern publisher", () => {
     });
   });
 
+  it("does not enqueue or read provider artifacts for Pattern while generation is paused", async () => {
+    const before = (await env.ARTIFACTS!.list({ prefix: "codex-provider-jobs/" })).objects;
+    const publisher = createCodexPatternPublisher({ ...env, PATTERN_GENERATION_ENABLED: "0" });
+    expect(await publisher.plan({ packet: "synthetic fixture" }, options())).toMatchObject({
+      ok: false, code: "publisher_unavailable",
+    });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM codex_provider_jobs").first()).toEqual({ n: 0 });
+    expect((await env.ARTIFACTS!.list({ prefix: "codex-provider-jobs/" })).objects).toEqual(before);
+  });
+
+  it("keeps the ontology regression adapter available during a Pattern pause", async () => {
+    const publisher = createCodexPatternPublisher({ ...env, PATTERN_GENERATION_ENABLED: "0" });
+    const pass = options();
+    pass.codexJob = { ...pass.codexJob!, pipeline: "ontology", userId: null };
+    expect(await publisher.plan({ packet: "synthetic fixture" }, pass)).toMatchObject({
+      ok: false, code: "publisher_pending",
+    });
+  });
+
   it("waits without charging, then adopts an exact completed result", async () => {
     const reserve = vi.fn(async () => ({ ok: true }));
     const publisher = createCodexPatternPublisher(env);

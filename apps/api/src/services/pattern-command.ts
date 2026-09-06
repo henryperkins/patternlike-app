@@ -1,5 +1,6 @@
 import type { BirthTimeAccuracy } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 import { hasPatternProviderCallCapacity } from "../db/pattern-provider-usage.js";
 import type { PatternPublisherPin } from "./pattern-publisher.js";
 
@@ -101,6 +102,7 @@ export async function patternFailureIsRetryable(
   failureClass: string | null,
   now = new Date(),
 ): Promise<boolean> {
+  if (!patternGenerationIsEnabled(env)) return false;
   if (failureClass !== "publisher_budget_exhausted") return true;
   return hasPatternProviderCallCapacity(env, now);
 }

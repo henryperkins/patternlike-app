@@ -45,9 +45,10 @@ export function SignedOut({ onSignIn, error }: SignedOutProps) {
       <p className="eyebrow">Pattern/Like</p>
       <h1>Calculated, not invented.</h1>
       <p>
-        Positions come from Swiss Ephemeris. Nothing here is generated about you
-        until you provide a birth date, and every claim the app makes is traceable
-        to the calculation that produced it.
+        Chart positions come from Swiss Ephemeris and can be traced to their
+        calculations. With your consent, AI uses chart facts to write
+        interpretations for reflection. These interpretations are generated
+        language and can be mistaken.
       </p>
 
       <button

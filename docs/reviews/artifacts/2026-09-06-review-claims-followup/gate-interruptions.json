@@ -1,0 +1,24 @@
+{
+  "schema_version": "review-gate-interruption.v1",
+  "reason": "Fresh provider output replay identified additional supported grammar before final release freeze. These deliberate interruptions do not count as successful CI.",
+  "runs": [
+    {
+      "receipt": "local-gate-01.json",
+      "gate_started_at": "2026-09-06T15:45:40.178Z",
+      "captured_at": "2026-09-06T15:55:14.976Z",
+      "passed": false,
+      "exit_code": null,
+      "source_unchanged": true,
+      "interrupted_by_operator": true
+    },
+    {
+      "receipt": "local-gate-02.json",
+      "gate_started_at": "2026-09-06T15:56:37.598Z",
+      "captured_at": "2026-09-06T15:58:48.887Z",
+      "passed": false,
+      "exit_code": null,
+      "source_unchanged": true,
+      "interrupted_by_operator": true
+    }
+  ]
+}

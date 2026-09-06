@@ -302,7 +302,10 @@ internalPatternRoutes.post("/pattern-generations/:generation_id/reconcile", asyn
   const requestId = c.get("requestId");
   const result = await reconcilePatternGeneration(c.env, c.req.param("generation_id"));
   if (!result.ok) {
-    return c.json(error(requestId, result.code, "Generation not found"), result.status);
+    return c.json(error(requestId, result.code,
+      result.code === "pattern_generation_paused"
+        ? "Pattern generation is temporarily paused"
+        : "Generation not found"), result.status);
   }
   return c.json(result.body, result.status);
 });

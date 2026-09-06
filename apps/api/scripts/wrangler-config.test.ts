@@ -71,7 +71,7 @@ test("production parks the machine pipeline and configures Pattern for every acc
   assert.equal(production.vars.OPENAI_READING_TIMEOUT_MS, "900000");
   assert.equal(production.vars.OPENAI_READING_MODEL, "gpt-5.6-sol");
   assert.equal(production.vars.OPENAI_READING_REASONING, "xhigh");
-  assert.equal(production.vars.OPENAI_READING_PROMPT_VERSION, "1.0.2");
+  assert.equal(production.vars.OPENAI_READING_PROMPT_VERSION, "1.0.3");
   assert.equal(production.vars.OPENAI_READING_MAX_OUTPUT_TOKENS, "4000");
   assert.equal(production.vars.READING_CONTEXT_MAX_BYTES, "98304");
   assert.equal(production.vars.READING_DAILY_PROVIDER_CALL_LIMIT, "10000");
@@ -94,9 +94,8 @@ test("production parks the machine pipeline and configures Pattern for every acc
   assert.equal(production.vars.ONTOLOGY_PIPELINE_PUBLISHER, "codex");
   assert.equal(production.vars.OPENAI_ONTOLOGY_GENERATOR_TIMEOUT_MS, "900000");
   assert.equal(production.vars.OPENAI_ONTOLOGY_EVALUATOR_TIMEOUT_MS, "900000");
-  // Pattern admission is not a variable. Absence is the contract: neither name
-  // may come back, in either block, under any value -- an empty string would be
-  // a switch someone could set.
+  // The generation pause applies to every account. The removed cohort controls
+  // remain absent in both environments.
   for (const block of [development, production]) {
     assert.equal("PATTERN_AI_ROLLOUT" in block.vars, false);
     assert.equal("PATTERN_INTERNAL_ACCOUNT_IDS" in block.vars, false);
@@ -107,6 +106,7 @@ test("production parks the machine pipeline and configures Pattern for every acc
   // expects CODEX_PROVIDER_TIMEOUT_MS on every pass: the OpenAI 120000 values
   // fail the pin check rather than running long.
   for (const block of [development, production]) {
+    assert.equal(block.vars.PATTERN_GENERATION_ENABLED, "1");
     assert.equal(block.vars.PATTERN_PUBLISHER, "codex");
     assert.equal(block.vars.OPENAI_PATTERN_PLANNER_TIMEOUT_MS, "900000");
     assert.equal(block.vars.OPENAI_PATTERN_WRITER_TIMEOUT_MS, "900000");

@@ -72,6 +72,13 @@ test("requires one completed native image and successful turn, preserves image p
     assert.equal(out.completion.original_sha256, createHash("sha256").update(f.png).digest("hex"));
     assert.equal(out.completion.provider_request_id, "11111111-2222-4333-8444-555555555555:turn-1");
     assert.equal(out.completion.image_request_id, "image-call-1");
+    assert.deepEqual(out.completion.image_model_provenance, {
+      schema_version: "portrait-image-model-provenance/v1",
+      requested_image_model: "gpt-image-2",
+      observed_image_model: null,
+      observation_status: "not_exposed",
+      codex_cli_version: "0.153.3",
+    });
     assert.equal(out.completion.source_sha256, CLAIM.source_sha256);
     assert.equal(out.completion.pixels.width, 128);
     assert.equal(Buffer.from(out.completion.pixels.rgba_base64, "base64").length, 128 * 128 * 4);

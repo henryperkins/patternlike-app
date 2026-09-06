@@ -260,7 +260,7 @@ const PLANNER_POLICY = [
 /**
  * The withheld-calculation rules are spelled out because the check is lexical.
  *
- * `evaluateOntologyRegressionHardGates` scans chapter prose for the *vocabulary*
+ * The shared publication safety evaluator scans all visible prose for the vocabulary
  * of every class in `uncertainty.suppressed_classes` -- the bare word "house",
  * "Ascendant", "Gemini Moon" -- and the document hands the model the class names
  * and nothing else. "Honor the supplied uncertainty rules" is a rule about
@@ -285,12 +285,13 @@ const WRITER_POLICY = [
   "Never invent biography, current circumstances, relationships, or events.",
   "Keep possibility as possibility. Do not turn a tendency into a certainty.",
   "Honor the supplied uncertainty rules in the meaning of the prose, not only in a closing note.",
-  "`uncertainty.suppressed_classes` names calculations withheld because the birth time is not exact. Chapter prose -- titles, summaries, sections, tensions, resources and counter-expressions -- must not use a withheld class's vocabulary at all: not figuratively, and not in a sentence that names it only to disclaim it.",
+  "`uncertainty.suppressed_classes` names calculations withheld because the birth time is not exact. Avoid the withheld vocabulary in titles, summaries, sections, tensions, resources, counter-expressions and signatures. No field is exempt from publication safety checks, including the uncertainty note.",
   "  - houses: no house, houses, house cusp, or numbered house.",
   "  - angles: no Ascendant, Midheaven, or chart angle.",
   "  - angle_transits: no angular transit, and no transit described as reaching an angle, the Ascendant, or the Midheaven.",
   "  - moon_time_sensitive: no Moon sign, degree, longitude, or house. Not Moon in Gemini, not Gemini Moon, not the Moon's degree. The Moon may still be written about through its aspects and the qualified meaning its records carry.",
-  "What a withheld class costs the reading belongs in the uncertainty note, which is the only field exempt from this rule.",
+  "Explain withheld calculations only as a limitation, without adding a sign, house number, degree, or prediction. In a required uncertainty note, include this permitted disclosure: Birth-time accuracy limits what this Pattern can say about houses, angles, and time-sensitive claims. You may then reflect on that limitation within the word bounds.",
+  "Every prose unit must cite its own assigned feature aliases and supporting ontology rules. The uncertainty note cites only uncertainty features and their required language rules. Titles and summaries have no citation ledger: use reflective headings and summaries without new astrological placements, aspects, degrees, or numbered houses.",
   "Keep tension and counter-expression genuinely different possibilities rather than restatements.",
   "Respect every prohibited claim attached to a cited ontology record.",
   "Write to the reader as \"you\". Sound like a thoughtful person speaking to one person, not a report describing a specimen.",

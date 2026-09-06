@@ -1,4 +1,4 @@
-import { canonicalJson, contentHash, sha256Hex, ZODIAC_SIGNS, PATTERN_GENERATION_CONSENT_POLICY_VERSION, PORTRAIT_SCHEMA_VERSION, PORTRAIT_CONSENT_POLICY_VERSION, createPortraitGraph, isPortraitGraph, type CodexPortraitClaim, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest, type PatternPortraitResponse, type PatternResponseV7, type ZodiacSignName } from "@patternlike/shared";
+import { canonicalJson, contentHash, sha256Hex, ZODIAC_SIGNS, PATTERN_GENERATION_CONSENT_POLICY_VERSION, PORTRAIT_SCHEMA_VERSION, PORTRAIT_CONSENT_POLICY_VERSION, createPortraitGraph, isPortraitGraph, portraitImageModelProvenance, type CodexPortraitClaim, type CodexPortraitCompletion, type CodexPortraitFailure, type PatternPortraitGenerationRequest, type PatternPortraitResponse, type PatternPortraitDownload, type PatternResponseV7, type ZodiacSignName } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { b64, fromB64 } from "../crypto.js";
 import { loadUserIdentity, type UserIdentity } from "../db/users.js";
@@ -34,6 +34,7 @@ export interface AssetRow { id: string; portrait_id: string; user_id: string; jo
 interface Sample {
   label: string; rationale: string; original_sha256: string; provider_request_id: string; image_request_id: string;
   image_model: "gpt-image-2"; pixels: CodexPortraitCompletion["pixels"];
+  image_model_provenance?: CodexPortraitCompletion["image_model_provenance"];
 }
 export type Current = NonNullable<Awaited<ReturnType<typeof currentPattern>>>;
 const encoder = new TextEncoder();
@@ -205,7 +206,7 @@ export async function readPortrait(env: Env, userId: string): Promise<PatternPor
       const sample = await assetById(env,job.sample_asset_id!);
       if (!image || !sample || !await env.ARTIFACTS!.head(image.object_key)) throw new Error("portrait image missing");
       const metadata = JSON.parse(decoder.decode(await readAsset(env,sample,key))) as Sample;
-      response.chapters.push({ chapter_id: `chapter-${job.chapter_index + 1}`, reference_id: image.id, label: metadata.label, rationale: metadata.rationale, reference_sha256: image.plaintext_sha256, source_text: current.sources[job.chapter_index]! });
+      response.chapters.push({ chapter_id: `chapter-${job.chapter_index + 1}`, reference_id: image.id, label: metadata.label, rationale: metadata.rationale, reference_sha256: image.plaintext_sha256, source_text: current.sources[job.chapter_index]!, image_model_provenance: portraitImageModelProvenance(metadata) });
     }
     if (response.chapters.length !== 4) throw new Error("portrait incomplete");
     response.graph = graph;
@@ -259,6 +260,7 @@ export async function completePortrait(env: Env,jobId: string,completion: CodexP
   if (job.status !== "running" || !job.lease_expires_at || job.lease_expires_at <= now.toISOString()) throw new PortraitError(409,"portrait_result_conflict");
   const image = fromB64(completion.image_base64);
   const sample: Sample = { label:completion.label,rationale:completion.rationale,original_sha256:completion.original_sha256,provider_request_id:completion.provider_request_id,image_request_id:completion.image_request_id,image_model:completion.image_model,pixels:completion.pixels };
+  if (completion.image_model_provenance) sample.image_model_provenance = completion.image_model_provenance;
   const imageAsset = await saveAsset(env,row,current,job.id,"image",image,`${job.id}:${tokenHash}:${hash}`,now);
   const sampleAsset = await saveAsset(env,row,current,job.id,"sample",encoder.encode(JSON.stringify(sample)),`${job.id}:${tokenHash}:${hash}`,now);
   // R2 put is deliberately outside D1. The post-upload transaction fences late
@@ -316,12 +318,12 @@ export async function portraitImage(env: Env,userId: string,referenceId: string)
   if (!asset) throw new PortraitError(404,"portrait_image_not_found");
   try { return await readAsset(env,asset,await patternKey(env,current)); } catch { throw new PortraitError(404,"portrait_image_not_found"); }
 }
-export async function portraitDownload(env: Env,userId: string,expected: URLSearchParams) {
+export async function portraitDownload(env: Env,userId: string,expected: URLSearchParams): Promise<PatternPortraitDownload> {
   const portrait = await readPortrait(env,userId);
   for (const key of ["chart_id","pattern_id","generated_at"] as const) if (!expected.has(key) || expected.get(key) !== portrait[key]) throw new PortraitError(409,"portrait_revision_conflict");
   if (portrait.status !== "ready") throw new PortraitError(409,"portrait_not_ready");
-  const images = [];
-  for (const chapter of portrait.chapters) images.push({ reference_id: chapter.reference_id, content_type: "image/png", sha256: chapter.reference_sha256, data_base64: b64(await portraitImage(env,userId,chapter.reference_id)) });
+  const images: PatternPortraitDownload["images"] = [];
+  for (const chapter of portrait.chapters) images.push({ reference_id: chapter.reference_id, content_type: "image/png", sha256: chapter.reference_sha256, data_base64: b64(await portraitImage(env,userId,chapter.reference_id)), image_model_provenance: chapter.image_model_provenance });
   return { schema_version: "pattern-portrait-download/v1", portrait, images };
 }
 /** Claim a fair bounded scan without changing the user-visible completion time. */
