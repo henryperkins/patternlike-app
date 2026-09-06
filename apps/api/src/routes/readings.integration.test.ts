@@ -1730,6 +1730,21 @@ describe("v5 stored readings", () => {
     const { status, body } = await get<ErrorEnvelope>("/v1/readings/today");
     expect(status).toBe(404);
     expect(body.error.code).toBe("reading_not_generated");
+
+    const historical = await get<Record<string, unknown>>(`/v1/readings/${readingId}`);
+    expect(historical.status).toBe(200);
+    expect(historical.body).toMatchObject({
+      schema_version: "0.5.0",
+      reading: { reading_id: readingId, headline: "A narrower commitment" },
+    });
+
+    const history = await get<{ items: Array<{ reading_id: string; headline: string | null }> }>(
+      "/v1/readings?view=history",
+    );
+    expect(history.status).toBe(200);
+    expect(history.body.items).toEqual([
+      expect.objectContaining({ reading_id: readingId, headline: "A narrower commitment" }),
+    ]);
   });
 
   it("uses explicit PUT to invalidate a stale current-day V5 row and reserve one fact repair", async () => {
@@ -1848,5 +1863,325 @@ describe("v5 stored readings", () => {
     const { status, body } = await get("/v1/readings/today");
     expect(status).toBe(500);
     expect((body as ErrorEnvelope).error.code).toBe("internal_error");
+  });
+});
+
+describe("reading history, detail, and Save routes", () => {
+  beforeEach(seedBoth);
+
+  async function request(
+    path: string,
+    init: RequestInit = {},
+    userId: string | null = USER_A,
+  ) {
+    const headers = new Headers(init.headers);
+    if (userId) headers.set("x-user-id", userId);
+    const response = await SELF.fetch(`http://api.test${path}`, { ...init, headers });
+    return {
+      status: response.status,
+      headers: response.headers,
+      body: response.status === 204 ? null : await response.json() as unknown,
+    };
+  }
+
+  async function reissue(readingId: string): Promise<string> {
+    const [row] = await rows<{ local_date: string }>(
+      "SELECT local_date FROM daily_readings WHERE id = ? AND user_id = ?",
+      readingId,
+      USER_A,
+    );
+    if (!row) throw new Error("predecessor fixture missing");
+    const published = await loadPublishedReadingForDate(env, IDENTITY_A, row.local_date);
+    if (!published || published.record.id !== readingId) {
+      throw new Error("predecessor fixture is not published");
+    }
+    const successorId = `rdg_${crypto.randomUUID().replaceAll("-", "")}`;
+    const revision = published.record.revision + 1;
+    const stored = structuredClone(published.stored) as StoredReading;
+    stored.reading.reading_id = successorId;
+    stored.reading.revision = revision;
+    const sealed = await encryptPayload(env, IDENTITY_A, stored, {
+      subject: IDENTITY_A.cryptoSubject,
+      field: "daily_readings.reading_enc",
+      recordId: successorId,
+    });
+    await rows("UPDATE daily_readings SET status = 'superseded' WHERE id = ?", readingId);
+    await rows(
+      `INSERT INTO daily_readings
+         (id, user_id, local_date, release_version, reading_key, chart_fingerprint,
+          contract_id, assembly_mode, status, revision, revision_reason,
+          supersedes_reading_id, command_generation, reading_enc, reading_key_version,
+          reading_nonce, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, 'safety_correction', ?, 1,
+               ?, ?, ?, ?, ?)`,
+      successorId,
+      USER_A,
+      published.record.localDate,
+      published.record.releaseVersion,
+      `${published.record.readingKey}:history:${successorId}`,
+      published.record.chartFingerprint,
+      published.record.contractId,
+      published.record.assemblyMode,
+      revision,
+      readingId,
+      fromB64(sealed.ciphertext),
+      sealed.keyVersion,
+      sealed.nonce,
+      new Date().toISOString(),
+      new Date().toISOString(),
+    );
+    return successorId;
+  }
+
+  it("returns closed empty pages for both library views", async () => {
+    for (const view of ["history", "saved"] as const) {
+      const response = await request(`/v1/readings?view=${view}`);
+      expect(response).toMatchObject({
+        status: 200,
+        body: { schema_version: "0.8.0", view, items: [], next_cursor: null },
+      });
+    }
+  });
+
+  it("serves only owned readable detail and uses the same projection as Today", async () => {
+    const readingId = await publish(USER_A);
+    const todayResponse = await get<TodayBody>("/v1/readings/today");
+    const detail = await request(`/v1/readings/${readingId}`);
+
+    expect(detail.status).toBe(200);
+    expect(detail.body).toEqual(todayResponse.body);
+    expect(detail.headers.get("cache-control")).toBe("private, no-store");
+
+    for (const [path, userId] of [
+      [`/v1/readings/rdg_does_not_exist_0001`, USER_A],
+      [`/v1/readings/${readingId}`, USER_B],
+    ] as const) {
+      const response = await request(path, {}, userId);
+      expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({ error: { code: "reading_not_found" } });
+    }
+
+    await rows("UPDATE daily_readings SET status = 'superseded' WHERE id = ?", readingId);
+    expect((await request(`/v1/readings/${readingId}`)).status).toBe(200);
+    await rows(
+      "UPDATE daily_readings SET status = 'invalidated', invalidated_at = ? WHERE id = ?",
+      new Date().toISOString(),
+      readingId,
+    );
+    expect((await request(`/v1/readings/${readingId}`)).status).toBe(200);
+
+    for (const status of ["pending", "failed"] as const) {
+      await rows(
+        "UPDATE daily_readings SET status = ?, invalidated_at = NULL WHERE id = ?",
+        status,
+        readingId,
+      );
+      const response = await request(`/v1/readings/${readingId}`);
+      expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({ error: { code: "reading_not_found" } });
+      const evidence = await request(`/v1/readings/${readingId}/evidence`);
+      expect(evidence.status).toBe(404);
+      expect(evidence.body).toMatchObject({ error: { code: "reading_not_found" } });
+    }
+    await rows(
+      `UPDATE daily_readings
+       SET status = 'superseded', reading_enc = NULL,
+           reading_key_version = NULL, reading_nonce = NULL
+       WHERE id = ?`,
+      readingId,
+    );
+    expect((await request(`/v1/readings/${readingId}`)).status).toBe(404);
+  });
+
+  it("fails closed when historical ciphertext does not decode as a stored reading", async () => {
+    const readingId = await publish(USER_A);
+    const [row] = await rows<{ reading_enc: ArrayBuffer }>(
+      "SELECT reading_enc FROM daily_readings WHERE id = ?",
+      readingId,
+    );
+    const corrupted = new Uint8Array(row!.reading_enc);
+    corrupted[0] = corrupted[0]! ^ 0xff;
+    await rows("UPDATE daily_readings SET reading_enc = ? WHERE id = ?", corrupted, readingId);
+
+    const response = await request(`/v1/readings/${readingId}`);
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({ error: { code: "internal_error" } });
+  });
+
+  it("withholds existing feedback when the target artifact becomes unreadable", async () => {
+    const readingId = await publish(USER_A);
+    const created = await request(`/v1/readings/${readingId}/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "feedback-history-0001" },
+      body: JSON.stringify({ resonance: "helpful", relevance_labels: [] }),
+    });
+    expect(created.status).toBe(201);
+
+    await rows("UPDATE daily_readings SET status = 'failed' WHERE id = ?", readingId);
+    const loaded = await request(`/v1/readings/${readingId}/feedback`);
+    expect(loaded.status).toBe(404);
+    expect(loaded.body).toMatchObject({ error: { code: "feedback_not_found" } });
+
+    const replay = await request(`/v1/readings/${readingId}/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "feedback-history-0001" },
+      body: JSON.stringify({ resonance: "helpful", relevance_labels: [] }),
+    });
+    expect(replay.status).toBe(404);
+    expect(replay.body).toMatchObject({ error: { code: "reading_not_found" } });
+
+    const stored = await request(`/v1/readings/${readingId}/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "feedback-history-0002" },
+      body: JSON.stringify({ resonance: "neutral", relevance_labels: [] }),
+    });
+    expect(stored.status).toBe(404);
+    expect(stored.body).toMatchObject({ error: { code: "reading_not_found" } });
+  });
+
+  it("lists canonical History, every saved revision, and drains a stable cursor", async () => {
+    const first = await publish(USER_A, new Date(Date.now() - 3 * 86_400_000));
+    const second = await reissue(first);
+    const third = await publish(USER_A, new Date(Date.now() - 2 * 86_400_000));
+    const fourth = await publish(USER_A, new Date(Date.now() - 1 * 86_400_000));
+    await publish(USER_B, new Date(Date.now() - 4 * 86_400_000));
+
+    for (const readingId of [first, second]) {
+      expect((await request(`/v1/readings/${readingId}/save`, { method: "PUT" })).status).toBe(200);
+    }
+
+    const history = await request("/v1/readings?view=history");
+    expect(history.status).toBe(200);
+    expect(history.headers.get("cache-control")).toBe("private, no-store");
+    expect(history.body).toMatchObject({
+      schema_version: "0.8.0",
+      view: "history",
+      items: [
+        expect.objectContaining({ reading_id: fourth, headline: null }),
+        expect.objectContaining({ reading_id: third, headline: null }),
+        expect.objectContaining({ reading_id: second, headline: null, saved: true }),
+      ],
+      next_cursor: null,
+    });
+    expect(JSON.stringify(history.body)).not.toContain(USER_B);
+    expect(JSON.stringify(history.body)).not.toContain("paragraphs");
+
+    const saved = await request("/v1/readings?view=saved");
+    expect(saved.status).toBe(200);
+    const savedItems = (saved.body as { items: Array<{ reading_id: string }> }).items;
+    expect(new Set(savedItems.map((item) => item.reading_id))).toEqual(new Set([first, second]));
+
+    const drained: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await request(
+        `/v1/readings?view=history&limit=1${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      );
+      expect(page.status).toBe(200);
+      const body = page.body as { items: Array<{ reading_id: string }>; next_cursor: string | null };
+      drained.push(...body.items.map((item) => item.reading_id));
+      cursor = body.next_cursor;
+    } while (cursor);
+    expect(drained).toEqual([fourth, third, second]);
+    expect(new Set(drained).size).toBe(drained.length);
+  });
+
+  it("ranks published above a higher invalidated revision", async () => {
+    const first = await publish(USER_A, new Date(Date.now() - 2 * 86_400_000));
+    const second = await reissue(first);
+    await rows("UPDATE daily_readings SET status = 'superseded' WHERE id = ?", second);
+    const superseded = await request("/v1/readings?view=history");
+    expect(superseded.body).toMatchObject({
+      items: [expect.objectContaining({ reading_id: second, status: "superseded", revision: 2 })],
+    });
+    await rows(
+      "UPDATE daily_readings SET status = 'invalidated', invalidated_at = ? WHERE id = ?",
+      new Date().toISOString(),
+      second,
+    );
+    const invalidated = await request("/v1/readings?view=history");
+    expect(invalidated.body).toMatchObject({
+      items: [expect.objectContaining({ reading_id: second, status: "invalidated", revision: 2 })],
+    });
+    await rows("UPDATE daily_readings SET status = 'published' WHERE id = ?", first);
+
+    const response = await request("/v1/readings?view=history");
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      items: [expect.objectContaining({ reading_id: first, status: "published", revision: 1 })],
+    });
+  });
+
+  it("rejects missing, malformed, oversized, and mode-mismatched list queries", async () => {
+    const readingId = await publish(USER_A);
+    const otherReadingId = await publish(USER_A, new Date(Date.now() - 86_400_000));
+    const saved = await request(`/v1/readings/${readingId}/save`, { method: "PUT" });
+    expect(saved.status).toBe(200);
+    expect((await request(`/v1/readings/${otherReadingId}/save`, { method: "PUT" })).status)
+      .toBe(200);
+    const savedPage = await request("/v1/readings?view=saved&limit=1");
+    const savedCursor = (savedPage.body as { next_cursor: string | null }).next_cursor;
+
+    for (const path of [
+      "/v1/readings",
+      "/v1/readings?view=other",
+      "/v1/readings?view=history&limit=0",
+      "/v1/readings?view=history&limit=51",
+      "/v1/readings?view=history&limit=1.5",
+      "/v1/readings?view=history&view=saved",
+      "/v1/readings?view=history&unknown=true",
+      "/v1/readings?view=history&cursor=not-base64!",
+      `/v1/readings?view=history&cursor=${"a".repeat(2049)}`,
+      ...(savedCursor ? [`/v1/readings?view=history&cursor=${savedCursor}`] : []),
+    ]) {
+      const response = await request(path);
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({ error: { code: "invalid_reading_query" } });
+    }
+  });
+
+  it("implements the idempotent Save resource without disclosing DELETE targets", async () => {
+    const readingId = await publish(USER_A);
+    const initial = await request(`/v1/readings/${readingId}/save`);
+    expect(initial).toMatchObject({
+      status: 200,
+      body: { schema_version: "0.8.0", reading_id: readingId, saved: false, saved_at: null },
+    });
+
+    const first = await request(`/v1/readings/${readingId}/save`, { method: "PUT" });
+    const second = await request(`/v1/readings/${readingId}/save`, { method: "PUT" });
+    expect(first.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+
+    const nonEmpty = await request(`/v1/readings/${readingId}/save`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(nonEmpty.status).toBe(400);
+    expect(nonEmpty.body).toMatchObject({ error: { code: "invalid_body" } });
+
+    const streamed = await request(`/v1/readings/${readingId}/save`, {
+      method: "PUT",
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("streamed body"));
+          controller.close();
+        },
+      }),
+    });
+    expect(streamed.status).toBe(400);
+    expect(streamed.body).toMatchObject({ error: { code: "invalid_body" } });
+
+    for (const id of ["rdg_does_not_exist_0001", readingId]) {
+      const userId = id === readingId ? USER_B : USER_A;
+      expect((await request(`/v1/readings/${id}/save`, {}, userId)).status).toBe(404);
+      expect((await request(`/v1/readings/${id}/save`, { method: "PUT" }, userId)).status).toBe(404);
+      expect((await request(`/v1/readings/${id}/save`, { method: "DELETE" }, userId)).status).toBe(204);
+      expect((await request(`/v1/readings/${id}/save`, { method: "DELETE" }, userId)).status).toBe(204);
+    }
+
+    expect((await request(`/v1/readings/${readingId}/save`, { method: "DELETE" })).status).toBe(204);
+    expect((await request(`/v1/readings/${readingId}/save`, { method: "DELETE" })).status).toBe(204);
   });
 });

@@ -299,6 +299,83 @@ def assert_birth_calc_schema(con: sqlite3.Connection, lane: str) -> None:
                 )
 
 
+def check_0028_reading_saves() -> None:
+    con = fresh()
+    columns = [
+        (row[1], row[2], row[3], row[4], row[5])
+        for row in con.execute("PRAGMA table_info(reading_saves)")
+    ]
+    expected_columns = [
+        ("user_id", "TEXT", 1, None, 1),
+        ("reading_id", "TEXT", 1, None, 2),
+        ("saved_at", "TEXT", 1, None, 0),
+    ]
+    if columns != expected_columns:
+        raise SystemExit(f"0028 has wrong reading_saves columns/PK: {columns}")
+
+    foreign_keys = con.execute(
+        "PRAGMA foreign_key_list(reading_saves)"
+    ).fetchall()
+    expected_foreign_keys = [
+        (0, 0, "daily_readings", "reading_id", "id", "NO ACTION", "NO ACTION", "NONE"),
+        (0, 1, "daily_readings", "user_id", "user_id", "NO ACTION", "NO ACTION", "NONE"),
+        (1, 0, "users", "user_id", "id", "NO ACTION", "NO ACTION", "NONE"),
+    ]
+    if foreign_keys != expected_foreign_keys:
+        raise SystemExit(f"0028 has wrong reading_saves foreign keys: {foreign_keys}")
+
+    index_columns = con.execute(
+        "PRAGMA index_info(idx_reading_saves_user_saved)"
+    ).fetchall()
+    if index_columns != [
+        (0, 0, "user_id"),
+        (1, 2, "saved_at"),
+        (2, 1, "reading_id"),
+    ]:
+        raise SystemExit(
+            f"0028 has wrong reading_saves saved-order index: {index_columns}"
+        )
+    index_source = con.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'index' "
+        "AND name = 'idx_reading_saves_user_saved'"
+    ).fetchone()
+    normalized_index = " ".join(index_source[0].split()) if index_source else ""
+    expected_index = (
+        "CREATE INDEX idx_reading_saves_user_saved "
+        "ON reading_saves(user_id, saved_at DESC, reading_id DESC)"
+    )
+    if normalized_index != expected_index:
+        raise SystemExit(f"0028 lost descending Saved order: {normalized_index}")
+
+    seed_user(con, USER_A, SUBJ_A)
+    seed_user(con, USER_B, SUBJ_B)
+    insert_reading(
+        con,
+        "rdr_0028_owner_a",
+        USER_A,
+        "2026-09-06",
+        "published",
+        mode="constrained_model",
+        release=None,
+    )
+    expect_integrity_error(
+        lambda: con.execute(
+            "INSERT INTO reading_saves (user_id, reading_id, saved_at) "
+            "VALUES (?, 'rdr_0028_owner_a', ?)",
+            (USER_B, NOW),
+        ),
+        "0028 rejects a cross-owner reading Save",
+    )
+    con.execute(
+        "INSERT INTO reading_saves (user_id, reading_id, saved_at) "
+        "VALUES (?, 'rdr_0028_owner_a', ?)",
+        (USER_A, NOW),
+    )
+    if con.execute("PRAGMA foreign_key_check").fetchall():
+        raise SystemExit("0028 reading Saves left foreign-key violations")
+    print("D1 OK  0028 reading Save keys, ownership, and pagination index")
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -1770,6 +1847,7 @@ def main() -> int:
     check_0019_over_populated_0018()
     check_0021_over_populated_0020()
     check_0023_pattern_source_regeneration()
+    check_0028_reading_saves()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

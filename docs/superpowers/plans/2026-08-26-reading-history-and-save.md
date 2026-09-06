@@ -1,12 +1,34 @@
 # Reading History and Save Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution record:** Implementation is complete on `feat/reading-history-save`; all 14 local CI lanes passed. The dated status below supersedes the original step sequence retained for reference. Production migration 0028 is applied ahead of the compatible main release.
 
 **Goal:** Let readers revisit past daily chapters and explicitly save or unsave a specific reading revision without changing the existing Today, evidence, feedback, or generation semantics.
 
 **Architecture:** Add an owner-scoped reading-by-id projection and a cursor-paginated library with two views: canonical history (one best artifact per local date) and Saved (every explicitly saved revision). A small `reading_saves` relation stores portable user intent. The web extracts the existing reading renderer into a reusable article, adds History navigation, and uses one idempotent HTTP resource for Save state.
 
 **Tech Stack:** TypeScript strict ESM, Hono, Cloudflare Workers, D1/SQLite window functions, user-DEK decryption, React 19, Vite, Vitest/Testing Library/workerd, JSON Schema/OpenAPI
+
+## Execution notes (2026-09-06)
+
+- The M8 schemas, shared types, fixtures, export successor, and OpenAPI additions in Task 1 already exist and pass the contract gate.
+- The available migration is `0028_reading_saves.sql`. References to `0019` below belong to the original sequencing; `0019` already contains Pattern claim-transition guards and must not be rewritten.
+- The normative M8 OpenAPI requires an explicit `view=history|saved`; the client always supplies it. This overrides Task 3's original implicit History default.
+- Implementation and local verification took place in an isolated branch. After production release was authorized, migration 0028 was applied before the compatible runtime reached main; the implementation review records its receipt.
+- Current implementation and verification evidence is recorded in [the implementation review](../../reviews/2026-09-06-reading-history-and-save-implementation.md).
+
+| Task | Status in this branch |
+| --- | --- |
+| 1. M8 contracts and export successor | Existing implementation verified with the full contract gate |
+| 2. Shared projection and owner-scoped detail | Complete |
+| 3. Canonical History and Saved pagination | Complete |
+| 4. Save persistence, routes, export, deletion | Complete with additive migration 0028 |
+| 5. Shared article and accessible Save control | Complete |
+| 6. History navigation, detail, browser walkthrough | Complete; real local Worker/D1 video and screenshots recorded |
+| Independent review | All four P2 findings and one P3 copy finding closed |
+| Aggregate local CI | All 14 lanes passed on the integrated, frozen implementation |
+| Production release | Migration 0028 applied; compatible Worker ships through main’s automatic deployment |
+
+The original per-task commit examples below are historical instructions. The branch packages the additive migration with its runtime and deletion/export registration. Production follows the separately recorded migration-before-runtime order. Task 1 was already delivered before this execution, so its initial RED steps were not repeated.
 
 ## Global Constraints
 
@@ -62,7 +84,7 @@
 - Produces: `ReadingHistoryView`, `ReadingHistoryItem`, `ReadingHistoryResponse`, `ReadingSaveState`.
 - Consumed by: API and web tasks.
 
-- [ ] **Step 1: Write failing M8 schema and OpenAPI checks**
+- **Step 1: Write failing M8 schema and OpenAPI checks**
 
 Freeze:
 
@@ -114,7 +136,7 @@ DELETE /v1/readings/{reading_id}/save
 
 `GET /v1/readings/{reading_id}` is a `oneOf` reference to the frozen M3 and M5 Today success envelopes.
 
-- [ ] **Step 2: Run contracts and verify RED**
+- **Step 2: Run contracts and verify RED**
 
 ```bash
 npm run test:contracts
@@ -122,7 +144,7 @@ npm run test:contracts
 
 Expected: missing reading schemas/routes/fixtures.
 
-- [ ] **Step 3: Add the M8 account-export successor**
+- **Step 3: Add the M8 account-export successor**
 
 Copy the M7 section model, set `schema_version` to 0.8.0, and define reading items with their existing metadata/artifact/evidence plus:
 
@@ -135,11 +157,11 @@ Copy the M7 section model, set `schema_version` to 0.8.0, and define reading ite
 
 Record M7 account export as the predecessor/superseded family. Stored M7 exports remain valid under M7.
 
-- [ ] **Step 4: Add schemas, fixtures, types, and validation**
+- **Step 4: Add schemas, fixtures, types, and validation**
 
 Objects are closed, ids/dates reference existing common definitions, list max is 50, and cursor max length is bounded. The invalid fixtures prove unknown fields, pending status, and `saved: false` with non-null `saved_at` are rejected.
 
-- [ ] **Step 5: Verify and commit**
+- **Step 5: Verify and commit**
 
 ```bash
 npm run test:contracts
@@ -168,7 +190,7 @@ git commit -m "contracts: add M8 core-loop amendments"
 - Produces: `loadReadableReadingById`, `projectReadingResponse`.
 - Consumed by: Today and History.
 
-- [ ] **Step 1: Write failing detail/projection tests**
+- **Step 1: Write failing detail/projection tests**
 
 Prove:
 
@@ -181,7 +203,7 @@ Prove:
 - v5 historical detail remains readable after its chart becomes inactive.
 - Stored-artifact guards still fail closed on malformed decrypted content.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- **Step 2: Run focused tests and verify RED**
 
 ```bash
 npm exec -w @patternlike/api -- vitest run src/services/reading-product-projection.test.ts src/routes/readings.integration.test.ts
@@ -189,7 +211,7 @@ npm exec -w @patternlike/api -- vitest run src/services/reading-product-projecti
 
 Expected: route/loader missing.
 
-- [ ] **Step 3: Add the readable-by-id loader**
+- **Step 3: Add the readable-by-id loader**
 
 Expose:
 
@@ -215,15 +237,15 @@ guards. Feedback GET joins the owned reading and applies the same ciphertext
 plus status predicate; POST’s transactional assertion does likewise. Do not use
 Today’s active-chart `EXISTS`.
 
-- [ ] **Step 4: Extract product projection**
+- **Step 4: Extract product projection**
 
 Move the field-by-field v3/v5 reading envelope projection from `routes/readings.ts` into `services/reading-product-projection.ts`. Today and detail call the same function, preserving the M5 assertion.
 
-- [ ] **Step 5: Register route in safe order**
+- **Step 5: Register route in safe order**
 
 Keep `/v1/readings/today` before dynamic routes. Add `GET /v1/readings/:id` before `/:id/evidence`, `/:id/feedback`, and `/:id/save`. Return the existing opaque `reading_not_found` envelope.
 
-- [ ] **Step 6: Verify and commit**
+- **Step 6: Verify and commit**
 
 ```bash
 npm exec -w @patternlike/api -- vitest run src/services/reading-product-projection.test.ts src/routes/readings.integration.test.ts
@@ -249,7 +271,7 @@ git commit -m "api: read historical reading artifacts"
 **Interfaces:**
 - Produces: `encodeReadingHistoryCursor`, `parseReadingHistoryCursor`, `listReadingHistory`.
 
-- [ ] **Step 1: Write failing cursor and history tests**
+- **Step 1: Write failing cursor and history tests**
 
 Cover:
 
@@ -263,7 +285,7 @@ Cover:
 - Foreign user data never appears.
 - V5 headline appears; V3 headline is null.
 
-- [ ] **Step 2: Define the cursor union**
+- **Step 2: Define the cursor union**
 
 ```ts
 type ReadingHistoryCursor =
@@ -283,7 +305,7 @@ type ReadingHistoryCursor =
 
 Encode canonical JSON as base64url. Parse exact keys/types, re-encode, and require byte equality to reject alternate encodings.
 
-- [ ] **Step 3: Implement canonical History query**
+- **Step 3: Implement canonical History query**
 
 Use a window CTE:
 
@@ -326,7 +348,7 @@ the History runtime commit yet. Execute Task 4’s schema-only commit, apply 001
 to production, and only then merge the combined History/Save runtime commit
 shown in Task 4 Step 6.
 
-- [ ] **Step 4: Implement Saved query after 0019**
+- **Step 4: Implement Saved query after 0019**
 
 Join from `reading_saves` to owned readable rows; do not collapse by date:
 
@@ -336,20 +358,20 @@ ORDER BY s.saved_at DESC, r.id DESC
 
 Bind the saved cursor to both values.
 
-- [ ] **Step 5: Decrypt headlines with one DEK load**
+- **Step 5: Decrypt headlines with one DEK load**
 
 Fetch at most `limit + 1` rows. Use the extra row only to detect continuation;
 remove it before decryption. Load the user key once, decode each returned row
 with the existing closed stored-reading guard, and project `headline` only for
 v5. Do not return paragraph previews.
 
-- [ ] **Step 6: Add list route**
+- **Step 6: Add list route**
 
 Default `view=history`, `limit=20`; max 50. When an extra row exists, encode
 the cursor from the last returned row, not the extra row, so the strict `<`
 predicate includes the extra row at the start of the next page.
 
-- [ ] **Step 7: Run focused verification**
+- **Step 7: Run focused verification**
 
 ```bash
 npm exec -w @patternlike/api -- vitest run src/services/reading-history-cursor.test.ts src/routes/readings.integration.test.ts
@@ -383,7 +405,7 @@ Do not merge the runtime commit before Task 4’s migration is applied.
 - Produces: `getReadingSaveState`, `saveReading`, `unsaveReading`.
 - Completes: Task 3 Saved query.
 
-- [ ] **Step 1: Write failing migration, Save, export, and lifecycle tests**
+- **Step 1: Write failing migration, Save, export, and lifecycle tests**
 
 Prove:
 
@@ -399,7 +421,7 @@ Prove:
 - An export command reserved before M8 still emits byte-compatible M7 on retry;
   a new command pins M8 and emits Save metadata.
 
-- [ ] **Step 2: Add migration 0019**
+- **Step 2: Add migration 0019**
 
 ```sql
 CREATE TABLE reading_saves (
@@ -419,7 +441,7 @@ No id column and no encryption are needed: the composite resource identity and t
 Extend `contracts/smoke_check.py` with the composite primary/foreign keys and
 the saved-order index.
 
-- [ ] **Step 3: Implement idempotent Save operations**
+- **Step 3: Implement idempotent Save operations**
 
 Expose:
 
@@ -453,7 +475,7 @@ PUT uses one D1 batch:
 
 DELETE is `DELETE ... WHERE user_id = ? AND reading_id = ?` and always succeeds.
 
-- [ ] **Step 4: Classify Save as portable**
+- **Step 4: Classify Save as portable**
 
 Add `reading_saves` to `DELETED_USER_TABLES` and `PORTABLE_USER_TABLES`, not `NON_PORTABLE_USER_TABLES`. Extend account export’s reading query with an owner-scoped left join and emit `saved_at`. Change new export documents to `schema_version: "0.8.0"` and validate against M8.
 
@@ -464,7 +486,7 @@ pre-M8 commands as `"0.7.0"`. Thread the frozen value into
 M8 includes it. This keeps a create-only export retry from changing bytes
 merely because the Worker was upgraded.
 
-- [ ] **Step 5: Add routes**
+- **Step 5: Add routes**
 
 ```text
 GET    /v1/readings/:id/save  -> 200 state or 404 reading_not_found
@@ -474,7 +496,7 @@ DELETE /v1/readings/:id/save  -> 204
 
 No request body and no Idempotency-Key. Reject a non-empty PUT body if the framework exposes one.
 
-- [ ] **Step 6: Verify and commit schema first**
+- **Step 6: Verify and commit schema first**
 
 ```bash
 npm exec -w @patternlike/api -- vitest run src/db/reading-saves.test.ts src/routes/privacy-export.integration.test.ts src/services/deletion-manifest.test.ts src/routes/readings.integration.test.ts
@@ -512,11 +534,11 @@ git commit -m "api: serve reading history and save state"
 - Produces: `ReadingArticle`, `ReadingSaveButton`.
 - Consumed by: Today and History.
 
-- [ ] **Step 1: Write failing extraction and Save tests**
+- **Step 1: Write failing extraction and Save tests**
 
 Prove v3/v5 paragraphs, fallback/disclosure, revision chip, evidence, feedback, and Today check-in remain unchanged after extraction. Save tests cover initial GET, PUT, DELETE, reload persistence, busy state, `aria-pressed`, unauthorized, and recoverable failure.
 
-- [ ] **Step 2: Add API client methods**
+- **Step 2: Add API client methods**
 
 ```ts
 listReadingHistory(input: {
@@ -531,7 +553,7 @@ saveReading(readingId: string, signal?: AbortSignal): Promise<ReadingSaveState>;
 unsaveReading(readingId: string, signal?: AbortSignal): Promise<void>;
 ```
 
-- [ ] **Step 3: Extract `ReadingArticle`**
+- **Step 3: Extract `ReadingArticle`**
 
 Props:
 
@@ -548,14 +570,14 @@ interface ReadingArticleProps {
 
 Today passes `showCheckIn=true`; historical detail passes false. The article includes `ReadingSaveButton`, evidence, and feedback for the displayed `reading_id`.
 
-- [ ] **Step 4: Implement accessible Save**
+- **Step 4: Implement accessible Save**
 
 Render a real button with `aria-pressed`, visible `Save`/`Saved`, and
 `aria-live` status for network completion. Optimistic UI may toggle only after
 the server returns; on failure retain the previous state. Emit the committed
 `ReadingSaveState` through `onSaveStateChange`.
 
-- [ ] **Step 5: Verify and commit**
+- **Step 5: Verify and commit**
 
 ```bash
 npm exec -w @patternlike/web -- vitest run src/components/ReadingArticle.test.tsx src/components/ReadingSaveButton.test.tsx src/components/TodayView.test.tsx
@@ -584,7 +606,7 @@ git commit -m "web: add reusable reading save control"
 - Consumes: Task 5 components/client.
 - Produces: `#history` product surface.
 
-- [ ] **Step 1: Write failing History tests**
+- **Step 1: Write failing History tests**
 
 Cover:
 
@@ -598,11 +620,11 @@ Cover:
 - Unauthorized delegates to the signed-out screen.
 - Save/unsave refreshes the active list without deleting the reading.
 
-- [ ] **Step 2: Add route and navigation**
+- **Step 2: Add route and navigation**
 
 Add `"history"` to `ViewId`, `currentView`, `viewIds`, and the app branch. Add a History icon/label to desktop and mobile navigation, then verify the six-item mobile bar at the smallest supported width rather than silently clipping labels.
 
-- [ ] **Step 3: Implement list/detail state**
+- **Step 3: Implement list/detail state**
 
 `HistoryView` owns:
 
@@ -619,18 +641,18 @@ Pass `onSaveStateChange` to the detail article. Update the matching list item
 locally; when the current view is Saved and the state becomes unsaved, remove
 that item locally. Back therefore restores correct state without a refetch.
 
-- [ ] **Step 4: Add a Today entry point**
+- **Step 4: Add a Today entry point**
 
 Add “Past chapters” near Today’s action controls even though History is in primary navigation. This keeps the Save→revisit path discoverable.
 
-- [ ] **Step 5: Run focused verification**
+- **Step 5: Run focused verification**
 
 ```bash
 npm exec -w @patternlike/web -- vitest run src/components/HistoryView.test.tsx src/components/ReadingArticle.test.tsx src/components/TodayView.test.tsx src/App.test.tsx
 npm run typecheck -w @patternlike/web
 ```
 
-- [ ] **Step 6: Perform the manual walkthrough**
+- **Step 6: Perform the manual walkthrough**
 
 Using the real local API/web stack:
 
@@ -644,7 +666,7 @@ Using the real local API/web stack:
 
 Record one concise demo video under `/opt/cursor/artifacts`.
 
-- [ ] **Step 7: Commit**
+- **Step 7: Commit**
 
 ```bash
 git add apps/web/src/components/HistoryView.tsx apps/web/src/components/HistoryView.test.tsx apps/web/src/components/AppShell.tsx apps/web/src/components/icons.tsx apps/web/src/App.tsx apps/web/src/App.test.tsx apps/web/src/components/TodayView.tsx apps/web/src/styles.css
@@ -653,14 +675,16 @@ git commit -m "web: add reading history"
 
 ## Definition of Done
 
-- [ ] History returns one canonical readable artifact per date.
-- [ ] Saved returns every explicitly saved revision without date collapse.
-- [ ] Cursor pagination has no duplicate/gap under stable data and rejects mode mismatch.
-- [ ] Reading detail serves owned published/superseded/invalidated v3 and v5 artifacts.
-- [ ] Today remains active-chart-gated; historical detail does not.
-- [ ] PUT/DELETE Save operations are idempotent without jobs or idempotency headers.
-- [ ] Save state survives reload, is deleted with the account, and appears in M8 export.
-- [ ] No new encrypted column exists; existing prose/evidence crypto paths are reused.
-- [ ] Today and History share one renderer without changing fallback/disclosure/evidence/feedback behavior.
-- [ ] History and Save controls are keyboard/screen-reader operable.
-- [ ] The manual video demonstrates Save, History, Saved filtering, detail, evidence, feedback, and unsave.
+Completed against the implemented branch and the local Worker/D1 walkthrough. Aggregate CI evidence is recorded separately above.
+
+- [x] History returns one canonical readable artifact per date.
+- [x] Saved returns every explicitly saved revision without date collapse.
+- [x] Cursor pagination has no duplicate/gap under stable data and rejects mode mismatch.
+- [x] Reading detail serves owned published/superseded/invalidated v3 and v5 artifacts.
+- [x] Today remains active-chart-gated; historical detail does not.
+- [x] PUT/DELETE Save operations are idempotent without jobs or idempotency headers.
+- [x] Save state survives reload, is deleted with the account, and appears in M8 export.
+- [x] No new encrypted column exists; existing prose/evidence crypto paths are reused.
+- [x] Today and History share one renderer without changing fallback/disclosure/evidence/feedback behavior.
+- [x] History and Save controls are keyboard/screen-reader operable.
+- [x] The manual video demonstrates Save, History, Saved filtering, detail, evidence, feedback, and unsave.

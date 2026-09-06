@@ -31,6 +31,8 @@
 
 ## Plan Set
 
+**Reading-library update (2026-09-06):** The P1 Reading History and Save workstream is implemented on `feat/reading-history-save`; its available migration is 0028. See the [implementation record](../../reviews/2026-09-06-reading-history-and-save-implementation.md) for verification and the migration-before-runtime release order. Other workstream statuses are unchanged by this update.
+
 | Workstream | Detailed plan | Deliverable |
 | --- | --- | --- |
 | P0 birth safety | `docs/superpowers/plans/2026-08-26-birth-operational-guards.md` | Timeout, exact per-user spend guard, safe telemetry, async trigger thresholds |

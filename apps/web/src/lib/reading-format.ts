@@ -74,6 +74,25 @@ export function formatLocalDate(isoDate: string): string {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+/** History spans years, so its otherwise-identical calendar label keeps the year. */
+export function formatHistoricalDate(isoDate: string): string {
+  const parts = isoDate.split("-").map(Number);
+  const [year, month, day] = parts;
+  if (parts.length !== 3 || year === undefined || month === undefined || day === undefined) {
+    return isoDate;
+  }
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return isoDate;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 /** A real instant, so ordinary local formatting is correct here. */
 export function formatInstant(value: string): string {
   const instant = new Date(value);

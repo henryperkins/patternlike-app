@@ -10,6 +10,10 @@ import { projectBirthPayloadForExport } from "./birth-command.js";
 
 export const M6_SCHEMA_VERSION = "0.6.0" as const;
 export const M7_EXPORT_SCHEMA_VERSION = "0.7.0" as const;
+export const M8_EXPORT_SCHEMA_VERSION = "0.8.0" as const;
+export type ExportSchemaVersion =
+  | typeof M7_EXPORT_SCHEMA_VERSION
+  | typeof M8_EXPORT_SCHEMA_VERSION;
 const M0_SCHEMA_VERSION = "0.2.0" as const;
 
 export interface ExportOptions {
@@ -88,6 +92,7 @@ export async function assembleAccountExport(
   exportId: string,
   generatedAt: string,
   options: ExportOptions,
+  exportSchemaVersion: ExportSchemaVersion = M8_EXPORT_SCHEMA_VERSION,
 ): Promise<Uint8Array> {
   const account = await env.DB.prepare(
     `SELECT id, crypto_subject, status, locale, locale_source, locale_updated_at,
@@ -102,7 +107,7 @@ export async function assembleAccountExport(
 
   const { dek } = await loadUserKey(env, identity);
   const document: Record<string, unknown> = {
-    schema_version: M7_EXPORT_SCHEMA_VERSION,
+    schema_version: exportSchemaVersion,
     export_id: exportId,
     generated_at: generatedAt,
     account: {
@@ -415,11 +420,15 @@ export async function assembleAccountExport(
 
   if (options.include_readings) {
     const readingRows = await env.DB.prepare(
-      `SELECT id, local_date, release_version, chart_fingerprint, contract_id,
-              assembly_mode, status, revision, revision_reason,
-              supersedes_reading_id, invalidated_at, reading_enc,
-              reading_key_version, reading_nonce, created_at, updated_at
-       FROM daily_readings WHERE user_id = ? ORDER BY local_date, revision`,
+      `SELECT r.id, r.local_date, r.release_version, r.chart_fingerprint,
+              r.contract_id, r.assembly_mode, r.status, r.revision,
+              r.revision_reason, r.supersedes_reading_id, r.invalidated_at,
+              r.reading_enc, r.reading_key_version, r.reading_nonce,
+              r.created_at, r.updated_at, s.saved_at
+       FROM daily_readings r
+       LEFT JOIN reading_saves s
+         ON s.reading_id = r.id AND s.user_id = r.user_id
+       WHERE r.user_id = ? ORDER BY r.local_date, r.revision`,
     )
       .bind(identity.userId)
       .all<Record<string, unknown>>();
@@ -430,6 +439,7 @@ export async function assembleAccountExport(
         reading_enc: ArrayBuffer | null;
         reading_key_version: number | null;
         reading_nonce: string | null;
+        saved_at: string | null;
       };
       let artifact: unknown = null;
       if (
@@ -455,6 +465,7 @@ export async function assembleAccountExport(
         reading_enc: _readingEnc,
         reading_key_version: _readingKeyVersion,
         reading_nonce: _readingNonce,
+        saved_at: savedAt,
         ...metadata
       } = row;
       const loadedEvidence = artifact === null
@@ -470,7 +481,9 @@ export async function assembleAccountExport(
             header: loadedEvidence.header,
             paragraphs: loadedEvidence.paragraphs,
           };
-      items.push({ ...metadata, artifact, evidence });
+      items.push(exportSchemaVersion === M8_EXPORT_SCHEMA_VERSION
+        ? { ...metadata, artifact, evidence, saved_at: savedAt }
+        : { ...metadata, artifact, evidence });
       document.readings = { status: "included", items };
       assertBounded(document);
     }

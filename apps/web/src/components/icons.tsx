@@ -2,11 +2,14 @@ import type { SVGProps } from "react";
 
 export type IconName =
   | "today"
+  | "history"
   | "pattern"
   | "timing"
   | "travel"
   | "privacy"
   | "arrow"
+  | "arrow-back"
+  | "bookmark"
   | "check"
   | "refresh"
   | "shield"
@@ -37,6 +40,12 @@ export function Icon({ name, ...props }: SVGProps<SVGSVGElement> & { name: IconN
         <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" />
       </>
     ),
+    history: (
+      <>
+        <path d="M5 5.5h14v14H5zM8 3.5v4M16 3.5v4M5 9.5h14" />
+        <path d="M8.5 14h7M8.5 17h4.5" />
+      </>
+    ),
     pattern: (
       <>
         <circle cx="12" cy="12" r="8.5" />
@@ -62,6 +71,8 @@ export function Icon({ name, ...props }: SVGProps<SVGSVGElement> & { name: IconN
       </>
     ),
     arrow: <path d="M5 12h14M14 7l5 5-5 5" />,
+    "arrow-back": <path d="M19 12H5M10 7l-5 5 5 5" />,
+    bookmark: <path d="M7 4.5h10v15l-5-3-5 3z" />,
     check: <path d="m5 12.5 4.2 4.2L19 7" />,
     refresh: (
       <>

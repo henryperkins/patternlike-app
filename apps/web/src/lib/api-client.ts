@@ -25,6 +25,9 @@ import type {
   PlaceSearchRequest,
   PlaceSearchResponse,
   ReadingPublisherProvider,
+  ReadingHistoryResponse,
+  ReadingHistoryView,
+  ReadingSaveState,
   TimeTravelResponse,
   TimezoneLookupRequest,
   TimezoneLookupResponse,
@@ -660,6 +663,64 @@ export function getTodayReading(signal?: AbortSignal): Promise<DailyReadingRespo
     headers: requestHeaders(),
     signal,
   });
+}
+
+export function listReadingHistory(
+  input: {
+    view: ReadingHistoryView;
+    limit?: number;
+    cursor?: string;
+  },
+  signal?: AbortSignal,
+): Promise<ReadingHistoryResponse> {
+  const query = new URLSearchParams({ view: input.view });
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.cursor !== undefined) query.set("cursor", input.cursor);
+  return request<ReadingHistoryResponse>(`/v1/readings?${query.toString()}`, {
+    method: "GET",
+    headers: requestHeaders(),
+    signal,
+  });
+}
+
+export function getReading(
+  readingId: string,
+  signal?: AbortSignal,
+): Promise<DailyReadingResponse> {
+  return request<DailyReadingResponse>(
+    `/v1/readings/${encodeURIComponent(readingId)}`,
+    { method: "GET", headers: requestHeaders(), signal },
+  );
+}
+
+export function getReadingSaveState(
+  readingId: string,
+  signal?: AbortSignal,
+): Promise<ReadingSaveState> {
+  return request<ReadingSaveState>(
+    `/v1/readings/${encodeURIComponent(readingId)}/save`,
+    { method: "GET", headers: requestHeaders(), signal },
+  );
+}
+
+export function saveReading(
+  readingId: string,
+  signal?: AbortSignal,
+): Promise<ReadingSaveState> {
+  return request<ReadingSaveState>(
+    `/v1/readings/${encodeURIComponent(readingId)}/save`,
+    { method: "PUT", headers: requestHeaders(), signal },
+  );
+}
+
+export function unsaveReading(
+  readingId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return requestNoContent(
+    `/v1/readings/${encodeURIComponent(readingId)}/save`,
+    { method: "DELETE", headers: requestHeaders(), signal },
+  );
 }
 
 /**

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { M3_SCHEMA_VERSION, M5_SCHEMA_VERSION } from "@patternlike/shared";
-import type { DailyReadingV5 } from "@patternlike/shared";
+import { M5_SCHEMA_VERSION, type ReadingHistoryView } from "@patternlike/shared";
 import type { Env } from "../env.js";
 import type { AppVariables } from "../middleware/auth.js";
 import type { UserIdentity } from "../db/users.js";
@@ -8,15 +7,14 @@ import { loadPreferences } from "../db/preferences.js";
 import { localDateIn } from "../services/local-day.js";
 import {
   hasActiveChart,
+  listReadingHistory,
   loadPublishedReadingForDate,
+  loadReadableReadingById,
   loadReadingEvidence,
-  type PublishedReading,
   type ReadingEvidence,
-  type ReadingRecord,
 } from "../db/readings.js";
-import type { DailyReading } from "@patternlike/reading-engine";
-import { isStoredReadingV5 } from "../services/stored-reading.js";
 import { loadLatestFeedback, parseFeedbackRequest, storeReadingFeedback } from "../db/feedback.js";
+import { getReadingSaveState, saveReading, unsaveReading } from "../db/reading-saves.js";
 import { ensureTodayReading } from "../services/ensure-today-reading.js";
 import { resumePausedV2ForFirstOpen } from "../db/generation.js";
 import { dispatch, resolveV5TargetDate } from "../services/enqueue.js";
@@ -24,8 +22,9 @@ import { readReadingV5Rollout, rolloutAllows } from "../services/reading-rollout
 import { safeLog } from "../services/safe-log.js";
 import {
   assertM5EvidenceResponse,
-  assertM5TodayResponse,
 } from "../services/m5-product-contract.js";
+import { parseReadingHistoryCursor } from "../services/reading-history-cursor.js";
+import { projectReadingResponse } from "../services/reading-product-projection.js";
 
 /**
  * The two read surfaces for a generated daily reading.
@@ -44,82 +43,51 @@ export const readingRoutes = new Hono<{
   Variables: AppVariables;
 }>();
 
-/** Relative, per the contract. Built from the column the evidence route matches on. */
-function evidenceUrl(record: ReadingRecord): string {
-  return `/v1/readings/${record.id}/evidence`;
+function privateNoStore(c: { header(name: string, value: string): void }): void {
+  c.header("cache-control", "private, no-store");
 }
 
-function projectReading(reading: DailyReading) {
+function readingNotFound(requestId: string | undefined) {
   return {
-    schema_version: reading.schema_version,
-    output_schema: reading.output_schema,
-    reading_id: reading.reading_id,
-    local_date: reading.local_date,
-    generated_at: reading.generated_at,
-    assembly_mode: reading.assembly_mode,
-    revision: reading.revision,
-    locale: reading.locale,
-    domain_preference: reading.domain_preference ?? null,
-    paragraphs: reading.paragraphs.map((paragraph) => ({
-      paragraph_id: paragraph.paragraph_id,
-      role: paragraph.role,
-      order: paragraph.order,
-      text: paragraph.text,
-    })),
-    fallback_used: reading.fallback_used,
+    error: {
+      code: "reading_not_found",
+      message: "No such reading",
+      request_id: requestId,
+    },
   };
 }
 
-/**
- * The v5 artifact.
- *
- * No `release_version` and no `fallback_used`: v5 has neither, and a projection
- * that emitted them would be describing an editorial pipeline that did not
- * produce this reading. `disclosure` is required rather than optional — a reader
- * cannot consent to model synthesis and then not be told when it happened.
- */
-function projectReadingV5(reading: DailyReadingV5) {
-  return {
-    schema_version: reading.schema_version,
-    output_schema: reading.output_schema,
-    reading_id: reading.reading_id,
-    local_date: reading.local_date,
-    generated_at: reading.generated_at,
-    assembly_mode: reading.assembly_mode,
-    revision: reading.revision,
-    locale: reading.locale,
-    domain_preference: reading.domain_preference ?? null,
-    headline: reading.headline,
-    disclosure: reading.disclosure,
-    paragraphs: reading.paragraphs.map((paragraph) => ({
-      paragraph_id: paragraph.paragraph_id,
-      role: paragraph.role,
-      order: paragraph.order,
-      text: paragraph.text,
-    })),
-  };
-}
-
-function projectTodayResponse(published: PublishedReading) {
-  // Never null in either format: completeReading refuses to commit a publication
-  // whose reading_sources count is wrong, and neither publisher emits zero
-  // paragraphs. The null in the contract is headroom, not a case, so this does
-  // not spend a COUNT(*) per request to rediscover it.
-  const evidence_url = evidenceUrl(published.record);
-  if (isStoredReadingV5(published.stored)) {
-    const response = {
-      schema_version: M5_SCHEMA_VERSION,
-      reading: projectReadingV5(published.stored.reading),
-      evidence_url,
-    };
-    assertM5TodayResponse(response);
-    return response;
+function parseHistoryQuery(url: string): {
+  view: ReadingHistoryView;
+  limit: number;
+  cursor: ReturnType<typeof parseReadingHistoryCursor>;
+} | null {
+  const params = new URL(url).searchParams;
+  const allowed = new Set(["view", "limit", "cursor"]);
+  for (const key of params.keys()) {
+    if (!allowed.has(key) || params.getAll(key).length !== 1) return null;
   }
-  return {
-    schema_version: M3_SCHEMA_VERSION,
-    reading: projectReading(published.stored.reading),
-    evidence_url,
-  };
+  const view = params.get("view");
+  if (view !== "history" && view !== "saved") return null;
+  const rawLimit = params.get("limit");
+  if (rawLimit !== null && !/^[1-9]\d*$/.test(rawLimit)) return null;
+  const limit = rawLimit === null ? 20 : Number(rawLimit);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) return null;
+  const rawCursor = params.get("cursor");
+  const cursor = rawCursor === null ? null : parseReadingHistoryCursor(rawCursor, view);
+  if (rawCursor !== null && cursor === null) return null;
+  return { view, limit, cursor };
+}
+
+async function requestHasBody(request: Request): Promise<boolean> {
+  if (request.body === null) return false;
+  const reader = request.body.getReader();
+  try {
+    const first = await reader.read();
+    return !first.done;
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }
 
 /**
@@ -304,7 +272,7 @@ readingRoutes.put("/v1/readings/today", async (c) => {
 
   if (outcome.ok) {
     if (outcome.status === "ready") {
-      return c.json(projectTodayResponse(outcome.published), 200);
+      return c.json(projectReadingResponse(outcome.published), 200);
     }
     return c.json(
       {
@@ -547,7 +515,40 @@ readingRoutes.get("/v1/readings/today", async (c) => {
     );
   }
 
-  return c.json(projectTodayResponse(published));
+  return c.json(projectReadingResponse(published));
+});
+
+readingRoutes.get("/v1/readings", async (c) => {
+  privateNoStore(c);
+  const query = parseHistoryQuery(c.req.url);
+  if (!query) {
+    return c.json(
+      {
+        error: {
+          code: "invalid_reading_query",
+          message: "view, limit, or cursor is invalid",
+          request_id: c.get("requestId"),
+        },
+      },
+      400,
+    );
+  }
+  const identity: UserIdentity = {
+    userId: c.get("userId"),
+    cryptoSubject: c.get("cryptoSubject"),
+  };
+  return c.json(await listReadingHistory(c.env, identity, query), 200);
+});
+
+readingRoutes.get("/v1/readings/:id", async (c) => {
+  privateNoStore(c);
+  const identity: UserIdentity = {
+    userId: c.get("userId"),
+    cryptoSubject: c.get("cryptoSubject"),
+  };
+  const published = await loadReadableReadingById(c.env, identity, c.req.param("id"));
+  if (!published) return c.json(readingNotFound(c.get("requestId")), 404);
+  return c.json(projectReadingResponse(published), 200);
 });
 
 readingRoutes.get("/v1/readings/:id/evidence", async (c) => {
@@ -655,4 +656,40 @@ readingRoutes.post("/v1/readings/:id/feedback", async (c) => {
     );
   }
   return c.json(result.response, 201);
+});
+
+readingRoutes.get("/v1/readings/:id/save", async (c) => {
+  privateNoStore(c);
+  const state = await getReadingSaveState(
+    c.env,
+    c.get("userId"),
+    c.req.param("id"),
+  );
+  if (!state) return c.json(readingNotFound(c.get("requestId")), 404);
+  return c.json(state, 200);
+});
+
+readingRoutes.put("/v1/readings/:id/save", async (c) => {
+  privateNoStore(c);
+  if (await requestHasBody(c.req.raw)) {
+    return c.json(
+      {
+        error: {
+          code: "invalid_body",
+          message: "Save requests do not accept a body",
+          request_id: c.get("requestId"),
+        },
+      },
+      400,
+    );
+  }
+  const state = await saveReading(c.env, c.get("userId"), c.req.param("id"));
+  if (!state) return c.json(readingNotFound(c.get("requestId")), 404);
+  return c.json(state, 200);
+});
+
+readingRoutes.delete("/v1/readings/:id/save", async (c) => {
+  privateNoStore(c);
+  await unsaveReading(c.env, c.get("userId"), c.req.param("id"));
+  return c.body(null, 204);
 });

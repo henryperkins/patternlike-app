@@ -1,0 +1,46 @@
+{
+  "environment": "Actual local Worker + ephemeral D1, fictional encrypted fixtures, external service calls disabled",
+  "save_keyboard_and_reload": true,
+  "history_pages": [
+    20,
+    23
+  ],
+  "saved_exact_revisions": 3,
+  "superseded_and_invalidated_detail": true,
+  "preserved_paragraphs_per_reading": 5,
+  "evidence_loaded": true,
+  "feedback_submitted": true,
+  "unsave_resave_reinsert_and_order": true,
+  "entry_return_and_removed_opener_focus": true,
+  "empty_saved_and_retained_history": true,
+  "keyboard_filters_and_mobile_unsave": true,
+  "history_widths": [
+    320,
+    390,
+    1440
+  ],
+  "detail_widths": [
+    320,
+    1440
+  ],
+  "horizontal_overflow": false,
+  "navigation_links": 6,
+  "axe_tags": [
+    "wcag2a",
+    "wcag2aa",
+    "wcag21aa"
+  ],
+  "axe_final_violations": 0,
+  "axe_note": "Scans wait for entry animations to settle; a scan during an opacity animation transiently reported contrast.",
+  "expected_console_errors": [
+    "GET feedback 404 for each of three readings before feedback exists"
+  ],
+  "unexpected_console_errors": 0,
+  "manual_screen_reader_tested": false,
+  "video": {
+    "file": "reading-history-demo-3x.webm",
+    "playback_speed": 3,
+    "duration_seconds": 64.973,
+    "container_check": "ffmpeg remux completed exit 0"
+  }
+}

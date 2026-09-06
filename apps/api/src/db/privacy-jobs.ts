@@ -6,7 +6,12 @@ import {
   encryptPayload,
   type UserIdentity,
 } from "./users.js";
-import type { ExportOptions } from "../services/account-export.js";
+import {
+  M7_EXPORT_SCHEMA_VERSION,
+  M8_EXPORT_SCHEMA_VERSION,
+  type ExportOptions,
+  type ExportSchemaVersion,
+} from "../services/account-export.js";
 import type { SealedExport } from "../services/export-envelope.js";
 import { buildCryptoWriteFence } from "./crypto-write-fence.js";
 
@@ -26,6 +31,7 @@ export interface WorkflowAccepted {
 export interface ExportJobCommand {
   command_version: 1;
   job_type: typeof EXPORT_JOB_TYPE;
+  export_schema_version: ExportSchemaVersion;
   request: ExportOptions;
   accepted_response: WorkflowAccepted;
   accepted_at: string;
@@ -48,7 +54,7 @@ async function loadCommand(
     userId: row.user_id,
     cryptoSubject: asCryptoSubject(row.crypto_subject),
   };
-  return decryptPayload<ExportJobCommand>(
+  const decoded = await decryptPayload<unknown>(
     env,
     identity,
     {
@@ -62,6 +68,25 @@ async function loadCommand(
       recordId: row.id,
     },
   );
+  if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new Error("export command is not an object");
+  }
+  const candidate = decoded as Omit<ExportJobCommand, "export_schema_version"> & {
+    export_schema_version?: unknown;
+  };
+  const exportSchemaVersion = candidate.export_schema_version === undefined
+    ? M7_EXPORT_SCHEMA_VERSION
+    : candidate.export_schema_version;
+  if (
+    exportSchemaVersion !== M7_EXPORT_SCHEMA_VERSION &&
+    exportSchemaVersion !== M8_EXPORT_SCHEMA_VERSION
+  ) {
+    throw new Error("unsupported export schema version");
+  }
+  return {
+    ...candidate,
+    export_schema_version: exportSchemaVersion,
+  };
 }
 
 async function existingExportCommand(
@@ -141,6 +166,7 @@ export async function reserveAccountExport(
   const command: ExportJobCommand = {
     command_version: 1,
     job_type: EXPORT_JOB_TYPE,
+    export_schema_version: M8_EXPORT_SCHEMA_VERSION,
     request,
     accepted_response: response,
     accepted_at: acceptedAt,

@@ -21,6 +21,7 @@ const expectedTail = [
   "0025_codex_xhigh_reasoning.sql",
   "0026_pattern_portraits.sql",
   "0027_portrait_mesh_automation.sql",
+  "0028_reading_saves.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -246,12 +247,109 @@ async function assertDatabaseHealthy(db: D1Database, lane: string): Promise<void
   }
 }
 
+async function assertReadingSavesSchema(
+  db: D1Database,
+  lane: string,
+): Promise<void> {
+  const columns = await db.prepare("PRAGMA table_info(reading_saves)")
+    .all<SchemaColumn>();
+  const actual = columns.results.map(
+    ({ name, type, notnull, dflt_value, pk }) => ({
+      name,
+      type,
+      notnull,
+      dflt_value,
+      pk,
+    }),
+  );
+  const expected = [
+    { name: "user_id", type: "TEXT", notnull: 1, dflt_value: null, pk: 1 },
+    { name: "reading_id", type: "TEXT", notnull: 1, dflt_value: null, pk: 2 },
+    { name: "saved_at", type: "TEXT", notnull: 1, dflt_value: null, pk: 0 },
+  ];
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`0028 ${lane} has wrong reading_saves columns`);
+  }
+
+  const foreignKeys = await db.prepare("PRAGMA foreign_key_list(reading_saves)")
+    .all<{
+      id: number;
+      seq: number;
+      table: string;
+      from: string;
+      to: string;
+      on_update: string;
+      on_delete: string;
+      match: string;
+    }>();
+  const expectedForeignKeys = [
+    {
+      id: 0,
+      seq: 0,
+      table: "daily_readings",
+      from: "reading_id",
+      to: "id",
+      on_update: "NO ACTION",
+      on_delete: "NO ACTION",
+      match: "NONE",
+    },
+    {
+      id: 0,
+      seq: 1,
+      table: "daily_readings",
+      from: "user_id",
+      to: "user_id",
+      on_update: "NO ACTION",
+      on_delete: "NO ACTION",
+      match: "NONE",
+    },
+    {
+      id: 1,
+      seq: 0,
+      table: "users",
+      from: "user_id",
+      to: "id",
+      on_update: "NO ACTION",
+      on_delete: "NO ACTION",
+      match: "NONE",
+    },
+  ];
+  if (JSON.stringify(foreignKeys.results) !== JSON.stringify(expectedForeignKeys)) {
+    throw new Error(`0028 ${lane} has wrong reading_saves foreign keys`);
+  }
+
+  const index = await db.prepare(
+    "PRAGMA index_info(idx_reading_saves_user_saved)",
+  ).all<{ seqno: number; cid: number; name: string }>();
+  if (
+    JSON.stringify(index.results) !==
+    JSON.stringify([
+      { seqno: 0, cid: 0, name: "user_id" },
+      { seqno: 1, cid: 2, name: "saved_at" },
+      { seqno: 2, cid: 1, name: "reading_id" },
+    ])
+  ) {
+    throw new Error(`0028 ${lane} has wrong saved-order index`);
+  }
+  const indexSource = await db.prepare(
+    `SELECT sql FROM sqlite_master
+     WHERE type = 'index' AND name = 'idx_reading_saves_user_saved'`,
+  ).first<{ sql: string }>();
+  if (
+    indexSource?.sql.replace(/\s+/g, " ") !==
+      "CREATE INDEX idx_reading_saves_user_saved ON reading_saves(user_id, saved_at DESC, reading_id DESC)"
+  ) {
+    throw new Error(`0028 ${lane} lost descending Saved order`);
+  }
+}
+
 // Main-test storage starts empty and receives the exact ordered migration set.
 // This is the fresh-database lane; individual tests then exercise the schema.
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 await assertBirthCalcSchema(env.DB, "clean apply");
 await assertAccountProcessingConsentSchema(env.DB, "clean apply");
-await assertDatabaseHealthy(env.DB, "0018 clean apply");
+await assertReadingSavesSchema(env.DB, "clean apply");
+await assertDatabaseHealthy(env.DB, "0028 clean apply");
 
 // The isolated upgrade binding stops before 0009, carries live rows through the
 // adapter rebuild/additive migrations and 0011, and only then applies 0012.

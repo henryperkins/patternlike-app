@@ -104,6 +104,7 @@ export async function collectDeletionArtifactKeys(
  * are therefore classified separately below rather than silently omitted.
  */
 export const DELETED_USER_TABLES = [
+  "reading_saves",
   "reading_sources",
   "reading_feedback",
   "daily_readings",
@@ -173,6 +174,7 @@ export const PORTABLE_USER_TABLES = [
   "consents",
   "context_source_permissions",
   "context_signals",
+  "reading_saves",
   "daily_readings",
   "pattern_documents",
 ] as const;

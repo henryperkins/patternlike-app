@@ -1556,4 +1556,32 @@ describe("web application shell", () => {
 
     expect(results.violations).toEqual([]);
   });
+
+  it("keeps History reachable without an active chart and exposes six navigation destinations", async () => {
+    window.location.hash = "history";
+    mockApiResponses({
+      "/v1/chart": {
+        status: 404,
+        body: { error: { code: "chart_not_found", message: "No active chart for user" } },
+      },
+      "GET /v1/readings": {
+        status: 200,
+        body: {
+          schema_version: "0.8.0",
+          view: "history",
+          items: [],
+          next_cursor: null,
+        },
+      },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Reading history" }))
+      .toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "History" })).toHaveLength(2);
+    for (const navigation of screen.getAllByRole("navigation")) {
+      expect(navigation.querySelectorAll(".nav-item")).toHaveLength(6);
+    }
+  });
 });

@@ -139,7 +139,8 @@ async function ownedReadableReading(
 ): Promise<boolean> {
   const row = await env.DB.prepare(
     `SELECT id FROM daily_readings
-     WHERE id = ? AND user_id = ? AND reading_enc IS NOT NULL`,
+     WHERE id = ? AND user_id = ? AND reading_enc IS NOT NULL
+       AND status IN ('published', 'superseded', 'invalidated')`,
   )
     .bind(readingId, userId)
     .first<{ id: string }>();
@@ -152,10 +153,14 @@ export async function loadLatestFeedback(
   readingId: string,
 ): Promise<ReadingFeedbackRecord | null> {
   const row = await env.DB.prepare(
-    `SELECT id, reading_id, resonance, relevance_labels_json, created_at
-     FROM reading_feedback
-     WHERE reading_id = ? AND user_id = ?
-     ORDER BY created_at DESC, id DESC
+    `SELECT f.id, f.reading_id, f.resonance, f.relevance_labels_json, f.created_at
+     FROM reading_feedback f
+     JOIN daily_readings r
+       ON r.id = f.reading_id AND r.user_id = f.user_id
+     WHERE f.reading_id = ? AND f.user_id = ?
+       AND r.reading_enc IS NOT NULL
+       AND r.status IN ('published', 'superseded', 'invalidated')
+     ORDER BY f.created_at DESC, f.id DESC
      LIMIT 1`,
   )
     .bind(readingId, identity.userId)
@@ -197,15 +202,15 @@ export async function storeReadingFeedback(
     return { ok: false, reason: "missing_idempotency_key" };
   }
 
+  if (!(await ownedReadableReading(env, identity.userId, readingId))) {
+    return { ok: false, reason: "reading_not_found" };
+  }
+
   const replay = await loadStoredMutation(env, identity, idempotencyKey);
   if (replay) {
     return canonicalJson(replay.request) === canonicalJson(request)
       ? { ok: true, response: replay.response }
       : { ok: false, reason: "idempotency_conflict" };
-  }
-
-  if (!(await ownedReadableReading(env, identity.userId, readingId))) {
-    return { ok: false, reason: "reading_not_found" };
   }
 
   const grant = await ensureFirstPartyGrant(env, identity, USR12_SOURCE_ID, now);
@@ -259,6 +264,7 @@ export async function storeReadingFeedback(
          WHERE NOT EXISTS (
            SELECT 1 FROM daily_readings
            WHERE id = ? AND user_id = ? AND reading_enc IS NOT NULL
+             AND status IN ('published', 'superseded', 'invalidated')
          )`,
       ).bind(readingId, identity.userId),
       env.DB.prepare(

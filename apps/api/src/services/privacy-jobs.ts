@@ -136,6 +136,7 @@ export async function processExportMessage(
       claim.exportId,
       generatedAt,
       claim.command.request,
+      claim.command.export_schema_version,
     );
     const sealed = await sealExport(
       env,

@@ -139,6 +139,53 @@ describe("account-deletion manifest", () => {
     }
   });
 
+  it("classifies reading Save metadata as portable and deletion-owned", () => {
+    expect(DELETED_USER_TABLES).toContain("reading_saves");
+    expect(PORTABLE_USER_TABLES).toContain("reading_saves");
+    expect(NON_PORTABLE_USER_TABLES).not.toContain("reading_saves" as never);
+  });
+
+  it("deletes an account's Save rows before their reading foreign keys", async () => {
+    await seedUser(IDENTITY_A);
+    await seedUser(IDENTITY_B);
+    const createdAt = "2026-09-06T08:00:00.000Z";
+    for (const [readingId, userId] of [
+      ["rdr_deletion_save_a", USER_A],
+      ["rdr_deletion_save_b", USER_B],
+    ] as const) {
+      await env.DB.prepare(
+        `INSERT INTO daily_readings (
+           id, user_id, local_date, release_version, reading_key,
+           chart_fingerprint, contract_id, assembly_mode, status, revision,
+           revision_reason, command_generation, reading_enc,
+           reading_key_version, reading_nonce, created_at, updated_at
+         ) VALUES (?, ?, '2026-09-06', NULL, ?, 'sha256:test', 'contract-test',
+                   'constrained_model', 'published', 1, 'initial', 1,
+                   X'01', 1, 'nonce', ?, ?)`,
+      ).bind(
+        readingId,
+        userId,
+        `reading-v5:${userId}:2026-09-06:r1`,
+        createdAt,
+        createdAt,
+      ).run();
+      await env.DB.prepare(
+        `INSERT INTO reading_saves (user_id, reading_id, saved_at)
+         VALUES (?, ?, ?)`,
+      ).bind(userId, readingId, createdAt).run();
+    }
+
+    await deleteUserRows(env, USER_A, "job_deletion_fixture");
+
+    const { results } = await env.DB.prepare(
+      "SELECT user_id, reading_id FROM reading_saves ORDER BY user_id",
+    ).all();
+    expect(results).toEqual([{
+      user_id: USER_B,
+      reading_id: "rdr_deletion_save_b",
+    }]);
+  });
+
   it("collects both encrypted Codex objects and deletes the provider row", async () => {
     await seedUser(IDENTITY_A);
     const jobId = `cpjob_${"ab".repeat(16)}`;

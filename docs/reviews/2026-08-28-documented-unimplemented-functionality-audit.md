@@ -1,5 +1,7 @@
 # Documented but Incompletely Implemented Functionality Audit
 
+> **2026-09-06 follow-up:** Reading History and Save are implemented in `feat/reading-history-save`, with migration 0028 and local verification. See the [implementation record](2026-09-06-reading-history-and-save-implementation.md). The original audit below remains a snapshot of its audit date; production release is separate.
+
 > **Snapshot as of `52228ede` (2026-08-28).** Commits on `main` later that day
 > closed several rows below: persisted `account_processing` consent
 > (`12b1a94`); place search and geocoder consent, and the crypto operator

@@ -107,10 +107,11 @@ export const READING_CODEX_PUBLISHER_VARS = {
  * and makes tests pass for the wrong reason.
  */
 const TABLES = [
-  // M3, children first: reading_sources -> daily_readings -> jobs, and
+  // M3/M8, children first: reading_sources/feedback/saves -> readings -> jobs, and
   // cycle_passes -> cycle_instances -> chart_snapshots.
   "reading_sources",
   "reading_feedback",
+  "reading_saves",
   "daily_readings",
   // 0003. Not user-scoped, so it is not caught by any per-user cleanup: a
   // leaked row makes the next suite's first provider call look like the
@@ -236,6 +237,7 @@ export async function resetDb(): Promise<void> {
   // supersedes. Bounded because a user-day's revision chain is short.
   await env.DB.prepare("DELETE FROM reading_sources").run();
   await env.DB.prepare("DELETE FROM reading_feedback").run();
+  await env.DB.prepare("DELETE FROM reading_saves").run();
   for (let pass = 0; pass < 16; pass++) {
     const { meta } = await env.DB.prepare(
       `DELETE FROM daily_readings

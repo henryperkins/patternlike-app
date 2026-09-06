@@ -1,24 +1,14 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ensureTodayReading,
-  isDailyReadingV5,
   type DailyReadingResponse,
-  type DailyReadingResponseV3,
-  type DailyReadingResponseV5,
 } from "../lib/api-client.js";
 import { NOT_IMPLEMENTED_MESSAGE, withRequestId } from "../lib/api-status.js";
 import { classifyTodayError } from "../lib/reading-state.js";
-import {
-  ROLE_PRESENTATION,
-  ROLE_PRESENTATION_V5,
-  domainPreferenceLabel,
-  formatLocalDate,
-  type RolePresentation,
-} from "../lib/reading-format.js";
+import { formatLocalDate } from "../lib/reading-format.js";
 import { AiConsentGate } from "./AiConsentGate.js";
-import { DailyCheckInCard } from "./DailyCheckInCard.js";
 import { PreferenceConfirm } from "./PreferenceConfirm.js";
-import { WhyThisDrawer } from "./WhyThisDrawer.js";
+import { ReadingArticle } from "./ReadingArticle.js";
 import { Icon } from "./icons.js";
 
 type TodayState =
@@ -56,264 +46,6 @@ interface TodayViewProps {
   onUnauthorized: () => void;
   /** Re-run a preference-gated load after foreground device sync settles. */
   preferenceSyncRevision: number;
-}
-
-/**
- * A fallback reading is the whole reading, not a decorated failure.
- *
- * Derived from the flag but checked against the shape: the contract says
- * `fallback_used` implies exactly one `safety_fallback` paragraph, and if a
- * response ever disagrees, rendering what is actually there beats assuming an
- * element that is not.
- */
-function isFallbackShape(reading: DailyReadingResponseV3["reading"]): boolean {
-  return (
-    reading.fallback_used &&
-    reading.paragraphs.length === 1 &&
-    reading.paragraphs[0]?.role === "safety_fallback"
-  );
-}
-
-/**
- * One prose unit, in whichever publisher's role vocabulary wrote it.
- *
- * The presentation is passed rather than looked up: the two publishers have
- * different closed role sets, and a lookup inside here would need a table
- * spanning both, which is the drift the two `Record`s in reading-format exist to
- * prevent. `kicker` may be supplied — v5 puts its own headline in that slot.
- */
-function Paragraph({
-  role,
-  text,
-  presentation,
-  kicker,
-}: {
-  role: string;
-  text: string;
-  presentation: RolePresentation | undefined;
-  kicker?: string | null;
-}) {
-  const label = kicker ?? presentation?.kicker;
-  const tone = presentation?.tone ?? "body";
-
-  const body = (
-    <>
-      {label ? <p className="kicker">{label}</p> : null}
-      <p className={`reading-paragraph reading-paragraph--${tone}`}>{text}</p>
-    </>
-  );
-
-  if (tone === "aside") {
-    return <aside className="reading-reflection">{body}</aside>;
-  }
-  if (tone === "notice") {
-    return (
-      <div className={`reading-notice reading-notice--${role}`}>
-        <Icon name="shield" aria-hidden="true" />
-        <div>{body}</div>
-      </div>
-    );
-  }
-  return <div className={`reading-block reading-block--${role}`}>{body}</div>;
-}
-
-/**
- * The header both publishers share: the date is the title, and everything about
- * the artifact that is not prose lives in the meta strip.
- */
-function TodayHeader({
-  headingId,
-  localDate,
-  locale,
-  revision,
-  domainPreference,
-}: {
-  headingId: string;
-  localDate: string;
-  locale: string;
-  revision: number;
-  domainPreference?: string | null;
-}) {
-  return (
-    <header className="page-header today-page__header">
-      <div>
-        <p className="eyebrow">Today / Daily chapter</p>
-        <h1 id={headingId}>{formatLocalDate(localDate)}</h1>
-      </div>
-      {/*
-        The meta strip, never the prose. `revision_reason` lives only on the
-        evidence graph, so the chip can say a reading was revised and only the
-        drawer can say why.
-      */}
-      <div className="today-meta">
-        {domainPreference ? (
-          <span className="today-chip">{domainPreferenceLabel(domainPreference)}</span>
-        ) : null}
-        {revision > 1 ? (
-          <span className="today-chip today-chip--revised">Revised · r{revision}</span>
-        ) : null}
-        <span className="today-chip today-chip--code">{locale}</span>
-      </div>
-    </header>
-  );
-}
-
-/*
- * The drawer below is keyed for the same reason the preference form is: it
- * caches its fetch for the reading it was opened against, and its 404 branch
- * deliberately does not re-arm. "Reload Today" after a reissue answers with a
- * different reading id into the same mounted instance, which would leave the
- * drawer reporting the old reading as missing and refusing to fetch the new
- * one. Same id keeps the cache.
- */
-function TodayReadingV3({
-  response,
-  headingId,
-  onReload,
-  onUnauthorized,
-}: {
-  response: DailyReadingResponseV3;
-  headingId: string;
-  onReload: () => void;
-  onUnauthorized: () => void;
-}) {
-  const { reading } = response;
-  const paragraphs = [...reading.paragraphs].sort((a, b) => a.order - b.order);
-
-  return (
-    <article className="today-page page-enter" aria-labelledby={headingId}>
-      <TodayHeader
-        headingId={headingId}
-        localDate={reading.local_date}
-        locale={reading.locale}
-        revision={reading.revision}
-        domainPreference={reading.domain_preference}
-      />
-
-      {isFallbackShape(reading) ? (
-        <p className="today-fallback-note">
-          Nothing in your chart was eligible to be written about today, so what
-          follows is a reviewed passage shown in its place. It is not tailored to
-          your chart.
-        </p>
-      ) : null}
-
-      <div className="today-reading">
-        <div className="today-body">
-          {paragraphs.map((paragraph) => (
-            <Paragraph
-              key={paragraph.paragraph_id}
-              role={paragraph.role}
-              text={paragraph.text}
-              presentation={ROLE_PRESENTATION[paragraph.role]}
-            />
-          ))}
-        </div>
-
-        {response.evidence_url ? (
-          <WhyThisDrawer
-            key={reading.reading_id}
-            readingId={reading.reading_id}
-            paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
-            onReload={onReload}
-            onUnauthorized={onUnauthorized}
-          />
-        ) : null}
-      </div>
-      <DailyCheckInCard />
-    </article>
-  );
-}
-
-/**
- * The v5 reading.
- *
- * Two differences that matter, and no third. The headline takes the quiet kicker
- * slot above the lead, so the lead stays the page's typographic statement rather
- * than competing with a second heading. And the disclosure is always rendered:
- * it closes the chapter and introduces the provenance beneath it, because a
- * reader who agreed to model synthesis is owed the sentence saying when it
- * happened. There is no fallback note here — v5 has no reviewed copy to fall
- * back to, and an unavailable reading says so instead.
- */
-function TodayReadingV5({
-  response,
-  headingId,
-  onReload,
-  onUnauthorized,
-}: {
-  response: DailyReadingResponseV5;
-  headingId: string;
-  onReload: () => void;
-  onUnauthorized: () => void;
-}) {
-  const { reading } = response;
-  const paragraphs = [...reading.paragraphs].sort((a, b) => a.order - b.order);
-
-  return (
-    <article className="today-page page-enter" aria-labelledby={headingId}>
-      <TodayHeader
-        headingId={headingId}
-        localDate={reading.local_date}
-        locale={reading.locale}
-        revision={reading.revision}
-        domainPreference={reading.domain_preference}
-      />
-
-      <div className="today-reading">
-        <div className="today-body">
-          {paragraphs.map((paragraph, index) => (
-            <Paragraph
-              key={paragraph.paragraph_id}
-              role={paragraph.role}
-              text={paragraph.text}
-              presentation={ROLE_PRESENTATION_V5[paragraph.role]}
-              kicker={index === 0 ? reading.headline : undefined}
-            />
-          ))}
-        </div>
-
-        <p className="today-disclosure">{reading.disclosure}</p>
-
-        <WhyThisDrawer
-          key={reading.reading_id}
-          readingId={reading.reading_id}
-          paragraphOrder={paragraphs.map((paragraph) => paragraph.paragraph_id)}
-          onReload={onReload}
-          onUnauthorized={onUnauthorized}
-        />
-      </div>
-      <DailyCheckInCard />
-    </article>
-  );
-}
-
-function TodayReading({
-  response,
-  headingId,
-  onReload,
-  onUnauthorized,
-}: {
-  response: DailyReadingResponse;
-  headingId: string;
-  onReload: () => void;
-  onUnauthorized: () => void;
-}) {
-  return isDailyReadingV5(response) ? (
-    <TodayReadingV5
-      response={response}
-      headingId={headingId}
-      onReload={onReload}
-      onUnauthorized={onUnauthorized}
-    />
-  ) : (
-    <TodayReadingV3
-      response={response}
-      headingId={headingId}
-      onReload={onReload}
-      onUnauthorized={onUnauthorized}
-    />
-  );
 }
 
 interface NoticeAction {
@@ -427,7 +159,6 @@ export function TodayView({
   const [state, setState] = useState<TodayState>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const headingId = useId();
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
@@ -531,9 +262,9 @@ export function TodayView({
   switch (state.status) {
     case "ready":
       return (
-        <TodayReading
+        <ReadingArticle
           response={state.response}
-          headingId={headingId}
+          showCheckIn
           onReload={reload}
           onUnauthorized={onUnauthorized}
         />

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons.js";
 
-export type ViewId = "today" | "pattern" | "timing" | "travel" | "privacy";
+export type ViewId = "today" | "history" | "pattern" | "timing" | "travel" | "privacy";
 
 const navigation: Array<{ id: ViewId; label: string; icon: IconName; stage?: string }> = [
   { id: "today", label: "Today", icon: "today", stage: "M3" },
+  { id: "history", label: "History", icon: "history" },
   { id: "pattern", label: "Your pattern", icon: "pattern" },
   { id: "timing", label: "Timing", icon: "timing", stage: "M3" },
   { id: "travel", label: "Time travel", icon: "travel", stage: "M4" },

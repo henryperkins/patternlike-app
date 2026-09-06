@@ -7,6 +7,23 @@ import {
 } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { CALC_CONTRACT_ID } from "@patternlike/shared";
+import Ajv2020 from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
+import m0Common from "../../../../contracts/m0/common.schema.json";
+import m0Consent from "../../../../contracts/m0/consent.schema.json";
+import m0ContextSignal from "../../../../contracts/m0/context-signal.schema.json";
+import m3Common from "../../../../contracts/m3/common.schema.json";
+import m3DailyReading from "../../../../contracts/m3/daily-reading.schema.json";
+import m3ReadingEvidence from "../../../../contracts/m3/reading-evidence.schema.json";
+import m5Common from "../../../../contracts/m5/common.schema.json";
+import m5DailyReading from "../../../../contracts/m5/daily-reading.schema.json";
+import m5ReadingEvidence from "../../../../contracts/m5/reading-evidence.schema.json";
+import m6AccountExport from "../../../../contracts/m6/account-export.schema.json";
+import m6Common from "../../../../contracts/m6/common.schema.json";
+import m7Common from "../../../../contracts/m7/common.schema.json";
+import m7PatternResponse from "../../../../contracts/m7/pattern-response.schema.json";
+import m8Common from "../../../../contracts/m8/common.schema.json";
+import m8AccountExport from "../../../../contracts/m8/account-export.schema.json";
 import worker, { app } from "../index.js";
 import type { Env, PrivacyMessage } from "../env.js";
 import { encryptPayload } from "../db/users.js";
@@ -31,6 +48,29 @@ import {
   seedChart,
   seedUser,
 } from "../../test/helpers.js";
+
+const exportAjv = new Ajv2020({ strict: false });
+addFormats(exportAjv);
+for (const schema of [
+  m0Common,
+  m0Consent,
+  m0ContextSignal,
+  m3Common,
+  m3DailyReading,
+  m3ReadingEvidence,
+  m5Common,
+  m5DailyReading,
+  m5ReadingEvidence,
+  m6Common,
+  m6AccountExport,
+  m7Common,
+  m7PatternResponse,
+  m8Common,
+  m8AccountExport,
+]) {
+  exportAjv.addSchema(schema);
+}
+const validateM8AccountExport = exportAjv.getSchema(m8AccountExport.$id)!;
 
 interface WorkflowAccepted {
   schema_version: "0.2.0";
@@ -85,6 +125,27 @@ async function deliver(jobId: string) {
 
 function fromB64(value: string): Uint8Array {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+async function replaceExportCommand(
+  accepted: WorkflowAccepted,
+  command: Record<string, unknown>,
+): Promise<void> {
+  const sealed = await encryptPayload(env, IDENTITY_A, command, {
+    subject: IDENTITY_A.cryptoSubject,
+    field: "jobs.payload_enc",
+    recordId: accepted.job_id,
+  });
+  await env.DB.prepare(
+    `UPDATE jobs
+     SET payload_enc = ?, payload_key_version = ?, payload_nonce = ?
+     WHERE id = ?`,
+  ).bind(
+    fromB64(sealed.ciphertext),
+    sealed.keyVersion,
+    sealed.nonce,
+    accepted.job_id,
+  ).run();
 }
 
 async function seedReadingWithEvidence(
@@ -237,6 +298,69 @@ beforeEach(async () => {
 });
 
 describe("account export", () => {
+  it("pins new export commands to the M8 document schema", async () => {
+    const accepted = await postExport(USER_A, "idem-export-command-m8");
+    const claim = await claimExportJob(env, accepted.body.job_id);
+
+    expect(claim?.command.export_schema_version).toBe("0.8.0");
+  });
+
+  it("defaults only an absent pre-M8 pin to M7 and rejects null or unknown versions", async () => {
+    const legacy = await postExport(USER_A, "idem-export-command-m7");
+    await replaceExportCommand(legacy.body, {
+      command_version: 1,
+      job_type: "export_account",
+      request: {
+        include_readings: true,
+        include_journal: true,
+        include_patterns: true,
+      },
+      accepted_response: legacy.body,
+      accepted_at: "2026-09-06T08:00:00.000Z",
+    });
+    expect(
+      (await claimExportJob(env, legacy.body.job_id))?.command.export_schema_version,
+    ).toBe("0.7.0");
+
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    const unknown = await postExport(USER_A, "idem-export-command-unknown");
+    await replaceExportCommand(unknown.body, {
+      command_version: 1,
+      job_type: "export_account",
+      export_schema_version: "0.9.0",
+      request: {
+        include_readings: true,
+        include_journal: true,
+        include_patterns: true,
+      },
+      accepted_response: unknown.body,
+      accepted_at: "2026-09-06T08:00:00.000Z",
+    });
+    await expect(claimExportJob(env, unknown.body.job_id)).rejects.toThrow(
+      "unsupported export schema version",
+    );
+
+    await resetDb();
+    await seedUser(IDENTITY_A);
+    const nullPinned = await postExport(USER_A, "idem-export-command-null");
+    await replaceExportCommand(nullPinned.body, {
+      command_version: 1,
+      job_type: "export_account",
+      export_schema_version: null,
+      request: {
+        include_readings: true,
+        include_journal: true,
+        include_patterns: true,
+      },
+      accepted_response: nullPinned.body,
+      accepted_at: "2026-09-06T08:00:00.000Z",
+    });
+    await expect(claimExportJob(env, nullPinned.body.job_id)).rejects.toThrow(
+      "unsupported export schema version",
+    );
+  });
+
   it("reserves one encrypted job and distinguishes exact replay from conflict", async () => {
     const first = await postExport(USER_A, "idem-export-account-1");
 
@@ -457,7 +581,7 @@ describe("account export", () => {
     expect(download.headers.get("cache-control")).toBe("no-store");
     const artifact = JSON.parse(downloadText) as Record<string, unknown>;
     expect(artifact).toMatchObject({
-      schema_version: "0.7.0",
+      schema_version: "0.8.0",
       export_id: accepted.body.resource_id,
       account: { user_id: USER_A, status: "active" },
       readings: { status: "omitted_by_request", items: [] },
@@ -577,6 +701,11 @@ describe("account export", () => {
 
   it("includes saved readings and their decrypted evidence when requested", async () => {
     const { readingId, paragraphId } = await seedReadingWithEvidence();
+    const savedAt = "2026-09-06T08:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO reading_saves (user_id, reading_id, saved_at)
+       VALUES (?, ?, ?)`,
+    ).bind(USER_A, readingId, savedAt).run();
     const accepted = await postExport(USER_A, "idem-export-with-evidence", {
       include_readings: true,
       include_journal: false,
@@ -590,21 +719,69 @@ describe("account export", () => {
     const body = await download.text();
     expect(download.status, body).toBe(200);
     const artifact = JSON.parse(body) as {
+      schema_version: string;
       readings: {
         status: string;
         items: Array<Record<string, unknown>>;
       };
     };
+    expect(artifact.schema_version).toBe("0.8.0");
+    expect(
+      validateM8AccountExport(artifact),
+      JSON.stringify(validateM8AccountExport.errors),
+    ).toBe(true);
     expect(artifact.readings.status).toBe("included");
     expect(artifact.readings.items).toHaveLength(1);
     expect(artifact.readings.items[0]).toMatchObject({
       id: readingId,
+      saved_at: savedAt,
       evidence: {
         schema_version: "0.5.0",
         paragraphs: [{ paragraph_id: paragraphId, order: 1 }],
       },
     });
     expect(JSON.stringify(artifact)).not.toContain("evidence_enc");
+  });
+
+  it("retries a stored pre-M8 command as M7 without adding Save metadata", async () => {
+    const { readingId } = await seedReadingWithEvidence();
+    await env.DB.prepare(
+      `INSERT INTO reading_saves (user_id, reading_id, saved_at)
+       VALUES (?, ?, '2026-09-06T08:00:00.000Z')`,
+    ).bind(USER_A, readingId).run();
+    const accepted = await postExport(USER_A, "idem-export-frozen-m7", {
+      include_readings: true,
+      include_journal: false,
+      include_patterns: false,
+    });
+    await replaceExportCommand(accepted.body, {
+      command_version: 1,
+      job_type: "export_account",
+      request: {
+        include_readings: true,
+        include_journal: false,
+        include_patterns: false,
+      },
+      accepted_response: accepted.body,
+      accepted_at: "2026-09-06T08:00:00.000Z",
+    });
+
+    await expect(processExportMessage(env, {
+      kind: "privacy",
+      job_id: accepted.body.job_id,
+      job_type: "export_account",
+    }, new Date("2026-09-06T09:00:00.000Z"))).resolves.toBe("ack");
+    const download = await SELF.fetch(
+      `http://api.test/v1/exports/${accepted.body.resource_id}/download`,
+      { headers: { "x-user-id": USER_A } },
+    );
+    const artifact = await download.json() as {
+      schema_version: string;
+      readings: { items: Array<Record<string, unknown>> };
+    };
+    expect(artifact.schema_version).toBe("0.7.0");
+    expect(artifact.readings.items).toHaveLength(1);
+    expect(artifact.readings.items[0]).not.toHaveProperty("saved_at");
   });
 
   it("exports a Codex-authored reading under its own provenance", async () => {
