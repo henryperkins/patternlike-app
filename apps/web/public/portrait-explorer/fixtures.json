@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "representation": "authored-fictional-fixture-glb-v1",
+  "authoring": {
+    "method": "deterministic hand-authored procedural mesh geometry",
+    "generator": "scripts/portrait-explorer/build-fixture-assets.mjs",
+    "generatorVersion": 1,
+    "description": "Authored fictional reference-based fixture assets; not automatic image reconstruction, recovered physical objects, or account-generated personal portraits.",
+    "source": "Four inspected native fictional-study images; geometric detail is an artistic interpretation of those references."
+  },
+  "coordinates": {
+    "upAxis": "Y",
+    "origin": "geometric bounds center",
+    "maximumDimension": 2,
+    "unit": "normalized artistic world unit"
+  },
+  "assets": [
+    {
+      "chapterId": "chapter-1",
+      "file": "compass.glb",
+      "title": "Brass compass with a blue needle",
+      "sha256": "b3ecf22ffd513d156c2bc8bfb9bf195713fd3ba053f4f18e93cc997bd77fdde2",
+      "sourceImage": "apps/web/src/preview/references/native-01.png",
+      "sourceImageSha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+      "byteLength": 337016,
+      "bounds": {
+        "min": [
+          -0.9999999403953552,
+          -0.18815892934799194,
+          -0.9337617754936218
+        ],
+        "max": [
+          0.9999999403953552,
+          0.18815892934799194,
+          0.9337617754936218
+        ]
+      },
+      "triangles": 12056,
+      "vertices": 7154,
+      "drawCalls": 5,
+      "meshNodes": [
+        "chapter-1"
+      ],
+      "materials": [
+        "warm machined brass",
+        "satin brushed brass",
+        "polished brass edges",
+        "recessed antique brass",
+        "blued steel needle"
+      ],
+      "orientation": "face +Y, bowl in XZ",
+      "fictionalFixture": true
+    },
+    {
+      "chapterId": "chapter-2",
+      "file": "bench.glb",
+      "title": "Two-seat wooden rocking bench",
+      "sha256": "83f0dfb3f287af99b7af6aa5fe06d32aa01720b8599f68743b17e3a85cbdcb9b",
+      "sourceImage": "apps/web/src/preview/references/native-02.png",
+      "sourceImageSha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+      "byteLength": 617808,
+      "bounds": {
+        "min": [
+          -1,
+          -0.9663582444190979,
+          -0.8259459733963013
+        ],
+        "max": [
+          1,
+          0.9663582444190979,
+          0.8259459733963013
+        ]
+      },
+      "triangles": 15780,
+      "vertices": 14292,
+      "drawCalls": 3,
+      "meshNodes": [
+        "chapter-2"
+      ],
+      "materials": [
+        "honey oak with carved grain",
+        "oak end grain and joinery",
+        "subtle oak grain"
+      ],
+      "orientation": "upright +Y, front +Z",
+      "fictionalFixture": true
+    },
+    {
+      "chapterId": "chapter-3",
+      "file": "rope.glb",
+      "title": "Coiled hemp rope with a loop and knot",
+      "sha256": "1129d1861f43ee12c3333888fcf1e41d9821dc4028100dc9c5244ccae4f61884",
+      "sourceImage": "apps/web/src/preview/references/native-03.png",
+      "sourceImageSha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1",
+      "byteLength": 905456,
+      "bounds": {
+        "min": [
+          -0.9442328214645386,
+          -0.17102237045764923,
+          -1
+        ],
+        "max": [
+          0.9442328214645386,
+          0.17102237045764923,
+          1
+        ]
+      },
+      "triangles": 37120,
+      "vertices": 18807,
+      "drawCalls": 1,
+      "meshNodes": [
+        "chapter-3"
+      ],
+      "materials": [
+        "natural twisted hemp"
+      ],
+      "orientation": "coil in XZ, knot above +Y",
+      "fictionalFixture": true
+    },
+    {
+      "chapterId": "chapter-4",
+      "file": "spyglass.glb",
+      "title": "Collapsible brass and leather spyglass",
+      "sha256": "9fc4c5b1659ba937bc04e770c940d93cb9779eef76fc2711f3d41d7ae6dfba60",
+      "sourceImage": "apps/web/src/preview/references/native-04.png",
+      "sourceImageSha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+      "byteLength": 525308,
+      "bounds": {
+        "min": [
+          -1,
+          -0.21473121643066406,
+          -0.21473121643066406
+        ],
+        "max": [
+          1,
+          0.21473121643066406,
+          0.21473121643066406
+        ]
+      },
+      "triangles": 14240,
+      "vertices": 11788,
+      "drawCalls": 7,
+      "meshNodes": [
+        "chapter-4"
+      ],
+      "materials": [
+        "warm machined brass",
+        "aged brown leather",
+        "satin brushed brass",
+        "polished brass edges",
+        "deep blue optical glass",
+        "recessed antique brass",
+        "leather stitching"
+      ],
+      "orientation": "length along X, objective -X, eyepiece +X",
+      "fictionalFixture": true
+    }
+  ]
+}

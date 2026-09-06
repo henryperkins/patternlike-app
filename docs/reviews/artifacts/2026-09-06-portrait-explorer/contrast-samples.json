@@ -1,0 +1,30 @@
+{
+  "method": "sRGB relative luminance from declared solid CSS colors; scene overlays additionally visually inspected",
+  "samples": [
+    {
+      "foreground": "#213d37",
+      "background": "#f6f5ed",
+      "ratio": 10.74
+    },
+    {
+      "foreground": "#56665e",
+      "background": "#f6f5ed",
+      "ratio": 5.55
+    },
+    {
+      "foreground": "#faf9e9",
+      "background": "#284b38",
+      "ratio": 9.19
+    },
+    {
+      "foreground": "#1b3d32",
+      "background": "#eff0dd",
+      "ratio": 10.33
+    },
+    {
+      "foreground": "#fffbed",
+      "background": "#163a33",
+      "ratio": 12.02
+    }
+  ]
+}

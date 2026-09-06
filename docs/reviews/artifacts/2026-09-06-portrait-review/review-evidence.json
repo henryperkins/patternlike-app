@@ -1,0 +1,119 @@
+{
+  "review_date": "2026-09-06",
+  "source_sha": "82d5dd9fd3ff406bcec985411dc58fcbf2bf3432",
+  "url": "https://patternlike-portrait-preview.lfd.workers.dev/",
+  "browser": "Installed Chromium with Playwright CLI and SwiftShader",
+  "browser_plugin": "unavailable",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "touch_emulation": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "reflow_check": true
+    }
+  ],
+  "mobile_initial": {
+    "stage_top": 460.890625,
+    "stage_bottom": 830.890625,
+    "controls_top": 838.890625,
+    "chapter_index_top": 942.890625,
+    "horizontal_overflow": false
+  },
+  "mobile_navigation": {
+    "reader_scroll_y": 995,
+    "stage_return_scroll_y": 449,
+    "index_display_after_return": "none",
+    "facet_after_return": "Tensions"
+  },
+  "touch_scroll": {
+    "before": 449,
+    "after": 813,
+    "chapter_unchanged": true
+  },
+  "reading": {
+    "chapter_articles": 4,
+    "facet_headings": 12,
+    "canvas_count": 0
+  },
+  "axe_selected_portrait_region": {
+    "passes": 26,
+    "violations": [],
+    "incomplete": [
+      "aria-prohibited-attr",
+      "color-contrast"
+    ]
+  },
+  "graphics_loss": {
+    "trigger": "WEBGL_lose_context",
+    "reading_preserved": true,
+    "camera_controls_disabled": true
+  },
+  "console": {
+    "uncaught_errors_observed": 0,
+    "warning": "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+  },
+  "limits": [
+    "No physical-device frame-rate or memory benchmark",
+    "No Safari or screen-reader session",
+    "No production account generation/download flow",
+    "No fresh aggregate test/build gate"
+  ],
+  "files": [
+    {
+      "path": "desktop-entry.png",
+      "sha256": "7a0ec57ed9e71c738814fc05fe38e8cf3d2b6bfcbc9c8289a847996a6295e275"
+    },
+    {
+      "path": "model-front.png",
+      "sha256": "241cb17303e4a78b062c7560076aec778bcd33714797d7826a72031fe5372dc9"
+    },
+    {
+      "path": "model-side.png",
+      "sha256": "07e2fd99337dd8e6f3a9260bd699e548915e560501b58cfaabc07786a83647d9"
+    },
+    {
+      "path": "mobile-entry.png",
+      "sha256": "be0e833a15d2658c448b4534847af071d2c478f8a66bb4cca1a147656a3f618c"
+    },
+    {
+      "path": "mobile-reader.png",
+      "sha256": "28941572293608857237f8cc4567a5b9f556abf334c3aa540ea0d013fbdd0518"
+    },
+    {
+      "path": "mobile-return.png",
+      "sha256": "01b36008ca4aaa392229bb65573f4a6e03ae1c61f1e4df1809f998680e3e76d7"
+    },
+    {
+      "path": "scene-overview.png",
+      "sha256": "a9d921745bd48a444da282ca47d1debe0799231d2e5c8455f4c5103cd4597aa3"
+    },
+    {
+      "path": "scene-tensions.png",
+      "sha256": "a9d921745bd48a444da282ca47d1debe0799231d2e5c8455f4c5103cd4597aa3"
+    },
+    {
+      "path": "camera-before-reading.png",
+      "sha256": "83d6e7af6dfc13d080fc55dc45423a497701e3c697f65b3d635c912593cc12b1"
+    },
+    {
+      "path": "camera-after-reading.png",
+      "sha256": "c070bca464fefddddbb78bc106ab306034026643ba9be5e664a9a0fd29271400"
+    },
+    {
+      "path": "graphics-fallback.png",
+      "sha256": "d3e3524e4fd7379cfe649b88a45a8fa61cbfdfd9cb8685a2c3c131ef480b2df0"
+    },
+    {
+      "path": "asset-verification.json",
+      "sha256": "babad95ba38b5672e679c5780c55f56d9e28e67c2676be782c10fb6a7aa456d3"
+    }
+  ]
+}

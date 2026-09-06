@@ -1,0 +1,15 @@
+{
+  "html_matches_local_dist": true,
+  "assets": [
+    {
+      "asset": "/assets/pattern-portrait-BHcyDdVR.js",
+      "matches_local_dist": true,
+      "sha256": "1391b1795fb3550e86c990f48fa56f03c55c1976f6e48c488e5d064361f9c1e6"
+    },
+    {
+      "asset": "/assets/pattern-portrait-Bv7iidQ8.css",
+      "matches_local_dist": true,
+      "sha256": "80660cc07b1ead49759a9d3587b42b5229befdc1d1c80bb39a2346363cc218f5"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "baseline": "82d5dd9fd3ff406bcec985411dc58fcbf2bf3432",
+  "branch": "codex/portrait-explorer",
+  "sourceChangedAfterFreeze": false,
+  "node": "22.23.2",
+  "npm": "10.9.8",
+  "python": "3.14.4",
+  "workflowPython": "3.12",
+  "aggregate": {
+    "command": "npm run ci:local",
+    "exitCode": 1,
+    "passedLanes": 13,
+    "failedLanes": [
+      "monorepo: npm run typecheck"
+    ],
+    "error": "TS2688: Cannot find type definition file for @cloudflare/workers-types"
+  },
+  "repair": {
+    "cause": "Root node_modules was copied into the new worktree, but two workspace-local type-only packages were absent.",
+    "packages": [
+      "apps/api/node_modules/@cloudflare/workers-types",
+      "apps/ontology-signer/node_modules/@cloudflare/workers-types"
+    ],
+    "version": "4.20260702.1",
+    "versionMatchesLockfile": true,
+    "sourceOrLockfileChanged": false,
+    "command": "npm run typecheck",
+    "exitCode": 0
+  },
+  "tests": {
+    "explorerFocused": 59,
+    "fixtureAssets": 6,
+    "allWeb": 529,
+    "apiPrimary": 2282,
+    "apiCompatibility": 1,
+    "allListedSuitesPassed": true
+  },
+  "portraitBuild": {
+    "command": "npm run build:portrait -w @patternlike/web",
+    "exitCode": 0,
+    "advisory": "Shared Three.js/OrbitControls chunk exceeds500kB minified; approximately144kB gzip."
+  },
+  "releaseGate": "Original aggregate exited1; failed type-check lane subsequently passed. No fresh uninterrupted aggregate was run after dependency repair. Run ci:local before any merge.",
+  "delivery": {
+    "commit": false,
+    "push": false,
+    "deployment": false,
+    "accountPipelineEnabled": false
+  },
+  "recordScope": "Initial local implementation handoff before the user requested commit and push to main. See main-integration-verification.json for the subsequent fresh gate."
+}

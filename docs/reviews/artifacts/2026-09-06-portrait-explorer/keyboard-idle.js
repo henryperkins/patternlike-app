@@ -1,0 +1,36 @@
+async(page)=>{
+ const result={};
+ await page.addInitScript(()=>{window.drawCount=0;for(const name of ['drawElements','drawArrays','drawElementsInstanced','drawArraysInstanced']){const original=WebGL2RenderingContext.prototype[name];WebGL2RenderingContext.prototype[name]=function(...args){window.drawCount++;return original.apply(this,args)}}});
+ await page.goto('http://127.0.0.1:5175/pattern-portrait.html');await page.waitForFunction(()=>!document.querySelector('button[aria-label="Rotate left"]')?.disabled);
+ await page.evaluate(()=>new Promise(r=>setTimeout(r,700)));
+ const first=await page.evaluate(()=>window.drawCount);
+ await page.evaluate(()=>new Promise(r=>setTimeout(r,700)));
+ result.idleDraws=await page.evaluate(()=>window.drawCount)-first;
+ await page.getByRole('button',{name:/^1\./}).focus();await page.keyboard.press('Enter');
+ await page.getByRole('tab',{name:'Overview',exact:true}).focus();await page.keyboard.press('ArrowRight');
+ result.keyboardFacet=await page.getByRole('tab',{name:'Tensions',exact:true}).getAttribute('aria-selected');
+ await page.getByRole('button',{name:/Tensions: show source passage/}).focus();await page.keyboard.press('Enter');
+ result.keyboardPassage=await page.evaluate(()=>document.activeElement.textContent);
+ await page.getByRole('button',{name:'Inspect original image',exact:true}).focus();await page.keyboard.press('Enter');
+ const dialog=page.getByRole('dialog',{name:'Original chapter image'});await dialog.waitFor();
+ await page.keyboard.press('Tab');result.modalFocusContained=await page.evaluate(()=>document.querySelector('dialog').contains(document.activeElement));
+ await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+ result.keyboardFocusReturn=await page.evaluate(()=>document.activeElement.textContent);
+ await page.getByRole('group',{name:'3D controls',exact:true}).focus();const before=await page.evaluate(()=>window.drawCount);await page.keyboard.press('ArrowLeft');await page.evaluate(()=>new Promise(r=>setTimeout(r,600)));
+ result.keyboardCameraDraws=await page.evaluate(()=>window.drawCount)-before;
+ await page.getByRole('button',{name:'Expand scene',exact:true}).focus();await page.keyboard.press('Enter');await page.getByRole('dialog',{name:'Expanded portrait scene'}).waitFor();
+ await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Expanded portrait scene'}).waitFor({state:'hidden'});
+ result.expandedFocusReturn=await page.evaluate(()=>document.activeElement.getAttribute('aria-label'));
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.getByText('Scene controls & motion',{exact:true}).click();
+ result.reducedMotion=await page.getByRole('checkbox',{name:'Reduce motion'}).isChecked();
+ await page.locator('.explorer-settings select').selectOption('low');await page.getByRole('button',{name:'Reset view',exact:true}).click();
+ result.lowQualityCanvas=await page.evaluate(()=>{const c=document.querySelector('canvas');return{pixelWidth:c.width,cssWidth:c.getBoundingClientRect().width}});
+ await page.route('**/portrait-explorer/bench.glb',route=>route.abort());await page.reload();
+ await page.getByRole('button',{name:'Try 3D again',exact:true}).waitFor();
+ await page.getByRole('button',{name:/^3\./}).click();
+ result.assetFailureReader=await page.locator('.explorer-reader h2').textContent();
+ await page.unroute('**/portrait-explorer/bench.glb');await page.getByRole('button',{name:'Try 3D again',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Rotate left"]')?.disabled);
+ result.assetRetry=true;
+ return result;
+}

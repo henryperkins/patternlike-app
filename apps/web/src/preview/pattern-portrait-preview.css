@@ -1,4 +1,5 @@
 .portrait-preview { max-width: 1280px; margin: 0 auto; padding: 0 52px; }
+.explorer-preview-scenarios { margin:0 clamp(18px,3.1vw,52px) 30px; }
 .portrait-preview-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 102px; border-bottom: 1px solid var(--line); }
 .portrait-preview-wordmark { display: flex; align-items: center; gap: 12px; text-decoration: none; font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -0.03em; }
 .portrait-wordmark-light { font-weight: 400; }

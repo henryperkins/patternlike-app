@@ -1,0 +1,149 @@
+import { describe, expect, it, vi } from "vitest";
+import { webcrypto } from "node:crypto";
+import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector3 } from "three";
+import { cameraFrame, chapterLayout, disposeModel, isCameraBookmark, TapTracker, validateGlb, verifyGlbAsset } from "./scene-utils.js";
+
+function glb(json: unknown) {
+  const text = new TextEncoder().encode(JSON.stringify(json));
+  const size = Math.ceil(text.length / 4) * 4;
+  const bytes = new ArrayBuffer(20 + size);
+  const view = new DataView(bytes);
+  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, bytes.byteLength, true);
+  view.setUint32(12, size, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  new Uint8Array(bytes, 20).fill(32);
+  new Uint8Array(bytes, 20, text.length).set(text);
+  return bytes;
+}
+
+describe("verified self-contained GLBs", () => {
+  it("rejects every external buffer, image, and nested extension resource before parsing", () => {
+    for (const json of [
+      { buffers: [{ uri: "https://example.invalid/private.bin" }] },
+      { images: [{ uri: "texture.png" }] },
+      { images: [{ uri: "data:image/png;base64,AA==" }] },
+      { extensions: { example: { uri: "/unbound.bin" } } },
+    ]) expect(() => validateGlb(glb({ asset: { version: "2.0" }, ...json }))).toThrow(/self-contained/);
+    expect(() => validateGlb(glb({ asset: { version: "2.0" }, buffers: [{ byteLength: 0 }] }))).not.toThrow();
+  });
+
+  it("rejects malformed headers, chunk overflows, non-glTF JSON, and oversized payloads", () => {
+    const valid = glb({ asset: { version: "2.0" } });
+    for (const offset of [0, 4, 8, 12, 16]) {
+      const bytes = valid.slice(0);
+      new DataView(bytes).setUint32(offset, 1, true);
+      expect(() => validateGlb(bytes)).toThrow();
+    }
+    expect(() => validateGlb(new ArrayBuffer(12 * 1024 * 1024 + 1))).toThrow(/size/);
+    expect(() => validateGlb(glb({ asset: { version: "1.0" } }))).toThrow(/version/);
+  });
+
+  it("checks the manifest SHA-256 against the exact fetched bytes", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    try {
+      const bytes = glb({ asset: { version: "2.0" } });
+      const digest = Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256", bytes)), byte => byte.toString(16).padStart(2, "0")).join("");
+      await expect(verifyGlbAsset(bytes, digest)).resolves.toBeUndefined();
+      await expect(verifyGlbAsset(bytes, "0".repeat(64))).rejects.toThrow(/hash/);
+      await expect(verifyGlbAsset(bytes, "")).rejects.toThrow(/hash/);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("requires one explicitly bound chapter root and rejects absent, conflicting, or duplicate identities", () => {
+    const root = { name: "chapter-1", extras: { chapterId: "chapter-1" } };
+    const document = { asset: { version: "2.0" }, scene: 0, scenes: [{ nodes: [0] }], nodes: [root] };
+    expect(() => validateGlb(glb(document), "chapter-1")).not.toThrow();
+    for (const changed of [
+      { ...document, nodes: [{ name: "chapter-2", extras: { chapterId: "chapter-2" } }] },
+      { ...document, nodes: [{ name: "chapter-1", extras: { chapterId: "chapter-2" } }] },
+      { ...document, nodes: [{ name: "chapter-1" }] },
+      { ...document, nodes: [{ name: "unbound", extras: { chapterId: "chapter-1" } }] },
+      { ...document, nodes: [root, root] },
+      { ...document, nodes: [root, { name: "chapter-2" }] },
+      { ...document, nodes: [root, { name: "child", extras: { chapterId: "chapter-2" } }] },
+      { ...document, scenes: [{ nodes: [0, 0] }] },
+      { ...document, scenes: [{ nodes: [0] }, { nodes: [0] }] },
+      { ...document, scene: 1 },
+    ]) expect(() => validateGlb(glb(changed), "chapter-1")).toThrow(/chapter identity/);
+  });
+});
+
+describe("bounds framing and camera restoration", () => {
+  const boxes = [
+    new Box3(new Vector3(-2.2, 0, -2), new Vector3(-0.2, 2, 0)),
+    new Box3(new Vector3(0.2, 0, 0.2), new Vector3(2.2, 0.4, 2.2)),
+  ];
+
+  it.each([0.65, 1, 1.8])("keeps real object bounds visible at aspect %s even while a chapter is selected", (aspect) => {
+    for (const selected of [[], [1], [0, 1]]) {
+      const frame = cameraFrame(boxes, selected, aspect);
+      const camera = new PerspectiveCamera(38, aspect, 0.05, 100);
+      camera.position.fromArray(frame.position);
+      camera.lookAt(new Vector3().fromArray(frame.target));
+      camera.updateMatrixWorld();
+      for (const box of boxes) for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+        const point = new Vector3(x, y, z).project(camera);
+        expect(Math.abs(point.x)).toBeLessThan(0.88);
+        expect(Math.abs(point.y)).toBeLessThan(0.88);
+      }
+    }
+  });
+
+  it("moves the framing target toward the selected contribution and separates unfolded positions", () => {
+    expect(cameraFrame(boxes, [1], 1).target[0]).toBeGreaterThan(cameraFrame(boxes, [], 1).target[0]);
+    const together = chapterLayout(0, false);
+    const apart = chapterLayout(0, true);
+    expect(Math.hypot(apart[0], apart[2])).toBeGreaterThan(Math.hypot(together[0], together[2]));
+  });
+
+  it("accepts a concrete saved pose and rejects nonfinite or degenerate restoration", () => {
+    expect(isCameraBookmark({ position: [2, 3, 5], target: [1, 0, 0] })).toBe(true);
+    expect(isCameraBookmark({ position: [0, 0, 0], target: [0, 0, 0] })).toBe(false);
+    expect(isCameraBookmark({ position: [NaN, 0, 3], target: [0, 0, 0] })).toBe(false);
+    expect(isCameraBookmark({ position: [0, 0, Infinity], target: [0, 0, 0] })).toBe(false);
+    expect(isCameraBookmark(undefined)).toBe(false);
+  });
+});
+
+describe("body picking gesture boundaries", () => {
+  const pointer = (pointerId: number, x = 10, y = 10, isPrimary = true) => ({ pointerId, clientX: x, clientY: y, isPrimary, button: 0 });
+  it("selects only a stationary primary release without page scrolling", () => {
+    const taps = new TapTracker();
+    taps.down(pointer(1), 0, 0);
+    expect(taps.up(pointer(1, 12, 12), 0, 0)).toBe(true);
+    taps.down(pointer(1), 0, 0);
+    expect(taps.up(pointer(1), 0, 3)).toBe(false);
+  });
+  it("rejects drag-return, multitouch, cancellation, and mismatched pointer releases", () => {
+    const taps = new TapTracker();
+    taps.down(pointer(1), 0, 0);
+    taps.move(pointer(1, 30));
+    expect(taps.up(pointer(1), 0, 0)).toBe(false);
+    taps.down(pointer(1), 0, 0);
+    taps.down(pointer(2, 10, 10, false), 0, 0);
+    expect(taps.up(pointer(1), 0, 0)).toBe(false);
+    taps.cancel();
+    expect(taps.up(pointer(2), 0, 0)).toBe(false);
+    taps.down(pointer(1), 0, 0);
+    expect(taps.up(pointer(2), 0, 0)).toBe(false);
+  });
+});
+
+it("disposes shared geometry, material, texture, and decoded image exactly once across GLB scenes", () => {
+  const geometry = new BoxGeometry();
+  const close = vi.fn();
+  const texture = new Texture({ close } as unknown as HTMLImageElement);
+  const material = new MeshStandardMaterial({ map: texture, roughnessMap: texture });
+  const geometryDispose = vi.spyOn(geometry, "dispose");
+  const materialDispose = vi.spyOn(material, "dispose");
+  const textureDispose = vi.spyOn(texture, "dispose");
+  const first = new Group().add(new Mesh(geometry, material));
+  const second = new Group().add(new Mesh(geometry, material));
+  disposeModel([first, second]);
+  expect(geometryDispose).toHaveBeenCalledTimes(1);
+  expect(materialDispose).toHaveBeenCalledTimes(1);
+  expect(textureDispose).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(1);
+});

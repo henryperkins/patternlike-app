@@ -1,0 +1,306 @@
+{
+  "environment": {
+    "browser": "Chromium (Playwright browser build 1237), headless Linux",
+    "renderer": "SwiftShader",
+    "desktop": [
+      1440,
+      900
+    ],
+    "phone": [
+      390,
+      844
+    ],
+    "narrowPhone": [
+      320,
+      740
+    ],
+    "tabletWidth": 820,
+    "deviceEvidence": "Emulation only; physical device and assistive technology checks are pending"
+  },
+  "desktop": {
+    "bodyPicking": "true",
+    "fullEntry": "chapter-1",
+    "cameraPixelsRestored": true,
+    "facetRestored": "true",
+    "exactPassage": "You can distinguish a change of direction from a loss of purpose. The value can remain steady while the route changes.",
+    "comparisonChapters": [
+      "Finding your own direction",
+      "Making room for care"
+    ],
+    "comparisonPassages": [
+      "Sometimes choosing your direction means listening carefully to advice and then deciding which part belongs with you.",
+      "Receiving something without immediately returning the favor can also be an act of trust."
+    ],
+    "comparisonReturn": "true",
+    "imageFocusRestored": "Inspect original image \u2197",
+    "guidedChapters": [
+      "Finding your own direction",
+      "Making room for care",
+      "Keeping what matters",
+      "Seeing beyond the immediate"
+    ],
+    "guideReturnWhole": true,
+    "axe": {
+      "violations": [],
+      "passes": 32,
+      "incomplete": [
+        "aria-prohibited-attr",
+        "color-contrast"
+      ]
+    },
+    "contextLossPreservesChapter": "Making room for care",
+    "contextLossDisablesControls": true,
+    "retryWorks": true
+  },
+  "mobile": {
+    "initial": {
+      "width": 390,
+      "scene": {
+        "x": 16,
+        "y": 207.578125,
+        "width": 358,
+        "height": 330,
+        "top": 207.578125,
+        "right": 374,
+        "bottom": 537.578125,
+        "left": 16
+      },
+      "chapters": {
+        "x": 16,
+        "y": 537.578125,
+        "width": 358,
+        "height": 130,
+        "top": 537.578125,
+        "right": 374,
+        "bottom": 667.578125,
+        "left": 16
+      },
+      "buttons": [
+        {
+          "label": "Rotate left",
+          "w": 44,
+          "h": 44
+        },
+        {
+          "label": "Rotate right",
+          "w": 44,
+          "h": 44
+        },
+        {
+          "label": "Zoom out",
+          "w": 44,
+          "h": 44
+        },
+        {
+          "label": "Zoom in",
+          "w": 44,
+          "h": 44
+        },
+        {
+          "label": "Reset view",
+          "w": 44,
+          "h": 44
+        },
+        {
+          "label": "Expand scene",
+          "w": 44,
+          "h": 44
+        }
+      ]
+    },
+    "reverseLink": {
+      "presentation": "portrait-explorer explorer-presentation-explore",
+      "scene": "block",
+      "focus": "Overview: show source passage 2 for Finding your own direction",
+      "annotation": "\u25cf Overview \u00b7 2"
+    },
+    "expandedAnnotation": {
+      "chapter": "Making room for care",
+      "focus": "You may recognize another person's needs quickly and make space for them before checking your own capacity. That responsiveness can be generous. It becomes easier to sustain when your own hunger, rest, and limits also have a place."
+    },
+    "imageFocus": "Inspect original image \u2197",
+    "nestedGuideExit": {
+      "presentation": "portrait-explorer explorer-presentation-explore",
+      "historyLength": 29
+    },
+    "nestedExitAddsNoHistory": true,
+    "reflow320": {
+      "width": 320,
+      "viewport": 320,
+      "buttons": [
+        [
+          44,
+          44
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          44,
+          44
+        ]
+      ]
+    },
+    "axe": {
+      "violations": [],
+      "passes": 25,
+      "incomplete": [
+        "aria-prohibited-attr",
+        "color-contrast"
+      ]
+    }
+  },
+  "keyboard_idle_failure": {
+    "idleDraws": 0,
+    "keyboardFacet": "true",
+    "keyboardPassage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.",
+    "modalFocusContained": true,
+    "keyboardFocusReturn": "Inspect original image \u2197",
+    "keyboardCameraDraws": 102,
+    "expandedFocusReturn": "Expand scene",
+    "reducedMotion": true,
+    "lowQualityCanvas": {
+      "pixelWidth": 809,
+      "cssWidth": 809.65625
+    },
+    "assetFailureReader": "Keeping what matters",
+    "assetRetry": true
+  },
+  "reflow": {
+    "text200": {
+      "width": 320,
+      "viewport": 320,
+      "buttons": [
+        {
+          "label": "Rotate left",
+          "rect": {
+            "x": 40,
+            "y": 975.0625,
+            "width": 60,
+            "height": 60,
+            "top": 975.0625,
+            "right": 100,
+            "bottom": 1035.0625,
+            "left": 40
+          }
+        },
+        {
+          "label": "Rotate right",
+          "rect": {
+            "x": 100,
+            "y": 975.0625,
+            "width": 60,
+            "height": 60,
+            "top": 975.0625,
+            "right": 160,
+            "bottom": 1035.0625,
+            "left": 100
+          }
+        },
+        {
+          "label": "Zoom out",
+          "rect": {
+            "x": 160,
+            "y": 975.0625,
+            "width": 60,
+            "height": 60,
+            "top": 975.0625,
+            "right": 220,
+            "bottom": 1035.0625,
+            "left": 160
+          }
+        },
+        {
+          "label": "Zoom in",
+          "rect": {
+            "x": 220,
+            "y": 975.0625,
+            "width": 60,
+            "height": 60,
+            "top": 975.0625,
+            "right": 280,
+            "bottom": 1035.0625,
+            "left": 220
+          }
+        },
+        {
+          "label": "Reset view",
+          "rect": {
+            "x": 100,
+            "y": 1035.0625,
+            "width": 60,
+            "height": 60,
+            "top": 1035.0625,
+            "right": 160,
+            "bottom": 1095.0625,
+            "left": 100
+          }
+        },
+        {
+          "label": "Expand scene",
+          "rect": {
+            "x": 160,
+            "y": 1035.0625,
+            "width": 60,
+            "height": 60,
+            "top": 1035.0625,
+            "right": 220,
+            "bottom": 1095.0625,
+            "left": 160
+          }
+        }
+      ],
+      "passageSize": "38px"
+    },
+    "tablet": {
+      "width": 820,
+      "viewport": 820,
+      "columns": "769.188px"
+    }
+  },
+  "assembly_angles": {
+    "shots": [
+      "front",
+      "front-left",
+      "left",
+      "rear",
+      "right",
+      "front-right",
+      "elevated",
+      "lower"
+    ]
+  },
+  "review": {
+    "rendering": "Eight assembly angles and 32 individual-model views captured; side and rear geometry visually inspected.",
+    "independentFindings": "All reported P1/P2 findings remediated and reviewed within their stated scope.",
+    "limits": [
+      "Physical phone performance",
+      "Safari",
+      "VoiceOver and NVDA",
+      "GPU/texture memory and lifecycle plateau",
+      "Representative-reader usability sessions"
+    ]
+  },
+  "built_preview": {
+    "url": "http://127.0.0.1:4175/pattern-portrait.html",
+    "forwardTab": "Whole portrait",
+    "backwardTab": "4. Seeing beyond the immediate",
+    "focusReturn": "Expand scene",
+    "sourceParagraph": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.",
+    "canvasCount": 1,
+    "errors": []
+  }
+}

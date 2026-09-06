@@ -1,0 +1,35 @@
+{
+  "command": "npm run ci:local -- --clean",
+  "exitCode": 0,
+  "passedLanes": 14,
+  "failedLanes": [],
+  "headAtInvocation": "82d5dd9fd3ff406bcec985411dc58fcbf2bf3432",
+  "mainBeforeIntegration": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+  "testedTree": "Portrait baseline plus the uncommitted explorer implementation identified by source-fingerprint.json. Only documentation and evidence changed during verification.",
+  "sourceFingerprintMatchesAtCompletion": true,
+  "sourceFingerprintFileCount": 27,
+  "install": "Full clean npm ci from the unchanged package-lock.json",
+  "node": "22.23.2",
+  "npm": "10.9.8",
+  "python": "3.14.4",
+  "workflowPython": "3.12",
+  "fixtureValidation": {
+    "command": "node --test scripts/portrait-explorer/build-fixture-assets.test.mjs",
+    "passed": 6,
+    "exitCode": 0
+  },
+  "portraitBuild": {
+    "command": "npm run build:portrait -w @patternlike/web",
+    "exitCode": 0,
+    "advisory": "Shared Three.js/OrbitControls chunk is 579.36 kB minified, 143.96 kB gzip."
+  },
+  "browserSmoke": "main-browser-smoke.json",
+  "integration": {
+    "authorizedAction": "Commit and push to main",
+    "strategy": "Fast-forward the tested tree; normal push; verify remote SHA",
+    "productionPortraitFlagBeforePush": "Absent in live Worker settings",
+    "newExplorerEntry": "Separate fictional preview built to dist-portrait; normal production build serves dist",
+    "migrationOrFlagChange": false,
+    "deliveryEvidence": "Commit and remote SHA are reported after successful push; this file records the pre-push gate."
+  }
+}

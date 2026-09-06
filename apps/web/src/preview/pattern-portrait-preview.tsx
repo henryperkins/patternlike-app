@@ -2,6 +2,8 @@ import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ZODIAC_SIGNS, type BirthTimeAccuracy, type ZodiacSignName } from "@patternlike/shared";
 import { PatternPortrait } from "../components/PatternPortrait.js";
+import { PortraitExplorer } from "../components/portrait-explorer/PortraitExplorer.js";
+import { portraitExplorerFixture } from "./portrait-explorer-fixture.js";
 import { sunShapeProfiles } from "../lib/sun-sculpture.js";
 import type { PortraitSource } from "../lib/pattern-portrait.js";
 import { fictionalPattern } from "./pattern-portrait-fixture.js";
@@ -16,6 +18,7 @@ function PortraitPreview() {
   const [accuracy, setAccuracy] = useState<BirthTimeAccuracy>("exact");
   const [status, setStatus] = useState<PortraitSource["status"]>("ready");
   const [replacement, setReplacement] = useState(false);
+  const [iteration, setIteration] = useState("explorer");
   const pattern = example === "direction" ? nativePattern : fictionalPattern;
   const objectBindings = example === "direction" ? nativeImageBindings : imageStudyBindings;
   const source = useMemo<PortraitSource>(() => {
@@ -37,6 +40,17 @@ function PortraitPreview() {
     };
   }, [status, accuracy, replacement, sunSign, pattern]);
 
+  if (iteration === "explorer") return <>
+    <a className="skip-link" href="#portrait-start" onClick={(event) => { event.preventDefault(); const target = document.getElementById("portrait-start"); target?.focus(); target?.scrollIntoView(); }}>Skip to the portrait</a>
+    <PortraitExplorer source={source} objectBindings={objectBindings} meshBundle={portraitExplorerFixture} />
+    <details className="portrait-preview-scenarios explorer-preview-scenarios"><summary>Fictional preview scenarios</summary><p>These controls test the study’s loading, fallback, and source replacement behavior.</p><div className="portrait-scenario-fields">
+      <label>Document state<select value={status} onChange={(event) => setStatus(event.target.value as PortraitSource["status"])}><option value="ready">Available</option><option value="loading">Loading</option><option value="unavailable">Removed</option></select></label>
+      <label>Example birth-time accuracy<select value={accuracy} onChange={(event) => setAccuracy(event.target.value as BirthTimeAccuracy)}><option value="exact">Exact</option><option value="approximate">Approximate</option><option value="unknown">Unknown</option></select></label>
+      <button onClick={() => { setReplacement((value) => !value); setStatus("ready"); }}>{replacement ? "Restore four-chapter sample" : "Replace with three-chapter sample"}</button>
+      <button onClick={() => setIteration("previous")}>Inspect previous iteration</button>
+    </div></details>
+  </>;
+
   return (
     <div className="portrait-preview">
       <a className="skip-link" href="#portrait-main">Skip to the portrait</a>
@@ -55,6 +69,7 @@ function PortraitPreview() {
             <p className="portrait-fictional-note">Choose a fictional reading to compare. Your choices stay on this page.</p>
           </div>
         </div>
+        <button onClick={() => { setIteration("explorer"); setExample("direction"); setReplacement(false); setStatus("ready"); }}>Return to redesigned portrait</button>
         <div className="portrait-sun-choice">
           <label htmlFor="portrait-example">Reading
             <select id="portrait-example" value={example} onChange={(event) => { setExample(event.target.value); setReplacement(false); setStatus("ready"); }}>

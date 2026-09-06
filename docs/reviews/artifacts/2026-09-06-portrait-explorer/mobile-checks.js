@@ -1,0 +1,36 @@
+async (page) => {
+ const result={};
+ await page.setViewportSize({width:390,height:844});
+ const ready=()=>page.waitForFunction(()=>!document.querySelector('button[aria-label="Rotate left"]')?.disabled);
+ const settle=()=>page.evaluate(async()=>{for(let i=0;i<35;i++)await new Promise(requestAnimationFrame)});
+ await page.goto('http://127.0.0.1:5175/pattern-portrait.html'); await ready();await settle();
+ result.initial=await page.evaluate(()=>({width:document.documentElement.scrollWidth,scene:document.querySelector('.explorer-scene').getBoundingClientRect().toJSON(),chapters:document.querySelector('.explorer-chapters').getBoundingClientRect().toJSON(),buttons:[...document.querySelectorAll('.explorer-scene-toolbar button')].map(x=>({label:x.getAttribute('aria-label'),w:x.getBoundingClientRect().width,h:x.getBoundingClientRect().height}))}));
+ await page.screenshot({path:'docs/reviews/artifacts/2026-09-06-portrait-explorer/mobile-whole.png',scale:'css'});
+ await page.getByRole('button',{name:/^1\./}).click();await settle();
+ await page.screenshot({path:'docs/reviews/artifacts/2026-09-06-portrait-explorer/mobile-selected.png',scale:'css'});
+ await page.getByRole('button',{name:'Read chapter',exact:true}).click();
+ await page.getByRole('button',{name:'Show passage 2 in portrait',exact:true}).click();await settle();
+ result.reverseLink=await page.evaluate(()=>({presentation:document.querySelector('main').className,scene:getComputedStyle(document.querySelector('.explorer-scene')).display,focus:document.activeElement?.getAttribute('aria-label'),annotation:document.querySelector('.explorer-annotation')?.textContent}));
+ await page.getByRole('button',{name:'Expand scene',exact:true}).click();await ready();await settle();
+ const dialog=page.getByRole('dialog',{name:'Expanded portrait scene'});
+ await dialog.getByRole('button',{name:/^2\./}).click();await settle();
+ await page.screenshot({path:'docs/reviews/artifacts/2026-09-06-portrait-explorer/mobile-expanded.png',scale:'css'});
+ await dialog.getByRole('button',{name:/Overview: show source passage/}).click();await settle();
+ result.expandedAnnotation=await page.evaluate(()=>({chapter:document.querySelector('.explorer-reader h2').textContent,focus:document.activeElement.textContent}));
+ await page.getByRole('button',{name:'Inspect original image',exact:true}).click();await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Original chapter image'}).waitFor({state:'hidden'});await settle();
+ result.imageFocus=await page.evaluate(()=>document.activeElement.textContent);
+ await page.getByRole('button',{name:'Whole portrait',exact:true}).click();
+ await page.getByRole('button',{name:'Guide me through',exact:true}).click();
+ await page.getByRole('button',{name:'Read chapter',exact:true}).click();
+ await page.getByRole('button',{name:'Next stop',exact:true}).click();
+ const before=await page.evaluate(()=>history.length);
+ await page.getByRole('button',{name:'Exit guide',exact:true}).click();await page.locator('.explorer-introduction').waitFor();
+ result.nestedGuideExit=await page.evaluate(()=>({presentation:document.querySelector('main').className,historyLength:history.length}));
+ result.nestedExitAddsNoHistory=result.nestedGuideExit.historyLength===before;
+ await page.setViewportSize({width:320,height:740});await settle();
+ result.reflow320=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth,buttons:[...document.querySelectorAll('.explorer-scene-toolbar button')].map(x=>[x.getBoundingClientRect().width,x.getBoundingClientRect().height])}));
+ await page.screenshot({path:'docs/reviews/artifacts/2026-09-06-portrait-explorer/mobile-320.png',scale:'css'});
+ await page.addScriptTag({path:'node_modules/axe-core/axe.min.js'});
+ result.axe=await page.evaluate(async()=>{const r=await window.axe.run(document.querySelector('.portrait-explorer'));return{violations:r.violations.map(x=>({id:x.id,impact:x.impact})),passes:r.passes.length,incomplete:r.incomplete.map(x=>x.id)}});
+ return result;
+}

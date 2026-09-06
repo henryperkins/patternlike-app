@@ -1,0 +1,507 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  ACESFilmicToneMapping, Box3, Color, DirectionalLight, Group, HemisphereLight, LoadingManager, Mesh,
+  MeshStandardMaterial, PCFShadowMap, PerspectiveCamera, PlaneGeometry, PMREMGenerator,
+  Raycaster, RingGeometry, Scene, Spherical, TOUCH, Vector2, Vector3, WebGLRenderer,
+  type Object3D, type WebGLRenderTarget,
+} from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { cameraFrame, chapterLayout, disposeModel, isCameraBookmark, MAX_GLB_BYTES, TapTracker, verifyGlbAsset } from "./scene-utils.js";
+import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
+
+type LoadedForm = { id: string; root: Group; resources: Object3D[]; };
+type Motion = { start: number; duration: number; from: CameraBookmark; to: CameraBookmark; positions: Vector3[]; goals: Vector3[]; };
+
+async function loadForm(asset: PortraitSceneProps["assets"][number], signal: AbortSignal): Promise<LoadedForm> {
+  const response = await fetch(asset.url, { credentials: "same-origin", signal });
+  if (!response.ok) throw new Error("Model delivery failed");
+  if (Number(response.headers.get("content-length")) > MAX_GLB_BYTES) throw new Error("Model size exceeded");
+  // Bound the response while reading, including a response without Content-Length.
+  const reader = response.body?.getReader();
+  let bytes: ArrayBuffer;
+  if (reader) {
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        length += next.value.byteLength;
+        if (signal.aborted || length > MAX_GLB_BYTES) throw new Error("Model size or lifetime exceeded");
+        chunks.push(next.value);
+      }
+    } catch (error) { await reader.cancel().catch(() => {}); throw error; }
+    finally { reader.releaseLock(); }
+    const joined = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.byteLength; }
+    bytes = joined.buffer;
+  } else bytes = await response.arrayBuffer();
+  if (signal.aborted) throw new Error("Model loading cancelled");
+  await verifyGlbAsset(bytes, asset.sha256, asset.chapterId);
+  if (signal.aborted) throw new Error("Model loading cancelled");
+  const manager = new LoadingManager();
+  // Embedded image bufferViews become blob URLs inside GLTFLoader.
+  manager.setURLModifier(url => {
+    if (!url.startsWith("blob:")) throw new Error("Unexpected model resource");
+    return url;
+  });
+  const model: GLTF = await new GLTFLoader(manager).parseAsync(bytes, "");
+  const resources = model.scenes;
+  try {
+    if (signal.aborted) throw new Error("Model loading cancelled");
+    const bounds = new Box3().setFromObject(model.scene);
+    const size = bounds.getSize(new Vector3());
+    if (bounds.isEmpty() || ![...bounds.min.toArray(), ...bounds.max.toArray()].every(Number.isFinite)
+      || Math.max(size.x, size.y, size.z) > 10 || Math.min(size.x, size.y, size.z) < 0.02) throw new Error("Invalid volumetric model bounds");
+    const root = new Group();
+    root.userData.chapterId = asset.chapterId;
+    root.add(model.scene);
+    root.traverse(object => {
+      if (object instanceof Mesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+        object.userData.chapterId = asset.chapterId;
+      }
+    });
+    return { id: asset.chapterId, root, resources };
+  } catch (error) { disposeModel(resources); throw error; }
+}
+
+/** Owns GPU resources, gestures, and demand rendering; prose stays in the sibling DOM reader. */
+class PortraitRuntime {
+  private props: PortraitSceneProps;
+  private renderer: WebGLRenderer;
+  private scene = new Scene();
+  private camera = new PerspectiveCamera(38, 1, 0.05, 150);
+  private controls!: OrbitControls;
+  private environment: WebGLRenderTarget | null = null;
+  private observer?: ResizeObserver;
+  private raycaster = new Raycaster();
+  private taps = new TapTracker();
+  private animation: number | null = null;
+  private motion: Motion | null = null;
+  private disposed = false;
+  private ready = false;
+  private width = 1;
+  private height = 1;
+  private usableHeight = 1;
+  private topInset = 0;
+  private bottomInset = 0;
+  private visible = true;
+  private hovered: string | null = null;
+  private ground!: Mesh;
+  private rings: Mesh[] = [];
+  private elevations: number[] = [];
+  private localBoxes: Box3[] = [];
+  private materials = new Map<MeshStandardMaterial, { emissive: Color; intensity: number; }>();
+  private keyLight!: DirectionalLight;
+
+  constructor(private host: HTMLDivElement, private labels: HTMLDivElement, private forms: LoadedForm[], props: PortraitSceneProps, private fail: () => void, private reportStatus: (status: SceneStatus) => void) {
+    this.props = props;
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: "low-power" });
+    try {
+    const canvas = this.renderer.domElement;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.");
+    canvas.style.cssText = "display:block;width:100%;height:100%;cursor:grab";
+    this.host.append(canvas);
+    this.renderer.setClearColor("#091b21");
+    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.86;
+    this.renderer.shadowMap.type = PCFShadowMap;
+    this.scene.add(new HemisphereLight("#d4e8e4", "#3e3021", 0.8));
+    this.keyLight = new DirectionalLight("#ffe6bd", 2.7);
+    this.keyLight.position.set(-3, 7, 5);
+    this.keyLight.castShadow = true;
+    this.keyLight.shadow.mapSize.set(1024, 1024);
+    this.keyLight.shadow.camera.left = -5;
+    this.keyLight.shadow.camera.right = 5;
+    this.keyLight.shadow.camera.top = 5;
+    this.keyLight.shadow.camera.bottom = -5;
+    this.keyLight.shadow.normalBias = 0.025;
+    this.keyLight.shadow.bias = -0.00015;
+    this.scene.add(this.keyLight);
+    const rim = new DirectionalLight("#aecbd7", 1.5);
+    rim.position.set(3, 5, -5);
+    this.scene.add(rim);
+    this.ground = new Mesh(new PlaneGeometry(200, 200), new MeshStandardMaterial({ color: "#030b0d", roughness: 1, metalness: 0 }));
+    this.ground.rotation.x = -Math.PI / 2;
+    this.ground.position.y = -0.025;
+    this.ground.receiveShadow = true;
+    this.scene.add(this.ground);
+    for (const [index, form] of forms.entries()) {
+      const box = new Box3().setFromObject(form.root);
+      this.localBoxes.push(box.clone());
+      this.elevations.push(-box.min.y);
+      form.root.position.fromArray(chapterLayout(index, props.unfolded));
+      form.root.position.y = -box.min.y;
+      this.scene.add(form.root);
+      form.root.traverse(object => {
+        if (!(object instanceof Mesh)) return;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if (material instanceof MeshStandardMaterial) this.materials.set(material, { emissive: material.emissive.clone(), intensity: material.emissiveIntensity });
+        }
+      });
+      const ring = new Mesh(new RingGeometry(1.06, 1.075, 64), new MeshStandardMaterial({ color: "#e89775", emissive: "#df8064", emissiveIntensity: 0.25, roughness: 1 }));
+      ring.rotation.x = -Math.PI / 2;
+      this.rings.push(ring);
+      this.scene.add(ring);
+    }
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.enablePan = false;
+    this.controls.enableDamping = false;
+    this.controls.touches.TWO = TOUCH.DOLLY_ROTATE;
+    this.controls.rotateSpeed = 0.65;
+    this.controls.minDistance = 2;
+    this.controls.maxDistance = 35;
+    this.controls.minPolarAngle = 0.12;
+    this.controls.maxPolarAngle = Math.PI * 0.56;
+    this.controls.addEventListener("change", this.invalidate);
+    this.controls.addEventListener("start", this.onOrbitStart);
+    this.controls.addEventListener("end", this.onOrbitEnd);
+    canvas.addEventListener("pointerdown", this.onPointerDown);
+    canvas.addEventListener("pointermove", this.onPointerMove);
+    canvas.addEventListener("pointerup", this.onPointerUp);
+    canvas.addEventListener("pointercancel", this.onPointerCancel);
+    canvas.addEventListener("pointerleave", this.onPointerLeave);
+    canvas.addEventListener("webglcontextlost", this.onContextLost);
+    document.addEventListener("visibilitychange", this.onVisibility);
+    this.observer = new ResizeObserver(this.resize);
+    this.observer.observe(host);
+    for (const toolbar of host.closest(".explorer-scene")?.querySelectorAll(".explorer-scene-top, .explorer-scene-toolbar") ?? []) this.observer.observe(toolbar);
+    this.resize();
+    this.applyQuality();
+    const pose = isCameraBookmark(props.bookmark) ? props.bookmark : this.frame();
+    this.applyPose(pose);
+    this.updateEmphasis();
+    this.invalidate();
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
+  }
+
+  private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray() });
+  private save = () => { if (this.ready) this.props.onBookmark(this.props.viewKey, this.snapshot()); };
+  private bounds = (unfolded = this.props.unfolded) => this.localBoxes.map((box, index) => {
+    const position = new Vector3().fromArray(chapterLayout(index, unfolded));
+    position.y = this.elevations[index]!;
+    return box.clone().translate(position);
+  });
+  private frame = () => cameraFrame(this.bounds(), this.forms.flatMap((form, index) => this.props.selectedIds.includes(form.id) ? [index] : []), this.width / this.usableHeight);
+  private applyPose = (pose: CameraBookmark) => {
+    this.camera.position.fromArray(pose.position);
+    this.controls.target.fromArray(pose.target);
+    this.controls.update();
+  };
+
+  private applyQuality() {
+    const low = this.props.quality === "low";
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, low ? 1 : 1.6));
+    this.renderer.shadowMap.enabled = !low;
+    this.renderer.shadowMap.needsUpdate = true;
+    this.controls.enableZoom = this.props.expanded;
+    this.renderer.domElement.style.touchAction = this.props.expanded ? "none" : "pan-y";
+    if (!low && !this.environment) {
+      const generator = new PMREMGenerator(this.renderer);
+      const room = new RoomEnvironment();
+      try { this.environment = generator.fromScene(room, 0.04); }
+      finally { room.dispose(); generator.dispose(); }
+    }
+    this.scene.environment = low ? null : this.environment?.texture ?? null;
+    this.scene.environmentIntensity = 0.42;
+    this.renderer.setSize(this.width, this.height, false);
+  }
+
+  update(props: PortraitSceneProps) {
+    const before = this.props;
+    if (before.viewKey !== props.viewKey) this.save();
+    this.props = props;
+    if (before.quality !== props.quality || before.expanded !== props.expanded) this.applyQuality();
+    if (before.viewKey !== props.viewKey || before.unfolded !== props.unfolded) {
+      this.moveTo(isCameraBookmark(props.bookmark) && before.viewKey !== props.viewKey ? props.bookmark : this.frame(), before.unfolded !== props.unfolded ? 540 : 420);
+    }
+    if (before.command.serial !== props.command.serial) this.command();
+    if (props.reducedMotion && this.motion) {
+      this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
+      this.applyPose(this.motion.to);
+      this.motion = null;
+      this.save();
+    }
+    this.updateEmphasis();
+    this.invalidate();
+  }
+
+  private moveTo(pose: CameraBookmark, duration: number) {
+    const goals = this.forms.map((_, index) => {
+      const goal = new Vector3().fromArray(chapterLayout(index, this.props.unfolded));
+      goal.y = this.elevations[index]!;
+      return goal;
+    });
+    if (this.props.reducedMotion) {
+      this.forms.forEach((form, index) => form.root.position.copy(goals[index]!));
+      this.applyPose(pose);
+      this.motion = null;
+      this.save();
+    } else this.motion = { start: performance.now(), duration, from: this.snapshot(), to: pose, positions: this.forms.map(form => form.root.position.clone()), goals };
+    this.invalidate();
+  }
+
+  private command() {
+    const kind = this.props.command.kind;
+    if (kind === "reset" || kind === "frame") { this.moveTo(this.frame(), 420); return; }
+    this.stopMotion();
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const spherical = new Spherical().setFromVector3(offset);
+    if (kind === "left" || kind === "right") spherical.theta += kind === "left" ? -Math.PI / 8 : Math.PI / 8;
+    if (kind === "up" || kind === "down") spherical.phi = Math.max(this.controls.minPolarAngle, Math.min(this.controls.maxPolarAngle, spherical.phi + (kind === "up" ? -Math.PI / 12 : Math.PI / 12)));
+    if (kind === "closer" || kind === "farther") spherical.radius = Math.max(this.controls.minDistance, Math.min(this.controls.maxDistance, spherical.radius * (kind === "closer" ? 0.84 : 1.19)));
+    const pose = { position: this.controls.target.clone().add(new Vector3().setFromSpherical(spherical)).toArray(), target: this.controls.target.toArray() };
+    this.moveTo(pose, 260);
+  }
+
+  private stopMotion() {
+    // Direct input interrupts camera motion; assembly finishes at its stable destination.
+    if (this.motion) this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
+    this.motion = null;
+  }
+  private onOrbitStart = () => { this.stopMotion(); this.renderer.domElement.style.cursor = "grabbing"; };
+  private onOrbitEnd = () => { this.renderer.domElement.style.cursor = "grab"; this.save(); };
+  private onPointerDown = (event: PointerEvent) => this.taps.down(event, window.scrollX, window.scrollY);
+  private onPointerMove = (event: PointerEvent) => {
+    this.taps.move(event);
+    if (event.buttons === 0 && event.pointerType !== "touch") this.highlight(this.pick(event));
+  };
+  private onPointerUp = (event: PointerEvent) => {
+    if (!this.taps.up(event, window.scrollX, window.scrollY)) return;
+    const id = this.pick(event);
+    if (id) this.props.onSelect(id);
+  };
+  private onPointerCancel = () => { this.taps.cancel(); this.highlight(null); };
+  private onPointerLeave = () => this.highlight(null);
+  private onContextLost = (event: Event) => { event.preventDefault(); this.dispose(); this.fail(); };
+  private onVisibility = () => {
+    if (document.hidden) {
+      if (this.animation !== null) cancelAnimationFrame(this.animation);
+      this.animation = null;
+      this.save();
+    } else this.invalidate();
+  };
+
+  private pick(event: PointerEvent): string | null {
+    const box = this.renderer.domElement.getBoundingClientRect();
+    if (!box.width || !box.height) return null;
+    this.raycaster.setFromCamera(new Vector2((event.clientX - box.left) / box.width * 2 - 1, -(event.clientY - box.top) / box.height * 2 + 1), this.camera);
+    return this.raycaster.intersectObjects(this.forms.map(form => form.root), true)[0]?.object.userData.chapterId ?? null;
+  }
+  highlight(id: string | null) {
+    if (this.hovered === id) return;
+    this.hovered = id;
+    this.updateEmphasis();
+    this.invalidate();
+  }
+  private updateEmphasis() {
+    this.forms.forEach((form, index) => {
+      const selected = this.props.selectedIds.includes(form.id);
+      const highlighted = this.hovered === form.id;
+      this.rings[index]!.visible = selected || highlighted;
+      form.root.traverse(object => {
+        if (!(object instanceof Mesh)) return;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if (!(material instanceof MeshStandardMaterial)) continue;
+          const base = this.materials.get(material)!;
+          material.emissive.copy(base.emissive);
+          material.emissiveIntensity = base.intensity;
+          if (selected || highlighted) { material.emissive.set("#735442"); material.emissiveIntensity = highlighted ? 0.16 : 0.075; }
+        }
+      });
+    });
+  }
+
+  private resize = () => {
+    const bounds = this.host.getBoundingClientRect();
+    this.visible = bounds.width > 0 && bounds.height > 0;
+    if (!this.visible) return;
+    this.width = Math.max(1, bounds.width);
+    this.height = Math.max(1, bounds.height);
+    const parent = this.host.closest(".explorer-scene");
+    const top = parent?.querySelector(".explorer-scene-top")?.getBoundingClientRect();
+    const bottom = parent?.querySelector(".explorer-scene-toolbar")?.getBoundingClientRect();
+    this.topInset = top ? Math.max(0, Math.min(this.height * 0.33, top.bottom - bounds.top + 8)) : 0;
+    this.bottomInset = bottom ? Math.max(0, Math.min(this.height * 0.4, bounds.bottom - bottom.top + 8)) : 0;
+    this.usableHeight = Math.max(60, this.height - this.topInset - this.bottomInset);
+    // Extend the viewport around its unobscured center instead of drawing objects behind controls.
+    this.camera.setViewOffset(this.width, this.usableHeight, 0, -this.topInset, this.width, this.height);
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(this.width, this.height, false);
+    this.invalidate();
+  };
+
+  private projectLabels() {
+    const occupied: Array<{ x: number; y: number; width: number; height: number }> = [];
+    // The selected annotation gets first claim on space. Occluded labels remain in the native chapter rail.
+    const ordered = this.forms.map((form, index) => ({ form, index })).sort((a, b) => Number(this.props.selectedIds.includes(b.form.id)) - Number(this.props.selectedIds.includes(a.form.id)));
+    for (const { form, index } of ordered) {
+      const label = this.labels.querySelector<HTMLButtonElement>(`[data-form-index="${index}"]`);
+      if (!label) continue;
+      label.dataset.highlighted = String(this.hovered === form.id);
+      const box = new Box3().setFromObject(form.root);
+      const anchor = box.getCenter(new Vector3());
+      anchor.y = box.max.y + 0.12;
+      const projected = anchor.clone().project(this.camera);
+      let visible = projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
+      if (this.width < 520 && this.height < 420 && !this.props.selectedIds.includes(form.id)) visible = false;
+      this.raycaster.set(this.camera.position, anchor.clone().sub(this.camera.position).normalize());
+      const hit = this.raycaster.intersectObjects(this.forms.map(item => item.root), true)[0];
+      if (hit && hit.distance < this.camera.position.distanceTo(anchor) - 0.1 && hit.object.userData.chapterId !== form.id) visible = false;
+      const width = label.offsetWidth || 110;
+      const height = label.offsetHeight || 44;
+      const x = Math.max(8, Math.min(this.width - width - 8, (projected.x + 1) * this.width / 2 - width / 2));
+      const y = Math.max(this.topInset + 4, Math.min(this.height - this.bottomInset - height - 4, (1 - projected.y) * this.height / 2 - height));
+      if (occupied.some(other => x < other.x + other.width + 8 && x + width + 8 > other.x && y < other.y + other.height + 8 && y + height + 8 > other.y)) visible = false;
+      // Never hide a focused native control while a camera transition is running.
+      if (document.activeElement === label) visible = true;
+      label.style.visibility = visible ? "visible" : "hidden";
+      label.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      if (visible) occupied.push({ x, y, width, height });
+    }
+  }
+
+  private invalidate = () => {
+    if (this.disposed || document.hidden || !this.visible || this.animation !== null) return;
+    this.animation = requestAnimationFrame(this.draw);
+  };
+  private draw = (now: number) => {
+    this.animation = null;
+    if (this.disposed) return;
+    try {
+      if (this.motion) {
+        const amount = Math.min(1, Math.max(0, (now - this.motion.start) / this.motion.duration));
+        const eased = amount * amount * (3 - 2 * amount);
+        this.camera.position.lerpVectors(new Vector3().fromArray(this.motion.from.position), new Vector3().fromArray(this.motion.to.position), eased);
+        this.controls.target.lerpVectors(new Vector3().fromArray(this.motion.from.target), new Vector3().fromArray(this.motion.to.target), eased);
+        this.forms.forEach((form, index) => form.root.position.lerpVectors(this.motion!.positions[index]!, this.motion!.goals[index]!, eased));
+        this.controls.update();
+        if (amount === 1) { this.motion = null; this.save(); }
+      }
+      this.rings.forEach((ring, index) => {
+        const position = this.forms[index]!.root.position;
+        ring.position.set(position.x, 0.005, position.z);
+      });
+      this.renderer.render(this.scene, this.camera);
+      this.projectLabels();
+      if (!this.ready) { this.ready = true; this.reportStatus("ready"); }
+      if (this.motion) this.invalidate();
+    } catch { this.dispose(); this.fail(); }
+  };
+
+  dispose = () => {
+    if (this.disposed) return;
+    this.save();
+    this.disposed = true;
+    if (this.animation !== null) cancelAnimationFrame(this.animation);
+    this.observer?.disconnect();
+    this.controls?.removeEventListener("change", this.invalidate);
+    this.controls?.removeEventListener("start", this.onOrbitStart);
+    this.controls?.removeEventListener("end", this.onOrbitEnd);
+    this.controls?.dispose();
+    const canvas = this.renderer.domElement;
+    canvas.removeEventListener("pointerdown", this.onPointerDown);
+    canvas.removeEventListener("pointermove", this.onPointerMove);
+    canvas.removeEventListener("pointerup", this.onPointerUp);
+    canvas.removeEventListener("pointercancel", this.onPointerCancel);
+    canvas.removeEventListener("pointerleave", this.onPointerLeave);
+    canvas.removeEventListener("webglcontextlost", this.onContextLost);
+    document.removeEventListener("visibilitychange", this.onVisibility);
+    this.taps.cancel();
+    this.environment?.dispose();
+    this.keyLight?.shadow.dispose();
+    disposeModel([...(this.ground ? [this.ground] : []), ...this.rings]);
+    this.renderer.dispose();
+    canvas.remove();
+  };
+}
+
+export default function PortraitScene(props: PortraitSceneProps) {
+  const host = useRef<HTMLDivElement>(null);
+  const labels = useRef<HTMLDivElement>(null);
+  const runtime = useRef<PortraitRuntime | null>(null);
+  const latest = useRef(props);
+  latest.current = props;
+  const [status, setStatus] = useState<SceneStatus>("loading");
+  const assetKey = JSON.stringify(props.assets.map(asset => [asset.chapterId, asset.url, asset.sha256, asset.sourceImageSha256]));
+
+  useLayoutEffect(() => {
+    runtime.current?.update(props);
+  });
+  // Controls must release document listeners and capture the camera before React detaches the canvas.
+  useLayoutEffect(() => () => runtime.current?.dispose(), []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let stopped = false;
+    const owned: LoadedForm[] = [];
+    setStatus("loading");
+    latest.current.onStatus("loading");
+    const failure = () => {
+      if (stopped) return;
+      controller.abort();
+      runtime.current?.dispose();
+      runtime.current = null;
+      disposeModel(owned.splice(0).flatMap(form => form.resources));
+      setStatus("unavailable");
+      latest.current.onStatus("unavailable");
+    };
+    const initialize = async () => {
+      try {
+        if (!latest.current.assets.length) throw new Error("Missing chapter models");
+        const forms = await Promise.all(latest.current.assets.map(async asset => {
+          const form = await loadForm(asset, controller.signal);
+          if (stopped || controller.signal.aborted) { disposeModel(form.resources); throw new Error("Model loading cancelled"); }
+          owned.push(form);
+          return form;
+        }));
+        if (stopped || !host.current || !labels.current) return;
+        runtime.current = new PortraitRuntime(host.current, labels.current, forms, latest.current, failure,
+          state => { if (!stopped) { setStatus(state); latest.current.onStatus(state); } });
+      } catch {
+        controller.abort();
+        if (!stopped) failure();
+      }
+    };
+    void initialize();
+    return () => {
+      stopped = true;
+      controller.abort();
+      runtime.current?.dispose();
+      runtime.current = null;
+      disposeModel(owned.flatMap(form => form.resources));
+    };
+  }, [assetKey]);
+
+  const facet = facets.find(item => item.id === props.facet)!;
+  return <div className="explorer-scene-renderer" style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div className="explorer-canvas-host" ref={host} style={{ position: "absolute", inset: 0 }} />
+    <div className="explorer-labels" ref={labels} style={{ position: "absolute", inset: 0, pointerEvents: "none", visibility: status === "ready" ? "visible" : "hidden" }}>
+      {props.assets.map((asset, index) => {
+        const chapter = props.chapters.find(item => item.id === asset.chapterId);
+        if (!chapter) return null;
+        const selected = props.selectedIds.includes(chapter.id);
+        const annotation = selected && chapter.id === props.selectedIds[0];
+        return <button key={chapter.id} type="button" data-form-index={index} data-selected={selected} data-active-passage={annotation && props.activePassage !== null ? props.activePassage : undefined}
+          className={annotation ? "explorer-annotation" : "explorer-chapter-label"}
+          style={{ position: "absolute", top: 0, left: 0, minWidth: 44, minHeight: 44, pointerEvents: "auto" }}
+          aria-label={annotation ? `${facet.label}: show source passage${props.activePassage === null ? "" : ` ${props.activePassage + 1}`} for ${chapter.title}` : `Explore chapter ${chapter.ordinal}: ${chapter.title}`}
+          aria-pressed={annotation ? undefined : selected}
+          onFocus={() => runtime.current?.highlight(chapter.id)} onBlur={() => runtime.current?.highlight(null)}
+          onPointerEnter={() => runtime.current?.highlight(chapter.id)} onPointerLeave={() => runtime.current?.highlight(null)}
+          onClick={() => annotation ? props.onAnnotation() : props.onSelect(chapter.id)}>
+          {annotation ? <><span aria-hidden="true">●</span> {facet.label}{props.activePassage !== null && <span className="explorer-passage-number"> · {props.activePassage + 1}</span>}</> : <><span className="explorer-label-ordinal">Chapter {chapter.ordinal}</span><span className="explorer-label-title">{chapter.title}</span></>}
+        </button>;
+      })}
+    </div>
+  </div>;
+}

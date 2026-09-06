@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fictional fixture geometry inspection</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #eee8dc; color: #183e35; font-family: system-ui, sans-serif; }
+      h1 { margin: 24px; font: 30px Georgia, serif; }
+      p { margin: 12px 24px; }
+      #views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #c7c3b8; }
+      figure { margin: 0; background: #07151b; }
+      img { width: 100%; display: block; }
+      figcaption { padding: 10px 14px; color: #f2e5c9; font-size: 13px; }
+    </style>
+    <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+  </head>
+  <body>
+    <h1>Authored fictional fixture: geometry inspection</h1>
+    <p id="status">Loading source-bound GLB files…</p>
+    <main id="views"></main>
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setSize(600, 510);
+      renderer.setPixelRatio(1);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.85;
+      const environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.035).texture;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color("#07151b");
+      scene.environment = environment;
+      const sky = new THREE.HemisphereLight(0xf5dfb5, 0x466070, 0.6);
+      scene.add(sky);
+      const key = new THREE.DirectionalLight(0xffe0b4, 2);
+      key.position.set(-3, 5, 4);
+      scene.add(key);
+      const rim = new THREE.DirectionalLight(0xb7dcf2, 1);
+      rim.position.set(4, 3, -3);
+      scene.add(rim);
+      const camera = new THREE.PerspectiveCamera(33, 600 / 510, 0.05, 30);
+      const views = [
+        ["Front", [0, 0.1, 4.4]],
+        ["Rear", [0, 0.1, -4.4]],
+        ["Left", [-4.4, 0.1, 0]],
+        ["Right", [4.4, 0.1, 0]],
+        ["Front three-quarter", [3.2, 2.2, 3.2]],
+        ["Rear three-quarter", [-3.2, 2.2, -3.2]],
+        ["Elevated", [0, 4.4, 0.4]],
+        ["Underside", [0, -4.4, 0.4]],
+      ];
+      const models = await Promise.all(["compass", "bench", "rope", "spyglass"].map(async (name) => ({
+        name,
+        model: (await new GLTFLoader().loadAsync(`/apps/web/public/portrait-explorer/${name}.glb`)).scene,
+      })));
+      for (const [label, position] of views) for (const { name, model } of models) {
+        scene.add(model);
+        camera.position.set(...position);
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+        const figure = document.createElement("figure");
+        const image = document.createElement("img");
+        image.alt = `${name}: ${label}`;
+        image.src = renderer.domElement.toDataURL("image/png");
+        const caption = document.createElement("figcaption");
+        caption.textContent = `${name} · ${label}`;
+        figure.append(image, caption);
+        document.querySelector("#views").append(figure);
+        scene.remove(model);
+      }
+      document.querySelector("#status").textContent = "32 views rendered: front, rear, both sides, both three-quarter views, above, and below. These are authored fictional fixtures, not automatic image reconstructions.";
+      document.body.dataset.ready = "true";
+      window.fixtureInspection = { renderer, scene, camera, models };
+    </script>
+  </body>
+</html>
