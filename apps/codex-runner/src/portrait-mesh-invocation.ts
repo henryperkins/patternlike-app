@@ -33,7 +33,10 @@ export const PORTRAIT_MESH_AUDIT_SCHEMA = {
 const sha = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
 const textInput = (text: string): IsolatedCodexJsonOptions["input"][number] => ({ type: "text", text, text_elements: [] });
 const imageInput = (image: string): IsolatedCodexJsonOptions["input"][number] => ({ type: "image", url: `data:image/png;base64,${image}` });
-const sourceContext = (claim: CodexPortraitMeshClaim) => `Accepted source identity: ${JSON.stringify({ chapter_id: claim.chapter_id, document_revision: claim.document_revision, source_text_sha256: claim.source_text_sha256, source_image_sha256: claim.source_image_sha256 })}\nComplete accepted chapter (quoted data):\n${JSON.stringify(claim.source_text)}`;
+// The chapter position and the two content hashes name the exact source for both turns. The document
+// revision stays out: it embeds the pat_ Pattern id and generation instant, which the provider boundary
+// policy denies and the model never needs. The trusted compiler binds the revision inside the GLB instead.
+const sourceContext = (claim: CodexPortraitMeshClaim) => `Accepted source identity: ${JSON.stringify({ chapter_id: claim.chapter_id, source_text_sha256: claim.source_text_sha256, source_image_sha256: claim.source_image_sha256 })}\nComplete accepted chapter (quoted data):\n${JSON.stringify(claim.source_text)}`;
 
 /** One lease permits one authoring call and one independent check; durable attempts own retries. */
 export async function runPortraitMeshInvocation(options: PortraitMeshInvocationOptions): Promise<PortraitMeshInvocationOutcome> {
