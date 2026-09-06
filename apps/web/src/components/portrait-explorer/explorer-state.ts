@@ -83,7 +83,12 @@ function hasReturnContext(state: ExplorerState): boolean {
 
 function back(state: ExplorerState): ExplorerState {
   const previous = state.past.at(-1);
-  return previous ? { ...state, ...previous, past: state.past.slice(0, -1) } : state;
+  if (!previous) return state;
+  // Closing a presentation keeps the reader's choices. Comparison, guidance,
+  // and image inspection still undo to their exact originating snapshot.
+  const choices = !state.inspectImage && previous.presentation !== state.presentation
+    ? { view: state.view, facets: state.facets, passages: state.passages, unfolded: state.unfolded } : {};
+  return { ...state, ...previous, ...choices, past: state.past.slice(0, -1) };
 }
 
 export function explorerReducer(state: ExplorerState, action: ExplorerAction): ExplorerState {

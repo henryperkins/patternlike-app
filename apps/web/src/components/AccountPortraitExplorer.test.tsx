@@ -9,7 +9,7 @@ import { AccountPortraitExplorer } from "./AccountPortraitExplorer.js";
 import { PortraitExplorer } from "./portrait-explorer/PortraitExplorer.js";
 vi.mock("../lib/api-client.js", async (original) => ({ ...await original<typeof import("../lib/api-client.js")>(), getPatternPortraitExplorer: vi.fn(), getPatternPortraitImage: vi.fn(), getPatternPortraitModel: vi.fn(), downloadPatternPortraitExplorer: vi.fn() }));
 vi.mock("./PortraitAutomationControl.js", () => ({ PortraitAutomationControl: ({ onChanged, canEnable }: { onChanged: () => void; canEnable?: boolean }) => <button data-testid="automation-control" data-can-enable={String(canEnable)} onClick={onChanged}>Optional automation choice</button> }));
-vi.mock("./portrait-explorer/PortraitExplorer.js", () => ({ PortraitExplorer: vi.fn(() => <div>Personal interactive explorer</div>) }));
+vi.mock("./portrait-explorer/PortraitExplorer.js", () => ({ PortraitExplorer: vi.fn(({ navigation }: { navigation: { close: () => void } }) => <section id="portrait-start" tabIndex={-1} aria-label="Pattern portrait explorer">Personal interactive explorer<button onClick={navigation.close}>Back to reading</button></section>) }));
 const document: PatternResponseV7 = {
   schema_version: "0.7.0", pattern_id: "pat_account", generated_at: "2026-09-05T12:00:00Z", locale: "en-US", effective_accuracy: "exact",
   provenance: { assembly_mode: "constrained_model", provider: "OpenAI", model_family: "gpt", raw_birth_details_sent: false },
@@ -56,6 +56,8 @@ const modelBlobs = new Map<string, Blob>();
 function show(overrides: Partial<typeof props> = {}) { return render(<AccountPortraitExplorer {...props} {...overrides}><p>Complete written reading</p></AccountPortraitExplorer>); }
 beforeEach(() => {
   vi.clearAllMocks(); modelBlobs.clear(); vi.stubGlobal("crypto", webcrypto); vi.stubGlobal("Blob", NodeBlob);
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  window.history.replaceState({ route: "pattern" }, "");
   let serial = 0;
   vi.stubGlobal("URL", class extends URL { static createObjectURL = vi.fn(() => `blob:http://localhost/${++serial}`); static revokeObjectURL = vi.fn(); });
   vi.mocked(getPatternPortraitExplorer).mockResolvedValue(saved());
@@ -128,6 +130,19 @@ describe("automated account portrait delivery", () => {
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
 
+  it("can cancel stalled asset loading and return to the original account history entry", async () => {
+    vi.mocked(getPatternPortraitModel).mockReturnValue(new Promise(() => undefined));
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await waitFor(() => expect(getPatternPortraitModel).toHaveBeenCalledTimes(4));
+    const signal = vi.mocked(getPatternPortraitModel).mock.calls[0][1]!;
+    await userEvent.click(screen.getByRole("button", { name: "Cancel portrait loading" }));
+    expect(signal.aborted).toBe(true);
+    expect(screen.getByRole("button", { name: "Explore your 3D portrait" })).toBeEnabled();
+    expect(screen.getByText("Complete written reading").parentElement).toHaveFocus();
+    await waitFor(() => expect(window.history.state).toEqual({ route: "pattern" }));
+  });
+
   it.each(["not_started", "generating", "failed"] as const)("keeps saved images and the legacy view available while mesh status is %s", async (status) => {
     vi.mocked(getPatternPortraitExplorer).mockResolvedValue({ ...saved(), status, completed_models: 2, models: [] });
     show({ canCreate: false });
@@ -136,11 +151,13 @@ describe("automated account portrait delivery", () => {
     expect(screen.getByTestId("automation-control")).toHaveAttribute("data-can-enable", "false");
   });
 
-  it("moves focus with views and discards private cached artifacts when a status refresh fails", async () => {
+  it("reveals and focuses the explorer after hydration and returns to reading when a status refresh fails", async () => {
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
     const explorer = await screen.findByText("Personal interactive explorer");
-    await waitFor(() => expect(explorer.parentElement).toHaveFocus());
+    await waitFor(() => expect(explorer).toHaveFocus());
+    expect(vi.mocked(explorer.scrollIntoView).mock.contexts).toContain(explorer);
+    expect(explorer.scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "start" });
     vi.mocked(getPatternPortraitExplorer).mockRejectedValueOnce(new Error("Refresh failed."));
     await userEvent.click(screen.getByTestId("automation-control"));
     expect(await screen.findByRole("alert")).toHaveTextContent("Refresh failed.");

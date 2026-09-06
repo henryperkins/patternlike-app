@@ -6,6 +6,7 @@ import { nativeImageBindings, nativePattern } from "../../preview/native-image-s
 import { createPortraitManifest } from "../../lib/pattern-portrait.js";
 import type { PortraitMeshBundle, PortraitSceneProps } from "./types.js";
 import { PortraitExplorer } from "./PortraitExplorer.js";
+import { useExplorerNavigation } from "./use-explorer-navigation.js";
 
 const scene = vi.hoisted(() => ({ props: null as PortraitSceneProps | null }));
 vi.mock("./PortraitScene.js", () => ({ default: (props: PortraitSceneProps) => {
@@ -24,13 +25,171 @@ beforeEach(() => {
   window.history.replaceState(null, "");
   scene.props = null;
 });
-function mount() { return render(<PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} />); }
+function mount(mobile = false) {
+  const view = render(<PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} />);
+  if (mobile) {
+    document.querySelector<HTMLElement>(".explorer-mobile-modes")!.style.display = "flex";
+    const bounds = HTMLElement.prototype.getBoundingClientRect;
+    // jsdom has no layout. Model a chapter well below the account page's top.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.matches(".explorer-reader h2") ? new DOMRect(20, 3600 - window.scrollY, 350, 80) : bounds.call(this);
+    });
+  }
+  return view;
+}
 async function chapter(user: ReturnType<typeof userEvent.setup>, ordinal = 1) {
   const navigation = screen.getByRole("navigation", { name: "Pattern chapters" });
   await user.click(within(navigation).getByRole("button", { name: new RegExp(`^${ordinal}\\.`) }));
 }
 
 describe("Portrait exploration", () => {
+  it("embeds in the account landmark with a local exit and no duplicate page heading", async () => {
+    function Account() {
+      const navigation = useExplorerNavigation(manifest.chapters.map((item) => item.id), { embedded: true });
+      return <main><h1>Your Pattern</h1>{navigation.isOpen
+        ? <PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} navigation={navigation} />
+        : <button onClick={navigation.open}>Open portrait</button>}</main>;
+    }
+    const user = userEvent.setup(); render(<Account />);
+    await user.click(screen.getByRole("button", { name: "Open portrait" }));
+    await screen.findByTestId("scene");
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    const explorer = screen.getByRole("region", { name: "Pattern portrait explorer" });
+    await user.click(within(explorer).getByRole("button", { name: /^Full reading/ }));
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByText(nativePattern.core_chapters[3].counter_expression.text)).toBeInTheDocument();
+    await user.click(within(explorer).getByRole("button", { name: "Back to reading" }));
+    expect(screen.getByRole("button", { name: "Open portrait" })).toBeInTheDocument();
+  });
+
+  it("owns browser scroll restoration only while the explorer is mounted", () => {
+    window.history.scrollRestoration = "auto";
+    const view = mount();
+    expect(window.history.scrollRestoration).toBe("manual");
+    view.unmount();
+    expect(window.history.scrollRestoration).toBe("auto");
+  });
+
+  it("focuses the chapter heading on first reading entry without scrolling the containing page to zero", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    vi.stubGlobal("scrollY", 3200);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    const heading = within(screen.getByRole("complementary", { name: "Chapter reading" })).getByRole("heading", { level: 2 });
+    expect(heading).toHaveFocus();
+    expect(vi.mocked(heading.scrollIntoView).mock.contexts).toContain(heading);
+    expect(window.scrollTo).not.toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+  });
+
+  it("brings the next chapter heading into view from the bottom of the mobile reader", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    vi.stubGlobal("scrollY", 4200);
+    vi.mocked(HTMLElement.prototype.scrollIntoView).mockClear();
+    await user.click(screen.getByRole("button", { name: /^Next chapter/ }));
+    const heading = within(screen.getByRole("complementary", { name: "Chapter reading" })).getByRole("heading", { level: 2 });
+    expect(heading).toHaveTextContent(nativePattern.core_chapters[1].title);
+    expect(heading).toHaveFocus();
+    expect(vi.mocked(heading.scrollIntoView).mock.contexts).toContain(heading);
+  });
+
+  it("keeps new reading choices when browser Back returns to the scene", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    await user.click(screen.getByRole("button", { name: /^Next chapter/ }));
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    act(() => window.history.back());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
+    expect(scene.props?.selectedIds).toEqual(["chapter-2"]);
+    expect(scene.props?.facet).toBe("resources");
+  });
+
+  it("keeps keyboard focus inside comparison when its controls are replaced", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    const selector = screen.getByRole("combobox", { name: "Compare with another chapter" });
+    selector.focus();
+    await user.selectOptions(selector, "chapter-2");
+    expect(screen.getByRole("button", { name: "End comparison" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Compare with another chapter" })).toHaveFocus());
+  });
+
+  it("restores comparison controls when native Back removes the focused exit", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    act(() => window.history.back());
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Compare with another chapter" })).toHaveFocus());
+  });
+
+  it("keeps pointer selection focused on the chapter rail inside reading mode", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    await chapter(user, 2);
+    expect(within(screen.getByRole("navigation", { name: "Pattern chapters" })).getByRole("button", { name: /^2\./ })).toHaveFocus();
+  });
+
+  it("focuses the new chapter when the introductory control disappears", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
+    await user.click(screen.getByRole("button", { name: "Explore the first chapter" }));
+    expect(document.activeElement).toHaveTextContent(nativePattern.core_chapters[0].title);
+    expect(document.activeElement?.tagName).toBe("H2");
+  });
+
+  it("remembers reading scroll on return and starts a different chapter at its heading", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    vi.stubGlobal("scrollY", 3200);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    vi.stubGlobal("scrollY", 3820);
+    await user.click(screen.getByRole("button", { name: "Return to portrait" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 3200, behavior: "instant" });
+    vi.stubGlobal("scrollY", 3200);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 3820, behavior: "instant" });
+    await user.click(screen.getByRole("button", { name: "Return to portrait" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
+    await chapter(user, 2);
+    vi.mocked(window.scrollTo).mockClear();
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(document.activeElement).toHaveTextContent(nativePattern.core_chapters[1].title);
+  });
+
+  it("remembers reading scroll when the browser Back action leaves the reader", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    vi.stubGlobal("scrollY", 3820);
+    act(() => { window.dispatchEvent(new Event("scroll")); window.history.back(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 3820, behavior: "instant" });
+  });
+
+  it("restores the same source position when the layout above the chapter changes", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    vi.stubGlobal("scrollY", 3820);
+    await user.click(screen.getByRole("button", { name: "Return to portrait" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
+    const heading = within(screen.getByRole("complementary", { name: "Chapter reading" })).getByRole("heading", { level: 2 });
+    heading.getBoundingClientRect = () => new DOMRect(20, 3720 - window.scrollY, 350, 80);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 3940, behavior: "instant" });
+  });
+
+  it.each(["passage", "next chapter"])("focuses a visible %s when returning to a saved reading position", async (kind) => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    vi.stubGlobal("scrollY", 3820);
+    await user.click(screen.getByRole("button", { name: "Return to portrait" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
+    const target = kind === "passage" ? screen.getByText(nativePattern.core_chapters[0].sections[0].text)
+      : screen.getByRole("button", { name: /^Next chapter/ });
+    target.getBoundingClientRect = () => new DOMRect(20, 90, 350, 160);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(target).toHaveFocus();
+  });
+
   it("identifies a personal source-bound explorer as a private portrait", async () => {
     const bindings = nativeImageBindings.map((binding, index) => ({ ...binding, object: { ...binding.object, imageUrl: `blob:private-image-${index}` } }));
     const personal: PortraitMeshBundle = { ...bundle, authoring: "codex-parametric/v1", assets: bundle.assets.map((asset, index) => ({ ...asset, url: `blob:private-model-${index}`, provenance: {
@@ -166,7 +325,7 @@ describe("Portrait exploration", () => {
     const expanded = screen.getByRole("dialog", { name: "Expanded portrait scene" });
     within(expanded).getByRole("button", { name: /^4\./ }).focus();
     await user.tab();
-    expect(within(expanded).getByRole("button", { name: "Whole portrait" })).toHaveFocus();
+    expect(within(expanded).getByRole("button", { name: "Close expanded scene" })).toHaveFocus();
     await user.tab({ shift: true });
     expect(within(expanded).getByRole("button", { name: /^4\./ })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Close expanded scene" }));

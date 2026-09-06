@@ -421,6 +421,7 @@ class PortraitRuntime {
     this.keyLight?.shadow.dispose();
     disposeModel([...(this.ground ? [this.ground] : []), ...this.rings]);
     this.renderer.dispose();
+    if (!this.renderer.getContext().isContextLost()) this.renderer.forceContextLoss();
     canvas.remove();
   };
 }

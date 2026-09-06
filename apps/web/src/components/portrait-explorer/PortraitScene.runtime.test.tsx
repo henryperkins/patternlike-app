@@ -6,13 +6,22 @@ import { BufferGeometry, type Camera, type Scene } from "three";
 import PortraitScene from "./PortraitScene.js";
 import type { PortraitSceneProps } from "./types.js";
 
-const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, position: [] as number[], extent: [Infinity, -Infinity] }));
+const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity] }));
 // jsdom has no GPU. Keep the real loader, camera, mesh, controls and lifecycle.
 vi.mock("three", async importOriginal => {
   const original = await importOriginal<typeof import("three")>();
   return { ...original, WebGLRenderer: class {
     domElement = document.createElement("canvas");
     shadowMap = { enabled: false, type: 0, needsUpdate: false };
+    constructor() {
+      gpu.contexts.add(this.domElement);
+      this.domElement.addEventListener("webglcontextlost", () => gpu.contexts.delete(this.domElement));
+    }
+    getContext() { return { isContextLost: () => !gpu.contexts.has(this.domElement) }; }
+    forceContextLoss() {
+      gpu.contextLosses++;
+      this.domElement.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    }
     setClearColor() {}
     setPixelRatio() {}
     setSize() {}
@@ -54,6 +63,8 @@ function props(): PortraitSceneProps {
 beforeEach(() => {
   gpu.renders = 0;
   gpu.disposals = 0;
+  gpu.contextLosses = 0;
+  gpu.contexts.clear();
   gpu.position = [];
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
@@ -73,6 +84,19 @@ it("restores actual camera coordinates without replaying the last command, and s
   expect(saved[1].position[0]).toBeCloseTo(2, 8);
   expect(saved[1].target).toEqual([0, 1, 0]);
   expect(gpu.disposals).toBe(1);
+});
+
+it("leaves no live WebGL contexts after repeated scene teardown", async () => {
+  for (let cycle = 0; cycle < 3; cycle++) {
+    const callbacks = props();
+    const view = render(<PortraitScene {...callbacks} />);
+    await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"));
+    expect(gpu.contexts.size).toBe(1);
+    view.unmount();
+    expect(gpu.contexts.size).toBe(0);
+    expect(callbacks.onStatus).not.toHaveBeenCalledWith("unavailable");
+  }
+  expect(gpu.contextLosses).toBe(3);
 });
 
 it("keeps a reading-only facet change at the same camera pose, then stops drawing at idle", async () => {
@@ -116,6 +140,8 @@ it("releases the canvas and loaded geometry on graphics loss while leaving the r
   expect(screen.getByText("Complete published reading")).toBeVisible();
   expect(dispose.mock.calls.length).toBeGreaterThan(before);
   expect(gpu.disposals).toBe(1);
+  expect(gpu.contexts.size).toBe(0);
+  expect(gpu.contextLosses).toBe(0);
 });
 
 it("frames models inside the unobscured viewport above the real toolbar", async () => {

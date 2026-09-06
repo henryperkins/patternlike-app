@@ -28,17 +28,20 @@ interface ReaderProps {
   onPassage: (index: number) => void;
   passageRef: (index: number, element: HTMLParagraphElement | null) => void;
   graphicsAvailable: boolean;
+  embedded?: boolean;
 }
-export function ExplorerReader({ chapters, chapterCount, facet, activePassage, onFacet, onPassage, passageRef, graphicsAvailable }: ReaderProps) {
+export function ExplorerReader({ chapters, chapterCount, facet, activePassage, onFacet, onPassage, passageRef, graphicsAvailable, embedded = false }: ReaderProps) {
   const panelId = useId();
   const compare = chapters.length === 2;
+  const Heading = embedded ? "h3" : "h2";
+  const ChapterHeading = embedded ? "h4" : "h3";
   return <>
-    {!compare && <><p className="explorer-eyebrow">Chapter {chapters[0].ordinal} of {chapterCount}</p><h2>{chapters[0].title}</h2><p className="explorer-summary">{chapters[0].summary}</p></>}
-    {compare && <><p className="explorer-eyebrow">Two chapters, side by side</p><h2>Read them together</h2><p className="explorer-summary">Explore the same perspective in each chapter.</p></>}
+    {!compare && <><p className="explorer-eyebrow">Chapter {chapters[0].ordinal} of {chapterCount}</p><Heading data-reader-heading tabIndex={-1}>{chapters[0].title}</Heading><p className="explorer-summary">{chapters[0].summary}</p></>}
+    {compare && <><p className="explorer-eyebrow">Two chapters, side by side</p><Heading data-reader-heading tabIndex={-1}>Read them together</Heading><p className="explorer-summary">Explore the same perspective in each chapter.</p></>}
     <FacetTabs facet={facet} onChange={onFacet} panelId={panelId} />
     <div id={panelId} role="tabpanel" tabIndex={0} aria-labelledby={`${panelId}-${facet}`} className={compare ? "explorer-passages explorer-comparison" : "explorer-passages"}>
       {chapters.map((chapter, column) => <section key={chapter.id} aria-label={compare ? chapter.title : undefined}>
-        {compare && <><h3>{chapter.title}</h3><p className="explorer-summary">{chapter.summary}</p></>}
+        {compare && <><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-summary">{chapter.summary}</p></>}
         {chapterPassages(chapter, facet).map((text, index) => <div className="explorer-passage" data-active={column === 0 && index === activePassage} key={`${facet}-${index}`}>
           <p tabIndex={-1} ref={column === 0 ? (element) => passageRef(index, element) : undefined}>{text}</p>
           {!compare && <button className="explorer-text-button" disabled={!graphicsAvailable} aria-label={`Show passage ${index + 1} in portrait`} onClick={() => onPassage(index)}>Show in portrait <span aria-hidden="true">↗</span></button>}
@@ -48,14 +51,17 @@ export function ExplorerReader({ chapters, chapterCount, facet, activePassage, o
   </>;
 }
 
-export function CompleteReading({ manifest }: { manifest: PortraitManifest }) {
+export function CompleteReading({ manifest, embedded = false }: { manifest: PortraitManifest; embedded?: boolean }) {
+  const Heading = embedded ? "h2" : "h1";
+  const ChapterHeading = embedded ? "h3" : "h2";
+  const FacetHeading = embedded ? "h4" : "h3";
   return <section className="explorer-complete" aria-label="Complete Pattern reading">
-    <p className="explorer-eyebrow">Your Pattern · complete reading</p><h1>{manifest.chapters.length === 4 ? "Four chapters. One portrait." : "Your complete Pattern."}</h1>
+    <p className="explorer-eyebrow">Your Pattern · complete reading</p><Heading>{manifest.chapters.length === 4 ? "Four chapters. One portrait." : "Your complete Pattern."}</Heading>
     {manifest.uncertainty && <p className="explorer-uncertainty">{manifest.uncertainty}</p>}
-    {manifest.chapters.map((chapter) => <article key={chapter.id} data-reading-chapter={chapter.id} tabIndex={-1}><p className="explorer-eyebrow">Chapter {chapter.ordinal}</p><h2>{chapter.title}</h2><p className="explorer-summary">{chapter.summary}</p>
-      {facets.map(({ id, label }) => <section key={id}><h3>{label}</h3>{chapterPassages(chapter, id).map((text, index) => <p key={index}>{text}</p>)}</section>)}
+    {manifest.chapters.map((chapter) => <article key={chapter.id} data-reading-chapter={chapter.id} tabIndex={-1}><p className="explorer-eyebrow">Chapter {chapter.ordinal}</p><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-summary">{chapter.summary}</p>
+      {facets.map(({ id, label }) => <section key={id}><FacetHeading>{label}</FacetHeading>{chapterPassages(chapter, id).map((text, index) => <p key={index}>{text}</p>)}</section>)}
     </article>)}
-    {manifest.signatures.length > 0 && <section><h2>Additional signatures</h2>{manifest.signatures.map((signature, index) => <article key={index}><h3>{signature.title}</h3><p>{signature.text}</p></article>)}</section>}
+    {manifest.signatures.length > 0 && <section><ChapterHeading>Additional signatures</ChapterHeading>{manifest.signatures.map((signature, index) => <article key={index}><FacetHeading>{signature.title}</FacetHeading><p>{signature.text}</p></article>)}</section>}
     <p className="explorer-image-source">Source revision: {manifest.revision}</p>
   </section>;
 }

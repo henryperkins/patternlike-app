@@ -6,6 +6,7 @@ import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument, type PortraitObjectBinding } from "../lib/pattern-portrait.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { PortraitExplorer } from "./portrait-explorer/PortraitExplorer.js";
+import { useExplorerNavigation } from "./portrait-explorer/use-explorer-navigation.js";
 import type { PortraitMeshAsset, PortraitMeshBundle } from "./portrait-explorer/types.js";
 
 interface Props {
@@ -44,7 +45,8 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   const [useLegacy, setUseLegacy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), { embedded: true });
+  const { isOpen: open, open: openExplorer, close: closeExplorer } = navigation;
   const [loaded, setLoaded] = useState<LoadedPortrait | null>(null);
   const [assetError, setAssetError] = useState(false);
   const [assetAttempt, setAssetAttempt] = useState(0);
@@ -57,6 +59,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   const artifactIdentity = useRef<string | null>(null);
   const contentElement = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef(false);
+  const previousOpen = useRef(open);
   const opened = useRef(open); opened.current = open;
   const discardArtifacts = useCallback(() => {
     assetRequest.current?.abort(); assetRequest.current = null;
@@ -65,8 +68,8 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   }, []);
   const returnToReading = useCallback(() => {
     if (opened.current) pendingFocus.current = true;
-    setOpen(false); discardArtifacts();
-  }, [discardArtifacts]);
+    closeExplorer(); discardArtifacts();
+  }, [closeExplorer, discardArtifacts]);
   const refresh = useCallback(() => setAttempt((value) => value + 1), []);
   const report = useCallback((cause: unknown) => {
     if (cause instanceof ApiError && cause.status === 401) { returnToReading(); onUnauthorized(); }
@@ -164,8 +167,12 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
 
   const showingExplorer = Boolean(open && saved && loaded?.identity === identity);
   useLayoutEffect(() => {
+    if (previousOpen.current !== open) pendingFocus.current = true;
+    previousOpen.current = open;
     if (!pendingFocus.current || (open && !showingExplorer)) return;
-    contentElement.current?.focus({ preventScroll: true });
+    const target = showingExplorer ? contentElement.current?.querySelector<HTMLElement>("#portrait-start") : contentElement.current;
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ behavior: "instant", block: "start" });
     pendingFocus.current = false;
   }, [open, showingExplorer, useLegacy]);
 
@@ -182,14 +189,15 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
       {response?.status === "failed" && <><p role="status">Your 3D portrait could not be completed. {response.completed_models} of 4 models are saved.</p><p>Your complete reading remains available. Saved images and completed models are retained.</p></>}
       {saved && <>
         <p>Your four objects are saved privately with this Pattern. Exploring them reuses the saved models.</p>
-        <div className="account-portrait__actions"><button type="button" className="button" aria-expanded={open} onClick={() => { pendingFocus.current = true; setOpen((value) => !value); }}>{open ? "Back to reading" : "Explore your 3D portrait"}</button>
+        <div className="account-portrait__actions"><button type="button" className="button button--primary" aria-expanded={open} disabled={open} onClick={() => { pendingFocus.current = true; openExplorer(); }}>{open ? "Portrait open" : "Explore your 3D portrait"}</button>
           <button type="button" className="button button--secondary" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download complete portrait"}</button></div>
         <p className="account-portrait__detail">The private download includes your complete reading, four images, four 3D models, and their saved source records. It is separate from your account data export.</p>
       </>}
       {error && <div role="alert"><p>{error}</p><button type="button" className="button button--secondary" onClick={refresh}>Refresh portrait status</button></div>}
       {open && saved && loaded?.identity !== identity && (assetError ? <p role="alert">Your saved portrait could not be loaded. Your reading is still available. <button type="button" onClick={() => setAssetAttempt((value) => value + 1)}>Retry portrait loading</button></p> : <p role="status">Loading your saved images and 3D models.</p>)}
+      {open && !showingExplorer && <button type="button" className="button button--secondary" onClick={closeExplorer}>Cancel portrait loading</button>}
     </section>
-    <div ref={contentElement} tabIndex={-1}>{showingExplorer && loaded ? <PortraitExplorer source={source} objectBindings={loaded.bindings} meshBundle={loaded.bundle} />
+    <div ref={contentElement} tabIndex={-1}>{showingExplorer && loaded ? <PortraitExplorer source={source} objectBindings={loaded.bindings} meshBundle={loaded.bundle} navigation={navigation} />
       : response?.portrait.status === "ready" && !saved ? legacy : children}</div>
   </>;
 }

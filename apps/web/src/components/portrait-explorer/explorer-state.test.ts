@@ -35,11 +35,17 @@ describe("portrait explorer navigation", () => {
     expect(explorerReducer(changed, { type: "back" })).toEqual(origin);
   });
 
-  it.each(["reading", "scene", "full"] as const)("restores %s presentation origin after navigating inside it", (presentation) => {
+  it.each(["reading", "scene", "full"] as const)("retains chapter choices when returning from %s", (presentation) => {
     const origin = act(createExplorerState(chapterIds), { type: "select", chapterId: "chapter-3" }, { type: "facet", facet: "alternative" }, { type: "unfold" });
     const expanded = act(origin, { type: "presentation", presentation }, { type: "select", chapterId: "chapter-4" }, { type: "facet", facet: "resources" });
     expect(expanded.presentation).toBe(presentation);
-    expect(explorerReducer(expanded, { type: "back" })).toEqual(origin);
+    const returned = explorerReducer(expanded, { type: "back" });
+    expect(returned.presentation).toBe("explore");
+    expect(selectedChapterIds(returned)).toEqual(["chapter-4"]);
+    expect(currentFacet(returned)).toBe("resources");
+    expect(returned.facets["chapter-3"]).toBe("alternative");
+    expect(returned.unfolded).toBe(true);
+    expect(returned.past).toEqual(origin.past);
   });
 
   it("restores nested image inspection to comparison before returning to its chapter", () => {
