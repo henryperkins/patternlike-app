@@ -6,6 +6,7 @@ import { AccountDataControls } from "./components/AccountDataControls.js";
 import { AppShell, type ViewId } from "./components/AppShell.js";
 import { ChartView } from "./components/ChartView.js";
 import { DeletionStatusView } from "./components/DeletionStatusView.js";
+import { HistoryView } from "./components/HistoryView.js";
 import { Icon } from "./components/icons.js";
 import { Onboarding } from "./components/Onboarding.js";
 import { PrivacyView } from "./components/PrivacyView.js";
@@ -55,7 +56,7 @@ type AuthState =
   | { status: "signed-in" }
   | { status: "signed-out"; error?: string | null };
 
-const viewIds = new Set<ViewId>(["today", "pattern", "timing", "travel", "privacy"]);
+const viewIds = new Set<ViewId>(["today", "history", "pattern", "timing", "travel", "privacy"]);
 type AppRoute = ViewId | "deletion-status";
 
 function currentView(): AppRoute {
@@ -484,6 +485,8 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
         preferenceSyncRevision={preferenceSyncRevision}
       />
     );
+  } else if (view === "history") {
+    content = <HistoryView onUnauthorized={handleSignedOut} />;
   } else if (view === "timing") {
     content = <TimingView onUnauthorized={handleSignedOut} />;
   } else if (view === "travel") {

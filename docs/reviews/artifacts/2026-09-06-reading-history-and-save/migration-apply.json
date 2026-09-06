@@ -1,0 +1,23 @@
+{
+  "migration": {
+    "id": 28,
+    "name": "0028_reading_saves.sql",
+    "applied_at": "2026-09-06 09:08:54"
+  },
+  "migration_count": 28,
+  "save_count": 0,
+  "users": 4,
+  "daily_readings": 37,
+  "reading_sources": 128,
+  "assertion_probe": 0,
+  "foreign_key_violations": 0,
+  "quick_check": "ok",
+  "pending_migrations": 0,
+  "before_bookmark": "000001e6-00000018-000050de-1367f38c0d994de14df0609cd4e72dad",
+  "after_bookmark": "000001e6-0000001c-000050de-cdaefaa3f4445ab7b7ad4959a8049c40",
+  "migration_sha256": "74ad6048d8c72c6c01a6973d2db282b60089f40480616be6173f90f1ed826e23",
+  "backup_bytes": 8488079,
+  "backup_sha256": "8e951c44bec97e04151b05faeb96c1df781abbcb81bb2595cc5bc45aa5e9c9c9",
+  "previous_worker_version": "f95ff574-29a5-42c8-957b-57832c5e6c62",
+  "previous_source_sha": "eccddccfc48b50231228730534a84bde4b7fa32e"
+}

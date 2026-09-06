@@ -15,6 +15,9 @@ import {
   downloadPatternPortraitExplorer,
   getAiSynthesisConsent,
   getReadingEvidence,
+  getReading,
+  getReadingSaveState,
+  listReadingHistory,
   getTiming,
   grantAiSynthesisConsent,
   grantAccountProcessingConsent,
@@ -22,6 +25,8 @@ import {
   isReadingEvidenceV5,
   revokeAiSynthesisConsent,
   revokeAccountProcessingConsent,
+  saveReading,
+  unsaveReading,
   type TimingFilters,
   type TimingResponse,
 } from "./api-client.js";
@@ -251,6 +256,51 @@ describe("publisher discrimination", () => {
 
     await expect(getReadingEvidence(V5_READING_ID)).resolves.toEqual(evidenceGraphV5);
     expect(capturedFor(path)[0]!.method).toBe("GET");
+  });
+});
+
+describe("reading history and Save transport", () => {
+  it("binds the required view and optional pagination in stable order", async () => {
+    const body = {
+      schema_version: "0.8.0",
+      view: "saved",
+      items: [],
+      next_cursor: null,
+    };
+    mockApiResponses({ "/v1/readings": { status: 200, body } });
+    const signal = new AbortController().signal;
+
+    await expect(listReadingHistory({ view: "saved", limit: 12, cursor: "opaque cursor" }, signal))
+      .resolves.toEqual(body);
+    const [request] = capturedFor("/v1/readings");
+    expect(request.search).toBe("?view=saved&limit=12&cursor=opaque+cursor");
+    expect(request.signal).toBe(signal);
+  });
+
+  it("reads detail and state, mutates Save without idempotency headers, and accepts 204", async () => {
+    const savePath = `/v1/readings/${V5_READING_ID}/save`;
+    const saved = {
+      schema_version: "0.8.0",
+      reading_id: V5_READING_ID,
+      saved: true,
+      saved_at: "2026-08-10T10:00:00.000Z",
+    };
+    mockApiResponses({
+      [`GET /v1/readings/${V5_READING_ID}`]: { status: 200, body: todayResponseV5 },
+      [`GET ${savePath}`]: { status: 200, body: saved },
+      [`PUT ${savePath}`]: { status: 200, body: saved },
+      [`DELETE ${savePath}`]: { status: 204, body: null },
+    });
+
+    await expect(getReading(V5_READING_ID)).resolves.toEqual(todayResponseV5);
+    await expect(getReadingSaveState(V5_READING_ID)).resolves.toEqual(saved);
+    await expect(saveReading(V5_READING_ID)).resolves.toEqual(saved);
+    await expect(unsaveReading(V5_READING_ID)).resolves.toBeUndefined();
+
+    const mutations = capturedFor(savePath).filter((request) => request.method !== "GET");
+    expect(mutations.map((request) => request.method)).toEqual(["PUT", "DELETE"]);
+    expect(mutations.every((request) => request.body === null)).toBe(true);
+    expect(mutations.every((request) => request.headers.get("idempotency-key") === null)).toBe(true);
   });
 });
 

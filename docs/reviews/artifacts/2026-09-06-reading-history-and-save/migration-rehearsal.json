@@ -1,0 +1,44 @@
+{
+  "sqlite_version": "3.46.1",
+  "backup_bytes": 8488079,
+  "backup_sha256": "8e951c44bec97e04151b05faeb96c1df781abbcb81bb2595cc5bc45aa5e9c9c9",
+  "existing_tables_preserved": 64,
+  "existing_table_row_counts_and_hashes_unchanged": true,
+  "foreign_key_violations": 0,
+  "quick_check": "ok",
+  "reading_saves_rows": 0,
+  "save_foreign_keys": [
+    [
+      0,
+      0,
+      "daily_readings",
+      "reading_id",
+      "id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+    ],
+    [
+      0,
+      1,
+      "daily_readings",
+      "user_id",
+      "user_id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+    ],
+    [
+      1,
+      0,
+      "users",
+      "user_id",
+      "id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+    ]
+  ],
+  "save_index": "CREATE INDEX idx_reading_saves_user_saved\n  ON reading_saves(user_id, saved_at DESC, reading_id DESC)",
+  "migration_sha256": "74ad6048d8c72c6c01a6973d2db282b60089f40480616be6173f90f1ed826e23"
+}

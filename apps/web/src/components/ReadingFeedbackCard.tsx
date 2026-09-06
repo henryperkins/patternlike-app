@@ -27,6 +27,7 @@ function resonanceLabel(value: FeedbackResonance): string {
 
 interface ReadingFeedbackCardProps {
   readingId: string;
+  onUnauthorized?: () => void;
 }
 
 /**
@@ -36,7 +37,10 @@ interface ReadingFeedbackCardProps {
  * reader already rejected. It does not feed the deterministic ranker —
  * `resonance_feedback` is not a ranking factor.
  */
-export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
+export function ReadingFeedbackCard({
+  readingId,
+  onUnauthorized,
+}: ReadingFeedbackCardProps) {
   const [existing, setExisting] = useState<ReadingFeedbackRecord | null>(null);
   const [resonance, setResonance] = useState<FeedbackResonance | "">("");
   const [note, setNote] = useState("");
@@ -44,17 +48,38 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const key = useRef<string | null>(null);
+  const epoch = useRef(0);
+  const loadController = useRef<AbortController | null>(null);
+  const mutationController = useRef<AbortController | null>(null);
+  const mutationPending = useRef(false);
+  const onUnauthorizedRef = useRef(onUnauthorized);
+  onUnauthorizedRef.current = onUnauthorized;
 
   useEffect(() => {
     const controller = new AbortController();
+    loadController.current = controller;
+    mutationController.current?.abort();
+    mutationPending.current = false;
+    const currentEpoch = ++epoch.current;
+    setExisting(null);
+    setResonance("");
+    setNote("");
+    setNoteOpen(false);
+    setBusy(false);
+    setProblem(null);
+    key.current = null;
     void (async () => {
       try {
         const record = await getReadingFeedback(readingId, controller.signal);
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || epoch.current !== currentEpoch) return;
         setExisting(record);
         setResonance(record.resonance);
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || epoch.current !== currentEpoch) return;
+        if (error instanceof ApiError && error.status === 401) {
+          onUnauthorizedRef.current?.();
+          return;
+        }
         if (error instanceof ApiError && error.status === 404) {
           setExisting(null);
           return;
@@ -63,12 +88,24 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
         setExisting(null);
       }
     })();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      mutationController.current?.abort();
+      mutationPending.current = false;
+      epoch.current += 1;
+    };
   }, [readingId]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!resonance || busy) return;
+    if (!resonance || mutationPending.current) return;
+    mutationPending.current = true;
+    loadController.current?.abort();
+    const controller = new AbortController();
+    mutationController.current?.abort();
+    mutationController.current = controller;
+    const currentEpoch = epoch.current;
+    const submittedResonance = resonance;
     setBusy(true);
     setProblem(null);
     key.current ??= newIdempotencyKey("web-reading-feedback");
@@ -77,16 +114,23 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
         readingId,
         { resonance, note: note.trim() || null },
         key.current,
+        controller.signal,
       );
+      if (controller.signal.aborted || epoch.current !== currentEpoch) return;
       key.current = null;
       setExisting({
         id: created.id,
         reading_id: created.reading_id,
-        resonance,
+        resonance: submittedResonance,
         relevance_labels: [],
         created_at: created.created_at,
       });
     } catch (error) {
+      if (controller.signal.aborted || epoch.current !== currentEpoch) return;
+      if (error instanceof ApiError && error.status === 401) {
+        onUnauthorizedRef.current?.();
+        return;
+      }
       setProblem(
         withRequestId(
           error instanceof Error
@@ -96,7 +140,10 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
         ),
       );
     } finally {
-      setBusy(false);
+      if (epoch.current === currentEpoch) {
+        mutationPending.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -111,7 +158,7 @@ export function ReadingFeedbackCard({ readingId }: ReadingFeedbackCardProps) {
       ) : (
         <form className="reading-feedback__form" onSubmit={(event) => void submit(event)}>
           <p className="reading-feedback__invite" id="reading-feedback-invite">
-            Optional. It never changes today's chapter.
+            Optional. It never changes the published chapter.
           </p>
           <fieldset
             className="reading-feedback__choices"

@@ -5,7 +5,13 @@ import type {
   ReadingParagraph,
 } from "@patternlike/reading-engine";
 import type { ParagraphEvidenceV5, ReadingEvidenceV5 } from "@patternlike/shared";
-import { M5_SCHEMA_VERSION, PARAGRAPH_ROLES_V5 } from "@patternlike/shared";
+import {
+  M5_SCHEMA_VERSION,
+  M8_SCHEMA_VERSION,
+  PARAGRAPH_ROLES_V5,
+  type ReadingHistoryResponse,
+  type ReadingHistoryView,
+} from "@patternlike/shared";
 import type { Env } from "../env.js";
 import { b64, decryptJson, type EncryptionContext } from "../crypto.js";
 import { loadUserKey, type UserIdentity } from "./users.js";
@@ -15,6 +21,10 @@ import {
   type StoredReading,
   type StoredReadingV3,
 } from "../services/stored-reading.js";
+import {
+  encodeReadingHistoryCursor,
+  type ReadingHistoryCursor,
+} from "../services/reading-history-cursor.js";
 
 /**
  * The read side of the daily-reading pipeline.
@@ -579,6 +589,198 @@ export async function loadPublishedReadingForDate(
   return { record: recordFrom(row), stored: decodeStoredReading(stored, row.id) };
 }
 
+/** One immutable readable revision, without Today's active-chart gate. */
+export async function loadReadableReadingById(
+  env: Env,
+  identity: UserIdentity,
+  readingId: string,
+): Promise<PublishedReading | null> {
+  const columns = await readingColumnsForSchema(env);
+  const row = await env.DB.prepare(
+    `SELECT ${columns}
+     FROM daily_readings
+     WHERE id = ? AND user_id = ?
+       AND reading_enc IS NOT NULL
+       AND status IN ('published', 'superseded', 'invalidated')`,
+  ).bind(readingId, identity.userId).first<ReadingRow>();
+  if (!row) return null;
+  if (row.reading_key_version === null || row.reading_nonce === null) {
+    throw new StoredReadingInvalidError(
+      "daily_readings.reading_enc",
+      row.id,
+      "readable row carries incomplete ciphertext metadata",
+    );
+  }
+  const { dek } = await loadUserKey(env, identity);
+  const stored = await decryptColumn<unknown>(
+    dek,
+    row.reading_enc!,
+    row.reading_key_version,
+    row.reading_nonce,
+    {
+      subject: identity.cryptoSubject,
+      field: "daily_readings.reading_enc",
+      recordId: row.id,
+    },
+  );
+  return { record: recordFrom(row), stored: decodeStoredReading(stored, row.id) };
+}
+
+interface ReadingHistoryRow extends ReadingRow {
+  saved_at: string | null;
+}
+
+export interface ListReadingHistoryInput {
+  view: ReadingHistoryView;
+  limit: number;
+  cursor: ReadingHistoryCursor | null;
+}
+
+const HISTORY_READING_COLUMNS = `r.id, r.user_id, r.local_date, r.release_version,
+       r.reading_key, r.chart_fingerprint, r.contract_id, r.assembly_mode, r.status,
+       r.revision, r.revision_reason, r.supersedes_reading_id, r.invalidated_at,
+       r.created_at, r.updated_at, r.reading_enc, r.reading_key_version, r.reading_nonce`;
+
+/** Owner-scoped canonical History or revision-specific Saved page. */
+export async function listReadingHistory(
+  env: Env,
+  identity: UserIdentity,
+  input: ListReadingHistoryInput,
+): Promise<ReadingHistoryResponse> {
+  const fetchLimit = input.limit + 1;
+  let rows: ReadingHistoryRow[];
+  if (input.view === "history") {
+    const cursor = input.cursor?.view === "history" ? input.cursor : null;
+    const result = await env.DB.prepare(
+      `WITH readable AS (
+         SELECT source.*,
+           ROW_NUMBER() OVER (
+             PARTITION BY source.local_date
+             ORDER BY
+               CASE source.status
+                 WHEN 'published' THEN 0
+                 WHEN 'invalidated' THEN 1
+                 WHEN 'superseded' THEN 2
+                 ELSE 3
+               END,
+               source.revision DESC,
+               source.id DESC
+           ) AS canonical_rank
+         FROM daily_readings source
+         WHERE source.user_id = ?
+           AND source.reading_enc IS NOT NULL
+           AND source.status IN ('published', 'invalidated', 'superseded')
+       )
+       SELECT ${HISTORY_READING_COLUMNS}, s.saved_at
+       FROM readable r
+       LEFT JOIN reading_saves s
+         ON s.user_id = r.user_id AND s.reading_id = r.id
+       WHERE r.canonical_rank = 1
+         AND (? IS NULL OR r.local_date < ? OR (r.local_date = ? AND r.id < ?))
+       ORDER BY r.local_date DESC, r.id DESC
+       LIMIT ?`,
+    ).bind(
+      identity.userId,
+      cursor?.local_date ?? null,
+      cursor?.local_date ?? null,
+      cursor?.local_date ?? null,
+      cursor?.reading_id ?? null,
+      fetchLimit,
+    ).all<ReadingHistoryRow>();
+    rows = result.results ?? [];
+  } else {
+    const cursor = input.cursor?.view === "saved" ? input.cursor : null;
+    const result = await env.DB.prepare(
+      `SELECT ${HISTORY_READING_COLUMNS}, s.saved_at
+       FROM reading_saves s
+       JOIN daily_readings r
+         ON r.id = s.reading_id AND r.user_id = s.user_id
+       WHERE s.user_id = ?
+         AND r.reading_enc IS NOT NULL
+         AND r.status IN ('published', 'invalidated', 'superseded')
+         AND (? IS NULL OR s.saved_at < ? OR (s.saved_at = ? AND r.id < ?))
+       ORDER BY s.saved_at DESC, r.id DESC
+       LIMIT ?`,
+    ).bind(
+      identity.userId,
+      cursor?.saved_at ?? null,
+      cursor?.saved_at ?? null,
+      cursor?.saved_at ?? null,
+      cursor?.reading_id ?? null,
+      fetchLimit,
+    ).all<ReadingHistoryRow>();
+    rows = result.results ?? [];
+  }
+
+  const hasMore = rows.length > input.limit;
+  const pageRows = hasMore ? rows.slice(0, input.limit) : rows;
+  const items: ReadingHistoryResponse["items"] = [];
+  if (pageRows.length > 0) {
+    const { dek } = await loadUserKey(env, identity);
+    for (const row of pageRows) {
+      if (
+        row.reading_enc === null
+        || row.reading_key_version === null
+        || row.reading_nonce === null
+      ) {
+        throw new StoredReadingInvalidError(
+          "daily_readings.reading_enc",
+          row.id,
+          "readable row carries incomplete ciphertext metadata",
+        );
+      }
+      const value = await decryptColumn<unknown>(
+        dek,
+        row.reading_enc,
+        row.reading_key_version,
+        row.reading_nonce,
+        {
+          subject: identity.cryptoSubject,
+          field: "daily_readings.reading_enc",
+          recordId: row.id,
+        },
+      );
+      const stored = decodeStoredReading(value, row.id);
+      items.push({
+        reading_id: row.id,
+        local_date: row.local_date,
+        revision: row.revision,
+        revision_reason: row.revision_reason,
+        status: row.status as "published" | "superseded" | "invalidated",
+        assembly_mode: row.assembly_mode,
+        headline: isStoredReadingV5(stored) ? stored.reading.headline : null,
+        saved: row.saved_at !== null,
+        saved_at: row.saved_at,
+        evidence_url: `/v1/readings/${row.id}/evidence`,
+      });
+    }
+  }
+
+  let nextCursor: string | null = null;
+  const last = hasMore ? pageRows.at(-1) : undefined;
+  if (last) {
+    nextCursor = input.view === "history"
+      ? encodeReadingHistoryCursor({
+          v: 1,
+          view: "history",
+          local_date: last.local_date,
+          reading_id: last.id,
+        })
+      : encodeReadingHistoryCursor({
+          v: 1,
+          view: "saved",
+          saved_at: last.saved_at!,
+          reading_id: last.id,
+        });
+  }
+  return {
+    schema_version: M8_SCHEMA_VERSION,
+    view: input.view,
+    items,
+    next_cursor: nextCursor,
+  };
+}
+
 /**
  * The discriminator between the route's two 404s, and nothing more.
  *
@@ -626,7 +828,9 @@ export async function loadReadingEvidence(
   const row = await env.DB.prepare(
     `SELECT ${columns}
      FROM daily_readings
-     WHERE id = ? AND user_id = ?`,
+     WHERE id = ? AND user_id = ?
+       AND reading_enc IS NOT NULL
+       AND status IN ('published', 'superseded', 'invalidated')`,
   )
     .bind(readingId, identity.userId)
     .first<ReadingRow>();

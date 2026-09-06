@@ -37,6 +37,7 @@ interface WhyThisDrawerProps {
   paragraphOrder: string[];
   onReload: () => void;
   onUnauthorized: () => void;
+  reloadLabel?: string;
 }
 
 function roleLabel(paragraph: ParagraphEvidence): string {
@@ -352,6 +353,7 @@ export function WhyThisDrawer({
   paragraphOrder,
   onReload,
   onUnauthorized,
+  reloadLabel = "Reload Today",
 }: WhyThisDrawerProps) {
   const [state, setState] = useState<DrawerState>({ status: "idle" });
   const requested = useRef(false);
@@ -421,7 +423,7 @@ export function WhyThisDrawer({
               reading above may have been revised since it loaded.
             </p>
             <button className="button button--secondary" type="button" onClick={onReload}>
-              Reload Today
+              {reloadLabel}
             </button>
           </div>
         ) : null}
