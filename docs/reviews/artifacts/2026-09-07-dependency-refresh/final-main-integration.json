@@ -1,0 +1,16 @@
+{
+  "status": "observed",
+  "method": "Read-only included-source SHA256 comparison after predecessor squash merge",
+  "before_commit": "3f216879e142146e9bf933348b119068c8b402ea",
+  "after_commit": "ce42624246ad566035afb71808d81c0f24464649",
+  "source_sha256": "5a8ab5de7b25af99890cc705cf803edef721b50a1397c31cd6714df88b8dbee2",
+  "comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "tests_rerun": false,
+  "full_ci_gate_passed": false
+}
