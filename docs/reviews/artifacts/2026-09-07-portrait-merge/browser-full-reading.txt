@@ -1,0 +1,101 @@
+### Page
+- Page URL: http://127.0.0.1:4176/pattern-portrait.html
+- Page Title: Pattern portrait · Pattern/Like preview
+- Console: 0 errors, 4 warnings
+### Snapshot
+```yaml
+- generic [ref=e2]:
+  - link "Skip to the portrait" [ref=e3] [cursor=pointer]:
+    - /url: "#portrait-start"
+  - main "Pattern portrait explorer" [ref=e4]:
+    - generic [ref=e5]: Full Pattern reading. Four chapters available.
+    - generic [ref=e6]:
+      - link "Pattern/Like" [ref=e7] [cursor=pointer]:
+        - /url: "#portrait-start"
+      - generic [ref=e8]:
+        - generic [ref=e9]: Fictional study
+        - button "Return to portrait" [ref=e185] [cursor=pointer]: Return to portrait ↗
+    - region "Complete Pattern reading" [ref=e186]:
+      - heading "Four chapters. One portrait." [level=1] [ref=e187]
+      - paragraph [ref=e188]: Your Pattern · complete reading
+      - article [ref=e189]:
+        - heading "Finding your own direction" [level=2] [ref=e190]
+        - paragraph [ref=e191]: Chapter 1
+        - paragraph [ref=e192]: You can choose a direction before every part of the journey is clear.
+        - generic [ref=e193]:
+          - heading "Overview" [level=3] [ref=e194]
+          - paragraph [ref=e195]: There may be moments when several sensible paths are available and none carries a guarantee. Another person's certainty can be reassuring, but it cannot tell you which direction feels consistent with what matters to you.
+          - paragraph [ref=e196]: You can begin by naming one value you want the next choice to serve. A small step can provide information that thinking in circles cannot. You are allowed to notice what you learn and adjust your course.
+        - generic [ref=e197]:
+          - heading "Tensions" [level=3] [ref=e198]
+          - paragraph [ref=e199]: Looking for an unmistakable sign can delay a choice that is already small enough to explore.
+        - generic [ref=e200]:
+          - heading "Resources" [level=3] [ref=e201]
+          - paragraph [ref=e202]: You can distinguish a change of direction from a loss of purpose. The value can remain steady while the route changes.
+        - generic [ref=e203]:
+          - heading "Another expression" [level=3] [ref=e204]
+          - paragraph [ref=e205]: Sometimes choosing your direction means listening carefully to advice and then deciding which part belongs with you.
+      - article [active] [ref=e206]:
+        - heading "Making room for care" [level=2] [ref=e207]
+        - paragraph [ref=e208]: Chapter 2
+        - paragraph [ref=e209]: Care becomes easier to receive when there is room for your needs alongside someone else's.
+        - generic [ref=e210]:
+          - heading "Overview" [level=3] [ref=e211]
+          - paragraph [ref=e212]: You may recognize another person's needs quickly and make space for them before checking your own capacity. That responsiveness can be generous. It becomes easier to sustain when your own hunger, rest, and limits also have a place.
+          - paragraph [ref=e213]: A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return.
+        - generic [ref=e214]:
+          - heading "Tensions" [level=3] [ref=e215]
+          - paragraph [ref=e216]: Being needed can feel close to being valued, even when the exchange leaves little room for you.
+        - generic [ref=e217]:
+          - heading "Resources" [level=3] [ref=e218]
+          - paragraph [ref=e219]: You can offer care in a form that is simple, practical, and possible to repeat without exhausting yourself.
+        - generic [ref=e220]:
+          - heading "Another expression" [level=3] [ref=e221]
+          - paragraph [ref=e222]: Receiving something without immediately returning the favor can also be an act of trust.
+      - article [ref=e223]:
+        - heading "Keeping what matters" [level=2] [ref=e224]
+        - paragraph [ref=e225]: Chapter 3
+        - paragraph [ref=e226]: A dependable commitment can steady you while other parts of life change.
+        - generic [ref=e227]:
+          - heading "Overview" [level=3] [ref=e228]
+          - paragraph [ref=e229]: You do not need every circumstance to stay the same in order to feel grounded. One dependable promise, relationship, or practice can provide enough stability to consider something new.
+          - paragraph [ref=e230]: It can help to separate the commitment itself from the form it has taken. You may keep what matters while loosening an arrangement that no longer serves it. Holding on thoughtfully includes knowing when to release some weight.
+        - generic [ref=e231]:
+          - heading "Tensions" [level=3] [ref=e232]
+          - paragraph [ref=e233]: Familiar responsibility can become difficult to question when carrying it has become part of how you understand yourself.
+        - generic [ref=e234]:
+          - heading "Resources" [level=3] [ref=e235]
+          - paragraph [ref=e236]: You can make a commitment concrete and give it a realistic place in daily life.
+        - generic [ref=e237]:
+          - heading "Another expression" [level=3] [ref=e238]
+          - paragraph [ref=e239]: Staying connected to what matters can sometimes require a deliberate departure from what is familiar.
+      - article [ref=e240]:
+        - heading "Seeing beyond the immediate" [level=2] [ref=e241]
+        - paragraph [ref=e242]: Chapter 4
+        - paragraph [ref=e243]: A wider perspective can make room for possibilities that today's pressure hides.
+        - generic [ref=e244]:
+          - heading "Overview" [level=3] [ref=e245]
+          - paragraph [ref=e246]: An urgent question can fill your attention until it seems to be the whole landscape. Taking a little distance may reveal that the present difficulty is one part of a longer story.
+          - paragraph [ref=e247]: You can look further ahead without demanding a prediction. A question about the life you want to be moving toward may help you choose what deserves attention today. Curiosity can give the future room to surprise you.
+        - generic [ref=e248]:
+          - heading "Tensions" [level=3] [ref=e249]
+          - paragraph [ref=e250]: Imagining a distant possibility can become a way to postpone a small action that is available now.
+        - generic [ref=e251]:
+          - heading "Resources" [level=3] [ref=e252]
+          - paragraph [ref=e253]: You can move between detail and perspective, using each to correct what the other leaves out.
+        - generic [ref=e254]:
+          - heading "Another expression" [level=3] [ref=e255]
+          - paragraph [ref=e256]: Sometimes the wider view makes a modest, ordinary next step feel sufficient.
+      - paragraph [ref=e257]: "Source revision: 0.7.0:pat_fictional_native_portrait_20260905:2026-09-05T18:00:00Z"
+    - generic [ref=e94]:
+      - generic [ref=e95]: Four authored models based on the fictional chapter images.
+      - generic [ref=e96]: Personal meaning stays in the reading.
+  - group [ref=e97]:
+    - generic "Fictional preview scenarios" [ref=e98] [cursor=pointer]
+    - option "Available" [selected]
+    - option "Loading"
+    - option "Removed"
+    - option "Exact" [selected]
+    - option "Approximate"
+    - option "Unknown"
+```

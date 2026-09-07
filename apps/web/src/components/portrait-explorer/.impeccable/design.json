@@ -1,0 +1,465 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-06T20:30:07.910078Z",
+  "title": "Design System: Pattern/Like zodiac observatory",
+  "extensions": {
+    "colorMeta": {
+      "forest": {
+        "role": "primary",
+        "displayName": "Observatory Green",
+        "tonalRamp": [
+          "oklch(15.0% 0.0486 174.3)",
+          "oklch(26.4% 0.0486 174.3)",
+          "oklch(37.9% 0.0486 174.3)",
+          "oklch(49.3% 0.0486 174.3)",
+          "oklch(60.7% 0.0486 174.3)",
+          "oklch(72.1% 0.0486 174.3)",
+          "oklch(83.6% 0.0486 174.3)",
+          "oklch(95.0% 0.0486 174.3)"
+        ]
+      },
+      "forest-light": {
+        "role": "primary",
+        "displayName": "Washed Observatory Green",
+        "tonalRamp": [
+          "oklch(15.0% 0.0159 154.5)",
+          "oklch(26.4% 0.0159 154.5)",
+          "oklch(37.9% 0.0159 154.5)",
+          "oklch(49.3% 0.0159 154.5)",
+          "oklch(60.7% 0.0159 154.5)",
+          "oklch(72.1% 0.0159 154.5)",
+          "oklch(83.6% 0.0159 154.5)",
+          "oklch(95.0% 0.0159 154.5)"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink Green",
+        "tonalRamp": [
+          "oklch(15.0% 0.0349 174.3)",
+          "oklch(26.4% 0.0349 174.3)",
+          "oklch(37.9% 0.0349 174.3)",
+          "oklch(49.3% 0.0349 174.3)",
+          "oklch(60.7% 0.0349 174.3)",
+          "oklch(72.1% 0.0349 174.3)",
+          "oklch(83.6% 0.0349 174.3)",
+          "oklch(95.0% 0.0349 174.3)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.0267 171.8)",
+          "oklch(26.4% 0.0267 171.8)",
+          "oklch(37.9% 0.0267 171.8)",
+          "oklch(49.3% 0.0267 171.8)",
+          "oklch(60.7% 0.0267 171.8)",
+          "oklch(72.1% 0.0267 171.8)",
+          "oklch(83.6% 0.0267 171.8)",
+          "oklch(95.0% 0.0267 171.8)"
+        ]
+      },
+      "paper-light": {
+        "role": "neutral",
+        "displayName": "Clean Drafting Paper",
+        "tonalRamp": [
+          "oklch(15.0% 0.0082 91.5)",
+          "oklch(26.4% 0.0082 91.5)",
+          "oklch(37.9% 0.0082 91.5)",
+          "oklch(49.3% 0.0082 91.5)",
+          "oklch(60.7% 0.0082 91.5)",
+          "oklch(72.1% 0.0082 91.5)",
+          "oklch(83.6% 0.0082 91.5)",
+          "oklch(95.0% 0.0082 91.5)"
+        ]
+      },
+      "paper-deep": {
+        "role": "neutral",
+        "displayName": "Layered Drafting Paper",
+        "tonalRamp": [
+          "oklch(15.0% 0.0199 87.5)",
+          "oklch(26.4% 0.0199 87.5)",
+          "oklch(37.9% 0.0199 87.5)",
+          "oklch(49.3% 0.0199 87.5)",
+          "oklch(60.7% 0.0199 87.5)",
+          "oklch(72.1% 0.0199 87.5)",
+          "oklch(83.6% 0.0199 87.5)",
+          "oklch(95.0% 0.0199 87.5)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Graphite Rule",
+        "tonalRamp": [
+          "oklch(15.0% 0.0219 86.0)",
+          "oklch(26.4% 0.0219 86.0)",
+          "oklch(37.9% 0.0219 86.0)",
+          "oklch(49.3% 0.0219 86.0)",
+          "oklch(60.7% 0.0219 86.0)",
+          "oklch(72.1% 0.0219 86.0)",
+          "oklch(83.6% 0.0219 86.0)",
+          "oklch(95.0% 0.0219 86.0)"
+        ]
+      },
+      "focus": {
+        "role": "tertiary",
+        "displayName": "Focus Cobalt",
+        "tonalRamp": [
+          "oklch(15.0% 0.1429 262.4)",
+          "oklch(26.4% 0.1429 262.4)",
+          "oklch(37.9% 0.1429 262.4)",
+          "oklch(49.3% 0.1429 262.4)",
+          "oklch(60.7% 0.1429 262.4)",
+          "oklch(72.1% 0.1429 262.4)",
+          "oklch(83.6% 0.1429 262.4)",
+          "oklch(95.0% 0.1429 262.4)"
+        ]
+      },
+      "scene-control": {
+        "role": "primary",
+        "displayName": "Scene Control Green",
+        "tonalRamp": [
+          "oklch(15.0% 0.0471 175.6)",
+          "oklch(26.4% 0.0471 175.6)",
+          "oklch(37.9% 0.0471 175.6)",
+          "oklch(49.3% 0.0471 175.6)",
+          "oklch(60.7% 0.0471 175.6)",
+          "oklch(72.1% 0.0471 175.6)",
+          "oklch(83.6% 0.0471 175.6)",
+          "oklch(95.0% 0.0471 175.6)"
+        ]
+      },
+      "scene-control-text": {
+        "role": "neutral",
+        "displayName": "Scene Control Paper",
+        "tonalRamp": [
+          "oklch(15.0% 0.0142 84.6)",
+          "oklch(26.4% 0.0142 84.6)",
+          "oklch(37.9% 0.0142 84.6)",
+          "oklch(49.3% 0.0142 84.6)",
+          "oklch(60.7% 0.0142 84.6)",
+          "oklch(72.1% 0.0142 84.6)",
+          "oklch(83.6% 0.0142 84.6)",
+          "oklch(95.0% 0.0142 84.6)"
+        ]
+      },
+      "limestone": {
+        "role": "neutral",
+        "displayName": "Warm Limestone",
+        "tonalRamp": [
+          "oklch(15.0% 0.0305 87.6)",
+          "oklch(26.4% 0.0305 87.6)",
+          "oklch(37.9% 0.0305 87.6)",
+          "oklch(49.3% 0.0305 87.6)",
+          "oklch(60.7% 0.0305 87.6)",
+          "oklch(72.1% 0.0305 87.6)",
+          "oklch(83.6% 0.0305 87.6)",
+          "oklch(95.0% 0.0305 87.6)"
+        ]
+      },
+      "stone-edge": {
+        "role": "neutral",
+        "displayName": "Cut Stone Edges",
+        "tonalRamp": [
+          "oklch(15.0% 0.0307 86.7)",
+          "oklch(26.4% 0.0307 86.7)",
+          "oklch(37.9% 0.0307 86.7)",
+          "oklch(49.3% 0.0307 86.7)",
+          "oklch(60.7% 0.0307 86.7)",
+          "oklch(72.1% 0.0307 86.7)",
+          "oklch(83.6% 0.0307 86.7)",
+          "oklch(95.0% 0.0307 86.7)"
+        ]
+      },
+      "lime-plaster": {
+        "role": "neutral",
+        "displayName": "Lime Plaster",
+        "tonalRamp": [
+          "oklch(15.0% 0.0353 88.8)",
+          "oklch(26.4% 0.0353 88.8)",
+          "oklch(37.9% 0.0353 88.8)",
+          "oklch(49.3% 0.0353 88.8)",
+          "oklch(60.7% 0.0353 88.8)",
+          "oklch(72.1% 0.0353 88.8)",
+          "oklch(83.6% 0.0353 88.8)",
+          "oklch(95.0% 0.0353 88.8)"
+        ]
+      },
+      "oak": {
+        "role": "secondary",
+        "displayName": "Oiled Oak",
+        "tonalRamp": [
+          "oklch(15.0% 0.0570 60.7)",
+          "oklch(26.4% 0.0570 60.7)",
+          "oklch(37.9% 0.0570 60.7)",
+          "oklch(49.3% 0.0570 60.7)",
+          "oklch(60.7% 0.0570 60.7)",
+          "oklch(72.1% 0.0570 60.7)",
+          "oklch(83.6% 0.0570 60.7)",
+          "oklch(95.0% 0.0570 60.7)"
+        ]
+      },
+      "oak-endgrain": {
+        "role": "secondary",
+        "displayName": "Oak End Grain",
+        "tonalRamp": [
+          "oklch(15.0% 0.0783 70.8)",
+          "oklch(26.4% 0.0783 70.8)",
+          "oklch(37.9% 0.0783 70.8)",
+          "oklch(49.3% 0.0783 70.8)",
+          "oklch(60.7% 0.0783 70.8)",
+          "oklch(72.1% 0.0783 70.8)",
+          "oklch(83.6% 0.0783 70.8)",
+          "oklch(95.0% 0.0783 70.8)"
+        ]
+      },
+      "bronze": {
+        "role": "secondary",
+        "displayName": "Brushed Bronze",
+        "tonalRamp": [
+          "oklch(15.0% 0.0867 77.8)",
+          "oklch(26.4% 0.0867 77.8)",
+          "oklch(37.9% 0.0867 77.8)",
+          "oklch(49.3% 0.0867 77.8)",
+          "oklch(60.7% 0.0867 77.8)",
+          "oklch(72.1% 0.0867 77.8)",
+          "oklch(83.6% 0.0867 77.8)",
+          "oklch(95.0% 0.0867 77.8)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "heading": {
+        "displayName": "Inherited serif heading",
+        "purpose": "Page, chapter, and complete-reading headings; size remains contextual."
+      },
+      "reading": {
+        "displayName": "Source prose",
+        "purpose": "Full source paragraphs; comparison uses the observed smaller size."
+      },
+      "body": {
+        "displayName": "Operational body",
+        "purpose": "Introduction, supporting copy, and primary reading action."
+      },
+      "control": {
+        "displayName": "Native controls",
+        "purpose": "Environment actions, chapter navigation, perspectives, and settings."
+      },
+      "navigation": {
+        "displayName": "Observatory view navigation",
+        "purpose": "Your Pattern and Your sky use compact sans-serif text with explicit pressed state."
+      }
+    },
+    "shadows": [
+      {
+        "name": "scene-label",
+        "value": "none",
+        "purpose": "Local chapter labels and passage annotations use border and tonal contrast."
+      },
+      {
+        "name": "inherited-dialog",
+        "value": "0 30px 100px #0c261166",
+        "purpose": "Existing modal treatment only; not a general surface token."
+      }
+    ],
+    "motion": [
+      {
+        "name": "approach-reset",
+        "value": "420ms",
+        "purpose": "Chapter approach, focused sky framing, and reset camera travel."
+      },
+      {
+        "name": "unfold",
+        "value": "540ms",
+        "purpose": "Camera and saved-object assembly transition; furniture follows every frame."
+      },
+      {
+        "name": "camera-step",
+        "value": "260ms",
+        "purpose": "Explicit orbit, tilt, and zoom steps."
+      },
+      {
+        "name": "camera-easing",
+        "value": "t * t * (3 - 2 * t)",
+        "purpose": "Bounded camera and object-position interpolation."
+      },
+      {
+        "name": "desk-settle",
+        "value": "1 - exp(-seconds * 9)",
+        "purpose": "Hinge settling toward 0 or -1.25 radians; snaps within 0.001."
+      },
+      {
+        "name": "object-turn",
+        "value": "1 - exp(-seconds * 10)",
+        "purpose": "Settles each 45-degree object turn; snaps within 0.001."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "immediate",
+        "purpose": "Camera, assembly, turn, and hinge changes settle directly."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "workspace-stack-max",
+        "value": "1023px"
+      },
+      {
+        "name": "phone-max",
+        "value": "767px"
+      },
+      {
+        "name": "small-phone-max",
+        "value": "359px"
+      },
+      {
+        "name": "embedded-container-stack-max",
+        "value": "859px"
+      },
+      {
+        "name": "embedded-container-two-chapters-max",
+        "value": "539px"
+      },
+      {
+        "name": "embedded-container-camera-wrap-max",
+        "value": "319px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Account primary reading action",
+      "kind": "button",
+      "refersTo": "button-primary-account",
+      "description": "The account variant of the action that selects the first chapter.",
+      "html": "<button class=\"ds-primary\">Explore the first chapter</button>",
+      "css": ".ds-primary{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);font-size:15px;line-height:1.6;min-height:44px;padding:13px 20px;background:var(--forest,#173f35);color:var(--paper-light,#faf8f2);border:1px solid transparent;border-radius:0;cursor:pointer}.ds-primary:hover:not(:disabled){background:var(--ink,#17312a)}.ds-primary:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}.ds-primary:disabled{opacity:.42;cursor:default}"
+    },
+    {
+      "name": "Environment and display action",
+      "kind": "button",
+      "refersTo": "button-control",
+      "description": "A native button for roof, inspection, turn, or desk actions; mobile padding follows the build.",
+      "html": "<button class=\"ds-control\" aria-pressed=\"false\">Open reading desk</button>",
+      "css": ".ds-control{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);font-size:.75rem;line-height:1.6;min-height:44px;padding:8px 13px;color:var(--ink,#17312a);background:transparent;border:1px solid var(--line,#cec7b8);border-radius:2px;cursor:pointer}.ds-control:hover:not(:disabled){background:#e6e9db}.ds-control:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}.ds-control:disabled{opacity:.42;cursor:default}@media(max-width:767px){.ds-control{padding:7px 10px}}"
+    },
+    {
+      "name": "Pressed environment and display action",
+      "kind": "button",
+      "refersTo": "button-control-selected",
+      "description": "Pressed state uses forest fill and a current-action label, including an open reading desk.",
+      "html": "<button class=\"ds-control-pressed\" aria-pressed=\"true\">Close reading desk</button>",
+      "css": ".ds-control-pressed{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);font-size:.75rem;line-height:1.6;min-height:44px;padding:8px 13px;color:var(--paper-light,#faf8f2);background:var(--forest,#173f35);border:1px solid var(--line,#cec7b8);border-radius:2px;cursor:pointer}.ds-control-pressed:hover:not(:disabled){background:var(--forest,#173f35)}.ds-control-pressed:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}.ds-control-pressed:disabled{opacity:.42;cursor:default}@media(max-width:767px){.ds-control-pressed{padding:7px 10px}}"
+    },
+    {
+      "name": "Scene camera control",
+      "kind": "button",
+      "refersTo": "button-scene",
+      "description": "An accessible inline SVG camera action on the scene toolbar; the remaining camera actions share its treatment.",
+      "html": "<div class=\"ds-camera-bar\"><button class=\"ds-camera\" aria-label=\"Rotate left\" title=\"Rotate left\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 10a8 8 0 1 1 1.7 9M4 4v6h6\"/></svg></button></div>",
+      "css": ".ds-camera-bar{display:inline-flex;padding:3px;border:1px solid #99aa8f;border-radius:6px;background:#153c33f2;color:#fffaf0}.ds-camera{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);width:44px;min-height:44px;padding:8px;color:inherit;background:transparent;border:1px solid transparent;border-radius:5px;cursor:pointer}.ds-camera svg{vertical-align:middle}.ds-camera:hover:not(:disabled){background:#e0e8d2;color:#18392f}.ds-camera:focus-visible{outline:3px solid var(--paper-light,#faf8f2);outline-offset:3px}.ds-camera:disabled{opacity:.42;cursor:default}@media(forced-colors:active){.ds-camera:focus-visible{outline-color:Highlight}}"
+    },
+    {
+      "name": "Native chapter navigation",
+      "kind": "nav",
+      "refersTo": "chapter-navigation",
+      "description": "Chapter names remain available independently of graphics and label occlusion; this snippet shows the account state colors.",
+      "html": "<nav class=\"ds-chapters\" aria-label=\"Pattern chapters\"><button class=\"ds-chapter\" aria-pressed=\"true\"><span class=\"ds-ordinal\">01</span><span>Chapter title</span></button><button class=\"ds-chapter\" aria-pressed=\"false\"><span class=\"ds-ordinal\">02</span><span>Chapter title</span></button></nav>",
+      "css": ".ds-chapters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 0;border-bottom:1px solid var(--line,#cec7b8)}.ds-chapter{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);display:flex;align-items:flex-start;gap:9px;text-align:left;font-size:12px;line-height:1.4;padding:10px 8px;min-height:44px;min-width:0;background:transparent;color:var(--ink,#17312a);border:1px solid transparent;border-radius:0;cursor:pointer}.ds-ordinal{display:grid;place-items:center;flex:0 0 25px;width:25px;height:25px;border:1px solid #b8c3aa;border-radius:100%;font-size:10px;line-height:1.5}.ds-chapter[aria-pressed=true],.ds-chapter:hover:not(:disabled){background:var(--forest-light,#dce7df)}.ds-chapter[aria-pressed=true] .ds-ordinal{background:var(--forest,#173f35);color:var(--paper-light,#faf8f2);border-color:var(--forest,#173f35)}.ds-chapter:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}@media(forced-colors:active){.ds-chapter[aria-pressed=true]{outline:2px solid Highlight;outline-offset:-3px;font-weight:700}}"
+    },
+    {
+      "name": "Chapter perspective tabs",
+      "kind": "nav",
+      "refersTo": "facet-tab",
+      "description": "The account perspective row uses an underline and weight for selection; keyboard behavior remains in ExplorerReader.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"Chapter perspectives\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">Overview</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Tensions</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Resources</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Another expression</button></div>",
+      "css": ".ds-tabs{display:flex;flex-wrap:wrap;gap:0 12px;border-bottom:1px solid var(--line,#cec7b8)}.ds-tab{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);font-size:12px;line-height:1.6;min-height:44px;padding:10px 0;background:transparent;color:var(--ink,#17312a);border:0;border-bottom:2px solid transparent;border-radius:0;cursor:pointer}.ds-tab[aria-selected=true]{border-bottom-color:var(--forest,#173f35);color:var(--forest,#173f35);font-weight:650}.ds-tab:hover{background:var(--forest-light,#dce7df)}.ds-tab:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}@media(forced-colors:active){.ds-tab[aria-selected=true]{border-bottom-color:Highlight}}"
+    },
+    {
+      "name": "Account graphics selection",
+      "kind": "input",
+      "refersTo": "graphics-select-account",
+      "description": "A native select inside Scene controls & motion; low power is an explicit user choice.",
+      "html": "<label class=\"ds-graphics-label\">Graphics <select class=\"ds-graphics\"><option>Standard</option><option>Low power</option></select></label>",
+      "css": ".ds-graphics-label{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:12px;line-height:1.6;color:var(--ink-soft,#4e625b)}.ds-graphics{font:inherit;min-height:44px;padding:0 8px;color:inherit;background:transparent;border:1px solid #bec6b0;border-radius:0;cursor:pointer}.ds-graphics:hover{background:transparent}.ds-graphics:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}"
+    },
+    {
+      "name": "Source passage",
+      "kind": "custom",
+      "refersTo": "reading-passage",
+      "description": "The original prose remains DOM text; its selected edge and return action connect it to a scene annotation.",
+      "html": "<div class=\"ds-passage\" data-active=\"true\"><p>Source chapter passage.</p><button class=\"ds-source-action\">Show in portrait</button></div>",
+      "css": ".ds-passage{font-family:var(--serif,\"Iowan Old Style\",\"Palatino Linotype\",\"Book Antiqua\",Palatino,Georgia,serif);font-size:19px;line-height:1.75;color:var(--ink,#17312a);padding-left:13px;margin-bottom:22px;border-left:2px solid transparent}.ds-passage[data-active=true]{border-left-color:#9caa6b}.ds-passage p{margin:0;padding:0}.ds-source-action{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);font-size:11px;line-height:1.6;min-height:44px;padding:8px 0;opacity:.85;color:inherit;background:transparent;border:1px solid transparent;border-radius:0;text-align:left;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#9aa790;cursor:pointer}.ds-source-action:hover:not(:disabled){background:transparent;text-decoration-color:currentColor}.ds-source-action:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}.ds-source-action:disabled{opacity:.42;cursor:default}"
+    },
+    {
+      "name": "Observatory view navigation",
+      "kind": "nav",
+      "refersTo": "observatory-view",
+      "description": "Switches between natal chart inspection and the preserved chapter workspace; the sky button remains available without WebGL.",
+      "html": "<nav class=\"ds-observatory-views\" aria-label=\"Observatory views\"><button class=\"ds-observatory-view\" aria-pressed=\"false\">Your Pattern</button><button class=\"ds-observatory-view\" aria-pressed=\"true\">Your sky</button></nav>",
+      "css": ".ds-observatory-views{display:flex;align-items:center;gap:6px;flex-shrink:0}.ds-observatory-view{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);font-size:.8rem;line-height:1.6;min-height:44px;padding:8px 14px;color:var(--ink,#17312a);background:transparent;border:1px solid transparent;border-bottom:2px solid transparent;border-radius:0;cursor:pointer}.ds-observatory-view:hover{background:#e6e9db}.ds-observatory-view[aria-pressed=true]{border-bottom-color:var(--forest,#173f35);background:var(--paper-deep,#e5dfd1)}.ds-observatory-view:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}@media(max-width:767px){.ds-observatory-views{margin-top:10px}.ds-observatory-view{flex:1}}"
+    },
+    {
+      "name": "Native natal placement strip",
+      "kind": "custom",
+      "refersTo": "sky-placement",
+      "description": "Three body slots directly below the sky canvas. Sign names here are illustrative fixture values; absent data remains a non-interactive explanation.",
+      "html": "<div class=\"ds-sky-placements\" role=\"group\" aria-label=\"Birth-chart placements\"><button class=\"ds-sky-placement\" aria-label=\"Sun in Aries\" aria-pressed=\"true\"><svg viewBox=\"0 0 24 24\" width=\"25\" height=\"25\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.35\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5\"/></svg><span><span class=\"ds-body-name\">Sun</span><strong>Aries</strong></span></button><button class=\"ds-sky-placement\" aria-label=\"Moon in Taurus\" aria-pressed=\"false\"><svg viewBox=\"0 0 24 24\" width=\"25\" height=\"25\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.35\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18.7 17.3A8.5 8.5 0 0 1 8 4a8.5 8.5 0 1 0 10.7 13.3Z\"/></svg><span><span class=\"ds-body-name\">Moon</span><strong>Taurus</strong></span></button><div class=\"ds-sky-unavailable\"><svg viewBox=\"0 0 24 24\" width=\"25\" height=\"25\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.35\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 18h18M12 15V3m-4 4 4-4 4 4\"/><path d=\"M6 18a6 6 0 0 1 12 0\"/></svg><span><span class=\"ds-body-name\">Rising</span><small>Not available</small></span></div></div>",
+      "css": ".ds-sky-placements{font-family:var(--sans,\"Avenir Next\",\"Segoe UI\",Helvetica,Arial,sans-serif);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:10px 0 0;border-top:1px solid var(--line,#cec7b8);border-bottom:1px solid var(--line,#cec7b8);color:var(--ink,#17312a);font-size:15px;line-height:1.6}.ds-sky-placement,.ds-sky-unavailable{display:flex;align-items:center;gap:9px;min-width:0}.ds-sky-placement{font:inherit;min-height:66px;text-align:left;padding:8px 12px;color:inherit;background:transparent;border:1px solid transparent;border-radius:0;cursor:pointer}.ds-sky-unavailable{padding:13px 8px;color:var(--ink-soft,#4e625b)}.ds-sky-placements svg{flex-shrink:0}.ds-body-name{display:block;font-size:11px;color:var(--ink-soft,#4e625b)}.ds-sky-placements strong{font-family:var(--serif,\"Iowan Old Style\",\"Palatino Linotype\",\"Book Antiqua\",Palatino,Georgia,serif);display:block;font-size:19px;font-weight:400}.ds-sky-unavailable small{display:block;font-size:11px;line-height:1.45}.ds-sky-placement:hover{background:#e6e9db}.ds-sky-placement[aria-pressed=true]{background:var(--paper-deep,#e5dfd1)}.ds-sky-placement:focus-visible{outline:3px solid var(--cobalt,#234c9f);outline-offset:3px;}@media(max-width:767px){.ds-sky-placements{font-size:14px}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Private Observatory",
+    "overview": "This local surface inherits the brand authority of [the application design system](../../../DESIGN.md) and the calm, precise, private voice in [PRODUCT.md](../../../PRODUCT.md). Warm paper and forest ink frame a stylized WebGL courtyard: limestone terraces, timber screens, perimeter planting, a bronze twelve-sign instrument over the water court, and four chapter displays. The instrument replaces the central tree and gives the architectural model a celestial focal point.\n\nThe setting remains authored presentation furniture. Calculated natal placements arrive as separate, minimized chart context; personalized portraits retain their saved chapter meshes, original images, and complete prose. The fictional study identifies its example chart facts and fixture objects. Neither architecture nor zodiac selection creates relationships between chapters. The [zodiac direction contract](../../../../../docs/superpowers/specs/2026-09-06-zodiac-observatory-design.md) extends the [courtyard brief](../../../../../docs/superpowers/specs/2026-09-06-portrait-observatory-design.md) within the authorized local redesign; the composition is an implementation decision, not a separately approved concept.",
+    "keyCharacteristics": [
+      "A celestial court with distinct Your Pattern and Your sky views.",
+      "Light serif interpretation, compact sans-serif controls, and warm ruled paper.",
+      "Calibrated Sun, eligible Moon, and eligible rising markers with native facts and uncertainty.",
+      "Four approachable displays with object turns, hinged desks, and visible lanterns.",
+      "Complete native reading and controls remain usable independently of graphics."
+    ],
+    "rules": [
+      {
+        "name": "The Authored Setting Rule",
+        "body": "Materials and architecture describe the place; calibrated markers show supported natal positions; personal interpretation remains in the saved chapter reading.",
+        "section": "colors"
+      },
+      {
+        "name": "The Visible Surface Rule",
+        "body": "Scene picking and annotations respect the architecture in front of them; native navigation carries access when an object is occluded.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Calibrated Fact Rule",
+        "body": "Plot only supported longitude, preserve its qualification, and use a whole-sector fallback when only a saved Sun sign is available.",
+        "section": "components"
+      },
+      {
+        "name": "The One Display Rule",
+        "body": "Object, plinth, desk, and fixture share the unfolding trajectory; their visual connection must survive every frame.",
+        "section": "components"
+      },
+      {
+        "name": "The Complete Reading Rule",
+        "body": "Visual exploration must retain every source passage and its chapter association; the scene never substitutes for the complete text.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** inherit application brand tokens and keep architectural materials local to this surface.",
+      "**Do** preserve complete prose, original-image access, source identity, and native chapter navigation.",
+      "**Do** separate supported natal facts from published interpretation and retain every omission and qualification.",
+      "**Do** keep display furniture synchronized with the object and respect visible scene occlusion.",
+      "**Do** preserve keyboard access, page scrolling, reduced motion, reading positions, and graphics fallback.",
+      "**Do** release owned resources when the scene ends or its source changes."
+    ],
+    "donts": [
+      "**Don't** present the authored court, lighting, or arrangement as personalized psychological evidence.",
+      "**Don't** invent a longitude from a Sun sign or infer chapter-to-planet relationships, aspects, or a daily horoscope.",
+      "**Don't** describe this stylized WebGL scene as photorealistic or a native first-person walkthrough.",
+      "**Don't** require a scene gesture, animation, or open desk to reach the reading.",
+      "**Don't** mutate saved mesh geometry or source prose to implement an interaction."
+    ]
+  }
+}

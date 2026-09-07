@@ -4,6 +4,7 @@ import { ZODIAC_SIGNS, type BirthTimeAccuracy, type ZodiacSignName } from "@patt
 import { PatternPortrait } from "../components/PatternPortrait.js";
 import { PortraitExplorer } from "../components/portrait-explorer/PortraitExplorer.js";
 import { portraitExplorerFixture } from "./portrait-explorer-fixture.js";
+import { fictionalPortraitSky } from "./portrait-sky-fixture.js";
 import { sunShapeProfiles } from "../lib/sun-sculpture.js";
 import type { PortraitSource } from "../lib/pattern-portrait.js";
 import { fictionalPattern } from "./pattern-portrait-fixture.js";
@@ -19,6 +20,7 @@ function PortraitPreview() {
   const [status, setStatus] = useState<PortraitSource["status"]>("ready");
   const [replacement, setReplacement] = useState(false);
   const [iteration, setIteration] = useState("explorer");
+  const sky = useMemo(() => fictionalPortraitSky(accuracy), [accuracy]);
   const pattern = example === "direction" ? nativePattern : fictionalPattern;
   const objectBindings = example === "direction" ? nativeImageBindings : imageStudyBindings;
   const source = useMemo<PortraitSource>(() => {
@@ -42,7 +44,7 @@ function PortraitPreview() {
 
   if (iteration === "explorer") return <>
     <a className="skip-link" href="#portrait-start" onClick={(event) => { event.preventDefault(); const target = document.getElementById("portrait-start"); target?.focus(); target?.scrollIntoView(); }}>Skip to the portrait</a>
-    <PortraitExplorer source={source} objectBindings={objectBindings} meshBundle={portraitExplorerFixture} />
+    <PortraitExplorer source={source} objectBindings={objectBindings} meshBundle={portraitExplorerFixture} sky={sky} />
     <details className="portrait-preview-scenarios explorer-preview-scenarios"><summary>Fictional preview scenarios</summary><p>These controls test the study’s loading, fallback, and source replacement behavior.</p><div className="portrait-scenario-fields">
       <label>Document state<select value={status} onChange={(event) => setStatus(event.target.value as PortraitSource["status"])}><option value="ready">Available</option><option value="loading">Loading</option><option value="unavailable">Removed</option></select></label>
       <label>Example birth-time accuracy<select value={accuracy} onChange={(event) => setAccuracy(event.target.value as BirthTimeAccuracy)}><option value="exact">Exact</option><option value="approximate">Approximate</option><option value="unknown">Unknown</option></select></label>

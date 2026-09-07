@@ -43,6 +43,120 @@ async function chapter(user: ReturnType<typeof userEvent.setup>, ordinal = 1) {
 }
 
 describe("Portrait exploration", () => {
+  it("explores calculated zodiac placements and returns to the same Pattern perspective", async () => {
+    const user = userEvent.setup();
+    const sky = { chartId: "chart-fixture", placements: [
+      { body: "sun" as const, longitude: 115, sign: "cancer" as const, degree: 25 },
+      { body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 },
+      { body: "ascendant" as const, longitude: 193, sign: "libra" as const, degree: 13 },
+    ], unavailable: {} };
+    render(<PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} sky={sky} />);
+    await screen.findByTestId("scene"); await chapter(user, 2);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await user.click(screen.getByRole("button", { name: "Moon in Taurus" }));
+    expect(screen.getByRole("heading", { name: "Moon in Taurus" })).toBeVisible();
+    expect(screen.getByText("12° 30′ Taurus")).toBeVisible();
+    expect(scene.props?.selectedSkyBody).toBe("moon");
+    expect(scene.props?.skyView).toBe(true);
+    expect(document.querySelector(".explorer-sr-only[aria-live]")).toHaveTextContent("Your sky. Moon in Taurus.");
+    await user.click(screen.getByRole("button", { name: "Your Pattern" }));
+    expect(scene.props?.skyView).toBe(false);
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(nativePattern.core_chapters[1].resources[0].text)).toBeVisible();
+    expect(scene.props?.selectedIds).toEqual(["chapter-2"]);
+    document.querySelector<HTMLElement>(".explorer-mobile-modes")!.style.display = "flex";
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(scene.props?.skyView).toBe(false);
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(nativePattern.core_chapters[1].resources[0].text)).toBeVisible();
+  });
+
+  it("does not attribute every suppressed placement to missing birth-time detail", async () => {
+    const user = userEvent.setup();
+    const sky = { chartId: "chart-fixture", placements: [], unavailable: { ascendant: "suppressed" as const } };
+    render(<PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} sky={sky} />);
+    await screen.findByTestId("scene");
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    expect(screen.getByText("Unavailable in this chart")).toBeVisible();
+    expect(screen.queryByText("Needs birth-time detail")).not.toBeInTheDocument();
+  });
+
+  it("opens the sky from a reading comparison and preserves that reading context on return", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
+    await chapter(user, 1);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await waitFor(() => expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-explore"));
+    expect(scene.props?.selectedIds).toEqual(["chapter-1", "chapter-2"]);
+    await user.click(screen.getByRole("button", { name: "Back to Pattern" }));
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
+    expect(screen.getByRole("button", { name: "End comparison" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps supported sky facts readable without graphics and does not invent missing placements", async () => {
+    const user = userEvent.setup();
+    const sky = { chartId: "chart-fixture",
+      placements: [{ body: "sun" as const, longitude: 150, sign: "virgo" as const, degree: 0 }],
+      unavailable: { moon: "unknown_birth_time" as const, ascendant: "unknown_birth_time" as const },
+      uncertainty: "Birth time is unknown; time-sensitive placements are unavailable." };
+    render(<PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} sky={sky} />);
+    await screen.findByTestId("scene");
+    await user.click(screen.getByRole("button", { name: "Lose graphics" }));
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    expect(screen.getByRole("heading", { name: "Sun in Virgo" })).toBeVisible();
+    expect(screen.getByText(sky.uncertainty)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Moon in/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Rising in/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Full reading" }));
+    expect(screen.getByText(nativePattern.core_chapters[3].counter_expression.text)).toBeVisible();
+  });
+
+  it("uses a saved Sun sign as a sector without supplying a made-up longitude", async () => {
+    const user = userEvent.setup();
+    render(<PortraitExplorer source={{ ...source, sunSign: "virgo" }} objectBindings={nativeImageBindings} meshBundle={bundle} />);
+    await screen.findByTestId("scene");
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    expect(screen.getByRole("heading", { name: "Sun in Virgo" })).toBeVisible();
+    expect(screen.getByText("The saved portrait includes your Sun sign. Its exact position is not available in this view.")).toBeVisible();
+    expect(scene.props?.sky).toBeNull();
+    expect(scene.props?.sunSign).toBe("virgo");
+  });
+
+  it("keeps each chapter's physical display state independent of its complete reading", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
+    await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Open reading desk" }));
+    await user.click(screen.getByRole("button", { name: "Turn chapter object" }));
+    expect(screen.getByRole("button", { name: "Close reading desk" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    expect(screen.getByText(nativePattern.core_chapters[0].resources[0].text)).toBeVisible();
+    await chapter(user, 2);
+    expect(screen.getByRole("button", { name: "Open reading desk" })).toHaveAttribute("aria-pressed", "false");
+    await chapter(user);
+    expect(screen.getByRole("button", { name: "Close reading desk" })).toHaveAttribute("aria-pressed", "true");
+    expect(scene.props?.experience?.turns["chapter-1"]).toBe(1);
+    expect(scene.props?.experience?.turns["chapter-2"] ?? 0).toBe(0);
+    await user.click(screen.getByRole("button", { name: "Lose graphics" }));
+    expect(screen.getByRole("button", { name: "Turn chapter object" })).toBeDisabled();
+    expect(screen.getByText(nativePattern.core_chapters[0].resources[0].text)).toBeVisible();
+  });
+
+  it("changes the courtyard light and cutaway without changing chapter or perspective", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user, 2);
+    await user.click(screen.getByRole("tab", { name: "Tensions" }));
+    await user.click(screen.getByRole("button", { name: "Dusk" }));
+    await user.click(screen.getByRole("button", { name: "Show roof" }));
+    expect(screen.getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Cut away roof" })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: "Tensions" })).toHaveAttribute("aria-selected", "true");
+    expect(scene.props?.selectedIds).toEqual(["chapter-2"]);
+  });
+
   it("embeds in the account landmark with a local exit and no duplicate page heading", async () => {
     function Account() {
       const navigation = useExplorerNavigation(manifest.chapters.map((item) => item.id), { embedded: true });
@@ -295,6 +409,37 @@ describe("Portrait exploration", () => {
     expect(screen.queryByText(nativePattern.core_chapters[0].summary)).not.toBeInTheDocument();
     expect(screen.queryByTestId("scene")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("No Pattern to display");
+  });
+
+  it("preserves chapter state while refreshing or removing sky facts for the same source", async () => {
+    const user = userEvent.setup(); const view = mount(); await screen.findByTestId("scene");
+    await chapter(user, 2);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByRole("button", { name: "Open reading desk" }));
+    await user.click(screen.getByRole("button", { name: "Turn chapter object" }));
+    await user.click(screen.getByRole("button", { name: "Dusk" }));
+    const bookmark = { position: [4, 2, -3] as [number, number, number], target: [1, 0, 0] as [number, number, number] };
+    act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
+    const sky = { chartId: "chart-fixture", placements: [
+      { body: "moon" as const, longitude: 45, sign: "taurus" as const, degree: 15 },
+    ], unavailable: {} };
+    let previousScene = screen.getByTestId("scene");
+    for (const currentSky of [sky, { ...sky, placements: [{ ...sky.placements[0], longitude: 46, degree: 16 }] }, null]) {
+      view.rerender(<PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} sky={currentSky} />);
+      await screen.findByTestId("scene");
+      expect(screen.getByTestId("scene")).not.toBe(previousScene);
+      previousScene = screen.getByTestId("scene");
+      expect(scene.props?.selectedIds).toEqual(["chapter-2"]);
+      expect(scene.props?.facet).toBe("resources");
+      expect(scene.props?.bookmark).toEqual(bookmark);
+      expect(scene.props?.sky).toEqual(currentSky);
+      expect(scene.props?.selectedSkyBody).toBe(currentSky ? "moon" : null);
+      expect(scene.props?.experience?.turns["chapter-2"]).toBe(1);
+      expect(screen.getByRole("button", { name: "Close reading desk" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText(nativePattern.core_chapters[1].resources[0].text)).toBeVisible();
+    }
   });
 
   it("preserves navigation and camera when the same source image is hydrated", async () => {

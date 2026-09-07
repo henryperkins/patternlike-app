@@ -98,7 +98,7 @@
 .explorer-setting-actions button { border-color:#bec6b0; }
 .explorer-footer { display:flex; justify-content:space-between; gap:20px; border-top:1px solid var(--explorer-rule); padding:24px 0; margin-top:36px; color:var(--explorer-muted); font-size:11px; }
 .explorer-mobile-modes { display:none; }
-.explorer-uncertainty { border-left:3px solid #adba82; padding:8px 14px; font-size:13px; }
+.explorer-uncertainty { border-top:1px solid var(--explorer-rule); padding:12px 0; font-size:13px; }
 .explorer-complete { max-width:740px; margin:55px auto; }
 .explorer-complete h1 { font-size:42px; }
 .explorer-complete article { padding:30px 0; border-top:1px solid var(--explorer-rule); }

@@ -4,6 +4,7 @@ import { ApiError, downloadPatternPortraitExplorer, getPatternPortraitExplorer, 
 import { bindingsFor, validateResponse, verifyImage } from "../lib/account-portrait.js";
 import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument, type PortraitObjectBinding } from "../lib/pattern-portrait.js";
+import type { PortraitSky } from "../lib/portrait-sky.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { PortraitExplorer } from "./portrait-explorer/PortraitExplorer.js";
 import { useExplorerNavigation } from "./portrait-explorer/use-explorer-navigation.js";
@@ -11,6 +12,7 @@ import type { PortraitMeshAsset, PortraitMeshBundle } from "./portrait-explorer/
 
 interface Props {
   chartId: string; document: PatternResponseV7; pattern: PatternStatePattern;
+  sky?: PortraitSky | null;
   canCreate: boolean; onUnauthorized: () => void; children: ReactNode; legacy: ReactNode;
 }
 interface LoadedPortrait { identity: string; bindings: PortraitObjectBinding[]; bundle: PortraitMeshBundle; }
@@ -38,7 +40,7 @@ function validate(response: PatternPortraitExplorerResponse, chartId: string, do
   }
 }
 
-export function AccountPortraitExplorer({ chartId, document, pattern, canCreate, onUnauthorized, children, legacy }: Props) {
+export function AccountPortraitExplorer({ chartId, document, pattern, canCreate, onUnauthorized, children, legacy, sky }: Props) {
   const sourceMatches = patternMatchesDocument(pattern, document);
   const eligible = sourceMatches && document.core_chapters.length === 4;
   const [response, setResponse] = useState<PatternPortraitExplorerResponse | null>(null);
@@ -197,7 +199,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
       {open && saved && loaded?.identity !== identity && (assetError ? <p role="alert">Your saved portrait could not be loaded. Your reading is still available. <button type="button" onClick={() => setAssetAttempt((value) => value + 1)}>Retry portrait loading</button></p> : <p role="status">Loading your saved images and 3D models.</p>)}
       {open && !showingExplorer && <button type="button" className="button button--secondary" onClick={closeExplorer}>Cancel portrait loading</button>}
     </section>
-    <div ref={contentElement} tabIndex={-1}>{showingExplorer && loaded ? <PortraitExplorer source={source} objectBindings={loaded.bindings} meshBundle={loaded.bundle} navigation={navigation} />
+    <div ref={contentElement} tabIndex={-1}>{showingExplorer && loaded ? <PortraitExplorer source={source} objectBindings={loaded.bindings} meshBundle={loaded.bundle} navigation={navigation} sky={sky?.chartId === chartId ? sky : null} />
       : response?.portrait.status === "ready" && !saved ? legacy : children}</div>
   </>;
 }

@@ -1,8 +1,17 @@
-import { Box3, Mesh, Texture, Vector3, type Object3D, type Material } from "three";
+import { Box3, Mesh, Texture, Vector3, type Object3D, type Material, type Raycaster } from "three";
 import type { CameraBookmark, Point3, PortraitMeshAsset } from "./types.js";
 
 export const MAX_GLB_BYTES = 12 * 1024 * 1024;
 export const HOME_DIRECTION = new Vector3(0.15, 0.76, 1).normalize();
+
+/** Raycaster does not itself exclude invisible ancestors, including a cutaway roof. */
+export function firstVisibleIntersection(raycaster: Raycaster, roots: readonly Object3D[]) {
+  const targets: Mesh[] = [];
+  for (const root of roots) root.traverseVisible(object => {
+    if (object instanceof Mesh && (Array.isArray(object.material) ? object.material.some(material => material.visible) : object.material.visible)) targets.push(object);
+  });
+  return raycaster.intersectObjects(targets, false)[0];
+}
 
 /** Inspect the container before GLTFLoader can follow a buffer or image URL. */
 export function validateGlb(bytes: ArrayBuffer, chapterId?: string, source?: PortraitMeshAsset): void {

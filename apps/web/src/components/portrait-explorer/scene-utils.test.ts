@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHash, webcrypto } from "node:crypto";
-import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector3 } from "three";
-import { cameraFrame, chapterLayout, disposeModel, isCameraBookmark, TapTracker, validateGlb, verifyGlbAsset } from "./scene-utils.js";
+import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Raycaster, Texture, Vector3 } from "three";
+import { cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, TapTracker, validateGlb, verifyGlbAsset } from "./scene-utils.js";
+
+it("blocks chapter picking behind architecture and restores it when the roof is cut away", () => {
+  const chapter = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
+  chapter.userData.chapterId = "chapter-1";
+  const roof = new Group();
+  const panel = new Mesh(new BoxGeometry(3, 3, 0.2), new MeshStandardMaterial());
+  panel.position.z = 3; roof.add(panel);
+  chapter.updateMatrixWorld(); roof.updateMatrixWorld(true);
+  const ray = new Raycaster(new Vector3(0, 0, 8), new Vector3(0, 0, -1));
+  expect(firstVisibleIntersection(ray, [chapter, roof])?.object).toBe(panel);
+  roof.visible = false;
+  expect(firstVisibleIntersection(ray, [chapter, roof])?.object.userData.chapterId).toBe("chapter-1");
+  disposeModel([chapter, roof]);
+});
 
 function glb(json: unknown) {
   const text = new TextEncoder().encode(JSON.stringify(json));

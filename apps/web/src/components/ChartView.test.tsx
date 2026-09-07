@@ -43,13 +43,21 @@ function chart(qualifiedFeatures: ChartResponse["uncertainty"]["qualified_featur
 }
 
 describe("ChartView location qualifications", () => {
-  it("passes the current chart identity into the account reader after replacement", () => {
-    const original = chart([]);
+  it("passes minimized zodiac facts with the current chart identity after replacement", () => {
+    const original = { ...chart([]), positions: [{ body: "sun" as const, longitude_deg: 395.25, sign: "aries" }], angles: { ascendant_deg: 254.5, midheaven_deg: 170 } };
     const onUnauthorized = vi.fn();
     const view = render(<ChartView chart={original} onUnauthorized={onUnauthorized} />);
-    expect(reader).toHaveBeenLastCalledWith({ chartId: original.id, onUnauthorized });
+    const sky = {
+      chartId: original.id, accuracy: "exact", uncertainty: "Location details need confirmation.",
+      placements: [
+        { body: "sun", longitude: 35.25, sign: "taurus", degree: 5.25 },
+        { body: "ascendant", longitude: 254.5, sign: "sagittarius", degree: 14.5 },
+      ],
+      unavailable: { moon: "missing" },
+    };
+    expect(reader).toHaveBeenLastCalledWith({ chartId: original.id, onUnauthorized, sky });
     view.rerender(<ChartView chart={{ ...original, id: "replacement-chart" }} onUnauthorized={onUnauthorized} />);
-    expect(reader).toHaveBeenLastCalledWith({ chartId: "replacement-chart", onUnauthorized });
+    expect(reader).toHaveBeenLastCalledWith({ chartId: "replacement-chart", onUnauthorized, sky: { ...sky, chartId: "replacement-chart" } });
   });
   it("renders plain-language location qualifications", () => {
     render(<ChartView chart={chart([

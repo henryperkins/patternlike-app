@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { PORTRAIT_CONSENT_POLICY_VERSION, type PatternPortraitResponse, type PatternResponseV7, type PatternStatePattern } from "@patternlike/shared";
 import { ApiError, downloadPatternPortrait, getPatternPortrait, getPatternPortraitImage, newIdempotencyKey, startPatternPortraitGeneration } from "../lib/api-client.js";
 import { patternMatchesDocument } from "../lib/pattern-portrait.js";
+import type { PortraitSky } from "../lib/portrait-sky.js";
 import { withRequestId } from "../lib/api-status.js";
 import { bindingsFor, validateResponse, verifyImage } from "../lib/account-portrait.js";
 import { AccountPortraitExplorer } from "./AccountPortraitExplorer.js";
@@ -10,6 +11,7 @@ import "./account-pattern-portrait.css";
 
 interface AccountPatternPortraitProps {
   chartId: string;
+  sky?: PortraitSky | null;
   document: PatternResponseV7;
   pattern: PatternStatePattern;
   canCreate: boolean;
