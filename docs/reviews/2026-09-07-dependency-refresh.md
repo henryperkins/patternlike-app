@@ -6,7 +6,7 @@ Wrangler's workers-types peer requirement required the companion type update. Th
 
 The [implementation report](artifacts/2026-09-07-dependency-refresh/implementation-review.md) records primary release sources and exact focused checks. Clean npm ci preserved the lock hash; dependency graph validation, API typecheck, 18 real pool/Hono/signer RPC tests, six Wrangler config tests, signer typecheck, 19 signer tests and signer production-config dry-run build passed. The unchanged fast-uri and nanoid transitive audit findings remain outside this update.
 
-The source-frozen full local gate and independent review will be attached before merging. GitHub Actions remains billing-locked. Local dependency compatibility does not prove a deployed Worker or installed runner revision.
+The [independent spec and quality review](artifacts/2026-09-07-dependency-refresh/independent-review.md) passed after the install-policy correction. The source-frozen full local gate will be attached before merging. GitHub Actions remains billing-locked. Local dependency compatibility does not prove a deployed Worker or installed runner revision.
 
 ## Install-policy review correction
 
