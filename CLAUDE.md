@@ -11,9 +11,9 @@ Run from the repository root. Use the Node 22 pinned by `.nvmrc` (the package en
 ```bash
 npm install
 npm run typecheck          # strict tsc --noEmit across every workspace
-npm test                   # shared + calc-stub + ontology-signer + api + web, then test:contracts
+npm test                   # all eight workspaces, then test:content and test:contracts
 npm run test:contracts     # python: deterministic spec rendering + JSON Schema/fixture validation + D1 SQL smoke apply
-npm run build              # shared/calc/signer tsc-or-dry-run, Vite build, API production dry-run
+npm run build              # all eight workspaces in order; web assets before the API production dry-run
 npm run ci:local           # the merge gate — GitHub Actions does not run; see below
 
 npm run calc:dev           # calc service      :8080
