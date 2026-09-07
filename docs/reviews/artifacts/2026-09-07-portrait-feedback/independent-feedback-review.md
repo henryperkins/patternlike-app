@@ -1,0 +1,32 @@
+# Task 2 feedback review
+
+Reviewed commit `0a9251773c90194af4891901893c8082fa634fe3` against base `2e7dab059643f382b040d305170475a7e46eef3d`, the packaged ten-file diff, the implementation brief, and the supplied audit. This was a read-only source review; I did not run tests, builds, or a browser.
+
+## Important
+
+1. **The selected body readout can still make one of the twelve zodiac labels unusable at both required narrow layouts.** Root's frozen built-browser capture `output/playwright/portrait-feedback-20260907/landscape-expanded-sky.png` at 844x390 shows the Sun readout covering the end of `Capricorn`, even though the canvas is now 544x296 and all twelve label elements are marked visible. `output/playwright/portrait-feedback-20260907/narrow-moon.png` at 320x760 likewise shows the Moon readout covering `Sagittarius`. `PortraitScene.tsx:473-476` lays out every sign independently, then `PortraitScene.tsx:477-497` places the selected readout and connector without sharing collision bounds with those signs or moving the readout when it overlaps one. This leaves the first and third audit findings only partially resolved: viewport framing, canvas height, matching body keys, and the actual-marker leader are fixed, but the labels are not consistently readable/usable. The new runtime regression at `PortraitScene.runtime.test.tsx:321-328` checks the count of `visibility: visible` labels and the connector endpoint, so it passes both overlaps. Reposition the readout (while retaining its leader to the actual marker) or include the sign-label rectangles in collision placement, and extend the focused regression to assert non-overlap/readability at the narrow portrait and landscape geometries.
+
+2. **The helper-copy size correction causes the standalone phone header to overlap the page title.** In `output/playwright/portrait-feedback-20260907/narrow-moon.png` at 320x760, the wrapped `Fictional study` label extends from approximately y=53 to y=97 while the next title begins at y=64. The new grouped rule at `observatory.css:100-102` has greater specificity than the existing 9px phone rule at `explorer.css:124`, so it raises the two-line study label to 12px. The more-specific phone rule at `observatory.css:63-65` simultaneously keeps the header at a fixed 64px, overriding the later flexible-height protection at `explorer.css:172-175`. This is a visible regression introduced by the helper-copy change. Keep the 12px copy only where the header can accommodate it, or let the observatory phone header grow with its wrapped contents; verify that the header and following title bounds no longer intersect at 320px.
+
+## Remaining source review
+
+No other Critical or Important issue was found in this fix wave. Root's frozen browser batch confirmed the 320px placement cells contain the full Cancer/Taurus text without horizontal overflow, the active initial reading works, the short-landscape disclosure and expanded-to-reading focus handoff work, and real WebGL loss, Continue reading, and retry retain chapter 2, Resources, the open desk, and Dusk. The source otherwise preserves viewport-relative orbit and zoom through resize/remount, saved-sign-only uncertainty without invented longitude, reduced-motion behavior, GPU disposal, and authored reading/source boundaries.
+
+## Limits
+
+Root owns the authoritative frozen build and batched browser pass. This review relies on root's supplied frozen captures and measurements for rendered findings and successful interaction checks; production, signed-in account flows, Safari, physical GPU behavior, and screen-reader behavior were not verified here.
+
+## Re-review of correction `8b9386848f1529c51bf67378fc1a6f30f79d93c1`
+
+Base: `0a9251773c90194af4891901893c8082fa634fe3`.
+
+**PASS. No open Critical or Important findings.** Both Important findings above are resolved, and the four-file correction introduces no new scoped concern.
+
+- `PortraitScene.tsx:455-519` now records each visible sign's measured rectangle, reserves the selected marker's complete projected bounds, and places the selected readout inside the unobscured canvas through `placeLabel`. The leader's second endpoint remains the actual projected marker at `PortraitScene.tsx:514-515`; if extreme user zoom leaves no valid rectangle, the native placement strip remains available instead of rendering a misleading overlap. `scene-utils.ts:123-150` constrains candidates to the usable viewport and chooses the nearest collision-free rectangle. The focused runtime coverage at `PortraitScene.runtime.test.tsx:337-392` exercises 288x300 and 544x296 canvases for Sun, Moon, and Rising, requiring twelve visible signs, no readout/sign or readout/marker intersection, bounded readout placement, and an exact connector endpoint.
+- `observatory.css:63-65` now gives the phone header `height:auto` with `min-height:64px`, allowing the retained 12px metadata and controls to determine its actual height while leaving the desktop rule unchanged.
+
+Root's settled frozen built-browser batch confirmed the correction at the required sizes. At 390x844, the expanded canvas is 356x547 with twelve labels inside the canvas without Reset and a clear Sun readout. At 320x760, the canvas is 288x300; all 96px placement cells contain Cancer, Taurus, and Libra, and the 106.1875px header contains its children through y=97.1875 before the title begins at y=106.1875. At 844x390, the canvas is 544x296 with twelve labels inside. After allowing settled rendering (up to five seconds plus two animation frames), Sun, Moon, and Rising were each visible with zero readout/sign intersections at both the 320x760 and 844x390 geometries. Root visually confirmed the matching icons and clear leaders in `final-narrow-moon.png` and `final-landscape-rising-settled.png`; the earlier 150ms samples were taken before rendering settled and did not reproduce in the bounded settled check.
+
+The final real-context-loss check also retained the corrected recovery behavior: no canvas remained after loss; adjacent Retry and Continue reading controls each measured 44px; the paused hint stayed honest; Continue reading focused the `Making room for care` heading; and retry restored one canvas while preserving chapter 2, Resources, Dusk, and the open desk.
+
+This reviewer ran no tests, build, or browser automation during re-review. Production, signed-in account flows, Safari, physical GPU behavior, and screen-reader behavior remain unverified.

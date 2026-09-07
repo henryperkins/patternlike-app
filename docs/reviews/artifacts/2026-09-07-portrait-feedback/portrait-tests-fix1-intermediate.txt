@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/web
+
+ ❯ src/components/portrait-explorer/PortraitScene.runtime.test.tsx (14 tests | 1 failed) 20014ms
+   × keeps the selected readout clear of measured sign labels and its marker in a 288 by 300 canvas 2034ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps the selected readout clear of measured sign labels and its marker in a 288 by 300 canvas
+AssertionError: expected 'hidden' to be 'visible' // Object.is equality
+
+Expected: "visible"
+Received: "hidden"
+
+ ❯ src/components/portrait-explorer/PortraitScene.runtime.test.tsx:370:38
+    368|     await waitFor(() => expect(gpu.renders).toBeGreaterThan(renders));
+    369|     const readout = view.container.querySelector<HTMLElement>(`[data-s…
+    370|     expect(readout.style.visibility).toBe("visible");
+       |                                      ^
+    371|     const box = rect(readout);
+    372|     expect(box.left).toBeGreaterThanOrEqual(6);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 8 passed (9)
+      Tests  1 failed | 120 passed (121)
+   Start at  09:43:18
+   Duration  22.60s (transform 2.34s, setup 1.92s, import 3.94s, tests 45.32s, environment 9.32s)
+

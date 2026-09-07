@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/web
+
+
+ Test Files  9 passed (9)
+      Tests  119 passed (119)
+   Start at  09:17:41
+   Duration  26.30s (transform 2.37s, setup 1.97s, import 3.86s, tests 45.67s, environment 9.80s)
+

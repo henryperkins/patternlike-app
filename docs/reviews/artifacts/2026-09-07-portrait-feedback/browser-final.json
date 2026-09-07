@@ -1,0 +1,3001 @@
+{
+  "schema_version": "portrait-feedback-browser-observation.v1",
+  "source_commit": "8b9386848f1529c51bf67378fc1a6f30f79d93c1",
+  "source_sha256": "05a425b079699c1d177b92f1818003696c6f6bcf1fc8e03a3c1c0be1e3f8ed65",
+  "preview_url": "http://127.0.0.1:4176/pattern-portrait.html",
+  "browser": "Chromium1237 headless SwiftShader",
+  "scope": "Local fictional portrait only",
+  "reduced_motion": true,
+  "phone_entry_and_expansion": {
+    "entry": {
+      "action": {
+        "x": 16,
+        "y": 184.6875,
+        "width": 358,
+        "height": 88.78125,
+        "top": 184.6875,
+        "right": 374,
+        "bottom": 273.46875,
+        "left": 16
+      },
+      "canvas": {
+        "x": 16,
+        "y": 338.46875,
+        "width": 358,
+        "height": 345,
+        "top": 338.46875,
+        "right": 374,
+        "bottom": 683.46875,
+        "left": 16
+      },
+      "read_enabled": true
+    },
+    "expanded390": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "canvas": {
+        "x": 17,
+        "y": 73,
+        "width": 356,
+        "height": 547.234375,
+        "right": 373,
+        "bottom": 620.234375
+      },
+      "readout": {
+        "x": 108,
+        "y": 295,
+        "width": 69.359375,
+        "height": 44,
+        "right": 177.359375,
+        "bottom": 339
+      },
+      "selected": "Sun",
+      "readout_visible": true,
+      "signs": [
+        {
+          "name": "Aries",
+          "visible": true,
+          "rect": {
+            "x": 215,
+            "y": 188,
+            "width": 38.171875,
+            "height": 24.796875,
+            "right": 253.171875,
+            "bottom": 212.796875
+          }
+        },
+        {
+          "name": "Taurus",
+          "visible": true,
+          "rect": {
+            "x": 279,
+            "y": 225,
+            "width": 45.203125,
+            "height": 24.796875,
+            "right": 324.203125,
+            "bottom": 249.796875
+          }
+        },
+        {
+          "name": "Gemini",
+          "visible": true,
+          "rect": {
+            "x": 318,
+            "y": 292,
+            "width": 49,
+            "height": 24.796875,
+            "right": 367,
+            "bottom": 316.796875
+          }
+        },
+        {
+          "name": "Cancer",
+          "visible": true,
+          "rect": {
+            "x": 320,
+            "y": 371,
+            "width": 46.8125,
+            "height": 24.796875,
+            "right": 366.8125,
+            "bottom": 395.796875
+          }
+        },
+        {
+          "name": "Leo",
+          "visible": true,
+          "rect": {
+            "x": 291,
+            "y": 441,
+            "width": 30.21875,
+            "height": 24.796875,
+            "right": 321.21875,
+            "bottom": 465.796875
+          }
+        },
+        {
+          "name": "Virgo",
+          "visible": true,
+          "rect": {
+            "x": 217,
+            "y": 483,
+            "width": 39.328125,
+            "height": 24.796875,
+            "right": 256.328125,
+            "bottom": 507.796875
+          }
+        },
+        {
+          "name": "Libra",
+          "visible": true,
+          "rect": {
+            "x": 135,
+            "y": 483,
+            "width": 38.15625,
+            "height": 24.796875,
+            "right": 173.15625,
+            "bottom": 507.796875
+          }
+        },
+        {
+          "name": "Scorpio",
+          "visible": true,
+          "rect": {
+            "x": 59,
+            "y": 441,
+            "width": 50.453125,
+            "height": 24.796875,
+            "right": 109.453125,
+            "bottom": 465.796875
+          }
+        },
+        {
+          "name": "Sagittarius",
+          "visible": true,
+          "rect": {
+            "x": 23,
+            "y": 371,
+            "width": 65.609375,
+            "height": 24.796875,
+            "right": 88.609375,
+            "bottom": 395.796875
+          }
+        },
+        {
+          "name": "Capricorn",
+          "visible": true,
+          "rect": {
+            "x": 23,
+            "y": 292,
+            "width": 61.984375,
+            "height": 24.796875,
+            "right": 84.984375,
+            "bottom": 316.796875
+          }
+        },
+        {
+          "name": "Aquarius",
+          "visible": true,
+          "rect": {
+            "x": 59,
+            "y": 225,
+            "width": 57.671875,
+            "height": 24.796875,
+            "right": 116.671875,
+            "bottom": 249.796875
+          }
+        },
+        {
+          "name": "Pisces",
+          "visible": true,
+          "rect": {
+            "x": 135,
+            "y": 188,
+            "width": 42.5,
+            "height": 24.796875,
+            "right": 177.5,
+            "bottom": 212.796875
+          }
+        }
+      ],
+      "visible_count": 12,
+      "readout_sign_intersections": [],
+      "signs_outside_canvas": [],
+      "connector": {
+        "visible": true,
+        "x1": "125.5",
+        "y1": "244",
+        "x2": "270.81279492139697",
+        "y2": "313.46610365894645"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 358,
+        "height": 64,
+        "right": 374,
+        "bottom": 64
+      },
+      "header_children": [
+        {
+          "x": 16,
+          "y": 13.90625,
+          "width": 112.5625,
+          "height": 35.1875,
+          "right": 128.5625,
+          "bottom": 49.09375
+        },
+        {
+          "x": 202.609375,
+          "y": 9.5,
+          "width": 171.390625,
+          "height": 44,
+          "right": 374,
+          "bottom": 53.5
+        }
+      ],
+      "header_contains_children": true,
+      "title": {
+        "x": 16,
+        "y": 64,
+        "width": 358,
+        "height": 120.6875,
+        "right": 374,
+        "bottom": 184.6875
+      },
+      "horizontal_overflow": false
+    }
+  },
+  "first_rapid_samples": {
+    "landscape": [
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "canvas": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "right": 569,
+          "bottom": 369
+        },
+        "readout": {
+          "x": 260,
+          "y": 182,
+          "width": 69.359375,
+          "height": 44,
+          "right": 329.359375,
+          "bottom": 226
+        },
+        "selected": "Sun",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 296,
+              "y": 137,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 334.171875,
+              "bottom": 161.796875
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 325,
+              "y": 154,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 370.203125,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 342,
+              "y": 186,
+              "width": 49,
+              "height": 24.796875,
+              "right": 391,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 344,
+              "y": 223,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 390.8125,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 335,
+              "y": 257,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 365.21875,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 297,
+              "y": 274,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 336.328125,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 259,
+              "y": 274,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 297.15625,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 219,
+              "y": 257,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 269.453125,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 193,
+              "y": 223,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 258.609375,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 196,
+              "y": 186,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 257.984375,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 218,
+              "y": 154,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 275.671875,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 257,
+              "y": 137,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 299.5,
+              "bottom": 161.796875
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "269.5",
+          "y1": "131",
+          "x2": "315.92974258751946",
+          "y2": "164.0444021462613"
+        },
+        "header": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 72,
+          "right": 817.84375,
+          "bottom": 72
+        },
+        "header_children": [
+          {
+            "x": 26.15625,
+            "y": 15.5,
+            "width": 128.921875,
+            "height": 40,
+            "right": 155.078125,
+            "bottom": 55.5
+          },
+          {
+            "x": 545.46875,
+            "y": 13.5,
+            "width": 272.375,
+            "height": 44,
+            "right": 817.84375,
+            "bottom": 57.5
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 26.15625,
+          "y": 72,
+          "width": 791.6875,
+          "height": 88,
+          "right": 817.84375,
+          "bottom": 160
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "canvas": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "right": 569,
+          "bottom": 369
+        },
+        "readout": {
+          "x": 25,
+          "y": 73,
+          "width": 78.03125,
+          "height": 44,
+          "right": 103.03125,
+          "bottom": 117
+        },
+        "selected": "Moon",
+        "readout_visible": false,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 296,
+              "y": 137,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 334.171875,
+              "bottom": 161.796875
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 325,
+              "y": 154,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 370.203125,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 342,
+              "y": 186,
+              "width": 49,
+              "height": 24.796875,
+              "right": 391,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 344,
+              "y": 223,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 390.8125,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 335,
+              "y": 257,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 365.21875,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 297,
+              "y": 274,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 336.328125,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 259,
+              "y": 274,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 297.15625,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 219,
+              "y": 257,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 269.453125,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 193,
+              "y": 223,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 258.609375,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 196,
+              "y": 186,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 257.984375,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 218,
+              "y": 154,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 275.671875,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 257,
+              "y": 137,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 299.5,
+              "bottom": 161.796875
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "274",
+          "y1": "161",
+          "x2": "295.9231909180178",
+          "y2": "117.79374147505018"
+        },
+        "header": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 72,
+          "right": 817.84375,
+          "bottom": 72
+        },
+        "header_children": [
+          {
+            "x": 26.15625,
+            "y": 15.5,
+            "width": 128.921875,
+            "height": 40,
+            "right": 155.078125,
+            "bottom": 55.5
+          },
+          {
+            "x": 545.46875,
+            "y": 13.5,
+            "width": 272.375,
+            "height": 44,
+            "right": 817.84375,
+            "bottom": 57.5
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 26.15625,
+          "y": 72,
+          "width": 791.6875,
+          "height": 88,
+          "right": 817.84375,
+          "bottom": 160
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "canvas": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "right": 569,
+          "bottom": 369
+        },
+        "readout": {
+          "x": 25,
+          "y": 73,
+          "width": 81.359375,
+          "height": 44,
+          "right": 106.359375,
+          "bottom": 117
+        },
+        "selected": "Rising",
+        "readout_visible": false,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 296,
+              "y": 137,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 334.171875,
+              "bottom": 161.796875
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 325,
+              "y": 154,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 370.203125,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 342,
+              "y": 186,
+              "width": 49,
+              "height": 24.796875,
+              "right": 391,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 344,
+              "y": 223,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 390.8125,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 335,
+              "y": 257,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 365.21875,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 297,
+              "y": 274,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 336.328125,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 259,
+              "y": 274,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 297.15625,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 219,
+              "y": 257,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 269.453125,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 193,
+              "y": 223,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 258.609375,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 196,
+              "y": 186,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 257.984375,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 218,
+              "y": 154,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 275.671875,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 257,
+              "y": 137,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 299.5,
+              "bottom": 161.796875
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "275.5",
+          "y1": "129",
+          "x2": "266.5955881174531",
+          "y2": "166.94726034675415"
+        },
+        "header": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 72,
+          "right": 817.84375,
+          "bottom": 72
+        },
+        "header_children": [
+          {
+            "x": 26.15625,
+            "y": 15.5,
+            "width": 128.921875,
+            "height": 40,
+            "right": 155.078125,
+            "bottom": 55.5
+          },
+          {
+            "x": 545.46875,
+            "y": 13.5,
+            "width": 272.375,
+            "height": 44,
+            "right": 817.84375,
+            "bottom": 57.5
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 26.15625,
+          "y": 72,
+          "width": 791.6875,
+          "height": 88,
+          "right": 817.84375,
+          "bottom": 160
+        },
+        "horizontal_overflow": false
+      }
+    ],
+    "narrow": [
+      {
+        "viewport": {
+          "width": 320,
+          "height": 760
+        },
+        "canvas": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 288,
+          "height": 300,
+          "right": 304,
+          "bottom": 578.265625
+        },
+        "readout": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 69.359375,
+          "height": 44,
+          "right": 85.359375,
+          "bottom": 322.265625
+        },
+        "selected": "Sun",
+        "readout_visible": false,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 344.265625,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 198.171875,
+              "bottom": 369.0625
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 189,
+              "y": 362.265625,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 234.203125,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 206,
+              "y": 394.265625,
+              "width": 49,
+              "height": 24.796875,
+              "right": 255,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 209,
+              "y": 432.265625,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 255.8125,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 199,
+              "y": 466.265625,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 229.21875,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 484.265625,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 199.328125,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 121,
+              "y": 484.265625,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 159.15625,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 81,
+              "y": 466.265625,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 131.453125,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 55,
+              "y": 432.265625,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 120.609375,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 58,
+              "y": 394.265625,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 119.984375,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 80,
+              "y": 362.265625,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 137.671875,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 120,
+              "y": 344.265625,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 162.5,
+              "bottom": 369.0625
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "140.5",
+          "y1": "134",
+          "x2": "188.71420227658228",
+          "y2": "167.90233789887316"
+        },
+        "header": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 106.1875,
+          "right": 304,
+          "bottom": 106.1875
+        },
+        "header_children": [
+          {
+            "x": 16,
+            "y": 8,
+            "width": 112.5625,
+            "height": 35.1875,
+            "right": 128.5625,
+            "bottom": 43.1875
+          },
+          {
+            "x": 132.609375,
+            "y": 53.1875,
+            "width": 171.390625,
+            "height": 44,
+            "right": 304,
+            "bottom": 97.1875
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 16,
+          "y": 106.1875,
+          "width": 288,
+          "height": 115.078125,
+          "right": 304,
+          "bottom": 221.265625
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 320,
+          "height": 760
+        },
+        "canvas": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 288,
+          "height": 300,
+          "right": 304,
+          "bottom": 578.265625
+        },
+        "readout": {
+          "x": 122,
+          "y": 421.265625,
+          "width": 78.03125,
+          "height": 44,
+          "right": 200.03125,
+          "bottom": 465.265625
+        },
+        "selected": "Moon",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 344.265625,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 198.171875,
+              "bottom": 369.0625
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 189,
+              "y": 362.265625,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 234.203125,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 206,
+              "y": 394.265625,
+              "width": 49,
+              "height": 24.796875,
+              "right": 255,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 209,
+              "y": 432.265625,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 255.8125,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 199,
+              "y": 466.265625,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 229.21875,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 484.265625,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 199.328125,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 121,
+              "y": 484.265625,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 159.15625,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 81,
+              "y": 466.265625,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 131.453125,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 55,
+              "y": 432.265625,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 120.609375,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 58,
+              "y": 394.265625,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 119.984375,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 80,
+              "y": 362.265625,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 137.671875,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 120,
+              "y": 344.265625,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 162.5,
+              "bottom": 369.0625
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "145",
+          "y1": "165",
+          "x2": "168.35039075583953",
+          "y2": "120.82577257281902"
+        },
+        "header": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 106.1875,
+          "right": 304,
+          "bottom": 106.1875
+        },
+        "header_children": [
+          {
+            "x": 16,
+            "y": 8,
+            "width": 112.5625,
+            "height": 35.1875,
+            "right": 128.5625,
+            "bottom": 43.1875
+          },
+          {
+            "x": 132.609375,
+            "y": 53.1875,
+            "width": 171.390625,
+            "height": 44,
+            "right": 304,
+            "bottom": 97.1875
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 16,
+          "y": 106.1875,
+          "width": 288,
+          "height": 115.078125,
+          "right": 304,
+          "bottom": 221.265625
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 320,
+          "height": 760
+        },
+        "canvas": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 288,
+          "height": 300,
+          "right": 304,
+          "bottom": 578.265625
+        },
+        "readout": {
+          "x": 124,
+          "y": 388.265625,
+          "width": 81.359375,
+          "height": 44,
+          "right": 205.359375,
+          "bottom": 432.265625
+        },
+        "selected": "Rising",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 344.265625,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 198.171875,
+              "bottom": 369.0625
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 189,
+              "y": 362.265625,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 234.203125,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 206,
+              "y": 394.265625,
+              "width": 49,
+              "height": 24.796875,
+              "right": 255,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 209,
+              "y": 432.265625,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 255.8125,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 199,
+              "y": 466.265625,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 229.21875,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 484.265625,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 199.328125,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 121,
+              "y": 484.265625,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 159.15625,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 81,
+              "y": 466.265625,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 131.453125,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 55,
+              "y": 432.265625,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 120.609375,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 58,
+              "y": 394.265625,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 119.984375,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 80,
+              "y": 362.265625,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 137.671875,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 120,
+              "y": 344.265625,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 162.5,
+              "bottom": 369.0625
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "148.5",
+          "y1": "132",
+          "x2": "138.4990807624076",
+          "y2": "170.85703285294625"
+        },
+        "header": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 106.1875,
+          "right": 304,
+          "bottom": 106.1875
+        },
+        "header_children": [
+          {
+            "x": 16,
+            "y": 8,
+            "width": 112.5625,
+            "height": 35.1875,
+            "right": 128.5625,
+            "bottom": 43.1875
+          },
+          {
+            "x": 132.609375,
+            "y": 53.1875,
+            "width": 171.390625,
+            "height": 44,
+            "right": 304,
+            "bottom": 97.1875
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 16,
+          "y": 106.1875,
+          "width": 288,
+          "height": 115.078125,
+          "right": 304,
+          "bottom": 221.265625
+        },
+        "horizontal_overflow": false
+      }
+    ],
+    "scene_options": [
+      {
+        "open": false,
+        "bounds": {
+          "x": 581,
+          "y": 220.578125,
+          "width": 234,
+          "height": 44,
+          "top": 220.578125,
+          "right": 815,
+          "bottom": 264.578125,
+          "left": 581
+        }
+      }
+    ],
+    "placement_cells": [
+      {
+        "text": "SunCancer",
+        "cell": {
+          "x": 16,
+          "y": 589.265625,
+          "width": 96,
+          "height": 97.578125,
+          "top": 589.265625,
+          "right": 112,
+          "bottom": 686.84375,
+          "left": 16
+        },
+        "label": {
+          "x": 29,
+          "y": 647.453125,
+          "width": 53.8125,
+          "height": 30.390625,
+          "top": 647.453125,
+          "right": 82.8125,
+          "bottom": 677.84375,
+          "left": 29
+        }
+      },
+      {
+        "text": "MoonTaurus",
+        "cell": {
+          "x": 112,
+          "y": 589.265625,
+          "width": 96,
+          "height": 97.578125,
+          "top": 589.265625,
+          "right": 208,
+          "bottom": 686.84375,
+          "left": 112
+        },
+        "label": {
+          "x": 125,
+          "y": 647.453125,
+          "width": 51.4375,
+          "height": 30.390625,
+          "top": 647.453125,
+          "right": 176.4375,
+          "bottom": 677.84375,
+          "left": 125
+        }
+      },
+      {
+        "text": "RisingLibra",
+        "cell": {
+          "x": 208,
+          "y": 589.265625,
+          "width": 96,
+          "height": 97.578125,
+          "top": 589.265625,
+          "right": 304,
+          "bottom": 686.84375,
+          "left": 208
+        },
+        "label": {
+          "x": 221,
+          "y": 647.453125,
+          "width": 41.15625,
+          "height": 30.390625,
+          "top": 647.453125,
+          "right": 262.15625,
+          "bottom": 677.84375,
+          "left": 221
+        }
+      }
+    ]
+  },
+  "rapid_sample_caveat": "150ms samples preceded settled visibility for three selections. These are retained as intermediate observations; later explicit wait-for-visible and two-frame samples below passed without a source change.",
+  "final_settled_samples": {
+    "narrow": [
+      {
+        "viewport": {
+          "width": 320,
+          "height": 760
+        },
+        "canvas": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 288,
+          "height": 300,
+          "right": 304,
+          "bottom": 578.265625
+        },
+        "readout": {
+          "x": 122,
+          "y": 390.265625,
+          "width": 69.359375,
+          "height": 44,
+          "right": 191.359375,
+          "bottom": 434.265625
+        },
+        "selected": "Sun",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 344.265625,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 198.171875,
+              "bottom": 369.0625
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 189,
+              "y": 362.265625,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 234.203125,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 206,
+              "y": 394.265625,
+              "width": 49,
+              "height": 24.796875,
+              "right": 255,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 209,
+              "y": 432.265625,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 255.8125,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 199,
+              "y": 466.265625,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 229.21875,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 484.265625,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 199.328125,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 121,
+              "y": 484.265625,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 159.15625,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 81,
+              "y": 466.265625,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 131.453125,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 55,
+              "y": 432.265625,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 120.609375,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 58,
+              "y": 394.265625,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 119.984375,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 80,
+              "y": 362.265625,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 137.671875,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 120,
+              "y": 344.265625,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 162.5,
+              "bottom": 369.0625
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "140.5",
+          "y1": "134",
+          "x2": "188.71420227658228",
+          "y2": "167.90233789887316"
+        },
+        "header": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 106.1875,
+          "right": 304,
+          "bottom": 106.1875
+        },
+        "header_children": [
+          {
+            "x": 16,
+            "y": 8,
+            "width": 112.5625,
+            "height": 35.1875,
+            "right": 128.5625,
+            "bottom": 43.1875
+          },
+          {
+            "x": 132.609375,
+            "y": 53.1875,
+            "width": 171.390625,
+            "height": 44,
+            "right": 304,
+            "bottom": 97.1875
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 16,
+          "y": 106.1875,
+          "width": 288,
+          "height": 115.078125,
+          "right": 304,
+          "bottom": 221.265625
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 320,
+          "height": 760
+        },
+        "canvas": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 288,
+          "height": 300,
+          "right": 304,
+          "bottom": 578.265625
+        },
+        "readout": {
+          "x": 122,
+          "y": 421.265625,
+          "width": 78.03125,
+          "height": 44,
+          "right": 200.03125,
+          "bottom": 465.265625
+        },
+        "selected": "Moon",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 344.265625,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 198.171875,
+              "bottom": 369.0625
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 189,
+              "y": 362.265625,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 234.203125,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 206,
+              "y": 394.265625,
+              "width": 49,
+              "height": 24.796875,
+              "right": 255,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 209,
+              "y": 432.265625,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 255.8125,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 199,
+              "y": 466.265625,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 229.21875,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 484.265625,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 199.328125,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 121,
+              "y": 484.265625,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 159.15625,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 81,
+              "y": 466.265625,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 131.453125,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 55,
+              "y": 432.265625,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 120.609375,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 58,
+              "y": 394.265625,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 119.984375,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 80,
+              "y": 362.265625,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 137.671875,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 120,
+              "y": 344.265625,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 162.5,
+              "bottom": 369.0625
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "145",
+          "y1": "165",
+          "x2": "168.35039075583953",
+          "y2": "120.82577257281902"
+        },
+        "header": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 106.1875,
+          "right": 304,
+          "bottom": 106.1875
+        },
+        "header_children": [
+          {
+            "x": 16,
+            "y": 8,
+            "width": 112.5625,
+            "height": 35.1875,
+            "right": 128.5625,
+            "bottom": 43.1875
+          },
+          {
+            "x": 132.609375,
+            "y": 53.1875,
+            "width": 171.390625,
+            "height": 44,
+            "right": 304,
+            "bottom": 97.1875
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 16,
+          "y": 106.1875,
+          "width": 288,
+          "height": 115.078125,
+          "right": 304,
+          "bottom": 221.265625
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 320,
+          "height": 760
+        },
+        "canvas": {
+          "x": 16,
+          "y": 278.265625,
+          "width": 288,
+          "height": 300,
+          "right": 304,
+          "bottom": 578.265625
+        },
+        "readout": {
+          "x": 124,
+          "y": 388.265625,
+          "width": 81.359375,
+          "height": 44,
+          "right": 205.359375,
+          "bottom": 432.265625
+        },
+        "selected": "Rising",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 344.265625,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 198.171875,
+              "bottom": 369.0625
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 189,
+              "y": 362.265625,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 234.203125,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 206,
+              "y": 394.265625,
+              "width": 49,
+              "height": 24.796875,
+              "right": 255,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 209,
+              "y": 432.265625,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 255.8125,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 199,
+              "y": 466.265625,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 229.21875,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 160,
+              "y": 484.265625,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 199.328125,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 121,
+              "y": 484.265625,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 159.15625,
+              "bottom": 509.0625
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 81,
+              "y": 466.265625,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 131.453125,
+              "bottom": 491.0625
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 55,
+              "y": 432.265625,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 120.609375,
+              "bottom": 457.0625
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 58,
+              "y": 394.265625,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 119.984375,
+              "bottom": 419.0625
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 80,
+              "y": 362.265625,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 137.671875,
+              "bottom": 387.0625
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 120,
+              "y": 344.265625,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 162.5,
+              "bottom": 369.0625
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "148.5",
+          "y1": "132",
+          "x2": "138.4990807624076",
+          "y2": "170.85703285294625"
+        },
+        "header": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 106.1875,
+          "right": 304,
+          "bottom": 106.1875
+        },
+        "header_children": [
+          {
+            "x": 16,
+            "y": 8,
+            "width": 112.5625,
+            "height": 35.1875,
+            "right": 128.5625,
+            "bottom": 43.1875
+          },
+          {
+            "x": 132.609375,
+            "y": 53.1875,
+            "width": 171.390625,
+            "height": 44,
+            "right": 304,
+            "bottom": 97.1875
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 16,
+          "y": 106.1875,
+          "width": 288,
+          "height": 115.078125,
+          "right": 304,
+          "bottom": 221.265625
+        },
+        "horizontal_overflow": false
+      }
+    ],
+    "landscape": [
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "canvas": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "right": 569,
+          "bottom": 369
+        },
+        "readout": {
+          "x": 260,
+          "y": 182,
+          "width": 69.359375,
+          "height": 44,
+          "right": 329.359375,
+          "bottom": 226
+        },
+        "selected": "Sun",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 296,
+              "y": 137,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 334.171875,
+              "bottom": 161.796875
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 325,
+              "y": 154,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 370.203125,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 342,
+              "y": 186,
+              "width": 49,
+              "height": 24.796875,
+              "right": 391,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 344,
+              "y": 223,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 390.8125,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 335,
+              "y": 257,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 365.21875,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 297,
+              "y": 274,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 336.328125,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 259,
+              "y": 274,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 297.15625,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 219,
+              "y": 257,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 269.453125,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 193,
+              "y": 223,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 258.609375,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 196,
+              "y": 186,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 257.984375,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 218,
+              "y": 154,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 275.671875,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 257,
+              "y": 137,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 299.5,
+              "bottom": 161.796875
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "269.5",
+          "y1": "131",
+          "x2": "315.92974258751946",
+          "y2": "164.04440214626138"
+        },
+        "header": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 72,
+          "right": 817.84375,
+          "bottom": 72
+        },
+        "header_children": [
+          {
+            "x": 26.15625,
+            "y": 15.5,
+            "width": 128.921875,
+            "height": 40,
+            "right": 155.078125,
+            "bottom": 55.5
+          },
+          {
+            "x": 545.46875,
+            "y": 13.5,
+            "width": 272.375,
+            "height": 44,
+            "right": 817.84375,
+            "bottom": 57.5
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 26.15625,
+          "y": 72,
+          "width": 791.6875,
+          "height": 88,
+          "right": 817.84375,
+          "bottom": 160
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "canvas": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "right": 569,
+          "bottom": 369
+        },
+        "readout": {
+          "x": 260,
+          "y": 212,
+          "width": 78.03125,
+          "height": 44,
+          "right": 338.03125,
+          "bottom": 256
+        },
+        "selected": "Moon",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 296,
+              "y": 137,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 334.171875,
+              "bottom": 161.796875
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 325,
+              "y": 154,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 370.203125,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 342,
+              "y": 186,
+              "width": 49,
+              "height": 24.796875,
+              "right": 391,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 344,
+              "y": 223,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 390.8125,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 335,
+              "y": 257,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 365.21875,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 297,
+              "y": 274,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 336.328125,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 259,
+              "y": 274,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 297.15625,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 219,
+              "y": 257,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 269.453125,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 193,
+              "y": 223,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 258.609375,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 196,
+              "y": 186,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 257.984375,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 218,
+              "y": 154,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 275.671875,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 257,
+              "y": 137,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 299.5,
+              "bottom": 161.796875
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "274",
+          "y1": "161",
+          "x2": "295.9231909180178",
+          "y2": "117.79374147505028"
+        },
+        "header": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 72,
+          "right": 817.84375,
+          "bottom": 72
+        },
+        "header_children": [
+          {
+            "x": 26.15625,
+            "y": 15.5,
+            "width": 128.921875,
+            "height": 40,
+            "right": 155.078125,
+            "bottom": 55.5
+          },
+          {
+            "x": 545.46875,
+            "y": 13.5,
+            "width": 272.375,
+            "height": 44,
+            "right": 817.84375,
+            "bottom": 57.5
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 26.15625,
+          "y": 72,
+          "width": 791.6875,
+          "height": 88,
+          "right": 817.84375,
+          "bottom": 160
+        },
+        "horizontal_overflow": false
+      },
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "canvas": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "right": 569,
+          "bottom": 369
+        },
+        "readout": {
+          "x": 260,
+          "y": 180,
+          "width": 81.359375,
+          "height": 44,
+          "right": 341.359375,
+          "bottom": 224
+        },
+        "selected": "Rising",
+        "readout_visible": true,
+        "signs": [
+          {
+            "name": "Aries",
+            "visible": true,
+            "rect": {
+              "x": 296,
+              "y": 137,
+              "width": 38.171875,
+              "height": 24.796875,
+              "right": 334.171875,
+              "bottom": 161.796875
+            }
+          },
+          {
+            "name": "Taurus",
+            "visible": true,
+            "rect": {
+              "x": 325,
+              "y": 154,
+              "width": 45.203125,
+              "height": 24.796875,
+              "right": 370.203125,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Gemini",
+            "visible": true,
+            "rect": {
+              "x": 342,
+              "y": 186,
+              "width": 49,
+              "height": 24.796875,
+              "right": 391,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Cancer",
+            "visible": true,
+            "rect": {
+              "x": 344,
+              "y": 223,
+              "width": 46.8125,
+              "height": 24.796875,
+              "right": 390.8125,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Leo",
+            "visible": true,
+            "rect": {
+              "x": 335,
+              "y": 257,
+              "width": 30.21875,
+              "height": 24.796875,
+              "right": 365.21875,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Virgo",
+            "visible": true,
+            "rect": {
+              "x": 297,
+              "y": 274,
+              "width": 39.328125,
+              "height": 24.796875,
+              "right": 336.328125,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Libra",
+            "visible": true,
+            "rect": {
+              "x": 259,
+              "y": 274,
+              "width": 38.15625,
+              "height": 24.796875,
+              "right": 297.15625,
+              "bottom": 298.796875
+            }
+          },
+          {
+            "name": "Scorpio",
+            "visible": true,
+            "rect": {
+              "x": 219,
+              "y": 257,
+              "width": 50.453125,
+              "height": 24.796875,
+              "right": 269.453125,
+              "bottom": 281.796875
+            }
+          },
+          {
+            "name": "Sagittarius",
+            "visible": true,
+            "rect": {
+              "x": 193,
+              "y": 223,
+              "width": 65.609375,
+              "height": 24.796875,
+              "right": 258.609375,
+              "bottom": 247.796875
+            }
+          },
+          {
+            "name": "Capricorn",
+            "visible": true,
+            "rect": {
+              "x": 196,
+              "y": 186,
+              "width": 61.984375,
+              "height": 24.796875,
+              "right": 257.984375,
+              "bottom": 210.796875
+            }
+          },
+          {
+            "name": "Aquarius",
+            "visible": true,
+            "rect": {
+              "x": 218,
+              "y": 154,
+              "width": 57.671875,
+              "height": 24.796875,
+              "right": 275.671875,
+              "bottom": 178.796875
+            }
+          },
+          {
+            "name": "Pisces",
+            "visible": true,
+            "rect": {
+              "x": 257,
+              "y": 137,
+              "width": 42.5,
+              "height": 24.796875,
+              "right": 299.5,
+              "bottom": 161.796875
+            }
+          }
+        ],
+        "visible_count": 12,
+        "readout_sign_intersections": [],
+        "signs_outside_canvas": [],
+        "connector": {
+          "visible": true,
+          "x1": "275.5",
+          "y1": "129",
+          "x2": "266.5955881174531",
+          "y2": "166.94726034675423"
+        },
+        "header": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 72,
+          "right": 817.84375,
+          "bottom": 72
+        },
+        "header_children": [
+          {
+            "x": 26.15625,
+            "y": 15.5,
+            "width": 128.921875,
+            "height": 40,
+            "right": 155.078125,
+            "bottom": 55.5
+          },
+          {
+            "x": 545.46875,
+            "y": 13.5,
+            "width": 272.375,
+            "height": 44,
+            "right": 817.84375,
+            "bottom": 57.5
+          }
+        ],
+        "header_contains_children": true,
+        "title": {
+          "x": 26.15625,
+          "y": 72,
+          "width": 791.6875,
+          "height": 88,
+          "right": 817.84375,
+          "bottom": 160
+        },
+        "horizontal_overflow": false
+      }
+    ]
+  },
+  "settling_strategy": "Wait for selected readout visibility and transform within5000ms, then two animation frames",
+  "geometry_pass": true,
+  "graphics_loss_reading_and_retry": {
+    "loss": true,
+    "fallback": {
+      "canvas_count": 0,
+      "hint": "Your chapter reading remains available while the scene is paused.",
+      "actions": [
+        {
+          "text": "Try 3D again",
+          "bounds": {
+            "x": 339.21875,
+            "y": 478.203125,
+            "width": 111.3125,
+            "height": 44,
+            "top": 478.203125,
+            "right": 450.53125,
+            "bottom": 522.203125,
+            "left": 339.21875
+          }
+        },
+        {
+          "text": "Continue reading",
+          "bounds": {
+            "x": 458.53125,
+            "y": 478.203125,
+            "width": 140.265625,
+            "height": 44,
+            "top": 478.203125,
+            "right": 598.796875,
+            "bottom": 522.203125,
+            "left": 458.53125
+          }
+        }
+      ]
+    },
+    "focus": {
+      "tag": "H2",
+      "text": "Making room for care"
+    },
+    "recovered": {
+      "canvas_count": 1,
+      "heading": "Making room for care",
+      "facet": "Resources",
+      "pressed": [
+        "Your Pattern",
+        "Read chapter",
+        "Dusk",
+        "Close reading desk",
+        "022. Making room for care"
+      ]
+    }
+  },
+  "limitations": [
+    "No full repository gate",
+    "No production account flows",
+    "No physical-device GPU performance",
+    "No Safari",
+    "No screen-reader compliance assessment"
+  ]
+}
