@@ -435,15 +435,21 @@ class PortraitRuntime {
       anchor.y = box.max.y + 0.12;
       const projected = anchor.clone().project(this.camera);
       let visible = projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
-      if (this.width < 520 && this.height < 420 && !this.props.selectedIds.includes(form.id)) visible = false;
+      const compact = this.width < 520 && this.height < 420 && !this.props.selectedIds.includes(form.id);
+      label.dataset.compact = String(compact);
       this.raycaster.set(this.camera.position, anchor.clone().sub(this.camera.position).normalize());
       const hit = this.visibleHit();
       if (hit && hit.distance < this.camera.position.distanceTo(anchor) - 0.1 && hit.object.userData.chapterId !== form.id) visible = false;
-      const width = label.offsetWidth || 110;
+      const width = label.offsetWidth || (compact ? 44 : 110);
       const height = label.offsetHeight || 44;
-      const x = Math.max(8, Math.min(this.width - width - 8, (projected.x + 1) * this.width / 2 - width / 2));
-      const y = Math.max(this.topInset + 4, Math.min(this.height - this.bottomInset - height - 4, (1 - projected.y) * this.height / 2 - height));
-      if (occupied.some(other => x < other.x + other.width + 8 && x + width + 8 > other.x && y < other.y + other.height + 8 && y + height + 8 > other.y)) visible = false;
+      let x = Math.max(8, Math.min(this.width - width - 8, (projected.x + 1) * this.width / 2 - width / 2));
+      let y = Math.max(this.topInset + 4, Math.min(this.height - this.bottomInset - height - 4, (1 - projected.y) * this.height / 2 - height));
+      if (compact && visible) {
+        const placed = placeLabel({ x, y, width, height }, {
+          x: 8, y: this.topInset + 4, width: this.width - 16, height: this.usableHeight - 8,
+        }, occupied.map(other => ({ x: other.x - 3, y: other.y - 3, width: other.width + 6, height: other.height + 6 })));
+        if (placed) { x = placed.x; y = placed.y; } else visible = false;
+      } else if (occupied.some(other => x < other.x + other.width + 8 && x + width + 8 > other.x && y < other.y + other.height + 8 && y + height + 8 > other.y)) visible = false;
       // Never hide a focused native control while a camera transition is running.
       if (document.activeElement === label) visible = true;
       label.style.visibility = visible ? "visible" : "hidden";
@@ -665,7 +671,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
           onFocus={() => runtime.current?.highlight(chapter.id)} onBlur={() => runtime.current?.highlight(null)}
           onPointerEnter={() => runtime.current?.highlight(chapter.id)} onPointerLeave={() => runtime.current?.highlight(null)}
           onClick={() => annotation ? props.onAnnotation() : props.onSelect(chapter.id)}>
-          {annotation ? <><span aria-hidden="true">●</span> {facet.label}{props.activePassage !== null && <span className="explorer-passage-number"> · {props.activePassage + 1}</span>}</> : <><span className="explorer-label-ordinal">Chapter {chapter.ordinal}</span><span className="explorer-label-title">{chapter.title}</span></>}
+          {annotation ? <><span aria-hidden="true">●</span> {facet.label}{props.activePassage !== null && <span className="explorer-passage-number"> · {props.activePassage + 1}</span>}</> : <><span className="explorer-label-ordinal"><span className="explorer-label-prefix">Chapter </span>{String(chapter.ordinal).padStart(2, "0")}</span><span className="explorer-label-title">{chapter.title}</span></>}
         </button>;
       })}
     </div>

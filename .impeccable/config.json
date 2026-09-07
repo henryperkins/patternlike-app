@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "apps/web/src/styles.css"
+        ],
+        "createdAt": "2026-09-07T12:41:14.549Z",
+        "reason": "Codex: apps/web/DESIGN.md reserves Signal Coral for errors and consequential annotations; Onboarding.tsx renders .form-error as a role=alert validation message."
+      }
+    ]
+  }
+}

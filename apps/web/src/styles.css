@@ -230,10 +230,11 @@ summary:focus-visible {
   position: absolute;
   left: -18px;
   width: 3px;
-  height: 0;
+  height: 24px;
   background: var(--coral);
   content: "";
-  transition: height 160ms ease;
+  transform: scaleY(0);
+  transition: transform 160ms ease;
 }
 
 .nav-item:hover {
@@ -247,7 +248,7 @@ summary:focus-visible {
 }
 
 .nav-item--active::before {
-  height: 24px;
+  transform: scaleY(1);
 }
 
 .nav-item__icon {
@@ -558,9 +559,11 @@ summary:focus-visible {
 
 .step-heading__line span {
   display: block;
+  width: 100%;
   height: 100%;
   background: var(--coral);
-  transition: width 300ms ease;
+  transform-origin: left center;
+  transition: transform 300ms ease;
 }
 
 .form-step {
@@ -5521,12 +5524,8 @@ summary:focus-visible {
   .mobile-nav .nav-item::before {
     inset: -4px auto auto;
     width: 22px;
-  }
-
-  /* Scoped to the active item. Setting the height on every .nav-item::before
-   * drew the coral marker above all five, so nothing read as current. */
-  .mobile-nav .nav-item--active::before {
     height: 2px;
+    transform-origin: top center;
   }
 
   .mobile-nav .nav-item__icon {

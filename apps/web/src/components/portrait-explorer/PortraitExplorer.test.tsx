@@ -43,6 +43,20 @@ async function chapter(user: ReturnType<typeof userEvent.setup>, ordinal = 1) {
 }
 
 describe("Portrait exploration", () => {
+  it("returns focus to the selected chapter when leaving the sky reader", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
+    await chapter(user, 2);
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await user.click(screen.getByRole("button", { name: "Explore your Pattern" }));
+    expect(screen.getByRole("heading", { name: nativePattern.core_chapters[1].title })).toHaveFocus();
+  });
+
+  it("does not invite readers to find placements that are unavailable", async () => {
+    mount(); await screen.findByTestId("scene");
+    expect(screen.queryByText(/Find your Sun, Moon, and rising/)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your Pattern, in four chapters" })).toBeVisible();
+  });
+
   it("offers an entry invitation before the canvas and reads the first chapter immediately", async () => {
     const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
     const invitation = screen.getByText("Four objects hold your saved chapters. Choose one to explore its story.");

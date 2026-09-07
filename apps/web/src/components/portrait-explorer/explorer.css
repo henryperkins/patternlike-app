@@ -9,7 +9,7 @@
 .portrait-explorer h1, .portrait-explorer h2, .portrait-explorer h3, .portrait-explorer h4, .explorer-dialog h2 { font-family:var(--serif, Georgia, serif); font-weight:400; letter-spacing:-.035em; line-height:1.17; }
 .portrait-explorer p { margin:0 0 18px; }
 .explorer-header { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--explorer-rule); height:84px; gap:16px; }
-.explorer-wordmark { font-family:Georgia,serif; color:var(--explorer-ink); font-size:25px; font-weight:bold; text-decoration:none; letter-spacing:-1.1px; }
+.explorer-wordmark { font-family:var(--serif, Georgia, serif); color:var(--explorer-ink); font-size:25px; font-weight:bold; text-decoration:none; letter-spacing:-1.1px; }
 .explorer-wordmark span { color:#6c8563; padding:0 3px; }
 .explorer-header > div { display:flex; align-items:center; gap:24px; }
 .explorer-study-label { color:var(--explorer-muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
@@ -40,7 +40,7 @@
 .explorer-toolbar-divider { width:1px; height:20px; background:#76937a; margin:0 3px; }
 .explorer-scene-toolbar .explorer-expand { margin-left:8px; border-left:1px solid #63856e; border-radius:0; }
 .explorer-scene-message { position:absolute; inset:26% 8% auto; padding:24px; text-align:center; z-index:1; color:#fbf7e9; background:#12332ce8; border-radius:8px; }
-.explorer-scene-message p:first-child { font-family:Georgia,serif; font-size:24px; }
+.explorer-scene-message p:first-child { font-family:var(--serif, Georgia, serif); font-size:24px; }
 .explorer-scene-message button { border-color:#adc49c; }
 /* Let wrapped fallback copy determine the height; fixed overlays can hide retry on phones. */
 .explorer-scene:has(> .explorer-scene-message) { height:auto; min-height:330px; display:flex; flex-direction:column; gap:16px; padding:10px; }
@@ -74,8 +74,8 @@
 .explorer-reader-actions { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 16px; border-top:1px solid var(--explorer-rule); padding-top:12px; }
 .explorer-compare-label select { border:0; border-bottom:1px solid #aab6a0; background:transparent; font-size:12px; max-width:190px; padding:8px 4px; }
 .explorer-next-chapter { width:100%; margin-top:30px; padding:18px 0 !important; display:flex; flex-direction:column; align-items:flex-start; gap:6px; border-top:1px solid var(--explorer-rule) !important; border-radius:0 !important; text-align:left; }
-.explorer-next-chapter > span { text-transform:uppercase; font-size:10px; letter-spacing:.08em; color:var(--explorer-muted); }
-.explorer-next-chapter strong { font-family:Georgia,serif; font-weight:400; font-size:19px; }
+.explorer-next-chapter > span { text-transform:uppercase; font-size:12px; letter-spacing:.08em; color:var(--explorer-muted); }
+.explorer-next-chapter strong { font-family:var(--serif, Georgia, serif); font-weight:400; font-size:19px; }
 .explorer-introduction { padding:24px 0; }
 .explorer-introduction h2 { max-width:17ch; }
 .explorer-introduction > p { font-size:15px; color:#48604f; }

@@ -381,7 +381,7 @@ export function Onboarding({ onSubmit, mode = "create", onCancel }: OnboardingPr
         <div className="step-heading">
           <span className="step-heading__count">0{step} / 03</span>
           <div className="step-heading__line">
-            <span style={{ width: `${(step / 3) * 100}%` }} />
+            <span style={{ transform: `scaleX(${step / 3})` }} />
           </div>
         </div>
 

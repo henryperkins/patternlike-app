@@ -8,6 +8,7 @@ import type { PortraitSky } from "../lib/portrait-sky.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { PortraitExplorer } from "./portrait-explorer/PortraitExplorer.js";
 import { useExplorerNavigation } from "./portrait-explorer/use-explorer-navigation.js";
+import { usePortraitSession } from "./portrait-explorer/portrait-session.js";
 import type { PortraitMeshAsset, PortraitMeshBundle } from "./portrait-explorer/types.js";
 
 interface Props {
@@ -47,7 +48,8 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   const [useLegacy, setUseLegacy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), { embedded: true });
+  const session = usePortraitSession(JSON.stringify([chartId, document]));
+  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), { embedded: true, memory: session.memory });
   const { isOpen: open, open: openExplorer, close: closeExplorer } = navigation;
   const [loaded, setLoaded] = useState<LoadedPortrait | null>(null);
   const [assetError, setAssetError] = useState(false);
@@ -65,9 +67,10 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   const opened = useRef(open); opened.current = open;
   const discardArtifacts = useCallback(() => {
     assetRequest.current?.abort(); assetRequest.current = null;
+    session.verified = null;
     for (const url of artifactUrls.current) { URL.revokeObjectURL(url); ownedUrls.current.delete(url); }
     artifactUrls.current = []; artifactIdentity.current = null; setLoaded(null);
-  }, []);
+  }, [session]);
   const returnToReading = useCallback(() => {
     if (opened.current) pendingFocus.current = true;
     closeExplorer(); discardArtifacts();
@@ -83,6 +86,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
     void getPatternPortraitExplorer(controller.signal).then((next) => {
       if (controller.signal.aborted) return;
       validate(next, chartId, document);
+      if (session.verified && session.verified.identity !== JSON.stringify(next)) session.verified = null;
       if (next.status !== "ready") returnToReading();
       else if (artifactIdentity.current && artifactIdentity.current !== JSON.stringify(next)) discardArtifacts();
       setResponse((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
@@ -94,7 +98,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
       else report(cause);
     }).finally(() => { if (statusRequest.current === controller) statusRequest.current = null; });
     return () => { controller.abort(); if (statusRequest.current === controller) statusRequest.current = null; };
-  }, [eligible, chartId, document, attempt, report, returnToReading, discardArtifacts]);
+  }, [eligible, chartId, document, attempt, report, returnToReading, discardArtifacts, session]);
   useEffect(() => {
     if (response?.status !== "generating" && !response?.retryable) return;
     const poll = () => { if (globalThis.document.visibilityState === "visible" && !statusRequest.current) refresh(); };
@@ -110,7 +114,10 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   useEffect(() => {
     if (!saved || !open || loaded?.identity === identity) return;
     const controller = new AbortController(); assetRequest.current = controller; setAssetError(false);
-    void import("./portrait-explorer/scene-utils.js").then(({ verifyGlbAsset }) => {
+    // Reuse only fully verified bytes after the current authenticated status
+    // response passed validation. Object URLs still belong to this mount.
+    const artifacts = session.verified?.identity === identity ? Promise.resolve(session.verified.artifacts)
+      : import("./portrait-explorer/scene-utils.js").then(({ verifyGlbAsset }) => {
       controller.signal.throwIfAborted();
       return Promise.all(saved.portrait.chapters.map(async (chapter) => {
         const model = saved.models.find((model) => model.chapter_id === chapter.chapter_id)!;
@@ -126,8 +133,10 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
         await verifyGlbAsset(bytes, model.sha256, model.chapter_id, asset); controller.signal.throwIfAborted();
         return { image, mesh, asset };
       }));
-    }).then((artifacts) => {
+    });
+    void artifacts.then((artifacts) => {
       controller.signal.throwIfAborted();
+      session.verified = { identity: identity!, artifacts };
       const nextUrls: string[] = [];
       const own = (blob: Blob) => { const url = URL.createObjectURL(blob); nextUrls.push(url); ownedUrls.current.add(url); return url; };
       try {
@@ -148,7 +157,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
       if (cause instanceof ApiError && cause.status === 401) report(cause); else setAssetError(true);
     });
     return () => { controller.abort(); if (assetRequest.current === controller) assetRequest.current = null; };
-  }, [saved, identity, open, loaded?.identity, assetAttempt, report]);
+  }, [saved, identity, open, loaded?.identity, assetAttempt, report, session]);
   useEffect(() => () => {
     downloadRequest.current?.abort();
     for (const url of ownedUrls.current) URL.revokeObjectURL(url);
@@ -188,10 +197,12 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
       {!response && !error && <p role="status">Checking your saved portrait.</p>}
       {response?.status === "not_started" && <p>Choose automatic portraits above to turn this Pattern into four objects you can explore. Your reading is ready below.</p>}
       {response?.status === "generating" && <><p role="status">Creating your portrait · {response.portrait.completed_chapters} of 4 images · {response.completed_models} of 4 models saved.</p><p>You can keep reading or leave and return. Each model is checked against its chapter image before it is saved.</p></>}
-      {response?.status === "failed" && <><p role="status">Your 3D portrait could not be completed. {response.completed_models} of 4 models are saved.</p><p>Your complete reading remains available. Saved images and completed models are retained.</p></>}
+      {response?.status === "failed" && <><p role="status">Your 3D portrait could not be completed. {response.completed_models} of 4 models are saved.</p><p>Your complete reading remains available. Saved images and completed models are retained.</p>
+        {response.retryable && <p>Unfinished work may still be retried automatically. Check its progress below.</p>}
+        <button type="button" className="button button--secondary" onClick={refresh}>Refresh portrait status</button></>}
       {saved && <>
         <p>Your four objects are saved privately with this Pattern. Exploring them reuses the saved models.</p>
-        <div className="account-portrait__actions"><button type="button" className="button button--primary" aria-expanded={open} disabled={open} onClick={() => { pendingFocus.current = true; openExplorer(); }}>{open ? "Portrait open" : "Explore your 3D portrait"}</button>
+        <div className="account-portrait__actions"><button type="button" className="button button--primary" aria-expanded={open} aria-disabled={open} onClick={() => { if (open) return; pendingFocus.current = true; openExplorer(); }}>{open ? showingExplorer ? "Portrait open" : "Loading portrait…" : "Explore your 3D portrait"}</button>
           <button type="button" className="button button--secondary" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download complete portrait"}</button></div>
         <p className="account-portrait__detail">The private download includes your complete reading, four images, four 3D models, and their saved source records. It is separate from your account data export.</p>
       </>}
@@ -200,6 +211,6 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
       {open && !showingExplorer && <button type="button" className="button button--secondary" onClick={closeExplorer}>Cancel portrait loading</button>}
     </section>
     <div ref={contentElement} tabIndex={-1}>{showingExplorer && loaded ? <PortraitExplorer source={source} objectBindings={loaded.bindings} meshBundle={loaded.bundle} navigation={navigation} sky={sky?.chartId === chartId ? sky : null} />
-      : response?.portrait.status === "ready" && !saved ? legacy : children}</div>
+      : children}</div>
   </>;
 }

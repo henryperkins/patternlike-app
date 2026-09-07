@@ -14,6 +14,7 @@ import { TimeTravelView } from "./components/TimeTravelView.js";
 import { TimingView } from "./components/TimingView.js";
 import { TodayView } from "./components/TodayView.js";
 import { SignedOut } from "./components/SignedOut.js";
+import { PortraitSessionProvider } from "./components/portrait-explorer/portrait-session.js";
 import {
   ApiError,
   createBirthProfile,
@@ -498,11 +499,10 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
   }
 
   return (
-    <AppShell
-      activeView={view}
-      chartStatus={shellStatus}
-    >
-      {content}
-    </AppShell>
+    <PortraitSessionProvider key={chart?.id ?? "no-chart"}>
+      <AppShell activeView={view} chartStatus={shellStatus}>
+        {content}
+      </AppShell>
+    </PortraitSessionProvider>
   );
 }

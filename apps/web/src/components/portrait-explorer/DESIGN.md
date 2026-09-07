@@ -170,7 +170,9 @@ Your sky initially frames the dial from nearly overhead, arranging all twelve si
 
 At (`1023px`) and below, the workspace stacks and the reader returns to page scrolling. The scene is (`480px`) tall on tablets and (`345px`) below (`767px`), reducing to (`300px`) below (`359px`). Phone gutters are (`16px`); chapter navigation uses two columns. The mobile Read chapter view hides the scene and its atmosphere controls while retaining chapter navigation and reading. The expanded dialog allocates its height among the scene and native controls.
 
-Account embedding inherits the host's paper, navigation, and content width. Container rules stack it below (`859px`), reduce the chapter rail to two columns below (`539px`), and wrap the camera bar into three columns below (`319px`). Desktop comparison gives more width to the reader; phone comparison stacks the two chapters.
+Account embedding inherits the host's paper, navigation, and content width. Container rules stack it below (`859px`), reduce the chapter rail to two columns below (`539px`), and wrap the camera bar into three columns below (`319px`). Comparison hides the scene panel and uses the full workspace width. Its `17px` serif columns have a `45ch` minimum capped at the available width, stacking when two columns cannot fit. Comparison chapter headings use the same `25px` role in standalone and account views; summaries retain the `15px` sans-serif role.
+
+On canvases below `520px` wide and `420px` tall, unselected visible objects use `44px` ordinal controls matching the chapter rail. Compact controls move to the nearest free space; full labels retain their collision rule. Both respect occlusion and keep complete accessible chapter names.
 
 ## Elevation & Depth
 
@@ -220,15 +222,19 @@ The focused camera toolbar accepts arrow keys, plus/minus, and Home. Perspective
 
 The reader preserves chapter title, summary, all Overview paragraphs, Tensions, Resources, and Another expression. Comparison presents the same perspective in two chapters; the guide advances only through explicit Previous/Next actions. Show in portrait connects an unchanged passage to its scene annotation, and the annotation returns focus to that source passage. Original-image inspection retains its label, rationale, chapter title, and image reference.
 
-Full reading remains a native text view containing every chapter and perspective, additional signatures, uncertainty, and source revision. Reading and navigation do not depend on the desk being open or WebGL being available. Graphics failure displays an honest status and disables graphics-dependent controls; a valid bundle can retry while the complete reading remains accessible.
+Full reading remains a native text view containing every chapter and perspective, additional signatures, uncertainty, and source revision. Reading and navigation do not depend on the desk being open or WebGL being available. Graphics failure displays an honest status and disables graphics-dependent controls; a valid bundle can retry while the complete reading remains accessible. A failed scene-code import offers an explicit page reload to retrieve the current application, since retrying a deleted deployment chunk cannot restore it. Loading entry controls remain focusable, and returning from the sky reader focuses the selected chapter heading.
 
 **The Complete Reading Rule.** Visual exploration must retain every source passage and its chapter association; the scene never substitutes for the complete text.
 
-The sky reader shows calculated position and qualification beside an explicit return to the Pattern. It does not assign chapters or paragraphs to planets, signs, or inferred aspects. In account embedding, Read today's horoscope links to the existing `#today` route; this natal view neither calculates a new date nor generates daily horoscope copy.
+The sky reader shows calculated position and qualification beside an explicit return to the Pattern. It does not assign chapters or paragraphs to planets, signs, or inferred aspects. In account embedding, Open today's reading links to the existing `#today` route; this natal view neither calculates a new date nor generates daily reading copy. The Pattern introduction names its four chapters and only invites exploration of placements that are available.
+
+Failed portrait creation exposes a status refresh alongside the complete reading. `retryable` describes pending or running automatic work; refreshing does not start generation. The legacy constellation is shown only when explorer delivery is unavailable, avoiding duplicate cards during creation or failure.
 
 ### Resource ownership
 
 The runtime owns its canvas, controls, observers, animation requests, environment target, shadow resources, and authored world, including the instrument's materials and geometry. The loader effect owns downloaded model resources, aborts pending loads, and disposes completed or late models on failure, source replacement, and unmount. Static architecture and calibration ticks are merged where appropriate; desk hinges, markers, and hoops retain their required independent transforms. Asset validation retains chapter, source text, source image, mesh hash, and revision binding before display. Sky selection adds local instrument state without changing saved GLBs, image bindings, or source prose. The setting adds geometry, not raster assets or new generation requests.
+
+The signed-in chart session retains one portrait's fully verified image and model blobs, keyed on the exact explorer response. Reopening after a route change first validates a fresh authenticated status response and creates new object URLs; each mount revokes its own URLs. Changed source identity, failed authorization, Pattern deletion or withdrawal, sign-out, access loss and chart replacement invalidate reuse. Nothing is written to browser storage. Chapter, perspective, presentation and reading positions remain in session memory across close/reopen and route changes. Reopening rebuilds the retained path for Back controls; the session also retains prior visits so native Back and Forward restore them after a route change. Clearing the Pattern session unwinds the current visit before its history becomes unavailable.
 
 ## Do's and Don'ts
 

@@ -2,10 +2,10 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { currentFacet, selectedChapterIds } from "./explorer-state.js";
-import { useExplorerNavigation } from "./use-explorer-navigation.js";
+import { clearExplorerMemory, createExplorerMemory, useExplorerNavigation, type ExplorerMemory } from "./use-explorer-navigation.js";
 
-function AccountNavigation() {
-  const navigation = useExplorerNavigation(["chapter-1", "chapter-2"], { embedded: true });
+function AccountNavigation({ memory }: { memory?: ExplorerMemory } = {}) {
+  const navigation = useExplorerNavigation(["chapter-1", "chapter-2"], { embedded: true, memory });
   const { state, isOpen, open, close, dispatch } = navigation;
   return <>
     <output>{isOpen ? `${selectedChapterIds(state).join("+")}:${currentFacet(state)}:${state.presentation}` : "Account reading"}</output>
@@ -19,8 +19,8 @@ function AccountNavigation() {
 }
 
 beforeEach(() => {
-  window.history.replaceState({ route: "previous" }, "");
-  window.history.pushState({ route: "pattern", unrelated: "retained" }, "");
+  window.history.replaceState({ route: "previous" }, "", "#previous");
+  window.history.pushState({ route: "pattern", unrelated: "retained" }, "", "#pattern");
 });
 const output = () => screen.getByRole("status");
 async function travel(direction: "back" | "forward") {
@@ -30,8 +30,75 @@ async function travel(direction: "back" | "forward") {
     await done;
   });
 }
+async function visit(hash: string) {
+  await act(async () => {
+    const done = new Promise<void>((resolve) => window.addEventListener("hashchange", () => resolve(), { once: true }));
+    window.location.hash = hash;
+    await done;
+  });
+}
 
 describe("account portrait history boundary", () => {
+  it("releases private state and unwinds a visit after an in-flight return", async () => {
+    const memory = createExplorerMemory(), user = userEvent.setup();
+    const accountEntry = window.history.state;
+    const view = render(<AccountNavigation memory={memory} />);
+    await user.click(screen.getByText("Open portrait"));
+    await user.click(screen.getByText("Chapter two"));
+    await user.click(screen.getByText("Read"));
+    act(() => {
+      fireEvent.click(screen.getByText("Return"));
+      clearExplorerMemory(memory);
+      view.unmount();
+    });
+    expect(memory.snapshot).toBeNull();
+    expect(memory.history.entries.size).toBe(0);
+    await waitFor(() => expect(window.history.state).toEqual(accountEntry));
+    await travel("back");
+    expect(window.history.state).toEqual({ route: "previous" });
+  });
+  it("restores both visits when browser Back crosses a Today round trip", async () => {
+    const memory = createExplorerMemory();
+    const user = userEvent.setup(); const view = render(<AccountNavigation memory={memory} />);
+    await user.click(screen.getByText("Open portrait"));
+    await user.click(screen.getByText("Chapter two"));
+    await user.click(screen.getByText("Resources"));
+    await user.click(screen.getByText("Read"));
+    await visit("today");
+    view.unmount();
+    await visit("pattern");
+    const returned = render(<AccountNavigation memory={memory} />);
+    await user.click(screen.getByText("Open portrait"));
+    expect(output()).toHaveTextContent("chapter-2:resources:reading");
+    await travel("back");
+    expect(output()).toHaveTextContent("chapter-2:resources:explore");
+    await user.click(screen.getByText("Close portrait"));
+    await waitFor(() => expect(window.history.state?.portrait).toBeUndefined());
+    returned.unmount();
+    await travel("back");
+    expect(window.location.hash).toBe("#today");
+    await travel("back");
+    expect(window.location.hash).toBe("#pattern");
+    render(<AccountNavigation memory={memory} />);
+    expect(output()).toHaveTextContent("chapter-2:resources:reading");
+    await travel("back");
+    expect(output()).toHaveTextContent("chapter-2:resources:explore");
+    await travel("forward");
+    expect(output()).toHaveTextContent("chapter-2:resources:reading");
+  });
+  it("resumes the last chapter and perspective after closing and reopening", async () => {
+    const user = userEvent.setup(); render(<AccountNavigation />);
+    await user.click(screen.getByText("Open portrait"));
+    await user.click(screen.getByText("Chapter two"));
+    await user.click(screen.getByText("Resources"));
+    await user.click(screen.getByText("Read"));
+    await user.click(screen.getByText("Close portrait"));
+    await waitFor(() => expect(window.history.state?.portrait).toBeUndefined());
+    await user.click(screen.getByText("Open portrait"));
+    expect(output()).toHaveTextContent("chapter-2:resources:reading");
+    await travel("back");
+    expect(output()).toHaveTextContent("chapter-2:resources:explore");
+  });
   it("leaves account history untouched until entry and consumes all portrait entries on exit", async () => {
     const user = userEvent.setup(); render(<AccountNavigation />);
     expect(window.history.state).toEqual({ route: "pattern", unrelated: "retained" });

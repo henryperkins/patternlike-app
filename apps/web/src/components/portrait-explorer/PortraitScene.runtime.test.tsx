@@ -93,6 +93,17 @@ it("restores actual camera coordinates without replaying the last command, and s
   expect(gpu.disposals).toBe(1);
 });
 
+it("keeps an unselected chapter identifiable on a phone canvas", async () => {
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(new DOMRect(0, 0, 324, 345));
+  const callbacks = { ...props(), selectedIds: [], bookmark: undefined, command: { kind: "frame" as const, serial: 0 } };
+  render(<PortraitScene {...callbacks} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"));
+  const label = document.querySelector<HTMLButtonElement>("[data-form-index='0']")!;
+  expect(label.style.visibility).toBe("visible");
+  expect(label).toHaveAccessibleName("Explore chapter 1: Finding your own direction");
+  expect(label).toHaveAttribute("data-compact", "true");
+});
+
 it("operates real courtyard geometry, honors reduced motion, and releases its resources at rest", async () => {
   const callbacks = props();
   const experience = { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} };

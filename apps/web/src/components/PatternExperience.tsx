@@ -23,6 +23,7 @@ import type { PortraitSky } from "../lib/portrait-sky.js";
 import { AccountPatternPortrait } from "./AccountPatternPortrait.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { PatternConsentTerms } from "./PatternConsent.js";
+import { useClearPortraitSession } from "./portrait-explorer/portrait-session.js";
 
 interface PatternExperienceProps {
   chartId: string;
@@ -356,6 +357,7 @@ function ReadyDocument({
 }
 
 function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: PatternExperienceProps) {
+  const clearPortraitSession = useClearPortraitSession();
   const [portraitPreferenceSaving, setPortraitPreferenceSaving] = useState(false);
   const [state, setState] = useState<PatternStateDocumentV9 | null>(null);
   const [document, setDocument] = useState<PatternResponseV7 | null>(null);
@@ -375,6 +377,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
       const next = await getPatternState(signal);
       if (signal.aborted) return;
       if ((next.chart && next.chart.chart_id !== chartId) || (next.state === "ready" && (!next.chart || !next.pattern))) {
+        clearPortraitSession();
         currentDocument.current = null;
         setDocument(null);
         setState(null);
@@ -385,12 +388,14 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
       setRequestId(null);
       if (next.state === "ready") {
         if (currentDocument.current && !patternMatchesDocument(next.pattern, currentDocument.current)) {
+          clearPortraitSession();
           currentDocument.current = null;
           setDocument(null);
         }
         const generated = await getGeneratedPattern(signal);
         if (signal.aborted) return;
         if (!patternMatchesDocument(next.pattern, generated)) {
+          clearPortraitSession();
           currentDocument.current = null;
           setDocument(null);
           throw new Error("This reading no longer matches the current Pattern state. Refresh to load its latest revision.");
@@ -399,12 +404,14 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
         if (JSON.stringify(currentDocument.current) !== JSON.stringify(generated)) currentDocument.current = generated;
         setDocument(currentDocument.current);
       } else {
+        clearPortraitSession();
         currentDocument.current = null;
         setDocument(null);
       }
     } catch (caught) {
       if (signal.aborted) return;
       if (caught instanceof ApiError && caught.status === 401) {
+        clearPortraitSession();
         onUnauthorized();
         return;
       }
@@ -417,7 +424,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
     } finally {
       if (!signal.aborted) setBusy(false);
     }
-  }, [chartId, onUnauthorized]);
+  }, [chartId, onUnauthorized, clearPortraitSession]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -474,6 +481,9 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
     deleteKey.current ??= newIdempotencyKey("web-pattern-delete");
     try {
       await deleteGeneratedPattern(deleteKey.current);
+      clearPortraitSession();
+      currentDocument.current = null;
+      setDocument(null);
       deleteKey.current = null;
       setAttempt((value) => value + 1);
     } catch (caught) {

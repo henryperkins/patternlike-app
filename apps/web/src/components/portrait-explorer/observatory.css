@@ -53,7 +53,19 @@
 .observatory-explorer.explorer-embedded .explorer-workspace { grid-template-columns:minmax(0, 1.5fr) minmax(280px, 1fr); }
 .observatory-explorer.explorer-embedded .explorer-title { padding:14px 0; }
 .observatory-explorer.explorer-embedded .explorer-title h2 { font-size:1.65rem; }
-.observatory-explorer .explorer-is-comparing { grid-template-columns:minmax(0, 1.2fr) minmax(400px, 1fr); }
+.observatory-explorer .explorer-workspace.explorer-is-comparing,
+.observatory-explorer.explorer-embedded .explorer-workspace.explorer-is-comparing { display:grid; grid-template-columns:minmax(0, 1fr); }
+.portrait-explorer .explorer-workspace.explorer-is-comparing > .explorer-visual { display:none; }
+.observatory-explorer .explorer-is-comparing .explorer-reader { max-width:none; max-height:none; min-height:0; overflow:visible; padding-inline:0; }
+.observatory-explorer .explorer-comparison { font-size:1.0625rem; grid-template-columns:repeat(auto-fit, minmax(min(45ch, 100%), 1fr)); }
+.observatory-explorer .explorer-comparison > section { min-width:0; padding-block-start:20px; border-top:1px solid var(--explorer-rule); }
+.observatory-explorer .explorer-comparison :is(h3, h4) { font-size:1.5625rem; text-wrap:balance; }
+.observatory-explorer .explorer-comparison .explorer-summary { font-family:var(--sans, system-ui, sans-serif); font-size:.9375rem; }
+.observatory-explorer .explorer-comparison .explorer-passage { font-size:inherit; border:0; padding-inline:0; }
+.observatory-explorer .explorer-reader { overflow-wrap:anywhere; }
+.observatory-explorer .explorer-chapter-label[data-compact="true"] { width:44px; height:44px; padding:0; display:grid; place-items:center; text-align:center; }
+.observatory-explorer .explorer-chapter-label[data-compact="true"] .explorer-label-ordinal { font-size:.875rem; margin:0; }
+.observatory-explorer .explorer-chapter-label[data-compact="true"] :is(.explorer-label-prefix, .explorer-label-title) { display:none; }
 .observatory-explorer .explorer-expanded-dialog .explorer-scene { height:calc(100dvh - 340px); }
 @media (max-width:1023px) {
   .observatory-explorer .explorer-workspace, .observatory-explorer.explorer-embedded .explorer-workspace { grid-template-columns:minmax(0, 1fr); }
