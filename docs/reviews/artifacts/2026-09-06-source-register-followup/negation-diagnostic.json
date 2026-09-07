@@ -1,0 +1,25 @@
+{
+  "schema_version": "publication-negation-diagnostic.v1",
+  "observed_at": "2026-09-06T18:52:44.660Z",
+  "input_origin": "new_minimal_synthetic_examples_no_provider_calls",
+  "production_policy_changed": false,
+  "policy_file": "apps/api/src/services/pattern-publication-safety.ts",
+  "policy_sha256": "892b6ad37a3e99ff2c0e1b5b44e056eec55c739e9ee65741decfcdf904645cd2",
+  "samples": [
+    {
+      "text": "No particular outcome is guaranteed.",
+      "expected_rejected": false,
+      "observed_rejected": true
+    },
+    {
+      "text": "A particular outcome is guaranteed.",
+      "expected_rejected": true,
+      "observed_rejected": true
+    },
+    {
+      "text": "No diagnosis is offered, but this guarantees a result.",
+      "expected_rejected": true,
+      "observed_rejected": true
+    }
+  ]
+}

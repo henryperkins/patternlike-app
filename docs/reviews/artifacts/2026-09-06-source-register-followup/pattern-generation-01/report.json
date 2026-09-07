@@ -1,0 +1,138 @@
+{
+  "schema_version": "fresh-pattern-generation-evaluation.v1",
+  "execution_kind": "codex_process",
+  "provider_samples_observed": true,
+  "fresh_generation_chains": false,
+  "fresh_end_to_end_patterns": false,
+  "production_account_exercised": false,
+  "input_origin": "fixed_fictional_fact_packets_and_reference_ontology",
+  "corpus_manifest_hash": "sha256:5b73be13623882f0e1143d5ec38b2bd650355ac87b55b3b42ee2489d224299b4",
+  "started_at": "2026-09-06T18:25:59.282Z",
+  "completed_at": "2026-09-06T18:32:19.082Z",
+  "base_commit": "cefc97981981dfde7a36ce050e7fb33367c830be",
+  "source_snapshot_sha256": "1b3567df83f124e41f20444e30fc00fe6f84a45ac29c80e22c70fbdf741efa84",
+  "loaded_source_comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "source_comparison": {
+    "ok": true,
+    "changed": [],
+    "missing": [],
+    "added": [],
+    "problems": []
+  },
+  "pin": {
+    "publisher": "codex",
+    "planner_model": "gpt-5.6-sol",
+    "planner_reasoning": "xhigh",
+    "planner_prompt_version": "1.0.1",
+    "planner_max_output_tokens": 32000,
+    "writer_model": "gpt-5.6-sol",
+    "writer_reasoning": "xhigh",
+    "writer_prompt_version": "1.0.3",
+    "writer_max_output_tokens": 32000,
+    "verifier_model": "gpt-5.6-sol",
+    "verifier_reasoning": "xhigh",
+    "verifier_prompt_version": "1.0.0-verifier",
+    "verifier_max_output_tokens": 32000,
+    "input_max_bytes": 98304,
+    "selection_policy_version": "1.0.0",
+    "validation_policy_version": "1.0.0"
+  },
+  "text_isolation_version": "1.0.0",
+  "planned_cases": 2,
+  "provider_call_ceiling": 6,
+  "accepted": 0,
+  "transport_failures": 0,
+  "cases": [
+    {
+      "fixture_id": "m7-exact-01",
+      "input_sha256": "b268b4d00cf12600017bef8ef50d26209bf4d67db913b338ef98cbb6d0372022",
+      "status": "writer_rejected",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-06T18:25:59.437Z",
+          "invocation_sha256": "618a66ce315e5253384ca37d1e7786ac25e00a2ed8e7139036bc227001878080",
+          "sample_file": "m7-exact-01-planner.json",
+          "completed_at": "2026-09-06T18:26:29.808Z",
+          "output_sha256": "79fe4a0df5dba4126d102bf00538a929a85b53a2003cea40edf507f3c4a7e274",
+          "provider_request_sha256": "f5898650258fa7132e8ab591742c62b2b5fde67b22889e8d834d198fe64e6e4c",
+          "input_tokens": 8501,
+          "output_tokens": 2221,
+          "status": "accepted"
+        },
+        {
+          "pass": "writer",
+          "started_at": "2026-09-06T18:26:29.936Z",
+          "invocation_sha256": "91233ec78f35a02c99c394a8a8001558de053ccf598939b512594300b8d52274",
+          "sample_file": "m7-exact-01-writer.json",
+          "completed_at": "2026-09-06T18:29:37.849Z",
+          "output_sha256": "62473d913b7a803d787f9affb359763c7f9b865ce478cd90d6272f9ecec7abc3",
+          "provider_request_sha256": "ad56021dd843d008a52e8b4b0a7679ddc51603ab3fec7f82bd69b2e3387ff53f",
+          "input_tokens": 7633,
+          "output_tokens": 11748,
+          "status": "rejected",
+          "finding_codes": [
+            "chapter_word_count"
+          ]
+        }
+      ]
+    },
+    {
+      "fixture_id": "m7-unknown-01",
+      "input_sha256": "f841c3b862dc60fd55d4088e355861b158879699c0b07f5964617e9a5cc812a8",
+      "status": "verifier_rejected",
+      "stages": [
+        {
+          "pass": "planner",
+          "started_at": "2026-09-06T18:29:38.016Z",
+          "invocation_sha256": "b332fe3bb42411c6e94d1e62c6dbce2d4e7d922a6daf94e0b847d6a2e26471a8",
+          "sample_file": "m7-unknown-01-planner.json",
+          "completed_at": "2026-09-06T18:30:03.318Z",
+          "output_sha256": "879efa33577a4cc6a781170bc006809a4d941610a56a1fd8dfa593a87d7df2ff",
+          "provider_request_sha256": "9db8943d1c7ace2fac75e89a4485f9095a93f0c876f69f060a68eaf9754eceb2",
+          "input_tokens": 8521,
+          "output_tokens": 1534,
+          "status": "accepted"
+        },
+        {
+          "pass": "writer",
+          "started_at": "2026-09-06T18:30:03.489Z",
+          "invocation_sha256": "c73d55174e558f87dc6a88598578a803f96d52d95617caa0617bed3584c38033",
+          "sample_file": "m7-unknown-01-writer.json",
+          "completed_at": "2026-09-06T18:32:09.925Z",
+          "output_sha256": "5888d8da16c5bd8bee0b9c3fa1b0b46f072402091fbfa4f7b2d76c9bfd6fcd55",
+          "provider_request_sha256": "20602daf49d4b92827d96f016205d69acc2bf4f050fd6d40db51ff32f5a8c566",
+          "input_tokens": 7628,
+          "output_tokens": 10128,
+          "status": "accepted"
+        },
+        {
+          "pass": "verifier",
+          "started_at": "2026-09-06T18:32:10.067Z",
+          "invocation_sha256": "5a99f0c8af16e96c42bde4c2379576b9d2bfeda2131fa95f678909bc20822446",
+          "sample_file": "m7-unknown-01-verifier.json",
+          "completed_at": "2026-09-06T18:32:18.926Z",
+          "output_sha256": "9939612399a984d92acc0fda96c8cfeb39125fdea3b82d96a5584af12ae7db11",
+          "provider_request_sha256": "13eb9077efdde2389815f5c9e740990f32321191a84915556f9f7f7a9b282a8e",
+          "input_tokens": 10265,
+          "output_tokens": 379,
+          "finding_codes": [
+            "prohibited_claim"
+          ],
+          "status": "rejected"
+        }
+      ]
+    }
+  ],
+  "independent_review": {
+    "status": "unverified",
+    "note": "Generated chains do not establish independent editorial quality or durable production publication."
+  },
+  "passed": false
+}

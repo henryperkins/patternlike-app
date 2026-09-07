@@ -1,0 +1,35 @@
+{
+  "schema_version": "provider-account-owner-evidence-draft.v1",
+  "status": "unverified",
+  "owner_name": null,
+  "owner_authority": null,
+  "observed_at": null,
+  "private_evidence_reference": null,
+  "private_evidence_sha256": null,
+  "account_or_workspace_category": null,
+  "applicable_agreement_reference": null,
+  "paths_confirmed_to_use_this_account": {
+    "daily_pattern_ontology_text": null,
+    "native_portrait_image": null,
+    "mesh_authoring_and_visual_check": null
+  },
+  "data_use": {
+    "training_setting_and_scope": null,
+    "sharing_setting_and_scope": null,
+    "workspace_administrator_policy": null
+  },
+  "retention": {
+    "text_prompts_and_outputs": null,
+    "generated_images": null,
+    "image_inputs_files_and_previews": null,
+    "deletion_behavior_and_exceptions": null,
+    "host_logs_and_backups": null
+  },
+  "owner_personally_confirmed": null,
+  "limits": [
+    "This blank form makes no account privacy attestation.",
+    "Retain the actual account evidence privately; the repository may contain an opaque reference and checksum.",
+    "Do not include credentials, account email, prompts, readings, images or account exports in this form.",
+    "Current account evidence does not recover historical corpus-generation provenance."
+  ]
+}

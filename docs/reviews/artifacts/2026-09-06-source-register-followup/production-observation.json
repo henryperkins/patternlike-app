@@ -1,0 +1,219 @@
+{
+  "schema_version": "source-register-production-observation.v1",
+  "mutations_performed": false,
+  "worker": {
+    "observed_at": "2026-09-06T18:49:35.700Z",
+    "deployments": {
+      "success": true,
+      "values": [
+        {
+          "id": "a845f8e2-5b0f-4a30-a469-d8d50e873f3e",
+          "created_on": "2026-09-06T17:24:08.086185Z",
+          "versions": [
+            {
+              "version_id": "52a5c8df-3b67-499b-951e-0586a604c89f",
+              "percentage": 100
+            }
+          ],
+          "strategy": "percentage"
+        }
+      ]
+    },
+    "settings": {
+      "success": true,
+      "plain_text_bindings": [
+        {
+          "name": "GEOCODER_ROLLOUT",
+          "value": "enabled"
+        },
+        {
+          "name": "ONTOLOGY_PIPELINE_ROLLOUT",
+          "value": "off"
+        },
+        {
+          "name": "OPENAI_PATTERN_PLANNER_MODEL",
+          "value": "gpt-5.6-sol"
+        },
+        {
+          "name": "OPENAI_PATTERN_PLANNER_PROMPT_VERSION",
+          "value": "1.0.1"
+        },
+        {
+          "name": "OPENAI_PATTERN_PLANNER_REASONING",
+          "value": "xhigh"
+        },
+        {
+          "name": "OPENAI_PATTERN_VERIFIER_MODEL",
+          "value": "gpt-5.6-sol"
+        },
+        {
+          "name": "OPENAI_PATTERN_VERIFIER_PROMPT_VERSION",
+          "value": "1.0.0-verifier"
+        },
+        {
+          "name": "OPENAI_PATTERN_VERIFIER_REASONING",
+          "value": "xhigh"
+        },
+        {
+          "name": "OPENAI_PATTERN_WRITER_MODEL",
+          "value": "gpt-5.6-sol"
+        },
+        {
+          "name": "OPENAI_PATTERN_WRITER_PROMPT_VERSION",
+          "value": "1.0.3"
+        },
+        {
+          "name": "OPENAI_PATTERN_WRITER_REASONING",
+          "value": "xhigh"
+        },
+        {
+          "name": "OPENAI_READING_MODEL",
+          "value": "gpt-5.6-sol"
+        },
+        {
+          "name": "OPENAI_READING_PROMPT_VERSION",
+          "value": "1.0.3"
+        },
+        {
+          "name": "OPENAI_READING_REASONING",
+          "value": "xhigh"
+        },
+        {
+          "name": "PATTERN_GENERATION_ENABLED",
+          "value": "1"
+        },
+        {
+          "name": "PATTERN_PORTRAIT_ENABLED",
+          "value": "1"
+        },
+        {
+          "name": "PATTERN_PORTRAIT_MESH_ENABLED",
+          "value": "1"
+        },
+        {
+          "name": "PATTERN_PUBLISHER",
+          "value": "codex"
+        },
+        {
+          "name": "READING_PUBLISHER",
+          "value": "codex"
+        },
+        {
+          "name": "READING_V5_ROLLOUT",
+          "value": "hybrid"
+        }
+      ]
+    }
+  },
+  "build": {
+    "observed_at": "2026-09-06T18:48:52.268Z",
+    "success": true,
+    "build_uuid": "52b8e50c-dd06-4589-9269-2318ab832e88",
+    "build_outcome": "success",
+    "commit_hash": "cefc97981981dfde7a36ce050e7fb33367c830be",
+    "branch": "main"
+  },
+  "database": {
+    "observed_at": "2026-09-06T18:49:35.205Z",
+    "success": true,
+    "query": "SELECT name, applied_at FROM d1_migrations ORDER BY id DESC LIMIT 4; SELECT p.active_version, r.status, r.bundle_hash, r.corpus_release_hash, e.run_id AS machine_evidence_run FROM pattern_ontology_pointer p LEFT JOIN pattern_ontology_releases r ON r.version=p.active_version LEFT JOIN pattern_ontology_pipeline_evidence e ON e.ontology_version=r.version AND e.bundle_hash=r.bundle_hash WHERE p.id=1; SELECT enabled, COUNT(*) AS count FROM portrait_automation_grants GROUP BY enabled; SELECT status, COUNT(*) AS count FROM pattern_portraits GROUP BY status; SELECT status, COUNT(*) AS count, MIN(created_at) AS first_created_at, MAX(updated_at) AS latest_updated_at FROM portrait_mesh_jobs GROUP BY status; SELECT pipeline, pass, status, COUNT(*) AS count, MAX(updated_at) AS latest_updated_at FROM codex_provider_jobs WHERE created_at >= '2026-09-06T17:24:08Z' GROUP BY pipeline, pass, status; SELECT status, COUNT(*) AS count FROM codex_provider_jobs WHERE status IN ('pending','leased') GROUP BY status; SELECT stage, COUNT(*) AS count FROM pattern_generation_jobs WHERE stage NOT IN ('succeeded','failed','cancelled') GROUP BY stage;",
+    "sets": [
+      {
+        "success": true,
+        "rows": [
+          {
+            "name": "0028_reading_saves.sql",
+            "applied_at": "2026-09-06 09:08:54"
+          },
+          {
+            "name": "0027_portrait_mesh_automation.sql",
+            "applied_at": "2026-09-06 06:41:32"
+          },
+          {
+            "name": "0026_pattern_portraits.sql",
+            "applied_at": "2026-09-06 06:41:31"
+          },
+          {
+            "name": "0025_codex_xhigh_reasoning.sql",
+            "applied_at": "2026-09-05 07:27:35"
+          }
+        ],
+        "rows_read": 4,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [
+          {
+            "active_version": "pattern-ontology-en-us-internal-0.1.0",
+            "status": "active",
+            "bundle_hash": "sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84",
+            "corpus_release_hash": "sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c",
+            "machine_evidence_run": null
+          }
+        ],
+        "rows_read": 2,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [
+          {
+            "enabled": 1,
+            "count": 2
+          }
+        ],
+        "rows_read": 4,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [
+          {
+            "status": "ready",
+            "count": 1
+          }
+        ],
+        "rows_read": 2,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [
+          {
+            "status": "complete",
+            "count": 4,
+            "first_created_at": "2026-09-06T09:06:29.568Z",
+            "latest_updated_at": "2026-09-06T09:41:53.290Z"
+          }
+        ],
+        "rows_read": 4,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [],
+        "rows_read": 194,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [],
+        "rows_read": 2,
+        "rows_written": 0
+      },
+      {
+        "success": true,
+        "rows": [],
+        "rows_read": 25,
+        "rows_written": 0
+      }
+    ],
+    "errors": []
+  },
+  "limits": [
+    "Aggregate durable state is not an authenticated lifecycle exercise.",
+    "Existing portrait completions predate the current Worker deployment.",
+    "No current-deployment provider jobs were observed; this is not a production success-rate measurement."
+  ]
+}

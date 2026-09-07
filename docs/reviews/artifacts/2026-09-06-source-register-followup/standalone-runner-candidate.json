@@ -1,0 +1,36 @@
+{
+  "schema_version": "standalone-runner-candidate.v1",
+  "observed_at": "2026-09-06T18:52:44.830887Z",
+  "candidate_directory": "/tmp/patternlike-source-register-runner-candidate-20260906",
+  "source_commit": "cefc97981981dfde7a36ce050e7fb33367c830be",
+  "files_sha256": {
+    "package-lock.json": "6ce98fea522db04f524be8abbbba0d2aa54d8a17fa1b3dc171f531f55f1d930b",
+    "index.js": "edb25e3ce62a69f30d86b50eb3ce1c85b869938ed54d81aedd01d7650fedbf4c",
+    "package.json": "90bfa2df71e35eaee77c5e148da6d00cafbf9186e23090e1497d3a30c056f65d",
+    "portrait-mesh-canary.js": "01db850d60ef45f9548d0a1254fe0dbaa2b5a2a0fb602c2626bdedfeb813a6f0"
+  },
+  "standalone_imports": [
+    "index.js",
+    "portrait-mesh-canary.js"
+  ],
+  "runtime_checks": [
+    {
+      "node": "v22.23.2",
+      "exit_code": 0,
+      "native_sharp_png_roundtrip": true
+    },
+    {
+      "node": "v24.19.0",
+      "exit_code": 0,
+      "native_sharp_png_roundtrip": true
+    }
+  ],
+  "runtime_dependencies": {
+    "sharp": "0.35.2",
+    "three": "0.185.1"
+  },
+  "installation_command": "npm install --omit=dev --ignore-scripts --no-audit --no-fund",
+  "production_service_changed": false,
+  "production_calls": 0,
+  "production_lifecycle_status": "unverified"
+}

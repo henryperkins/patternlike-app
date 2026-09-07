@@ -1,0 +1,54 @@
+{
+  "schema_version": "followup-independent-code-review.v1",
+  "review_kind": "separate_agent_source_review",
+  "human_editorial_certification": false,
+  "reviewed_at": "2026-09-06T19:05:20.029601Z",
+  "reviewed_files": {
+    "scripts/pattern-release/fresh-pattern-evaluation.mjs": "e23742e04fefbbf1a03b5b0cb2e2abb6bef25f2814014b9051efb9d2779d5d7b",
+    "scripts/pattern-release/fresh-pattern-evaluation.test.mjs": "d562a9bad34cb5e681995bcbca12c241e7e46864d01d2865253575ef6f8d7271",
+    "scripts/pattern-release/operational-canary.mjs": "1b7a18ee091fce2af9a1425cf80c5c37f118d515fb33ba860391f3ca7ea3d507",
+    "scripts/pattern-release/operational-canary.test.mjs": "61346205c9a43729ee4e35ddeb4d94ca58b3f1ba4ba458ebc069a3b0551a5d4d"
+  },
+  "closed_findings": [
+    {
+      "priority": "P1",
+      "finding": "Unexpected verifier finding codes could carry provider prose into metadata.",
+      "resolution": "Only approved codes and fixed semantic problem codes are emitted."
+    },
+    {
+      "priority": "P2",
+      "finding": "Malformed completion metadata discarded returned output.",
+      "resolution": "Bounded raw output stays private with original hash, byte count and truncation flag."
+    },
+    {
+      "priority": "P2",
+      "finding": "HTTP loopback exception could forward operator session credentials.",
+      "resolution": "Production calls require HTTPS; explicitly labeled synthetic transports exist only in test invocation."
+    },
+    {
+      "priority": "P2",
+      "finding": "Usage warnings concealed missing authenticated coverage.",
+      "resolution": "Incomplete coverage takes precedence, while individual warning status remains visible."
+    },
+    {
+      "priority": "P2",
+      "finding": "Native pre-header failures could claim observed response evidence.",
+      "resolution": "Observed evidence also requires an actual HTTP status."
+    }
+  ],
+  "final_verdict": "no_remaining_material_findings",
+  "reviewer_reran_final_regressions": false,
+  "operator_focused_test_results": {
+    "fresh_chain": {
+      "passed": 6,
+      "failed": 0,
+      "exit_code": 0
+    },
+    "operational_canary": {
+      "passed": 7,
+      "failed": 0,
+      "exit_code": 0
+    }
+  },
+  "aggregate_receipt": "local-release-evidence.json"
+}
