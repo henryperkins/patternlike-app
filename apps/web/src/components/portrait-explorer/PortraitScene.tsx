@@ -9,7 +9,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, TapTracker, verifyGlbAsset } from "./scene-utils.js";
+import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, placeLabel, TapTracker, type LabelRect, verifyGlbAsset } from "./scene-utils.js";
 import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
 import { createObservatory, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
 import { BodyIcon, signLabel, skyBodyLabels } from "./SkyReader.js";
@@ -456,6 +456,7 @@ class PortraitRuntime {
     if (!this.world) return;
     const connector = this.labels.querySelector<SVGLineElement>("[data-sky-connector]");
     if (connector) connector.style.visibility = "hidden";
+    const occupied: LabelRect[] = [];
     const place = (element: HTMLElement, anchor: Vector3, marker?: PortraitSkyBody) => {
       const projected = anchor.clone().project(this.camera);
       let visible = Boolean(this.props.skyView) && projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
@@ -468,11 +469,14 @@ class PortraitRuntime {
       const y = Math.max(this.topInset + 2, Math.min(this.height - this.bottomInset - height - 2, (1 - projected.y) * this.height / 2 - height / 2));
       element.style.visibility = visible || (this.props.skyView && document.activeElement === element) ? "visible" : "hidden";
       element.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-      return { x: x + width / 2, y: y + height / 2, visible };
+      return { x: Math.round(x), y: Math.round(y), width, height, visible };
     };
     this.world.instrument.signAnchors.forEach((anchor, index) => {
       const label = this.labels.querySelector<HTMLElement>(`[data-sign-index="${index}"]`);
-      if (label) place(label, this.world!.instrument.root.localToWorld(new Vector3(...anchor)));
+      if (label) {
+        const box = place(label, this.world!.instrument.root.localToWorld(new Vector3(...anchor)));
+        if (box.visible) occupied.push(box);
+      }
     });
     for (const [body, marker] of this.world.instrument.markers) {
       const label = this.labels.querySelector<HTMLElement>(`[data-sky-body="${body}"]`);
@@ -487,9 +491,26 @@ class PortraitRuntime {
         const hit = this.visibleHit();
         const visible = readout.visible && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1
           && (!hit || hit.distance >= this.camera.position.distanceTo(markerAnchor) - 0.15 || hit.object.userData.skyBody === body);
+        // Reserve the projected marker's full bounds, not only its center point.
+        const markerBox = new Box3().setFromObject(marker);
+        const markerMin = new Vector2(Infinity, Infinity);
+        const markerMax = new Vector2(-Infinity, -Infinity);
+        for (const x of [markerBox.min.x, markerBox.max.x]) for (const y of [markerBox.min.y, markerBox.max.y]) for (const z of [markerBox.min.z, markerBox.max.z]) {
+          const corner = new Vector3(x, y, z).project(this.camera);
+          const point = new Vector2((corner.x + 1) * this.width / 2, (1 - corner.y) * this.height / 2);
+          markerMin.min(point);
+          markerMax.max(point);
+        }
+        const position = placeLabel(readout, { x: 6, y: this.topInset + 2, width: this.width - 12, height: this.usableHeight - 4 }, [
+          ...occupied,
+          { x: markerMin.x, y: markerMin.y, width: markerMax.x - markerMin.x, height: markerMax.y - markerMin.y },
+        ]);
+        // Extreme user zoom can leave no clear rectangle; the native placement strip still exposes the selection.
+        if (!position) { label.style.visibility = "hidden"; continue; }
+        label.style.transform = `translate(${position.x}px, ${position.y}px)`;
         if (connector && visible) {
-          connector.setAttribute("x1", String(readout.x));
-          connector.setAttribute("y1", String(readout.y));
+          connector.setAttribute("x1", String(position.x + position.width / 2));
+          connector.setAttribute("y1", String(position.y + position.height / 2));
           connector.setAttribute("x2", String((projected.x + 1) * this.width / 2));
           connector.setAttribute("y2", String((1 - projected.y) * this.height / 2));
           connector.style.visibility = "visible";

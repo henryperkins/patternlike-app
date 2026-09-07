@@ -332,3 +332,61 @@ it("keeps all zodiac labels in frame across expansion and resize and connects th
   expect(gpu.position[0]).toBeCloseTo(initialPosition[0], 6);
   expect(gpu.position[2]).toBeCloseTo(initialPosition[2], 6);
 }, 12_000);
+
+
+it.each([{ width: 288, height: 300 }, { width: 544, height: 296 }])("keeps the selected readout clear of measured sign labels and its marker in a $width by $height canvas", async ({ width, height }) => {
+  const signWidths: Record<string, number> = { Aries: 42, Taurus: 49, Gemini: 52, Cancer: 51, Leo: 30, Virgo: 42, Libra: 40, Scorpio: 53, Sagittarius: 76, Capricorn: 73, Aquarius: 64, Pisces: 43 };
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+    return this.matches("[data-sign-index]") ? signWidths[this.textContent ?? ""] ?? 50 : this.matches("[data-sky-body]") ? 80 : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.matches("[data-sign-index]") ? 25 : this.matches("[data-sky-body]") ? 44 : 0;
+  });
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+    if (this.matches(".explorer-scene-top")) return new DOMRect(8, 8, width - 16, 44);
+    if (this.matches(".explorer-scene-toolbar")) return new DOMRect(8, height - 58, width - 16, 50);
+    return new DOMRect(0, 0, width, height);
+  });
+  const callbacks = { ...props(), bookmark: undefined, selectedIds: [], skyView: true, viewKey: "sky",
+    experience: { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} },
+    sky: { chartId: "fictional", placements: [
+      { body: "sun" as const, longitude: 115, sign: "cancer" as const, degree: 25 },
+      { body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 },
+      { body: "ascendant" as const, longitude: 193, sign: "libra" as const, degree: 13 },
+    ], unavailable: {} },
+  };
+  const scene = (body: "sun" | "moon" | "ascendant") => <div className="explorer-scene"><div className="explorer-scene-top" /><PortraitScene {...callbacks} selectedSkyBody={body} /><div className="explorer-scene-toolbar" /></div>;
+  const view = render(scene("sun"));
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const rect = (element: HTMLElement) => {
+    const [x, y] = element.style.transform.match(/-?[\d.]+/g)!.map(Number);
+    return { left: x, right: x + element.offsetWidth, top: y, bottom: y + element.offsetHeight };
+  };
+  for (const body of ["sun", "moon", "ascendant"] as const) {
+    const renders = gpu.renders;
+    view.rerender(scene(body));
+    await waitFor(() => expect(gpu.renders).toBeGreaterThan(renders));
+    const readout = view.container.querySelector<HTMLElement>(`[data-sky-body="${body}"]`)!;
+    expect(readout.style.visibility, JSON.stringify({ body, readout: rect(readout), signs: [...view.container.querySelectorAll<HTMLElement>("[data-sign-index]")].map(label => ({ sign: label.textContent, ...rect(label) })) })).toBe("visible");
+    const box = rect(readout);
+    expect(box.left).toBeGreaterThanOrEqual(6);
+    expect(box.right).toBeLessThanOrEqual(width - 6);
+    expect(box.top).toBeGreaterThanOrEqual(62);
+    expect(box.bottom).toBeLessThanOrEqual(height - 68);
+    const signs = [...view.container.querySelectorAll<HTMLElement>("[data-sign-index]")];
+    expect(signs.filter(label => label.style.visibility === "visible")).toHaveLength(12);
+    for (const sign of signs) {
+      const labelBox = rect(sign);
+      expect(box.right <= labelBox.left || box.left >= labelBox.right || box.bottom <= labelBox.top || box.top >= labelBox.bottom, `${body} readout overlaps ${sign.textContent}`).toBe(true);
+    }
+    const marker = gpu.scene!.getObjectByName(`${body} zodiac marker`)!;
+    const projected = marker.getWorldPosition(new Vector3()).project(gpu.camera!);
+    const x = (projected.x + 1) * width / 2;
+    const y = (1 - projected.y) * height / 2;
+    expect(x < box.left || x > box.right || y < box.top || y > box.bottom, `${body} marker hidden by its readout`).toBe(true);
+    const connector = view.container.querySelector<SVGLineElement>("[data-sky-connector]")!;
+    expect(connector.style.visibility).toBe("visible");
+    expect(Number(connector.getAttribute("x2"))).toBeCloseTo(x, 1);
+    expect(Number(connector.getAttribute("y2"))).toBeCloseTo(y, 1);
+  }
+}, 10_000);

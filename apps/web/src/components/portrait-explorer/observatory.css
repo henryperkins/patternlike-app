@@ -61,7 +61,7 @@
   .observatory-explorer .explorer-scene { height:480px; }
 }
 @media (max-width:767px) {
-  .observatory-explorer .explorer-header { height:64px; }
+  .observatory-explorer .explorer-header { height:auto; min-height:64px; }
   .observatory-explorer .explorer-title { padding:19px 0 14px; display:block; }
   .observatory-explorer .explorer-title h1 { font-size:1.8rem; }
   .observatory-explorer .explorer-title > p { margin:7px 0 0; font-size:.75rem; }

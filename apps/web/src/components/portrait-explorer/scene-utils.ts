@@ -120,6 +120,35 @@ export function adaptCameraBookmark(bookmark: CameraBookmark, frameDistance: num
   };
 }
 
+export interface LabelRect { x: number; y: number; width: number; height: number; }
+
+/** Choose the nearest free rectangle from the usable viewport and obstacle edges. */
+export function placeLabel(preferred: LabelRect, viewport: LabelRect, obstacles: readonly LabelRect[]): LabelRect | null {
+  const maxX = viewport.x + viewport.width - preferred.width;
+  const maxY = viewport.y + viewport.height - preferred.height;
+  if (maxX < viewport.x || maxY < viewport.y) return null;
+  // A pixel of clearance covers fractional text widths without excluding the narrow dial’s center.
+  const gap = 1;
+  const xs = [preferred.x, viewport.x, maxX];
+  const ys = [preferred.y, viewport.y, maxY];
+  for (const box of obstacles) {
+    xs.push(box.x - preferred.width - gap, box.x + box.width + gap);
+    ys.push(box.y - preferred.height - gap, box.y + box.height + gap);
+  }
+  const columns = new Set(xs.map(x => Math.max(Math.ceil(viewport.x), Math.min(Math.floor(maxX), Math.round(x)))));
+  const rows = new Set(ys.map(y => Math.max(Math.ceil(viewport.y), Math.min(Math.floor(maxY), Math.round(y)))));
+  let best: LabelRect | null = null;
+  let distance = Infinity;
+  for (const x of columns) for (const y of rows) {
+    const score = (x - preferred.x) ** 2 + (y - preferred.y) ** 2;
+    if (score >= distance || obstacles.some(box => x < box.x + box.width + gap && x + preferred.width + gap > box.x
+      && y < box.y + box.height + gap && y + preferred.height + gap > box.y)) continue;
+    best = { ...preferred, x, y };
+    distance = score;
+  }
+  return best;
+}
+
 /** Four-chapter composition in published order; model Y is seated separately. */
 export function chapterLayout(index: number, unfolded: boolean): Point3 {
   const layouts: Point3[] = [[1.13, 0, 1.05], [-1.15, 0, -1.08], [1.2, 0, -1.12], [-1.18, 0, 1.24]];
