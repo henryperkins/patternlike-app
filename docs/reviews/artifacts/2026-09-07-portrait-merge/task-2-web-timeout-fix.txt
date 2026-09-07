@@ -1,0 +1,13 @@
+
+> @patternlike/web@0.2.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/web
+
+
+ Test Files  50 passed (50)
+      Tests  653 passed (653)
+   Start at  08:55:15
+   Duration  31.62s (transform 6.21s, setup 10.69s, import 14.14s, tests 119.66s, environment 58.14s)
+

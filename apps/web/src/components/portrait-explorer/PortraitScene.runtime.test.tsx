@@ -213,7 +213,8 @@ it("uses a saved Sun sector only without chart context and never substitutes it 
   expect(litSigns()).toEqual([]);
   chartView.rerender(<PortraitScene {...callbacks} experience={experience} sky={sky} sunSign="cancer" selectedSkyBody="moon" />);
   await waitFor(() => expect(litSigns()).toEqual(["taurus"]));
-});
+  // Two full scenes each have a bounded five-second readiness check.
+}, 12_000);
 
 it("leaves no live WebGL contexts after repeated scene teardown", async () => {
   for (let cycle = 0; cycle < 3; cycle++) {
