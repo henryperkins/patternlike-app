@@ -9,3 +9,9 @@ The [implementation record](artifacts/2026-09-07-release-attestation/implementat
 The [independent spec and quality review](artifacts/2026-09-07-release-attestation/independent-review.md) passed with no Critical or Important source findings. The final integrated full gate and actual operational prerequisites remain to be recorded. Before the compatible main merge, both Workers Builds commands must inject the actual CI SHA and migration 0029 must be backed up, rehearsed, applied and checked. Live observations will be retained below without changing source-hashed migration or deployment files after the gate.
 
 Root preserved the original focused logs and source snapshots privately under `/home/henry/.local/state/patternlike/merge-sequence-20260907/task-4-preparation-output/` before the aggregate freeze. Original report paths describe where the implementer produced them.
+
+## Verification scope updated by the user
+
+The initial full gate at `42d41ebeeb0bb0588b7574aa425715ee2670b604` completed nonpassing: thirteen lanes passed, including 2,525 API tests plus the compatibility case, while the web lane hit the already diagnosed five-second whole-case timeout for two sequential portrait scene loads. The [actual nonpassing summary](artifacts/2026-09-07-release-attestation/ci-local-summary-nonpassing.txt) and [receipt](artifacts/2026-09-07-release-attestation/local-release-evidence.json) are retained without modification. This is not a passing full merge gate.
+
+The user subsequently restricted tests to the 3D Pattern animation work. No new unrelated test suite or replacement `ci:local` will run. The earlier focused release-runtime checks and independent source review remain evidence for their exact source; final integration will separately verify unchanged release files and the revised portrait. No full-gate success, migration rehearsal on a production backup, or provider/lifecycle canary is claimed under that narrower scope.
