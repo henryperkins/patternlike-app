@@ -2,7 +2,7 @@
 
 Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculation authority; editorial content ships via signed WordPress releases; Fly.io is portable compute (not launch-critical).
 
-**Spec:** `spec-bundle/` (v0.2) · **Contracts:** `contracts/m0/` · **D1:** `db/d1/`
+**Spec:** `spec-bundle/` (v0.2) · **Contracts:** frozen baseline and additive packages under `contracts/` · **D1:** `db/d1/`
 
 **Open contract decisions:** [`docs/reviews/2026-08-01-spec-escalations.md`](docs/reviews/2026-08-01-spec-escalations.md) — twelve reviewed items where the code implements the frozen contract faithfully and the fix belongs in the spec.
 
@@ -10,23 +10,27 @@ Cloudflare-first psychological timing product. **Swiss Ephemeris** is calculatio
 
 | Path | Role |
 | --- | --- |
-| `apps/api` | Cloudflare Worker (Hono) — birth/chart M1 path |
-| `apps/ontology-signer` | Isolated no-route Worker; holds the ontology signing key |
+| `apps/api` | Hono Cloudflare Worker — product API, queues, schedules, D1, and bundled web assets |
 | `apps/calc-stub` | Portable AGPL Swiss Ephemeris calculation service |
-| `apps/web` | React/Vite PWA — onboarding, chart evidence, and privacy surface |
-| `packages/shared` | Shared types, fingerprint helpers, constants |
-| `contracts/m0` | Frozen JSON Schema + OpenAPI + fixtures |
-| `db/d1` | Operational schema (encrypted birth, idempotent jobs) |
+| `apps/codex-runner` | Installed-runner service for the Codex provider control plane |
+| `apps/ontology-signer` | Isolated no-route Worker that holds the ontology signing key |
+| `apps/web` | React/Vite PWA — onboarding, chart, Daily, Pattern, and privacy surfaces |
+| `packages/pattern-engine` | Deterministic Pattern validation and publication rules |
+| `packages/reading-engine` | Deterministic Daily reading assembly and claim-support rules |
+| `packages/shared` | Shared wire types, ids, fingerprints, and constants |
+| `contracts` | Frozen baseline contracts plus additive contract packages and fixtures |
+| `db/d1` | Ordered operational migrations and their dated evidence ledger |
 
 ## Prerequisites
 
-- Node 20+
+- Node 22 (pinned by `.nvmrc`; package engine floor is `>=22`)
 - Python 3.11+ (`pip install jsonschema referencing pyyaml openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt`)
 - Wrangler 4+ (via workspace)
 
 ## Quick start
 
 ```bash
+nvm use
 npm install
 npm run test:contracts
 npm run typecheck
@@ -48,28 +52,61 @@ npm run web:dev
 
 The web client opens at `http://127.0.0.1:5173` and proxies `/v1` requests to
 the local Worker at `http://127.0.0.1:8787`. Development defaults to
-`usr_local_dev_0001`; override `VITE_DEV_USER_ID`, `VITE_CONSENT_ID`, or
-`VITE_API_PROXY_TARGET` in `apps/web/.env.local` when needed. The seed command
-above creates that local user, crypto subject, and wrapped DEK idempotently.
-Production identity is implemented; `VITE_CONSENT_ID` remains local scaffolding
-because persisted `account_processing` consent is not yet implemented.
+`usr_local_dev_0001`; override `VITE_DEV_USER_ID` or `VITE_API_PROXY_TARGET` in
+`apps/web/.env.local` when needed. Use the exact `127.0.0.1` origin rather than
+`localhost`: the Vite server is strict about its host and port, and Auth0's
+callback, logout, and web-origin entries are registered for
+`http://127.0.0.1:5173/`.
+
+`npm run db:local -w @patternlike/api` applies the ordered migration directory.
+On a fresh local database, run the seed command afterward. It idempotently
+creates the local `users` row with its crypto subject and wrapped DEK. It does
+not create an `identities` row or grant account-processing consent.
 
 ### Birth → chart (local)
 
 ```bash
 curl -s http://127.0.0.1:8787/health
 
+consent_id="$(
+  curl -s -X PUT http://127.0.0.1:8787/v1/consents/account-processing \
+    -H "content-type: application/json" \
+    -H "x-user-id: usr_local_dev_0001" \
+    -H "idempotency-key: demo-account-processing-001" \
+    -H "x-consent-ui-surface: onboarding" \
+    -d '{"policy_version":"account-processing-v1-2026-08-28"}' |
+  node -e 'let body=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", chunk => body += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(body).consent_id))'
+)"
+
 curl -s -X POST http://127.0.0.1:8787/v1/birth-profiles \
   -H "content-type: application/json" \
   -H "x-user-id: usr_local_dev_0001" \
   -H "idempotency-key: demo-birth-001" \
-  -d "{\"accuracy\":\"exact\",\"consent_id\":\"cns_local_dev_0001\",\"birth_date\":\"1990-05-15\",\"birth_time_local\":\"12:34:00\",\"timezone_hint\":\"America/Los_Angeles\",\"birthplace\":{\"label\":\"Los Angeles\",\"latitude\":34.05,\"longitude\":-118.24}}"
+  -d "{\"accuracy\":\"exact\",\"consent_id\":\"${consent_id}\",\"birth_date\":\"1990-05-15\",\"birth_time_local\":\"12:34:00\",\"timezone_hint\":\"America/Los_Angeles\",\"birthplace\":{\"label\":\"Los Angeles\",\"latitude\":34.05,\"longitude\":-118.24}}"
 
 curl -s http://127.0.0.1:8787/v1/chart \
   -H "x-user-id: usr_local_dev_0001"
 ```
 
-`AUTH_STUB=1` (default `[vars]` in `wrangler.toml`) accepts **`X-User-Id`** for local development only. It is absent from `[env.production]`, and the `configGuard` middleware returns `503 configuration_error` for any request when `AUTH_STUB=1` or `ROOT_KEK` is unset/placeholder outside `ENVIRONMENT=development|test`. `npm run deploy` targets `--env production`.
+The consent endpoints are part of the small recovery-route set available before
+a current grant. `PUT` requires an idempotency key, the `onboarding` or
+`privacy_center` UI surface, and the exact current policy shown above. Birth
+then requires the returned `consent_id` to name that user's exact current grant.
+`DELETE /v1/consents/account-processing` is a privacy-center-only withdrawal:
+it freezes the account while leaving regrant, export, and deletion available;
+regrant restores access. Account-processing covers chart calculation and does
+not grant any generative-model permission.
+
+Place search and resolution use the server-side Geoapify adapter; there is no
+Google fallback. Committed production configuration enables the rollout, while
+actual availability still requires a non-empty `GEOAPIFY_API_KEY` and separate
+deployment proof. Missing rollout/key returns `503 geocoder_unavailable` only
+for search, resolution, and new geocoder grants. Manual place label,
+coordinates, and time zone remain the fallback. See the
+[`Geoapify decision`](docs/decisions/2026-09-04-geoapify-geocoder.md) and
+[`geocoder rollout runbook`](docs/deploy/geocoder-rollout.md).
+
+`AUTH_STUB=1` (default `[vars]` in `wrangler.toml`) accepts **`X-User-Id`** for local development only. Production explicitly sets it to `0`, and the `configGuard` middleware returns `503 configuration_error` for any request when `AUTH_STUB=1` or `ROOT_KEK` is unset/placeholder outside `ENVIRONMENT=development|test`.
 
 Idempotency keys are scoped per user, so the static `demo-birth-001` above is safe across local users. Resubmitting the same birth data under a different key returns `409 chart_already_exists` rather than a 500.
 
@@ -192,8 +229,8 @@ Counsel should still review AGPL network obligations and app-store strategy befo
 - [x] Privacy center export/delete workflows, including encrypted artifacts and terminal deletion status
 - [x] Bounded birth calculation: a validated fetch deadline, a 1 MiB response ceiling, and an exact per-user UTC-day invocation budget that charges only requests which actually call calc. Entry criteria for making the workflow asynchronous are recorded in [`docs/deploy/birth-calc-slo.md`](docs/deploy/birth-calc-slo.md) and none has been measured
 - [x] Migration `0016_birth_calc_usage.sql` applied to the remote database 2026-08-27. Worker version `287bce63-dece-4911-96db-dd212c2cec33` serves the budget guard.
-- [ ] Place-name geocoding: typing "Los Angeles" still requires entering coordinates by hand
-- [ ] Persisted `account_processing` consent: onboarding still sends a local placeholder and the birth route checks only that an id is present
+- [x] Geoapify place search/resolution and consent surfaces, with manual entry retained when search is unavailable; committed enablement is not live-provider proof
+- [x] Persisted `account_processing` consent, exact-current-grant birth authorization, privacy-center withdrawal/freeze, and regrant recovery
 
 ## M2 status — editorial control plane
 
@@ -279,11 +316,38 @@ development, so a deploy that forgets to replace them returns a loud
 Local development keeps `AUTH_STUB=1` and the `X-User-Id` header. **That header
 now names an existing user — it no longer creates one**, because user creation
 moved to identity-link time and a crypto subject can never come from a request.
-Seed a user first (see `seedUser` in `apps/api/test/helpers.ts` for the shape:
-the `users` row, its `identities` row, and its wrapped DEK must land together).
+For the local stub, run `node scripts/dev/seed-dev-user.mjs` after applying the
+ordered migrations. It creates the `users` and `user_keys` rows needed by the
+stub, not a production `identities` row or a consent grant.
 
 `ENVIRONMENT=test` counts as development and disables the config guard. Do not
 name a staging deployment `test`.
+
+## Releasing the API and PWA
+
+Production configuration ships `apps/web/dist` with the Hono API as one
+Cloudflare Worker. Workers Builds is the automatic release path for `main`; its
+existing API trigger must retain the web build and production environment while
+injecting `RELEASE_GIT_SHA` from `WORKERS_CI_COMMIT_SHA`. The bare
+`npm run deploy:api` and workspace deploy commands omit that release SHA and are
+insufficient outside development. For an authorized manual release, follow the
+clean, gated, explicit-SHA procedure in
+[`docs/deploy/release-attestation.md`](docs/deploy/release-attestation.md).
+
+The Worker exposes the declared source SHA and Cloudflare version metadata
+independently at `/v1/meta`; a correctly shaped value is still a declaration to
+reconcile, not proof of what produced or serves a bundle. Constrained-model
+Daily publication writes a success-only, content-free receipt that binds its
+provider/job exchange to those release coordinates. The additive receipt
+migration must be applied before a compatible Worker; checking out this source
+does not apply it. Deterministic Daily publication requires no such receipt.
+
+Treat each release layer as separate evidence: repository source support does
+not prove a migration was applied; an applied migration does not prove a Worker
+version was deployed; a deployed version does not prove a compatible runner was
+installed; an installed runner does not prove provider execution; and provider
+execution does not prove the reader lifecycle. Record each observation through
+its owning runbook without promoting local or configured state to live proof.
 
 ## Deploying the calculation service to Fly.io
 

@@ -374,11 +374,14 @@ Recorded evidence:
   after the interrupted CLI loopback attempt; the subsequent deployed SDK login
   created a live Worker session without exporting its bearer.
 
-Deploy the exact Gate 1 commit:
-
-```text
-npm run deploy:api
-```
+Release the exact Gate 1 commit through the configured Workers Builds `main`
+trigger after confirming that its existing API command retains the web build,
+the production environment selection, and the explicit
+`RELEASE_GIT_SHA:$WORKERS_CI_COMMIT_SHA` override. The bare
+`npm run deploy:api` command omits that SHA and is insufficient outside
+development. If a separately authorized manual release is required, use the
+clean, gated, explicit-SHA procedure in
+[`release-attestation.md`](release-attestation.md).
 
 Record the Worker version id and prove:
 
@@ -391,15 +394,28 @@ Record the Worker version id and prove:
 - with no public-capable ontology active, no Pattern queue delivery decrypts a
   command or calls a provider, and every account reads `ontology_unavailable`.
 
-Production currently runs only the separately routed ontology-pipeline
-maintenance cron. The incumbent reading/privacy/Pattern scheduler remains off,
-so `sweepPatternJobs` does not automatically re-send a Pattern job after its
-provider backoff expires. This is not a Gate 8 prerequisite. For the single
-Gate 8 canary, an operator uses the existing service-authenticated
-`POST /internal/pattern-generations/:generation_id/reconcile` route after the
-job's `available_at` time if a retry leaves it queued. Do not enable the
-incumbent scheduler as part of the Pattern rollout; its separate daily-reading
-rollout remains unchanged.
+Current repository configuration declares two production schedules. That source
+support remains separate from dated evidence about configured Builds triggers
+and from deployed-version adoption. The `*/15 * * * *` lane runs Codex provider
+maintenance, Daily scheduling/repair, privacy maintenance, Pattern
+recovery/retention, portrait maintenance, and portrait-mesh maintenance. Daily
+repair re-nudges expired leases and undispatched D1 outbox rows before it
+reserves new due work.
+The `7,22,37,52 * * * *` lane runs Codex provider maintenance plus ontology
+lease, dispatch, outbox, and artifact recovery. Codex maintenance covers the
+`pattern`, `ontology`, and `reading` pipelines with bounded stale cancellation,
+owner nudges, retention, and content-free observations.
+
+Pattern dispatch and recovery obey `PATTERN_GENERATION_ENABLED`. Its scheduled
+sweep recovers current and legacy pause classes, dispatches undispatched jobs,
+re-nudges expired leases, fails a job after 16 stage claims, and then performs
+retention and erasure work; retention and erasure continue while generation is
+paused. The existing service-authenticated
+`POST /internal/pattern-generations/:generation_id/reconcile` route remains a
+one-job nudge after `available_at`: it returns terminal jobs as
+`already_complete` and does not perform sweep-only failure or retention work.
+The legacy service-authenticated `POST /internal/readings/sweep` route also
+remains available, but scheduled Daily repair is now a separate recovery path.
 
 **Stop:** any product regression, wrong binding, non-off rollout, or provider
 traffic. Roll back the Worker version; do not roll back the forward migration.

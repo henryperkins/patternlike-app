@@ -1,0 +1,21 @@
+{
+  "status": "observed",
+  "method": "Read-only exact file comparison to independently reviewed documentation candidate",
+  "reviewed_commit": "b65767c2aa04e6eec28de6bbf17fdf1720614b61",
+  "integrated_commit": "f120828f9db1550e2e113c7e313b9f5703646261",
+  "main_base": "0b87e6007043ac0bcd15a8f644e41fbef0d543d7",
+  "unchanged_reviewed_files": true,
+  "files": {
+    ".env.example": "0ccf9cd09a4ab84949e31eab1ae48e20bca081498476ff0bea1feb03b8e3a527",
+    "AGENTS.md": "d7ffd61a89da3c185973daf812eeda7717b66a0437cf9593cfd72b326befe57b",
+    "CLAUDE.md": "3487cb765ae7dc8db4a6abb827074b4d1b1f4e354cc6d152a18021642472d83f",
+    "README.md": "abe320ec0daf6757fdbab4741e16a57af91c5227d80afe32419decb9868edfbf",
+    "apps/api/src/routes/internal-generation.ts": "8a10d92c3fcc470fe56ca5db86d077e5a104079dcc5bc03483583d00c2d8643c",
+    "apps/api/wrangler.toml": "e744fdcea2605ab668cd044c1161fd067d20e11ccbe3e583c1a9378ac983fe13",
+    "docs/deploy/openai-pattern-rollout.md": "39d641b1eab0ce5799d8eb21c70342dd63783abb9f4dc82f1488f3fda5d1823d",
+    "docs/reviews/2026-08-26-documentation-drift-reconciliation-design.md": "e53b4b71c3ed53c8bf6853c5c02b25c3ddc8699ed80e4ed70e900143bc6b0b45",
+    "fly.toml": "f1a1162fc597ced097a5f8c0f651df54d5ec5ea8f2656bbac0cbffc6680eec55"
+  },
+  "tests_run": false,
+  "full_ci_gate_passed": false
+}

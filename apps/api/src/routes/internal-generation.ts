@@ -26,10 +26,9 @@ import {
  * Operator and scheduler entry points for daily-reading generation.
  *
  * Mounted under `/internal` behind the service token, never on the product API.
- * Until the cron trigger lands these are the only things that start generation,
- * and they are what the production smoke test drives: the runbook deploys the
- * Worker with no cron, proves initial generation, duplicate delivery, and an
- * explicit reissue through these routes, and only then enables the schedule.
+ * The scheduled lane handles due work and bounded repair. These
+ * service-authenticated routes remain explicit operator controls for generation,
+ * reissue, replacement, and legacy one-shot recovery.
  */
 export const internalGenerationRoutes = new Hono<{
   Bindings: Env;
@@ -332,8 +331,8 @@ internalGenerationRoutes.post("/readings/replace", async (c) => {
  * whose lease expired.
  *
  * Both may produce a duplicate delivery, which is exactly what the claim CAS
- * exists to absorb. The cron trigger that calls this on a schedule is Phase 7;
- * today it is driven by hand.
+ * exists to absorb. Scheduled Daily repair performs its own bounded queries;
+ * this service-authenticated route remains a legacy one-shot operator control.
  */
 internalGenerationRoutes.post("/readings/sweep", async (c) => {
   const undispatched = await findUndispatched(c.env);

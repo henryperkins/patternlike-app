@@ -1,3 +1,9 @@
+> **Snapshot notice (2026-09-07):** This body is the approved 2026-08-26
+> point-in-time design and retains then-current absence claims for provenance.
+> Current repository guidance lives in the [README](../../README.md),
+> [CLAUDE.md](../../CLAUDE.md), and the successor
+> [Geoapify decision](../decisions/2026-09-04-geoapify-geocoder.md).
+
 # Documentation Drift Reconciliation Design
 
 **Date:** 2026-08-26
