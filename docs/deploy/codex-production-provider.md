@@ -6,6 +6,15 @@ privacy evidence still outstanding, see
 (2026-09-06). Its local evidence does not certify current upstream account
 settings or installed production configuration.
 
+## Daily publication release identity
+
+The [release-attestation runbook](release-attestation.md) requires additive
+migration 0029 before compatible Worker runtime and actual Workers Builds CI
+SHA injection on both deploy and versions-upload commands. Its durable Daily
+receipt preserves observed high/xhigh job pins after provider cleanup without
+changing the runner completion contract or reader-facing provider metadata.
+This source port does not demonstrate production adoption.
+
 ## Current source transport and pause control (2026-09-06)
 
 The source now runs ordinary text work through isolated `codex app-server`

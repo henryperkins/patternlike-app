@@ -46,9 +46,26 @@ const PATTERN_CODEX_VARS = {
   OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
 };
 
-/** `checkSecureConfig` over a deployment whose Pattern block is complete. */
+/**
+ * A release identity, so a case about an unrelated rule is not refused for
+ * lacking one. It is a real-shaped commit hash rather than the committed
+ * placeholder, because the placeholder is itself refused in production and
+ * would make every production case here about attestation.
+ */
+const ATTESTED_RELEASE = {
+  RELEASE_GIT_SHA: "abc1230000000000000000000000000000000def",
+};
+
+/**
+ * `checkSecureConfig` over a deployment whose Pattern block is complete and
+ * whose release is attested.
+ */
 function guard(environment: Record<string, unknown>) {
-  return checkSecureConfig({ ...PATTERN_CODEX_VARS, ...environment } as never);
+  return checkSecureConfig({
+    ...PATTERN_CODEX_VARS,
+    ...ATTESTED_RELEASE,
+    ...environment,
+  } as never);
 }
 
 

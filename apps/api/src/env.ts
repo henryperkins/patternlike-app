@@ -43,6 +43,14 @@ export interface PatternGenerationMessage {
 export interface Env {
   DB: D1Database;
   ENVIRONMENT: string;
+  /**
+   * The commit this Worker was built from, injected at upload time by
+   * Workers Builds. wrangler.toml carries only a placeholder that
+   * `checkReleaseAttestation` refuses outside development.
+   */
+  RELEASE_GIT_SHA: string;
+  /** Cloudflare's own version_metadata binding for the serving upload. */
+  CF_VERSION_METADATA: WorkerVersionMetadata;
   AUTH_STUB: string;
   CALC_SERVICE_URL: string;
   CALC_SERVICE_AUTH_TOKEN?: string;

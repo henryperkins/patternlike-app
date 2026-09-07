@@ -379,6 +379,37 @@ def check_0028_reading_saves() -> None:
 # ---------------------------------------------------------------------------
 
 
+def check_0029_daily_publication_receipts() -> None:
+    # Full SQLite integrity_check complements D1's supported quick_check.
+    for populated in (False, True):
+        con = fresh(28 if populated else None)
+        if populated:
+            seed_user(con, USER_A, SUBJ_A)
+            seed_job(con, "job_receipt_upgrade", USER_A, "receipt-upgrade")
+            insert_reading(con, "rdr_receipt_upgrade", USER_A, "2026-09-07",
+                           "published", mode="constrained_model", release=None)
+            con.execute("INSERT INTO reading_saves VALUES (?, ?, ?)",
+                        (USER_A, "rdr_receipt_upgrade", NOW))
+            con.commit()
+            names = [row[0] for row in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )]
+            before = {name: con.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
+                      for name in names}
+            apply_migrations(con, start=29)
+            after = {name: con.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
+                     for name in names}
+            if before != after:
+                raise SystemExit("0029 changed populated 0028 table bytes")
+        if con.execute("PRAGMA foreign_key_check").fetchall():
+            raise SystemExit("0029 left foreign-key violations")
+        if con.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+            raise SystemExit("0029 failed full integrity_check")
+        if con.execute("SELECT * FROM assertion_probe").fetchall():
+            raise SystemExit("0029 left an assertion probe armed")
+    print("D1 OK  0029 fresh/populated 0028 preservation and full SQLite integrity")
+
+
 def check_fresh_schema() -> None:
     con = fresh()
     tables = {
@@ -396,6 +427,7 @@ def check_fresh_schema() -> None:
         "birth_profile_version_counters",
         "crypto_operations", "crypto_kek_rewrap_campaigns",
         "crypto_kek_rewrap_items", "place_resolutions",
+        "daily_publication_receipts",
     }
     missing = expected - tables
     if missing:
@@ -1848,6 +1880,7 @@ def main() -> int:
     check_0021_over_populated_0020()
     check_0023_pattern_source_regeneration()
     check_0028_reading_saves()
+    check_0029_daily_publication_receipts()
     check_revision_invariants()
     check_cross_user_links()
     check_encrypted_command_requires_owner()

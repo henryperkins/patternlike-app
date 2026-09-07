@@ -57,6 +57,7 @@ import {
 import { leaseDisposition, type V5FailureCode } from "./generation-failures.js";
 import { currentAiConsentMatches } from "./reading-current-owner.js";
 import { createCodexReadingPublisher } from "./codex-reading-publisher.js";
+import { resolveReleaseAttestation } from "./release-attestation.js";
 import {
   CODEX_PROVIDER_TIMEOUT_MS,
   isCodexProviderReasoningEffort,
@@ -411,6 +412,12 @@ export async function generateDailyReadingV5(
   }
   if (!supportedCommand(command)) {
     return fail("policy_unsupported", "the frozen V2 policy tuple is not implemented");
+  }
+  // Refuse before calculation, R2, or provider work if either release authority
+  // is missing. No later retry can supply a missing deployment binding.
+  const attestation = resolveReleaseAttestation(env);
+  if (!attestation) {
+    return fail("publisher_not_configured", "publisher_not_configured");
   }
   if (!(await currentAiConsentMatches(env, userId, command))) {
     return fail("ai_synthesis_consent_required", "consent_not_active");
@@ -849,6 +856,24 @@ export async function generateDailyReadingV5(
       nonce: sealedReading.nonce,
     },
     evidence: evidenceRows,
+    receipt: {
+      readingId: command.reading_id,
+      jobId: claim.jobId,
+      commandGeneration: command.command_generation,
+      providerJobId: publisher.exchange.provider_job_id,
+      stageGeneration: publisher.exchange.stage_generation,
+      stageAttempt: publisher.exchange.stage_attempt,
+      model: publisher.exchange.model,
+      reasoningEffort: publisher.exchange.reasoning_effort,
+      promptVersion: publisher.exchange.prompt_version,
+      requestHash: publisher.exchange.request_hash,
+      responseHash: publisher.exchange.response_hash,
+      inputTokens: publisher.exchange.input_tokens,
+      outputTokens: publisher.exchange.output_tokens,
+      providerCompletedAt: publisher.exchange.provider_completed_at,
+      workerVersionId: attestation.workerVersionId,
+      releaseGitSha: attestation.releaseGitSha,
+    },
   });
   if (!published.ok) {
     if (published.reason === "stale_claim") {

@@ -1,0 +1,9 @@
+# Release attestation and Daily receipts merge review — 2026-09-07
+
+The Worker now reports the injected release commit and Cloudflare serving version independently through `/v1/meta`. Guarded production work requires a valid release SHA. Model-backed Daily publication binds a content-free receipt to the exact reading, generic job, durable provider job, command/stage generation and attempt within the same atomic D1 batch. Deterministic publication requires no receipt. The additive migration is `0029_daily_publication_receipts.sql`.
+
+This selectively ports the original `feat/release-truth-attestation` work while preserving current high/xhigh execution, source and privacy boundaries, retry/replacement behavior, and Save-aware erasure. The original worktree and authored patch remain preserved. The obsolete manual release wrapper is not introduced; the [current runbook](../deploy/release-attestation.md) describes required SHA injection for Workers Builds and reviewed manual releases.
+
+The [implementation record](artifacts/2026-09-07-release-attestation/implementation-review.md) reports the source freeze and completed focused evidence: 400 tests on Node 22, API/scripts typecheck, seven Wrangler checks, pre-0003 compatibility, source-fingerprint check, and fresh/populated migration integrity/preservation checks. These establish bounded local implementation behavior, not production adoption.
+
+Independent review, the final integrated full gate, and actual operational prerequisites remain to be recorded. Before the compatible main merge, both Workers Builds commands must inject the actual CI SHA and migration 0029 must be backed up, rehearsed, applied and checked. Live observations will be retained below without changing source-hashed migration or deployment files after the gate.

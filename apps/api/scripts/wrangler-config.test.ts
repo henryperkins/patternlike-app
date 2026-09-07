@@ -119,6 +119,31 @@ test("production parks the machine pipeline and configures Pattern for every acc
   assert.equal(production.ai?.binding ?? null, null);
 });
 
+test("both blocks can attest what they are, and neither commits a real release", () => {
+  const development = unstable_readConfig({ config: configPath });
+  const production = unstable_readConfig({
+    config: configPath,
+    env: "production",
+  });
+
+  // Named environments do not inherit bindings, so a version_metadata block
+  // present only at the top level would leave production unable to name the
+  // upload serving a request -- and every Daily publication would refuse.
+  for (const block of [development, production]) {
+    assert.deepEqual(block.version_metadata, { binding: "CF_VERSION_METADATA" });
+    // The committed value is a placeholder in BOTH blocks, deliberately. A real
+    // commit cannot be committed here: writing a commit's own SHA into a tracked
+    // file changes that SHA. Workers Builds must inject the real value with
+    // `--var` at upload time, and checkReleaseAttestation refuses this exact
+    // string outside development -- so a deploy that omitted the override serves
+    // 503 rather than attesting to nothing.
+    assert.equal(
+      block.vars.RELEASE_GIT_SHA,
+      "0000000000000000000000000000000000000000",
+    );
+  }
+});
+
 test("production sends every API namespace through the Worker before assets", () => {
   const production = unstable_readConfig({
     config: configPath,

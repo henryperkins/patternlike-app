@@ -17,6 +17,7 @@ import {
 import { CODEX_PROVIDER_TIMEOUT_MS } from "../services/codex-provider-contract.js";
 import { resolveBirthOperationalConfig } from "../services/birth-operational-config.js";
 import { readRootKekKeyring } from "../services/root-kek-keyring.js";
+import { checkReleaseAttestation } from "../services/release-attestation.js";
 
 export const ONTOLOGY_PIPELINE_ROLLOUT_MODES = ["off", "internal"] as const;
 export type OntologyPipelineRollout = (typeof ONTOLOGY_PIPELINE_ROLLOUT_MODES)[number];
@@ -510,6 +511,16 @@ export function checkSecureConfig(
     return { code: publisher.code, message: publisher.message };
   }
 
+  // Presence-gated in both directions, exactly like the birth operational pair
+  // above. A RELEASE_GIT_SHA that is PRESENT and malformed is a wrong claim in
+  // any environment, so it is refused here; an ABSENT one is only a problem for
+  // a deployment, so it is refused after the development short-circuit.
+  const releaseShaPresent = (env.RELEASE_GIT_SHA ?? "").trim() !== "";
+  if (releaseShaPresent) {
+    const failure = checkReleaseAttestation(env);
+    if (failure) return { code: failure.code, message: failure.message };
+  }
+
   const patternPublisher = checkPatternPublisherValues(env);
   if (patternPublisher) return patternPublisher;
 
@@ -588,6 +599,13 @@ export function checkSecureConfig(
       message:
         "Identity provider configuration is incomplete; the API cannot authenticate anyone",
     };
+  }
+  // A deployment that cannot name its own source. Refused here rather than
+  // discovered later: without it every published reading would be unattributable
+  // to a commit, and the Daily publication receipt could not be written at all.
+  if (!releaseShaPresent) {
+    const failure = checkReleaseAttestation(env);
+    if (failure) return { code: failure.code, message: failure.message };
   }
   const timeTravel = resolveTimeTravelConfiguration(env);
   if (!timeTravel.ok) {
