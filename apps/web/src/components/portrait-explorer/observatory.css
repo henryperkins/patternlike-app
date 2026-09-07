@@ -6,20 +6,20 @@
 .observatory-explorer .observatory-views button { min-height:44px; padding:8px 14px; font-size:.8rem; border-radius:0; border-bottom:2px solid transparent; }
 .observatory-explorer .observatory-views button[aria-pressed="true"] { border-bottom-color:var(--forest, #173f35); background:var(--paper-deep, #e5dfd1); }
 .sky-placements { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:22px 0; border-top:1px solid var(--explorer-rule); border-bottom:1px solid var(--explorer-rule); }
-.explorer-visual > .sky-placements { margin:10px 0 0; }
+.explorer-scene-support > .sky-placements { margin:10px 0 0; }
 .sky-placements > * { display:flex; align-items:center; gap:9px; min-width:0; padding:13px 8px; }
 .portrait-explorer .sky-placements button { text-align:left; min-height:66px; border-radius:0; }
 .sky-placements svg { flex-shrink:0; }
-.sky-placements span span { display:block; font-size:11px; color:var(--ink-soft, #4e625b); }
+.sky-placements span span { display:block; font-size:12px; color:var(--ink-soft, #4e625b); }
 .sky-placements strong { display:block; font-family:var(--serif, Georgia, serif); font-size:19px; font-weight:400; }
 .sky-placement-unavailable { color:var(--ink-soft, #4e625b); }
-.sky-placement-unavailable small { display:block; font-size:11px; line-height:1.45; }
+.sky-placement-unavailable small { display:block; font-size:12px; line-height:1.45; }
 .portrait-explorer .sky-placements button[aria-pressed="true"] { background:var(--paper-deep, #e5dfd1); }
 .sky-reader > p { font-size:15px; line-height:1.8; }
 .sky-reader .sky-position { font-family:var(--serif, Georgia, serif); font-size:24px; margin:10px 0 22px; }
 .sky-reader .sky-fact { font-size:13px; color:var(--ink-soft, #4e625b); }
 .sky-reading-bridge { margin-top:28px; padding-top:22px; border-top:1px solid var(--explorer-rule); }
-.sky-reading-bridge h4 { font-family:var(--serif, Georgia, serif); font-size:24px; font-weight:400; margin:0 0 12px; }
+.sky-reading-bridge :is(h3, h4) { font-family:var(--serif, Georgia, serif); font-size:24px; font-weight:400; margin:0 0 12px; }
 .sky-reading-bridge p { font-size:14px; line-height:1.8; }
 .sky-today-link, .sky-intro-link { display:block; width:fit-content; min-height:44px; padding:10px 0; font-size:13px; text-underline-offset:4px; }
 .sky-reader .sky-map-note { font-size:12px; color:var(--ink-soft, #4e625b); margin-top:22px; }
@@ -81,3 +81,46 @@
   .observatory-explorer .explorer-scene { height:300px; }
   .observatory-explorer .explorer-title h1 { font-size:1.5rem; }
 }
+
+/* Placements keep their complete names and qualifications inside their own touch target. */
+.sky-placements { container-type:inline-size; container-name:placements; }
+.sky-placements > * > span { min-width:0; }
+@container placements (max-width:360px) {
+  .sky-placements > * { flex-direction:column; align-items:flex-start; gap:5px; padding:10px 8px; }
+  .sky-placement-unavailable small { overflow-wrap:anywhere; }
+}
+.sky-marker-connector { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.sky-marker-connector line { stroke:#faf8f2; stroke-width:2; filter:drop-shadow(0 1px 1px #17312a); }
+.portrait-explorer .sky-body-label { display:flex; align-items:center; gap:6px; }
+.sky-body-label svg { width:20px; height:20px; flex:none; }
+.explorer-entry-invitation { display:none; }
+.explorer-secondary-controls > summary { display:none; }
+.explorer-scene-support { flex:none; min-width:0; }
+.explorer-recovery-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }
+.observatory-explorer .explorer-visual-footer > span,
+.observatory-explorer .explorer-study-label,
+.observatory-explorer .explorer-chapter-number { font-size:12px; }
+@media (max-width:767px) {
+  .explorer-entry-invitation { display:block; margin-bottom:8px; }
+  .explorer-entry-invitation p { margin:0; font-size:14px; line-height:1.6; }
+  .portrait-explorer .explorer-entry-invitation button { font-size:14px; }
+}
+@container portrait (max-width:767px) {
+  .explorer-entry-invitation { display:block; margin-bottom:8px; }
+  .explorer-entry-invitation p { margin:0; font-size:14px; line-height:1.6; }
+  .portrait-explorer .explorer-entry-invitation button { font-size:14px; }
+}
+/* A short expanded window spends its full height on the instrument. Options scroll beside it. */
+.observatory-explorer .explorer-expanded-dialog > .explorer-compact-expanded {
+  display:grid; grid-template-columns:minmax(0, 1fr) 238px; grid-template-rows:minmax(0, 1fr); gap:12px;
+}
+.observatory-explorer .explorer-compact-expanded .explorer-scene { height:100%; min-height:0; }
+.explorer-compact-expanded .explorer-scene-support { min-height:0; overflow:auto; padding-right:4px; }
+.explorer-compact-expanded .explorer-secondary-controls > summary { display:list-item; min-height:44px; padding:10px 0; cursor:pointer; font-size:13px; }
+.observatory-explorer .explorer-compact-expanded .explorer-chapters { grid-template-columns:1fr; }
+.explorer-compact-expanded .explorer-visual-footer { flex-direction:column; align-items:flex-start; }
+.explorer-compact-expanded .explorer-visual-footer > span { display:none; }
+.explorer-compact-expanded .explorer-scene-support > .sky-placements { margin-top:4px; }
+
+.observatory-explorer .explorer-label-ordinal { font-size:12px; letter-spacing:.04em; }
+.explorer-compact-expanded .explorer-settings { display:block; }

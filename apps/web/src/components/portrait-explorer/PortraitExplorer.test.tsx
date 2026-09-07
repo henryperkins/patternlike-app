@@ -43,6 +43,63 @@ async function chapter(user: ReturnType<typeof userEvent.setup>, ordinal = 1) {
 }
 
 describe("Portrait exploration", () => {
+  it("offers an entry invitation before the canvas and reads the first chapter immediately", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
+    const invitation = screen.getByText("Four objects hold your saved chapters. Choose one to explore its story.");
+    expect(invitation.compareDocumentPosition(screen.getByTestId("scene")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
+    expect(scene.props?.selectedIds).toEqual(["chapter-1"]);
+    expect(screen.getByRole("heading", { name: nativePattern.core_chapters[0].title })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Return to portrait" }));
+    expect(scene.props?.selectedIds).toEqual(["chapter-1"]);
+  });
+
+  it("replaces unavailable graphics instructions with reading beside retry and preserves the selected experience", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
+    await chapter(user, 2);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByRole("button", { name: "Dusk" }));
+    await user.click(screen.getByRole("button", { name: "Open reading desk" }));
+    await user.click(screen.getByRole("button", { name: "Lose graphics" }));
+    expect(screen.queryByText(/Turn the object to inspect|The reading desk is open/)).not.toBeInTheDocument();
+    const recovery = screen.getByRole("button", { name: "Try 3D again" }).parentElement!;
+    await user.click(within(recovery).getByRole("button", { name: "Continue reading" }));
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    expect(scene.props?.selectedIds).toEqual(["chapter-2"]);
+    expect(scene.props?.experience).toMatchObject({ lighting: "dusk", openDesks: { "chapter-2": true } });
+    await user.click(screen.getByRole("button", { name: "Return to portrait" }));
+    await user.click(screen.getByRole("button", { name: "Try 3D again" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rotate left" })).toBeEnabled());
+    expect(scene.props?.facet).toBe("resources");
+    expect(scene.props?.experience).toMatchObject({ lighting: "dusk", openDesks: { "chapter-2": true } });
+  });
+
+  it("keeps secondary options collapsible in a short expanded scene and hands focus to the preserved reading", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("max-height: 480px"), media: query,
+      addEventListener() {}, removeEventListener() {},
+    }));
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
+    await chapter(user, 2);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByRole("button", { name: "Dusk" }));
+    await user.click(screen.getByRole("button", { name: "Expand scene" }));
+    const expanded = screen.getByRole("dialog", { name: "Expanded portrait scene" });
+    const summary = within(expanded).getByText("Scene options");
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    expect(within(expanded).getByRole("navigation", { name: "Pattern chapters" })).toBeVisible();
+    await user.click(summary);
+    expect(summary.closest("details")).toHaveAttribute("open");
+    expect(within(expanded).getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(expanded).getByRole("button", { name: "Read chapter" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(screen.getByRole("heading", { name: nativePattern.core_chapters[1].title })).toHaveFocus());
+  });
+
   it("explores calculated zodiac placements and returns to the same Pattern perspective", async () => {
     const user = userEvent.setup();
     const sky = { chartId: "chart-fixture", placements: [

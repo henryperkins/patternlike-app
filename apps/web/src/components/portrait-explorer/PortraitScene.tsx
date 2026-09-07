@@ -9,10 +9,10 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, TapTracker, verifyGlbAsset } from "./scene-utils.js";
+import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, TapTracker, verifyGlbAsset } from "./scene-utils.js";
 import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
 import { createObservatory, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
-import { signLabel, skyBodyLabels } from "./SkyReader.js";
+import { BodyIcon, signLabel, skyBodyLabels } from "./SkyReader.js";
 import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
 type LoadedForm = { id: string; root: Group; resources: Object3D[]; };
@@ -198,7 +198,7 @@ class PortraitRuntime {
     this.applyExperience();
     this.world?.tick(1);
     this.forms.forEach(form => { form.root.rotation.y = (props.experience?.turns[form.id] ?? 0) * Math.PI / 4; });
-    const pose = isCameraBookmark(props.bookmark) ? props.bookmark : this.frame();
+    const pose = isCameraBookmark(props.bookmark) ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame();
     this.applyPose(pose);
     this.updateEmphasis();
     this.invalidate();
@@ -208,7 +208,7 @@ class PortraitRuntime {
     }
   }
 
-  private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray() });
+  private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray(), frameDistance: this.frameDistance() });
   private layout = (index: number, unfolded: boolean) => this.world ? stationPosition(index, unfolded) : chapterLayout(index, unfolded);
   private save = () => { if (this.ready) this.props.onBookmark(this.props.viewKey, this.snapshot()); };
   private bounds = (unfolded = this.props.unfolded) => this.localBoxes.map((box, index) => {
@@ -227,6 +227,10 @@ class PortraitRuntime {
     const selected = this.forms.flatMap((form, index) => this.props.selectedIds.includes(form.id) ? [index] : []);
     return this.world ? observatoryFrame(this.bounds(), selected, this.width / this.usableHeight, Boolean(this.props.experience?.inspect))
       : cameraFrame(this.bounds(), selected, this.width / this.usableHeight);
+  };
+  private frameDistance = () => {
+    const frame = this.frame();
+    return new Vector3(...frame.position).distanceTo(new Vector3(...frame.target));
   };
   private applyPose = (pose: CameraBookmark) => {
     this.camera.position.fromArray(pose.position);
@@ -282,7 +286,7 @@ class PortraitRuntime {
     if (before.quality !== props.quality || before.expanded !== props.expanded) this.applyQuality();
     this.applyExperience();
     if (before.viewKey !== props.viewKey || before.unfolded !== props.unfolded) {
-      this.moveTo(isCameraBookmark(props.bookmark) && before.viewKey !== props.viewKey ? props.bookmark : this.frame(), before.unfolded !== props.unfolded ? 540 : 420);
+      this.moveTo(isCameraBookmark(props.bookmark) && before.viewKey !== props.viewKey ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame(), before.unfolded !== props.unfolded ? 540 : 420);
     }
     if (before.command.serial !== props.command.serial) this.command();
     if (props.reducedMotion && this.motion) {
@@ -390,6 +394,7 @@ class PortraitRuntime {
     const bounds = this.host.getBoundingClientRect();
     this.visible = bounds.width > 0 && bounds.height > 0;
     if (!this.visible) return;
+    const before = this.ready ? this.snapshot() : null;
     this.width = Math.max(1, bounds.width);
     this.height = Math.max(1, bounds.height);
     const parent = this.host.closest(".explorer-scene");
@@ -402,6 +407,16 @@ class PortraitRuntime {
     this.camera.setViewOffset(this.width, this.usableHeight, 0, -this.topInset, this.width, this.height);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.width, this.height, false);
+    if (before) {
+      const distance = this.frameDistance();
+      this.applyPose(adaptCameraBookmark(before, distance));
+      if (this.motion) {
+        // Both animation endpoints share the old viewport, even if the destination has not been saved yet.
+        this.motion.from = adaptCameraBookmark({ ...this.motion.from, frameDistance: before.frameDistance }, distance);
+        this.motion.to = adaptCameraBookmark({ ...this.motion.to, frameDistance: before.frameDistance }, distance);
+      }
+      this.save();
+    }
     this.invalidate();
   };
 
@@ -439,6 +454,8 @@ class PortraitRuntime {
 
   private projectSkyLabels() {
     if (!this.world) return;
+    const connector = this.labels.querySelector<SVGLineElement>("[data-sky-connector]");
+    if (connector) connector.style.visibility = "hidden";
     const place = (element: HTMLElement, anchor: Vector3, marker?: PortraitSkyBody) => {
       const projected = anchor.clone().project(this.camera);
       let visible = Boolean(this.props.skyView) && projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
@@ -451,18 +468,33 @@ class PortraitRuntime {
       const y = Math.max(this.topInset + 2, Math.min(this.height - this.bottomInset - height - 2, (1 - projected.y) * this.height / 2 - height / 2));
       element.style.visibility = visible || (this.props.skyView && document.activeElement === element) ? "visible" : "hidden";
       element.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      return { x: x + width / 2, y: y + height / 2, visible };
     };
     this.world.instrument.signAnchors.forEach((anchor, index) => {
       const label = this.labels.querySelector<HTMLElement>(`[data-sign-index="${index}"]`);
       if (label) place(label, this.world!.instrument.root.localToWorld(new Vector3(...anchor)));
     });
-    for (const [body] of this.world.instrument.markers) {
+    for (const [body, marker] of this.world.instrument.markers) {
       const label = this.labels.querySelector<HTMLElement>(`[data-sky-body="${body}"]`);
       if (!label) continue;
-      // Keep the selected readout centered, including when placements share a longitude.
-      // Native placement controls below the canvas expose every available body.
-      if (body === this.props.selectedSkyBody) place(label, this.world.instrument.root.localToWorld(new Vector3(0, 1.12, 0)), body);
-      else label.style.visibility = "hidden";
+      if (body === this.props.selectedSkyBody) {
+        // The readout stays clear of crowded placements; a leader terminates at the actual chart marker.
+        const markerAnchor = marker.getWorldPosition(new Vector3());
+        const projected = markerAnchor.clone().project(this.camera);
+        const readoutAnchor = marker.position.clone().setY(0).normalize().multiplyScalar(-0.55).setY(1.12);
+        const readout = place(label, this.world.instrument.root.localToWorld(readoutAnchor), body);
+        this.raycaster.set(this.camera.position, markerAnchor.clone().sub(this.camera.position).normalize());
+        const hit = this.visibleHit();
+        const visible = readout.visible && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1
+          && (!hit || hit.distance >= this.camera.position.distanceTo(markerAnchor) - 0.15 || hit.object.userData.skyBody === body);
+        if (connector && visible) {
+          connector.setAttribute("x1", String(readout.x));
+          connector.setAttribute("y1", String(readout.y));
+          connector.setAttribute("x2", String((projected.x + 1) * this.width / 2));
+          connector.setAttribute("y2", String((1 - projected.y) * this.height / 2));
+          connector.style.visibility = "visible";
+        }
+      } else label.style.visibility = "hidden";
     }
   }
 
@@ -596,8 +628,9 @@ export default function PortraitScene(props: PortraitSceneProps) {
     <div className="explorer-canvas-host" ref={host} style={{ position: "absolute", inset: 0 }} />
     <div className="explorer-labels" ref={labels} style={{ position: "absolute", inset: 0, pointerEvents: "none", visibility: status === "ready" ? "visible" : "hidden" }}>
       {props.experience && ZODIAC_SIGNS.map((sign, index) => <span key={sign} className="sky-sign-label" data-sign-index={index} aria-hidden="true" style={{ visibility: "hidden" }}>{signLabel(sign)}</span>)}
+      <svg className="sky-marker-connector" aria-hidden="true"><line data-sky-connector style={{ visibility: "hidden" }} /></svg>
       {props.sky?.placements.map(placement => <button key={placement.body} type="button" className="sky-body-label" data-sky-body={placement.body} data-selected={props.selectedSkyBody === placement.body}
-        aria-label={`${skyBodyLabels[placement.body]} in ${signLabel(placement.sign)}`} style={{ visibility: "hidden" }} onClick={() => props.onSelectSkyBody?.(placement.body)}>{skyBodyLabels[placement.body]}</button>)}
+        aria-label={`${skyBodyLabels[placement.body]} in ${signLabel(placement.sign)}`} style={{ visibility: "hidden" }} onClick={() => props.onSelectSkyBody?.(placement.body)}><BodyIcon body={placement.body} />{skyBodyLabels[placement.body]}</button>)}
       {props.assets.map((asset, index) => {
         const chapter = props.chapters.find(item => item.id === asset.chapterId);
         if (!chapter) return null;

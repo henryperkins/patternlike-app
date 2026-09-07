@@ -6,7 +6,7 @@ import { BufferGeometry, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Ca
 import PortraitScene from "./PortraitScene.js";
 import type { PortraitSceneProps } from "./types.js";
 
-const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity], scene: null as Scene | null, detachedDisplay: false }));
+const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity], scene: null as Scene | null, camera: null as Camera | null, detachedDisplay: false }));
 // jsdom has no GPU. Keep the real loader, camera, mesh, controls and lifecycle.
 vi.mock("three", async importOriginal => {
   const original = await importOriginal<typeof import("three")>();
@@ -27,6 +27,7 @@ vi.mock("three", async importOriginal => {
     setSize() {}
     render(scene: Scene, camera: Camera) {
       gpu.scene = scene;
+      gpu.camera = camera;
       const station = scene.getObjectByName("Chapter display 1");
       const artifact = scene.children.find(object => object.userData.chapterId === "chapter-1");
       if (station && artifact && (Math.abs(station.position.x - artifact.position.x) > 0.001 || Math.abs(station.position.z - artifact.position.z) > 0.001)) gpu.detachedDisplay = true;
@@ -296,3 +297,38 @@ it("rejects an intact correctly hashed compass assigned to a different chapter b
   expect(screen.queryByRole("img")).not.toBeInTheDocument();
   expect(gpu.renders).toBe(0);
 });
+
+
+it("keeps all zodiac labels in frame across expansion and resize and connects the selected readout to the plotted marker", async () => {
+  let resize: () => void = () => {};
+  vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
+  let bounds = new DOMRect(0, 0, 358, 345);
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(() => bounds);
+  const callbacks = { ...props(), bookmark: undefined, selectedIds: [], skyView: true, viewKey: "sky",
+    selectedSkyBody: "moon" as const,
+    experience: { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} },
+    sky: { chartId: "fictional", placements: [{ body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 }], unavailable: {} },
+  };
+  const initial = render(<PortraitScene {...callbacks} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const initialPosition = [...gpu.position];
+  initial.unmount();
+  const bookmark = vi.mocked(callbacks.onBookmark).mock.lastCall![1];
+  bounds = new DOMRect(0, 0, 354, 580);
+  vi.mocked(callbacks.onStatus).mockClear();
+  const expanded = render(<PortraitScene {...callbacks} bookmark={bookmark} expanded />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const labels = [...expanded.container.querySelectorAll<HTMLElement>("[data-sign-index]")];
+  expect(labels.filter(label => label.style.visibility === "visible")).toHaveLength(12);
+  const marker = gpu.scene!.getObjectByName("moon zodiac marker")!;
+  const projected = marker.getWorldPosition(new Vector3()).project(gpu.camera!);
+  const connector = expanded.container.querySelector<SVGLineElement>("[data-sky-connector]")!;
+  expect(connector).not.toBeNull();
+  expect(Number(connector.getAttribute("x2"))).toBeCloseTo((projected.x + 1) * 354 / 2, 1);
+  expect(Number(connector.getAttribute("y2"))).toBeCloseTo((1 - projected.y) * 580 / 2, 1);
+  bounds = new DOMRect(0, 0, 358, 345);
+  act(() => resize());
+  await waitFor(() => expect(gpu.position[1]).toBeCloseTo(initialPosition[1], 6));
+  expect(gpu.position[0]).toBeCloseTo(initialPosition[0], 6);
+  expect(gpu.position[2]).toBeCloseTo(initialPosition[2], 6);
+}, 12_000);

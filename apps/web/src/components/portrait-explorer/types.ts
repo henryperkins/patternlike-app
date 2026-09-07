@@ -10,7 +10,7 @@ export const facets: ReadonlyArray<{ id: Facet; label: string }> = [
   { id: "alternative", label: "Another expression" },
 ];
 export type Point3 = [number, number, number];
-export interface CameraBookmark { position: Point3; target: Point3; }
+export interface CameraBookmark { position: Point3; target: Point3; frameDistance?: number; }
 export interface PortraitMeshAsset {
   chapterId: string;
   url: string;

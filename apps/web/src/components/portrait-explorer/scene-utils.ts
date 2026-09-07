@@ -108,6 +108,18 @@ export function cameraFrame(boxes: readonly Box3[], selected: readonly number[],
   return { position: target.clone().addScaledVector(HOME_DIRECTION, distance).toArray(), target: target.toArray() };
 }
 
+/** Preserve the orbit and user zoom relative to the viewport's fitted frame. */
+export function adaptCameraBookmark(bookmark: CameraBookmark, frameDistance: number): CameraBookmark {
+  const previous = bookmark.frameDistance;
+  const scale = previous && Number.isFinite(previous) && previous > 0 ? frameDistance / previous : 1;
+  const target = new Vector3(...bookmark.target);
+  return {
+    position: new Vector3(...bookmark.position).sub(target).multiplyScalar(scale).add(target).toArray(),
+    target: [...bookmark.target],
+    frameDistance,
+  };
+}
+
 /** Four-chapter composition in published order; model Y is seated separately. */
 export function chapterLayout(index: number, unfolded: boolean): Point3 {
   const layouts: Point3[] = [[1.13, 0, 1.05], [-1.15, 0, -1.08], [1.2, 0, -1.12], [-1.18, 0, 1.24]];

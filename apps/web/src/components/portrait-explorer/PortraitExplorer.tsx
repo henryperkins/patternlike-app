@@ -37,7 +37,7 @@ class SceneBoundary extends Component<{ children: ReactNode; onFailure: () => vo
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-function Modal({ label, children, onClose, className = "" }: { label: string; children: ReactNode; onClose: () => void; className?: string }) {
+function Modal({ label, children, onClose, className = "", restoreFocus }: { label: string; children: ReactNode; onClose: () => void; className?: string; restoreFocus?: () => boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef(document.activeElement as HTMLElement | null);
   useEffect(() => {
@@ -48,12 +48,12 @@ function Modal({ label, children, onClose, className = "" }: { label: string; ch
     return () => {
       document.body.style.overflow = overflow;
       if (dialog?.open && typeof dialog.close === "function") dialog.close();
-      queueMicrotask(() => { if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }); });
+      queueMicrotask(() => { if (restoreFocus?.() !== false && opener.current?.isConnected) opener.current.focus({ preventScroll: true }); });
     };
   }, []);
   return <dialog ref={ref} className={`explorer-dialog ${className}`} aria-label={label} onCancel={(event) => { event.preventDefault(); onClose(); }} onKeyDown={(event) => {
     if (event.key !== "Tab") return;
-    const controls = Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? [])
+    const controls = Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), summary, a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? [])
       .filter((element) => {
         for (let ancestor: HTMLElement | null = element; ancestor && ancestor !== ref.current; ancestor = ancestor.parentElement) {
           const style = getComputedStyle(ancestor);
@@ -77,6 +77,16 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
   const facet = currentFacet(state);
   const [status, setStatus] = useState<SceneStatus>("loading");
   const [retry, setRetry] = useState(0);
+  const [shortViewport, setShortViewport] = useState(() => window.matchMedia?.("(min-width: 600px) and (max-height: 480px)").matches ?? false);
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
+  const restoreExpandedFocus = useRef(true);
+  const compactExpanded = state.presentation === "scene" && shortViewport;
+  useEffect(() => {
+    const query = window.matchMedia?.("(min-width: 600px) and (max-height: 480px)");
+    const update = () => setShortViewport(Boolean(query?.matches));
+    query?.addEventListener("change", update);
+    return () => query?.removeEventListener("change", update);
+  }, []);
   const [quality, setQuality] = useState<"standard" | "low">("standard");
   const [skyView, setSkyView] = useState(false);
   // Sky exploration temporarily reveals the scene without unwinding the reading's history.
@@ -214,7 +224,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
         if (presentation === "reading") target?.focus({ preventScroll: true });
         target?.scrollIntoView({ behavior: "instant", block: "start" });
       }
-      if (previousPresentation.current === "scene") expandButton.current?.focus({ preventScroll: true });
+      if (previousPresentation.current === "scene" && presentation !== "reading") expandButton.current?.focus({ preventScroll: true });
       else if (previousPresentation.current === "reading") readButton.current?.focus({ preventScroll: true });
       else if (previousPresentation.current === "full") fullReadingButton.current?.focus({ preventScroll: true });
     }
@@ -253,10 +263,20 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
     previousPresentation.current = presentation;
   }, [state, chapter?.id, scrollKey]);
   const present = (presentation: "reading" | "scene" | "full") => {
+    if (presentation === "scene") restoreExpandedFocus.current = true;
     dispatch({ type: "presentation", presentation });
   };
+  const readChapter = () => {
+    setSkyView(false);
+    if (presentation === "scene") restoreExpandedFocus.current = false;
+    dispatch([
+      ...(presentation === "scene" ? [{ type: "back" as const }] : []),
+      ...(!chapter ? [{ type: "select" as const, chapterId: manifest.chapters[0].id }] : []),
+      { type: "presentation", presentation: "reading" },
+    ]);
+  };
   const chapterRail = <nav aria-label="Pattern chapters" className="explorer-chapters">{manifest.chapters.map((item) => <button key={item.id} aria-label={`${item.ordinal}. ${item.title}`} aria-pressed={selectedIds.includes(item.id)} onClick={() => select(item.id)}><span className="explorer-chapter-number">{String(item.ordinal).padStart(2, "0")}</span><span><span className="explorer-sr-only">{item.ordinal}. </span>{item.title}</span></button>)}</nav>;
-  const scenePanel = <div className="explorer-visual">
+  const scenePanel = <div className={`explorer-visual${compactExpanded ? " explorer-compact-expanded" : ""}`}>
     <div className="explorer-scene" aria-label="Interactive Pattern portrait">
       <div className="explorer-scene-top"><button onClick={() => { setSkyView(false); if (!skyView) dispatch({ type: "whole" }); }} aria-pressed={!skyView && state.view.kind === "whole"}>{skyView ? "Back to Pattern" : "Whole portrait"}</button><button disabled={!graphicsAvailable || skyView} onClick={() => dispatch({ type: "unfold" })}>{state.unfolded ? "Reassemble" : "Unfold portrait"}<span aria-hidden="true">{state.unfolded ? " ↙" : " ↗"}</span></button></div>
       {validMeshes && <SceneBoundary key={JSON.stringify([retry, sky])} onFailure={() => setStatus("unavailable")}><Suspense fallback={null}><PortraitScene assets={meshBundle.assets} chapters={manifest.chapters}
@@ -266,7 +286,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
         sky={sky} sunSign={manifest.sunSign} skyView={skyView} selectedSkyBody={selectedSkyBody} onSelectSkyBody={openSky}
         viewKey={viewKey} bookmark={bookmarks.current.get(viewKey)} command={command} onBookmark={onBookmark}
         onSelect={select} onAnnotation={annotation} onStatus={setStatus} /></Suspense></SceneBoundary>}
-      {(!validMeshes || status === "unavailable") && <div className="explorer-scene-message" role="status"><p>The portrait is taking a pause.</p><p>Your complete reading is available below.</p>{validMeshes && <button onClick={() => { setStatus("loading"); setRetry((value) => value + 1); }}>Try 3D again</button>}</div>}
+      {(!validMeshes || status === "unavailable") && <div className="explorer-scene-message" role="status"><p>The portrait is taking a pause.</p><p>Your saved chapters are ready to read.</p><div className="explorer-recovery-actions">{validMeshes && <button onClick={() => { setStatus("loading"); setRetry((value) => value + 1); }}>Try 3D again</button>}<button onClick={readChapter}>Continue reading</button></div></div>}
       {validMeshes && status === "loading" && <p className="explorer-loading" role="status">Preparing four objects…</p>}
       <div className="explorer-scene-toolbar" role="group" aria-label="3D controls" tabIndex={0} onKeyDown={(event) => {
         if (event.target !== event.currentTarget || !graphicsAvailable) return;
@@ -281,16 +301,22 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
         {presentation !== "scene" && <button ref={expandButton} disabled={!validMeshes || status === "unavailable"} className="explorer-expand" aria-label="Expand scene" title="Expand scene" onClick={() => present("scene")}><span className="explorer-mobile-icon"><SceneIcon name="expand" /></span><span className="explorer-control-text">Expand scene</span></button>}
       </div>
     </div>
-    {skyView && <SkyPlacements sky={sky} sunSign={manifest.sunSign} selected={selectedSkyBody} onSelect={openSky} />}
-    <ObservatoryControls experience={experience} onChange={changeExperience} available={graphicsAvailable} skyView={skyView}
-      chapterId={!skyView && selectedIds.length === 1 ? chapter?.id : undefined} onOperate={() => chapter && operate(chapter.id)} />
-    {!skyView && <>{chapterRail}
-    <div className="explorer-visual-footer"><span>Select an object or a chapter to explore.</span><button data-start-guide className="explorer-text-button" onClick={() => { pendingFocus.current = "heading"; dispatch({ type: "guide" }); }}>Guide me through <span aria-hidden="true">→</span></button></div></>}
-    <details className="explorer-settings"><summary>Scene controls &amp; motion</summary><div><p>Drag horizontally to rotate. Scroll the page with one finger. In the expanded scene, pinch to zoom or use the camera buttons. Each object also has a named chapter button.</p><div className="explorer-setting-actions"><button disabled={!graphicsAvailable} onClick={() => issueCommand("up")}>Tilt up</button><button disabled={!graphicsAvailable} onClick={() => issueCommand("down")}>Tilt down</button><button disabled={!graphicsAvailable} onClick={() => issueCommand("frame")}>Frame selection</button></div><label><input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} /> Reduce motion</label><label>Graphics <select value={quality} onChange={(event) => setQuality(event.target.value as "standard" | "low")}><option value="standard">Standard</option><option value="low">Low power</option></select></label></div></details>
+    <div className="explorer-scene-support">
+      {compactExpanded && <button className="explorer-text-button" onClick={readChapter}>Read chapter</button>}
+      {skyView ? <SkyPlacements sky={sky} sunSign={manifest.sunSign} selected={selectedSkyBody} onSelect={openSky} /> : compactExpanded && chapterRail}
+      <details className="explorer-secondary-controls" open={!compactExpanded || secondaryOpen} onToggle={(event) => { if (compactExpanded) setSecondaryOpen(event.currentTarget.open); }}>
+        <summary>Scene options</summary>
+        <ObservatoryControls experience={experience} onChange={changeExperience} available={graphicsAvailable} skyView={skyView}
+          chapterId={!skyView && selectedIds.length === 1 ? chapter?.id : undefined} onOperate={() => chapter && operate(chapter.id)} />
+        <details className="explorer-settings"><summary>Scene controls &amp; motion</summary><div><p>{graphicsAvailable ? "Drag horizontally to rotate. Scroll the page with one finger. In the expanded scene, pinch to zoom or use the camera buttons. Each object also has a named chapter button." : "Your reading is available while graphics are paused. You can adjust motion and graphics before trying 3D again."}</p><div className="explorer-setting-actions"><button disabled={!graphicsAvailable} onClick={() => issueCommand("up")}>Tilt up</button><button disabled={!graphicsAvailable} onClick={() => issueCommand("down")}>Tilt down</button><button disabled={!graphicsAvailable} onClick={() => issueCommand("frame")}>Frame selection</button></div><label><input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} /> Reduce motion</label><label>Graphics <select value={quality} onChange={(event) => setQuality(event.target.value as "standard" | "low")}><option value="standard">Standard</option><option value="low">Low power</option></select></label></div></details>
+      </details>
+      {!skyView && !compactExpanded && chapterRail}
+      {!skyView && <div className="explorer-visual-footer"><span>Choose a chapter to explore its reading.</span><button data-start-guide className="explorer-text-button" onClick={() => { pendingFocus.current = "heading"; dispatch({ type: "guide" }); }}>Guide me through <span aria-hidden="true">→</span></button></div>}
+    </div>
   </div>;
   const ReaderHeading = embedded ? "h3" : "h2";
   const reader = <aside ref={readerElement} className="explorer-reader" aria-label={skyView ? "Birth-chart reading" : "Chapter reading"} onScroll={(event) => readerPositions.current.set(readerKey, event.currentTarget.scrollTop)}>
-    {skyView ? <SkyReader sky={sky} sunSign={manifest.sunSign} selected={selectedSkyBody} embedded={embedded}
+    {skyView ? <SkyReader sky={sky} sunSign={manifest.sunSign} selected={selectedSkyBody} embedded={embedded} graphicsAvailable={graphicsAvailable}
       onPattern={() => chapter ? setSkyView(false) : select(manifest.chapters[0].id, true)} /> : chapter ? <>
       {state.view.kind === "guided" && <div className="explorer-guide"><span>Guided exploration · Stop {state.view.step + 1} of {manifest.chapters.length}</span><button onClick={() => endView("guided")}>Exit guide</button></div>}
       {state.view.kind === "compare" && <button data-end-comparison className="explorer-text-button" onClick={() => endView("compare")}>End comparison</button>}
@@ -317,9 +343,10 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
         <nav className="observatory-views" aria-label="Observatory views"><button aria-pressed={!skyView} onClick={() => setSkyView(false)}>Your Pattern</button><button aria-pressed={skyView} onClick={() => openSky()}>Your sky</button></nav>
       </div>
       {manifest.uncertainty && <p className="explorer-uncertainty">{manifest.uncertainty}</p>}
-      <div className="explorer-mobile-modes"><button aria-pressed={presentation === "explore"} onClick={() => presentation !== "explore" && back()}>{presentation === "reading" ? "Return to portrait" : "Explore"}</button><button ref={readButton} aria-pressed={presentation === "reading"} disabled={!chapter} onClick={() => { setSkyView(false); present("reading"); }}>Read chapter</button></div>
+      {!chapter && !skyView && presentation === "explore" && <div className="explorer-entry-invitation"><p>Four objects hold your saved chapters. Choose one to explore its story.</p><button className="explorer-text-button" onClick={() => select(manifest.chapters[0].id, true)}>Begin with {manifest.chapters[0].title} <span aria-hidden="true">→</span></button></div>}
+      <div className="explorer-mobile-modes"><button aria-pressed={presentation === "explore"} onClick={() => presentation !== "explore" && back()}>{presentation === "reading" ? "Return to portrait" : "Explore"}</button><button ref={readButton} aria-pressed={presentation === "reading"} onClick={readChapter}>Read chapter</button></div>
       <div className={`explorer-workspace${selected.length === 2 ? " explorer-is-comparing" : ""}`}>{presentation !== "scene" && scenePanel}{reader}</div>
-      {presentation === "scene" && <Modal label="Expanded portrait scene" className="explorer-expanded-dialog" onClose={back}><div className="explorer-dialog-heading"><h2>Portrait scene</h2><button onClick={back}>Close expanded scene</button></div>{scenePanel}</Modal>}
+      {presentation === "scene" && <Modal label="Expanded portrait scene" className="explorer-expanded-dialog" onClose={back} restoreFocus={() => restoreExpandedFocus.current}><div className="explorer-dialog-heading"><h2>Portrait scene</h2><button onClick={back}>Close expanded scene</button></div>{scenePanel}</Modal>}
     </>}
     {state.inspectImage && chapter?.object && <Modal label="Original chapter image" onClose={() => dispatch({ type: "inspect", open: false })}><div className="explorer-dialog-heading"><div><p className="explorer-eyebrow">Original chapter image</p><h2>{chapter.object.label}</h2></div><button onClick={() => dispatch({ type: "inspect", open: false })}>Close image</button></div><img src={chapter.object.imageUrl} alt={chapter.object.label} /><h3>Visual metaphor</h3><p>{chapter.object.rationale}</p><p className="explorer-image-source">{chapter.title} · Image reference {chapter.object.referenceId}</p></Modal>}
     {!embedded && <footer className="explorer-footer"><span>{meshBundle.authoring === "codex-parametric/v1" ? "Four objects created from your chapters and their saved images." : "Four authored models based on the fictional chapter images."}</span><span>Personal meaning stays in the reading.</span></footer>}

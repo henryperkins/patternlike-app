@@ -5,11 +5,12 @@ export const skyBodyLabels: Record<PortraitSkyBody, string> = { sun: "Sun", moon
 export const signLabel = (sign: ZodiacSignName) => sign.charAt(0).toUpperCase() + sign.slice(1);
 const bodyOrder: PortraitSkyBody[] = ["sun", "moon", "ascendant"];
 
-function BodyIcon({ body }: { body: PortraitSkyBody }) {
+export function BodyIcon({ body }: { body: PortraitSkyBody }) {
   return <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {body === "sun" ? <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>
-      : body === "moon" ? <path d="M18.7 17.3A8.5 8.5 0 0 1 8 4a8.5 8.5 0 1 0 10.7 13.3Z" />
-        : <><path d="M3 18h18M12 15V3m-4 4 4-4 4 4" /><path d="M6 18a6 6 0 0 1 12 0" /></>}
+    {body === "sun" ? <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" fill="currentColor" /></>
+      : body === "moon" ? <circle cx="12" cy="12" r="7" fill="currentColor" fillOpacity=".35" />
+        : <><path d="m12 2 10 10-10 10L2 12Z" fill="currentColor" fillOpacity=".2" /><path d="m2 12 10-3 10 3m-10-3v13" /></>}
+
   </svg>;
 }
 
@@ -36,13 +37,14 @@ function degreeLabel(placement: PortraitSkyPlacement) {
   return `${Math.floor(minutes / 60)}° ${String(minutes % 60).padStart(2, "0")}′ ${signLabel(placement.sign)}`;
 }
 
-export function SkyReader({ sky, sunSign, selected, onPattern, embedded }: {
+export function SkyReader({ sky, sunSign, selected, onPattern, embedded, graphicsAvailable = true }: {
   sky: PortraitSky | null; sunSign: ZodiacSignName | null; selected: PortraitSkyBody | null;
-  onPattern: () => void; embedded: boolean;
+  onPattern: () => void; embedded: boolean; graphicsAvailable?: boolean;
 }) {
   const placement = sky?.placements.find(item => item.body === selected);
   const savedSun = !sky && selected === "sun" ? sunSign : null;
   const Heading = embedded ? "h3" : "h2";
+  const Subheading = embedded ? "h4" : "h3";
   return <div className="sky-reader">
     <Heading data-reader-heading tabIndex={-1}>{placement ? `${skyBodyLabels[placement.body]} in ${signLabel(placement.sign)}` : savedSun ? `Sun in ${signLabel(savedSun)}` : "The sky behind your Pattern."}</Heading>
     {placement && <p className="sky-position">{degreeLabel(placement)}</p>}
@@ -51,9 +53,9 @@ export function SkyReader({ sky, sunSign, selected, onPattern, embedded }: {
       {placement.house && <p className="sky-fact">House {placement.house}</p>}
       {placement.qualification && <p className="explorer-uncertainty">{placement.qualification}</p>}
     </> : savedSun ? <p>The saved portrait includes your Sun sign. Its exact position is not available in this view.</p>
-      : <p>Your birth-chart placements are not available in this view. The twelve-sign ring remains available to explore.</p>}
+      : <p>Your birth-chart placements are not available in this view. {graphicsAvailable ? "The twelve-sign ring remains available to explore." : "Your saved Pattern remains available to read."}</p>}
     {sky?.uncertainty && <p className="explorer-uncertainty">{sky.uncertainty}</p>}
-    <div className="sky-reading-bridge"><h4>From your sky to your Pattern</h4><p>Your four chapters bring the chart into a personal reading. Return to a chapter to explore its tensions, resources, and another expression.</p>
+    <div className="sky-reading-bridge"><Subheading>From your sky to your Pattern</Subheading><p>Your four chapters bring the chart into a personal reading. Return to a chapter to explore its tensions, resources, and another expression.</p>
       <button type="button" className="explorer-primary" onClick={onPattern}>Explore your Pattern</button>
       {embedded && <a className="sky-today-link" href="#today">Read today’s horoscope</a>}
     </div>
