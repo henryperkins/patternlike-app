@@ -1,0 +1,9 @@
+{
+  "pr": 44,
+  "url": "https://github.com/henryperkins/patternlike-app/pull/44",
+  "candidate": "af2b14935576144853647181cf6c9cf5d749c079",
+  "remote_main": "8d15092c0687b223e82c919e369625f623c8db34",
+  "tree_equal_to_verified_candidate": true,
+  "source_snapshot_sha256": "3fa07ec01fdf85b60fc7ccac448ca66d21d6cbd43d848fb3226094b150d146b1",
+  "deployment_status": "not_yet_observed"
+}

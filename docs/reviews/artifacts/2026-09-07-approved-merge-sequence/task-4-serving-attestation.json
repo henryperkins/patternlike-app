@@ -1,0 +1,27 @@
+{
+  "observed_at": "2026-09-07T10:22:20.869Z",
+  "success": true,
+  "deployment": {
+    "id": "ae94bfbc-1074-4bf9-bd8f-3a170dfc5492",
+    "created_at": "2026-09-07T10:21:49.633094Z",
+    "source": "wrangler"
+  },
+  "versions": [
+    {
+      "version_id": "4bda6968-fa39-4ae8-8c11-d220b1538686",
+      "percentage": 100,
+      "created_at": "2026-09-07T10:21:47.951619Z",
+      "release_git_sha": "0b87e6007043ac0bcd15a8f644e41fbef0d543d7"
+    }
+  ],
+  "public_metadata": {
+    "url": "https://patternlike-api-production.lfd.workers.dev/v1/meta",
+    "http_status": 200,
+    "release_git_sha": "0b87e6007043ac0bcd15a8f644e41fbef0d543d7",
+    "worker_version_id": "4bda6968-fa39-4ae8-8c11-d220b1538686",
+    "auth_stub": false
+  },
+  "status": "observed",
+  "scope": "Actual deployed source/version and traffic observation. No provider, installed-runner or account lifecycle certification.",
+  "provider_or_lifecycle_canary_run": false
+}
