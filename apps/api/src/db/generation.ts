@@ -1,5 +1,9 @@
 import { newId } from "@patternlike/shared";
 import type { Env } from "../env.js";
+import {
+  buildDailyPublicationReceiptInsert,
+  type DailyPublicationReceiptInput,
+} from "./daily-publication-receipts.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
 import {
@@ -1387,6 +1391,15 @@ export interface PublicationInput {
   predecessor: PredecessorTransition;
   reading: { ciphertext: Uint8Array; keyVersion: number; nonce: string };
   evidence: EvidenceRow[];
+  /**
+   * The durable publication receipt, or null for a deterministic reading.
+   *
+   * Explicitly nullable rather than optional: a constrained-model publication
+   * that forgot its receipt and a V1 assembly that has no provider exchange to
+   * describe are different things, and an omitted field would make them look
+   * the same at every call site.
+   */
+  receipt: DailyPublicationReceiptInput | null;
 }
 
 export type PublishOutcome =
@@ -1409,6 +1422,15 @@ export async function completeReading(
 ): Promise<PublishOutcome> {
   const now = new Date().toISOString();
   const { identity, readingId, jobId, claimToken } = input;
+  if (
+    input.receipt &&
+    (input.receipt.readingId !== readingId ||
+      input.receipt.jobId !== jobId ||
+      input.receipt.commandGeneration !== input.commandGeneration ||
+      input.receipt.stageGeneration !== input.commandGeneration)
+  ) {
+    throw new Error("publication receipt names a different reading, job, command, or stage");
+  }
   const keyVersion = requireSingleCryptoWriteVersion([
     input.reading.keyVersion,
     ...input.evidence.map((row) => row.keyVersion),
@@ -1429,10 +1451,18 @@ export async function completeReading(
          JOIN users u ON u.id = r.user_id
          WHERE r.id = ? AND r.user_id = ? AND r.status = 'pending'
            AND r.command_generation = ?
+           AND r.assembly_mode = ?
            AND j.id = ? AND j.status = 'running' AND j.claim_token = ?
            AND u.status = 'active'
        )`,
-    ).bind(readingId, identity.userId, input.commandGeneration, jobId, claimToken),
+    ).bind(
+      readingId,
+      identity.userId,
+      input.commandGeneration,
+      input.receipt ? "constrained_model" : "deterministic",
+      jobId,
+      claimToken,
+    ),
   ];
 
   const predecessor = input.predecessor;
@@ -1504,6 +1534,14 @@ export async function completeReading(
     );
   }
 
+  // Inside the batch, deliberately. A receipt written afterwards could be lost
+  // to a crash while the reading stayed published, and one written before could
+  // outlive a publication that never committed. Here it is the same all-or-
+  // nothing fact as the ciphertext.
+  if (input.receipt) {
+    statements.push(buildDailyPublicationReceiptInsert(env, input.receipt, now));
+  }
+
   statements.push(
     auditStatement(env, identity.userId, "daily_reading.published", readingId, "success", now),
     env.DB.prepare(
@@ -1513,16 +1551,43 @@ export async function completeReading(
     ).bind(now, jobId, claimToken),
     env.DB.prepare(
       `INSERT INTO assertion_probe (id, reason)
-       SELECT 1, 'publication did not complete: reading, evidence, or job is not in its final state'
+       SELECT 1, 'publication did not complete: reading, evidence, receipt, or job is not in its final state'
        WHERE NOT EXISTS (
          SELECT 1 FROM daily_readings r
          JOIN jobs j ON j.id = r.active_generation_job_id
          WHERE r.id = ? AND r.status = 'published'
            AND r.reading_enc IS NOT NULL
-           AND j.id = ? AND j.status = 'succeeded'
+           AND j.id = ? AND j.status = 'succeeded' AND j.result_class = 'published'
+           AND r.command_generation = ?
        )
-       OR (SELECT COUNT(*) FROM reading_sources WHERE reading_id = ?) != ?`,
-    ).bind(readingId, jobId, readingId, input.evidence.length),
+       OR (SELECT COUNT(*) FROM reading_sources WHERE reading_id = ?) != ?
+       OR (
+         SELECT COUNT(*) FROM daily_publication_receipts WHERE reading_id = ?
+       ) != ?
+       OR (
+         SELECT COUNT(*) FROM daily_publication_receipts
+         WHERE reading_id = ? AND job_id = ? AND command_generation = ?
+           AND provider_job_id = ? AND stage_generation = ? AND stage_attempt = ?
+       ) != ?`,
+    ).bind(
+      readingId,
+      jobId,
+      input.commandGeneration,
+      readingId,
+      input.evidence.length,
+      readingId,
+      // Exactly one for a constrained-model publication and exactly zero for a
+      // deterministic one. Counting rather than checking existence is what
+      // makes a second receipt a refusal instead of an unnoticed duplicate.
+      input.receipt ? 1 : 0,
+      readingId,
+      jobId,
+      input.commandGeneration,
+      input.receipt?.providerJobId ?? "",
+      input.receipt?.stageGeneration ?? input.commandGeneration,
+      input.receipt?.stageAttempt ?? 0,
+      input.receipt ? 1 : 0,
+    ),
   );
 
   if (predecessor.kind === "supersede_published") {

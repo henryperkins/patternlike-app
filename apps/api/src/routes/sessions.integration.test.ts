@@ -26,6 +26,11 @@ function prodEnv() {
     OIDC_ISSUER: ISSUER,
     OIDC_AUDIENCE: AUDIENCE,
     OIDC_JWKS_URL: JWKS_URL,
+    // Same reason as the OIDC overrides above: `env` spreads wrangler.toml's
+    // committed forty-zero placeholder, which configGuard refuses outside
+    // development. A deployment that cannot name its own source is a refusal,
+    // and that refusal is the point — so override it rather than relax it.
+    RELEASE_GIT_SHA: "abc1230000000000000000000000000000000def",
   };
 }
 

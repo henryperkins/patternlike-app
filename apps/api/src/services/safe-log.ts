@@ -46,7 +46,8 @@ export type ConfigurationCode =
   | "ontology_pipeline_rollout_invalid"
   | "ontology_pipeline_misconfigured"
   | "codex_runner_authority_aliased"
-  | "crypto_operator_authority_aliased";
+  | "crypto_operator_authority_aliased"
+  | "release_attestation_missing";
 
 type OperationalFailureClass =
   | GenerationFailureCode

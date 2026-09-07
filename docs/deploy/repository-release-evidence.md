@@ -64,14 +64,12 @@ drift, but do not authenticate an author or independently prove a historical
 process run if the record itself was fabricated. Retain the original gate log
 outside the repository when independent inspection is needed.
 
-The unrelated `feat/release-truth-attestation` worktree at
-`/home/henry/patternlike-release-truth` was inspected read-only on 2026-09-06.
-It contains a production release script, runtime `RELEASE_GIT_SHA`/Worker
-attestation, and durable Daily publication receipt work. This local tool does
-not duplicate or integrate those runtime changes or their migration. That
-branch still needs its own review, compatibility reconciliation, and explicit
-release authorization. A source comparison with its recorded deployment notes
-does not show that its uncommitted implementation is deployed.
+The runtime [release-attestation and Daily receipt port](release-attestation.md)
+was reconciled from the preserved release-truth worktree onto current source.
+It uses Workers Builds SHA injection rather than the historical manual wrapper.
+Migration 0029 and static runbook requirements are part of the source snapshot;
+actual trigger changes, schema application, serving metadata, and traffic are
+separate operational observations. The local tool does not perform them.
 
 ## Offline reconciliation after the gate
 

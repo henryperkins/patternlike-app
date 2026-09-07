@@ -64,6 +64,10 @@ const enabled: Partial<Env> = {
   ...PATTERN,
   ENVIRONMENT: "production",
   ROOT_KEK: STRONG_KEK,
+  // A production deployment names the commit it was built from, exactly as it
+  // names a real issuer and a real root key. Absent, configGuard refuses before
+  // any Daily rule is reached.
+  RELEASE_GIT_SHA: "abc1230000000000000000000000000000000def",
   OIDC_ISSUER: "https://issuer.example.com",
   OIDC_AUDIENCE: "patternlike-web",
   OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",
@@ -190,6 +194,7 @@ describe("Codex-only Daily publisher configuration", () => {
       CODEX_PROVIDER_ARTIFACT_KEYRING: KEYRING,
       ENVIRONMENT: "production",
       ROOT_KEK: STRONG_KEK,
+      RELEASE_GIT_SHA: "abc1230000000000000000000000000000000def",
       OIDC_ISSUER: "https://issuer.example.com",
       OIDC_AUDIENCE: "patternlike-web",
       OIDC_JWKS_URL: "https://issuer.example.com/.well-known/jwks.json",

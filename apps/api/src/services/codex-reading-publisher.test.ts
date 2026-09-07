@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { canonicalJson, contentHash } from "@patternlike/shared";
 import type { ReadingGenerationOutput, ReadingGenerationRequest } from "@patternlike/shared";
@@ -16,6 +16,7 @@ import {
   codexProviderJobId,
   loadCodexProviderJob,
 } from "../db/codex-provider-jobs.js";
+import * as providerJobs from "../db/codex-provider-jobs.js";
 import { putCodexProviderArtifact } from "./codex-provider-artifacts.js";
 import {
   CODEX_PROVIDER_TIMEOUT_MS,
@@ -300,6 +301,46 @@ describe("the Codex Daily publisher adapter", () => {
     expect(result.metadata.provider_request_id).toBe("thread_codex_reading_0001");
     expect(result.metadata.provider_request_id).not.toBe(pending.job_id);
     expect(result.metadata.provider_request_id).not.toMatch(/^cpjob_/);
+  });
+
+  it.each(["high", "xhigh"] as const)("returns the completed %s durable exchange privately", async (effort) => {
+    const publisher = createCodexReadingPublisher(env);
+    const opts = options({ configuration: { ...pin, reasoning_effort: effort } });
+    const pending = await publisher.publish(packet, opts);
+    if (pending.ok || pending.code !== "publisher_pending") throw new Error("expected pending");
+    await completeWith(pending.job_id, JSON.stringify(candidate));
+    const job = await loadCodexProviderJob(env, pending.job_id);
+    const result = await publisher.publish(packet, opts);
+    if (!result.ok || !job) throw new Error("expected completed job");
+    expect(result.exchange).toEqual({
+      provider_job_id: job.id, stage_generation: job.stageGeneration, stage_attempt: job.stageAttempt,
+      model: job.model, reasoning_effort: effort, prompt_version: job.promptVersion,
+      request_hash: job.request.plaintextHash, response_hash: job.response!.plaintextHash,
+      input_tokens: job.inputTokens, output_tokens: job.outputTokens, provider_completed_at: job.completedAt,
+    });
+    expect(Object.keys(result.metadata).sort()).toEqual([
+      "input_tokens", "model", "output_tokens", "provider", "provider_request_id", "provider_response_hash",
+    ]);
+    expect(JSON.stringify(result.metadata)).not.toContain(job.id);
+  });
+
+  it("refuses a completed durable result missing its completion instant", async () => {
+    const publisher = createCodexReadingPublisher(env);
+    const pending = await publisher.publish(packet, options());
+    if (pending.ok || pending.code !== "publisher_pending") throw new Error("expected pending");
+    await completeWith(pending.job_id, JSON.stringify(candidate));
+    const job = await loadCodexProviderJob(env, pending.job_id);
+    if (!job) throw new Error("missing job");
+    // D1 prevents this malformed state today. Inject the loaded-row boundary to
+    // exercise the adapter's own refusal without weakening that CHECK.
+    const enqueue = vi.spyOn(providerJobs, "enqueueCodexProviderJob").mockResolvedValue({
+      job: { ...job, completedAt: null }, status: "adopted",
+    });
+    try {
+      expect(await publisher.publish(packet, options())).toMatchObject({ ok: false, code: "publisher_unavailable" });
+    } finally {
+      enqueue.mockRestore();
+    }
   });
 
   it("returns the runner's own closed failure rather than a second opinion", async () => {

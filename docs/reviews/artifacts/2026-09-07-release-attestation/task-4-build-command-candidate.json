@@ -1,0 +1,70 @@
+{
+  "scope": "Offline shell expansion with a fake npx; no platform changes",
+  "commands": {
+    "main": "npx wrangler deploy --config apps/api/wrangler.toml --env production --var \"RELEASE_GIT_SHA:${WORKERS_CI_COMMIT_SHA:?Missing Workers Builds commit SHA}\"",
+    "preview": "npx wrangler versions upload --config apps/api/wrangler.toml --env production --var \"RELEASE_GIT_SHA:${WORKERS_CI_COMMIT_SHA:?Missing Workers Builds commit SHA}\""
+  },
+  "checks": [
+    {
+      "trigger": "main",
+      "case": "missing",
+      "exit_code": 2,
+      "wrangler_invoked": false,
+      "args": null
+    },
+    {
+      "trigger": "main",
+      "case": "empty",
+      "exit_code": 2,
+      "wrangler_invoked": false,
+      "args": null
+    },
+    {
+      "trigger": "main",
+      "case": "valid",
+      "exit_code": 0,
+      "wrangler_invoked": true,
+      "args": [
+        "wrangler",
+        "deploy",
+        "--config",
+        "apps/api/wrangler.toml",
+        "--env",
+        "production",
+        "--var",
+        "RELEASE_GIT_SHA:8d15092c0687b223e82c919e369625f623c8db34"
+      ]
+    },
+    {
+      "trigger": "preview",
+      "case": "missing",
+      "exit_code": 2,
+      "wrangler_invoked": false,
+      "args": null
+    },
+    {
+      "trigger": "preview",
+      "case": "empty",
+      "exit_code": 2,
+      "wrangler_invoked": false,
+      "args": null
+    },
+    {
+      "trigger": "preview",
+      "case": "valid",
+      "exit_code": 0,
+      "wrangler_invoked": true,
+      "args": [
+        "wrangler",
+        "versions",
+        "upload",
+        "--config",
+        "apps/api/wrangler.toml",
+        "--env",
+        "production",
+        "--var",
+        "RELEASE_GIT_SHA:8d15092c0687b223e82c919e369625f623c8db34"
+      ]
+    }
+  ]
+}

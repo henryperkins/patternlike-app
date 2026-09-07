@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "triggers": [
+    {
+      "trigger_uuid": "937c3393-d924-40b8-8c39-133f4513b8d8",
+      "trigger_name": "Deploy non-production branches",
+      "build_command": "npm run build",
+      "deploy_command": "npx wrangler versions upload --config apps/api/wrangler.toml --env production",
+      "root_directory": "/",
+      "branch_includes": [
+        "*"
+      ],
+      "branch_excludes": [
+        "main"
+      ]
+    },
+    {
+      "trigger_uuid": "35f833d4-f1d1-4835-8ecf-597d291d84ec",
+      "trigger_name": "Deploy default branch",
+      "build_command": "npm run build",
+      "deploy_command": "npx wrangler deploy --config apps/api/wrangler.toml --env production",
+      "root_directory": "/",
+      "branch_includes": [
+        "main"
+      ],
+      "branch_excludes": []
+    }
+  ]
+}

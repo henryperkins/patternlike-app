@@ -1,0 +1,43 @@
+{
+  "observed_at": "2026-09-07T08:43:42.020Z",
+  "phase": "complete",
+  "results": [
+    {
+      "id": "937c3393-d924-40b8-8c39-133f4513b8d8",
+      "success": true,
+      "status": 200,
+      "errors": []
+    },
+    {
+      "id": "35f833d4-f1d1-4835-8ecf-597d291d84ec",
+      "success": true,
+      "status": 200,
+      "errors": []
+    }
+  ],
+  "verified": true,
+  "triggers": [
+    {
+      "trigger_uuid": "937c3393-d924-40b8-8c39-133f4513b8d8",
+      "build_command": "npm run build",
+      "deploy_command": "npx wrangler versions upload --config apps/api/wrangler.toml --env production --var \"RELEASE_GIT_SHA:${WORKERS_CI_COMMIT_SHA:?Missing Workers Builds commit SHA}\"",
+      "root_directory": "/",
+      "branch_includes": [
+        "*"
+      ],
+      "branch_excludes": [
+        "main"
+      ]
+    },
+    {
+      "trigger_uuid": "35f833d4-f1d1-4835-8ecf-597d291d84ec",
+      "build_command": "npm run build",
+      "deploy_command": "npx wrangler deploy --config apps/api/wrangler.toml --env production --var \"RELEASE_GIT_SHA:${WORKERS_CI_COMMIT_SHA:?Missing Workers Builds commit SHA}\"",
+      "root_directory": "/",
+      "branch_includes": [
+        "main"
+      ],
+      "branch_excludes": []
+    }
+  ]
+}

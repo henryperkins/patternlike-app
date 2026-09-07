@@ -1,0 +1,44 @@
+{
+  "schema_version": "production-migration-observation.v1",
+  "observed_at": "2026-09-07T10:15:56.175Z",
+  "database_id": "1305a75d-0a8a-4a21-b201-d94fda0aaf93",
+  "migration_file": "db/d1/0029_daily_publication_receipts.sql",
+  "migration_sha256": "8bee1cc29787a3061860fd80b78a3c15c80e5a7c3b51cab93719184c5df6cf85",
+  "ledger": {
+    "id": 29,
+    "name": "0029_daily_publication_receipts.sql",
+    "applied_at": "2026-09-07 10:15:26"
+  },
+  "schema_matches_reviewed_sql_ignoring_comments_and_whitespace": true,
+  "columns": 19,
+  "explicit_indexes": 2,
+  "foreign_keys": 0,
+  "quick_check": "ok",
+  "foreign_key_issues": 0,
+  "assertion_probe_rows": 0,
+  "receipt_count_after_apply": 0,
+  "backup": {
+    "private": true,
+    "bytes": 8936855,
+    "sha256": "d9d5dc21aa22600bde909e580c702eaf2ccd063d1662535295a5bc50148db422",
+    "mode": "0o600",
+    "bookmark_captured": true
+  },
+  "health_readback": {
+    "observed_at": "2026-09-07T10:17:38Z",
+    "method": "curl --silent --show-error --include --max-time 20",
+    "url": "https://patternlike-api-production.lfd.workers.dev/health",
+    "http_status": 200,
+    "body": {
+      "ok": true,
+      "service": "patternlike-api",
+      "schema_version": "0.2.0",
+      "environment": "production"
+    },
+    "earlier_client_observation": "An initial Python urllib request returned403; the subsequent curl response above was200. No server-side cause is inferred."
+  },
+  "new_migration_rehearsal_run": false,
+  "provider_or_lifecycle_canary_run": false,
+  "full_ci_gate_passed": false,
+  "verification_scope": "Actual approved deployment prerequisite and readback. No unrelated test suite or new migration rehearsal was run."
+}

@@ -453,6 +453,10 @@ export async function generateDailyReading(
       nonce: sealedReading.nonce,
     },
     evidence: evidenceRows,
+    // A deterministic assembly has no provider exchange, so there is nothing to
+    // attest and null is the honest value. The publication batch asserts zero
+    // receipts here, which is what keeps this from being a silent omission.
+    receipt: null,
   });
 
   if (!published.ok) {

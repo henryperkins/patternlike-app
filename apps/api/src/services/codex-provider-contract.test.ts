@@ -170,6 +170,8 @@ describe("Codex provider terminal result contract", () => {
     expect(parseCodexProviderCompletion({ output: "secret" })).toEqual({
       ok: false,
     });
+    expect(parseCodexProviderCompletion({ ...value, provider_job_id: `cpjob_${"a".repeat(32)}` })).toEqual({ ok: false });
+    expect(parseCodexProviderCompletion({ ...value, reasoning_effort: "xhigh", provider_completed_at: "2026-09-07T00:00:00Z" })).toEqual({ ok: false });
     expect(parseCodexProviderCompletion({ ...value, note: "extra" })).toEqual({
       ok: false,
     });

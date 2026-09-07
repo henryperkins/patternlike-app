@@ -38,9 +38,26 @@ const PATTERN_CODEX_VARS = {
   OPENAI_PATTERN_VERIFIER_MAX_OUTPUT_TOKENS: "32000",
 };
 
-/** `checkSecureConfig` over a deployment whose Pattern block is complete. */
+/**
+ * A release identity, so a case about an unrelated rule is not refused for
+ * lacking one. It is a real-shaped commit hash rather than the committed
+ * placeholder, because the placeholder is itself refused in production and
+ * would make every production case here about attestation.
+ */
+const ATTESTED_RELEASE = {
+  RELEASE_GIT_SHA: "abc1230000000000000000000000000000000def",
+};
+
+/**
+ * `checkSecureConfig` over a deployment whose Pattern block is complete and
+ * whose release is attested.
+ */
 function guard(environment: Record<string, unknown>) {
-  return checkSecureConfig({ ...PATTERN_CODEX_VARS, ...environment } as never);
+  return checkSecureConfig({
+    ...PATTERN_CODEX_VARS,
+    ...ATTESTED_RELEASE,
+    ...environment,
+  } as never);
 }
 
 const configuredProduction = {
@@ -53,6 +70,40 @@ const configuredProduction = {
   TIME_TRAVEL_RECEIPT_EPOCH: "1",
   TIME_TRAVEL_DAILY_SCAN_LIMIT: "32",
 };
+
+describe("release attestation guard", () => {
+  it("refuses a production deployment that cannot name its own source", () => {
+    // The failure this produces is deliberately total: 503 on every guarded
+    // path, including the queue and scheduled entry points, so an unattested
+    // Worker cannot publish a reading it could not account for.
+    expect(
+      guard({ ...configuredProduction, RELEASE_GIT_SHA: "" })?.code,
+    ).toBe("release_attestation_missing");
+    expect(
+      guard({
+        ...configuredProduction,
+        RELEASE_GIT_SHA: "0000000000000000000000000000000000000000",
+      })?.code,
+    ).toBe("release_attestation_missing");
+  });
+
+  it("accepts the committed placeholder in development and refuses a malformed one", () => {
+    expect(
+      guard({
+        ENVIRONMENT: "development",
+        AUTH_STUB: "1",
+        RELEASE_GIT_SHA: "0000000000000000000000000000000000000000",
+      }),
+    ).toBeNull();
+    expect(
+      guard({
+        ENVIRONMENT: "development",
+        AUTH_STUB: "1",
+        RELEASE_GIT_SHA: "HEAD",
+      })?.code,
+    ).toBe("release_attestation_missing");
+  });
+});
 
 describe("root encryption key configuration", () => {
   it("accepts the retained legacy root without a keyring", () => {

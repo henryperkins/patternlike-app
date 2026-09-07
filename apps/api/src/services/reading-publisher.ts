@@ -445,8 +445,39 @@ export interface CodexPublisherFailure {
   retry_after_seconds: number | null;
 }
 
+/**
+ * What the durable publication receipt needs and `ProviderMetadata` does not
+ * carry.
+ *
+ * Kept off `ProviderMetadata` on purpose. That type is the reader-facing
+ * evidence header's model block, and it deliberately does NOT name the Codex
+ * control job — published evidence must not become a way to enumerate internal
+ * coordinates. The receipt is internal operational evidence and is exactly
+ * where that coordinate belongs, so it travels as its own field.
+ *
+ * Every value here is observed, not restated from configuration: the hashes are
+ * of the bytes that actually crossed, and the completion instant is the one the
+ * control plane recorded when the runner finished.
+ */
+export interface CodexProviderExchangeEvidence {
+  /** `codex_provider_jobs.id`. Recorded so it survives that row's cleanup. */
+  provider_job_id: string;
+  stage_generation: number;
+  stage_attempt: number;
+  prompt_version: string;
+  request_hash: string;
+  response_hash: string;
+  provider_completed_at: string;
+  model: string;
+  reasoning_effort: "high" | "xhigh";
+  input_tokens: number;
+  output_tokens: number;
+}
+
 export type CodexPublisherResult =
-  | Extract<PublisherResult, { ok: true }>
+  | (Extract<PublisherResult, { ok: true }> & {
+      exchange: CodexProviderExchangeEvidence;
+    })
   | CodexPublisherFailure
   | ReadingPublisherPending;
 

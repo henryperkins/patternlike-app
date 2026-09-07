@@ -53,6 +53,7 @@ import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
 import type { GenerateDailyReadingCommandV2 } from "./generation-command-v2.js";
 import { OPENAI_READING_MODEL } from "./reading-publisher.js";
+import { proveDailyPublication } from "../db/daily-publication-receipts.js";
 import { invalidatePublishedReading } from "./reading-invalidation.js";
 import type { StoredReadingV5 } from "./stored-reading.js";
 
@@ -311,6 +312,8 @@ describe("V5 execution", () => {
       },
       validation: { status: "passed", policy_version: "1.1.1" },
     });
+    expect(JSON.stringify(stored)).not.toContain("cpjob_");
+    expect(stored.evidence_header.model).not.toHaveProperty("provider_job_id");
     expect(await rows("SELECT id FROM reading_sources WHERE reading_id = ?", enqueued.readingId))
       .toHaveLength(stored.reading.paragraphs.length);
   });
@@ -867,14 +870,33 @@ describe("V5 execution", () => {
     expect(stored.reading.paragraphs[0]!.text).toMatch(/candidate [12]/);
   });
 
-  it("retains an invalidated predecessor when a fact-repair successor commits", async () => {
+  it("refuses missing Worker metadata before calculation, R2, or provider work", async () => {
+    const { claim } = await claimReserved();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const putSpy = vi.spyOn(env.ARTIFACTS!, "put");
+    try {
+      expect(await dispatchGeneration(enabledEnv({ CF_VERSION_METADATA: undefined }), claim))
+        .toMatchObject({ ok: false, reason: "publisher_not_configured" });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(putSpy).not.toHaveBeenCalled();
+      expect(await readingProviderJobCount()).toBe(0);
+      expect(await rows("SELECT * FROM daily_publication_receipts")).toEqual([]);
+    } finally {
+      fetchSpy.mockRestore();
+      putSpy.mockRestore();
+    }
+  });
+
+  it.each(["fact_repair", "manual_reissue"] as const)("preserves the predecessor transition and receipts for %s", async (kind) => {
     const { enqueued: predecessor, claim: predecessorClaim } = await claimReserved();
     expect(
       (await withProvider((candidate) => candidate, () =>
         dispatchGeneration(enabledEnv(), predecessorClaim))).result,
     ).toMatchObject({ ok: true });
     const predecessorCommand = predecessorClaim.command as GenerateDailyReadingCommandV2;
-    expect(
+    const originalReceipt = await rows("SELECT * FROM daily_publication_receipts WHERE reading_id = ?", predecessor.readingId);
+    expect(originalReceipt).toHaveLength(1);
+    if (kind === "fact_repair") expect(
       await invalidatePublishedReading(enabledEnv(), {
         identity: IDENTITY_A,
         readingId: predecessor.readingId,
@@ -884,10 +906,10 @@ describe("V5 execution", () => {
     ).toMatchObject({ ok: true, status: "invalidated" });
     const successor = await enqueueConstrainedReading(enabledEnv(), USER_A, {
       entry: "internal",
-      reservationReason: "fact_repair",
+      reservationReason: kind,
       targetLocalDate: predecessorCommand.target_local_date,
       revision: 2,
-      revisionReason: "chart_recalculated",
+      revisionReason: kind === "fact_repair" ? "chart_recalculated" : "defect_repair",
       supersedesReadingId: predecessor.readingId,
     });
     if (!successor.ok) throw new Error(`successor enqueue failed: ${successor.reason}`);
@@ -900,7 +922,14 @@ describe("V5 execution", () => {
     ).toMatchObject({ ok: true });
     expect(
       await rows("SELECT status FROM daily_readings WHERE id = ?", predecessor.readingId),
-    ).toEqual([{ status: "invalidated" }]);
+    ).toEqual([{ status: kind === "fact_repair" ? "invalidated" : "superseded" }]);
+    expect(await rows("SELECT * FROM daily_publication_receipts WHERE reading_id = ?", predecessor.readingId)).toEqual(originalReceipt);
+    expect(await proveDailyPublication(env, predecessor.readingId)).toBeNull();
+    expect(await proveDailyPublication(env, successor.readingId)).toMatchObject({ reading_id: successor.readingId, job_id: successor.jobId });
+    expect(await rows("SELECT reading_id, job_id, command_generation, stage_generation FROM daily_publication_receipts WHERE reading_id = ?", successor.readingId)).toEqual([{
+      reading_id: successor.readingId, job_id: successor.jobId,
+      command_generation: successorClaim.command.command_generation, stage_generation: successorClaim.command.command_generation,
+    }]);
   });
 
   it("supersedes an unpublished OpenAI command instead of running it through Codex", async () => {

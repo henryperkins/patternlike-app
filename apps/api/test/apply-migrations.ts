@@ -22,6 +22,7 @@ const expectedTail = [
   "0026_pattern_portraits.sql",
   "0027_portrait_mesh_automation.sql",
   "0028_reading_saves.sql",
+  "0029_daily_publication_receipts.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -49,6 +50,7 @@ const placeResolutionsMigrationIndex = migrationNames.indexOf(expectedTail[13]);
 const patternSourceRegenerationMigrationIndex = migrationNames.indexOf(expectedTail[14]);
 const geoapifyMigrationIndex = migrationNames.indexOf(expectedTail[15]);
 const codexXhighMigrationIndex = migrationNames.indexOf(expectedTail[16]);
+const publicationReceiptMigrationIndex = migrationNames.indexOf(expectedTail[20]);
 
 interface SchemaColumn {
   name: string;
@@ -349,7 +351,7 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 await assertBirthCalcSchema(env.DB, "clean apply");
 await assertAccountProcessingConsentSchema(env.DB, "clean apply");
 await assertReadingSavesSchema(env.DB, "clean apply");
-await assertDatabaseHealthy(env.DB, "0028 clean apply");
+await assertDatabaseHealthy(env.DB, "0029 clean apply");
 
 // The isolated upgrade binding stops before 0009, carries live rows through the
 // adapter rebuild/additive migrations and 0011, and only then applies 0012.
@@ -1430,7 +1432,7 @@ const providerTables = ["codex_provider_jobs", "codex_provider_response_uploads"
 const beforeXhigh = await Promise.all(providerTables.map((table) =>
   upgradeDb.prepare(`SELECT * FROM ${table} ORDER BY 1, 2`).all(),
 ));
-await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(codexXhighMigrationIndex));
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(codexXhighMigrationIndex, publicationReceiptMigrationIndex));
 for (const [index, table] of providerTables.entries()) {
   const after = await upgradeDb.prepare(`SELECT * FROM ${table} ORDER BY 1, 2`).all();
   if (JSON.stringify(beforeXhigh[index]!.results) !== JSON.stringify(after.results)) {
@@ -1438,3 +1440,22 @@ for (const [index, table] of providerTables.entries()) {
   }
 }
 await assertDatabaseHealthy(upgradeDb, "0025 populated apply");
+
+// 0029: upgrade the populated current 0028 schema without changing any prior
+// table values, including D1's serialized ciphertext byte arrays.
+const beforeReceiptTables = await upgradeDb.prepare(
+  "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '_cf_*' AND name != 'd1_migrations' ORDER BY name",
+).all<{ name: string }>();
+const beforeReceiptRows = new Map<string, string>();
+for (const { name } of beforeReceiptTables.results) {
+  const result = await upgradeDb.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
+  beforeReceiptRows.set(name, JSON.stringify(result.results));
+}
+await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(publicationReceiptMigrationIndex));
+for (const [name, before] of beforeReceiptRows) {
+  const after = await upgradeDb.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
+  if (JSON.stringify(after.results) !== before) {
+    throw new Error(`0029 changed historical ${name} rows`);
+  }
+}
+await assertDatabaseHealthy(upgradeDb, "0029 populated apply");

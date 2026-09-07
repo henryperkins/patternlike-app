@@ -111,6 +111,7 @@ export const READING_CODEX_PUBLISHER_VARS = {
 const TABLES = [
   // M3/M8, children first: reading_sources/feedback/saves -> readings -> jobs, and
   // cycle_passes -> cycle_instances -> chart_snapshots.
+  "daily_publication_receipts",
   "reading_sources",
   "reading_feedback",
   "reading_saves",
@@ -237,6 +238,7 @@ export async function resetDb(): Promise<void> {
   // so clearing the predecessor of a revision > 1 violates the constraint. The
   // chain is unwound leaf-first instead: repeatedly delete the rows nothing
   // supersedes. Bounded because a user-day's revision chain is short.
+  await env.DB.prepare("DELETE FROM daily_publication_receipts").run();
   await env.DB.prepare("DELETE FROM reading_sources").run();
   await env.DB.prepare("DELETE FROM reading_feedback").run();
   await env.DB.prepare("DELETE FROM reading_saves").run();

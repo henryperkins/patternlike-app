@@ -221,7 +221,13 @@ export function createCodexReadingPublisher(
       if (
         !job.providerRequestId ||
         job.inputTokens === null ||
-        job.outputTokens === null
+        job.outputTokens === null ||
+        // The publication receipt records when completion was accepted, and
+        // the control plane is the only witness to that instant. A completed
+        // job without one cannot be attested, so it is treated as an
+        // incomplete result rather than published with the instant guessed.
+        job.completedAt === null ||
+        !isCodexProviderReasoningEffort(job.reasoningEffort)
       ) {
         return unavailable();
       }
@@ -241,6 +247,22 @@ export function createCodexReadingPublisher(
           input_tokens: job.inputTokens,
           output_tokens: job.outputTokens,
           provider_response_hash: job.response.plaintextHash,
+        },
+        // Internal, and separate from `metadata` for that reason: the control
+        // job id belongs in the durable receipt, never in reader-facing
+        // evidence.
+        exchange: {
+          provider_job_id: job.id,
+          model: job.model,
+          reasoning_effort: job.reasoningEffort,
+          input_tokens: job.inputTokens,
+          output_tokens: job.outputTokens,
+          stage_generation: job.stageGeneration,
+          stage_attempt: job.stageAttempt,
+          prompt_version: job.promptVersion,
+          request_hash: job.request.plaintextHash,
+          response_hash: job.response.plaintextHash,
+          provider_completed_at: job.completedAt,
         },
       };
     },

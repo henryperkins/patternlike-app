@@ -15,6 +15,10 @@
 export const HERMETIC_TEST_BINDINGS = {
   ENVIRONMENT: "development",
   AUTH_STUB: "1",
+  // The committed development placeholder, exactly as wrangler.toml ships it.
+  // A suite that wants to prove production refuses it overrides ENVIRONMENT,
+  // not this value.
+  RELEASE_GIT_SHA: "0000000000000000000000000000000000000000",
   CALC_SERVICE_URL: "http://127.0.0.1:8080",
   CALC_SERVICE_AUTH_TOKEN: "",
   CALC_FETCH_TIMEOUT_MS: "10000",

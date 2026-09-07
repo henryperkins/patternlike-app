@@ -1,0 +1,8 @@
+{
+  "status": "observed",
+  "method": "Read-only included source hash; no new test suite",
+  "source_commit": "c393a9cfbeac5d75ae9bcf5e361688ced38c5bf0",
+  "source_sha256": "fca64034df9852771bd16964961007c8b3c6aa7ae5ee4ac742b70236620d61b6",
+  "file_count": 1263,
+  "full_ci_gate_passed": false
+}

@@ -935,6 +935,7 @@ describe("queue delivery", () => {
 
     const [reading] = await readings();
     expect(reading!.status).toBe("published");
+    expect(await rows("SELECT * FROM daily_publication_receipts WHERE reading_id = ?", enqueued.readingId)).toEqual([]);
     expect(reading!.reading_enc).not.toBeNull();
 
     const [job] = await jobs();
@@ -1386,6 +1387,8 @@ describe("claims", () => {
       predecessor: { kind: "none" },
       reading: { ciphertext: new Uint8Array([1, 2, 3]), keyVersion: 1, nonce: "stale" },
       evidence: [],
+      // A refusal test: nothing commits, so there is no exchange to attest.
+      receipt: null,
     });
 
     expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
@@ -1419,6 +1422,8 @@ describe("claims", () => {
         nonce: "stale",
       },
       evidence: [],
+      // A refusal test: nothing commits, so there is no exchange to attest.
+      receipt: null,
     });
 
     expect(outcome).toMatchObject({ ok: false, reason: "conflict" });
@@ -1519,6 +1524,8 @@ describe("claims", () => {
       predecessor: { kind: "none" },
       reading: { ciphertext: new Uint8Array([1, 2, 3]), keyVersion: 1, nonce: "loser" },
       evidence: [],
+      // A refusal test: nothing commits, so there is no exchange to attest.
+      receipt: null,
     });
 
     expect(outcome).toMatchObject({ ok: false, reason: "stale_claim" });
