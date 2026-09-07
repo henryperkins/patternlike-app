@@ -1,0 +1,67 @@
+{
+  "reviewed_commit": "76b4671cb3392dec1424aab18929927613d72011",
+  "date": "2026-09-07",
+  "target": "http://127.0.0.1:5174/pattern-portrait.html",
+  "browser": "Chromium via Playwright MCP; software WebGL likely; later desktop steps used prefers-reduced-motion: reduce",
+  "viewports": {
+    "desktop": { "width": 1440, "height": 900 },
+    "phone": { "width": 390, "height": 844 },
+    "narrow": { "width": 320, "height": 740 },
+    "landscape": { "width": 844, "height": 390 }
+  },
+  "desktop_1440x900_entry": {
+    "scene": { "top": 160, "bottom": 695.1, "height": 535.1, "fully": true },
+    "toolbar": { "top": 627, "bottom": 679.1, "fully": true },
+    "atmosphere": { "top": 695.1, "bottom": 777.3, "fully": true },
+    "chapter_rail": { "top": 834.3, "bottom": 910.9, "fully": false },
+    "chapter_buttons_reported_fully": true,
+    "guide": { "top": 922.9, "fully": false },
+    "floating_labels_visible": ["chapter 1", "chapter 2"],
+    "floating_labels_hidden": ["chapter 3", "chapter 4"],
+    "intro_heading": "Your sky. Your story, unfolding.",
+    "overflow_x": false,
+    "scroll_height": 1205
+  },
+  "desktop_after_chapter_select": {
+    "chapter_rail": { "top": 888.3, "bottom": 964.9, "fully": false },
+    "workbench_visible": ["Look closer", "Turn chapter object", "Open reading desk"],
+    "live": "Finding your own direction. overview."
+  },
+  "browser_back_from_sky": {
+    "screenshot_sha256_sky": "2e7faff40660cbff88fc8f2be882b25411cd0ea0aed977790d33bb277205388c",
+    "screenshot_sha256_after_back": "2e7faff40660cbff88fc8f2be882b25411cd0ea0aed977790d33bb277205388c",
+    "byte_identical": true,
+    "pressed_view_after_back": "Your sky"
+  },
+  "phone_390x844_entry": {
+    "scene": { "top": 338.5, "height": 345, "fully": true },
+    "toolbar": { "fully": true },
+    "invitation": { "fully": true },
+    "chapter_rail": { "top": 850.9, "fully": false },
+    "all_four_floating_labels_hidden": true,
+    "intro_heading": "Your sky.Your story, unfolding.",
+    "overflow_x": false,
+    "scroll_height": 1923
+  },
+  "phone_begin_with_chapter": {
+    "scroll_y": 979.3,
+    "scene_in_viewport": false,
+    "heading": "Finding your own direction"
+  },
+  "phone_read_chapter": {
+    "scene_display": "none",
+    "modes_sticky": false
+  },
+  "narrow_320": { "overflow_x": false, "scene_height": 300, "header_height": 106.2 },
+  "landscape_844x390": { "scene_height": 480, "scene_bottom": 640, "scene_fully_in_viewport": false },
+  "original_image_dialog": {
+    "label": "Original chapter image",
+    "heading": "Adjustable brass compass",
+    "has_visual_metaphor": true
+  },
+  "full_reading": { "articles": 4, "canvas": false },
+  "identical_pairs": {
+    "06_and_07_sky_back": true,
+    "21_and_22_phone_canvas_click": true
+  }
+}
