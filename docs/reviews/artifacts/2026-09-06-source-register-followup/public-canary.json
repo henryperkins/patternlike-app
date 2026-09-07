@@ -1,0 +1,40 @@
+{
+  "schema_version": "patternlike-operational-canary.v1",
+  "observed_at": "2026-09-06T18:45:11.593Z",
+  "origin": "https://patternlike-api-production.lfd.workers.dev",
+  "checks": [
+    {
+      "name": "health",
+      "http_status": 200,
+      "status": "pass"
+    },
+    {
+      "name": "configuration",
+      "http_status": 200,
+      "status": "pass"
+    },
+    {
+      "name": "protected_route",
+      "http_status": 401,
+      "status": "pass"
+    },
+    {
+      "name": "geocoding",
+      "status": "unconfigured"
+    },
+    {
+      "name": "daily_publication_readback",
+      "status": "unconfigured"
+    },
+    {
+      "name": "geoapify_account_usage",
+      "status": "unconfigured"
+    }
+  ],
+  "execution_kind": "native_http",
+  "response_evidence_observed": true,
+  "status": "incomplete",
+  "fresh_generation_exercised": false,
+  "lifecycle_exercised": false,
+  "notification_delivery": "unconfigured"
+}

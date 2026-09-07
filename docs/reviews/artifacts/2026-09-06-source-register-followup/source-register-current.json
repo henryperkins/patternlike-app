@@ -1,0 +1,233 @@
+{
+  "schema_version": "patternlike-source-register-refresh.v1",
+  "assembled_at": "2026-09-06T19:02:19.740061Z",
+  "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+  "current_application_commit": "cefc97981981dfde7a36ce050e7fb33367c830be",
+  "followup_branch": "codex/source-register-followup",
+  "followup_committed": false,
+  "final_local_ci": "pending",
+  "entries": [
+    {
+      "id": "r1",
+      "title": "R1. Review target and changes",
+      "source_paths": [],
+      "status": "Updated",
+      "finding": "The original targets eccddcc. Current application source is cefc979, three commits later, adding Daily History/saves, assurance and evidence work, and portrait navigation fixes. All 22 referenced historical Git file objects exist; 11 changed and 11 are byte-identical.",
+      "action": "Use the original for historical claims and this dated register for current evidence.",
+      "evidence_files": [
+        "git-source-validation.json",
+        "original-preservation.json"
+      ]
+    },
+    {
+      "id": "r2",
+      "title": "R2. Core product and calculation baseline",
+      "source_paths": [
+        "README.md",
+        "apps/web/PRODUCT.md"
+      ],
+      "status": "Confirmed source",
+      "finding": "The product separates calculated astronomical facts from generated reflective prose. Its calculation baseline and uncertainty/fallback handling remain documented. Mechanical checks and interpretation traceability do not establish scientific validity of the interpretations.",
+      "action": "Keep product/spec descriptions separate from current deployment and provider evidence.",
+      "evidence_files": []
+    },
+    {
+      "id": "r3",
+      "title": "R3. Current production configuration",
+      "source_paths": [
+        "apps/api/wrangler.toml"
+      ],
+      "status": "Updated and observed",
+      "finding": "The live Worker uses Daily hybrid/Codex, Pattern Codex and Sol/xhigh. Daily/writer prompts are 1.0.3, planner 1.0.1 and verifier 1.0.0-verifier. Geoapify and both portrait flags are enabled; the ontology pipeline is off. PATTERN_GENERATION_ENABLED is now present and enabled.",
+      "action": "Bind configuration to the observed build/version and check runner installation separately.",
+      "evidence_files": [
+        "production-observation.json"
+      ]
+    },
+    {
+      "id": "r4",
+      "title": "R4. Text prompt policies",
+      "source_paths": [
+        "apps/api/src/services/pattern-prompt.ts",
+        "apps/api/src/services/reading-prompt.ts",
+        "apps/codex-runner/src/codex-cli.ts",
+        "apps/codex-runner/src/isolated-codex-json.ts",
+        "docs/deploy/codex-production-provider.md"
+      ],
+      "status": "Source implemented; runner adoption open",
+      "finding": "Current text source uses isolated app-server JSON. The installed service bundle still uses codex exec for ordinary text. CLI 0.153.3 and ChatGPT login were observed; account category, training, sharing and retention remain unverified.",
+      "action": "Activate the reviewed candidate through the existing rollout process, prove dedicated-account publication, and obtain account-owner evidence.",
+      "evidence_files": [
+        "runner-observation.json",
+        "standalone-runner-candidate.json",
+        "account-owner-evidence-draft.json"
+      ]
+    },
+    {
+      "id": "r5",
+      "title": "R5. Daily validation and safety rules",
+      "source_paths": [
+        "packages/reading-engine/src/candidate-policy.ts",
+        "packages/reading-engine/src/candidate-validation.ts",
+        "packages/reading-engine/src/claim-support.ts"
+      ],
+      "status": "Historical defect fixed in source",
+      "finding": "The pooled-vocabulary finding was valid at the original target. Current policy 1.1.1 checks sentence-level claim support against each paragraph’s cited facts. These are bounded English checks, not arbitrary semantic entailment. Fresh Daily generation accepted 5/6 samples; one unknown fact ID was correctly rejected.",
+      "action": "Retain citation enforcement and investigate reference-ID generation/correction. Keep editorial assessment separate from mechanical validation.",
+      "evidence_files": [
+        "daily-04/report.json"
+      ]
+    },
+    {
+      "id": "r6",
+      "title": "R6. Ontology admission has two assurance levels",
+      "source_paths": [
+        "apps/api/src/db/pattern-ontology.ts",
+        "apps/api/src/services/pattern-publication-safety.ts",
+        "docs/deploy/openai-pattern-rollout.md"
+      ],
+      "status": "Confirmed source and active pointer",
+      "finding": "The two ontology release-assurance paths remain distinct. Newly generated documents from both use common publication safety checks and a model semantic verifier. D1 points to pattern-ontology-en-us-internal-0.1.0, with no matching machine-pipeline evidence run.",
+      "action": "Describe release assurance separately from per-document validation and retain corpus provenance limitations.",
+      "evidence_files": [
+        "production-observation.json"
+      ]
+    },
+    {
+      "id": "r7",
+      "title": "R7. Actual interpretation corpus and rights classification",
+      "source_paths": [
+        "pattern-corpus/ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md",
+        "pattern-corpus/provenance.json",
+        "pattern-corpus/review.mjs",
+        "pattern-corpus/reviewer-notes.md"
+      ],
+      "status": "Open external evidence",
+      "finding": "The corpus remains 60 model-generated first-party fragments. licensed_excerpt is a rights flag, not human authorship or independent source authority. Integrity is consistent, while signed passing review coverage is 0/60 and historical provider/model/account/date remain unknown.",
+      "action": "Have the named independent human review all five criteria for every fragment and supply attributable evidence. Do not backfill historical unknowns from today’s runner.",
+      "evidence_files": [
+        "corpus-review-status.json",
+        "human-review-packet/packet.md",
+        "human-review-packet/review-draft.json"
+      ]
+    },
+    {
+      "id": "r8",
+      "title": "R8. Source-aware Pattern regeneration",
+      "source_paths": [
+        "docs/superpowers/specs/2026-08-29-pattern-source-regeneration-design.md"
+      ],
+      "status": "Confirmed source",
+      "finding": "Eligibility uses a curated source fingerprint. The prior Pattern remains readable during replacement or failure; successful atomic replacement erases its generation material with later physical cleanup. This is not Pattern version history. Daily History and saves were added separately.",
+      "action": "Verify source alignment and replacement behavior in the designated account; describe Daily History separately.",
+      "evidence_files": []
+    },
+    {
+      "id": "r9",
+      "title": "R9. Geocoder rollout and failure containment",
+      "source_paths": [
+        "apps/api/src/services/geocoder/geoapify.ts",
+        "apps/api/wrangler.toml",
+        "docs/deploy/geocoder-rollout.md"
+      ],
+      "status": "Source confirmed; monitoring incomplete",
+      "finding": "Geoapify mapping still accepts verified OSM-backed results with manual redirect handling. Credential failure is contained to place operations; the per-user limiter is not an account quota. Live health/configuration return 200 and the protected reading route returns 401 without authentication. Authenticated geocoding was not exercised.",
+      "action": "Configure the dedicated-account canary and actual account-wide credit observation. Threshold evaluation is ready; collection, scheduling and alert delivery are not configured.",
+      "evidence_files": [
+        "public-canary.json",
+        "operator-handoff.md"
+      ]
+    },
+    {
+      "id": "r10",
+      "title": "R10. Native image-generation boundary",
+      "source_paths": [
+        "apps/codex-runner/src/portrait-invocation.ts"
+      ],
+      "status": "Confirmed source; account terms open",
+      "finding": "The native image boundary pins CLI 0.153.3, checks isolation/media identity, and cleans bounded image artifacts. Provenance distinguishes the requested model label from an observed identifier: unexposed identity is null/not_exposed; older records are legacy_unrecorded. Local cleanup is not upstream deletion.",
+      "action": "Preserve requested/observed provenance and obtain actual account-owner data-use and retention evidence.",
+      "evidence_files": [
+        "runner-observation.json",
+        "account-owner-evidence-draft.json"
+      ]
+    },
+    {
+      "id": "r11",
+      "title": "R11. Image-to-3D geometry and audit boundary",
+      "source_paths": [
+        "apps/api/src/services/pattern-portrait-mesh.ts",
+        "apps/codex-runner/src/portrait-mesh-invocation.ts"
+      ],
+      "status": "Complete local source inspected",
+      "finding": "The full current API service was read locally. Geometry remains declarative, compiled by trusted code and evaluated in a separate same-model visual pass. Program/part/triangle/GLB limits and consent/source/ownership fences remain. Same-model checking is not independent human review.",
+      "action": "Exercise saved-asset reuse and late-upload fences with the designated test account and retain hashes rather than private media.",
+      "evidence_files": [
+        "operator-handoff.md"
+      ]
+    },
+    {
+      "id": "r12",
+      "title": "R12. Portrait consent, reader experience and export",
+      "source_paths": [
+        "apps/web/src/components/PortraitAutomationControl.tsx",
+        "docs/reviews/2026-09-06-portrait-automation.md",
+        "docs/reviews/2026-09-06-portrait-second-pass.md"
+      ],
+      "status": "Source implemented; lifecycle exercise open",
+      "finding": "Chart-specific opt-in, four-chapter admission, complete reading fallback, asset reuse and withdrawal fences are implemented. The archive includes the full reading, images, GLBs and source/program/audit records, without an offline viewer; account export is separate. Navigation/layout received subsequent fixes.",
+      "action": "Verify full prose, reuse, withdrawal during work, deletion and cleanup on the designated account. Aggregate D1 counts do not close that lifecycle.",
+      "evidence_files": [
+        "operator-handoff.md"
+      ]
+    },
+    {
+      "id": "r13",
+      "title": "R13. Recorded tests and real-provider probes",
+      "source_paths": [
+        "docs/reviews/2026-09-06-portrait-automation.md",
+        "docs/reviews/artifacts/2026-09-06-portrait-automation/ci-local-summary.txt",
+        "scripts/pattern-release/release-evidence.mjs"
+      ],
+      "status": "Verification in progress",
+      "finding": "The final tools passed six fresh-chain and seven operational-canary regressions. Independent code review found and closed reporting/privacy issues. The aggregate receipt binds source hashes and built artifacts when complete. Earlier totals in the original register remain historical.",
+      "action": "Use only the completed final gate receipt for this candidate. Keep CI, model-sample outcomes and production evidence distinct.",
+      "evidence_files": [
+        "local-release-evidence.json",
+        "ci-local-summary.txt",
+        "evaluation-export.json"
+      ]
+    },
+    {
+      "id": "r14",
+      "title": "R14. Migration and deployment evidence",
+      "source_paths": [
+        "db/d1/MIGRATIONS.json"
+      ],
+      "status": "Direct observations; runner mismatch open",
+      "finding": "Worker version 52a5c8df-3b67-499b-951e-0586a604c89f serves 100% and its successful build maps to cefc979. Migrations through 0028 are recorded. Two enabled portrait grants, one ready portrait and four complete mesh jobs exist; completions predate this Worker. The installed runner differs from the current candidate.",
+      "action": "Keep Worker, database, installed runner and authenticated lifecycle evidence separate. Verify activation and fresh durable publication.",
+      "evidence_files": [
+        "production-observation.json",
+        "runner-observation.json",
+        "standalone-runner-candidate.json"
+      ]
+    },
+    {
+      "id": "r15",
+      "title": "R15. CI and model-evaluation limits",
+      "source_paths": [
+        "AGENTS.md"
+      ],
+      "status": "Fresh evidence; quality results open",
+      "finding": "Twenty new fictional outputs were observed: six Daily, five Pattern stage and nine verifier outputs, with zero transport failures. All three evaluation runs have passed:false. Positive-control adjudication and a reproduced deterministic negation false positive remain open. No durable production generation or independent human editorial review was established.",
+      "action": "Adjudicate the control, address bounded quality issues, and rerun frozen samples. Bind policies/source hashes, Worker, runner and migrations; retain all failures.",
+      "evidence_files": [
+        "daily-04/report.json",
+        "pattern-generation-01/report.json",
+        "verifier-02/report.json",
+        "negation-diagnostic.json"
+      ]
+    }
+  ]
+}

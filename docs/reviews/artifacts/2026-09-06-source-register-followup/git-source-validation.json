@@ -1,0 +1,185 @@
+{
+  "schema_version": "source-register-git-validation.v1",
+  "current_commit": "cefc97981981dfde7a36ce050e7fb33367c830be",
+  "checked_file_objects": 22,
+  "unchanged": 11,
+  "changed": 11,
+  "files": [
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "AGENTS.md",
+      "historical_exists": true,
+      "historical_sha256": "b12da1989b6045e339c0a77ff7f6f9d91aca410a3c37c5c838c8082ac5ca1122",
+      "current_sha256": "b12da1989b6045e339c0a77ff7f6f9d91aca410a3c37c5c838c8082ac5ca1122",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "README.md",
+      "historical_exists": true,
+      "historical_sha256": "4d66d8ddb9fe8da0d828c8f3bc95b8f346e98026d55afa248165b57c8399b1e6",
+      "current_sha256": "4d66d8ddb9fe8da0d828c8f3bc95b8f346e98026d55afa248165b57c8399b1e6",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "apps/api/src/services/pattern-prompt.ts",
+      "historical_exists": true,
+      "historical_sha256": "f964f40469cdcede1542267b55ccbd829cf1c19c97db4a91c30cd0692c456232",
+      "current_sha256": "598eb586a8c2892870f937f09779de84ddb79392bd37aa5cc1035869f7d62003",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "apps/api/src/services/reading-prompt.ts",
+      "historical_exists": true,
+      "historical_sha256": "4333fdca6acd291d486cae34670f1ad1d08e61aa2e3547360c884fe59427932c",
+      "current_sha256": "40ffb3c5b1cbd56ea84e8ba45948d278ab29036134d39452ee5db4954f086575",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "apps/web/PRODUCT.md",
+      "historical_exists": true,
+      "historical_sha256": "b446458d42a5348cbdab82fb0363c85bd1cbfe74bf5ae24f20c400ac95671114",
+      "current_sha256": "fdd46285a15aeada3b6d89c088b1a91258473923ad6d843dab4ecaba018cdea2",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "docs/deploy/codex-production-provider.md",
+      "historical_exists": true,
+      "historical_sha256": "9e91e6907835814d7c166fda9b01c04d0dc39de19f42917bd1d62762b7a00324",
+      "current_sha256": "2df39d1f6af1ecdef9e3c1f69924c9ec75a4b7da8d97e1caf52594ca0ba4298a",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "docs/deploy/geocoder-rollout.md",
+      "historical_exists": true,
+      "historical_sha256": "b7bbc71a4d1c1c2849f1151911931da46f5cf477b06c7599ec6753d6204dea08",
+      "current_sha256": "b7bbc71a4d1c1c2849f1151911931da46f5cf477b06c7599ec6753d6204dea08",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "e3d794de13a40c9f0e7da7d7281c53ae5801f4d9",
+      "path": "docs/deploy/openai-pattern-rollout.md",
+      "historical_exists": true,
+      "historical_sha256": "ace2b583af027d4e728e47c2abdd141bbf98443e78dcb5aa8a4714c52369a19a",
+      "current_sha256": "ace2b583af027d4e728e47c2abdd141bbf98443e78dcb5aa8a4714c52369a19a",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "historical_exists": true,
+      "historical_sha256": "5f82322fccb72e595d8e94f24403764b22c0626952eb528751774f9084afde29",
+      "current_sha256": "5e15be35cdd4a59ae4309ad3bae7ece4a39fc60c850b84126ee1b97035b9ddaa",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "apps/api/src/services/pattern-portrait-mesh.ts",
+      "historical_exists": true,
+      "historical_sha256": "496a72734cbeb87dbfcf67c4efb15725e5b4708bde713925643b0d3f828f221b",
+      "current_sha256": "496a72734cbeb87dbfcf67c4efb15725e5b4708bde713925643b0d3f828f221b",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "apps/api/wrangler.toml",
+      "historical_exists": true,
+      "historical_sha256": "6e09089ce7d5de3e32577fe601d1b56931afb70d77ed07df6893a7161099ee70",
+      "current_sha256": "49045023fad223fe9ebaa7bb0907921a6919de5e461c70e0ff425b43131c2bea",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "apps/codex-runner/src/portrait-invocation.ts",
+      "historical_exists": true,
+      "historical_sha256": "75df696c6a29cfd76235a742e0163d74f8a2c2b81051fae4d19cb2dfb4515623",
+      "current_sha256": "377e306d4bfe90362a66069e828fbd2318a57435771f231abbafe460d0ba02ba",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "apps/codex-runner/src/portrait-mesh-invocation.ts",
+      "historical_exists": true,
+      "historical_sha256": "dfd1612a160c7c4504f53ea93cc002a8219c335cbf2ee1facc4c4c936eed533b",
+      "current_sha256": "dfd1612a160c7c4504f53ea93cc002a8219c335cbf2ee1facc4c4c936eed533b",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "apps/web/src/components/PortraitAutomationControl.tsx",
+      "historical_exists": true,
+      "historical_sha256": "ae3beede36eb100443caffab2e23ca70b18d8f8ef2cac48255b1fda155c8defc",
+      "current_sha256": "ae3beede36eb100443caffab2e23ca70b18d8f8ef2cac48255b1fda155c8defc",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "db/d1/MIGRATIONS.json",
+      "historical_exists": true,
+      "historical_sha256": "9dcf244716ead2a410b4f0385307aef0385de640b5f6abc98b827d12667f9414",
+      "current_sha256": "c9e778d51630521d6207d0c03105631ae2160244d67b57ca3760a1b4e096653b",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "docs/reviews/2026-09-06-portrait-automation.md",
+      "historical_exists": true,
+      "historical_sha256": "8cbbb36a0eaf5cea4863a99b15ceca933639c5b8ff57572e20cb3243b4493fcc",
+      "current_sha256": "8cbbb36a0eaf5cea4863a99b15ceca933639c5b8ff57572e20cb3243b4493fcc",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "docs/reviews/artifacts/2026-09-06-portrait-automation/ci-local-summary.txt",
+      "historical_exists": true,
+      "historical_sha256": "fb9cc434ff5d1c1d9ef20107f20eee5d52c4095811548874d7997be40860ba54",
+      "current_sha256": "fb9cc434ff5d1c1d9ef20107f20eee5d52c4095811548874d7997be40860ba54",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "docs/superpowers/specs/2026-08-29-pattern-source-regeneration-design.md",
+      "historical_exists": true,
+      "historical_sha256": "46c66940215d1bc69d91a9161e945e2f5766c84323e739f7c0973da500930c4a",
+      "current_sha256": "46c66940215d1bc69d91a9161e945e2f5766c84323e739f7c0973da500930c4a",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "packages/reading-engine/src/candidate-policy.ts",
+      "historical_exists": true,
+      "historical_sha256": "4c802199d0dec02a1e27aaf0f82701f0acd1a44eb35608c737aee660999f34c6",
+      "current_sha256": "ff37e60eaca4eb4567b2e9ac81c2bd4e4d3d0d0f0bb0f44d81f298322dd84f4a",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "packages/reading-engine/src/candidate-validation.ts",
+      "historical_exists": true,
+      "historical_sha256": "20f3d0e2914de3e55de86248116eee7f5ce8c0fa5df99b66ef4a3d6379aecc78",
+      "current_sha256": "c5e1c3cf8befa3961d2e6a58d5ad720dbb12f19a5e8b1f7632fa1e0e09503bf3",
+      "unchanged": false
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "pattern-corpus/ONTOLOGY_CORPUS_LICENSE_CLASS_DECISION.md",
+      "historical_exists": true,
+      "historical_sha256": "85bee06d1de62f45056c426032c804db83b507877b2ae60db827b7dcea26e413",
+      "current_sha256": "85bee06d1de62f45056c426032c804db83b507877b2ae60db827b7dcea26e413",
+      "unchanged": true
+    },
+    {
+      "historical_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+      "path": "pattern-corpus/reviewer-notes.md",
+      "historical_exists": true,
+      "historical_sha256": "1c7f4acfc73a2e35f5a0f480c4e84803ad7f7361c6869a6fb0166ab465543cbf",
+      "current_sha256": "01686dfaa2de07612681d9e3f8d6229cdeb3d519579aad210fbf0eca355bae31",
+      "unchanged": false
+    }
+  ]
+}

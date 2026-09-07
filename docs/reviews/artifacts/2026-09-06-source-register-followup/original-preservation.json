@@ -1,0 +1,9 @@
+{
+  "schema_version": "source-register-preservation.v1",
+  "original_file": "original-source-register.html",
+  "sha256": "6421c23973e47827573f11955f6103d71b21f3a842f49fdeafa3696063ef7f9d",
+  "bytes": 22355,
+  "historical_review_commit": "eccddccfc48b50231228730534a84bde4b7fa32e",
+  "validated_against_commit": "cefc97981981dfde7a36ce050e7fb33367c830be",
+  "preserved_without_edits": true
+}

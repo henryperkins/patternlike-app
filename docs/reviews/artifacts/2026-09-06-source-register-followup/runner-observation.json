@@ -1,0 +1,56 @@
+{
+  "schema_version": "source-register-runner-observation.v1",
+  "observed_at": "2026-09-06T18:51:24.379160Z",
+  "service": {
+    "ActiveState": "active",
+    "SubState": "running",
+    "MainPID": "1852916",
+    "NRestarts": "0",
+    "ExecMainStartTimestamp": "Sun 2026-09-06 07:54:21 UTC",
+    "WorkingDirectory": "/var/lib/patternlike-codex-runner/workspace",
+    "User": "patternlike-codex"
+  },
+  "installed_bundle_sha256": "3a0139ae4268e03652ab55f5945dab41c0c4e70515cc92e847cf24a81586b708",
+  "reviewed_candidate_bundle_sha256": "edb25e3ce62a69f30d86b50eb3ce1c85b869938ed54d81aedd01d7650fedbf4c",
+  "installed_matches_candidate": false,
+  "installed_text_transport": "codex_exec",
+  "reviewed_candidate_text_transport": "isolated_app_server_json",
+  "transport_inspection": "runCodexInvocation body inspected; mesh helper presence alone not used as proof",
+  "codex_bin": "/opt/patternlike-codex-runner/releases/ce524431ee18f955a7105bfb2ba573000eb5b625.boundary-fix-uncommitted-20260906T075044Z/codex-cli/bin/codex",
+  "cli_version": {
+    "expected": "codex-cli 0.153.3",
+    "exit_code": 0,
+    "expected_output_observed": true
+  },
+  "authentication": {
+    "expected": "Logged in using ChatGPT",
+    "exit_code": 0,
+    "expected_output_observed": true
+  },
+  "path_permissions": [
+    {
+      "path": "/var/lib/patternlike-codex-runner",
+      "mode": "0o700",
+      "owner": "patternlike-codex"
+    },
+    {
+      "path": "/var/lib/patternlike-codex-runner/workspace",
+      "mode": "0o700",
+      "owner": "patternlike-codex"
+    },
+    {
+      "path": "/var/lib/patternlike-codex-runner/.codex",
+      "mode": "0o700",
+      "owner": "patternlike-codex"
+    },
+    {
+      "path": "/etc/patternlike-codex-runner.env",
+      "mode": "0o600",
+      "owner": "root"
+    }
+  ],
+  "credentials_copied": false,
+  "service_changed": false,
+  "account_category_and_data_use_settings": "unverified",
+  "log_and_backup_retention": "unverified"
+}
