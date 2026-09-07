@@ -48,7 +48,7 @@ describe("ChartView location qualifications", () => {
     const onUnauthorized = vi.fn();
     const view = render(<ChartView chart={original} onUnauthorized={onUnauthorized} />);
     const sky = {
-      chartId: original.id, accuracy: "exact", uncertainty: "Location details need confirmation.",
+      chartId: original.id, uncertainty: "Location details need confirmation.",
       placements: [
         { body: "sun", longitude: 35.25, sign: "taurus", degree: 5.25 },
         { body: "ascendant", longitude: 254.5, sign: "sagittarius", degree: 14.5 },

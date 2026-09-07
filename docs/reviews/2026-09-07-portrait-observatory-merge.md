@@ -22,4 +22,6 @@ The independent source/spec review passed after removing copied retrograde and u
 
 These are local built-fixture observations. Physical phones, Safari, VoiceOver/NVDA, live-account lifecycle behavior, and production adoption were not checked by this review. Source identity, the local aggregate gate, and Workers deployment observations are separate evidence. The historical September 6 plan receipts remain historical and do not substitute for this merge's gate.
 
-The source-frozen aggregate merge gate will be recorded here and attached verbatim to the PR before merging.
+The first source-frozen aggregate gate completed with 13 passing lanes and one failing web lane. One ChartView test still expected the removed `accuracy` field; 652 web tests passed and that assertion failed. The [nonpassing receipt](artifacts/2026-09-07-portrait-merge/local-release-evidence.json) is preserved. Correcting that expected object passed 37 focused tests across ChartView, account propagation, and sky projection. This was a test-only follow-up to the final browser build; the rendered implementation did not change. The browser file-hash record retains the original build inputs.
+
+A new complete aggregate gate will be recorded and attached verbatim to the PR before merging. The first gate's passing API lane logged workerd teardown diagnostics also seen in the preceding source-register gate; its 2,482 tests and compatibility lane completed with exit 0.
