@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-09-07T10:14:49.106Z",
+  "worker": "patternlike-api-production",
+  "deployment_id": "bbb0fd66-bb0b-404f-a8b7-baf152ebe27f",
+  "deployment_created_at": "2026-09-07T10:12:53.227414Z",
+  "worker_version_id": "9d085371-00fe-4976-849e-73c7924dd617",
+  "traffic_percent": 100,
+  "release_git_sha": "c3190768bf0e169925fd4a14d1f7f8adf901d57a",
+  "source": "Cloudflare deployments and version resources.bindings readback; only release identity retained",
+  "interpretation": "Actual main Builds SHA injection is observed on the serving dependency-release Worker before the compatible release guard merges",
+  "runtime_attestation_port_deployed": false
+}
