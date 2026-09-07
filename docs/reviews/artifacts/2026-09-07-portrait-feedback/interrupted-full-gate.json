@@ -1,0 +1,12 @@
+{
+  "schema_version": "interrupted-verification-note.v1",
+  "status": "interrupted",
+  "test_process_exit_code": 143,
+  "command": "npm run ci:local through release-evidence gate",
+  "reason": "Latest user instruction permits only tests directly related to the 3D Pattern animation",
+  "receipt_placeholder_bytes": 0,
+  "receipt_placeholder_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "e7e173a152ea9e5a034b28de8eba969f6620b5c4111c87cd356e90743b7d0dbf",
+  "full_gate_passed": false,
+  "replacement_full_gate": "Not authorized by latest test-scope instruction"
+}

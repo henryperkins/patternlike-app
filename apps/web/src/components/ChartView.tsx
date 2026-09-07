@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import type { CelestialBody, LongitudePosition } from "@patternlike/shared";
 import type { ChartResponse } from "../lib/api-client.js";
+import { createPortraitSky } from "../lib/portrait-sky.js";
 import { ChartWheel } from "./ChartWheel.js";
 import { Icon } from "./icons.js";
 import { PatternExperience } from "./PatternExperience.js";
@@ -50,6 +52,7 @@ interface ChartViewProps {
 }
 
 export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
+  const sky = useMemo(() => createPortraitSky(chart, chart.id), [chart]);
   const positionByBody = new Map(chart.positions.map((position) => [position.body, position]));
   const anchors: CelestialBody[] = ["sun", "moon", "ascendant"];
   const visiblePositions = chart.positions.filter(
@@ -187,7 +190,7 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
         </div>
       </section>
 
-      <PatternExperience chartId={chart.id} onUnauthorized={onUnauthorized} />
+      <PatternExperience chartId={chart.id} onUnauthorized={onUnauthorized} sky={sky} />
 
       <details className="evidence-drawer">
         <summary>

@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHash, webcrypto } from "node:crypto";
-import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector3 } from "three";
-import { cameraFrame, chapterLayout, disposeModel, isCameraBookmark, TapTracker, validateGlb, verifyGlbAsset } from "./scene-utils.js";
+import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Raycaster, Texture, Vector3 } from "three";
+import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, TapTracker, validateGlb, verifyGlbAsset } from "./scene-utils.js";
+
+it("blocks chapter picking behind architecture and restores it when the roof is cut away", () => {
+  const chapter = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
+  chapter.userData.chapterId = "chapter-1";
+  const roof = new Group();
+  const panel = new Mesh(new BoxGeometry(3, 3, 0.2), new MeshStandardMaterial());
+  panel.position.z = 3; roof.add(panel);
+  chapter.updateMatrixWorld(); roof.updateMatrixWorld(true);
+  const ray = new Raycaster(new Vector3(0, 0, 8), new Vector3(0, 0, -1));
+  expect(firstVisibleIntersection(ray, [chapter, roof])?.object).toBe(panel);
+  roof.visible = false;
+  expect(firstVisibleIntersection(ray, [chapter, roof])?.object.userData.chapterId).toBe("chapter-1");
+  disposeModel([chapter, roof]);
+});
 
 function glb(json: unknown) {
   const text = new TextEncoder().encode(JSON.stringify(json));
@@ -165,4 +179,18 @@ it("disposes shared geometry, material, texture, and decoded image exactly once 
   expect(materialDispose).toHaveBeenCalledTimes(1);
   expect(textureDispose).toHaveBeenCalledTimes(1);
   expect(close).toHaveBeenCalledTimes(1);
+});
+
+
+it("adapts a turned and zoomed bookmark to a new frame without losing its direction or relative zoom", () => {
+  const target: [number, number, number] = [1, 2, 3];
+  const bookmark = { position: [3, 6, 11] as [number, number, number], target, frameDistance: 10 };
+  const resized = adaptCameraBookmark(bookmark, 20);
+  const originalOffset = new Vector3(...bookmark.position).sub(new Vector3(...target));
+  const resizedOffset = new Vector3(...resized.position).sub(new Vector3(...target));
+  expect(resized.target).toEqual(target);
+  expect(resizedOffset.clone().normalize().distanceTo(originalOffset.clone().normalize())).toBeLessThan(1e-10);
+  expect(resizedOffset.length() / 20).toBeCloseTo(originalOffset.length() / 10);
+  expect(adaptCameraBookmark(resized, 10).position).toEqual(bookmark.position);
+  expect(adaptCameraBookmark({ position: bookmark.position, target }, 20).position).toEqual(bookmark.position);
 });

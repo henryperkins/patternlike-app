@@ -1,0 +1,20 @@
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/web
+
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > restores actual camera coordinates without replaying the last command, and saves before unmount 166ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > operates real courtyard geometry, honors reduced motion, and releases its resources at rest 3985ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > places the zodiac markers at supplied longitudes and brings the instrument into view 3267ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > selects the previous chapter from the sky view before allowing its reading desk to operate 2910ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > uses a saved Sun sector only without chart context and never substitutes it for a missing chart Sun 4694ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > leaves no live WebGL contexts after repeated scene teardown 162ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps a reading-only facet change at the same camera pose, then stops drawing at idle 234ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > saves the old view before framing a new one and accepts only a new command serial 62ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > releases the canvas and loaded geometry on graphics loss while leaving the reading reachable 72ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > frames models inside the unobscured viewport above the real toolbar 59ms
+ ✓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > rejects an intact correctly hashed compass assigned to a different chapter before drawing 60ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  08:51:53
+   Duration  18.33s (transform 511ms, setup 326ms, import 669ms, tests 15.68s, environment 1.37s)
+

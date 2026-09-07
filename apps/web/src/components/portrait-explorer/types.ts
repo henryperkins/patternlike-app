@@ -1,4 +1,6 @@
 import type { PortraitManifest } from "../../lib/pattern-portrait.js";
+import type { ZodiacSignName } from "@patternlike/shared";
+import type { PortraitSky, PortraitSkyBody } from "../../lib/portrait-sky.js";
 
 export type Facet = "overview" | "tensions" | "resources" | "alternative";
 export const facets: ReadonlyArray<{ id: Facet; label: string }> = [
@@ -8,7 +10,7 @@ export const facets: ReadonlyArray<{ id: Facet; label: string }> = [
   { id: "alternative", label: "Another expression" },
 ];
 export type Point3 = [number, number, number];
-export interface CameraBookmark { position: Point3; target: Point3; }
+export interface CameraBookmark { position: Point3; target: Point3; frameDistance?: number; }
 export interface PortraitMeshAsset {
   chapterId: string;
   url: string;
@@ -30,11 +32,25 @@ export interface PortraitMeshBundle {
   assets: readonly PortraitMeshAsset[];
 }
 export type SceneStatus = "loading" | "ready" | "unavailable";
+export interface ObservatoryExperience {
+  roofOpen: boolean;
+  lighting: "day" | "dusk";
+  inspect: boolean;
+  openDesks: Readonly<Record<string, boolean>>;
+  turns: Readonly<Record<string, number>>;
+}
 export type CameraCommand = {
   kind: "left" | "right" | "up" | "down" | "closer" | "farther" | "reset" | "frame";
   serial: number;
 };
 export interface PortraitSceneProps {
+  sky?: PortraitSky | null;
+  sunSign?: ZodiacSignName | null;
+  skyView?: boolean;
+  selectedSkyBody?: PortraitSkyBody | null;
+  onSelectSkyBody?: (body: PortraitSkyBody) => void;
+  experience?: ObservatoryExperience;
+  onOperate?: (chapterId: string) => void;
   assets: readonly PortraitMeshAsset[];
   chapters: ReadonlyArray<Pick<PortraitManifest["chapters"][number], "id" | "title" | "ordinal">>;
   selectedIds: readonly string[];

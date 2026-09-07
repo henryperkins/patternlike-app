@@ -2,11 +2,11 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { createHash, webcrypto } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { BufferGeometry, type Camera, type Scene } from "three";
+import { BufferGeometry, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Camera, type Scene } from "three";
 import PortraitScene from "./PortraitScene.js";
 import type { PortraitSceneProps } from "./types.js";
 
-const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity] }));
+const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity], scene: null as Scene | null, camera: null as Camera | null, detachedDisplay: false }));
 // jsdom has no GPU. Keep the real loader, camera, mesh, controls and lifecycle.
 vi.mock("three", async importOriginal => {
   const original = await importOriginal<typeof import("three")>();
@@ -26,6 +26,11 @@ vi.mock("three", async importOriginal => {
     setPixelRatio() {}
     setSize() {}
     render(scene: Scene, camera: Camera) {
+      gpu.scene = scene;
+      gpu.camera = camera;
+      const station = scene.getObjectByName("Chapter display 1");
+      const artifact = scene.children.find(object => object.userData.chapterId === "chapter-1");
+      if (station && artifact && (Math.abs(station.position.x - artifact.position.x) > 0.001 || Math.abs(station.position.z - artifact.position.z) > 0.001)) gpu.detachedDisplay = true;
       scene.updateMatrixWorld();
       camera.updateMatrixWorld();
       gpu.position = camera.position.toArray();
@@ -66,6 +71,8 @@ beforeEach(() => {
   gpu.contextLosses = 0;
   gpu.contexts.clear();
   gpu.position = [];
+  gpu.scene = null;
+  gpu.detachedDisplay = false;
   vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0, toJSON() {} });
@@ -85,6 +92,130 @@ it("restores actual camera coordinates without replaying the last command, and s
   expect(saved[1].target).toEqual([0, 1, 0]);
   expect(gpu.disposals).toBe(1);
 });
+
+it("operates real courtyard geometry, honors reduced motion, and releases its resources at rest", async () => {
+  const callbacks = props();
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} };
+  const { rerender, unmount } = render(<PortraitScene {...callbacks} experience={experience} />);
+  // This integration test constructs the real architectural geometry in jsdom.
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  expect(screen.getByRole("img")).not.toHaveAccessibleName(/birth-chart markers/);
+  const initial = [...gpu.position];
+  const source = gpu.scene!.getObjectByName("chapter-1")!;
+  const display = gpu.scene!.children.find(object => object.userData.chapterId === "chapter-1")!;
+  const geometryBefore = source.children[0].position.clone();
+  rerender(<PortraitScene {...callbacks} experience={{ ...experience, roofOpen: false, lighting: "dusk", openDesks: { "chapter-1": true }, turns: { "chapter-1": 1 } }} />);
+  await waitFor(() => expect(gpu.scene!.getObjectByName("Reading desk hinge")!.rotation.x).toBe(-1.25));
+  expect(gpu.scene!.getObjectByName("Timber canopy cutaway")!.visible).toBe(true);
+  await waitFor(() => expect(display.rotation.y).toBeCloseTo(Math.PI / 4));
+  expect(source.children[0].position).toEqual(geometryBefore);
+  expect(gpu.position).toEqual(initial);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  const frames = gpu.renders;
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  expect(gpu.renders).toBe(frames);
+  rerender(<PortraitScene {...callbacks} experience={experience} reducedMotion={false} unfolded viewKey="chapter-1:unfolded" bookmark={undefined} />);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 650)); });
+  expect(gpu.detachedDisplay).toBe(false);
+  const dispose = vi.spyOn(BufferGeometry.prototype, "dispose");
+  unmount();
+  expect(dispose.mock.calls.length).toBeGreaterThan(20);
+  expect(gpu.contexts.size).toBe(0);
+});
+
+it("places the zodiac markers at supplied longitudes and brings the instrument into view", async () => {
+  const callbacks = props();
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} };
+  const sky = { chartId: "fictional-chart", placements: [
+    { body: "sun" as const, longitude: 115, sign: "cancer" as const, degree: 25 },
+    { body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 },
+  ], unavailable: {} };
+  const selectSky = vi.fn();
+  const view = render(<PortraitScene {...callbacks} experience={experience} sky={sky} selectedSkyBody="sun" onSelectSkyBody={selectSky} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  expect(screen.getByRole("img")).toHaveAccessibleName(/birth-chart markers/);
+  const markers: import("three").Object3D[] = [];
+  gpu.scene!.traverse(object => { if (object.type === "Group" && object.userData.skyBody === "sun") markers.push(object); });
+  expect(markers).toHaveLength(1);
+  const marker = markers[0];
+  expect((Math.atan2(marker.position.x, -marker.position.z) * 180 / Math.PI + 360) % 360).toBeCloseTo(115, 5);
+  const before = [...gpu.position];
+  view.rerender(<PortraitScene {...callbacks} experience={experience} sky={sky} skyView selectedSkyBody="moon" viewKey="sky" bookmark={undefined} onSelectSkyBody={selectSky} />);
+  await waitFor(() => expect(gpu.position).not.toEqual(before));
+  expect(document.querySelector<HTMLButtonElement>("[data-form-index]")?.style.visibility).toBe("hidden");
+  expect(document.querySelectorAll("[data-sign-index]")).toHaveLength(12);
+  expect([...document.querySelectorAll<HTMLElement>("[data-sky-body]")].filter(label => label.style.visibility === "visible")).toHaveLength(1);
+  await act(async () => { screen.getByRole("button", { name: "Moon in Taurus" }).click(); });
+  expect(selectSky).toHaveBeenCalledWith("moon");
+  const markerMesh = marker.children.find(object => "geometry" in object) as import("three").Mesh;
+  const dispose = vi.spyOn(markerMesh.geometry, "dispose");
+  view.unmount();
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(gpu.contextLosses).toBe(1);
+});
+
+it("selects the previous chapter from the sky view before allowing its reading desk to operate", async () => {
+  const callbacks = props();
+  const operate = vi.fn();
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} };
+  const view = render(<PortraitScene {...callbacks} experience={experience} skyView onOperate={operate} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  let chapterMesh: Mesh | undefined;
+  gpu.scene!.traverse(object => { if (!chapterMesh && object instanceof Mesh && object.userData.chapterId === "chapter-1") chapterMesh = object; });
+  expect(chapterMesh).toBeDefined();
+  const canvas = screen.getByRole("img") as HTMLCanvasElement;
+  canvas.setPointerCapture = vi.fn();
+  canvas.releasePointerCapture = vi.fn();
+  const hit = vi.spyOn(Raycaster.prototype, "intersectObjects").mockReturnValue([{ distance: 1, point: new Vector3(), object: chapterMesh! }]);
+  const tap = () => act(() => {
+    for (const type of ["pointerdown", "pointerup"]) canvas.dispatchEvent(Object.assign(
+      new MouseEvent(type, { bubbles: true, button: 0, buttons: type === "pointerdown" ? 1 : 0, clientX: 400, clientY: 300 }),
+      { pointerId: 1, pointerType: "mouse", isPrimary: true },
+    ));
+  });
+  try {
+    tap();
+    expect(callbacks.onSelect).toHaveBeenCalledExactlyOnceWith("chapter-1");
+    expect(operate).not.toHaveBeenCalled();
+    vi.mocked(callbacks.onSelect).mockClear();
+    view.rerender(<PortraitScene {...callbacks} experience={experience} skyView={false} onOperate={operate} />);
+    tap();
+    expect(operate).toHaveBeenCalledExactlyOnceWith("chapter-1");
+    expect(callbacks.onSelect).not.toHaveBeenCalled();
+  } finally {
+    hit.mockRestore();
+  }
+});
+
+it("uses a saved Sun sector only without chart context and never substitutes it for a missing chart Sun", async () => {
+  const callbacks = props();
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} };
+  const view = render(<PortraitScene {...callbacks} experience={experience} sky={null} sunSign="cancer" selectedSkyBody="sun" />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const litSigns = () => {
+    const signs: string[] = [];
+    gpu.scene!.traverse(object => {
+      if (object instanceof Mesh && object.userData.zodiacSign && object.material instanceof MeshStandardMaterial && object.material.emissiveIntensity > 0) signs.push(object.userData.zodiacSign);
+    });
+    return signs;
+  };
+  expect(litSigns()).toEqual(["cancer"]);
+  expect(gpu.scene!.getObjectByName("sun zodiac marker")).toBeUndefined();
+  // PortraitExplorer keys its child by sky context, so a chart change mounts a fresh scene.
+  view.unmount();
+  const sky = { chartId: "fictional-chart", placements: [
+    { body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 },
+  ], unavailable: { sun: "missing" as const, ascendant: "missing" as const } };
+  vi.mocked(callbacks.onStatus).mockClear();
+  const chartView = render(<PortraitScene {...callbacks} experience={experience} sky={sky} sunSign="cancer" selectedSkyBody="sun" />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  expect(gpu.scene!.getObjectByName("moon zodiac marker")).toBeDefined();
+  expect(gpu.scene!.getObjectByName("sun zodiac marker")).toBeUndefined();
+  expect(litSigns()).toEqual([]);
+  chartView.rerender(<PortraitScene {...callbacks} experience={experience} sky={sky} sunSign="cancer" selectedSkyBody="moon" />);
+  await waitFor(() => expect(litSigns()).toEqual(["taurus"]));
+  // Two full scenes each have a bounded five-second readiness check.
+}, 12_000);
 
 it("leaves no live WebGL contexts after repeated scene teardown", async () => {
   for (let cycle = 0; cycle < 3; cycle++) {
@@ -166,3 +297,96 @@ it("rejects an intact correctly hashed compass assigned to a different chapter b
   expect(screen.queryByRole("img")).not.toBeInTheDocument();
   expect(gpu.renders).toBe(0);
 });
+
+
+it("keeps all zodiac labels in frame across expansion and resize and connects the selected readout to the plotted marker", async () => {
+  let resize: () => void = () => {};
+  vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
+  let bounds = new DOMRect(0, 0, 358, 345);
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(() => bounds);
+  const callbacks = { ...props(), bookmark: undefined, selectedIds: [], skyView: true, viewKey: "sky",
+    selectedSkyBody: "moon" as const,
+    experience: { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} },
+    sky: { chartId: "fictional", placements: [{ body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 }], unavailable: {} },
+  };
+  const initial = render(<PortraitScene {...callbacks} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const initialPosition = [...gpu.position];
+  initial.unmount();
+  const bookmark = vi.mocked(callbacks.onBookmark).mock.lastCall![1];
+  bounds = new DOMRect(0, 0, 354, 580);
+  vi.mocked(callbacks.onStatus).mockClear();
+  const expanded = render(<PortraitScene {...callbacks} bookmark={bookmark} expanded />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const labels = [...expanded.container.querySelectorAll<HTMLElement>("[data-sign-index]")];
+  expect(labels.filter(label => label.style.visibility === "visible")).toHaveLength(12);
+  const marker = gpu.scene!.getObjectByName("moon zodiac marker")!;
+  const projected = marker.getWorldPosition(new Vector3()).project(gpu.camera!);
+  const connector = expanded.container.querySelector<SVGLineElement>("[data-sky-connector]")!;
+  expect(connector).not.toBeNull();
+  expect(Number(connector.getAttribute("x2"))).toBeCloseTo((projected.x + 1) * 354 / 2, 1);
+  expect(Number(connector.getAttribute("y2"))).toBeCloseTo((1 - projected.y) * 580 / 2, 1);
+  bounds = new DOMRect(0, 0, 358, 345);
+  act(() => resize());
+  await waitFor(() => expect(gpu.position[1]).toBeCloseTo(initialPosition[1], 6));
+  expect(gpu.position[0]).toBeCloseTo(initialPosition[0], 6);
+  expect(gpu.position[2]).toBeCloseTo(initialPosition[2], 6);
+}, 12_000);
+
+
+it.each([{ width: 288, height: 300 }, { width: 544, height: 296 }])("keeps the selected readout clear of measured sign labels and its marker in a $width by $height canvas", async ({ width, height }) => {
+  const signWidths: Record<string, number> = { Aries: 42, Taurus: 49, Gemini: 52, Cancer: 51, Leo: 30, Virgo: 42, Libra: 40, Scorpio: 53, Sagittarius: 76, Capricorn: 73, Aquarius: 64, Pisces: 43 };
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+    return this.matches("[data-sign-index]") ? signWidths[this.textContent ?? ""] ?? 50 : this.matches("[data-sky-body]") ? 80 : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.matches("[data-sign-index]") ? 25 : this.matches("[data-sky-body]") ? 44 : 0;
+  });
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+    if (this.matches(".explorer-scene-top")) return new DOMRect(8, 8, width - 16, 44);
+    if (this.matches(".explorer-scene-toolbar")) return new DOMRect(8, height - 58, width - 16, 50);
+    return new DOMRect(0, 0, width, height);
+  });
+  const callbacks = { ...props(), bookmark: undefined, selectedIds: [], skyView: true, viewKey: "sky",
+    experience: { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} },
+    sky: { chartId: "fictional", placements: [
+      { body: "sun" as const, longitude: 115, sign: "cancer" as const, degree: 25 },
+      { body: "moon" as const, longitude: 42.5, sign: "taurus" as const, degree: 12.5 },
+      { body: "ascendant" as const, longitude: 193, sign: "libra" as const, degree: 13 },
+    ], unavailable: {} },
+  };
+  const scene = (body: "sun" | "moon" | "ascendant") => <div className="explorer-scene"><div className="explorer-scene-top" /><PortraitScene {...callbacks} selectedSkyBody={body} /><div className="explorer-scene-toolbar" /></div>;
+  const view = render(scene("sun"));
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const rect = (element: HTMLElement) => {
+    const [x, y] = element.style.transform.match(/-?[\d.]+/g)!.map(Number);
+    return { left: x, right: x + element.offsetWidth, top: y, bottom: y + element.offsetHeight };
+  };
+  for (const body of ["sun", "moon", "ascendant"] as const) {
+    const renders = gpu.renders;
+    view.rerender(scene(body));
+    await waitFor(() => expect(gpu.renders).toBeGreaterThan(renders));
+    const readout = view.container.querySelector<HTMLElement>(`[data-sky-body="${body}"]`)!;
+    expect(readout.style.visibility, JSON.stringify({ body, readout: rect(readout), signs: [...view.container.querySelectorAll<HTMLElement>("[data-sign-index]")].map(label => ({ sign: label.textContent, ...rect(label) })) })).toBe("visible");
+    const box = rect(readout);
+    expect(box.left).toBeGreaterThanOrEqual(6);
+    expect(box.right).toBeLessThanOrEqual(width - 6);
+    expect(box.top).toBeGreaterThanOrEqual(62);
+    expect(box.bottom).toBeLessThanOrEqual(height - 68);
+    const signs = [...view.container.querySelectorAll<HTMLElement>("[data-sign-index]")];
+    expect(signs.filter(label => label.style.visibility === "visible")).toHaveLength(12);
+    for (const sign of signs) {
+      const labelBox = rect(sign);
+      expect(box.right <= labelBox.left || box.left >= labelBox.right || box.bottom <= labelBox.top || box.top >= labelBox.bottom, `${body} readout overlaps ${sign.textContent}`).toBe(true);
+    }
+    const marker = gpu.scene!.getObjectByName(`${body} zodiac marker`)!;
+    const projected = marker.getWorldPosition(new Vector3()).project(gpu.camera!);
+    const x = (projected.x + 1) * width / 2;
+    const y = (1 - projected.y) * height / 2;
+    expect(x < box.left || x > box.right || y < box.top || y > box.bottom, `${body} marker hidden by its readout`).toBe(true);
+    const connector = view.container.querySelector<SVGLineElement>("[data-sky-connector]")!;
+    expect(connector.style.visibility).toBe("visible");
+    expect(Number(connector.getAttribute("x2"))).toBeCloseTo(x, 1);
+    expect(Number(connector.getAttribute("y2"))).toBeCloseTo(y, 1);
+  }
+}, 10_000);

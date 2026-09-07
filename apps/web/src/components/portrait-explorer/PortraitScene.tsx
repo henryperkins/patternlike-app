@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ZODIAC_SIGNS } from "@patternlike/shared";
 import {
-  ACESFilmicToneMapping, Box3, Color, DirectionalLight, Group, HemisphereLight, LoadingManager, Mesh,
+  ACESFilmicToneMapping, Box3, Color, DirectionalLight, Fog, Group, HemisphereLight, LoadingManager, Matrix4, Mesh,
   MeshStandardMaterial, PCFShadowMap, PerspectiveCamera, PlaneGeometry, PMREMGenerator,
   Raycaster, RingGeometry, Scene, Spherical, TOUCH, Vector2, Vector3, WebGLRenderer,
   type Object3D, type WebGLRenderTarget,
@@ -8,8 +9,11 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { cameraFrame, chapterLayout, disposeModel, isCameraBookmark, MAX_GLB_BYTES, TapTracker, verifyGlbAsset } from "./scene-utils.js";
+import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, placeLabel, TapTracker, type LabelRect, verifyGlbAsset } from "./scene-utils.js";
 import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
+import { createObservatory, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
+import { BodyIcon, signLabel, skyBodyLabels } from "./SkyReader.js";
+import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
 type LoadedForm = { id: string; root: Group; resources: Object3D[]; };
 type Motion = { start: number; duration: number; from: CameraBookmark; to: CameraBookmark; positions: Vector3[]; goals: Vector3[]; };
@@ -98,6 +102,10 @@ class PortraitRuntime {
   private localBoxes: Box3[] = [];
   private materials = new Map<MeshStandardMaterial, { emissive: Color; intensity: number; }>();
   private keyLight!: DirectionalLight;
+  private hemisphere!: HemisphereLight;
+  private rimLight!: DirectionalLight;
+  private world: ObservatoryWorld | null = null;
+  private lastFrame = 0;
 
   constructor(private host: HTMLDivElement, private labels: HTMLDivElement, private forms: LoadedForm[], props: PortraitSceneProps, private fail: () => void, private reportStatus: (status: SceneStatus) => void) {
     this.props = props;
@@ -105,14 +113,15 @@ class PortraitRuntime {
     try {
     const canvas = this.renderer.domElement;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.");
+    canvas.setAttribute("aria-label", props.experience ? `A zodiac observatory with a bronze twelve-sign instrument${props.sky?.placements.length ? ", birth-chart markers" : ""}, four chapter displays, and opening reading desks. Use the named sky, chapter, and scene controls to explore.` : "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.");
     canvas.style.cssText = "display:block;width:100%;height:100%;cursor:grab";
     this.host.append(canvas);
     this.renderer.setClearColor("#091b21");
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.86;
     this.renderer.shadowMap.type = PCFShadowMap;
-    this.scene.add(new HemisphereLight("#d4e8e4", "#3e3021", 0.8));
+    this.hemisphere = new HemisphereLight("#d4e8e4", "#3e3021", 0.8);
+    this.scene.add(this.hemisphere);
     this.keyLight = new DirectionalLight("#ffe6bd", 2.7);
     this.keyLight.position.set(-3, 7, 5);
     this.keyLight.castShadow = true;
@@ -127,17 +136,29 @@ class PortraitRuntime {
     const rim = new DirectionalLight("#aecbd7", 1.5);
     rim.position.set(3, 5, -5);
     this.scene.add(rim);
+    this.rimLight = rim;
     this.ground = new Mesh(new PlaneGeometry(200, 200), new MeshStandardMaterial({ color: "#030b0d", roughness: 1, metalness: 0 }));
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.position.y = -0.025;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
+    if (props.experience) {
+      this.world = createObservatory(forms.length, props.sky?.placements ?? []);
+      this.scene.add(this.world.root);
+      this.keyLight.shadow.mapSize.set(2048, 2048);
+      this.keyLight.shadow.camera.left = -11;
+      this.keyLight.shadow.camera.right = 11;
+      this.keyLight.shadow.camera.top = 11;
+      this.keyLight.shadow.camera.bottom = -11;
+      this.keyLight.shadow.camera.updateProjectionMatrix();
+      this.ground.position.y = -0.46;
+    }
     for (const [index, form] of forms.entries()) {
       const box = new Box3().setFromObject(form.root);
       this.localBoxes.push(box.clone());
-      this.elevations.push(-box.min.y);
-      form.root.position.fromArray(chapterLayout(index, props.unfolded));
-      form.root.position.y = -box.min.y;
+      this.elevations.push(-box.min.y + (this.world ? DISPLAY_HEIGHT : 0));
+      form.root.position.fromArray(this.layout(index, props.unfolded));
+      form.root.position.y = this.elevations[index]!;
       this.scene.add(form.root);
       form.root.traverse(object => {
         if (!(object instanceof Mesh)) return;
@@ -156,9 +177,9 @@ class PortraitRuntime {
     this.controls.touches.TWO = TOUCH.DOLLY_ROTATE;
     this.controls.rotateSpeed = 0.65;
     this.controls.minDistance = 2;
-    this.controls.maxDistance = 35;
+    this.controls.maxDistance = this.world ? 90 : 35;
     this.controls.minPolarAngle = 0.12;
-    this.controls.maxPolarAngle = Math.PI * 0.56;
+    this.controls.maxPolarAngle = Math.PI * (this.world ? 0.48 : 0.56);
     this.controls.addEventListener("change", this.invalidate);
     this.controls.addEventListener("start", this.onOrbitStart);
     this.controls.addEventListener("end", this.onOrbitEnd);
@@ -174,7 +195,10 @@ class PortraitRuntime {
     for (const toolbar of host.closest(".explorer-scene")?.querySelectorAll(".explorer-scene-top, .explorer-scene-toolbar") ?? []) this.observer.observe(toolbar);
     this.resize();
     this.applyQuality();
-    const pose = isCameraBookmark(props.bookmark) ? props.bookmark : this.frame();
+    this.applyExperience();
+    this.world?.tick(1);
+    this.forms.forEach(form => { form.root.rotation.y = (props.experience?.turns[form.id] ?? 0) * Math.PI / 4; });
+    const pose = isCameraBookmark(props.bookmark) ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame();
     this.applyPose(pose);
     this.updateEmphasis();
     this.invalidate();
@@ -184,14 +208,30 @@ class PortraitRuntime {
     }
   }
 
-  private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray() });
+  private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray(), frameDistance: this.frameDistance() });
+  private layout = (index: number, unfolded: boolean) => this.world ? stationPosition(index, unfolded) : chapterLayout(index, unfolded);
   private save = () => { if (this.ready) this.props.onBookmark(this.props.viewKey, this.snapshot()); };
   private bounds = (unfolded = this.props.unfolded) => this.localBoxes.map((box, index) => {
-    const position = new Vector3().fromArray(chapterLayout(index, unfolded));
+    const position = new Vector3().fromArray(this.layout(index, unfolded));
     position.y = this.elevations[index]!;
-    return box.clone().translate(position);
+    const rotation = (this.props.experience?.turns[this.forms[index].id] ?? 0) * Math.PI / 4;
+    return box.clone().applyMatrix4(new Matrix4().makeRotationY(rotation)).translate(position);
   });
-  private frame = () => cameraFrame(this.bounds(), this.forms.flatMap((form, index) => this.props.selectedIds.includes(form.id) ? [index] : []), this.width / this.usableHeight);
+  private frame = () => {
+    if (this.world && this.props.skyView) {
+      const aspect = this.width / this.usableHeight;
+      const distance = 1.75 / Math.tan(38 * Math.PI / 360) / Math.min(1, aspect);
+      const target = new Vector3(0, 0.9, 0);
+      return { position: target.clone().addScaledVector(new Vector3(0, 0.999, 0.045).normalize(), distance).toArray(), target: target.toArray() };
+    }
+    const selected = this.forms.flatMap((form, index) => this.props.selectedIds.includes(form.id) ? [index] : []);
+    return this.world ? observatoryFrame(this.bounds(), selected, this.width / this.usableHeight, Boolean(this.props.experience?.inspect))
+      : cameraFrame(this.bounds(), selected, this.width / this.usableHeight);
+  };
+  private frameDistance = () => {
+    const frame = this.frame();
+    return new Vector3(...frame.position).distanceTo(new Vector3(...frame.target));
+  };
   private applyPose = (pose: CameraBookmark) => {
     this.camera.position.fromArray(pose.position);
     this.controls.target.fromArray(pose.target);
@@ -216,13 +256,37 @@ class PortraitRuntime {
     this.renderer.setSize(this.width, this.height, false);
   }
 
+  private applyExperience() {
+    const experience = this.props.experience;
+    if (!this.world || !experience) return;
+    this.world.setState({ ...experience, open: this.forms.map(form => Boolean(experience.openDesks[form.id])), unfolded: this.props.unfolded });
+    this.world.instrument.setSelection(this.props.selectedSkyBody ?? null, this.props.sky ? null : this.props.sunSign);
+    this.world.instrument.setFocused(Boolean(this.props.skyView));
+    const dusk = experience.lighting === "dusk";
+    const sky = dusk ? "#233d40" : "#536a60";
+    this.renderer.setClearColor(sky);
+    this.scene.fog = new Fog(sky, dusk ? 20 : 30, 75);
+    this.renderer.toneMappingExposure = dusk ? 1.05 : 1.1;
+    this.scene.environmentIntensity = dusk ? 0.1 : 0.35;
+    this.keyLight.color.set(dusk ? "#ffc991" : "#ffead0");
+    this.keyLight.intensity = dusk ? 0.6 : 3.2;
+    this.keyLight.position.set(-6, dusk ? 5 : 10, 8);
+    this.hemisphere.intensity = dusk ? 0.5 : 1.35;
+    this.hemisphere.color.set(dusk ? "#adc7da" : "#d9e8e3");
+    this.rimLight.intensity = dusk ? 0.35 : 1.1;
+    const ground = this.ground.material as MeshStandardMaterial;
+    ground.color.set("#3b4839");
+    if (this.props.reducedMotion) this.world.tick(1);
+  }
+
   update(props: PortraitSceneProps) {
     const before = this.props;
     if (before.viewKey !== props.viewKey) this.save();
     this.props = props;
     if (before.quality !== props.quality || before.expanded !== props.expanded) this.applyQuality();
+    this.applyExperience();
     if (before.viewKey !== props.viewKey || before.unfolded !== props.unfolded) {
-      this.moveTo(isCameraBookmark(props.bookmark) && before.viewKey !== props.viewKey ? props.bookmark : this.frame(), before.unfolded !== props.unfolded ? 540 : 420);
+      this.moveTo(isCameraBookmark(props.bookmark) && before.viewKey !== props.viewKey ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame(), before.unfolded !== props.unfolded ? 540 : 420);
     }
     if (before.command.serial !== props.command.serial) this.command();
     if (props.reducedMotion && this.motion) {
@@ -237,7 +301,7 @@ class PortraitRuntime {
 
   private moveTo(pose: CameraBookmark, duration: number) {
     const goals = this.forms.map((_, index) => {
-      const goal = new Vector3().fromArray(chapterLayout(index, this.props.unfolded));
+      const goal = new Vector3().fromArray(this.layout(index, this.props.unfolded));
       goal.y = this.elevations[index]!;
       return goal;
     });
@@ -278,7 +342,9 @@ class PortraitRuntime {
   private onPointerUp = (event: PointerEvent) => {
     if (!this.taps.up(event, window.scrollX, window.scrollY)) return;
     const id = this.pick(event);
-    if (id) this.props.onSelect(id);
+    if (id?.startsWith("sky:")) this.props.onSelectSkyBody?.(id.slice(4) as PortraitSkyBody);
+    else if (id && !this.props.skyView && this.props.selectedIds.length === 1 && this.props.selectedIds[0] === id && this.props.onOperate) this.props.onOperate(id);
+    else if (id) this.props.onSelect(id);
   };
   private onPointerCancel = () => { this.taps.cancel(); this.highlight(null); };
   private onPointerLeave = () => this.highlight(null);
@@ -291,11 +357,14 @@ class PortraitRuntime {
     } else this.invalidate();
   };
 
+  private visibleHit = () => firstVisibleIntersection(this.raycaster, [...this.forms.map(form => form.root), ...(this.world ? [this.world.root] : [])]);
+
   private pick(event: PointerEvent): string | null {
     const box = this.renderer.domElement.getBoundingClientRect();
     if (!box.width || !box.height) return null;
     this.raycaster.setFromCamera(new Vector2((event.clientX - box.left) / box.width * 2 - 1, -(event.clientY - box.top) / box.height * 2 + 1), this.camera);
-    return this.raycaster.intersectObjects(this.forms.map(form => form.root), true)[0]?.object.userData.chapterId ?? null;
+    const data = this.visibleHit()?.object.userData;
+    return data?.skyBody ? `sky:${data.skyBody}` : data?.chapterId ?? null;
   }
   highlight(id: string | null) {
     if (this.hovered === id) return;
@@ -305,7 +374,7 @@ class PortraitRuntime {
   }
   private updateEmphasis() {
     this.forms.forEach((form, index) => {
-      const selected = this.props.selectedIds.includes(form.id);
+      const selected = !this.props.skyView && this.props.selectedIds.includes(form.id);
       const highlighted = this.hovered === form.id;
       this.rings[index]!.visible = selected || highlighted;
       form.root.traverse(object => {
@@ -325,6 +394,7 @@ class PortraitRuntime {
     const bounds = this.host.getBoundingClientRect();
     this.visible = bounds.width > 0 && bounds.height > 0;
     if (!this.visible) return;
+    const before = this.ready ? this.snapshot() : null;
     this.width = Math.max(1, bounds.width);
     this.height = Math.max(1, bounds.height);
     const parent = this.host.closest(".explorer-scene");
@@ -337,16 +407,28 @@ class PortraitRuntime {
     this.camera.setViewOffset(this.width, this.usableHeight, 0, -this.topInset, this.width, this.height);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.width, this.height, false);
+    if (before) {
+      const distance = this.frameDistance();
+      this.applyPose(adaptCameraBookmark(before, distance));
+      if (this.motion) {
+        // Both animation endpoints share the old viewport, even if the destination has not been saved yet.
+        this.motion.from = adaptCameraBookmark({ ...this.motion.from, frameDistance: before.frameDistance }, distance);
+        this.motion.to = adaptCameraBookmark({ ...this.motion.to, frameDistance: before.frameDistance }, distance);
+      }
+      this.save();
+    }
     this.invalidate();
   };
 
   private projectLabels() {
+    this.projectSkyLabels();
     const occupied: Array<{ x: number; y: number; width: number; height: number }> = [];
     // The selected annotation gets first claim on space. Occluded labels remain in the native chapter rail.
     const ordered = this.forms.map((form, index) => ({ form, index })).sort((a, b) => Number(this.props.selectedIds.includes(b.form.id)) - Number(this.props.selectedIds.includes(a.form.id)));
     for (const { form, index } of ordered) {
       const label = this.labels.querySelector<HTMLButtonElement>(`[data-form-index="${index}"]`);
       if (!label) continue;
+      if (this.props.skyView) { label.style.visibility = "hidden"; continue; }
       label.dataset.highlighted = String(this.hovered === form.id);
       const box = new Box3().setFromObject(form.root);
       const anchor = box.getCenter(new Vector3());
@@ -355,7 +437,7 @@ class PortraitRuntime {
       let visible = projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
       if (this.width < 520 && this.height < 420 && !this.props.selectedIds.includes(form.id)) visible = false;
       this.raycaster.set(this.camera.position, anchor.clone().sub(this.camera.position).normalize());
-      const hit = this.raycaster.intersectObjects(this.forms.map(item => item.root), true)[0];
+      const hit = this.visibleHit();
       if (hit && hit.distance < this.camera.position.distanceTo(anchor) - 0.1 && hit.object.userData.chapterId !== form.id) visible = false;
       const width = label.offsetWidth || 110;
       const height = label.offsetHeight || 44;
@@ -370,6 +452,73 @@ class PortraitRuntime {
     }
   }
 
+  private projectSkyLabels() {
+    if (!this.world) return;
+    const connector = this.labels.querySelector<SVGLineElement>("[data-sky-connector]");
+    if (connector) connector.style.visibility = "hidden";
+    const occupied: LabelRect[] = [];
+    const place = (element: HTMLElement, anchor: Vector3, marker?: PortraitSkyBody) => {
+      const projected = anchor.clone().project(this.camera);
+      let visible = Boolean(this.props.skyView) && projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
+      this.raycaster.set(this.camera.position, anchor.clone().sub(this.camera.position).normalize());
+      const hit = this.visibleHit();
+      if (hit && hit.distance < this.camera.position.distanceTo(anchor) - 0.15 && (!marker || hit.object.userData.skyBody !== marker)) visible = false;
+      const width = element.offsetWidth || (marker ? 65 : 44);
+      const height = element.offsetHeight || (marker ? 44 : 20);
+      const x = Math.max(6, Math.min(this.width - width - 6, (projected.x + 1) * this.width / 2 - width / 2));
+      const y = Math.max(this.topInset + 2, Math.min(this.height - this.bottomInset - height - 2, (1 - projected.y) * this.height / 2 - height / 2));
+      element.style.visibility = visible || (this.props.skyView && document.activeElement === element) ? "visible" : "hidden";
+      element.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      return { x: Math.round(x), y: Math.round(y), width, height, visible };
+    };
+    this.world.instrument.signAnchors.forEach((anchor, index) => {
+      const label = this.labels.querySelector<HTMLElement>(`[data-sign-index="${index}"]`);
+      if (label) {
+        const box = place(label, this.world!.instrument.root.localToWorld(new Vector3(...anchor)));
+        if (box.visible) occupied.push(box);
+      }
+    });
+    for (const [body, marker] of this.world.instrument.markers) {
+      const label = this.labels.querySelector<HTMLElement>(`[data-sky-body="${body}"]`);
+      if (!label) continue;
+      if (body === this.props.selectedSkyBody) {
+        // The readout stays clear of crowded placements; a leader terminates at the actual chart marker.
+        const markerAnchor = marker.getWorldPosition(new Vector3());
+        const projected = markerAnchor.clone().project(this.camera);
+        const readoutAnchor = marker.position.clone().setY(0).normalize().multiplyScalar(-0.55).setY(1.12);
+        const readout = place(label, this.world.instrument.root.localToWorld(readoutAnchor), body);
+        this.raycaster.set(this.camera.position, markerAnchor.clone().sub(this.camera.position).normalize());
+        const hit = this.visibleHit();
+        const visible = readout.visible && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1
+          && (!hit || hit.distance >= this.camera.position.distanceTo(markerAnchor) - 0.15 || hit.object.userData.skyBody === body);
+        // Reserve the projected marker's full bounds, not only its center point.
+        const markerBox = new Box3().setFromObject(marker);
+        const markerMin = new Vector2(Infinity, Infinity);
+        const markerMax = new Vector2(-Infinity, -Infinity);
+        for (const x of [markerBox.min.x, markerBox.max.x]) for (const y of [markerBox.min.y, markerBox.max.y]) for (const z of [markerBox.min.z, markerBox.max.z]) {
+          const corner = new Vector3(x, y, z).project(this.camera);
+          const point = new Vector2((corner.x + 1) * this.width / 2, (1 - corner.y) * this.height / 2);
+          markerMin.min(point);
+          markerMax.max(point);
+        }
+        const position = placeLabel(readout, { x: 6, y: this.topInset + 2, width: this.width - 12, height: this.usableHeight - 4 }, [
+          ...occupied,
+          { x: markerMin.x, y: markerMin.y, width: markerMax.x - markerMin.x, height: markerMax.y - markerMin.y },
+        ]);
+        // Extreme user zoom can leave no clear rectangle; the native placement strip still exposes the selection.
+        if (!position) { label.style.visibility = "hidden"; continue; }
+        label.style.transform = `translate(${position.x}px, ${position.y}px)`;
+        if (connector && visible) {
+          connector.setAttribute("x1", String(position.x + position.width / 2));
+          connector.setAttribute("y1", String(position.y + position.height / 2));
+          connector.setAttribute("x2", String((projected.x + 1) * this.width / 2));
+          connector.setAttribute("y2", String((1 - projected.y) * this.height / 2));
+          connector.style.visibility = "visible";
+        }
+      } else label.style.visibility = "hidden";
+    }
+  }
+
   private invalidate = () => {
     if (this.disposed || document.hidden || !this.visible || this.animation !== null) return;
     this.animation = requestAnimationFrame(this.draw);
@@ -378,6 +527,15 @@ class PortraitRuntime {
     this.animation = null;
     if (this.disposed) return;
     try {
+      const seconds = this.props.reducedMotion ? 1 : Math.min(0.05, Math.max(0.001, (now - this.lastFrame) / 1000));
+      this.lastFrame = now;
+      let worldMoving = this.world?.tick(seconds) ?? false;
+      this.forms.forEach(form => {
+        const goal = (this.props.experience?.turns[form.id] ?? 0) * Math.PI / 4;
+        form.root.rotation.y = seconds >= 1 || Math.abs(form.root.rotation.y - goal) < 0.001 ? goal
+          : form.root.rotation.y + (goal - form.root.rotation.y) * (1 - Math.exp(-seconds * 10));
+        worldMoving ||= form.root.rotation.y !== goal;
+      });
       if (this.motion) {
         const amount = Math.min(1, Math.max(0, (now - this.motion.start) / this.motion.duration));
         const eased = amount * amount * (3 - 2 * amount);
@@ -389,12 +547,14 @@ class PortraitRuntime {
       }
       this.rings.forEach((ring, index) => {
         const position = this.forms[index]!.root.position;
-        ring.position.set(position.x, 0.005, position.z);
+        // The artifact owns the unfolding trajectory; its furniture follows it on every frame.
+        this.world?.stations[index]?.position.set(position.x, 0, position.z);
+        ring.position.set(position.x, this.world ? 0.56 : 0.005, position.z);
       });
       this.renderer.render(this.scene, this.camera);
       this.projectLabels();
       if (!this.ready) { this.ready = true; this.reportStatus("ready"); }
-      if (this.motion) this.invalidate();
+      if (this.motion || worldMoving) this.invalidate();
     } catch { this.dispose(); this.fail(); }
   };
 
@@ -419,6 +579,7 @@ class PortraitRuntime {
     this.taps.cancel();
     this.environment?.dispose();
     this.keyLight?.shadow.dispose();
+    if (this.world) disposeModel([this.world.root]);
     disposeModel([...(this.ground ? [this.ground] : []), ...this.rings]);
     this.renderer.dispose();
     if (!this.renderer.getContext().isContextLost()) this.renderer.forceContextLoss();
@@ -487,6 +648,10 @@ export default function PortraitScene(props: PortraitSceneProps) {
   return <div className="explorer-scene-renderer" style={{ position: "relative", width: "100%", height: "100%" }}>
     <div className="explorer-canvas-host" ref={host} style={{ position: "absolute", inset: 0 }} />
     <div className="explorer-labels" ref={labels} style={{ position: "absolute", inset: 0, pointerEvents: "none", visibility: status === "ready" ? "visible" : "hidden" }}>
+      {props.experience && ZODIAC_SIGNS.map((sign, index) => <span key={sign} className="sky-sign-label" data-sign-index={index} aria-hidden="true" style={{ visibility: "hidden" }}>{signLabel(sign)}</span>)}
+      <svg className="sky-marker-connector" aria-hidden="true"><line data-sky-connector style={{ visibility: "hidden" }} /></svg>
+      {props.sky?.placements.map(placement => <button key={placement.body} type="button" className="sky-body-label" data-sky-body={placement.body} data-selected={props.selectedSkyBody === placement.body}
+        aria-label={`${skyBodyLabels[placement.body]} in ${signLabel(placement.sign)}`} style={{ visibility: "hidden" }} onClick={() => props.onSelectSkyBody?.(placement.body)}><BodyIcon body={placement.body} />{skyBodyLabels[placement.body]}</button>)}
       {props.assets.map((asset, index) => {
         const chapter = props.chapters.find(item => item.id === asset.chapterId);
         if (!chapter) return null;

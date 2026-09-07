@@ -19,6 +19,7 @@ import {
 } from "../lib/api-client.js";
 import { withRequestId } from "../lib/api-status.js";
 import { patternMatchesDocument } from "../lib/pattern-portrait.js";
+import type { PortraitSky } from "../lib/portrait-sky.js";
 import { AccountPatternPortrait } from "./AccountPatternPortrait.js";
 import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { PatternConsentTerms } from "./PatternConsent.js";
@@ -26,6 +27,7 @@ import { PatternConsentTerms } from "./PatternConsent.js";
 interface PatternExperienceProps {
   chartId: string;
   onUnauthorized: () => void;
+  sky?: PortraitSky | null;
 }
 
 const PROGRESS: Record<"organizing_evidence" | "writing" | "checking_claims", string> = {
@@ -207,6 +209,7 @@ function PatternRegenerationPanel({
 
 function ReadyDocument({
   chartId,
+  sky,
   document,
   pattern,
   canCreatePortrait,
@@ -219,6 +222,7 @@ function ReadyDocument({
   error,
 }: {
   chartId: string;
+  sky?: PortraitSky | null;
   document: PatternResponseV7;
   pattern: PatternStatePattern;
   canCreatePortrait: boolean;
@@ -250,7 +254,7 @@ function ReadyDocument({
         Written for this chart. Chart facts above remain inspectable; individual
         paragraphs do not expose a claim-level evidence list.
       </p>
-      <AccountPatternPortrait chartId={chartId} document={document} pattern={pattern} canCreate={canCreatePortrait} onUnauthorized={onUnauthorized}>
+      <AccountPatternPortrait chartId={chartId} document={document} pattern={pattern} canCreate={canCreatePortrait} onUnauthorized={onUnauthorized} sky={sky}>
         <div className="pattern-chapters__list">
           {document.core_chapters.map((chapter, index) => (
             <GeneratedChapter chapter={chapter} index={index} key={`${chapter.title}-${index}`} />
@@ -351,7 +355,7 @@ function ReadyDocument({
   );
 }
 
-function CurrentChartPatternExperience({ chartId, onUnauthorized }: PatternExperienceProps) {
+function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: PatternExperienceProps) {
   const [portraitPreferenceSaving, setPortraitPreferenceSaving] = useState(false);
   const [state, setState] = useState<PatternStateDocumentV9 | null>(null);
   const [document, setDocument] = useState<PatternResponseV7 | null>(null);
@@ -555,6 +559,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized }: PatternExper
       <ReadyDocument
         key={`${document.pattern_id}:${document.generated_at}`}
         chartId={chartId}
+        sky={sky}
         document={document}
         pattern={state.pattern}
         canCreatePortrait={state.consent?.status === "granted" && !state.regeneration?.generation}

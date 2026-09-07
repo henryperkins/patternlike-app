@@ -1,0 +1,31 @@
+
+> @patternlike/web@0.2.0 build:portrait
+> tsc -p tsconfig.json --noEmit && vite build --config vite.portrait.config.ts
+
+vite v8.2.0 building client environment for production...
+[2Ktransforming...✓ 91 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-portrait/pattern-portrait.html                     1.36 kB │ gzip:   0.73 kB
+dist-portrait/assets/native-04-8Zayl9Ke.png           223.45 kB
+dist-portrait/assets/native-02-CkReeZ8R.png           279.75 kB
+dist-portrait/assets/native-01-R7StLI3v.png           324.32 kB
+dist-portrait/assets/native-03-BRPnLTeI.png           340.88 kB
+dist-portrait/assets/image-03-C8B1HNvU.png          1,537.45 kB
+dist-portrait/assets/image-01-BvWRuk_-.png          1,583.87 kB
+dist-portrait/assets/image-04-aJYUs4-_.png          1,869.06 kB
+dist-portrait/assets/image-02-BA87dorG.png          2,172.49 kB
+dist-portrait/assets/pattern-portrait-BNUNaDmX.css    132.06 kB │ gzip:  22.96 kB
+dist-portrait/assets/jsx-runtime-DfAaymxN.js            9.87 kB │ gzip:   3.86 kB
+dist-portrait/assets/portrait-graph-DnhsuBq4.js        15.45 kB │ gzip:   6.56 kB
+dist-portrait/assets/PortraitScene-BYj52ysn.js         86.28 kB │ gzip:  27.17 kB
+dist-portrait/assets/PatternSculpture-NILTJJvv.js     160.11 kB │ gzip:  51.52 kB
+dist-portrait/assets/pattern-portrait-BsIp699r.js     262.27 kB │ gzip:  79.15 kB
+dist-portrait/assets/OrbitControls-DH91eKPC.js        585.86 kB │ gzip: 146.18 kB
+
+✓ built in 379ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

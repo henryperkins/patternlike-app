@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { webcrypto, createHash } from "node:crypto";
 import { Blob as NodeBlob } from "node:buffer";
 import type { PatternPortraitResponse, PatternPortraitExplorerResponse, PatternResponseV7, PatternStatePattern, PortraitGraph } from "@patternlike/shared";
-import { ApiError, getPatternPortraitExplorer, getPatternPortraitImage, getPatternPortraitModel, downloadPatternPortraitExplorer } from "../lib/api-client.js";
+import { ApiError, getPatternPortraitExplorer, getPatternPortraitImage, getPatternPortraitModel, downloadPatternPortraitExplorer, getPatternState, getGeneratedPattern } from "../lib/api-client.js";
+import type { PortraitSky } from "../lib/portrait-sky.js";
 import { AccountPortraitExplorer } from "./AccountPortraitExplorer.js";
+import { PatternExperience } from "./PatternExperience.js";
 import { PortraitExplorer } from "./portrait-explorer/PortraitExplorer.js";
-vi.mock("../lib/api-client.js", async (original) => ({ ...await original<typeof import("../lib/api-client.js")>(), getPatternPortraitExplorer: vi.fn(), getPatternPortraitImage: vi.fn(), getPatternPortraitModel: vi.fn(), downloadPatternPortraitExplorer: vi.fn() }));
+vi.mock("../lib/api-client.js", async (original) => ({ ...await original<typeof import("../lib/api-client.js")>(), getPatternPortraitExplorer: vi.fn(), getPatternPortraitImage: vi.fn(), getPatternPortraitModel: vi.fn(), downloadPatternPortraitExplorer: vi.fn(), getPatternState: vi.fn(), getGeneratedPattern: vi.fn() }));
 vi.mock("./PortraitAutomationControl.js", () => ({ PortraitAutomationControl: ({ onChanged, canEnable }: { onChanged: () => void; canEnable?: boolean }) => <button data-testid="automation-control" data-can-enable={String(canEnable)} onClick={onChanged}>Optional automation choice</button> }));
 vi.mock("./portrait-explorer/PortraitExplorer.js", () => ({ PortraitExplorer: vi.fn(({ navigation }: { navigation: { close: () => void } }) => <section id="portrait-start" tabIndex={-1} aria-label="Pattern portrait explorer">Personal interactive explorer<button onClick={navigation.close}>Back to reading</button></section>) }));
 const document: PatternResponseV7 = {
@@ -53,7 +55,8 @@ function saved() {
   return { schema_version: "pattern-portrait-explorer/v1", status: "ready", portrait, completed_models: 4, retryable: false, models } satisfies PatternPortraitExplorerResponse;
 }
 const modelBlobs = new Map<string, Blob>();
-function show(overrides: Partial<typeof props> = {}) { return render(<AccountPortraitExplorer {...props} {...overrides}><p>Complete written reading</p></AccountPortraitExplorer>); }
+const sky: PortraitSky = { chartId: "chart-current", placements: [{ body: "sun", longitude: 42, sign: "taurus", degree: 12 }], unavailable: { moon: "missing", ascendant: "missing" } };
+function show(overrides: Partial<typeof props> & { sky?: PortraitSky | null } = {}) { return render(<AccountPortraitExplorer {...props} {...overrides}><p>Complete written reading</p></AccountPortraitExplorer>); }
 beforeEach(() => {
   vi.clearAllMocks(); modelBlobs.clear(); vi.stubGlobal("crypto", webcrypto); vi.stubGlobal("Blob", NodeBlob);
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -65,6 +68,33 @@ beforeEach(() => {
   vi.mocked(getPatternPortraitModel).mockImplementation(async (id) => modelBlobs.get(id)!);
 });
 describe("automated account portrait delivery", () => {
+  it("carries supported sky facts through the Pattern account flow without changing saved source bindings", async () => {
+    vi.mocked(getPatternState).mockResolvedValue({ schema_version: "0.9.0", state: "ready", chart: { chart_id: props.chartId, effective_accuracy: "exact", feature_policy_version: "1.0.0" }, consent: null, generation: null, pattern, regeneration: null });
+    vi.mocked(getGeneratedPattern).mockResolvedValue(document);
+    render(<PatternExperience chartId={props.chartId} onUnauthorized={unauthorized} sky={sky} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await screen.findByText("Personal interactive explorer");
+    const explorer = vi.mocked(PortraitExplorer).mock.lastCall![0];
+    expect(explorer.sky).toEqual(sky);
+    expect(explorer.source).toEqual({ status: "ready", document, sunSign: "taurus" });
+    expect(explorer.meshBundle.documentRevision).toBe(revision);
+    expect(explorer.meshBundle.assets.map(asset => asset.sourceText)).toEqual(ready().chapters.map(chapter => chapter.source_text));
+  });
+
+  it("removes mismatched chart facts without discarding the saved portrait or refetching its assets", async () => {
+    const view = show({ sky });
+    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await screen.findByText("Personal interactive explorer");
+    const original = vi.mocked(PortraitExplorer).mock.lastCall![0];
+    expect(original.sky).toEqual(sky);
+    view.rerender(<AccountPortraitExplorer {...props} sky={{ ...sky, chartId: "another-chart" }}><p>Complete written reading</p></AccountPortraitExplorer>);
+    const current = vi.mocked(PortraitExplorer).mock.lastCall![0];
+    expect(current.sky).toBeNull();
+    expect(current.source).toBe(original.source);
+    expect(current.meshBundle).toBe(original.meshBundle);
+    expect(getPatternPortraitModel).toHaveBeenCalledTimes(4);
+  });
+
   it("keeps the automation preference reachable for a current Pattern with a different chapter count", () => {
     show({ document: { ...document, core_chapters: document.core_chapters.slice(0, 3) } });
     expect(screen.getByTestId("automation-control")).toBeInTheDocument();

@@ -1,0 +1,12 @@
+{
+  "recorded_at": "2026-09-07T09:06:59.823373+00:00",
+  "user_instruction": "if it isnt directly related to the 3d animation pattern work dont run its tests",
+  "allowed": "3D Pattern portrait tests and built UI interaction verification only",
+  "disallowed": "Full ci:local and unrelated test suites",
+  "stopped_sessions": [
+    9228,
+    9002,
+    16802
+  ],
+  "earlier_evidence": "Failed and interrupted receipts remain nonpassing; no new full gate will be claimed"
+}

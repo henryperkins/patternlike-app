@@ -1,0 +1,12 @@
+### Result
+{"webglContextLossObserved":true,"readingRetained":true}
+### Ran Playwright code
+```js
+await (async page => { await page.getByRole("button",{name:"Your Pattern",exact:true}).click(); await page.getByRole("navigation",{name:"Pattern chapters"}).getByRole("button",{name:/^1\./}).click(); const canvas = page.getByRole("img"); await canvas.waitFor({state:"visible"}); const lost = await canvas.evaluate(el => { const gl = el.getContext("webgl2"); const extension = gl?.getExtension("WEBGL_lose_context"); if (!extension) return false; extension.loseContext(); return true; }); if (!lost) throw new Error("No real context to lose"); await page.getByText("The portrait is taking a pause.",{exact:true}).waitFor(); await page.getByRole("button",{name:"Read chapter",exact:true}).click(); if (!(await page.getByRole("complementary",{name:"Chapter reading"}).innerText()).includes("Finding your own direction")) throw new Error("Reading lost after graphics failure"); await page.screenshot({path:"output/playwright/merge-sequence/built-graphics-fallback.png",scale:"css"}); return {webglContextLossObserved:true,readingRetained:true}; })(page);
+```
+### Page
+- Page URL: http://127.0.0.1:4176/pattern-portrait.html
+- Page Title: Pattern portrait · Pattern/Like preview
+- Console: 0 errors, 4 warnings
+### Events
+- New console entries: .playwright-cli/console-2026-09-07T07-47-36-853Z.log#L5

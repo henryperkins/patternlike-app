@@ -1,0 +1,175 @@
+{
+  "date": "2026-09-07",
+  "target": "apps/web/src/components/portrait-explorer/PortraitExplorer.tsx",
+  "target_slug": "components-portrait-explorer-portraitexplorer-tsx",
+  "revision": "c35b6363f7f73e2337b1f5faeb84a062a8d562f7",
+  "url": "http://127.0.0.1:5174/pattern-portrait.html",
+  "environment": "Fictional local Vite preview; headless Chromium 1237 using SwiftShader. Browser plugin unavailable.",
+  "viewports": [
+    "1440x1000",
+    "390x844",
+    "320x760",
+    "844x390"
+  ],
+  "method": "Independent design assessment A and technical/detector assessment B, plus primary interaction testing. A completed before B findings were delivered.",
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Expanded mobile sky loses usable framing",
+      "evidence": [
+        "16-mobile-expanded-sky.png",
+        "17-landscape-expanded-sky.png",
+        "18-mobile-expanded-reset.png"
+      ],
+      "observations": "At 390x844, eight of twelve sign labels remained visible after expansion; Reset restored all twelve. At 844x390, expanded canvas height was 124.8125 CSS pixels and sign labels overlapped.",
+      "source": [
+        "PortraitScene.tsx:201",
+        "PortraitScene.tsx:391",
+        "explorer.css:241",
+        "explorer.css:246"
+      ],
+      "recommendation": "Adapt bookmarked framing to available aspect ratio and give the scene usable space in landscape by collapsing secondary controls."
+    },
+    {
+      "priority": "P2",
+      "title": "Placement text clipped at 320px",
+      "evidence": [
+        "design-a-moon-320.png"
+      ],
+      "observations": "Sun cell ended at x112; Cancer text ended at x116.81 and was obscured by selected neighboring cell.",
+      "source": [
+        "observatory.css:8",
+        "observatory.css:10"
+      ],
+      "recommendation": "Stack icon and name or reflow placement strip at narrow widths."
+    },
+    {
+      "priority": "P2",
+      "title": "Selected sky readout not associated visually with actual marker",
+      "evidence": [
+        "06-desktop-sky.png",
+        "design-a-moon-320.png"
+      ],
+      "observations": "Selected Sun/Moon/Rising name is centered while the plotted marker stays at its longitude; native icons differ from scene marker shapes.",
+      "source": [
+        "PortraitScene.tsx:462",
+        "zodiac-instrument.ts:127",
+        "SkyReader.tsx:8"
+      ],
+      "recommendation": "Connect readout to marker and use a matching visual key."
+    },
+    {
+      "priority": "P2",
+      "title": "Phone entry hides the explanation below scene controls",
+      "evidence": [
+        "10-mobile-entry.png"
+      ],
+      "observations": "Initial viewport shows mode rows, scene, camera and atmosphere controls, then chapter rail; introductory explanation and primary first-chapter action are below the fold. Read chapter starts disabled, with all four scene chapter labels hidden.",
+      "source": [
+        "PortraitExplorer.tsx:303",
+        "PortraitExplorer.tsx:320",
+        "PortraitScene.tsx:423"
+      ],
+      "recommendation": "Put a short invitation and first-chapter action before the mobile canvas; disclose secondary scene controls."
+    },
+    {
+      "priority": "P2",
+      "title": "Graphics failure leaves instructions for disabled controls",
+      "evidence": [
+        "design-a-graphics-fallback-320.png",
+        "tech-b-context-loss-mobile.png"
+      ],
+      "observations": "After forced WebGL context loss, operation hints still instruct turning the object/opening the desk; native reading and graphics retry still work.",
+      "source": [
+        "ObservatoryControls.tsx:30",
+        "PortraitExplorer.tsx:269"
+      ],
+      "recommendation": "Gate guidance by graphics availability and put a reading action beside retry."
+    }
+  ],
+  "verified": {
+    "page_identity": true,
+    "nonblank_rendered_webgl": true,
+    "no_framework_overlay": true,
+    "main_browser_console": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "chapter_selection_and_close_view": true,
+    "rotate_zoom_reset": true,
+    "horizontal_touch_rotation": {
+      "changed_visible_camera": true,
+      "scrollY": 0,
+      "chapter_selection_retained": true
+    },
+    "vertical_touch_scroll": {
+      "before": 0,
+      "after": 174
+    },
+    "desk_and_object_turn": true,
+    "unfold_and_reassemble": true,
+    "day_dusk_roof_controls": true,
+    "facet_keyboard_navigation": true,
+    "comparison_and_restore_after_sky": true,
+    "guide": {
+      "stops": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "finish_focus": "Guide me through"
+    },
+    "full_reading": {
+      "four_chapters_and_all_facets": true,
+      "canvas_count": 0
+    },
+    "original_image_dialog": true,
+    "expanded_dialog": {
+      "focus_wrap": true,
+      "escape_closes": true,
+      "focus_returns_to_expand": true
+    },
+    "reading_passage_scene_return": {
+      "passage_label": "Overview 2",
+      "saved_reading_scroll_restored": true
+    },
+    "preferences": {
+      "reduce_motion_selected": true,
+      "low_power_selected": true
+    },
+    "unknown_birth_time": {
+      "moon_and_rising_unavailable": true,
+      "house_omitted": true
+    },
+    "context_loss_retry": "Independent B receipts verified: canvas 0 on loss, reader and selection retained, retry canvas 1 with live context and controls enabled",
+    "idle_draw_observation": "Independent B: 0 WebGL draw calls across 1.2 seconds at rest"
+  },
+  "heuristics": {
+    "system_status": 3,
+    "real_world_match": 2,
+    "user_control": 2,
+    "consistency": 3,
+    "error_prevention": 3,
+    "recognition": 2,
+    "efficiency": 3,
+    "minimalism": 2,
+    "error_recovery": 2,
+    "help": 2,
+    "total": 24,
+    "maximum": 40
+  },
+  "detector": "105 advisories, 0 non-advisories. Many overridden CSS/document mismatches; do not interpret as 105 confirmed UX defects. Browser overlays succeeded on three states; no live visible user overlay.",
+  "minor_notes": [
+    "Some preview/helper copy is 9-10px",
+    "Sky reading subsection skips h3 in standalone mode"
+  ],
+  "limits": [
+    "No production or signed-in account verification",
+    "No physical GPU/mobile-device or Safari/Firefox testing",
+    "No screen-reader conformance audit",
+    "No full ci:local/build gate was run for this read-only UX review"
+  ],
+  "cleanup": "All audit browser sessions and audit-only servers stopped; artifacts intentionally retained outside repository; tracked source and original untracked entries unchanged.",
+  "persistence": "Current-run notes and screenshots only; no repository critique archive or historical trend read."
+}

@@ -1,8 +1,17 @@
-import { Box3, Mesh, Texture, Vector3, type Object3D, type Material } from "three";
+import { Box3, Mesh, Texture, Vector3, type Object3D, type Material, type Raycaster } from "three";
 import type { CameraBookmark, Point3, PortraitMeshAsset } from "./types.js";
 
 export const MAX_GLB_BYTES = 12 * 1024 * 1024;
 export const HOME_DIRECTION = new Vector3(0.15, 0.76, 1).normalize();
+
+/** Raycaster does not itself exclude invisible ancestors, including a cutaway roof. */
+export function firstVisibleIntersection(raycaster: Raycaster, roots: readonly Object3D[]) {
+  const targets: Mesh[] = [];
+  for (const root of roots) root.traverseVisible(object => {
+    if (object instanceof Mesh && (Array.isArray(object.material) ? object.material.some(material => material.visible) : object.material.visible)) targets.push(object);
+  });
+  return raycaster.intersectObjects(targets, false)[0];
+}
 
 /** Inspect the container before GLTFLoader can follow a buffer or image URL. */
 export function validateGlb(bytes: ArrayBuffer, chapterId?: string, source?: PortraitMeshAsset): void {
@@ -97,6 +106,47 @@ export function cameraFrame(boxes: readonly Box3[], selected: readonly number[],
     }
   }
   return { position: target.clone().addScaledVector(HOME_DIRECTION, distance).toArray(), target: target.toArray() };
+}
+
+/** Preserve the orbit and user zoom relative to the viewport's fitted frame. */
+export function adaptCameraBookmark(bookmark: CameraBookmark, frameDistance: number): CameraBookmark {
+  const previous = bookmark.frameDistance;
+  const scale = previous && Number.isFinite(previous) && previous > 0 ? frameDistance / previous : 1;
+  const target = new Vector3(...bookmark.target);
+  return {
+    position: new Vector3(...bookmark.position).sub(target).multiplyScalar(scale).add(target).toArray(),
+    target: [...bookmark.target],
+    frameDistance,
+  };
+}
+
+export interface LabelRect { x: number; y: number; width: number; height: number; }
+
+/** Choose the nearest free rectangle from the usable viewport and obstacle edges. */
+export function placeLabel(preferred: LabelRect, viewport: LabelRect, obstacles: readonly LabelRect[]): LabelRect | null {
+  const maxX = viewport.x + viewport.width - preferred.width;
+  const maxY = viewport.y + viewport.height - preferred.height;
+  if (maxX < viewport.x || maxY < viewport.y) return null;
+  // A pixel of clearance covers fractional text widths without excluding the narrow dial’s center.
+  const gap = 1;
+  const xs = [preferred.x, viewport.x, maxX];
+  const ys = [preferred.y, viewport.y, maxY];
+  for (const box of obstacles) {
+    xs.push(box.x - preferred.width - gap, box.x + box.width + gap);
+    ys.push(box.y - preferred.height - gap, box.y + box.height + gap);
+  }
+  const columns = new Set(xs.map(x => Math.max(Math.ceil(viewport.x), Math.min(Math.floor(maxX), Math.round(x)))));
+  const rows = new Set(ys.map(y => Math.max(Math.ceil(viewport.y), Math.min(Math.floor(maxY), Math.round(y)))));
+  let best: LabelRect | null = null;
+  let distance = Infinity;
+  for (const x of columns) for (const y of rows) {
+    const score = (x - preferred.x) ** 2 + (y - preferred.y) ** 2;
+    if (score >= distance || obstacles.some(box => x < box.x + box.width + gap && x + preferred.width + gap > box.x
+      && y < box.y + box.height + gap && y + preferred.height + gap > box.y)) continue;
+    best = { ...preferred, x, y };
+    distance = score;
+  }
+  return best;
 }
 
 /** Four-chapter composition in published order; model Y is seated separately. */

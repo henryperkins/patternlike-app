@@ -1,0 +1,5 @@
+[    5518ms] [WARNING] [.WebGL-0x1a1c001a8800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:4176/pattern-portrait.html:0
+[    6659ms] [WARNING] [.WebGL-0x1a1c001a8800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:4176/pattern-portrait.html:0
+[   51033ms] [WARNING] [.WebGL-0x1a1c001a8800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:4176/pattern-portrait.html:0
+[   51995ms] [WARNING] [.WebGL-0x1a1c001a8800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://127.0.0.1:4176/pattern-portrait.html:0
+[  825720ms] [LOG] THREE.WebGLRenderer: Context Lost. @ http://127.0.0.1:4176/assets/OrbitControls-DH91eKPC.js:0
