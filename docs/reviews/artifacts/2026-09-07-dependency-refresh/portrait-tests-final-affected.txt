@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /home/henry/patternlike-app/.worktrees/dependency-refresh-20260907/apps/web
+
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  09:54:03
+   Duration  24.52s (transform 586ms, setup 353ms, import 729ms, tests 22.66s, environment 2.06s)
+
