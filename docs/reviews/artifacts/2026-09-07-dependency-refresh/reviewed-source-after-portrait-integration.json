@@ -1,0 +1,13 @@
+{
+  "method": "Read-only SHA-256 comparison against independent reviewed files; no dependency tests executed",
+  "head": "3f216879e142146e9bf933348b119068c8b402ea",
+  "reviewed_file_count": 5,
+  "unchanged_reviewed_files": true,
+  "files": {
+    "package.json": "e753b591f6c9ae6ba87965ea92c79556ba4379aba956ce0a96077b5714944035",
+    "package-lock.json": "f33a1ab50a6bf28b56700e8f4f603d38b1c098e41c334312b3a7ba51f12cc80b",
+    "apps/api/package.json": "8206939964b789dc7029dbaa665f664d6a10176a07762d3d9bde1c23bdcf0478",
+    "apps/web/package.json": "cb66927d5bc82ef04b2dcecb23f7cc7264c9e0b82aef01932528682e4a869b0b",
+    "apps/ontology-signer/package.json": "ec2a6dfa22fad9cceef2f559272e1d1e72f2bc26203daa422a06d4ff4de55ab9"
+  }
+}

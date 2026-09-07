@@ -1,0 +1,6 @@
+npm error code ESTRICTALLOWSCRIPTS
+npm error --strict-allow-scripts: 2 package(s) have install scripts not covered by allowScripts:
+npm error   workerd@1.20260815.1 (postinstall: node install.js)
+npm error   workerd@1.20260903.1 (postinstall: node install.js)
+npm error Approve them with `npm install-scripts approve`, deny them with `npm install-scripts deny`, or bypass this check with `--dangerously-allow-all-scripts`.
+npm error A complete log of this run can be found in: /home/henry/.npm/_logs/2026-09-07T08_23_31_679Z-debug-0.log
