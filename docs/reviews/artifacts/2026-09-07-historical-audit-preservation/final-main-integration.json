@@ -1,0 +1,17 @@
+{
+  "status": "observed",
+  "method": "Read-only exact file comparison after ordered predecessor integration",
+  "reviewed_commit": "1df4e24c7ab137e053d21b465528b7354a38f9db",
+  "integrated_commit": "40c5a2e2e8d0493a4ceff8388995483fdd885472",
+  "main_base": "78e0100dc43ef898d953a2003af1fb39a8af3a44",
+  "reviewed_files_unchanged": true,
+  "files": {
+    "docs/reviews/2026-08-10-astrology-feature-reference-audit.md": "255e3917798dcd9aefd4d9f03cef7de3db41ae9322fd645fb048d2fbef5f3c23",
+    "docs/reviews/2026-08-11-mobile-first-design.md": "59e88f1239e49b06fbf2c434bc401d1bf7c6b65c67c6573d4d5a048792bc291a",
+    "docs/reviews/2026-08-28-competitive-systems-original-research.md": "7ca3d0988d5bf1a53d5b8287f8c9a5cfc234b9164310eb65c290c47eb535cf81",
+    "docs/reviews/2026-09-07-historical-audit-preservation.md": "7193cf1a6e73045bfdcd6f2218e32d7de0c38fcbc730847f9d5419d31d1abbe0",
+    "docs/reviews/2026-08-28-competitive-systems-audit.md": "d3898ad185034609d9a848894c2c8adfa871bcbfe6321925485344d425bbaf4d"
+  },
+  "tests_run": false,
+  "full_ci_gate_passed": false
+}

@@ -1,0 +1,15 @@
+{
+  "pr": 48,
+  "url": "https://github.com/henryperkins/patternlike-app/pull/48",
+  "candidate": "706db60165b037f3793099f01370db49e5faf748",
+  "expected_base": "0b87e6007043ac0bcd15a8f644e41fbef0d543d7",
+  "premerge_body_verified": true,
+  "premerge_at": "2026-09-07T10:23:24.321252+00:00",
+  "authorization": "Existing user approval for the ordered six-batch sequence; latest portrait-only test override honored",
+  "merged_at": "2026-09-07T10:23:26Z",
+  "main": "78e0100dc43ef898d953a2003af1fb39a8af3a44",
+  "candidate_tree": "7c16a3b15824aeeed2cc4b6025a0b1b19dafce86",
+  "main_tree": "7c16a3b15824aeeed2cc4b6025a0b1b19dafce86",
+  "tree_identical": true,
+  "remote_main_verified": true
+}
