@@ -142,9 +142,9 @@ max_concurrency = 1
 max_retries = 3
 dead_letter_queue = "patternlike-ontology-pipeline-dev-dlq"
 
-# Keep incumbent and ontology D1 maintenance in separate invocations in the
-# local/default environment. Production separately declares only the approved
-# ontology-maintenance schedule; its reading scheduler remains absent.
+# Keep incumbent and ontology D1 maintenance in separate invocations in both
+# environments. Production redeclares both schedules because named environments
+# must own the trigger set they release.
 [triggers]
 crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
 
@@ -640,7 +640,7 @@ dead_letter_queue = "patternlike-ontology-pipeline-dlq"
 
 # Workers Logs / Traces. Declared here so a deploy cannot silently reset what
 # the dashboard currently has: observability is part of the uploaded metadata,
-# so whatever this file says (or omits) wins on every `npm run deploy:api`.
+# so whatever this file says (or omits) wins on every Worker upload.
 #
 # The shape mirrors the live production settings verbatim, so applying it is a
 # no-op today. It reads oddly on purpose: the parent `enabled = false` does not

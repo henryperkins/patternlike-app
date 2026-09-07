@@ -5,7 +5,7 @@
 # Deploy from the repository ROOT (the Docker build context must be the root):
 #   fly deploy
 #
-# The web PWA deploys separately via fly.web.toml (app "patternlike-app").
+# The web PWA ships with the API Worker. fly.web.toml is a retired deployment.
 #
 # `app` and `primary_region` below are load-bearing and have been clobbered
 # before: "New files from Fly.io Launch" (5e6acec) rewrote them to

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Run from the repository root. Node 20+ (CI uses 22), Python 3.11+ with `pip install jsonschema referencing pyyaml openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt`.
+Run from the repository root. Use the Node 22 pinned by `.nvmrc` (the package engine floor is `>=22`) and Python 3.11+ with `pip install jsonschema referencing pyyaml openapi-spec-validator -r spec-bundle/render_v0_5.requirements.txt`.
 
 ```bash
 npm install
@@ -17,7 +17,7 @@ npm run build              # shared/calc/signer tsc-or-dry-run, Vite build, API 
 npm run ci:local           # the merge gate — GitHub Actions does not run; see below
 
 npm run calc:dev           # calc service      :8080
-npm run db:local -w @patternlike/api   # apply db/d1/0001_m0_core.sql to local D1
+npm run db:local -w @patternlike/api   # apply the ordered db/d1 migrations to local D1
 npm run dev:api            # Wrangler Worker   :8787
 npm run web:dev            # Vite PWA          :5173 (proxies /v1 → :8787)
 ```
@@ -55,11 +55,11 @@ the push, not merely before an operator deploy step.
 
 ## Architecture
 
-Seven workspaces (`apps/*`, `packages/*`), one product request path plus an isolated signing sidecar:
+Eight workspaces (`apps/*`, `packages/*`), one product request path plus an isolated signing sidecar and installed runner:
 
-`apps/web` (React 19 + Vite PWA) → `apps/api` (Hono on Cloudflare Workers, D1) → `apps/calc-stub` (Node + Swiss Ephemeris, AGPL, deployed to Fly). The calc binding is plain HTTP (`CALC_SERVICE_URL` + optional `CALC_SERVICE_AUTH_TOKEN`) so the runtime can move without touching contracts. `apps/ontology-signer` is not on that path: the API reaches its single `signOntology` RPC through the `ONTOLOGY_SIGNER` service binding. `packages/shared` holds wire types, id minting, canonical JSON, and the launch body/aspect lists used by both sides.
+`apps/web` (React 19 + Vite PWA) → `apps/api` (Hono on Cloudflare Workers, D1) → `apps/calc-stub` (Node + Swiss Ephemeris, AGPL, deployed to Fly). The calc binding is plain HTTP (`CALC_SERVICE_URL` + optional `CALC_SERVICE_AUTH_TOKEN`) so the runtime can move without touching contracts. `apps/ontology-signer` is not on that path: the API reaches its `signOntology` RPC through the `ONTOLOGY_SIGNER` service binding. `apps/codex-runner` polls the separately authenticated provider control plane. `packages/shared` holds wire types and shared primitives; `packages/reading-engine` and `packages/pattern-engine` hold deterministic Daily and Pattern rules.
 
-`contracts/m0/` is the frozen baseline (JSON Schema + OpenAPI + valid/invalid fixtures); additive milestone contracts run through `contracts/m7/`. `db/d1/0001_m0_core.sql` is the core operational schema. Product-spec v0.2 remains the baseline and v0.5 restates the daily-reading contract; Your Pattern is defined by `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` as amended by `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` and `docs/superpowers/specs/2026-08-29-pattern-source-regeneration-design.md`.
+`contracts/m0/` is the frozen baseline (JSON Schema + OpenAPI + valid/invalid fixtures); additive contract packages under `contracts/` extend it without changing frozen wire identities. `db/d1/0001_m0_core.sql` is the core schema and later files in the ordered migration directory extend it. Product-spec v0.2 remains the baseline and v0.5 restates the daily-reading contract; Your Pattern is defined by `docs/superpowers/specs/2026-08-14-ai-generated-pattern-design.md` as amended by `docs/superpowers/specs/2026-08-16-m7-spec-artifact-amendments.md` and `docs/superpowers/specs/2026-08-29-pattern-source-regeneration-design.md`.
 
 ### Worker routing
 
@@ -105,6 +105,18 @@ USR-09 Life-event timeline is a **separate consent** from USR-06, granted only `
 ### Daily claim support (validation policy 1.1.1)
 
 Daily prompt `1.0.3`, selection policy `1.1.0`, and validation policy `1.1.1` preserve role-bearing calculation records internally. `packages/reading-engine/src/claim-support.ts` matches each factual sentence against a bounded English grammar and one cited record: participant/frame, placement, measured natal orb versus configured cycle orb limit, UTC event role, and collective scope. Reflection uses separate sentences; there is no general psychological entailment claim. Whole uncertainty disclosures also use bounded, evidence-matching forms. Old stored readings remain historical records; queued commands with old pins fail `policy_unsupported` rather than executing new semantics under an old identity. Public/provider JSON shapes are unchanged. The synthetic evaluation corpus `1.1.0` retains prior candidate strings and labels changed acceptance; it is not a fresh provider sample.
+
+Constrained-model Daily publication also writes one success-only,
+content-free `daily_publication_receipts` row in the same guarded D1 batch as
+the encrypted reading and succeeded job. It binds the exact job/stage and
+executed model, prompt, effort, request/response hashes, token counts, provider
+completion time, declared release SHA, and Cloudflare version id without a user
+id, prose, chart fact, local date, consent, or provider request handle.
+Deterministic V1 supplies `null` and requires zero receipts. Migration support,
+application of that migration, deployed release metadata, installed runner,
+provider execution, and an active reader lifecycle are separate evidence
+layers; [`docs/deploy/release-attestation.md`](docs/deploy/release-attestation.md)
+defines the release boundary.
 
 ### AI Pattern generation (M7)
 
@@ -221,8 +233,8 @@ For M7 ontology corpora, `license_class` is a publication-rights flag, not an au
 
 ## Deployment
 
-- **API + PWA are one Worker.** `[env.production.assets]` in `apps/api/wrangler.toml` ships `apps/web/dist` alongside the API, so both live on one origin (`patternlike-api-production.lfd.workers.dev`). Deploy with `npm run deploy:api` from the root — it builds the web app first, which the upload requires. **Live** since 2026-08-08; the applied-migration ledger is `db/d1/MIGRATIONS.json` and the rollout runbooks are under `docs/deploy/`.
-- `run_worker_first` lists every path family the Hono app serves (`["/health", "/v1/*", "/internal/*", "/admin/*", "/codex-provider/*"]`). A path missing from it is **not** a 404 — static assets answer first and `not_found_handling: single-page-application` returns `index.html` with a 200, silently serving HTML to an API client. Keep it in sync with `src/index.ts`.
+- **API + PWA are one Worker.** `[env.production.assets]` in `apps/api/wrangler.toml` ships `apps/web/dist` alongside the API, so both share one origin. Workers Builds is the automatic production release path on `main`; its API trigger builds the web assets and must inject `RELEASE_GIT_SHA` from `WORKERS_CI_COMMIT_SHA`. The bare root `npm run deploy:api` and workspace deploy command omit that attestation and are insufficient outside development. Authorized manual releases use the clean, gated, explicit-SHA procedure in [`docs/deploy/release-attestation.md`](docs/deploy/release-attestation.md).
+- `run_worker_first` lists every path family the Hono app serves (`["/health", "/v1/*", "/internal/*", "/admin/*", "/codex-provider/*", "/crypto-operator/*"]`). A path missing from it is **not** a 404 — static assets answer first and `not_found_handling: single-page-application` returns `index.html` with a 200, silently serving HTML to an API client. Keep it in sync with `src/index.ts`.
 - `assets` is scoped to `[env.production]` deliberately: the vitest pool loads `wrangler.toml`, and a top-level `assets.directory` pointing at an unbuilt `apps/web/dist` breaks the API suite.
 - Same-origin is a requirement, not a preference: sessions ride an httpOnly cookie with `SameSite=Strict` and `Path=/v1`, and cross-origin makes it a third-party cookie that Safari's ITP blocks.
 - Calc service: Fly.io, `fly deploy` from the repository root → `patternlike-calc` (iad, always-on, 2 machines). The Dockerfile copies root-level `package.json`, `package-lock.json`, and `packages/shared`, so never `cd` into the app dir or pass `--build-context`.
@@ -234,7 +246,7 @@ For M7 ontology corpora, `license_class` is a publication-rights flag, not an au
 - `db/d1/0002_m3_daily_reading_pipeline.sql` **is applied** to the remote database (ledger entry 2026-08-09 10:38 UTC). Verified after the fact: the three new tables exist, every new column on `users`/`jobs`/`daily_readings`/`reading_sources`/`cycle_instances` is present, `assertion_probe` is empty, `PRAGMA foreign_key_check` returns zero rows, and `PRAGMA quick_check` is `ok`. Migrations from here go through `wrangler d1 migrations apply patternlike-ops --env production --remote` and the ordered runbook in `docs/superpowers/plans/2026-08-09-m3-daily-reading-pipeline.md` §5 — bookmark and export first.
 - Before the Reading History release the remote ledger was at **0027** (`d1_migrations` holds 27 rows; verified read-only 2026-09-06). `0025_codex_xhigh_reasoning.sql` applied 2026-09-05 07:27:35 UTC after its export, bookmark, and local rehearsal. `0026_pattern_portraits.sql` (14 commands) and `0027_portrait_mesh_automation.sql` (18 commands) applied together 2026-09-06 06:41:31–32 UTC, three minutes before the push of `ce52443` that Workers Builds deployed as version `c9f0ec8e-d55a-42fd-8e38-a850e87dbe5e` with `PATTERN_PORTRAIT_ENABLED` and `PATTERN_PORTRAIT_MESH_ENABLED` both `"1"`. All seven portrait tables, their 13 triggers, and their 10 indexes exist; `d1 migrations list` reports nothing pending, `foreign_key_check` is empty, `quick_check` is `ok`, and `assertion_probe` is empty. `db/d1/MIGRATIONS.json` is the ledger of record and carries the bookmarks, export hashes, and post-apply checks for every apply from `0002` onward; `docs/deploy/openai-pattern-rollout.md` Gate 2 holds the 0009–0015 recovery coordinates. A missing pipeline evidence receipt still fails machine ingestion closed.
 - **Reading History release (2026-09-06):** Migration `0028_reading_saves.sql` applied at 09:08:54 UTC before the compatible Worker push. The remote ledger has 28 records and nothing pending; the new Save table is empty, existing reading/evidence counts are preserved, foreign-key checks are empty, and quick-check is `ok`. `db/d1/MIGRATIONS.json` records the private backup, bookmarks, rehearsal, and apply receipt. Once saves exist, a rollback must preserve Save-aware account deletion.
-- **A Worker rollback does not land on a neutral earlier state.** The pre-Codex deployment is built from `origin/main`, whose `[env.production]` declares `crons = ["7,22,37,52 * * * *"]` only — no `*/15` lane — plus `READING_V5_ROLLOUT = "first_open"` and `READING_PUBLISHER = "openai"`. Rolling back therefore removes the Daily scheduler, privacy maintenance, and the Pattern sweep, and points Daily at a transport that no longer exists. Any `pipeline = 'reading'` rows left in D1 get no nudge repair and no artifact purge. Wrangler also warns that a rollback does not revert bound resources: an applied migration stays applied. Treat rollback as a distinct configuration, not as undo.
+- **Current source declares two scheduled lanes.** `*/15 * * * *` runs Codex provider maintenance, Daily scheduling/repair, privacy maintenance, Pattern recovery/retention, portrait maintenance, and portrait-mesh maintenance. `7,22,37,52 * * * *` runs Codex provider maintenance plus ontology lease, dispatch, outbox, and artifact recovery. Codex maintenance covers `pattern`, `ontology`, and `reading` through bounded stale cancellation, owner nudges, retention, and content-free observations. Pattern dispatch/recovery obeys `PATTERN_GENERATION_ENABLED`; even while paused, retention and erasure continue. The service-authenticated one-job Pattern reconcile route remains a nudge only, while the sweep also recovers pause classes and undispatched jobs, re-nudges leases, fails jobs after 16 stage claims, and performs retention cleanup. A rollback can change those bindings and schedules but cannot undo an applied migration, so inspect the target version as its own configuration.
 - **`OPENAI_API_KEY` is unused by pin, not by deletion.** No reader path reads it, but both ontology publisher branches select on `resolved.config.publisher === "codex"`; flipping that pin makes the key load-bearing again. `apps/api/scripts/verify-openai-pattern-model.ts` reads `process.env.OPENAI_API_KEY` on an operator machine, never the Worker secret. Retire the secret only as its own change, after proving with `rg`, the config tests, and the deployed inventory that nothing reads it.
 - **Geoapify search is optional, never a whole-product credential dependency.** `GEOCODER_ROLLOUT = "enabled"` plus a non-empty `GEOAPIFY_API_KEY` enables search, resolution, and new grants. Missing credentials or rollout `off` return `503 geocoder_unavailable` only there; consent reads/withdrawal and unrelated routes remain available. Google credentials are not a fallback. Apply `0024_geoapify_place_resolutions.sql` before the compatible Worker. Consent uses the `contracts/geocoder-v2` 0.8.1 overlay; M0-M9 remain frozen. See `docs/deploy/geocoder-rollout.md` for live gates and rollback.
 - Production has **no content release** (`content_releases` is empty) and `CONTENT_RELEASE_KEYS` is unset. The legacy M3 daily-reading path therefore answers `release_not_active`. This no longer affects Pattern, which reads an ontology rather than a content release, and M5 constrained-model daily readings do not depend on one either.
