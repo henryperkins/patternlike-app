@@ -46,6 +46,20 @@ R2 bytes, recompute saved hashes, regenerate images, or attest historical provid
 behavior. Legacy API responses and downloaded files may omit the object entirely;
 that absence also means unrecorded evidence.
 
+## Operational enablement
+
+This note is the image-model evidence boundary. The product path and flags
+are summarized in the root `README.md` Pattern portraits section.
+
+| Piece | Source truth |
+| --- | --- |
+| API flags | Production only: `PATTERN_PORTRAIT_ENABLED=1`, `PATTERN_PORTRAIT_MESH_ENABLED=1`. Default `[vars]` omits both. Only exact `"1"` plus `ARTIFACTS` enables creation. |
+| Migrations | `0026_pattern_portraits.sql` and `0027_portrait_mesh_automation.sql`, recorded applied 2026-09-06 in `db/d1/MIGRATIONS.json`. |
+| Consent | Creation reuses live `account_processing` and `pattern_generation` grants (`consent_policy_version` `1.0.0` is a typed confirm). Automation is a separate per-chart grant at policy `1.1.0`. |
+| Runner | `CODEX_RUNNER_PORTRAITS=1` then `CODEX_RUNNER_MESHES=1`. Poll order is text → image → mesh. See [`apps/codex-runner/README.md`](../../apps/codex-runner/README.md). |
+| Pause | Unsetting the API flags stops creation and claims; scheduled cleanup still runs if the tables exist. `PATTERN_GENERATION_ENABLED` does not pause portraits. |
+| Local trap | `npm run dev:portrait -w @patternlike/web` is a fictional preview on port 5174, not the authenticated `#pattern` product. |
+
 This is an additive extension to the preview portrait protocols. M0-M9 contracts,
 schema identities, account exports, image/model pins and prompts are unchanged.
 No database migration or historical backfill is needed. A release must deploy the

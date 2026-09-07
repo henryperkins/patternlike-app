@@ -75,6 +75,15 @@ recorded, and Gate 6 spend certification remains open. Neither this status nor
 any later runbook edit authorizes a deployment, provider call, ontology
 activation, or rollout advance.
 
+**Ledger pointer (2026-09-07):** treat `db/d1/MIGRATIONS.json` as the apply
+record, not the 2026-08-25 inventory above. It records 0025–0028 applied and
+0029 not applied by the source change that added the receipts table. Portrait
+image/mesh work is a separate runner poll after the text queue
+(`CODEX_RUNNER_PORTRAITS`, `CODEX_RUNNER_MESHES`; only `"0"` or `"1"`). See
+[`apps/codex-runner/README.md`](../../apps/codex-runner/README.md) for enablement
+order. Committed API flags and an applied migration are not proof that the host
+is polling those queues.
+
 This runbook operates the supported Codex CLI provider for **daily readings**,
 Pattern generation, and the ontology pipeline. The API Worker owns durable jobs,
 budgets, validation, signing, publication, and encrypted artifacts. An approved
@@ -280,7 +289,9 @@ On the approved host:
    - `CODEX_RUNNER_TOKEN` — the password-manager value provisioned above;
    - `CODEX_BIN` — the absolute Codex executable path;
    - `CODEX_RUNNER_POLL_MS=5000`;
-   - `CODEX_RUNNER_CONCURRENCY=1`.
+   - `CODEX_RUNNER_CONCURRENCY=1`;
+   - optional `CODEX_RUNNER_PORTRAITS=0|1` and `CODEX_RUNNER_MESHES=0|1`
+     (omit or `0` keeps the text-only poller; `"true"`/`"yes"` fail closed).
 
 Never place the Worker artifact keyring in this file.
 

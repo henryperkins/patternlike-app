@@ -1,8 +1,14 @@
 # Geoapify birthplace search rollout
 
-Updated: 2026-09-04. Local implementation is not production proof. Record the
+Updated: 2026-09-07. Local implementation is not production proof. Record the
 exact release SHA, Worker version/allocation, credential canary, and migration
 receipt when the live switch is performed.
+
+Committed configuration (not live proof): production
+`GEOCODER_ROLLOUT = "enabled"`; default `[vars]` stays `"off"`. Search still
+needs a non-empty `GEOAPIFY_API_KEY`. `db/d1/MIGRATIONS.json` has no dedicated
+0024 APPLIED receipt — the 0023 note says production was already at 0022.
+Confirm the remote ledger before treating 0024 as pending or re-applying it.
 
 ## Incident and successor
 
