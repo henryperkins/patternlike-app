@@ -8,6 +8,13 @@
 - Important findings: four found and resolved in the reviewed working tree.
 - Merge readiness remains conditional on the root owner's fresh rendered desktop/phone/fallback checks and source-frozen `npm run ci:local`. Historical browser and aggregate evidence in the implementation plans is context only, not final merge evidence.
 
+## Post-review test consistency correction
+
+- Scoped comparison: `f242a3fb8369e7ebb5e56dcb53095108b046c1ac..1e5cc24ab81a2ef99560546a7279097862ed2692`, limited to `apps/web/src/components/ChartView.test.tsx`.
+- The follow-up changes one test fixture property: it removes the stale `accuracy: "exact"` expectation from the minimized `sky` object. This aligns the ChartView integration expectation with the accepted projection boundary and the I4 runtime/type correction. There is no runtime-source change and no new behavior or scope.
+- Root-reported focused verification at `1e5cc24ab81a2ef99560546a7279097862ed2692` passed 37/37 tests across `ChartView`, `AccountPortraitExplorer`, and `portrait-sky`. The root-owned replacement full gate is still running in an isolated checkout; its result is not claimed here.
+- Final review verdict remains **PASS after four Important corrections**, conditional on the fresh root-owned browser evidence and successful source-frozen full gate at the final candidate.
+
 ## Important findings and resolutions
 
 ### I1. The minimized sky projection copied retrograde state outside the accepted allowlist
@@ -49,6 +56,7 @@
 
 - Focused review run after I1-I3: 8 files, 117 tests passed. Files covered account propagation, ChartView projection, explorer state/navigation, real scene runtime/lifecycle, scene utilities, observatory geometry, zodiac geometry, and sky projection.
 - After I4 narrowed the output type: `apps/web/src/lib/portrait-sky.test.ts` passed 17/17.
+- Follow-up test-only consistency correction: the root reported 37/37 focused tests passing for `ChartView`, `AccountPortraitExplorer`, and `portrait-sky` at `1e5cc24ab81a2ef99560546a7279097862ed2692`. The prior full-gate attempt at `f242a3fb8369e7ebb5e56dcb53095108b046c1ac` is excluded as final evidence because its web lane found the stale ChartView expectation; the replacement isolated gate remains root-owned and pending.
 - `git diff --check` passed on the corrected working tree.
 - `apps/web/src/components/portrait-explorer/.impeccable/design.json` parsed successfully with both `jq` and `JSON.parse`.
 
