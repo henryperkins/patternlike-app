@@ -1,0 +1,481 @@
+{
+  "schema_version": "remote-documentation-preservation.v1",
+  "preserved_on": "2026-09-08",
+  "reviewed_main": "c991c8a832454aab4418e812d9db4644ab34dea2",
+  "source_branches_retained": true,
+  "sources": [
+    {
+      "branch": "cursor/3d-model-ui-workflows-b7ef",
+      "commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "reviewed_source_base": "6e706741f03253f2807d33380afb529161f3481f"
+    },
+    {
+      "branch": "cursor/3d-model-ui-workflows-review-d137",
+      "commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "reviewed_source_base": "76b4671cb3392dec1424aab18929927613d72011"
+    },
+    {
+      "branch": "cursor/3d-ui-workflow-review-39e1",
+      "commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "reviewed_source_base": "76b4671cb3392dec1424aab18929927613d72011"
+    },
+    {
+      "branch": "cursor/engineering-documentation-updates-6f3e",
+      "commit": "330ee55bf9a6ca9a8e9977953d1170f1c912e73d",
+      "pull_request": 50,
+      "preservation": "Original branch retained; useful documentation selectively updated against reviewed_main. Dispositions are in the integration review."
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/reviews/2026-09-07-portrait-3d-interaction-workflows.md",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "bcc55dc8167006a0dde72dba0dd6e93b638c3d99",
+      "original_sha256": "b906d36e8af26820f66f62a6080f5c851c02c3bb957d5c320ec05a2f7b57a780",
+      "original_bytes": 15723,
+      "preservation": "unchanged body after preservation notice",
+      "preserved_sha256": "2a8f322d2b52290bf418cec736fe33873377b86054f4884685d86e8c3aa75632"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/browser-measurements.json",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "ccdabc9f4819414f3024fc6e7c6272acc8091b9d",
+      "original_sha256": "7d6ae6aa7d260e15915bb4cc8e5bc74d450ed7a81d64d848bb30818cfd4af1e4",
+      "original_bytes": 1808,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "7d6ae6aa7d260e15915bb4cc8e5bc74d450ed7a81d64d848bb30818cfd4af1e4"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/desktop-chapter-selected.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "9e37dd63a8a304aeba840149e327d2e5229d69c9",
+      "original_sha256": "36fe063dc864a7b787d5f718fd394a9c004873a278898feb1a84f1915b567b6f",
+      "original_bytes": 415089,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "36fe063dc864a7b787d5f718fd394a9c004873a278898feb1a84f1915b567b6f"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/desktop-comparison.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "b453a3a0f36800daf4185db3b09de8fd0595b0e7",
+      "original_sha256": "b24acfa71d225d72863c1325e69378b166409ebe5f956ebc602cc9c9f2b68c65",
+      "original_bytes": 76171,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "b24acfa71d225d72863c1325e69378b166409ebe5f956ebc602cc9c9f2b68c65"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/desktop-inspect-tensions.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "b723bfccd5ca092a08365ba3fe609c98b93b8426",
+      "original_sha256": "9dbca2de1ba6260b8574b4148da43c7cf44b9f96b946905898b45616648a41ff",
+      "original_bytes": 395310,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "9dbca2de1ba6260b8574b4148da43c7cf44b9f96b946905898b45616648a41ff"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/desktop-sky.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "2d36941cea8017a8f150b96931fb2417c3a1f6d2",
+      "original_sha256": "c5bf87866148c92a7301b9d2bdd14e582d852e4005de83101b5d9b58f2e32eb0",
+      "original_bytes": 330942,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "c5bf87866148c92a7301b9d2bdd14e582d852e4005de83101b5d9b58f2e32eb0"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/desktop-unfolded.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "8b370921504e3cd98261096b59b05b5ed4de7511",
+      "original_sha256": "78c03685e84f6109246672ffbb294d470f01c1aafb63ece3c9212fb83446847c",
+      "original_bytes": 391967,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "78c03685e84f6109246672ffbb294d470f01c1aafb63ece3c9212fb83446847c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/desktop-whole-portrait.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "e9191ed1fc487f034ab657930f2321feeeffe0c2",
+      "original_sha256": "bf1b7299ca5f192e54bf76caa0e13a6a4004f7150cb12aa5e6441f56c7140e3a",
+      "original_bytes": 469191,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "bf1b7299ca5f192e54bf76caa0e13a6a4004f7150cb12aa5e6441f56c7140e3a"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/mobile-expanded.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "5095effdba636139514c6062e029e4d5c9410fc7",
+      "original_sha256": "d037cf083abbb4e61c6fb158f62a63888b79db568281f23f53e5bfffdd110b17",
+      "original_bytes": 157126,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "d037cf083abbb4e61c6fb158f62a63888b79db568281f23f53e5bfffdd110b17"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/mobile-explore.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "39f28e122a3f55fc255cc8d8ca0bc5f989325ad3",
+      "original_sha256": "819f0cc46e945cb2535902c2874c14f2ad5ac8521b26d1b8c33b33d586ba7097",
+      "original_bytes": 155772,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "819f0cc46e945cb2535902c2874c14f2ad5ac8521b26d1b8c33b33d586ba7097"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-portrait-3d-workflows/mobile-read-chapter.png",
+      "source_commit": "607d39d08cb643d734fdf124f2be9ba0dcd848b9",
+      "source_git_blob": "c32fc90c590a4d4ecaa1d9cc66928eff1a03f75b",
+      "original_sha256": "22a3c3112d370035bce09264528975c394bbbabe958501bd989bfccd115916f0",
+      "original_bytes": 74068,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "22a3c3112d370035bce09264528975c394bbbabe958501bd989bfccd115916f0"
+    },
+    {
+      "path": "docs/reviews/2026-09-07-3d-model-interaction-ui-workflows.md",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "30b323a46a83e49c0ce2dc42fa59ed7fcb733db3",
+      "original_sha256": "c173ba0b3f43b4dd8580231dd355ccda46ba8a035716ebb508ffdc586703f2c1",
+      "original_bytes": 15920,
+      "preservation": "unchanged body after preservation notice",
+      "preserved_sha256": "4ebd4da03df88d1fc5893247a99a43857f6f4e850b1ed2d5e022a9131d9db557"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-chapter-1.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "ca7c70a66a7bdbcab75a3e4fa06d75fffdb41fa5",
+      "original_sha256": "25fdf82d182030a0cee44a4fd67b06a9f1f5631ffea271f2d48dd3c8fc4cf77a",
+      "original_bytes": 440508,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "25fdf82d182030a0cee44a4fd67b06a9f1f5631ffea271f2d48dd3c8fc4cf77a"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-compare.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "9fee2d6e37a31315742503b3069396dfdf18c179",
+      "original_sha256": "b8a2d531360699e194f7709b6ac73979e90e76611c1474a76499a6d717f28912",
+      "original_bytes": 455522,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "b8a2d531360699e194f7709b6ac73979e90e76611c1474a76499a6d717f28912"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-entry-1440x900.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "69fe3bfa2be9338762a6446cf7ede7854ac925d1",
+      "original_sha256": "b4f7e5e5e743fab582c077439c607fe2a5aae99884064a45875a5171d74e4a57",
+      "original_bytes": 478019,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "b4f7e5e5e743fab582c077439c607fe2a5aae99884064a45875a5171d74e4a57"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-look-closer.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "178b3ed1ab4114128b1dc62766732f940c490732",
+      "original_sha256": "336cc7908ddae823d31a2c77c80c1dbbdb6bcde5d8fd9ef3826896d8c248e23c",
+      "original_bytes": 418345,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "336cc7908ddae823d31a2c77c80c1dbbdb6bcde5d8fd9ef3826896d8c248e23c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-open-desk.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "290e8db5adba7bc6f6546aa136e0c90a322e2a0b",
+      "original_sha256": "2874cb1b162d2f758aad3fb6cecc16c37693878a8b8f659d2db11cc190739426",
+      "original_bytes": 381188,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "2874cb1b162d2f758aad3fb6cecc16c37693878a8b8f659d2db11cc190739426"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-sky.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "1e8a570c47d8dc242a27d6bd75f3b3c2532aab1f",
+      "original_sha256": "062d83ecd93cd1acf0d938129c7f79645868489e78de647344f5892605dc3e3c",
+      "original_bytes": 279159,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "062d83ecd93cd1acf0d938129c7f79645868489e78de647344f5892605dc3e3c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-tensions.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "ada37f6cdcbe9fcf7719e5a896ffc989902ec877",
+      "original_sha256": "b7c7d8ed9ee8aa5343dd13e5fba6f4979ac4c33dfc1e1a1bd6a08a0928f444ab",
+      "original_bytes": 413410,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "b7c7d8ed9ee8aa5343dd13e5fba6f4979ac4c33dfc1e1a1bd6a08a0928f444ab"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/desktop-unfolded-inspect.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "8c19a2dde26f7b642d21e6a1c8f240fbb6c15f81",
+      "original_sha256": "086625bd58ae57db717247a86fae4a6743ca5b3acd991ad937ee089b661b1bde",
+      "original_bytes": 476291,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "086625bd58ae57db717247a86fae4a6743ca5b3acd991ad937ee089b661b1bde"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/measurements.json",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "45662248cb89ffedf13f23e0f60a502d0325a45c",
+      "original_sha256": "1531866985f74a0ae2a7e7b1264208d0d6a00facab5236ad2c78b1373595213d",
+      "original_bytes": 1389,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "1531866985f74a0ae2a7e7b1264208d0d6a00facab5236ad2c78b1373595213d"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/mobile-compare.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "54d60bb51733e05474e524eba3156777f7a0166f",
+      "original_sha256": "a93f71623f02388b43ecd46e47abfb53bc8a0288f87858d8a4cd9675e5cbd05c",
+      "original_bytes": 156994,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "a93f71623f02388b43ecd46e47abfb53bc8a0288f87858d8a4cd9675e5cbd05c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/mobile-reading.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "a2bf14987ed13da8be7ff9e4c6de7c73df9d803a",
+      "original_sha256": "526ae3908c2c90f768820bb9ee88cdf5d006d773ad5c384229b9b7e4233e044e",
+      "original_bytes": 50453,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "526ae3908c2c90f768820bb9ee88cdf5d006d773ad5c384229b9b7e4233e044e"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-model-ui-workflows/mobile-whole.png",
+      "source_commit": "591d073bcb9261bc823f4dc220f1191574674fad",
+      "source_git_blob": "ee6faacc1ae557a31f795271dccdd9496816cc3b",
+      "original_sha256": "8adef0997e99901ed9dcee32ab8faf0e24ae0e2094274377357ec933ad0aabae",
+      "original_bytes": 161457,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "8adef0997e99901ed9dcee32ab8faf0e24ae0e2094274377357ec933ad0aabae"
+    },
+    {
+      "path": "docs/reviews/2026-09-07-3d-model-ui-workflows.md",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "8ba6c0aab079e64378c5e12ed860eb1e9611fc6a",
+      "original_sha256": "dd2006d234e37ce0e32c7c061571fefebb40d6f874607cc8bf9e36eebbd7b377",
+      "original_bytes": 12795,
+      "preservation": "unchanged body after preservation notice",
+      "preserved_sha256": "3b43239f32ecdc47ebd36df07b1e3619793d5663ae05e7500437b65ffdc7cbef"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/01-desktop-entry.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "69fe3bfa2be9338762a6446cf7ede7854ac925d1",
+      "original_sha256": "b4f7e5e5e743fab582c077439c607fe2a5aae99884064a45875a5171d74e4a57",
+      "original_bytes": 478019,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "b4f7e5e5e743fab582c077439c607fe2a5aae99884064a45875a5171d74e4a57"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/02-desktop-chapter-1.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "d3c7073d816cf8e12a30d12d6658c09fda7d73a7",
+      "original_sha256": "4af372e3108942da976ee6d2364a50338be52d8074fd005a01dc5da539cac650",
+      "original_bytes": 440194,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "4af372e3108942da976ee6d2364a50338be52d8074fd005a01dc5da539cac650"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/03-desktop-tensions.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "ada37f6cdcbe9fcf7719e5a896ffc989902ec877",
+      "original_sha256": "b7c7d8ed9ee8aa5343dd13e5fba6f4979ac4c33dfc1e1a1bd6a08a0928f444ab",
+      "original_bytes": 413410,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "b7c7d8ed9ee8aa5343dd13e5fba6f4979ac4c33dfc1e1a1bd6a08a0928f444ab"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/04-desktop-show-passage.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "6ad8535a3b24afb4b53aad93393a2d8961c5a0e1",
+      "original_sha256": "2188f5a58496c49866a21b28ee8e8f743b478d92617301daf96f3bf97d2d0e29",
+      "original_bytes": 413108,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "2188f5a58496c49866a21b28ee8e8f743b478d92617301daf96f3bf97d2d0e29"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/05-desktop-compare.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "d5ac51e188cf9df14379e17645f333b3e3069c2c",
+      "original_sha256": "e0659444e05211fcd8d6922333e52fdfd2fad689bb4cc5b2be381169c914cbc8",
+      "original_bytes": 454837,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "e0659444e05211fcd8d6922333e52fdfd2fad689bb4cc5b2be381169c914cbc8"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/06-desktop-sky.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "fd852a8368d05885cd6ae157b68b4841a426b8a4",
+      "original_sha256": "2e7faff40660cbff88fc8f2be882b25411cd0ea0aed977790d33bb277205388c",
+      "original_bytes": 335319,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "2e7faff40660cbff88fc8f2be882b25411cd0ea0aed977790d33bb277205388c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/07-desktop-back-from-sky.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "fd852a8368d05885cd6ae157b68b4841a426b8a4",
+      "original_sha256": "2e7faff40660cbff88fc8f2be882b25411cd0ea0aed977790d33bb277205388c",
+      "original_bytes": 335319,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "2e7faff40660cbff88fc8f2be882b25411cd0ea0aed977790d33bb277205388c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/14-desktop-ch1-from-rail.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "a75b5c902a34180af8d0e08eff57adf493192804",
+      "original_sha256": "5ac0116fb599c1de55da6cfe10d74389a48ac62c24b6c4980d73d5636d9465a0",
+      "original_bytes": 414968,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "5ac0116fb599c1de55da6cfe10d74389a48ac62c24b6c4980d73d5636d9465a0"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/15-desktop-look-closer.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "2bb32f13428a5e7859bdb0abaff2604b219de858",
+      "original_sha256": "15573e975c8239cb0373c09c75bda900c1ca59a32f217e727ecef1c6cc556434",
+      "original_bytes": 422862,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "15573e975c8239cb0373c09c75bda900c1ca59a32f217e727ecef1c6cc556434"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/16-desktop-desk-open.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "2e6b1712c564ed639b4dc11d1a9200d7532938e5",
+      "original_sha256": "eaf60816bd001daf52c2def3dd2592a828d40c74b494fe522d1c566bc984914c",
+      "original_bytes": 416687,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "eaf60816bd001daf52c2def3dd2592a828d40c74b494fe522d1c566bc984914c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/17-desktop-unfold.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "589e2071fc96ecdd9cecbc7c9bba3891cd57be3c",
+      "original_sha256": "9a9e3a75e5b045029fba707712f0056ac0b6ac872d524ab6b329ef5eef65c86c",
+      "original_bytes": 383221,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "9a9e3a75e5b045029fba707712f0056ac0b6ac872d524ab6b329ef5eef65c86c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/18-desktop-after-canvas-click.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "cf3be3baf4cff0d1335fc78597edc9d97c5dfb4c",
+      "original_sha256": "83b98e5d1d097fd71530504e9d57db057665ba88439d247d604130018bd4f06c",
+      "original_bytes": 384813,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "83b98e5d1d097fd71530504e9d57db057665ba88439d247d604130018bd4f06c"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/19-desktop-full-reading.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "406be6e6347ad7c0533b8dca9b4e2c9a46bcba31",
+      "original_sha256": "c9a97fd61375004f48c4476e9e0ef9cdc6408df57454094212c4e7aa9909fa76",
+      "original_bytes": 80041,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "c9a97fd61375004f48c4476e9e0ef9cdc6408df57454094212c4e7aa9909fa76"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/20-desktop-guide.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "f3e7a267533ffb6fb5f02012fdb686c7411e04e2",
+      "original_sha256": "62cd504831e13559e3edb645b1a2e62fd4a89d2b5ec3deadb777857e90e4c5c8",
+      "original_bytes": 382780,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "62cd504831e13559e3edb645b1a2e62fd4a89d2b5ec3deadb777857e90e4c5c8"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/21-phone-390-entry.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "38c91cd974eefa3dc115b3cab2e8b1823a94cc6f",
+      "original_sha256": "122029f986430f551f0e13baf2c9ab921c96390438dc4843db8161f063159bd0",
+      "original_bytes": 158021,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "122029f986430f551f0e13baf2c9ab921c96390438dc4843db8161f063159bd0"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/22-phone-after-canvas-click.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "38c91cd974eefa3dc115b3cab2e8b1823a94cc6f",
+      "original_sha256": "122029f986430f551f0e13baf2c9ab921c96390438dc4843db8161f063159bd0",
+      "original_bytes": 158021,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "122029f986430f551f0e13baf2c9ab921c96390438dc4843db8161f063159bd0"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/23-phone-chapter.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "f68f7ad837f8a76ad0699f320f16de50269b890c",
+      "original_sha256": "ad58291288a14358e65606a64821a6661a348d0e77e9cdf6b7f96f9746df1cc4",
+      "original_bytes": 72388,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "ad58291288a14358e65606a64821a6661a348d0e77e9cdf6b7f96f9746df1cc4"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/24-phone-read-chapter.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "7d4b0b26e8876d008d94e9ecacb2eff4b0a7021b",
+      "original_sha256": "a75815b56821a208168b4eb8b8132899520afc406409a3e2ec0d30188f947226",
+      "original_bytes": 73419,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "a75815b56821a208168b4eb8b8132899520afc406409a3e2ec0d30188f947226"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/25-phone-expand-scene.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "db3d807a57e664b97bbc53d7a581c7e969bb5f80",
+      "original_sha256": "302f7aa3c1181283a81a36ab9c45e56b3f452703655a363a4eab5897b5bd42af",
+      "original_bytes": 155604,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "302f7aa3c1181283a81a36ab9c45e56b3f452703655a363a4eab5897b5bd42af"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/26-phone-sky.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "c1f15444ad01596ddcdba235f862589de5aada09",
+      "original_sha256": "9ed3e7d2664c66a7f3f0e28707e287a9ac47f15dd488c6aafa443c3c69f8c837",
+      "original_bytes": 130868,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "9ed3e7d2664c66a7f3f0e28707e287a9ac47f15dd488c6aafa443c3c69f8c837"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/27-phone-320.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "2ac32f59ec19d7c28077f133f8e770f4a3ed7c02",
+      "original_sha256": "4e594b9da92225f90cb02a4a6617ac7747808cd25024aedc620ac1d319e2ced2",
+      "original_bytes": 98669,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "4e594b9da92225f90cb02a4a6617ac7747808cd25024aedc620ac1d319e2ced2"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/28-landscape-844x390.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "a504bea29c8a0e0a747a4e1d6a00ba7c83af4633",
+      "original_sha256": "a25862e7016946a130d6febd35435206b764e9386d0a742a2525b6d3e00c74e8",
+      "original_bytes": 119488,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "a25862e7016946a130d6febd35435206b764e9386d0a742a2525b6d3e00c74e8"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/29-desktop-original-image.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "0586dea01e215133a9150c03f7745b11b3f82bab",
+      "original_sha256": "6e404007a30f629c71012a311307fb2955c1c2bc8d9b296e5e2eade7aec0344b",
+      "original_bytes": 521225,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "6e404007a30f629c71012a311307fb2955c1c2bc8d9b296e5e2eade7aec0344b"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/30-desktop-keyboard-toolbar.png",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "ef436acb304509192fcde84b3e2aaf5f1f71ae0f",
+      "original_sha256": "70b65f94617cde6e04c83c4d9177f6fdc094d8c3f2f51bca732e3c639690fdf8",
+      "original_bytes": 406366,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "70b65f94617cde6e04c83c4d9177f6fdc094d8c3f2f51bca732e3c639690fdf8"
+    },
+    {
+      "path": "docs/reviews/artifacts/2026-09-07-3d-ui-review/measurements.json",
+      "source_commit": "9f87b839047dab67e8c308a5fabac75e94ed2301",
+      "source_git_blob": "76fc4bb19fea8fcec88a4a38ea9f005960f2953c",
+      "original_sha256": "bb20cb5f13c3654aea49dd96582894568d8eb3875032dab1336c7ffca4bcffa5",
+      "original_bytes": 2758,
+      "preservation": "byte-identical file",
+      "preserved_sha256": "bb20cb5f13c3654aea49dd96582894568d8eb3875032dab1336c7ffca4bcffa5"
+    }
+  ]
+}

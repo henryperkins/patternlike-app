@@ -100,7 +100,9 @@ not grant any generative-model permission.
 Place search and resolution use the server-side Geoapify adapter; there is no
 Google fallback. Committed production configuration enables the rollout, while
 actual availability still requires a non-empty `GEOAPIFY_API_KEY` and separate
-deployment proof. Missing rollout/key returns `503 geocoder_unavailable` only
+deployment proof. Default `[vars]` keeps `GEOCODER_ROLLOUT=off`; a local Worker
+needs both the key and `GEOCODER_ROLLOUT=enabled` in `apps/api/.dev.vars`.
+Missing rollout/key returns `503 geocoder_unavailable` only
 for search, resolution, and new geocoder grants. Manual place label,
 coordinates, and time zone remain the fallback. See the
 [`Geoapify decision`](docs/decisions/2026-09-04-geoapify-geocoder.md) and
@@ -322,6 +324,86 @@ stub, not a production `identities` row or a consent grant.
 
 `ENVIRONMENT=test` counts as development and disables the config guard. Do not
 name a staging deployment `test`.
+
+## Daily History and Save
+
+The History tab (`#history`) lists Daily revisions the authenticated account
+can still read. History has no separate feature flag; existing authentication
+and ownership checks apply.
+
+| Surface | Behavior |
+| --- | --- |
+| `GET /v1/readings?view=history\|saved` | `schema_version` `0.8.0`. Optional `limit` (default 20, range 1–50) and `cursor`. Duplicate query keys or a cursor from the other view are `400 invalid_reading_query`. |
+| `view=history` | One canonical row per `local_date`: `published`, then `invalidated`, then `superseded`; newest revision wins ties. |
+| `view=saved` | Every saved revision, newest `saved_at` first — including multiple revisions from the same date. |
+| `GET /v1/readings/:id` | A specific revision, including superseded and invalidated ones. |
+| `GET\|PUT\|DELETE /v1/readings/:id/save` | Revision-specific intent in `reading_saves` (migration `0028`). `PUT` must have an **empty** body. Re-PUT keeps the first `saved_at`. The authenticated `DELETE` handler returns `204` even when the save does not exist. |
+
+Only `published`, `superseded`, or `invalidated` rows with `reading_enc` can be
+saved; anything else is `404 reading_not_found`. Saves hold no prose copy.
+They are portable on account export and must be deleted **before**
+`daily_readings` (composite FK). After saves exist, a Worker rollback must
+keep Save-aware account deletion.
+
+`resetDb()` in `apps/api/test/helpers.ts` already deletes
+`daily_publication_receipts`, then `reading_saves`, then `daily_readings`. A
+new user-owned table missing from that list — or from
+`services/deletion-manifest.ts` — leaks rows between suites or fails
+deletion tests.
+
+## Pattern portraits
+
+The account's `#pattern` surface opens the observatory by default for published
+Patterns with three to six chapters. Local reading folios and the complete
+written Pattern remain available while optional artwork is missing, delayed,
+invalid, or unavailable. Verified artwork replaces those folios when ready;
+opening the observatory does not grant permission to generate artwork. See the
+[default-observatory release](docs/reviews/2026-09-08-default-pattern-observatory.md).
+
+The current artwork-generation contract still binds four chapter images and
+optionally four meshes to an accepted four-chapter Pattern. Its generation
+eligibility is separate from observatory presentation. Wire contract:
+[`contracts/portrait-v1/`](contracts/portrait-v1/).
+Image-model evidence:
+[`docs/deploy/portrait-image-model-provenance.md`](docs/deploy/portrait-image-model-provenance.md).
+Runner enablement: [`apps/codex-runner/README.md`](apps/codex-runner/README.md).
+
+**Artwork flags.** Committed production `[env.production.vars]` sets
+`PATTERN_PORTRAIT_ENABLED=1` and `PATTERN_PORTRAIT_MESH_ENABLED=1`. Default
+`[vars]` omits both, so a local Worker stays off until `.dev.vars` sets them.
+Only exact `"1"` plus an `ARTIFACTS` binding enables creation; mesh also
+requires the image flag. `PATTERN_GENERATION_ENABLED=0` does **not** pause
+portrait generation. These flags gate the artwork APIs; the observatory's
+local folios and complete reading remain available independently.
+
+**Consent.** `POST /v1/pattern-portrait-generations` requires live
+`account_processing` and `pattern_generation` grants, an 8–128 character
+`Idempotency-Key`, `confirm: "CREATE MY PORTRAIT"`, and
+`consent_policy_version: "1.0.0"`. The request also identifies `pattern_id`,
+`generated_at`, and `chart_id`. There is no separate portrait consent kind.
+Automation is a distinct per-chart grant:
+`PUT /v1/pattern-portrait/automation` with policy `1.1.0` and the typed
+`ENABLE AUTOMATIC PORTRAITS` / `DISABLE AUTOMATIC PORTRAITS` confirm strings.
+
+**Local loop.** After `db:local`, put the two flags and a `CODEX_RUNNER_TOKEN`
+in `apps/api/.dev.vars`. Real generation also needs the installed runner with
+`CODEX_RUNNER_PORTRAITS=1` (and `CODEX_RUNNER_MESHES=1` for explorer models).
+`npm run dev:portrait -w @patternlike/web` is a **fictional** preview on port
+5174 — it does not exercise auth, consent, or the runner.
+
+**Durable jobs.** Portrait work uses D1 job rows and runner polling rather than
+a Cloudflare Queue binding. The runner polls
+`/codex-provider/v1/portraits/claim`, then `/codex-provider/v1/portrait-meshes/claim`
+(text jobs first). The `*/15` cron recovers expired leases and drains the
+automation outbox. Three attempts per slot, 20-minute lease, 15-minute image
+timeout. Flag-off artwork reads return `status: "unavailable"`; creation without
+flags/R2 is `503 portrait_unavailable`. These responses do not hide the local
+reading folios or the published reading.
+
+Portrait bytes encrypt under the accepted Pattern document content key, not
+the user DEK. Downloads
+(`GET /v1/pattern-portrait/download`, `/v1/pattern-portrait/explorer/download`)
+are private account bundles and are not part of portable account export.
 
 ## Releasing the API and PWA
 

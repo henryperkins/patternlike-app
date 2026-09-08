@@ -7,7 +7,9 @@
 >
 > Keep this file for its dated evidence — what was observed, when, and by whom —
 > which remains the record of how the direct-API rollout actually went. Do not
-> follow its steps. The current Daily procedure is
+> follow its steps. Gate 2's `run_worker_first` three-path list and empty
+> production cron are historical; current committed values are in
+> `apps/api/wrangler.toml` and `CLAUDE.md`. The current Daily procedure is
 > [`codex-production-provider.md`](./codex-production-provider.md), and the
 > ordered enablement sequence is
 > `docs/superpowers/plans/2026-08-27-codex-reader-rollout.md`.

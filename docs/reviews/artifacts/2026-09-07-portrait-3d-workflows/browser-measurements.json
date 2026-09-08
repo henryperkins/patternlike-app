@@ -1,0 +1,48 @@
+{
+  "reviewed_commit": "6e706741f03253f2807d33380afb529161f3481f",
+  "preview": "http://127.0.0.1:5174/pattern-portrait.html",
+  "browser": "Chromium via Playwright, software-rendered WebGL",
+  "date": "2026-09-07",
+  "desktop_1440x900": {
+    "scene_bottom_px": 535.57,
+    "toolbar_bottom_px": 519.57,
+    "chapter_rail_bottom_px": 805.41,
+    "toolbar_buttons_css_px": [
+      { "name": "Rotate left", "w": 44, "h": 44 },
+      { "name": "Rotate right", "w": 44, "h": 44 },
+      { "name": "Zoom out", "w": 44, "h": 44 },
+      { "name": "Zoom in", "w": 44, "h": 44 },
+      { "name": "Reset view", "w": 77.32, "h": 44 },
+      { "name": "Expand scene", "w": 95.44, "h": 44 }
+    ],
+    "tilt_and_frame_in_3d_toolbar": false,
+    "tilt_up_visible_until_settings_opened": false
+  },
+  "phone_390x844": {
+    "overflow": false,
+    "scroll_width_px": 374,
+    "scene": { "top": 338.49, "bottom": 683.49, "height": 345 },
+    "toolbar_bottom_px": 674.49,
+    "chapter_rail": { "top": 840.89, "bottom": 974.90, "height": 134.02 },
+    "compact_scene_labels": 4,
+    "toolbar_buttons_all_44x44": true
+  },
+  "phone_320x740": {
+    "overflow": false,
+    "scroll_width_px": 320,
+    "scene_height_px": 300
+  },
+  "workflows": {
+    "annotation_focuses_exact_tensions_passage": true,
+    "show_in_portrait_reveals_scene_annotation": true,
+    "pattern_return_preserves_tensions": true,
+    "browser_back_from_sky_leaves_sky_pressed": true,
+    "browser_back_from_sky_then_pattern_resets_facet_to_overview": true,
+    "comparison_hides_scene_display": "none",
+    "end_comparison_restores_scene_and_facet": true,
+    "guide_next_and_exit_restore_origin": true,
+    "full_reading_unmounts_canvas_and_restores_desk_unfold": true,
+    "twelve_sky_sign_labels_visible": true,
+    "unfold_disabled_in_sky": true
+  }
+}

@@ -1,8 +1,8 @@
 # 3D portrait — consolidated remaining priorities
 
-Status updated **2026-09-08, during approved working-tree integration**. R1–R4 are implemented with regression coverage; **R5, R6 and the three P3 follow-ups remain open**. The original audit/remediation baseline was `6e706741f03253f2807d33380afb529161f3481f`. This integrated change is based on `e4ba2f9c8316cf884f17bcf70da8bc8734d38a9e`, which already includes default observatory entry and support for three to six chapters.
+Status updated **2026-09-08, during branch and evidence reconciliation**. R1–R4 are implemented with regression coverage and were pushed as `4394e9c`, followed by evidence commit `c991c8a`; **R5, R6 and the three P3 follow-ups remain open**. The original audit/remediation baseline was `6e706741f03253f2807d33380afb529161f3481f`. Their integration built on `e4ba2f9c8316cf884f17bcf70da8bc8734d38a9e`, which already includes default observatory entry and support for three to six chapters.
 
-This priority list folds three user-supplied Cursor review extracts into the [corrected local review](2026-09-07-portrait-review-followup.md). The current status below supersedes the original backlog. Historical evidence is retained with its original scope; its line references and measurements describe the pre-remediation source. The [preserved evidence](artifacts/2026-09-07-portrait-r1-r4/README.md) retains the original reports, receipts and source fingerprints. Local implementation and verification do not establish production adoption.
+This priority list originally folded three user-supplied Cursor review extracts into the [corrected local review](2026-09-07-portrait-review-followup.md). Their [complete reports and captures](2026-09-08-branch-cleanup-and-review-integration.md#complete-portrait-review-sources) are now preserved from the original Git branches. The current status below supersedes the original backlog. Historical evidence retains its original scope; its line references and measurements describe the pre-remediation source. The [R1–R4 evidence](artifacts/2026-09-07-portrait-r1-r4/README.md) retains the remediation reports, receipts and source fingerprints. A Git push does not by itself establish verified production adoption.
 
 Keep the observatory as the product's 3D path. Prioritize investigating the published chapter objects, with the complete reading and calibrated sky intact. The sky is a distinct navigation mode; lighting and furniture controls support exploration. Preserve source identity, exact passages, uncertainty, accessible alternatives and private-session invalidation throughout.
 
@@ -43,7 +43,7 @@ All remaining work must also preserve:
 | --- | --- |
 | Full repository suite and merge gate | The September 8 `npm run ci:local` passed all 14 lanes on the integrated, uncommitted source based on `e4ba2f9`, including 2,525 API tests, the compatibility lane and 721 web tests. See the [actual summary](artifacts/2026-09-07-portrait-r1-r4/verification/ci-local-summary.txt), [gate receipt](artifacts/2026-09-07-portrait-r1-r4/verification/review-gate.json), and [subsequent packaging checks](artifacts/2026-09-07-portrait-r1-r4/verification/packaging-checks.json). Runtime and test bytes are unchanged by the documentation/artifact packaging. Preserve this evidence when publishing the change. |
 | Coverage beyond local Chromium | The recorded browser checks used fictional preview data and intercepted account responses with SwiftShader on their stated September 7 source snapshots. They are historical browser evidence; the later integrated source has automated-suite verification. Live account generation, Safari, physical-device performance and real screen-reader use remain unverified. |
-| Production adoption | This work is integrated locally. No push, deployment, or verification of production adoption is established by the review and cleanup. |
+| Production adoption | The implementation and evidence were pushed in commits [`4394e9c`](https://github.com/henryperkins/patternlike-app/commit/4394e9c7380c51c19efa1e78d73d81f94ec45992) and [`c991c8a`](https://github.com/henryperkins/patternlike-app/commit/c991c8a832454aab4418e812d9db4644ab34dea2) on September 8. Production build completion and adoption of these follow-ups were not verified in the push or branch-cleanup task. |
 
 The remaining items are verification and release gaps, not additional reproduced product defects. The September 8 full gate supersedes the earlier timed-out repository test. Historical R4 source hashes and browser measurements remain attached to their original checkpoint; they are not represented as measurements of the later default-observatory source. Documentation/artifact packaging was checked separately while preserving the tested runtime and test files.
 
@@ -158,13 +158,13 @@ Optional evaluation: guide progress through facets and whether guide entry shoul
 
 ## Reconciliation of supplied reviews — historical baseline
 
-The text supplied in chat is the review source. The referenced full files and `/opt/cursor/artifacts` screenshots were not available in this checkout; the authenticated Cursor pages were not readable. No claim is made to have inspected those original screenshots or reports beyond the supplied extracts. The dispositions below describe the original audit baseline; current local status is listed at the top of this document.
+At the original audit, the text supplied in chat was the available review source. The referenced full files and `/opt/cursor/artifacts` screenshots were not in the checkout, and the authenticated Cursor pages were not readable. The [September 8 integration](2026-09-08-branch-cleanup-and-review-integration.md) now preserves all three full reports and their Git-tracked captures; it does not repeat their browser sessions. The dispositions below describe the original audit baseline; current status is listed at the top of this document.
 
 | Source | Supplied report identity | Revision / scope |
 | --- | --- | --- |
 | A | `2026-09-07-portrait-3d-interaction-workflows.md` | Claims live preview at `6e70674` |
 | B | `2026-09-07-3d-model-ui-workflows.md` | Claims preview at older `76b4671`; account reviewed from source only |
-| C | `2026-09-07-3d-model-interaction-ui-workflows.md` | Preview evidence; no commit supplied; several observations differ from current main |
+| C | `2026-09-07-3d-model-interaction-ui-workflows.md` | The original extract supplied no commit; the recovered full report identifies `76b4671`. Several observations differ from later main. |
 
 | Review claim | Disposition at the original audit baseline |
 | --- | --- |

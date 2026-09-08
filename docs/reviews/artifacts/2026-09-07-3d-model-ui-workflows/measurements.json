@@ -1,0 +1,40 @@
+{
+  "reviewedAt": "2026-09-07T13:37:00Z",
+  "commit": "76b4671",
+  "target": "http://127.0.0.1:5174/pattern-portrait.html",
+  "browser": "Playwright Chromium, SwiftShader",
+  "desktop": {
+    "viewport": [1440, 900],
+    "scrollHeight": 1205,
+    "overflowX": false,
+    "fullyVisibleControls": 31,
+    "scene": { "top": 160, "height": 535 },
+    "chapterRail": { "top": 844, "bottom": 911, "fullyInViewport": false },
+    "atmosphere": { "top": 695, "fullyInViewport": true }
+  },
+  "mobileWhole": {
+    "viewport": [390, 844],
+    "scrollHeight": 1923,
+    "overflowX": false,
+    "scene": { "top": 338, "height": 345 },
+    "chapterRail": { "top": 841, "bottom": 975, "fullyInViewport": false },
+    "invitation": { "top": 185, "height": 89 },
+    "visibleNamedButtons": 24
+  },
+  "mobileReading": {
+    "viewport": [390, 844],
+    "sceneDisplay": "none",
+    "modesTop": -137,
+    "chapterRail": { "top": -80, "bottom": 54 },
+    "readerTop": 78,
+    "returnToPortraitInFirstViewport": false
+  },
+  "narrow": {
+    "viewport": [320, 740],
+    "overflowX": false
+  },
+  "notes": [
+    "desktop-unfolded-inspect.png and a subsequent Whole-portrait capture were byte-identical (SHA-256 086625bd58ae57db717247a86fae4a6743ca5b3acd991ad937ee089b661b1bde).",
+    "Tensions versus Overview changed the overlay label text; canvas framing of the selected object did not otherwise change."
+  ]
+}
