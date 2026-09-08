@@ -244,17 +244,7 @@ function ReadyDocument({
 
   return (
     <section className="pattern-chapters" aria-labelledby="pattern-experience-heading">
-      <div className="panel-heading">
-        <div>
-          <p className="kicker">Your Pattern</p>
-          <h2 id="pattern-experience-heading">A private reading of this chart</h2>
-        </div>
-        <span className="panel-code">{document.locale}</span>
-      </div>
-      <p className="pattern-chapters__accuracy">
-        Written for this chart. Chart facts above remain inspectable; individual
-        paragraphs do not expose a claim-level evidence list.
-      </p>
+      <h2 id="pattern-experience-heading" className="sr-only">A private reading of this chart</h2>
       <AccountPatternPortrait chartId={chartId} document={document} pattern={pattern} canCreate={canCreatePortrait} onUnauthorized={onUnauthorized} sky={sky}>
         <div className="pattern-chapters__list">
           {document.core_chapters.map((chapter, index) => (

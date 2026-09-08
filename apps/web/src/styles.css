@@ -4015,7 +4015,26 @@ summary:focus-visible {
   }
 }
 
-/* Your Pattern: reviewed chapters under the calculation layer */
+/* The saved Pattern leads the page; calculated chart facts follow it. */
+.chart-page .chart-page__intro {
+  padding-bottom: 24px;
+}
+
+@media (min-width: 600px) and (max-height: 480px) {
+  .chart-page.page-enter {
+    padding-top: 16px;
+  }
+
+  .chart-page .chart-page__intro {
+    padding-bottom: 12px;
+  }
+
+  .chart-page__intro h1 {
+    margin-top: 8px;
+    font-size: 32px;
+  }
+}
+
 .pattern-chapters {
   margin-top: 24px;
   padding: 30px;

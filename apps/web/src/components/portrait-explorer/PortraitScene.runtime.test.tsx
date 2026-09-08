@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { BufferGeometry, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Camera, type Scene } from "three";
 import PortraitScene from "./PortraitScene.js";
 import type { PortraitSceneProps } from "./types.js";
+import { compilePortraitMesh } from "../../../../codex-runner/src/portrait-mesh-compiler.js";
+import { verifyGlbAsset } from "./scene-utils.js";
 
 const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity], scene: null as Scene | null, camera: null as Camera | null, detachedDisplay: false }));
 // jsdom has no GPU. Keep the real loader, camera, mesh, controls and lifecycle.
@@ -77,6 +79,54 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0, toJSON() {} });
 });
+
+it.each([3, 4, 5, 6])("renders %i distinct chapter stations without downloading artwork", async (count) => {
+  const callbacks = props();
+  const chapters = Array.from({ length: count }, (_, index) => ({ id: `chapter-${index + 1}`, title: `Reading ${index + 1}`, ordinal: index + 1 }));
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} };
+  const view = render(<PortraitScene {...callbacks} assets={[]} chapters={chapters} selectedIds={[]} bookmark={undefined} experience={experience} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  expect(fetch).not.toHaveBeenCalled();
+  const stations = chapters.map(chapter => gpu.scene!.getObjectByName(`Chapter display ${chapter.ordinal}`)!);
+  expect(stations.every(Boolean)).toBe(true);
+  expect(new Set(stations.map(station => station.position.toArray().join(","))).size).toBe(count);
+  expect(screen.getByRole("img")).toHaveAccessibleName(new RegExp(`${count} chapter`));
+  view.unmount();
+  expect(gpu.contexts.size).toBe(0);
+});
+
+it("keeps reading stations when a verified artwork upgrade fails geometry checks", async () => {
+  const callbacks = props();
+  const sourceText = "Exact source";
+  const identity = { chapterId: "chapter-1", documentRevision: "current", sourceImageSha256: "1".repeat(64), sourceTextSha256: createHash("sha256").update(sourceText).digest("hex") };
+  const compiled = compilePortraitMesh({ version: "portrait-mesh-program/v1",
+    materials: [{ id: "oak", color: "#ad8151", metalness: 0, roughness: 0.7 }],
+    parts: [{ name: "body", material: "oak", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], repeat: null, geometry: { kind: "box", size: [5, 0.05, 5], bevel: 0 } }],
+  }, identity);
+  const bytes = Uint8Array.from(compiled.glb);
+  const asset = { ...callbacks.assets[0], sha256: compiled.sha256, sourceText,
+    provenance: { authoring: "codex-parametric/v1" as const, documentRevision: identity.documentRevision, sourceTextSha256: identity.sourceTextSha256, programSha256: compiled.programSha256, compilerVersion: "portrait-mesh-compiler/v1" as const } };
+  await expect(verifyGlbAsset(bytes.buffer, asset.sha256, asset.chapterId, asset)).resolves.toBeUndefined();
+  vi.mocked(fetch).mockImplementation(async () => new Response(bytes));
+  const chapters = Array.from({ length: 4 }, (_, index) => ({ id: `chapter-${index + 1}`, title: `Reading ${index + 1}`, ordinal: index + 1 }));
+  const experience = { roofOpen: true, lighting: "dusk" as const, inspect: false, openDesks: {}, turns: {} };
+  const onArtworkFallback = vi.fn();
+  const scene = { ...callbacks, chapters, selectedIds: [], bookmark: undefined, experience, onArtworkFallback };
+  const view = render(<PortraitScene {...scene} assets={[]} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenLastCalledWith("ready"), { timeout: 5000 });
+  vi.mocked(callbacks.onStatus).mockClear();
+  view.rerender(<PortraitScene {...scene} assets={[asset]} />);
+  await waitFor(() => expect(vi.mocked(callbacks.onStatus).mock.lastCall?.[0]).not.toBe("loading"), { timeout: 5000 });
+  expect(callbacks.onStatus).toHaveBeenLastCalledWith("ready");
+  expect(callbacks.onStatus).not.toHaveBeenCalledWith("unavailable");
+  expect(onArtworkFallback).toHaveBeenLastCalledWith(true);
+  expect(screen.getByRole("img")).toHaveAccessibleName(/4 chapter displays/);
+  const folios: string[] = [];
+  gpu.scene!.traverse(object => { if (object.name === "Chapter reading folio") folios.push(object.userData.chapterId); });
+  expect(folios.sort()).toEqual(chapters.map(chapter => chapter.id));
+  view.unmount();
+  expect(gpu.contexts.size).toBe(0);
+}, 10000); // Builds two complete observatory worlds with real geometry.
 
 it("restores actual camera coordinates without replaying the last command, and saves before unmount", async () => {
   const callbacks = props();

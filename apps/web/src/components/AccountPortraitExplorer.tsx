@@ -14,7 +14,7 @@ import type { PortraitMeshAsset, PortraitMeshBundle } from "./portrait-explorer/
 interface Props {
   chartId: string; document: PatternResponseV7; pattern: PatternStatePattern;
   sky?: PortraitSky | null;
-  canCreate: boolean; onUnauthorized: () => void; children: ReactNode; legacy: ReactNode;
+  canCreate: boolean; onUnauthorized: () => void; children: ReactNode;
 }
 interface LoadedPortrait { identity: string; bindings: PortraitObjectBinding[]; bundle: PortraitMeshBundle; }
 const mismatch = "This 3D portrait no longer matches the current Pattern. Refresh its status to continue.";
@@ -41,15 +41,18 @@ function validate(response: PatternPortraitExplorerResponse, chartId: string, do
   }
 }
 
-export function AccountPortraitExplorer({ chartId, document, pattern, canCreate, onUnauthorized, children, legacy, sky }: Props) {
+export function AccountPortraitExplorer({ chartId, document, pattern, canCreate, onUnauthorized, children, sky }: Props) {
   const sourceMatches = patternMatchesDocument(pattern, document);
-  const eligible = sourceMatches && document.core_chapters.length === 4;
+  const canRender = sourceMatches && document.core_chapters.length >= 3 && document.core_chapters.length <= 6;
+  // The v1 generated-artwork service is optional and supports four chapters.
+  // Its eligibility must never gate the locally rendered observatory.
+  const artworkEligible = sourceMatches && document.core_chapters.length === 4;
   const [response, setResponse] = useState<PatternPortraitExplorerResponse | null>(null);
-  const [useLegacy, setUseLegacy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const session = usePortraitSession(JSON.stringify([chartId, document]));
-  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), { embedded: true, memory: session.memory });
+  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), { embedded: true, defaultOpen: canRender, memory: session.memory });
   const { isOpen: open, open: openExplorer, close: closeExplorer } = navigation;
   const [loaded, setLoaded] = useState<LoadedPortrait | null>(null);
   const [assetError, setAssetError] = useState(false);
@@ -64,6 +67,7 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
   const contentElement = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef(false);
   const previousOpen = useRef(open);
+  const initialOpening = useRef(true);
   const opened = useRef(open); opened.current = open;
   const discardArtifacts = useCallback(() => {
     assetRequest.current?.abort(); assetRequest.current = null;
@@ -81,24 +85,24 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
     else setError(cause instanceof Error ? withRequestId(cause.message, cause instanceof ApiError ? cause.requestId : null) : "Your portrait could not be loaded.");
   }, [onUnauthorized, returnToReading]);
   useEffect(() => {
-    if (!eligible) return;
+    if (!artworkEligible) return;
+    setChecking(true);
     const controller = new AbortController(); statusRequest.current = controller;
     void getPatternPortraitExplorer(controller.signal).then((next) => {
       if (controller.signal.aborted) return;
       validate(next, chartId, document);
       if (session.verified && session.verified.identity !== JSON.stringify(next)) session.verified = null;
-      if (next.status !== "ready") returnToReading();
+      if (next.status !== "ready") discardArtifacts();
       else if (artifactIdentity.current && artifactIdentity.current !== JSON.stringify(next)) discardArtifacts();
       setResponse((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
-      setUseLegacy(next.status === "unavailable"); setError(null);
+      setError(null);
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return;
-      setResponse(null); returnToReading();
-      if (cause instanceof ApiError && [404, 503].includes(cause.status)) setUseLegacy(true);
-      else report(cause);
-    }).finally(() => { if (statusRequest.current === controller) statusRequest.current = null; });
+      setResponse(null); discardArtifacts();
+      if (!(cause instanceof ApiError && [404, 503].includes(cause.status))) report(cause);
+    }).finally(() => { if (statusRequest.current === controller) statusRequest.current = null; if (!controller.signal.aborted) setChecking(false); });
     return () => { controller.abort(); if (statusRequest.current === controller) statusRequest.current = null; };
-  }, [eligible, chartId, document, attempt, report, returnToReading, discardArtifacts, session]);
+  }, [artworkEligible, chartId, document, attempt, report, returnToReading, discardArtifacts, session]);
   useEffect(() => {
     if (response?.status !== "generating" && !response?.retryable) return;
     const poll = () => { if (globalThis.document.visibilityState === "visible" && !statusRequest.current) refresh(); };
@@ -176,8 +180,13 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
     finally { if (downloadRequest.current === controller) downloadRequest.current = null; if (!controller.signal.aborted) setDownloading(false); }
   };
 
-  const showingExplorer = Boolean(open && saved && loaded?.identity === identity);
+  const showingExplorer = sourceMatches && open;
+  const verified = loaded?.identity === identity ? loaded : null;
   useLayoutEffect(() => {
+    if (initialOpening.current && open) {
+      initialOpening.current = false;
+      if (!pendingFocus.current) { previousOpen.current = open; return; }
+    }
     if (previousOpen.current !== open) pendingFocus.current = true;
     previousOpen.current = open;
     if (!pendingFocus.current || (open && !showingExplorer)) return;
@@ -185,32 +194,31 @@ export function AccountPortraitExplorer({ chartId, document, pattern, canCreate,
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ behavior: "instant", block: "start" });
     pendingFocus.current = false;
-  }, [open, showingExplorer, useLegacy]);
+  }, [open, showingExplorer]);
 
-  if (!sourceMatches) return <>{children}</>;
-  if (!eligible) return <><PortraitAutomationControl chartId={chartId} canEnable={canCreate} onUnauthorized={onUnauthorized} onChanged={refresh} /><p>3D portraits currently support four-chapter Patterns. Your complete reading is available below.</p>{children}</>;
-  if (useLegacy) return <><PortraitAutomationControl chartId={chartId} canEnable={canCreate} onUnauthorized={onUnauthorized} onChanged={refresh} /><div ref={contentElement} tabIndex={-1}>{legacy}</div></>;
+  if (!canRender) return <>{children}</>;
   return <>
-    <section className="account-portrait" aria-label="Your 3D portrait">
-      <div className="account-portrait__heading"><p className="kicker">Your 3D portrait</p><h3>Four chapters, a shape of your own</h3></div>
-      <PortraitAutomationControl chartId={chartId} canEnable={canCreate} onUnauthorized={onUnauthorized} onChanged={refresh} />
-      {!response && !error && <p role="status">Checking your saved portrait.</p>}
-      {response?.status === "not_started" && <p>Choose automatic portraits above to turn this Pattern into four objects you can explore. Your reading is ready below.</p>}
-      {response?.status === "generating" && <><p role="status">Creating your portrait · {response.portrait.completed_chapters} of 4 images · {response.completed_models} of 4 models saved.</p><p>You can keep reading or leave and return. Each model is checked against its chapter image before it is saved.</p></>}
-      {response?.status === "failed" && <><p role="status">Your 3D portrait could not be completed. {response.completed_models} of 4 models are saved.</p><p>Your complete reading remains available. Saved images and completed models are retained.</p>
-        {response.retryable && <p>Unfinished work may still be retried automatically. Check its progress below.</p>}
+    {!open && <button type="button" className="button button--primary" onClick={() => { pendingFocus.current = true; openExplorer(); }}>Explore your 3D portrait</button>}
+    <div ref={contentElement} tabIndex={-1}>{showingExplorer ? <PortraitExplorer source={source} objectBindings={verified?.bindings} meshBundle={verified?.bundle} navigation={navigation} sky={sky?.chartId === chartId ? sky : null} /> : children}</div>
+    <section className="account-portrait" aria-label="Chapter artwork">
+      <h3>Chapter artwork</h3>
+      <p>{artworkEligible ? "Your observatory is ready to explore. Optional artwork adds a personal object to each reading station." : "Generated artwork is not available for this Pattern. Your reading stations are ready to explore."}</p>
+      <PortraitAutomationControl chartId={chartId} canEnable={canCreate && artworkEligible} onUnauthorized={onUnauthorized} onChanged={refresh} />
+      {artworkEligible && <>
+      {checking && !response && !error && <p role="status">Checking your saved portrait.</p>}
+      {!checking && !error && (!response || response.status === "unavailable") && <p>Chapter artwork is currently unavailable. <button type="button" onClick={refresh}>Refresh portrait status</button></p>}
+      {response?.status === "not_started" && <p>Choose automatic portraits to create objects from your chapters.</p>}
+      {response?.status === "generating" && <p role="status">Creating your portrait · {response.portrait.completed_chapters} of 4 images · {response.completed_models} of 4 models saved.</p>}
+      {response?.status === "failed" && <><p role="status">Your 3D portrait could not be completed. {response.completed_models} of 4 models are saved.</p>
+        {response.retryable && <p>Unfinished work may still be retried automatically.</p>}
         <button type="button" className="button button--secondary" onClick={refresh}>Refresh portrait status</button></>}
       {saved && <>
-        <p>Your four objects are saved privately with this Pattern. Exploring them reuses the saved models.</p>
-        <div className="account-portrait__actions"><button type="button" className="button button--primary" aria-expanded={open} aria-disabled={open} onClick={() => { if (open) return; pendingFocus.current = true; openExplorer(); }}>{open ? showingExplorer ? "Portrait open" : "Loading portrait…" : "Explore your 3D portrait"}</button>
-          <button type="button" className="button button--secondary" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download complete portrait"}</button></div>
-        <p className="account-portrait__detail">The private download includes your complete reading, four images, four 3D models, and their saved source records. It is separate from your account data export.</p>
+        <button type="button" className="button button--secondary" disabled={downloading} onClick={() => void download()}>{downloading ? "Preparing download…" : "Download complete portrait"}</button>
+        <p className="account-portrait__detail">The private download includes your complete reading, four images, four 3D models, and their saved source records.</p>
       </>}
       {error && <div role="alert"><p>{error}</p><button type="button" className="button button--secondary" onClick={refresh}>Refresh portrait status</button></div>}
-      {open && saved && loaded?.identity !== identity && (assetError ? <p role="alert">Your saved portrait could not be loaded. Your reading is still available. <button type="button" onClick={() => setAssetAttempt((value) => value + 1)}>Retry portrait loading</button></p> : <p role="status">Loading your saved images and 3D models.</p>)}
-      {open && !showingExplorer && <button type="button" className="button button--secondary" onClick={closeExplorer}>Cancel portrait loading</button>}
+      {open && saved && !verified && (assetError ? <p role="alert">Your saved artwork could not be loaded. Your observatory and reading are still available. <button type="button" onClick={() => setAssetAttempt((value) => value + 1)}>Retry portrait loading</button></p> : <p role="status">Loading your saved images and 3D models.</p>)}
+      </>}
     </section>
-    <div ref={contentElement} tabIndex={-1}>{showingExplorer && loaded ? <PortraitExplorer source={source} objectBindings={loaded.bindings} meshBundle={loaded.bundle} navigation={navigation} sky={sky?.chartId === chartId ? sky : null} />
-      : children}</div>
   </>;
 }

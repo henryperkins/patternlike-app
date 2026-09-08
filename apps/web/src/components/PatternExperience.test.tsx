@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PatternConsent,
   PatternRegenerationState,
@@ -11,7 +11,8 @@ import { PATTERN_GENERATION_CONSENT_POLICY_VERSION } from "@patternlike/shared";
 import { capturedFor, deferred, mockApiResponses as apiResponses, type MockResponse } from "../test/api-mock.js";
 import { PatternExperience } from "./PatternExperience.js";
 
-// Older deployments have no mesh/automation routes; keep that fallback explicit.
+// Missing artwork routes must not prevent the default observatory or reading.
+beforeEach(() => { HTMLElement.prototype.scrollIntoView = vi.fn(); });
 const mockApiResponses = (responses: Record<string, MockResponse>) => apiResponses({
   "/v1/pattern-portrait/automation": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
   "/v1/pattern-portrait/explorer": { status: 404, body: { error: { code: "not_found", message: "Not found" } } },
@@ -493,13 +494,14 @@ describe("Pattern reader revision matching", () => {
     expect(screen.queryByRole("heading", { name: "A standing emphasis" })).toBeNull();
   });
 
-  it("adds optional portrait creation to a matched four-chapter reading without removing account controls", async () => {
+  it("opens the observatory without artwork routes and keeps reading and account controls", async () => {
     const fourChapters = { ...generated, core_chapters: Array.from({ length: 4 }, (_, index) => ({ ...generated.core_chapters[0], title: `Published chapter ${index + 1}` })) };
     mockApiResponses({ [STATE]: { status: 200, body: { ...readyState(), consent: { ...consent, status: "granted" } } }, [PATTERN]: { status: 200, body: fourChapters }, "/v1/pattern-portrait": { status: 200, body: { schema_version: "pattern-portrait/v1", status: "not_started", portrait_id: null, chart_id: "cht_pattern_ai_0001", pattern_id: generated.pattern_id, generated_at: generated.generated_at, document_revision: `0.7.0:${generated.pattern_id}:${generated.generated_at}`, sun_sign: "aries", completed_chapters: 0, retryable: true, chapters: [], graph: null } } });
     render(<PatternExperience chartId="cht_pattern_ai_0001" onUnauthorized={noop} />);
-    expect(await screen.findByRole("button", { name: "Create my constellation" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Pattern portrait explorer" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Full reading" }));
     expect(screen.getByRole("heading", { name: "Published chapter 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete this Pattern" })).toBeInTheDocument();
-    expect(screen.getByText(/Your birth date, time, birthplace/i)).toBeInTheDocument();
+    expect(capturedFor("/v1/pattern-portrait")).toHaveLength(0);
   });
 });
