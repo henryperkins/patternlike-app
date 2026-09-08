@@ -5,6 +5,68 @@ const chapterIds = ["chapter-1", "chapter-2", "chapter-3", "chapter-4"];
 const act = (state: ExplorerState, ...actions: ExplorerAction[]) => actions.reduce(explorerReducer, state);
 
 describe("portrait explorer navigation", () => {
+  it("unfolds into an overview with one reversible history entry and preserves source choices", () => {
+    const origin = act(createExplorerState(chapterIds), { type: "select", chapterId: "chapter-3" }, { type: "facet", facet: "resources" }, { type: "passage", index: 2 });
+    const unfolded = explorerReducer(origin, { type: "unfold", overview: true });
+    expect(unfolded.view).toEqual({ kind: "whole" });
+    expect(unfolded.unfolded).toBe(true);
+    expect(unfolded.facets).toEqual(origin.facets);
+    expect(unfolded.passages).toEqual(origin.passages);
+    expect(unfolded.past).toHaveLength(origin.past.length + 1);
+    expect(explorerReducer(unfolded, { type: "back" })).toEqual(origin);
+    const selected = explorerReducer(unfolded, { type: "select", chapterId: "chapter-3" });
+    const assembled = explorerReducer(selected, { type: "unfold", overview: true });
+    expect(assembled.view).toEqual({ kind: "whole" });
+    expect(assembled.unfolded).toBe(false);
+    expect(explorerReducer(assembled, { type: "back" })).toEqual(selected);
+  });
+
+  it("returns to the active guide stop and passage after unfolding to overview", () => {
+    const origin = act(createExplorerState(chapterIds), { type: "select", chapterId: "chapter-2" }, { type: "facet", facet: "resources" });
+    const guided = act(origin, { type: "guide" }, { type: "guide-step", step: 2 }, { type: "facet", facet: "tensions" }, { type: "passage", index: 1 });
+    const overview = explorerReducer(guided, { type: "unfold", overview: true });
+    expect(overview.past).toHaveLength(guided.past.length + 1);
+    expect(explorerReducer(overview, { type: "back" })).toEqual(guided);
+  });
+
+  it("tracks each compared chapter's passage without changing the pair or its return snapshot", () => {
+    const origin = act(createExplorerState(chapterIds), { type: "select", chapterId: "chapter-1" }, { type: "passage", index: 2 });
+    const pair = explorerReducer(origin, { type: "compare", chapterId: "chapter-2" });
+    const linked = explorerReducer(pair, { type: "passage", chapterId: "chapter-2", index: 1 });
+    expect(linked.passages["chapter-2"]).toBe(1);
+    expect(linked.passages["chapter-1"]).toBe(2);
+    expect(linked.view).toEqual(pair.view);
+    expect(linked.past).toBe(pair.past);
+    expect(explorerReducer(linked, { type: "passage", chapterId: "chapter-3", index: 4 })).toBe(linked);
+    expect(explorerReducer(linked, { type: "back" })).toEqual(origin);
+  });
+
+  it("retains the selected sky body when returning from an expanded sky presentation", () => {
+    const sky = act(createExplorerState(chapterIds), { type: "sky", body: "sun" });
+    const expanded = act(sky, { type: "presentation", presentation: "scene" }, { type: "sky", body: "moon" });
+    const returned = explorerReducer(expanded, { type: "back" });
+    expect(returned.presentation).toBe("explore");
+    expect(returned.sky).toEqual({ body: "moon" });
+    expect(explorerReducer(returned, { type: "back" })).toEqual(createExplorerState(chapterIds));
+  });
+
+  it.each(["explore", "reading", "scene"] as const)("returns from sky to the exact %s snapshot", (presentation) => {
+    const origin = act(createExplorerState(chapterIds),
+      { type: "select", chapterId: "chapter-1" }, { type: "facet", facet: "tensions" }, { type: "passage", index: 1 },
+      ...(presentation === "explore" ? [] : [{ type: "presentation" as const, presentation }]),
+      { type: "compare", chapterId: "chapter-2" },
+    );
+    const sky = explorerReducer(origin, { type: "sky", body: "sun" });
+    expect(sky.sky).toEqual({ body: "sun" });
+    expect(sky.past).toHaveLength(origin.past.length + 1);
+    const moon = explorerReducer(sky, { type: "sky", body: "moon" });
+    expect(moon.sky).toEqual({ body: "moon" });
+    expect(moon.past).toBe(sky.past);
+    expect(explorerReducer(moon, { type: "sky", body: "moon" })).toBe(moon);
+    expect(explorerReducer(moon, { type: "sky", body: "ascendant" }).sky).toEqual({ body: "ascendant" });
+    expect(explorerReducer(moon, { type: "back" })).toEqual(origin);
+  });
+
   it("remembers each chapter's facet and passage after visiting the whole portrait", () => {
     const state = act(createExplorerState(chapterIds),
       { type: "select", chapterId: "chapter-1" }, { type: "facet", facet: "tensions" }, { type: "passage", index: 2 },
@@ -116,6 +178,7 @@ describe("portrait explorer navigation", () => {
       { type: "select", chapterId: "../chapter-1" }, { type: "select", chapterId: "constructor" },
       { type: "compare", chapterId: "chapter-1" }, { type: "compare", chapterId: "chapter-5" },
       { type: "facet", facet: "unpublished" }, { type: "passage", index: -1 }, { type: "passage", index: 1.5 },
+      { type: "sky", body: "invented" },
       { type: "passage", index: NaN }, { type: "passage", index: Infinity }, { type: "passage", index: Number.MAX_SAFE_INTEGER + 1 },
       { type: "presentation", presentation: "unknown" }, { type: "inspect", open: false }, { type: "select", chapterId: "chapter-1" },
     ] as ExplorerAction[]) expect(explorerReducer(state, action)).toBe(state);

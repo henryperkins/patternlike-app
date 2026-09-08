@@ -6,7 +6,7 @@ import type { PortraitSceneProps } from "./types.js";
 const props = (): PortraitSceneProps => ({
   assets: [{ chapterId: "direction", url: "/portrait-explorer/compass.glb", sha256: "0".repeat(64), sourceImageSha256: "1".repeat(64), sourceText: "Exact source" }],
   chapters: [{ id: "direction", title: "Finding your own direction", ordinal: 1 }],
-  selectedIds: ["direction"], facet: "tensions", activePassage: 1, unfolded: false, reducedMotion: true,
+  selectedIds: ["direction"], facet: "tensions", activePassages: { direction: 1 }, unfolded: false, reducedMotion: true,
   expanded: false, quality: "standard", viewKey: "chapter:direction", command: { kind: "right", serial: 8 },
   onBookmark: vi.fn(), onSelect: vi.fn(), onAnnotation: vi.fn(), onStatus: vi.fn(),
 });

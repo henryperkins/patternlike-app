@@ -28,7 +28,7 @@ export function ObservatoryControls({ experience, onChange, available, chapterId
       </button>
     </div>}
     <p className="observatory-hint" aria-live="polite">{!available ? "Your chapter reading remains available while the scene is paused." : skyView ? "Explore the twelve-sign ring and any available placements." : chapterId
-      ? experience.openDesks[chapterId] ? "The reading desk is open. Explore each perspective in the chapter reading." : "Turn the object to inspect every side, or open its reading desk."
+      ? experience.openDesks[chapterId] ? "The reading desk is open. Tap the selected object again or use Close reading desk to close it." : "Look closer frames the object; Step back restores its approach. Tap the selected object again or use Open reading desk to open its desk."
       : "A court, four chapter spaces. Choose a chapter to approach its display."}</p>
   </div>;
 }

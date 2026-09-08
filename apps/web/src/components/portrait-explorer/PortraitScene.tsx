@@ -11,12 +11,21 @@ import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, placeLabel, TapTracker, type LabelRect, verifyGlbAsset } from "./scene-utils.js";
 import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
-import { createObservatory, createReadingFolio, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
+import { comparisonPosition, createObservatory, createReadingFolio, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
 import { BodyIcon, signLabel, skyBodyLabels } from "./SkyReader.js";
 import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
 type LoadedForm = { id: string; root: Group; resources: Object3D[]; };
 type Motion = { start: number; duration: number; from: CameraBookmark; to: CameraBookmark; positions: Vector3[]; goals: Vector3[]; };
+
+function sceneDescription(props: PortraitSceneProps): string {
+  if (!props.skyView && props.selectedIds.length === 2) {
+    const names = props.selectedIds.map(id => props.chapters.find(chapter => chapter.id === id)?.title).filter(Boolean);
+    return `Two saved chapter objects: ${names.join(" and ")}. Use their named source-passage links and scene controls to explore.`;
+  }
+  return props.experience ? `A zodiac observatory with a bronze twelve-sign instrument${props.sky?.placements.length ? ", birth-chart markers" : ""}, ${props.chapters.length} chapter displays, and opening reading desks. Use the named sky, chapter, and scene controls to explore.`
+    : "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.";
+}
 
 async function loadForm(asset: PortraitSceneProps["assets"][number], signal: AbortSignal): Promise<LoadedForm> {
   const response = await fetch(asset.url, { credentials: "same-origin", signal });
@@ -83,6 +92,7 @@ class PortraitRuntime {
   private controls!: OrbitControls;
   private environment: WebGLRenderTarget | null = null;
   private observer?: ResizeObserver;
+  private labelObserver?: ResizeObserver;
   private raycaster = new Raycaster();
   private taps = new TapTracker();
   private animation: number | null = null;
@@ -96,10 +106,12 @@ class PortraitRuntime {
   private bottomInset = 0;
   private visible = true;
   private hovered: string | null = null;
+  private orbiting = false;
   private ground!: Mesh;
   private rings: Mesh[] = [];
   private elevations: number[] = [];
   private localBoxes: Box3[] = [];
+  private stationBoxes: Box3[] = [];
   private materials = new Map<MeshStandardMaterial, { emissive: Color; intensity: number; }>();
   private keyLight!: DirectionalLight;
   private hemisphere!: HemisphereLight;
@@ -113,7 +125,7 @@ class PortraitRuntime {
     try {
     const canvas = this.renderer.domElement;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", props.experience ? `A zodiac observatory with a bronze twelve-sign instrument${props.sky?.placements.length ? ", birth-chart markers" : ""}, ${props.chapters.length} chapter displays, and opening reading desks. Use the named sky, chapter, and scene controls to explore.` : "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.");
+    canvas.setAttribute("aria-label", sceneDescription(props));
     canvas.style.cssText = "display:block;width:100%;height:100%;cursor:grab";
     this.host.append(canvas);
     this.renderer.setClearColor("#091b21");
@@ -145,6 +157,7 @@ class PortraitRuntime {
     if (props.experience) {
       this.world = createObservatory(forms.length, props.sky?.placements ?? []);
       this.scene.add(this.world.root);
+      this.stationBoxes = this.world.stations.map(station => new Box3().setFromObject(station).translate(station.position.clone().negate()));
       this.keyLight.shadow.mapSize.set(2048, 2048);
       this.keyLight.shadow.camera.left = -11;
       this.keyLight.shadow.camera.right = 11;
@@ -193,11 +206,17 @@ class PortraitRuntime {
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(host);
     for (const toolbar of host.closest(".explorer-scene")?.querySelectorAll(".explorer-scene-top, .explorer-scene-toolbar") ?? []) this.observer.observe(toolbar);
+    this.labelObserver = new ResizeObserver(this.invalidate);
+    this.observeLabels();
     this.resize();
     this.applyQuality();
     this.applyExperience();
     this.world?.tick(1);
-    this.forms.forEach(form => { form.root.rotation.y = (props.experience?.turns[form.id] ?? 0) * Math.PI / 4; });
+    this.forms.forEach((form, index) => {
+      form.root.rotation.y = (props.experience?.turns[form.id] ?? 0) * Math.PI / 4;
+      form.root.position.fromArray(this.layout(index, props.unfolded));
+      form.root.position.y = this.elevations[index]!;
+    });
     const pose = isCameraBookmark(props.bookmark) ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame();
     this.applyPose(pose);
     this.updateEmphasis();
@@ -209,7 +228,14 @@ class PortraitRuntime {
   }
 
   private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray(), frameDistance: this.frameDistance() });
-  private layout = (index: number, unfolded: boolean) => this.world ? stationPosition(index, unfolded, this.forms.length) : chapterLayout(index, unfolded);
+  private comparison = () => !this.props.skyView && this.props.selectedIds.length === 2;
+  private selectedIndices = () => this.props.selectedIds.flatMap(id => {
+    const index = this.forms.findIndex(form => form.id === id);
+    return index < 0 ? [] : [index];
+  });
+  private layout = (index: number, unfolded: boolean) => this.comparison() && this.props.selectedIds.includes(this.forms[index].id)
+    ? comparisonPosition(index, this.selectedIndices(), this.localBoxes.map((box, i) => box.clone().applyMatrix4(new Matrix4().makeRotationY((this.props.experience?.turns[this.forms[i].id] ?? 0) * Math.PI / 4))))
+    : this.world ? stationPosition(index, unfolded, this.forms.length) : chapterLayout(index, unfolded);
   private save = () => { if (this.ready) this.props.onBookmark(this.props.viewKey, this.snapshot()); };
   private bounds = (unfolded = this.props.unfolded) => this.localBoxes.map((box, index) => {
     const position = new Vector3().fromArray(this.layout(index, unfolded));
@@ -225,6 +251,12 @@ class PortraitRuntime {
       return { position: target.clone().addScaledVector(new Vector3(0, 0.999, 0.045).normalize(), distance).toArray(), target: target.toArray() };
     }
     const selected = this.forms.flatMap((form, index) => this.props.selectedIds.includes(form.id) ? [index] : []);
+    if (this.comparison()) {
+      const boxes = this.bounds();
+      const pair = selected.map(index => this.stationBoxes[index]
+        ? boxes[index].union(this.stationBoxes[index].clone().translate(new Vector3(...this.layout(index, this.props.unfolded)))) : boxes[index]);
+      return cameraFrame(pair, [], this.width / this.usableHeight, new Vector3(0, 0.85, 1).normalize());
+    }
     return this.world ? observatoryFrame(this.bounds(), selected, this.width / this.usableHeight, Boolean(this.props.experience?.inspect))
       : cameraFrame(this.bounds(), selected, this.width / this.usableHeight);
   };
@@ -259,7 +291,8 @@ class PortraitRuntime {
   private applyExperience() {
     const experience = this.props.experience;
     if (!this.world || !experience) return;
-    this.world.setState({ ...experience, open: this.forms.map(form => Boolean(experience.openDesks[form.id])), unfolded: this.props.unfolded });
+    this.world.setState({ ...experience, open: this.forms.map(form => Boolean(experience.openDesks[form.id])), unfolded: this.props.unfolded,
+      comparison: this.comparison() ? { indices: this.selectedIndices(), positions: this.forms.map((_, index) => this.layout(index, this.props.unfolded)) } : undefined });
     this.world.instrument.setSelection(this.props.selectedSkyBody ?? null, this.props.sky ? null : this.props.sunSign);
     this.world.instrument.setFocused(Boolean(this.props.skyView));
     const dusk = experience.lighting === "dusk";
@@ -281,14 +314,20 @@ class PortraitRuntime {
 
   update(props: PortraitSceneProps) {
     const before = this.props;
+    const turned = before.viewKey === props.viewKey && !props.skyView && props.selectedIds.length === 1
+      && props.selectedIds.some(id => (before.experience?.turns[id] ?? 0) !== (props.experience?.turns[id] ?? 0));
+    const previousBounds = turned ? this.selectedIndices().map(index => this.bounds()[index]) : null;
     if (before.viewKey !== props.viewKey) this.save();
     this.props = props;
+    this.renderer.domElement.setAttribute("aria-label", sceneDescription(props));
     if (before.quality !== props.quality || before.expanded !== props.expanded) this.applyQuality();
     this.applyExperience();
     if (before.viewKey !== props.viewKey || before.unfolded !== props.unfolded) {
       this.moveTo(isCameraBookmark(props.bookmark) && before.viewKey !== props.viewKey ? adaptCameraBookmark(props.bookmark, this.frameDistance()) : this.frame(), before.unfolded !== props.unfolded ? 540 : 420);
+    } else if (previousBounds) {
+      this.frameTurn(previousBounds);
     }
-    if (before.command.serial !== props.command.serial) this.command();
+    if (before.command.serial !== props.command.serial) this.command(before.unfolded !== props.unfolded ? 540 : 420);
     if (props.reducedMotion && this.motion) {
       this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
       this.applyPose(this.motion.to);
@@ -296,7 +335,15 @@ class PortraitRuntime {
       this.save();
     }
     this.updateEmphasis();
+    this.observeLabels();
     this.invalidate();
+  }
+
+  private observeLabels() {
+    // Text zoom and wrapping can change a label without resizing the canvas.
+    // Reproject it without reframing the reader's camera.
+    this.labelObserver?.disconnect();
+    for (const label of this.labels.querySelectorAll("[data-form-index], [data-sign-index], [data-sky-body]")) this.labelObserver?.observe(label);
   }
 
   private moveTo(pose: CameraBookmark, duration: number) {
@@ -314,9 +361,35 @@ class PortraitRuntime {
     this.invalidate();
   }
 
-  private command() {
+  private fitsView(boxes: readonly Box3[]) {
+    return boxes.every(box => {
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+        const point = new Vector3(x, y, z).project(this.camera);
+        const screenY = (1 - point.y) * this.height / 2;
+        if (Math.abs(point.x) > 0.98 || point.z < -1 || point.z > 1 || screenY < this.topInset + 2 || screenY > this.height - this.bottomInset - 2) return false;
+      }
+      return true;
+    });
+  }
+
+  private frameTurn(previousBounds: readonly Box3[]) {
+    // Correct clipping introduced by the turn, while preserving an already
+    // cropped view chosen through the camera controls.
+    if (!this.fitsView(previousBounds)) return;
+    const boxes = this.bounds();
+    const selected = this.selectedIndices().map(index => boxes[index]);
+    if (this.fitsView(selected)) return;
+    const direction = this.camera.position.clone().sub(this.controls.target).normalize();
+    const pose = cameraFrame(selected, [], this.width / this.usableHeight, direction);
+    const target = new Vector3(...pose.target);
+    const distance = Math.max(this.camera.position.distanceTo(this.controls.target),
+      new Vector3(...pose.position).distanceTo(target) * (this.props.experience?.inspect ? 1 : 1.2));
+    this.moveTo({ position: target.clone().addScaledVector(direction, distance).toArray(), target: target.toArray() }, 260);
+  }
+
+  private command(frameDuration = 420) {
     const kind = this.props.command.kind;
-    if (kind === "reset" || kind === "frame") { this.moveTo(this.frame(), 420); return; }
+    if (kind === "reset" || kind === "frame") { this.moveTo(this.frame(), frameDuration); return; }
     this.stopMotion();
     const offset = this.camera.position.clone().sub(this.controls.target);
     const spherical = new Spherical().setFromVector3(offset);
@@ -332,14 +405,15 @@ class PortraitRuntime {
     if (this.motion) this.forms.forEach((form, index) => form.root.position.copy(this.motion!.goals[index]!));
     this.motion = null;
   }
-  private onOrbitStart = () => { this.stopMotion(); this.renderer.domElement.style.cursor = "grabbing"; };
-  private onOrbitEnd = () => { this.renderer.domElement.style.cursor = "grab"; this.save(); };
+  private onOrbitStart = () => { this.stopMotion(); this.orbiting = true; this.renderer.domElement.style.cursor = "grabbing"; };
+  private onOrbitEnd = () => { this.orbiting = false; this.renderer.domElement.style.cursor = this.hovered ? "pointer" : "grab"; this.save(); };
   private onPointerDown = (event: PointerEvent) => this.taps.down(event, window.scrollX, window.scrollY);
   private onPointerMove = (event: PointerEvent) => {
     this.taps.move(event);
     if (event.buttons === 0 && event.pointerType !== "touch") this.highlight(this.pick(event));
   };
   private onPointerUp = (event: PointerEvent) => {
+    if (event.pointerType !== "touch") this.highlight(this.pick(event));
     if (!this.taps.up(event, window.scrollX, window.scrollY)) return;
     const id = this.pick(event);
     if (id?.startsWith("sky:")) this.props.onSelectSkyBody?.(id.slice(4) as PortraitSkyBody);
@@ -367,6 +441,7 @@ class PortraitRuntime {
     return data?.skyBody ? `sky:${data.skyBody}` : data?.chapterId ?? null;
   }
   highlight(id: string | null) {
+    if (!this.orbiting) this.renderer.domElement.style.cursor = id ? "pointer" : "grab";
     if (this.hovered === id) return;
     this.hovered = id;
     this.updateEmphasis();
@@ -375,8 +450,9 @@ class PortraitRuntime {
   private updateEmphasis() {
     this.forms.forEach((form, index) => {
       const selected = !this.props.skyView && this.props.selectedIds.includes(form.id);
+      form.root.visible = !this.comparison() || selected;
       const highlighted = this.hovered === form.id;
-      this.rings[index]!.visible = selected || highlighted;
+      this.rings[index]!.visible = form.root.visible && (selected || highlighted);
       form.root.traverse(object => {
         if (!(object instanceof Mesh)) return;
         for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -423,6 +499,16 @@ class PortraitRuntime {
   private projectLabels() {
     this.projectSkyLabels();
     const occupied: Array<{ x: number; y: number; width: number; height: number }> = [];
+    const objectRects: LabelRect[] = this.comparison() ? this.forms.filter(form => form.root.visible).map(form => {
+      const box = new Box3().setFromObject(form.root);
+      const min = new Vector2(Infinity, Infinity), max = new Vector2(-Infinity, -Infinity);
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+        const point = new Vector3(x, y, z).project(this.camera);
+        const screen = new Vector2((point.x + 1) * this.width / 2, (1 - point.y) * this.height / 2);
+        min.min(screen); max.max(screen);
+      }
+      return { x: min.x - 6, y: min.y - 6, width: max.x - min.x + 12, height: max.y - min.y + 12 };
+    }) : [];
     // The selected annotation gets first claim on space. Occluded labels remain in the native chapter rail.
     const ordered = this.forms.map((form, index) => ({ form, index })).sort((a, b) => Number(this.props.selectedIds.includes(b.form.id)) - Number(this.props.selectedIds.includes(a.form.id)));
     for (const { form, index } of ordered) {
@@ -444,14 +530,21 @@ class PortraitRuntime {
       const height = label.offsetHeight || 44;
       let x = Math.max(8, Math.min(this.width - width - 8, (projected.x + 1) * this.width / 2 - width / 2));
       let y = Math.max(this.topInset + 4, Math.min(this.height - this.bottomInset - height - 4, (1 - projected.y) * this.height / 2 - height));
-      if (compact && visible) {
+      let unplaceable = false;
+      if ((compact || this.comparison()) && visible) {
         const placed = placeLabel({ x, y, width, height }, {
           x: 8, y: this.topInset + 4, width: this.width - 16, height: this.usableHeight - 8,
-        }, occupied.map(other => ({ x: other.x - 3, y: other.y - 3, width: other.width + 6, height: other.height + 6 })));
-        if (placed) { x = placed.x; y = placed.y; } else visible = false;
+        }, [...objectRects, ...occupied.map(other => ({ x: other.x - 3, y: other.y - 3, width: other.width + 6, height: other.height + 6 }))]);
+        if (placed) { x = placed.x; y = placed.y; } else { visible = false; unplaceable = true; }
       } else if (occupied.some(other => x < other.x + other.width + 8 && x + width + 8 > other.x && y < other.y + other.height + 8 && y + height + 8 > other.y)) visible = false;
-      // Never hide a focused native control while a camera transition is running.
-      if (document.activeElement === label) visible = true;
+      // Enlarged comparison labels can outgrow the canvas. Keep keyboard access
+      // in their matching native link instead of forcing an obstructing overlay.
+      if (document.activeElement === label) {
+        const fallback = this.comparison() && unplaceable
+          ? [...this.host.closest(".explorer-visual")?.querySelectorAll<HTMLButtonElement>(".explorer-compared-chapters button") ?? []].find(button => button.dataset.chapterId === form.id) : undefined;
+        if (fallback) { fallback.focus({ preventScroll: true }); fallback.scrollIntoView({ behavior: "instant", block: "nearest" }); }
+        else visible = true;
+      }
       label.style.visibility = visible ? "visible" : "hidden";
       label.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
       if (visible) occupied.push({ x, y, width, height });
@@ -570,6 +663,7 @@ class PortraitRuntime {
     this.disposed = true;
     if (this.animation !== null) cancelAnimationFrame(this.animation);
     this.observer?.disconnect();
+    this.labelObserver?.disconnect();
     this.controls?.removeEventListener("change", this.invalidate);
     this.controls?.removeEventListener("start", this.onOrbitStart);
     this.controls?.removeEventListener("end", this.onOrbitEnd);
@@ -677,16 +771,19 @@ export default function PortraitScene(props: PortraitSceneProps) {
         aria-label={`${skyBodyLabels[placement.body]} in ${signLabel(placement.sign)}`} style={{ visibility: "hidden" }} onClick={() => props.onSelectSkyBody?.(placement.body)}><BodyIcon body={placement.body} />{skyBodyLabels[placement.body]}</button>)}
       {props.chapters.map((chapter, index) => {
         const selected = props.selectedIds.includes(chapter.id);
-        const annotation = selected && chapter.id === props.selectedIds[0];
-        return <button key={chapter.id} type="button" data-form-index={index} data-selected={selected} data-active-passage={annotation && props.activePassage !== null ? props.activePassage : undefined}
+        const comparing = !props.skyView && props.selectedIds.length === 2;
+        if (comparing && !selected) return null;
+        const annotation = selected && (comparing || chapter.id === props.selectedIds[0]);
+        const passage = props.activePassages[chapter.id] ?? 0;
+        return <button key={chapter.id} type="button" data-form-index={index} data-chapter-id={chapter.id} data-selected={selected} data-active-passage={annotation ? passage : undefined}
           className={annotation ? "explorer-annotation" : "explorer-chapter-label"}
           style={{ position: "absolute", top: 0, left: 0, minWidth: 44, minHeight: 44, pointerEvents: "auto" }}
-          aria-label={annotation ? `${facet.label}: show source passage${props.activePassage === null ? "" : ` ${props.activePassage + 1}`} for ${chapter.title}` : `Explore chapter ${chapter.ordinal}: ${chapter.title}`}
+          aria-label={annotation ? `${facet.label}: show source passage ${passage + 1} for ${chapter.title}` : `Explore chapter ${chapter.ordinal}: ${chapter.title}`}
           aria-pressed={annotation ? undefined : selected}
           onFocus={() => runtime.current?.highlight(chapter.id)} onBlur={() => runtime.current?.highlight(null)}
           onPointerEnter={() => runtime.current?.highlight(chapter.id)} onPointerLeave={() => runtime.current?.highlight(null)}
-          onClick={() => annotation ? props.onAnnotation() : props.onSelect(chapter.id)}>
-          {annotation ? <><span aria-hidden="true">●</span> {facet.label}{props.activePassage !== null && <span className="explorer-passage-number"> · {props.activePassage + 1}</span>}</> : <><span className="explorer-label-ordinal"><span className="explorer-label-prefix">Chapter </span>{String(chapter.ordinal).padStart(2, "0")}</span><span className="explorer-label-title">{chapter.title}</span></>}
+          onClick={() => annotation ? props.onAnnotation(chapter.id) : props.onSelect(chapter.id)}>
+          {annotation ? <>{comparing && <span className="explorer-label-title">{chapter.title}</span>}<span><span aria-hidden="true">●</span> {facet.label}<span className="explorer-passage-number"> · {passage + 1}</span></span></> : <><span className="explorer-label-ordinal"><span className="explorer-label-prefix">Chapter </span>{String(chapter.ordinal).padStart(2, "0")}</span><span className="explorer-label-title">{chapter.title}</span></>}
         </button>;
       })}
     </div>

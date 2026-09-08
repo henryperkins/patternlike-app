@@ -6,13 +6,13 @@ import { nativeImageBindings, nativePattern } from "../../preview/native-image-s
 import { createPortraitManifest } from "../../lib/pattern-portrait.js";
 import type { PortraitMeshBundle, PortraitSceneProps } from "./types.js";
 import { PortraitExplorer } from "./PortraitExplorer.js";
-import { useExplorerNavigation } from "./use-explorer-navigation.js";
+import { clearExplorerMemory, createExplorerMemory, useExplorerNavigation } from "./use-explorer-navigation.js";
 
 const scene = vi.hoisted(() => ({ props: null as PortraitSceneProps | null }));
 vi.mock("./PortraitScene.js", () => ({ default: (props: PortraitSceneProps) => {
   scene.props = props;
   useEffect(() => { props.onStatus("ready"); }, [props.onStatus]);
-  return <div data-testid="scene"><button onClick={() => props.onSelect("chapter-1")}>Pick compass body</button><button onClick={props.onAnnotation}>Open scene annotation</button><button onClick={() => props.onStatus("unavailable")}>Lose graphics</button></div>;
+  return <div data-testid="scene"><button onClick={() => props.onSelect("chapter-1")}>Pick compass body</button><button onClick={() => props.onAnnotation(props.selectedIds[0])}>Open scene annotation</button><button onClick={() => props.onStatus("unavailable")}>Lose graphics</button></div>;
 } }));
 const source = { status: "ready" as const, document: nativePattern };
 const manifest = createPortraitManifest(nativePattern, nativeImageBindings);
@@ -55,6 +55,183 @@ describe("Portrait exploration", () => {
     expect(screen.queryByText(/authored models|fictional study/i)).not.toBeInTheDocument();
   });
 
+  it("retains display choices and camera bookmarks across account close and reopen", async () => {
+    const memory = createExplorerMemory();
+    function Account() {
+      const navigation = useExplorerNavigation(manifest.chapters.map(item => item.id), { embedded: true, memory });
+      return navigation.isOpen
+        ? <PortraitExplorer source={source} objectBindings={nativeImageBindings} meshBundle={bundle} navigation={navigation} />
+        : <button onClick={navigation.open}>Open portrait</button>;
+    }
+    const user = userEvent.setup();
+    const view = render(<Account />);
+    await user.click(screen.getByRole("button", { name: "Open portrait" }));
+    await screen.findByTestId("scene");
+    await chapter(user, 2);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByText("Scene options"));
+    for (const name of ["Dusk", "Show roof", "Open reading desk", "Turn chapter object", "Look closer"]) await user.click(screen.getByRole("button", { name }));
+    const bookmark = { position: [-3, 3, 6] as [number, number, number], target: [-2, 1, -1] as [number, number, number], frameDistance: 8 };
+    act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
+    await user.click(screen.getByRole("button", { name: "Back to reading" }));
+    await waitFor(() => expect(window.history.state?.portrait).toBeUndefined());
+    // Remounting the account route still uses the same private session.
+    view.unmount();
+    render(<Account />);
+    await user.click(screen.getByRole("button", { name: "Open portrait" }));
+    await screen.findByTestId("scene");
+    await user.click(screen.getByText("Scene options"));
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Cut away roof" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Close reading desk" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Step back" })).toHaveAttribute("aria-pressed", "true");
+    expect(scene.props!.experience!.turns["chapter-2"]).toBe(1);
+    expect(scene.props!.bookmark).toEqual(bookmark);
+    expect(JSON.stringify(window.history.state)).not.toContain("chapter-2");
+    expect(window.location.href).not.toContain("chapter-2");
+    const save = scene.props!.onBookmark, key = scene.props!.viewKey;
+    act(() => clearExplorerMemory(memory));
+    // A disposed renderer cannot put its last camera back into invalidated memory.
+    act(() => save(key, bookmark));
+    expect(memory.scene).toBeNull();
+  });
+
+  it("shows the whole current layout on unfold and returns to the exact chapter with Back", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByText("Scene options"));
+    await user.click(screen.getByRole("button", { name: "Look closer" }));
+    const bookmark = { position: [4, 3, 2] as [number, number, number], target: [1, 1, 1] as [number, number, number] };
+    act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
+    await user.click(screen.getByRole("button", { name: /^Unfold portrait/ }));
+    expect(scene.props!.selectedIds).toEqual([]);
+    expect(scene.props!.unfolded).toBe(true);
+    const command = scene.props!.command.serial;
+    const historyIndex = window.history.state.portrait.index;
+    await user.click(screen.getByRole("button", { name: "Whole portrait" }));
+    expect(scene.props!.unfolded).toBe(true);
+    expect(scene.props!.command.serial).toBeGreaterThan(command);
+    expect(window.history.state.portrait.index).toBe(historyIndex);
+    act(() => window.history.back());
+    await waitFor(() => expect(scene.props!.selectedIds).toEqual(["chapter-1"]));
+    expect(scene.props!.unfolded).toBe(false);
+    expect(scene.props!.bookmark).toEqual(bookmark);
+    expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("links either compared chapter to its own complete source passage without breaking the pair", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    const navigation = screen.getByRole("navigation", { name: "Compared chapters" });
+    expect(within(navigation).getAllByRole("button")).toHaveLength(2);
+    const second = screen.getByRole("region", { name: nativePattern.core_chapters[1].title });
+    await user.click(within(second).getByRole("button", { name: "Show passage 2 in portrait" }));
+    await waitFor(() => expect(within(navigation).getAllByRole("button")[1]).toHaveFocus());
+    act(() => scene.props!.onAnnotation("chapter-2"));
+    expect(screen.getByText(nativePattern.core_chapters[1].sections[1].text)).toHaveFocus();
+    expect(scene.props!.selectedIds).toEqual(["chapter-1", "chapter-2"]);
+    for (const item of nativePattern.core_chapters.slice(0, 2)) for (const paragraph of item.sections) expect(screen.getByText(paragraph.text)).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Resources" }));
+    act(() => scene.props!.onAnnotation("chapter-2"));
+    expect(screen.getByText(nativePattern.core_chapters[1].resources[0].text)).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "End comparison" }));
+    await waitFor(() => expect(scene.props?.selectedIds).toEqual(["chapter-1"]));
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps comparison motion and graphics settings available when the scene is paused", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    await user.click(screen.getByText("Scene options"));
+    await user.click(screen.getByText("Scene controls & motion"));
+    await user.click(screen.getByRole("button", { name: "Lose graphics" }));
+    await user.click(screen.getByRole("checkbox", { name: "Reduce motion" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Graphics" }), "low");
+    expect(scene.props!.quality).toBe("low");
+    expect(scene.props!.reducedMotion).toBe(true);
+    expect(screen.getByRole("button", { name: "End comparison" })).toBeEnabled();
+    expect(screen.getByText(nativePattern.core_chapters[1].sections[0].text)).toBeInTheDocument();
+  });
+
+  it("keeps the comparison pair through expanded passage links and restores the originating camera on exit", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    const bookmark = { position: [4, 2, -3] as [number, number, number], target: [1, 0, 0] as [number, number, number] };
+    act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    await user.click(screen.getByRole("button", { name: "Expand scene" }));
+    act(() => scene.props!.onAnnotation("chapter-2"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText(nativePattern.core_chapters[1].sections[0].text)).toHaveFocus();
+    expect(scene.props!.selectedIds).toEqual(["chapter-1", "chapter-2"]);
+    await user.click(screen.getByRole("button", { name: "End comparison" }));
+    await waitFor(() => expect(scene.props!.bookmark).toEqual(bookmark));
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
+  });
+
+  it("focuses the visible second comparison passage when returning from the sky reader", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    const text = nativePattern.core_chapters[1].sections[0].text;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.matches(".explorer-reader")) return new DOMRect(0, -1000, 390, 2400);
+      return this.tagName === "P" && this.textContent === text ? new DOMRect(20, 240, 350, 150) : new DOMRect(0, -500, 350, 80);
+    });
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await user.click(screen.getByRole("button", { name: "Explore your Pattern" }));
+    await waitFor(() => expect(screen.getByText(text)).toHaveFocus());
+  });
+
+  it("returns directly to Pattern from an expanded sky and keeps body choices when closing only the expansion", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("tab", { name: "Tensions" }));
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await user.click(screen.getByRole("button", { name: "Expand scene" }));
+    act(() => scene.props!.onSelectSkyBody!("moon"));
+    await user.click(screen.getByRole("button", { name: "Close expanded scene" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(scene.props?.skyView).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Expand scene" }));
+    await user.click(screen.getByRole("button", { name: "Back to Pattern" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(scene.props?.skyView).toBe(false);
+    expect(scene.props?.facet).toBe("tensions");
+  });
+
+  it("closes the expanded scene even when sky was opened inside it", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Expand scene" }));
+    act(() => scene.props!.onSelectSkyBody!("sun"));
+    await user.click(screen.getByRole("button", { name: "Close expanded scene" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(scene.props?.skyView).toBe(false);
+    expect(scene.props?.selectedIds).toEqual(["chapter-1"]);
+  });
+
+  it("returns from sky before undoing the chapter facet, and restores sky on Forward", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
+    await chapter(user);
+    await user.click(screen.getByRole("tab", { name: "Tensions" }));
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    await act(async () => {
+      const done = new Promise<void>((resolve) => window.addEventListener("popstate", () => resolve(), { once: true }));
+      window.history.back(); await done;
+    });
+    expect(scene.props?.skyView).toBe(false);
+    expect(screen.getByRole("tab", { name: "Tensions" })).toHaveAttribute("aria-selected", "true");
+    await act(async () => {
+      const done = new Promise<void>((resolve) => window.addEventListener("popstate", () => resolve(), { once: true }));
+      window.history.forward(); await done;
+    });
+    expect(scene.props?.skyView).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Back to Pattern" }));
+    await waitFor(() => expect(scene.props?.skyView).toBe(false));
+    expect(screen.getByRole("tab", { name: "Tensions" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("returns focus to the selected chapter when leaving the sky reader", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user, 2);
@@ -69,13 +246,16 @@ describe("Portrait exploration", () => {
     expect(screen.getByRole("heading", { name: "Your Pattern, in 4 chapters" })).toBeVisible();
   });
 
-  it("keeps one chapter introduction and reads the first chapter immediately", async () => {
+  it("keeps one chapter introduction and reads the first chapter with its identity beside Return", async () => {
     const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
+    expect(document.querySelector(".explorer-entry-invitation")).not.toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Your Pattern, in 4 chapters" })).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "Read chapter" }));
     expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
     expect(scene.props?.selectedIds).toEqual(["chapter-1"]);
     expect(screen.getByRole("heading", { name: nativePattern.core_chapters[0].title })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Return to portrait" }).closest(".explorer-mobile-modes")).toHaveTextContent(nativePattern.core_chapters[0].title);
+    expect(screen.getByRole("button", { name: "Your sky" }).closest(".explorer-mobile-modes")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Return to portrait" }));
     expect(scene.props?.selectedIds).toEqual(["chapter-1"]);
   });
@@ -84,6 +264,7 @@ describe("Portrait exploration", () => {
     const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
     await chapter(user, 2);
     await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByText("Scene options"));
     await user.click(screen.getByRole("button", { name: "Dusk" }));
     await user.click(screen.getByRole("button", { name: "Open reading desk" }));
     await user.click(screen.getByRole("button", { name: "Lose graphics" }));
@@ -109,6 +290,7 @@ describe("Portrait exploration", () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user, 2);
     await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByText("Scene options"));
     await user.click(screen.getByRole("button", { name: "Dusk" }));
     await user.click(screen.getByRole("button", { name: "Expand scene" }));
     const expanded = screen.getByRole("dialog", { name: "Expanded portrait scene" });
@@ -212,6 +394,7 @@ describe("Portrait exploration", () => {
   it("keeps each chapter's physical display state independent of its complete reading", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user);
+    await user.click(screen.getByText("Scene options"));
     await user.click(screen.getByRole("button", { name: "Open reading desk" }));
     await user.click(screen.getByRole("button", { name: "Turn chapter object" }));
     expect(screen.getByRole("button", { name: "Close reading desk" })).toHaveAttribute("aria-pressed", "true");
@@ -231,6 +414,7 @@ describe("Portrait exploration", () => {
   it("changes the courtyard light and cutaway without changing chapter or perspective", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user, 2);
     await user.click(screen.getByRole("tab", { name: "Tensions" }));
+    await user.click(screen.getByText("Scene options"));
     await user.click(screen.getByRole("button", { name: "Dusk" }));
     await user.click(screen.getByRole("button", { name: "Show roof" }));
     expect(screen.getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
@@ -259,9 +443,10 @@ describe("Portrait exploration", () => {
     expect(screen.getByRole("button", { name: "Open portrait" })).toBeInTheDocument();
   });
 
-  it("owns browser scroll restoration only while the explorer is mounted", () => {
+  it("owns browser scroll restoration only while the explorer is mounted", async () => {
     window.history.scrollRestoration = "auto";
     const view = mount();
+    await screen.findByTestId("scene");
     expect(window.history.scrollRestoration).toBe("manual");
     view.unmount();
     expect(window.history.scrollRestoration).toBe("auto");
@@ -324,11 +509,27 @@ describe("Portrait exploration", () => {
     expect(within(screen.getByRole("navigation", { name: "Pattern chapters" })).getByRole("button", { name: /^2\./ })).toHaveFocus();
   });
 
-  it("focuses the new chapter when the introductory control disappears", async () => {
+  it("approaches the object and focuses its named chapter when Explore is chosen", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await user.click(screen.getByRole("button", { name: "Explore the first chapter" }));
     expect(document.activeElement).toHaveTextContent(nativePattern.core_chapters[0].title);
-    expect(document.activeElement?.tagName).toBe("H2");
+    expect(document.activeElement?.tagName).toBe("BUTTON");
+    expect(document.activeElement?.closest(".explorer-chapters")).toBeInTheDocument();
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-explore");
+    expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts.at(-1)).toBe(document.querySelector(".explorer-scene"));
+  });
+
+  it("keeps named chapters before collapsed Scene options after selection", async () => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
+    const options = screen.getByText("Scene options").closest("details")!;
+    expect(options).not.toHaveAttribute("open");
+    const rail = screen.getByRole("navigation", { name: "Pattern chapters" });
+    expect(rail.compareDocumentPosition(options) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await chapter(user);
+    expect(options).not.toHaveAttribute("open");
+    expect(within(rail).getAllByRole("button")).toHaveLength(4);
+    await user.click(screen.getByText("Scene options"));
+    expect(screen.getByRole("button", { name: "Look closer" })).toBeVisible();
   });
 
   it("remembers reading scroll on return and starts a different chapter at its heading", async () => {
@@ -358,6 +559,18 @@ describe("Portrait exploration", () => {
     act(() => { window.dispatchEvent(new Event("scroll")); window.history.back(); });
     await waitFor(() => expect(screen.getByRole("button", { name: "Explore" })).toHaveAttribute("aria-pressed", "true"));
     await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 3820, behavior: "instant" });
+  });
+
+  it("restores the phone passage position after a sky visit", async () => {
+    const user = userEvent.setup(); mount(true); await screen.findByTestId("scene"); await chapter(user);
+    await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    vi.stubGlobal("scrollY", 3820);
+    await user.click(screen.getByRole("button", { name: "Your sky" }));
+    vi.stubGlobal("scrollY", 100);
+    act(() => window.history.back());
+    await waitFor(() => expect(scene.props?.skyView).toBe(false));
+    expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
     expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 3820, behavior: "instant" });
   });
 
@@ -407,7 +620,7 @@ describe("Portrait exploration", () => {
     expect(screen.getByText(nativePattern.core_chapters[0].tensions[0].text)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Open scene annotation" }));
     expect(screen.getByRole("tabpanel")).toContainElement(document.activeElement as HTMLElement);
-    expect(scene.props?.activePassage).toBe(0);
+    expect(scene.props?.activePassages["chapter-1"]).toBe(0);
   });
 
   it("preserves a chapter's facet when exploring another chapter and returning", async () => {
@@ -497,6 +710,7 @@ describe("Portrait exploration", () => {
     const user = userEvent.setup(); const view = mount(); await screen.findByTestId("scene");
     await chapter(user, 2);
     await user.click(screen.getByRole("tab", { name: "Resources" }));
+    await user.click(screen.getByText("Scene options"));
     await user.click(screen.getByRole("button", { name: "Open reading desk" }));
     await user.click(screen.getByRole("button", { name: "Turn chapter object" }));
     await user.click(screen.getByRole("button", { name: "Dusk" }));
@@ -550,11 +764,12 @@ describe("Portrait exploration", () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user, 4);
     await user.click(screen.getByRole("button", { name: "Expand scene" }));
     const expanded = screen.getByRole("dialog", { name: "Expanded portrait scene" });
-    within(expanded).getByRole("button", { name: /^4\./ }).focus();
+    const lastControl = within(expanded).getByText("Scene options");
+    lastControl.focus();
     await user.tab();
     expect(within(expanded).getByRole("button", { name: "Close expanded scene" })).toHaveFocus();
     await user.tab({ shift: true });
-    expect(within(expanded).getByRole("button", { name: /^4\./ })).toHaveFocus();
+    expect(lastControl).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Close expanded scene" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Expand scene" })).toHaveFocus());
     await user.click(screen.getByRole("button", { name: /^Full reading/ }));

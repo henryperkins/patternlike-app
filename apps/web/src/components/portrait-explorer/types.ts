@@ -55,7 +55,7 @@ export interface PortraitSceneProps {
   chapters: ReadonlyArray<Pick<PortraitManifest["chapters"][number], "id" | "title" | "ordinal">>;
   selectedIds: readonly string[];
   facet: Facet;
-  activePassage: number | null;
+  activePassages: Readonly<Record<string, number>>;
   unfolded: boolean;
   reducedMotion: boolean;
   expanded: boolean;
@@ -65,7 +65,7 @@ export interface PortraitSceneProps {
   command: CameraCommand;
   onBookmark: (viewKey: string, bookmark: CameraBookmark) => void;
   onSelect: (chapterId: string) => void;
-  onAnnotation: () => void;
+  onAnnotation: (chapterId: string) => void;
   onStatus: (status: SceneStatus) => void;
   onArtworkFallback?: (fallback: boolean) => void;
 }

@@ -1,4 +1,5 @@
 .observatory-explorer { --explorer-paper:var(--paper-light, #faf8f2); --explorer-ink:var(--ink, #17312a); --explorer-rule:var(--line, #cec7b8); }
+.observatory-explorer:not(.explorer-embedded) { --mobile-header:0px; }
 .observatory-explorer .explorer-header { height:72px; }
 .observatory-explorer .explorer-title { padding:22px 0; }
 .observatory-explorer .explorer-title h1 { font-size:clamp(1.75rem, 2.6vw, 2.5rem); letter-spacing:-.03em; }
@@ -55,10 +56,9 @@
 .observatory-explorer.explorer-embedded .explorer-title h2 { font-size:1.65rem; }
 .observatory-explorer .explorer-workspace.explorer-is-comparing,
 .observatory-explorer.explorer-embedded .explorer-workspace.explorer-is-comparing { display:grid; grid-template-columns:minmax(0, 1fr); }
-.portrait-explorer .explorer-workspace.explorer-is-comparing > .explorer-visual { display:none; }
 .observatory-explorer .explorer-is-comparing .explorer-reader { max-width:none; max-height:none; min-height:0; overflow:visible; padding-inline:0; }
 .observatory-explorer .explorer-comparison { font-size:1.0625rem; grid-template-columns:repeat(auto-fit, minmax(min(45ch, 100%), 1fr)); }
-.observatory-explorer .explorer-comparison > section { min-width:0; padding-block-start:20px; border-top:1px solid var(--explorer-rule); }
+.observatory-explorer .explorer-comparison > section { min-width:0; font-size:1.0625rem; padding-block-start:20px; border-top:1px solid var(--explorer-rule); }
 .observatory-explorer .explorer-comparison :is(h3, h4) { font-size:1.5625rem; text-wrap:balance; }
 .observatory-explorer .explorer-comparison .explorer-summary { font-family:var(--sans, system-ui, sans-serif); font-size:.9375rem; }
 .observatory-explorer .explorer-comparison .explorer-passage { font-size:inherit; border:0; padding-inline:0; }
@@ -105,22 +105,31 @@
 .sky-marker-connector line { stroke:#faf8f2; stroke-width:2; filter:drop-shadow(0 1px 1px #17312a); }
 .portrait-explorer .sky-body-label { display:flex; align-items:center; gap:6px; }
 .sky-body-label svg { width:20px; height:20px; flex:none; }
-.explorer-entry-invitation { display:none; }
-.explorer-secondary-controls > summary { display:none; }
+.explorer-secondary-controls > summary { display:list-item; min-height:44px; padding:10px 0; cursor:pointer; font-size:.8125rem; }
 .explorer-scene-support { flex:none; min-width:0; }
 .explorer-recovery-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }
 .observatory-explorer .explorer-visual-footer > span,
 .observatory-explorer .explorer-study-label,
 .observatory-explorer .explorer-chapter-number { font-size:12px; }
-@media (max-width:767px) {
-  .explorer-entry-invitation { display:block; margin-bottom:8px; }
-  .explorer-entry-invitation p { margin:0; font-size:14px; line-height:1.6; }
-  .portrait-explorer .explorer-entry-invitation button { font-size:14px; }
+.explorer-mobile-modes { position:sticky; top:calc(var(--mobile-header, 0px) + var(--explorer-bar-height, 0px)); z-index:4; align-items:center; flex-wrap:wrap; gap:0 18px; background:var(--explorer-paper); }
+.explorer-presentation-reading .explorer-mobile-modes { display:flex; }
+.explorer-mobile-modes .observatory-views { flex-basis:100%; margin:0; }
+.explorer-mobile-modes .observatory-views button { flex:1; }
+.portrait-explorer .explorer-reading-identity { flex-basis:100%; margin:0 0 8px; font-size:.8125rem; line-height:1.5; overflow-wrap:anywhere; }
+.observatory-explorer :is(.explorer-reader [tabindex], .explorer-reader button, .explorer-reader select, .explorer-compared-chapters button, .explorer-scene, .explorer-complete, [data-reading-chapter]) {
+  scroll-margin-block-start:calc(var(--mobile-header, 0px) + var(--explorer-bar-height, 0px) + var(--explorer-modes-height, 0px) + 16px);
 }
-@container portrait (max-width:767px) {
-  .explorer-entry-invitation { display:block; margin-bottom:8px; }
-  .explorer-entry-invitation p { margin:0; font-size:14px; line-height:1.6; }
-  .portrait-explorer .explorer-entry-invitation button { font-size:14px; }
+.observatory-explorer .explorer-expanded-dialog .explorer-compared-chapters button { scroll-margin-block-start:8px; }
+@media (max-width:1023px) {
+  .observatory-explorer .explorer-mobile-modes { display:flex; margin-bottom:12px; border-bottom:1px solid var(--explorer-rule); }
+  .observatory-explorer.explorer-presentation-reading :is(.explorer-scene, .explorer-secondary-controls, .explorer-visual-footer) { display:none; }
+}
+@container portrait (max-width:859px) {
+  .observatory-explorer.explorer-presentation-reading .explorer-secondary-controls { display:none; }
+  .observatory-explorer.explorer-embedded .explorer-scene { height:clamp(240px, calc(100dvh - 570px), 345px); }
+}
+@media (min-width:600px) and (max-height:480px) {
+  .observatory-explorer .explorer-visual:not(.explorer-compact-expanded) .explorer-scene { height:clamp(260px, calc(100dvh - 160px), 360px); }
 }
 /* A short expanded window spends its full height on the instrument. Options scroll beside it. */
 .observatory-explorer .explorer-expanded-dialog > .explorer-compact-expanded {
@@ -136,3 +145,29 @@
 
 .observatory-explorer .explorer-label-ordinal { font-size:12px; letter-spacing:.04em; }
 .explorer-compact-expanded .explorer-settings { display:block; }
+
+/* Comparison keeps the two saved objects with both complete readings. */
+.observatory-explorer.explorer-comparing .explorer-mobile-modes { display:flex; margin-bottom:20px; border-bottom:1px solid var(--explorer-rule); }
+.observatory-explorer.explorer-comparing .explorer-scene { display:block; }
+.observatory-explorer.explorer-comparing :is(.explorer-secondary-controls, .explorer-settings) { display:block; }
+.observatory-explorer .explorer-is-comparing > .explorer-visual { position:static; min-width:0; }
+.observatory-explorer .explorer-is-comparing > .explorer-visual .explorer-scene { height:clamp(300px, 42dvh, 420px); }
+.observatory-explorer .explorer-compared-chapters { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.explorer-comparison-link { display:block; margin-top:5px; font-size:.75rem; text-decoration:underline; text-underline-offset:3px; }
+.explorer-comparing .explorer-annotation { max-width:calc(50% - 16px); }
+.explorer-comparing .explorer-annotation .explorer-label-title { display:block; font-size:.75rem; margin-bottom:5px; }
+.observatory-explorer .explorer-comparison { gap:24px; }
+.observatory-explorer .explorer-comparison > section { max-width:70ch; }
+.observatory-explorer .explorer-comparison > section > :is(h3, h4) { margin-top:0; }
+.observatory-explorer .explorer-comparison .explorer-passage .explorer-text-button { font-size:.75rem; }
+@media (min-width:1200px) {
+  .observatory-explorer:not(.explorer-embedded) .explorer-workspace.explorer-is-comparing { grid-template-columns:minmax(320px, .9fr) minmax(0, 2fr); gap:28px; }
+  .observatory-explorer:not(.explorer-embedded) .explorer-is-comparing > .explorer-visual { position:sticky; top:calc(var(--explorer-modes-height, 0px) + 16px); align-self:start; }
+}
+@container portrait (min-width:1100px) {
+  .observatory-explorer.explorer-embedded .explorer-workspace.explorer-is-comparing { grid-template-columns:minmax(320px, .9fr) minmax(0, 2fr); gap:28px; }
+  .observatory-explorer.explorer-embedded .explorer-is-comparing > .explorer-visual { position:sticky; top:calc(var(--mobile-header, 0px) + var(--explorer-bar-height, 0px) + var(--explorer-modes-height, 0px) + 16px); align-self:start; }
+}
+@media (min-width:600px) and (max-height:480px) {
+  .observatory-explorer .explorer-is-comparing > .explorer-visual .explorer-scene { height:260px; }
+}

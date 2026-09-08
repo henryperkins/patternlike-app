@@ -23,14 +23,14 @@ interface ReaderProps {
   chapters: PortraitChapter[];
   chapterCount: number;
   facet: Facet;
-  activePassage: number;
+  activePassages: Readonly<Record<string, number>>;
   onFacet: (facet: Facet) => void;
-  onPassage: (index: number) => void;
-  passageRef: (index: number, element: HTMLParagraphElement | null) => void;
+  onPassage: (chapterId: string, index: number) => void;
+  passageRef: (chapterId: string, index: number, element: HTMLParagraphElement | null) => void;
   graphicsAvailable: boolean;
   embedded?: boolean;
 }
-export function ExplorerReader({ chapters, chapterCount, facet, activePassage, onFacet, onPassage, passageRef, graphicsAvailable, embedded = false }: ReaderProps) {
+export function ExplorerReader({ chapters, chapterCount, facet, activePassages, onFacet, onPassage, passageRef, graphicsAvailable, embedded = false }: ReaderProps) {
   const panelId = useId();
   const compare = chapters.length === 2;
   const Heading = embedded ? "h3" : "h2";
@@ -40,11 +40,11 @@ export function ExplorerReader({ chapters, chapterCount, facet, activePassage, o
     {compare && <><Heading data-reader-heading tabIndex={-1}>Read them together</Heading><p className="explorer-summary">Explore the same perspective in each chapter.</p></>}
     <FacetTabs facet={facet} onChange={onFacet} panelId={panelId} />
     <div id={panelId} role="tabpanel" tabIndex={0} aria-labelledby={`${panelId}-${facet}`} className={compare ? "explorer-passages explorer-comparison" : "explorer-passages"}>
-      {chapters.map((chapter, column) => <section key={chapter.id} aria-label={compare ? chapter.title : undefined}>
+      {chapters.map((chapter) => <section key={chapter.id} aria-label={compare ? chapter.title : undefined}>
         {compare && <><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-summary">{chapter.summary}</p></>}
-        {chapterPassages(chapter, facet).map((text, index) => <div className="explorer-passage" data-active={column === 0 && index === activePassage} key={`${facet}-${index}`}>
-          <p tabIndex={-1} ref={column === 0 ? (element) => passageRef(index, element) : undefined}>{text}</p>
-          {!compare && <button className="explorer-text-button" disabled={!graphicsAvailable} aria-label={`Show passage ${index + 1} in portrait`} onClick={() => onPassage(index)}>Show in portrait <span aria-hidden="true">↗</span></button>}
+        {chapterPassages(chapter, facet).map((text, index) => <div className="explorer-passage" data-active={index === (activePassages[chapter.id] ?? 0)} key={`${facet}-${index}`}>
+          <p tabIndex={-1} ref={(element) => passageRef(chapter.id, index, element)}>{text}</p>
+          <button className="explorer-text-button" disabled={!graphicsAvailable} aria-label={`Show passage ${index + 1} in portrait`} onClick={() => onPassage(chapter.id, index)}>Show in portrait <span aria-hidden="true">↗</span></button>
         </div>)}
       </section>)}
     </div>

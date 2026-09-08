@@ -85,7 +85,7 @@ export async function verifyGlbAsset(bytes: ArrayBuffer, expected: string, chapt
 }
 
 /** A camera-space fit leaves room for native labels while retaining all four forms. */
-export function cameraFrame(boxes: readonly Box3[], selected: readonly number[], aspect: number): CameraBookmark {
+export function cameraFrame(boxes: readonly Box3[], selected: readonly number[], aspect: number, direction = HOME_DIRECTION): CameraBookmark {
   const whole = new Box3();
   for (const box of boxes) whole.union(box);
   if (whole.isEmpty()) whole.set(new Vector3(-1, 0, -1), new Vector3(1, 1, 1));
@@ -93,19 +93,19 @@ export function cameraFrame(boxes: readonly Box3[], selected: readonly number[],
   const chosen = new Box3();
   for (const index of selected) if (boxes[index]) chosen.union(boxes[index]!);
   if (!chosen.isEmpty()) target.lerp(chosen.getCenter(new Vector3()), 0.22);
-  const right = new Vector3().crossVectors(new Vector3(0, 1, 0), HOME_DIRECTION).normalize();
-  const up = new Vector3().crossVectors(HOME_DIRECTION, right).normalize();
+  const right = new Vector3().crossVectors(new Vector3(0, 1, 0), direction).normalize();
+  const up = new Vector3().crossVectors(direction, right).normalize();
   const tangent = Math.tan(38 * Math.PI / 360);
   const horizontal = tangent * Math.max(0.1, Number.isFinite(aspect) ? aspect : 1);
   let distance = 2;
   for (const box of boxes.length ? boxes : [whole]) {
     for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
       const point = new Vector3(x, y, z).sub(target);
-      distance = Math.max(distance, point.dot(HOME_DIRECTION)
+      distance = Math.max(distance, point.dot(direction)
         + Math.max(Math.abs(point.dot(right)) / horizontal, Math.abs(point.dot(up)) / tangent) / 0.82);
     }
   }
-  return { position: target.clone().addScaledVector(HOME_DIRECTION, distance).toArray(), target: target.toArray() };
+  return { position: target.clone().addScaledVector(direction, distance).toArray(), target: target.toArray() };
 }
 
 /** Preserve the orbit and user zoom relative to the viewport's fitted frame. */

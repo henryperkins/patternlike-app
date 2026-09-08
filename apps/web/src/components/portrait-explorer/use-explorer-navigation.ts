@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createExplorerState, explorerReducer, type ExplorerAction, type ExplorerState } from "./explorer-state.js";
+import type { CameraBookmark, ObservatoryExperience } from "./types.js";
 
 export interface ExplorerNavigation {
   state: ExplorerState;
@@ -11,6 +12,7 @@ export interface ExplorerNavigation {
 }
 export interface ExplorerMemory {
   snapshot: ExplorerState | null;
+  scene: { sourceIdentity: string; experience: ObservatoryExperience; bookmarks: Map<string, CameraBookmark> } | null;
   readerPositions: Map<string, number>;
   scrollPositions: Map<string, { top: number; headingOffset?: number }>;
   history: {
@@ -19,13 +21,14 @@ export interface ExplorerMemory {
     entries: Map<number, Entry>;
     active: number;
     pending: number | "exit" | null;
+    afterReturn: readonly ExplorerAction[] | null;
     exitRequested: boolean;
   };
 }
 export function createExplorerMemory(): ExplorerMemory {
   return {
-    snapshot: null, readerPositions: new Map(), scrollPositions: new Map(),
-    history: { scope: `portrait-${Math.random().toString(36).slice(2)}`, sequence: 0, entries: new Map(), active: 0, pending: null, exitRequested: false },
+    snapshot: null, scene: null, readerPositions: new Map(), scrollPositions: new Map(),
+    history: { scope: `portrait-${Math.random().toString(36).slice(2)}`, sequence: 0, entries: new Map(), active: 0, pending: null, afterReturn: null, exitRequested: false },
   };
 }
 interface Entry { state: ExplorerState; depth: number; parent?: number; }
@@ -47,10 +50,13 @@ export function clearExplorerMemory(memory: ExplorerMemory): void {
     }
   }
   memory.snapshot = null;
+  memory.scene?.bookmarks.clear();
+  memory.scene = null;
   memory.readerPositions.clear();
   memory.scrollPositions.clear();
   history.entries.clear();
   history.pending = null;
+  history.afterReturn = null;
   history.exitRequested = false;
 }
 
@@ -66,6 +72,27 @@ export function useExplorerNavigation(chapterIds: readonly string[], { embedded 
   const history = memory.history;
   const apply = useCallback((next: ExplorerState) => { current.current = next; memory.snapshot = next; setState(next); }, [memory]);
   const show = useCallback((value: boolean) => { opened.current = value; setIsOpen(value); }, []);
+  const commitActions = useCallback((actions: readonly ExplorerAction[]) => {
+    let next = current.current;
+    for (const action of actions) {
+      const before = next;
+      next = explorerReducer(before, action);
+      if (next === before) continue;
+      const previous = history.entries.get(history.active);
+      const remember = next.past !== before.past && action.type !== "back"
+        && !(action.type === "inspect" && !action.open)
+        && !(action.type === "presentation" && action.presentation === "explore");
+      if (remember) {
+        const index = ++history.sequence;
+        history.entries.set(index, { state: next, parent: history.active, depth: (previous?.depth ?? 0) + 1 });
+        history.active = index;
+        window.history.pushState({ ...window.history.state, portrait: { scope: history.scope, index } }, "");
+      } else {
+        history.entries.set(history.active, { ...previous, state: next, depth: previous?.depth ?? 0 });
+      }
+    }
+    if (next !== current.current) apply(next);
+  }, [apply, history]);
   useEffect(() => {
     if (!embedded) {
       history.entries.set(0, { state: current.current, depth: 0 });
@@ -76,6 +103,7 @@ export function useExplorerNavigation(chapterIds: readonly string[], { embedded 
       const marker = window.history.state?.portrait;
       const saved = marker?.scope === history.scope ? history.entries.get(marker.index) : undefined;
       history.pending = null;
+      history.afterReturn = null;
       history.exitRequested = false;
       if (saved) { history.active = marker.index; apply(saved.state); show(true); }
     }
@@ -83,6 +111,7 @@ export function useExplorerNavigation(chapterIds: readonly string[], { embedded 
       const marker = event.state?.portrait;
       if (marker?.scope !== history.scope) {
         history.pending = null;
+        history.afterReturn = null;
         history.exitRequested = false;
         if (embedded) show(false);
         return;
@@ -106,17 +135,24 @@ export function useExplorerNavigation(chapterIds: readonly string[], { embedded 
         // Finish an in-flight return before measuring the remaining distance
         // to the account. Two relative go() calls can otherwise overshoot it.
         history.exitRequested = false;
+        history.afterReturn = null;
         history.pending = "exit";
         apply(next); show(false);
         window.history.go(-(saved.depth + 1));
         return;
       }
       history.pending = null;
-      apply(next); show(true);
+      const afterReturn = history.afterReturn;
+      history.afterReturn = null;
+      apply(next);
+      // A new presentation starts a new branch after the browser reaches its
+      // parent. Putting it in the parent's entry would skip a later Back step.
+      if (afterReturn) commitActions(afterReturn);
+      show(true);
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [apply, embedded, history, show]);
+  }, [apply, commitActions, embedded, history, show]);
 
   const open = useCallback(() => {
     if (opened.current || history.pending !== null) return;
@@ -163,22 +199,14 @@ export function useExplorerNavigation(chapterIds: readonly string[], { embedded 
     let ancestor: number | undefined = history.active;
     for (let index = 0; index < steps && ancestor !== undefined; index++) ancestor = history.entries.get(ancestor)?.parent;
     if (steps && ancestor !== undefined && window.history.state?.portrait?.scope === history.scope) {
-      history.entries.set(ancestor, { ...history.entries.get(ancestor)!, state: next });
+      const returned = actions.slice(0, steps).reduce(explorerReducer, before);
+      history.entries.set(ancestor, { ...history.entries.get(ancestor)!, state: returned });
       history.pending = ancestor;
+      history.afterReturn = actions.slice(steps);
       window.history.go(-steps);
       return;
     }
-    const previous = history.entries.get(history.active);
-    const remember = !steps && next.past !== before.past;
-    if (remember) {
-      const index = ++history.sequence;
-      history.entries.set(index, { state: next, parent: history.active, depth: (previous?.depth ?? 0) + 1 });
-      history.active = index;
-      window.history.pushState({ ...window.history.state, portrait: { scope: history.scope, index } }, "");
-    } else {
-      history.entries.set(history.active, { ...previous, state: next, depth: previous?.depth ?? 0 });
-    }
-    apply(next);
-  }, [apply, history]);
+    commitActions(actions);
+  }, [commitActions, history]);
   return { state, dispatch, isOpen, open, close, memory };
 }

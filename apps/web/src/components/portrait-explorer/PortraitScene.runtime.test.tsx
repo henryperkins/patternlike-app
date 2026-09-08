@@ -2,11 +2,12 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { createHash, webcrypto } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { BufferGeometry, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Camera, type Scene } from "three";
+import { Box3, BufferGeometry, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Camera, type Scene } from "three";
 import PortraitScene from "./PortraitScene.js";
 import type { PortraitSceneProps } from "./types.js";
 import { compilePortraitMesh } from "../../../../codex-runner/src/portrait-mesh-compiler.js";
 import { verifyGlbAsset } from "./scene-utils.js";
+import { firstVisibleIntersection } from "./scene-utils.js";
 
 const gpu = vi.hoisted(() => ({ renders: 0, disposals: 0, contextLosses: 0, contexts: new Set<HTMLCanvasElement>(), position: [] as number[], extent: [Infinity, -Infinity], scene: null as Scene | null, camera: null as Camera | null, detachedDisplay: false }));
 // jsdom has no GPU. Keep the real loader, camera, mesh, controls and lifecycle.
@@ -60,7 +61,7 @@ function props(): PortraitSceneProps {
   return {
     assets: [{ chapterId: "chapter-1", url: "/portrait-explorer/compass.glb", sha256: createHash("sha256").update(bytes).digest("hex"), sourceImageSha256: "1".repeat(64), sourceText: "Exact source" }],
     chapters: [{ id: "chapter-1", title: "Finding your own direction", ordinal: 1 }],
-    selectedIds: ["chapter-1"], facet: "overview", activePassage: 0, unfolded: false,
+    selectedIds: ["chapter-1"], facet: "overview", activePassages: { "chapter-1": 0 }, unfolded: false,
     reducedMotion: true, expanded: false, quality: "low", viewKey: "chapter-1:assembled",
     bookmark: { position: [2, 4, 8], target: [0, 1, 0] }, command: { kind: "right", serial: 8 },
     onBookmark: vi.fn(), onSelect: vi.fn(), onAnnotation: vi.fn(), onStatus: vi.fn(),
@@ -94,6 +95,133 @@ it.each([3, 4, 5, 6])("renders %i distinct chapter stations without downloading 
   view.unmount();
   expect(gpu.contexts.size).toBe(0);
 });
+
+it("shows a pointer only over visible pickable geometry, and retains drag feedback", async () => {
+  const callbacks = props();
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: true, openDesks: {}, turns: {} };
+  render(<PortraitScene {...callbacks} bookmark={undefined} experience={experience} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const ray = new Raycaster();
+  let point: { clientX: number; clientY: number } | undefined;
+  for (let x = -0.8; x <= 0.8 && !point; x += 0.1) for (let y = -0.8; y <= 0.8 && !point; y += 0.1) {
+    ray.setFromCamera({ x, y } as import("three").Vector2, gpu.camera!);
+    if (firstVisibleIntersection(ray, gpu.scene!.children)?.object.userData.chapterId === "chapter-1") point = { clientX: (x + 1) * 400, clientY: (1 - y) * 300 };
+  }
+  expect(point).toBeDefined();
+  const canvas = screen.getByRole("img") as HTMLCanvasElement;
+  canvas.setPointerCapture = vi.fn(); canvas.releasePointerCapture = vi.fn();
+  const pointer = (type: string, buttons = 0) => act(() => canvas.dispatchEvent(Object.assign(new MouseEvent(type, { bubbles: true, button: 0, buttons, ...point }), { pointerId: 1, pointerType: "mouse", isPrimary: true })));
+  pointer("pointermove");
+  expect(canvas.style.cursor).toBe("pointer");
+  pointer("pointerdown", 1);
+  expect(canvas.style.cursor).toBe("grabbing");
+  pointer("pointerup");
+  expect(canvas.style.cursor).toBe("pointer");
+  pointer("pointerleave");
+  expect(canvas.style.cursor).toBe("grab");
+});
+
+it("keeps a long object in view when turned without changing the reader's camera angle", async () => {
+  const callbacks = props();
+  const fixtures = JSON.parse(readFileSync("public/portrait-explorer/fixtures.json", "utf8")).assets as Array<{ file: string; chapterId: string; sha256: string }>;
+  const item = fixtures.find(asset => asset.chapterId === "chapter-4")!;
+  const assets = [{ ...callbacks.assets[0], chapterId: item.chapterId, url: `/${item.file}`, sha256: item.sha256 }];
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(readFileSync(`public/portrait-explorer/${item.file}`)))));
+  const experience = { roofOpen: true, lighting: "day" as const, inspect: true, openDesks: {}, turns: {} };
+  const next = { ...callbacks, assets, chapters: [{ id: item.chapterId, title: "Seeing beyond the immediate", ordinal: 4 }], selectedIds: [item.chapterId], viewKey: "chapter-4:assembled:inspect", bookmark: undefined, experience };
+  const view = render(<PortraitScene {...next} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const angle = gpu.camera!.getWorldDirection(new Vector3());
+  view.rerender(<PortraitScene {...next} experience={{ ...experience, turns: { "chapter-4": 2 } }} />);
+  const object = gpu.scene!.children.find(object => object.userData.chapterId === "chapter-4")!;
+  await waitFor(() => expect(object.rotation.y).toBeCloseTo(Math.PI / 2));
+  const box = new Box3().setFromObject(object);
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const point = new Vector3(x, y, z).project(gpu.camera!);
+    expect(Math.abs(point.x)).toBeLessThan(1);
+    expect(Math.abs(point.y)).toBeLessThan(1);
+  }
+  expect(gpu.camera!.getWorldDirection(new Vector3()).distanceTo(angle)).toBeLessThan(0.00001);
+});
+
+it("repositions enlarged annotations without moving the camera and releases their size observation", async () => {
+  const observers: Array<{ callback: ResizeObserverCallback; elements: Set<Element> }> = [];
+  vi.stubGlobal("ResizeObserver", class {
+    elements = new Set<Element>();
+    constructor(readonly callback: ResizeObserverCallback) { observers.push(this); }
+    observe(element: Element) { this.elements.add(element); }
+    disconnect() { this.elements.clear(); }
+  });
+  let labelHeight = 44;
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.matches("[data-form-index]") ? labelHeight : 0;
+  });
+  const callbacks = props();
+  const view = render(<PortraitScene {...callbacks} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  const label = document.querySelector<HTMLElement>("[data-form-index]")!;
+  const initialTransform = label.style.transform;
+  const initialPosition = [...gpu.position];
+  labelHeight = 144;
+  act(() => {
+    for (const observer of observers) if (observer.elements.has(label)) observer.callback([], observer as unknown as ResizeObserver);
+  });
+  await waitFor(() => expect(label.style.transform).not.toBe(initialTransform));
+  expect(gpu.position).toEqual(initialPosition);
+  view.unmount();
+  expect(observers.every(observer => observer.elements.size === 0)).toBe(true);
+});
+
+it("frames only the compared displays in reading order and restores the exact original scene and camera", async () => {
+  const callbacks = props();
+  const fixtures = JSON.parse(readFileSync("public/portrait-explorer/fixtures.json", "utf8")).assets as Array<{ file: string; chapterId: string; sha256: string }>;
+  const assets = fixtures.map(item => ({ ...callbacks.assets[0], chapterId: item.chapterId, url: `/${item.file}`, sha256: item.sha256 }));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(new Uint8Array(readFileSync(`public/portrait-explorer${url}`)))));
+  const experience = { roofOpen: false, lighting: "dusk" as const, inspect: true, openDesks: { "chapter-1": true }, turns: { "chapter-1": 1 } };
+  const all = { ...callbacks, assets, chapters: assets.map((asset, index) => ({ id: asset.chapterId, title: `Saved chapter ${index + 1}`, ordinal: index + 1 })), experience };
+  const { rerender } = render(<PortraitScene {...all} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const initialPosition = [...gpu.position];
+  const display = (id: string) => gpu.scene!.children.find(object => object.userData.chapterId === id)!;
+  const originalDisplays = assets.map(asset => display(asset.chapterId).position.toArray());
+  const originalRenders = gpu.renders;
+  rerender(<PortraitScene {...all} selectedIds={["chapter-4", "chapter-1"]} viewKey="chapter-4+chapter-1:assembled" bookmark={undefined} />);
+  await waitFor(() => expect(gpu.renders).toBeGreaterThan(originalRenders));
+  await waitFor(() => expect(display("chapter-2").visible).toBe(false));
+  expect(display("chapter-3").visible).toBe(false);
+  expect(display("chapter-4").visible).toBe(true);
+  expect(display("chapter-1").visible).toBe(true);
+  expect(gpu.scene!.getObjectByName("Chapter display 2")!.visible).toBe(false);
+  expect(gpu.scene!.getObjectByName("Timber canopy cutaway")!.visible).toBe(false);
+  expect(display("chapter-4").position.x).toBeLessThan(display("chapter-1").position.x);
+  for (const id of ["chapter-4", "chapter-1"]) {
+    const bounds = new Box3().setFromObject(display(id));
+    for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+      const projected = new Vector3(x, y, z).project(gpu.camera!);
+      expect(Math.abs(projected.x)).toBeLessThan(1);
+      expect(Math.abs(projected.y)).toBeLessThan(1);
+    }
+  }
+  expect(document.querySelectorAll("[data-form-index]")).toHaveLength(2);
+  for (const ordinal of [1, 4]) {
+    const label = document.querySelector(`[data-chapter-id="chapter-${ordinal}"]`)!;
+    expect(label).toHaveTextContent(`Saved chapter ${ordinal}`);
+    expect(label).toHaveAccessibleName(`Overview: show source passage 1 for Saved chapter ${ordinal}`);
+  }
+  const pairPosition = [...gpu.position];
+  rerender(<PortraitScene {...all} selectedIds={["chapter-4", "chapter-1"]} viewKey="chapter-4+chapter-1:assembled" bookmark={undefined} facet="resources" />);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  expect(gpu.position).toEqual(pairPosition);
+  rerender(<PortraitScene {...all} />);
+  await waitFor(() => expect(display("chapter-2").visible).toBe(true));
+  await waitFor(() => expect(gpu.position).toEqual(initialPosition));
+  for (const [index, asset] of assets.entries()) expect(display(asset.chapterId).position.toArray()).toEqual(originalDisplays[index]);
+  expect(gpu.position).toEqual(initialPosition);
+  expect(gpu.scene!.getObjectByName("Timber canopy cutaway")!.visible).toBe(true);
+  expect(gpu.scene!.getObjectByName("Reading desk hinge")!.rotation.x).toBeCloseTo(-1.25);
+  expect(gpu.detachedDisplay).toBe(false);
+}, 12_000);
 
 it("keeps reading stations when a verified artwork upgrade fails geometry checks", async () => {
   const callbacks = props();
@@ -141,6 +269,40 @@ it("restores actual camera coordinates without replaying the last command, and s
   expect(saved[1].position[0]).toBeCloseTo(2, 8);
   expect(saved[1].target).toEqual([0, 1, 0]);
   expect(gpu.disposals).toBe(1);
+});
+
+it("hands an oversized focused comparison label to its matching native source link", async () => {
+  const observers: Array<{ callback: ResizeObserverCallback; elements: Set<Element> }> = [];
+  vi.stubGlobal("ResizeObserver", class {
+    elements = new Set<Element>();
+    constructor(readonly callback: ResizeObserverCallback) { observers.push(this); }
+    observe(element: Element) { this.elements.add(element); }
+    disconnect() { this.elements.clear(); }
+  });
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  let labelHeight = 44;
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.matches("[data-form-index]") ? labelHeight : 0;
+  });
+  const callbacks = props();
+  const fixtures = JSON.parse(readFileSync("public/portrait-explorer/fixtures.json", "utf8")).assets as Array<{ file: string; chapterId: string; sha256: string }>;
+  const assets = fixtures.map(item => ({ ...callbacks.assets[0], chapterId: item.chapterId, url: `/${item.file}`, sha256: item.sha256 }));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(new Uint8Array(readFileSync(`public/portrait-explorer${url}`)))));
+  render(<div className="explorer-visual"><PortraitScene {...callbacks} assets={assets} bookmark={undefined}
+    chapters={assets.map((asset, index) => ({ id: asset.chapterId, title: `Saved chapter ${index + 1}`, ordinal: index + 1 }))}
+    selectedIds={["chapter-1", "chapter-2"]} viewKey="chapter-1+chapter-2:assembled" />
+    <nav className="explorer-compared-chapters"><button data-chapter-id="chapter-1">Read first chapter</button><button data-chapter-id="chapter-2">Read second chapter</button></nav></div>);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"));
+  const label = document.querySelector<HTMLElement>('[data-form-index="1"]')!;
+  act(() => label.focus());
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  labelHeight = 800;
+  act(() => {
+    for (const observer of observers) if (observer.elements.has(label)) observer.callback([], observer as unknown as ResizeObserver);
+  });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Read second chapter" })).toHaveFocus());
+  expect(label.style.visibility).toBe("hidden");
+  expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts).toContain(screen.getByRole("button", { name: "Read second chapter" }));
 });
 
 it("keeps an unselected chapter identifiable on a phone canvas", async () => {
@@ -296,7 +458,7 @@ it("keeps a reading-only facet change at the same camera pose, then stops drawin
   const { rerender } = render(<PortraitScene {...callbacks} />);
   await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"));
   const initial = [...gpu.position];
-  rerender(<PortraitScene {...callbacks} facet="resources" activePassage={2} />);
+  rerender(<PortraitScene {...callbacks} facet="resources" activePassages={{ "chapter-1": 2 }} />);
   await waitFor(() => expect(screen.getByRole("button", { name: /Resources: show source passage 3/ })).toBeVisible());
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
   expect(gpu.position).toEqual(initial);
@@ -362,7 +524,11 @@ it("rejects an intact correctly hashed compass assigned to a different chapter b
 
 it("keeps all zodiac labels in frame across expansion and resize and connects the selected readout to the plotted marker", async () => {
   let resize: () => void = () => {};
-  vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private callback: () => void) {}
+    observe(element: Element) { if (element.matches(".explorer-canvas-host")) resize = this.callback; }
+    disconnect() {}
+  });
   let bounds = new DOMRect(0, 0, 358, 345);
   vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(() => bounds);
   const callbacks = { ...props(), bookmark: undefined, selectedIds: [], skyView: true, viewKey: "sky",

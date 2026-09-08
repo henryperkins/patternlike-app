@@ -1,4 +1,5 @@
 import type { Facet } from "./types.js";
+import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
 export type ExplorerView =
   | { kind: "whole" }
@@ -7,6 +8,7 @@ export type ExplorerView =
   | { kind: "guided"; step: number };
 
 export interface ExplorerSnapshot {
+  sky: { body: PortraitSkyBody | null } | null;
   view: ExplorerView;
   facets: Record<string, Facet>;
   passages: Record<string, number>;
@@ -21,21 +23,23 @@ export interface ExplorerState extends ExplorerSnapshot {
 }
 
 export type ExplorerAction =
+  | { type: "sky"; body: PortraitSkyBody | null }
   | { type: "select"; chapterId: string }
   | { type: "facet"; facet: Facet }
-  | { type: "passage"; index: number }
+  | { type: "passage"; index: number; chapterId?: string }
   | { type: "whole" }
   | { type: "compare"; chapterId: string }
   | { type: "guide" }
   | { type: "guide-step"; step: number }
   | { type: "presentation"; presentation: ExplorerSnapshot["presentation"] }
   | { type: "inspect"; open: boolean }
-  | { type: "unfold" }
+  | { type: "unfold"; overview?: boolean }
   | { type: "back" };
 
 export function createExplorerState(chapterIds: readonly string[]): ExplorerState {
   const ids = [...new Set(chapterIds.filter((id) => typeof id === "string" && /^[a-z0-9][a-z0-9_-]*$/i.test(id)))];
   return {
+    sky: null,
     view: { kind: "whole" },
     facets: Object.fromEntries(ids.map((id) => [id, "overview" as const])),
     passages: Object.fromEntries(ids.map((id) => [id, 0])),
@@ -64,8 +68,8 @@ export function currentFacet(state: ExplorerState): Facet {
 export function canGoBack(state: ExplorerState): boolean { return state.past.length > 0; }
 
 function snapshot(state: ExplorerState): ExplorerSnapshot {
-  const { view, facets, passages, unfolded, presentation, inspectImage } = state;
-  return { view, facets, passages, unfolded, presentation, inspectImage };
+  const { sky, view, facets, passages, unfolded, presentation, inspectImage } = state;
+  return { sky, view, facets, passages, unfolded, presentation, inspectImage };
 }
 
 function transition(state: ExplorerState, update: Partial<ExplorerSnapshot>, remember = true): ExplorerState {
@@ -78,7 +82,7 @@ function transition(state: ExplorerState, update: Partial<ExplorerSnapshot>, rem
 
 /** Overlay-local changes leave their single originating snapshot available to Back. */
 function hasReturnContext(state: ExplorerState): boolean {
-  return state.inspectImage || state.presentation !== "explore" || state.view.kind === "compare" || state.view.kind === "guided";
+  return state.sky !== null || state.inspectImage || state.presentation !== "explore" || state.view.kind === "compare" || state.view.kind === "guided";
 }
 
 function back(state: ExplorerState): ExplorerState {
@@ -87,13 +91,19 @@ function back(state: ExplorerState): ExplorerState {
   // Closing a presentation keeps the reader's choices. Comparison, guidance,
   // and image inspection still undo to their exact originating snapshot.
   const choices = !state.inspectImage && previous.presentation !== state.presentation
-    ? { view: state.view, facets: state.facets, passages: state.passages, unfolded: state.unfolded } : {};
+    ? { view: state.view, facets: state.facets, passages: state.passages, unfolded: state.unfolded,
+      sky: previous.sky && state.sky ? state.sky : previous.sky } : {};
   return { ...state, ...previous, ...choices, past: state.past.slice(0, -1) };
 }
 
 export function explorerReducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
   if (!action || typeof action !== "object") return state;
   switch (action.type) {
+    case "sky":
+      if ((action.body !== null && !["sun", "moon", "ascendant"].includes(action.body)) || state.sky?.body === action.body) return state;
+      // One visit retains its exact Pattern origin. Body choices replace that
+      // visit so Back returns to the reading and Forward restores the last body.
+      return transition(state, { sky: { body: action.body } }, state.sky === null);
     case "select": {
       if (!state.chapterIds.includes(action.chapterId)
         || (state.view.kind === "chapter" && state.view.chapterId === action.chapterId)) return state;
@@ -110,8 +120,9 @@ export function explorerReducer(state: ExplorerState, action: ExplorerAction): E
     }
     case "passage": {
       // The controller checks the upper bound against chapterPassages for its current source.
-      const chapterId = selectedChapterIds(state)[0];
-      if (!chapterId || !Number.isSafeInteger(action.index) || action.index < 0 || state.passages[chapterId] === action.index) return state;
+      const ids = selectedChapterIds(state);
+      const chapterId = action.chapterId ?? ids[0];
+      if (!chapterId || !ids.includes(chapterId) || !Number.isSafeInteger(action.index) || action.index < 0 || state.passages[chapterId] === action.index) return state;
       return transition(state, { passages: { ...state.passages, [chapterId]: action.index } }, !hasReturnContext(state));
     }
     case "whole":
@@ -138,7 +149,10 @@ export function explorerReducer(state: ExplorerState, action: ExplorerAction): E
       if (typeof action.open !== "boolean" || action.open === state.inspectImage || !selectedChapterIds(state).length) return state;
       return action.open ? transition(state, { inspectImage: true }) : back(state);
     case "unfold":
-      return transition(state, { unfolded: !state.unfolded }, !hasReturnContext(state));
+      return transition(state, {
+        unfolded: !state.unfolded,
+        ...(action.overview ? { view: { kind: "whole" as const } } : {}),
+      }, action.overview ? !state.inspectImage && state.presentation === "explore" : !hasReturnContext(state));
     case "back": return back(state);
     default: return state;
   }

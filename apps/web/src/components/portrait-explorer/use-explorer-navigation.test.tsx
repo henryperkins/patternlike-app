@@ -14,6 +14,11 @@ function AccountNavigation({ memory }: { memory?: ExplorerMemory } = {}) {
     <button onClick={() => dispatch({ type: "select", chapterId: "chapter-2" })}>Chapter two</button>
     <button onClick={() => dispatch({ type: "presentation", presentation: "reading" })}>Read</button>
     <button onClick={() => dispatch({ type: "facet", facet: "resources" })}>Resources</button>
+    <button onClick={() => dispatch({ type: "passage", index: 1 })}>Second passage</button>
+    <button onClick={() => dispatch({ type: "compare", chapterId: "chapter-2" })}>Compare</button>
+    <button onClick={() => dispatch({ type: "sky", body: "sun" })}>Sky</button>
+    <button onClick={() => dispatch({ type: "sky", body: "moon" })}>Moon</button>
+    <button onClick={() => dispatch([{ type: "back" }, { type: "presentation", presentation: "reading" }])}>Read from sky</button>
     <button onClick={() => dispatch({ type: "back" })}>Return</button>
   </>;
 }
@@ -39,6 +44,62 @@ async function visit(hash: string) {
 }
 
 describe("account portrait history boundary", () => {
+  it("pushes a new reading after returning from sky without overwriting the chapter history", async () => {
+    const memory = createExplorerMemory(), user = userEvent.setup();
+    render(<AccountNavigation memory={memory} />);
+    for (const name of ["Open portrait", "Chapter one", "Resources", "Sky", "Read from sky"]) await user.click(screen.getByText(name));
+    await waitFor(() => expect(output()).toHaveTextContent("chapter-1:resources:reading"));
+    const entry = memory.history.entries.get(memory.history.active)!;
+    expect(entry.depth).toBe(memory.snapshot!.past.length);
+    await user.click(screen.getByText("Return"));
+    await waitFor(() => expect(output()).toHaveTextContent("chapter-1:resources:explore"));
+    await travel("back");
+    expect(output()).toHaveTextContent("chapter-1:overview:explore");
+    await travel("back");
+    expect(output()).toHaveTextContent(":overview:explore");
+    expect(output()).not.toHaveTextContent("chapter-");
+    await travel("back");
+    expect(output()).toHaveTextContent("Account reading");
+  });
+
+  it.each(["Read", "Compare"])("round trips sky through native and visible returns from %s without leaking or skipping history", async (mode) => {
+    const memory = createExplorerMemory(), user = userEvent.setup();
+    const accountEntry = window.history.state;
+    render(<AccountNavigation memory={memory} />);
+    for (const name of ["Open portrait", "Chapter one", "Resources", "Second passage", mode]) await user.click(screen.getByText(name));
+    const origin = memory.snapshot, originMarker = window.history.state;
+    await user.click(screen.getByText("Sky"));
+    const skyMarker = window.history.state;
+    expect(skyMarker.portrait.index).not.toBe(originMarker.portrait.index);
+    await user.click(screen.getByText("Moon"));
+    expect(window.history.state).toEqual(skyMarker);
+    expect(memory.snapshot?.sky).toEqual({ body: "moon" });
+    expect(Object.keys(skyMarker.portrait).sort()).toEqual(["index", "scope"]);
+    expect(window.location.hash).toBe("#pattern");
+    await travel("back");
+    expect(memory.snapshot).toEqual(origin);
+    await travel("forward");
+    expect(memory.snapshot?.sky).toEqual({ body: "moon" });
+    await user.click(screen.getByText("Return"));
+    await waitFor(() => expect(window.history.state).toEqual(originMarker));
+    expect(memory.snapshot).toEqual(origin);
+    await travel("forward");
+    expect(memory.snapshot?.sky).toEqual({ body: "moon" });
+    await user.click(screen.getByText("Close portrait"));
+    await waitFor(() => expect(window.history.state).toEqual(accountEntry));
+    await user.click(screen.getByText("Open portrait"));
+    expect(memory.snapshot?.sky).toEqual({ body: "moon" });
+    await travel("back");
+    expect(memory.snapshot).toEqual(origin);
+    await user.click(screen.getByText("Close portrait"));
+    await waitFor(() => expect(window.history.state).toEqual(accountEntry));
+    clearExplorerMemory(memory);
+    expect(memory.snapshot).toBeNull();
+    expect(memory.history.entries.size).toBe(0);
+    await travel("back");
+    expect(window.history.state).toEqual({ route: "previous" });
+  });
+
   it("releases private state and unwinds a visit after an in-flight return", async () => {
     const memory = createExplorerMemory(), user = userEvent.setup();
     const accountEntry = window.history.state;

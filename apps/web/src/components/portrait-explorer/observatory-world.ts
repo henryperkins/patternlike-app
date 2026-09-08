@@ -40,6 +40,16 @@ export function createReadingFolio(chapterId: string): Group {
   return root;
 }
 
+/** The reading order determines a neutral pair arrangement, independent of meaning. */
+export function comparisonPosition(index: number, selected: readonly number[], boxes: readonly Box3[]): Point3 {
+  const radius = (selectedIndex: number) => {
+    const box = boxes[selectedIndex];
+    return box ? Math.max(1.25, Math.abs(box.min.x), Math.abs(box.max.x)) : 1.25;
+  };
+  const separation = radius(selected[0]) + radius(selected[1]) + 0.7;
+  return [selected.indexOf(index) === 0 ? -separation / 2 : separation / 2, 0, 0];
+}
+
 /** Chapter destinations are actual approaches; the overview includes the courtyard architecture. */
 export function observatoryFrame(boxes: readonly Box3[], selected: readonly number[], aspect: number, inspect: boolean): CameraBookmark {
   if (!selected.length) {
@@ -47,15 +57,22 @@ export function observatoryFrame(boxes: readonly Box3[], selected: readonly numb
   }
   const chosen = selected.flatMap(index => boxes[index] ? [boxes[index]] : []);
   if (!chosen.length) return cameraFrame(boxes, [], aspect);
-  const pose = cameraFrame(chosen, [], aspect);
+  const size = chosen[0].getSize(new Vector3());
+  // Low, broad objects need an elevated view to reveal their top surface above
+  // the folio. Derive this from physical bounds, never the chapter's meaning.
+  const shallow = chosen.length === 1 && size.y < Math.max(size.x, size.z) * 0.5;
+  const pose = cameraFrame(chosen, [], aspect, new Vector3(0.15, shallow ? 1.25 : 0.76, 1).normalize());
   const target = new Vector3(...pose.target);
   const offset = new Vector3(...pose.position).sub(target);
   // Keep room for the plinth and reading desk until the reader explicitly inspects the object.
-  offset.multiplyScalar(inspect ? 1.05 : 1.5);
+  offset.multiplyScalar(inspect ? 1 : 1.2);
   return { position: target.clone().add(offset).toArray(), target: target.toArray() };
 }
 
-interface WorldState { roofOpen: boolean; lighting: "day" | "dusk"; open: boolean[]; unfolded: boolean; }
+interface WorldState {
+  roofOpen: boolean; lighting: "day" | "dusk"; open: boolean[]; unfolded: boolean;
+  comparison?: { indices: readonly number[]; positions: readonly Point3[] };
+}
 export interface ObservatoryWorld {
   root: Group;
   instrument: ZodiacInstrument;
@@ -272,7 +289,7 @@ export function createObservatory(count: number, placements: readonly PortraitSk
       const goal = state.open[index] ? -1.25 : 0;
       desk.rotation.x = approach(desk.rotation.x, goal, fraction);
       moving ||= desk.rotation.x !== goal;
-      const destination = stationPosition(index, state.unfolded, count);
+      const destination = state.comparison?.positions[index] ?? stationPosition(index, state.unfolded, count);
       for (const [axis, value] of (["x", "y", "z"] as const).map((axis, i) => [axis, destination[i]] as const)) {
         stations[index].position[axis] = approach(stations[index].position[axis], value, fraction);
         moving ||= stations[index].position[axis] !== value;
@@ -282,7 +299,10 @@ export function createObservatory(count: number, placements: readonly PortraitSk
   };
   return { root, roof, instrument, stations, desks, tick, setState(next) {
     state = next;
-    roof.visible = !state.roofOpen;
+    architecture.visible = !state.comparison;
+    instrument.root.visible = !state.comparison;
+    roof.visible = !state.comparison && !state.roofOpen;
+    stations.forEach((station, index) => { station.visible = !state.comparison || state.comparison.indices.includes(index); });
     glass.emissiveIntensity = state.lighting === "dusk" ? 3 : 0.6;
     lights.forEach(light => { light.intensity = state.lighting === "dusk" ? 18 : 0.4; });
   } };

@@ -139,7 +139,14 @@
  .explorer-expanded-dialog { padding:8px; width:calc(100% - 16px); max-height:calc(100dvh - 16px); } .explorer-expanded-dialog .explorer-scene { height:calc(100dvh - 188px); min-height:350px; } .explorer-expanded-dialog .explorer-chapters { gap:2px; }
  .explorer-complete { margin:30px auto; } .explorer-complete h1 { font-size:32px; }
 }
-@media (prefers-reduced-motion:reduce) { .portrait-explorer *, .explorer-dialog * { scroll-behavior:auto !important; } }
+@media (prefers-reduced-motion:reduce) {
+ .portrait-explorer, .portrait-explorer *, .explorer-dialog, .explorer-dialog * {
+  scroll-behavior:auto !important;
+  /* The app's nonzero reduced-motion duration otherwise transitions layout and
+     inherited text sizes, clamping saved reader positions before they settle. */
+  transition:none !important;
+ }
+}
 
 .explorer-label-ordinal, .explorer-label-title { display:block; }
 .explorer-label-ordinal { font-size:9px; text-transform:uppercase; letter-spacing:.08em; opacity:.8; margin-bottom:3px; }
