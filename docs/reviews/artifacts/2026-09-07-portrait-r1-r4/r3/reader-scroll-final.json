@@ -1,0 +1,124 @@
+{
+  "before": {
+    "y": 0,
+    "readerTop": 204,
+    "readerHeight": 722,
+    "readerScrollHeight": 926,
+    "readerWidth": 444,
+    "passageFont": "19px / 33.25px \"Iowan Old Style\", \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif",
+    "passageWidth": 414.796875,
+    "focus": "1. Finding your own direction",
+    "choiceBox": {
+      "x": 1179.375,
+      "y": 702.75,
+      "width": 187,
+      "height": 44,
+      "top": 702.75,
+      "right": 1366.375,
+      "bottom": 746.75,
+      "left": 1179.375
+    }
+  },
+  "returned": {
+    "y": 0,
+    "readerTop": 204,
+    "readerHeight": 722,
+    "readerScrollHeight": 926,
+    "readerWidth": 444,
+    "passageFont": "19px / 33.25px \"Iowan Old Style\", \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif",
+    "passageWidth": 414.796875,
+    "focus": "Compare with another chapter",
+    "choiceBox": {
+      "x": 1179.375,
+      "y": 702.75,
+      "width": 187,
+      "height": 44,
+      "top": 702.75,
+      "right": 1366.375,
+      "bottom": 746.75,
+      "left": 1179.375
+    }
+  },
+  "assignments": [
+    {
+      "phase": "load",
+      "requested": 0,
+      "before": 0,
+      "after": 0,
+      "height": 415,
+      "scrollHeight": 415,
+      "width": 444,
+      "passageFont": "15px / 24px \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif",
+      "workspaceClass": "explorer-workspace",
+      "root": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "phase": "load",
+      "requested": 0,
+      "before": 0,
+      "after": 0,
+      "height": 415,
+      "scrollHeight": 415,
+      "width": 444,
+      "passageFont": "15px / 24px \"Avenir Next\", \"Segoe UI\", Helvetica, Arial, sans-serif",
+      "workspaceClass": "explorer-workspace",
+      "root": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "phase": "load",
+      "requested": 0,
+      "before": 0,
+      "after": 0,
+      "height": 722,
+      "scrollHeight": 926,
+      "width": 444,
+      "passageFont": "19px / 33.25px \"Iowan Old Style\", \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif",
+      "passageWidth": 414.796875,
+      "workspaceClass": "explorer-workspace",
+      "passagesClass": "explorer-passages",
+      "root": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "phase": "compare",
+      "requested": 0,
+      "before": 0,
+      "after": 0,
+      "height": 777,
+      "scrollHeight": 777,
+      "width": 912,
+      "passageFont": "17px / 29.75px \"Iowan Old Style\", \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif",
+      "passageWidth": 444.109375,
+      "workspaceClass": "explorer-workspace explorer-is-comparing",
+      "passagesClass": "explorer-passages explorer-comparison",
+      "root": "portrait-explorer observatory-explorer explorer-comparing explorer-presentation-explore"
+    },
+    {
+      "phase": "compare",
+      "requested": 0,
+      "before": 0,
+      "after": 0,
+      "height": 533,
+      "scrollHeight": 533,
+      "width": 912,
+      "passageFont": "17px / 29.75px \"Iowan Old Style\", \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif",
+      "passageWidth": 444.109375,
+      "workspaceClass": "explorer-workspace explorer-is-comparing",
+      "passagesClass": "explorer-passages explorer-comparison",
+      "root": "portrait-explorer observatory-explorer explorer-comparing explorer-presentation-explore"
+    },
+    {
+      "phase": "return",
+      "requested": 204,
+      "before": 204,
+      "after": 204,
+      "height": 722,
+      "scrollHeight": 926,
+      "width": 444,
+      "passageFont": "19px / 33.25px \"Iowan Old Style\", \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif",
+      "passageWidth": 414.796875,
+      "workspaceClass": "explorer-workspace",
+      "passagesClass": "explorer-passages",
+      "root": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    }
+  ]
+}

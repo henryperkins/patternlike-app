@@ -1,0 +1,27 @@
+
+> @patternlike/web@0.2.0 build
+> tsc -p tsconfig.json --noEmit && vite build
+
+vite v8.2.0 building client environment for production...
+
+transforming...✓ 123 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                             0.97 kB │ gzip:   0.47 kB
+dist/assets/index-BZoVSe66.css            134.66 kB │ gzip:  23.37 kB
+dist/assets/SkyReader-C9BaoL45.js           3.94 kB │ gzip:   1.61 kB
+dist/assets/scene-utils-0uj5e5RT.js         5.81 kB │ gzip:   2.48 kB
+dist/assets/jsx-runtime-PaTlW0he.js         9.87 kB │ gzip:   3.86 kB
+dist/assets/portrait-graph-Zju4hwvb.js     15.49 kB │ gzip:   6.59 kB
+dist/assets/PortraitScene-kf5wCTul.js      85.37 kB │ gzip:  26.83 kB
+dist/assets/PatternSculpture-DweUwfQv.js  160.16 kB │ gzip:  51.55 kB
+dist/assets/three.core-DhgquDLW.js        223.62 kB │ gzip:  59.55 kB
+dist/assets/OrbitControls-BuUeTXT6.js     363.52 kB │ gzip:  87.53 kB
+dist/assets/index-Do0teOdZ.js             667.69 kB │ gzip: 187.42 kB
+
+✓ built in 483ms
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

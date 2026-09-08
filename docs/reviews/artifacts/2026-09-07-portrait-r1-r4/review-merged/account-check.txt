@@ -1,0 +1,59 @@
+[
+  {
+    "before": {
+      "reader": {
+        "heading": "Finding your own direction",
+        "headingTop": 812.4375,
+        "scrollY": 3549,
+        "readerTop": 0,
+        "readerHeight": 722,
+        "readerScrollHeight": 722,
+        "facet": "Resources",
+        "focus": "Dusk",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "pose": {
+        "inspect": true,
+        "desk": true,
+        "dusk": "true",
+        "sky": "false"
+      },
+      "assetRequests": 8
+    },
+    "skyBeforeClose": {
+      "inspect": false,
+      "desk": false,
+      "dusk": "true",
+      "sky": "true"
+    },
+    "after": {
+      "reader": {
+        "heading": "Finding your own direction",
+        "headingTop": 1446.4375,
+        "scrollY": 2915,
+        "readerTop": 0,
+        "readerHeight": 722,
+        "readerScrollHeight": 722,
+        "facet": "Resources",
+        "focus": "Finding your own direction. resources.Back to readingFull reading ↗Your zodiac observatoryYour Patte",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "pose": {
+        "inspect": false,
+        "desk": false,
+        "dusk": "false",
+        "sky": "false"
+      },
+      "assetRequests": 8
+    },
+    "returnButton": {
+      "x": 33,
+      "y": 130,
+      "width": 92.046875,
+      "height": 49
+    },
+    "errors": []
+  }
+]

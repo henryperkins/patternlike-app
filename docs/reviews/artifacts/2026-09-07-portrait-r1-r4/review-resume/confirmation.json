@@ -1,0 +1,180 @@
+{
+  "fixture": "Fictional chapter/image fixtures and deterministic compiled test shapes, all API calls intercepted. Real validators and renderer unchanged.",
+  "states": [
+    {
+      "mode": "ready",
+      "text": "YOUR 3D PORTRAIT\n\nFour chapters, a shape of your own\nAutomatically create my 3D portrait\n\nYour complete chapter text and generated images are sent to Codex, run by OpenAI, to create and check a visual interpretation.\n\nEach new four-chapter Pattern for this chart starts a portrait automatically. It is saved privately, so you can leave and return while it is being created.\n\nTurning this off stops unfinished and future portraits. Saved portraits remain until you delete their Pattern; your written reading stays available.\n\nYour four objects are saved privately with this Pattern. Exploring them reuses the saved models.\n\nExplore your 3D portrait\nDownload complete portrait\n\nThe private download includes your complete reading, four images, four 3D models, and their saved source records. It is separate from your account data export.",
+      "prosePresent": true
+    }
+  ],
+  "workflows": [
+    {
+      "width": 1440,
+      "entry": {
+        "heading": "Your Pattern, in four chapters",
+        "headingTop": 245.578125,
+        "scrollY": 2215,
+        "readerTop": 0,
+        "readerHeight": 650,
+        "readerScrollHeight": 650,
+        "focus": "Whole portrait. Four chapters available.Back to readingFull reading ↗Your zodiac observatoryYour Pat",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "selected": {
+        "heading": "Making room for care",
+        "headingTop": 174.578125,
+        "scrollY": 2260,
+        "readerTop": 0,
+        "readerHeight": 722,
+        "readerScrollHeight": 938,
+        "facet": "Overview",
+        "focus": "022. Making room for care",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "beforeWhole": {
+        "heading": "Making room for care",
+        "headingTop": 174.578125,
+        "scrollY": 2260,
+        "readerTop": 0,
+        "readerHeight": 606,
+        "readerScrollHeight": 606,
+        "facet": "Resources",
+        "focus": "Resources",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "whole": {
+        "heading": "Your Pattern, in four chapters",
+        "headingTop": 200.578125,
+        "scrollY": 2260,
+        "readerTop": 0,
+        "readerHeight": 650,
+        "readerScrollHeight": 650,
+        "focus": "Whole portrait",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "afterBack": {
+        "heading": "Making room for care",
+        "headingTop": 174.578125,
+        "scrollY": 2260,
+        "readerTop": 0,
+        "readerHeight": 606,
+        "readerScrollHeight": 606,
+        "facet": "Resources",
+        "focus": "Whole portrait",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "scrolledBeforeWhole": {
+        "heading": "Making room for care",
+        "headingTop": 24.578125,
+        "scrollY": 2260,
+        "readerTop": 150,
+        "readerHeight": 722,
+        "readerScrollHeight": 938,
+        "facet": "Overview",
+        "focus": "Overview",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "scrolledAfterBack": {
+        "heading": "Making room for care",
+        "headingTop": 24.578125,
+        "scrollY": 2260,
+        "readerTop": 150,
+        "readerHeight": 722,
+        "readerScrollHeight": 938,
+        "facet": "Overview",
+        "focus": "Whole portrait",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "actions": {
+        "top": 914.28125,
+        "bottom": 971.28125,
+        "readerBottom": 890.578125
+      },
+      "privateAssetRequests": 8,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "entry": {
+        "heading": "Your Pattern, in four chapters",
+        "headingTop": 1246.21875,
+        "scrollY": 3114,
+        "readerTop": 0,
+        "readerHeight": 601,
+        "readerScrollHeight": 601,
+        "focus": "Whole portrait. Four chapters available.Back to readingFull reading ↗Your zodiac observatoryYour Pat",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "railSelected": {
+        "heading": "Making room for care",
+        "headingTop": 731.4375,
+        "scrollY": 3630,
+        "readerTop": 0,
+        "readerHeight": 1019,
+        "readerScrollHeight": 1019,
+        "facet": "Overview",
+        "focus": "022. Making room for care",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "reading": {
+        "heading": "Making room for care",
+        "headingTop": 196.0625,
+        "scrollY": 3508,
+        "readerTop": 0,
+        "readerHeight": 1019,
+        "readerScrollHeight": 1019,
+        "facet": "Overview",
+        "focus": "Making room for care",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-reading",
+        "overflow": 0
+      },
+      "skyReturn": {
+        "heading": "Making room for care",
+        "headingTop": 196.0625,
+        "scrollY": 3508,
+        "readerTop": 0,
+        "readerHeight": 654,
+        "readerScrollHeight": 654,
+        "facet": "Resources",
+        "focus": "Making room for care",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-reading",
+        "overflow": 0
+      },
+      "primarySelected": {
+        "heading": "Finding your own direction",
+        "headingTop": 196.4375,
+        "scrollY": 4165,
+        "readerTop": 0,
+        "readerHeight": 1054,
+        "readerScrollHeight": 1054,
+        "facet": "Overview",
+        "focus": "Finding your own direction",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "sceneSelected": {
+        "heading": "Finding your own direction",
+        "headingTop": 1239.4375,
+        "scrollY": 3122,
+        "readerTop": 0,
+        "readerHeight": 1054,
+        "readerScrollHeight": 1054,
+        "facet": "Overview",
+        "focus": "● Overview · 1",
+        "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+        "overflow": 0
+      },
+      "completeProse": true,
+      "errors": []
+    }
+  ]
+}

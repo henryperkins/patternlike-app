@@ -1,0 +1,230 @@
+{
+  "checks": [
+    {
+      "name": "reachable-comparison-320-2",
+      "pass": true,
+      "details": {
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 0,
+          "width": 288,
+          "height": 396.046875,
+          "top": 0,
+          "right": 304,
+          "bottom": 396.046875,
+          "left": 16
+        },
+        "regions": [
+          {
+            "width": 288,
+            "paragraphs": 1
+          },
+          {
+            "width": 288,
+            "paragraphs": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "label-fit-320-2",
+      "pass": true,
+      "details": {
+        "clear": true,
+        "visibleLabels": 0,
+        "nativeLinks": 2,
+        "identity": "Finding your own direction · Making room for care"
+      }
+    },
+    {
+      "name": "expanded-keyboard-320",
+      "pass": true
+    },
+    {
+      "name": "expanded-source-320",
+      "pass": true,
+      "details": {
+        "text": "Being needed can feel close to being valued, even when the exchange leaves little room for you.",
+        "box": {
+          "x": 16,
+          "y": 479.5625,
+          "width": 288,
+          "height": 297.5,
+          "top": 479.5625,
+          "right": 304,
+          "bottom": 777.0625,
+          "left": 16
+        },
+        "inset": 396.046875
+      }
+    },
+    {
+      "name": "image-source-320",
+      "pass": true
+    },
+    {
+      "name": "complete-reading-320",
+      "pass": true
+    },
+    {
+      "name": "original-facet-320",
+      "pass": true
+    },
+    {
+      "name": "reachable-comparison-844-1",
+      "pass": true,
+      "details": {
+        "overflow": 0,
+        "modes": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 116.5,
+          "top": 0,
+          "right": 817.84375,
+          "bottom": 116.5,
+          "left": 26.15625
+        },
+        "regions": [
+          {
+            "width": 383.84375,
+            "paragraphs": 1
+          },
+          {
+            "width": 383.84375,
+            "paragraphs": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "label-fit-844-1",
+      "pass": true,
+      "details": {
+        "clear": true,
+        "visibleLabels": 2,
+        "nativeLinks": 2,
+        "identity": "Finding your own direction · Making room for care"
+      }
+    },
+    {
+      "name": "expanded-keyboard-844",
+      "pass": true
+    },
+    {
+      "name": "expanded-source-844",
+      "pass": true,
+      "details": {
+        "text": "Being needed can feel close to being valued, even when the exchange leaves little room for you.",
+        "box": {
+          "x": 434,
+          "y": 231.328125,
+          "width": 383.84375,
+          "height": 59.5,
+          "top": 231.328125,
+          "right": 817.84375,
+          "bottom": 290.828125,
+          "left": 434
+        },
+        "inset": 116.5
+      }
+    },
+    {
+      "name": "image-source-844",
+      "pass": true
+    },
+    {
+      "name": "complete-reading-844",
+      "pass": true
+    },
+    {
+      "name": "original-facet-844",
+      "pass": true
+    },
+    {
+      "name": "reachable-comparison-1440-1",
+      "pass": true,
+      "details": {
+        "overflow": 0,
+        "modes": {
+          "x": 44.625,
+          "y": 0,
+          "width": 1350.75,
+          "height": 116.5,
+          "top": 0,
+          "right": 1395.375,
+          "bottom": 116.5,
+          "left": 44.625
+        },
+        "regions": [
+          {
+            "width": 444.109375,
+            "paragraphs": 1
+          },
+          {
+            "width": 444.125,
+            "paragraphs": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "label-fit-1440-1",
+      "pass": true,
+      "details": {
+        "clear": true,
+        "visibleLabels": 2,
+        "nativeLinks": 2,
+        "identity": "Finding your own direction · Making room for care"
+      }
+    },
+    {
+      "name": "expanded-keyboard-1440",
+      "pass": true
+    },
+    {
+      "name": "expanded-source-1440",
+      "pass": true,
+      "details": {
+        "text": "Being needed can feel close to being valued, even when the exchange leaves little room for you.",
+        "box": {
+          "x": 951.234375,
+          "y": 486.703125,
+          "width": 444.125,
+          "height": 59.5,
+          "top": 486.703125,
+          "right": 1395.359375,
+          "bottom": 546.203125,
+          "left": 951.234375
+        },
+        "inset": 128.296875
+      }
+    },
+    {
+      "name": "image-source-1440",
+      "pass": true
+    },
+    {
+      "name": "complete-reading-1440",
+      "pass": true
+    },
+    {
+      "name": "original-facet-1440",
+      "pass": true
+    },
+    {
+      "name": "graphics-fallback-pair",
+      "pass": true
+    },
+    {
+      "name": "graphics-fallback-source",
+      "pass": true
+    },
+    {
+      "name": "graphics-retry-pair",
+      "pass": true
+    }
+  ],
+  "errors": []
+}

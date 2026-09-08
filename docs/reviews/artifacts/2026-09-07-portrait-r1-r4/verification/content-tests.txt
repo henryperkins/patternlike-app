@@ -1,0 +1,488 @@
+
+> patternlike-app@0.2.0 test:content
+> node --test --test-concurrency=1 "scripts/pattern-release/*.test.mjs"
+
+TAP version 13
+# Subtest: the launch catalog holds 24 reviewable families across the four groups
+ok 1 - the launch catalog holds 24 reviewable families across the four groups
+  ---
+  duration_ms: 2.03209
+  type: 'test'
+  ...
+# Subtest: every family states its counter-expression and its prohibited claims
+ok 2 - every family states its counter-expression and its prohibited claims
+  ---
+  duration_ms: 0.265154
+  type: 'test'
+  ...
+# Subtest: a family with no positive predicate is not reviewable
+ok 3 - a family with no positive predicate is not reviewable
+  ---
+  duration_ms: 0.209058
+  type: 'test'
+  ...
+# Subtest: a noncanonical aspect pair is not reviewable
+ok 4 - a noncanonical aspect pair is not reviewable
+  ---
+  duration_ms: 0.199028
+  type: 'test'
+  ...
+# Subtest: a house or angle predicate without an accuracy gate is not reviewable
+ok 5 - a house or angle predicate without an accuracy gate is not reviewable
+  ---
+  duration_ms: 0.221501
+  type: 'test'
+  ...
+# Subtest: the builder refuses without a review manifest approving every candidate
+ok 6 - the builder refuses without a review manifest approving every candidate
+  ---
+  duration_ms: 6.020203
+  type: 'test'
+  ...
+# Subtest: the builder refuses a self-approved candidate and a self-approved release
+ok 7 - the builder refuses a self-approved candidate and a self-approved release
+  ---
+  duration_ms: 6.972346
+  type: 'test'
+  ...
+# Subtest: the builder refuses when the reviewed bytes no longer match
+ok 8 - the builder refuses when the reviewed bytes no longer match
+  ---
+  duration_ms: 6.698856
+  type: 'test'
+  ...
+# Subtest: an approved build ships no review-only field and no draft state
+ok 9 - an approved build ships no review-only field and no draft state
+  ---
+  duration_ms: 8.535573
+  type: 'test'
+  ...
+# Subtest: a draft object cannot be smuggled into a production-shaped body
+ok 10 - a draft object cannot be smuggled into a production-shaped body
+  ---
+  duration_ms: 5.82939
+  type: 'test'
+  ...
+# Subtest: signing produces a verifiable signature over the built body
+ok 11 - signing produces a verifiable signature over the built body
+  ---
+  duration_ms: 15.614443
+  type: 'test'
+  ...
+# Subtest: signing refuses a body whose declared bundle hash is wrong
+ok 12 - signing refuses a body whose declared bundle hash is wrong
+  ---
+  duration_ms: 7.107203
+  type: 'test'
+  ...
+# Subtest: no private key material is committed to this repository
+ok 13 - no private key material is committed to this repository
+  ---
+  duration_ms: 1640.253505
+  type: 'test'
+  ...
+# Subtest: no runtime source reads the candidate directory
+ok 14 - no runtime source reads the candidate directory
+  ---
+  duration_ms: 23.261085
+  type: 'test'
+  ...
+# Subtest: the candidate file is not reachable as a release fixture
+ok 15 - the candidate file is not reachable as a release fixture
+  ---
+  duration_ms: 12.592639
+  type: 'test'
+  ...
+# Subtest: the built body validates against the frozen M4 contract
+ok 16 - the built body validates against the frozen M4 contract
+  ---
+  duration_ms: 308.155839
+  type: 'test'
+  ...
+# Subtest: the canonical body order matches the shared package and the contract
+ok 17 - the canonical body order matches the shared package and the contract
+  ---
+  duration_ms: 0.64073
+  type: 'test'
+  ...
+# Subtest: the shipped projection is the closed M4 object shape
+ok 18 - the shipped projection is the closed M4 object shape
+  ---
+  duration_ms: 0.244055
+  type: 'test'
+  ...
+# Subtest: fragment validation refuses a missing provenance record
+ok 19 - fragment validation refuses a missing provenance record
+  ---
+  duration_ms: 72.764511
+  type: 'test'
+  ...
+# Subtest: fragment validation refuses content whose hash no longer matches the record
+ok 20 - fragment validation refuses content whose hash no longer matches the record
+  ---
+  duration_ms: 66.234787
+  type: 'test'
+  ...
+# Subtest: the recorded corpus passes integrity without claiming human certification
+ok 21 - the recorded corpus passes integrity without claiming human certification
+  ---
+  duration_ms: 76.610945
+  type: 'test'
+  ...
+# Subtest: each fragment must occur exactly once with its own content hash
+ok 22 - each fragment must occur exactly once with its own content hash
+  ---
+  duration_ms: 12.691106
+  type: 'test'
+  ...
+# Subtest: the record cannot silently relabel the corpus or invent a human certification
+ok 23 - the record cannot silently relabel the corpus or invent a human certification
+  ---
+  duration_ms: 11.853752
+  type: 'test'
+  ...
+# Subtest: declared corpus metadata must agree with the hashed fragment metadata
+ok 24 - declared corpus metadata must agree with the hashed fragment metadata
+  ---
+  duration_ms: 6.304525
+  type: 'test'
+  ...
+# Subtest: the origin record must bind the rights decision bytes without claiming unresolved review
+ok 25 - the origin record must bind the rights decision bytes without claiming unresolved review
+  ---
+  duration_ms: 7.939318
+  type: 'test'
+  ...
+# Subtest: packets expose complete fragment bytes and leave every human judgment blank
+ok 26 - packets expose complete fragment bytes and leave every human judgment blank
+  ---
+  duration_ms: 13.068646
+  type: 'test'
+  ...
+# Subtest: packet creation refuses stale corpus bytes and duplicate or unknown fragment selections
+ok 27 - packet creation refuses stale corpus bytes and duplicate or unknown fragment selections
+  ---
+  duration_ms: 11.766737
+  type: 'test'
+  ...
+# Subtest: record accepts only an enrolled name's signature over the exact review bytes
+ok 28 - record accepts only an enrolled name's signature over the exact review bytes
+  ---
+  duration_ms: 34.780651
+  type: 'test'
+  ...
+# Subtest: an automatic review, unsigned draft, incomplete criteria, or copied identity cannot count as human review
+ok 29 - an automatic review, unsigned draft, incomplete criteria, or copied identity cannot count as human review
+  ---
+  duration_ms: 42.966678
+  type: 'test'
+  ...
+# Subtest: signed coverage stays partial with missing fragments or unresolved adverse reviews
+ok 30 - signed coverage stays partial with missing fragments or unresolved adverse reviews
+  ---
+  duration_ms: 34.539411
+  type: 'test'
+  ...
+# Subtest: complete signed coverage never recovers historical provenance or independently proves human authorship
+ok 31 - complete signed coverage never recovers historical provenance or independently proves human authorship
+  ---
+  duration_ms: 30.809027
+  type: 'test'
+  ...
+# Subtest: CLI prepares readable packets and records verified submissions without overwriting existing evidence
+ok 32 - CLI prepares readable packets and records verified submissions without overwriting existing evidence
+  ---
+  duration_ms: 306.020142
+  type: 'test'
+  ...
+# Subtest: empty evidence inventory cannot infer human review from reviewer enrollment
+ok 33 - empty evidence inventory cannot infer human review from reviewer enrollment
+  ---
+  duration_ms: 6.401961
+  type: 'test'
+  ...
+# Subtest: reviewer enrollment refuses private keys and duplicate key identities
+ok 34 - reviewer enrollment refuses private keys and duplicate key identities
+  ---
+  duration_ms: 10.282319
+  type: 'test'
+  ...
+# Subtest: stale, corrupted, duplicate, and incomplete evidence cannot produce a clean coverage result
+ok 35 - stale, corrupted, duplicate, and incomplete evidence cannot produce a clean coverage result
+  ---
+  duration_ms: 35.329496
+  type: 'test'
+  ...
+# Subtest: caller-controlled executable or environment cannot attest provider observation even when every chain validates
+ok 36 - caller-controlled executable or environment cannot attest provider observation even when every chain validates
+  ---
+  duration_ms: 5840.397999
+  type: 'test'
+  ...
+# Subtest: invalid fresh planners stop their chain and retained failures cannot become provider evidence
+ok 37 - invalid fresh planners stop their chain and retained failures cannot become provider evidence
+  ---
+  duration_ms: 521.053585
+  type: 'test'
+  ...
+# Subtest: each writer and verifier consumes the output of its own preceding real application stage
+ok 38 - each writer and verifier consumes the output of its own preceding real application stage
+  ---
+  duration_ms: 1806.732561
+  type: 'test'
+  ...
+# Subtest: unexpected verifier codes stay private and incoherent verdicts and refusals cannot pass
+ok 39 - unexpected verifier codes stay private and incoherent verdicts and refusals cannot pass
+  ---
+  duration_ms: 4143.806622
+  type: 'test'
+  ...
+# Subtest: malformed completion metadata retains bounded output privately with its original hash
+ok 40 - malformed completion metadata retains bounded output privately with its original hash
+  ---
+  duration_ms: 472.41182
+  type: 'test'
+  ...
+# Subtest: source drift prevents another stage from spending a provider call
+ok 41 - source drift prevents another stage from spending a provider call
+  ---
+  duration_ms: 1259.254487
+  type: 'test'
+  ...
+# Subtest: fatal transport failure prevents further claims and cancellation spends no calls
+ok 42 - fatal transport failure prevents further claims and cancellation spends no calls
+  ---
+  duration_ms: 829.187633
+  type: 'test'
+  ...
+# Subtest: a false acceptance remains a verifier error when a separate deterministic gate catches the input
+ok 43 - a false acceptance remains a verifier error when a separate deterministic gate catches the input
+  ---
+  duration_ms: 2.172117
+  type: 'test'
+  ...
+# Subtest: rejecting an authored positive control is counted as a false rejection
+ok 44 - rejecting an authored positive control is counted as a false rejection
+  ---
+  duration_ms: 0.498559
+  type: 'test'
+  ...
+# Subtest: malformed and generic refusals cannot pass a negative challenge
+ok 45 - malformed and generic refusals cannot pass a negative challenge
+  ---
+  duration_ms: 0.901547
+  type: 'test'
+  ...
+# Subtest: preparation uses authored controls, schema-valid mutations, and the actual current verifier request
+ok 46 - preparation uses authored controls, schema-valid mutations, and the actual current verifier request
+  ---
+  duration_ms: 74.582803
+  type: 'test'
+  ...
+# Subtest: retains accepts, rejects, malformed output and content-free counts without turning test doubles into provider evidence
+ok 47 - retains accepts, rejects, malformed output and content-free counts without turning test doubles into provider evidence
+  ---
+  duration_ms: 486.23903
+  type: 'test'
+  ...
+# Subtest: fatal transport failures and cancellation leave a complete accounting of unattempted cases
+ok 48 - fatal transport failures and cancellation leave a complete accounting of unattempted cases
+  ---
+  duration_ms: 587.247914
+  type: 'test'
+  ...
+# Subtest: source changes during a run remain visible in the evidence even when every returned verdict is valid
+ok 49 - source changes during a run remain visible in the evidence even when every returned verdict is valid
+  ---
+  duration_ms: 308.598121
+  type: 'test'
+  ...
+# Subtest: a provider refusal is preserved separately from a semantic rejection and does not stop nonfatal remaining cases
+ok 50 - a provider refusal is preserved separately from a semantic rejection and does not stop nonfatal remaining cases
+  ---
+  duration_ms: 295.825108
+  type: 'test'
+  ...
+# Subtest: budgets and source destinations are rejected before any invocation
+ok 51 - budgets and source destinations are rejected before any invocation
+  ---
+  duration_ms: 1.318781
+  type: 'test'
+  ...
+# Subtest: fresh evaluation prepares every synthetic shape with the real prompt and frozen validator inputs
+ok 52 - fresh evaluation prepares every synthetic shape with the real prompt and frozen validator inputs
+  ---
+  duration_ms: 18.016968
+  type: 'test'
+  ...
+# Subtest: rejected fresh output is retained and a test double cannot become fresh-provider evidence
+ok 53 - rejected fresh output is retained and a test double cannot become fresh-provider evidence
+  ---
+  duration_ms: 318.172131
+  type: 'test'
+  ...
+# Subtest: fatal transport failure stops remaining calls, retains the failure and leaves evaluation incomplete
+ok 54 - fatal transport failure stops remaining calls, retains the failure and leaves evaluation incomplete
+  ---
+  duration_ms: 296.453776
+  type: 'test'
+  ...
+# Subtest: sample budget is bounded before any invocation
+ok 55 - sample budget is bounded before any invocation
+  ---
+  duration_ms: 1.328489
+  type: 'test'
+  ...
+# Subtest: edits after application import cannot be attributed to cached code or invoke the provider
+ok 56 - edits after application import cannot be attributed to cached code or invoke the provider
+  ---
+  duration_ms: 274.077045
+  type: 'test'
+  ...
+# Subtest: health alone stays incomplete and does not trigger authenticated or generation routes
+ok 57 - health alone stays incomplete and does not trigger authenticated or generation routes
+  ---
+  duration_ms: 57.148354
+  type: 'test'
+  ...
+# Subtest: authenticated checks verify real responses and retain no cookies, query results, or reading prose
+ok 58 - authenticated checks verify real responses and retain no cookies, query results, or reading prose
+  ---
+  duration_ms: 40.061256
+  type: 'test'
+  ...
+# Subtest: redirects are never followed, empty geocoding and stale publication fail even with HTTP 200
+ok 59 - redirects are never followed, empty geocoding and stale publication fail even with HTTP 200
+  ---
+  duration_ms: 28.922555
+  type: 'test'
+  ...
+# Subtest: credit thresholds use current account-wide credits and refuse missing, stale, future, or project-only inputs
+ok 60 - credit thresholds use current account-wide credits and refuse missing, stale, future, or project-only inputs
+  ---
+  duration_ms: 0.9296
+  type: 'test'
+  ...
+# Subtest: plaintext origins are rejected before any credential-bearing request
+ok 61 - plaintext origins are rejected before any credential-bearing request
+  ---
+  duration_ms: 1.751315
+  type: 'test'
+  ...
+# Subtest: usage warnings cannot conceal missing authenticated coverage
+ok 62 - usage warnings cannot conceal missing authenticated coverage
+  ---
+  duration_ms: 15.574328
+  type: 'test'
+  ...
+# Subtest: native transport failures before headers do not claim observed response evidence
+ok 63 - native transport failures before headers do not claim observed response evidence
+  ---
+  duration_ms: 2.024575
+  type: 'test'
+  ...
+# Subtest: snapshot captures tracked and new source paths without copying their contents
+ok 64 - snapshot captures tracked and new source paths without copying their contents
+  ---
+  duration_ms: 92.20997
+  type: 'test'
+  ...
+# Subtest: source comparison rejects changed, missing, and newly added paths
+ok 65 - source comparison rejects changed, missing, and newly added paths
+  ---
+  duration_ms: 48.258204
+  type: 'test'
+  ...
+# Subtest: source inventories preserve ordinary filenames that shadow object properties
+ok 66 - source inventories preserve ordinary filenames that shadow object properties
+  ---
+  duration_ms: 52.036439
+  type: 'test'
+  ...
+# Subtest: source comparison rejects a forged partial or malformed source manifest
+ok 67 - source comparison rejects a forged partial or malformed source manifest
+  ---
+  duration_ms: 34.956696
+  type: 'test'
+  ...
+# Subtest: the gate parser requires the complete final summary and all fourteen distinct passing lanes
+ok 68 - the gate parser requires the complete final summary and all fourteen distinct passing lanes
+  ---
+  duration_ms: 1.728241
+  type: 'test'
+  ...
+# Subtest: a real child gate binds source, process exit, summary, build artifacts, and repository pins
+ok 69 - a real child gate binds source, process exit, summary, build artifacts, and repository pins
+  ---
+  duration_ms: 476.574436
+  type: 'test'
+  ...
+# Subtest: gate refuses source drift, incomplete totals, and a nonzero process exit
+ok 70 - gate refuses source drift, incomplete totals, and a nonzero process exit
+  ---
+  duration_ms: 890.963778
+  type: 'test'
+  ...
+# Subtest: gate cannot write its own receipt into the source being measured
+ok 71 - gate cannot write its own receipt into the source being measured
+  ---
+  duration_ms: 67.299844
+  type: 'test'
+  ...
+# Subtest: malformed imported evidence is rejected without echoing its contents
+ok 72 - malformed imported evidence is rejected without echoing its contents
+  ---
+  duration_ms: 66.451179
+  type: 'test'
+  ...
+# Subtest: fresh verification detects artifact replacement after an otherwise passing gate
+ok 73 - fresh verification detects artifact replacement after an otherwise passing gate
+  ---
+  duration_ms: 380.135054
+  type: 'test'
+  ...
+# Subtest: a blank template represents every release and authorized lifecycle gap
+ok 74 - a blank template represents every release and authorized lifecycle gap
+  ---
+  duration_ms: 67.658196
+  type: 'test'
+  ...
+# Subtest: prepare validates the existing local gate and leaves all external observations blank
+ok 75 - prepare validates the existing local gate and leaves all external observations blank
+  ---
+  duration_ms: 469.815466
+  type: 'test'
+  ...
+# Subtest: a complete hash-matched offline record stays recorded and never proves deployment
+ok 76 - a complete hash-matched offline record stays recorded and never proves deployment
+  ---
+  duration_ms: 482.332502
+  type: 'test'
+  ...
+# Subtest: reconciliation rejects incomplete traffic, artifacts, pins, migrations and lifecycle claims
+ok 77 - reconciliation rejects incomplete traffic, artifacts, pins, migrations and lifecycle claims
+  ---
+  duration_ms: 2579.759581
+  type: 'test'
+  ...
+# Subtest: record-file hashing, strict input, bounded reads, safe paths and exclusive writes fail without leaking contents
+ok 78 - record-file hashing, strict input, bounded reads, safe paths and exclusive writes fail without leaking contents
+  ---
+  duration_ms: 1204.931605
+  type: 'test'
+  ...
+# Subtest: missing evidence, receipt replacement and stale source cannot close the record chain
+ok 79 - missing evidence, receipt replacement and stale source cannot close the record chain
+  ---
+  duration_ms: 1050.680776
+  type: 'test'
+  ...
+1..79
+# tests 79
+# suites 0
+# pass 79
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 31868.299343

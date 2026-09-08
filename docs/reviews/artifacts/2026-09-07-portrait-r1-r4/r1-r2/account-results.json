@@ -1,0 +1,465 @@
+{
+  "fixture": "Fictional chapter/image fixtures and deterministic compiled test shapes, all API calls intercepted. Real validators and renderer unchanged.",
+  "states": [
+    {
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "errors": []
+    }
+  ],
+  "workflows": [
+    {
+      "name": "account-entry-1440",
+      "pass": true,
+      "data": {
+        "scrollY": 2215,
+        "height": 900,
+        "rail": {
+          "x": 355,
+          "y": 684.78125,
+          "width": 563.28125,
+          "height": 123,
+          "top": 684.78125,
+          "right": 918.28125,
+          "bottom": 807.78125,
+          "left": 355
+        },
+        "scene": {
+          "x": 355,
+          "y": 149.78125,
+          "width": 563.28125,
+          "height": 535,
+          "top": 149.78125,
+          "right": 918.28125,
+          "bottom": 684.78125,
+          "left": 355
+        },
+        "modes": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "bar": {
+          "x": 355,
+          "y": 15.78125,
+          "width": 982,
+          "height": 62,
+          "top": 15.78125,
+          "right": 1337,
+          "bottom": 77.78125,
+          "left": 355
+        },
+        "overflow": 0,
+        "history": {
+          "portrait": {
+            "scope": "portrait-oviihs4vpr",
+            "index": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "account-native-return-1440",
+      "pass": true,
+      "data": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "headingTop": 240.375,
+          "scrollY": 2215,
+          "readerTop": 0,
+          "readerHeight": 722,
+          "readerScrollHeight": 731,
+          "facet": "Tensions",
+          "focus": "Tensions",
+          "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+          "overflow": 0
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "headingTop": 240.375,
+          "scrollY": 2215,
+          "readerTop": 0,
+          "readerHeight": 722,
+          "readerScrollHeight": 731,
+          "facet": "Tensions",
+          "focus": "Your Pattern",
+          "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-explore",
+          "overflow": 0
+        }
+      }
+    },
+    {
+      "name": "account-reopen-sky-1440",
+      "pass": true,
+      "data": {
+        "assetRequests": 8
+      }
+    },
+    {
+      "name": "account-reopen-return-1440",
+      "pass": true
+    },
+    {
+      "name": "account-exit-1440",
+      "pass": true
+    },
+    {
+      "name": "account-entry-390",
+      "pass": true,
+      "data": {
+        "scrollY": 3114,
+        "height": 844,
+        "rail": {
+          "x": 33,
+          "y": 594.671875,
+          "width": 324,
+          "height": 134,
+          "top": 594.671875,
+          "right": 357,
+          "bottom": 728.671875,
+          "left": 33
+        },
+        "scene": {
+          "x": 33,
+          "y": 320.671875,
+          "width": 324,
+          "height": 274,
+          "top": 320.671875,
+          "right": 357,
+          "bottom": 594.671875,
+          "left": 33
+        },
+        "modes": {
+          "x": 33,
+          "y": 258.671875,
+          "width": 324,
+          "height": 50,
+          "top": 258.671875,
+          "right": 357,
+          "bottom": 308.671875,
+          "left": 33
+        },
+        "bar": {
+          "x": 33,
+          "y": 83.78125,
+          "width": 324,
+          "height": 62,
+          "top": 83.78125,
+          "right": 357,
+          "bottom": 145.78125,
+          "left": 33
+        },
+        "overflow": 0,
+        "history": {
+          "portrait": {
+            "scope": "portrait-cca68jaw9q8",
+            "index": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "account-sticky-390",
+      "pass": true,
+      "data": {
+        "scrollY": 3704,
+        "height": 844,
+        "rail": {
+          "x": 33,
+          "y": -256.828125,
+          "width": 324,
+          "height": 134,
+          "top": -256.828125,
+          "right": 357,
+          "bottom": -122.828125,
+          "left": 33
+        },
+        "scene": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "modes": {
+          "x": 33,
+          "y": 130,
+          "width": 324,
+          "height": 116.5,
+          "top": 130,
+          "right": 357,
+          "bottom": 246.5,
+          "left": 33
+        },
+        "bar": {
+          "x": 33,
+          "y": 68,
+          "width": 324,
+          "height": 62,
+          "top": 68,
+          "right": 357,
+          "bottom": 130,
+          "left": 33
+        },
+        "identity": {
+          "x": 33,
+          "y": 174,
+          "width": 324,
+          "height": 19.5,
+          "top": 174,
+          "right": 357,
+          "bottom": 193.5,
+          "left": 33
+        },
+        "overflow": 0,
+        "history": {
+          "portrait": {
+            "scope": "portrait-cca68jaw9q8",
+            "index": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "account-native-return-390",
+      "pass": true,
+      "data": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "headingTop": 12.5625,
+          "scrollY": 3704,
+          "readerTop": 0,
+          "readerHeight": 794,
+          "readerScrollHeight": 794,
+          "facet": "Tensions",
+          "focus": "Finding your own direction",
+          "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-reading",
+          "overflow": 0
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "headingTop": 12.5625,
+          "scrollY": 3704,
+          "readerTop": 0,
+          "readerHeight": 794,
+          "readerScrollHeight": 794,
+          "facet": "Tensions",
+          "focus": "Your Pattern",
+          "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-reading",
+          "overflow": 0
+        }
+      }
+    },
+    {
+      "name": "account-passage-position-390",
+      "pass": true,
+      "data": {
+        "before": 12.5625,
+        "after": 12.5625
+      }
+    },
+    {
+      "name": "account-reopen-sky-390",
+      "pass": true,
+      "data": {
+        "assetRequests": 8
+      }
+    },
+    {
+      "name": "account-reopen-return-390",
+      "pass": true
+    },
+    {
+      "name": "account-exit-390",
+      "pass": true
+    },
+    {
+      "name": "account-entry-320",
+      "pass": true,
+      "data": {
+        "scrollY": 3300,
+        "height": 844,
+        "rail": {
+          "x": 33,
+          "y": 595.3125,
+          "width": 254,
+          "height": 145.390625,
+          "top": 595.3125,
+          "right": 287,
+          "bottom": 740.703125,
+          "left": 33
+        },
+        "scene": {
+          "x": 33,
+          "y": 321.3125,
+          "width": 254,
+          "height": 274,
+          "top": 321.3125,
+          "right": 287,
+          "bottom": 595.3125,
+          "left": 33
+        },
+        "modes": {
+          "x": 33,
+          "y": 259.3125,
+          "width": 254,
+          "height": 50,
+          "top": 259.3125,
+          "right": 287,
+          "bottom": 309.3125,
+          "left": 33
+        },
+        "bar": {
+          "x": 33,
+          "y": 84.421875,
+          "width": 254,
+          "height": 62,
+          "top": 84.421875,
+          "right": 287,
+          "bottom": 146.421875,
+          "left": 33
+        },
+        "overflow": 0,
+        "history": {
+          "portrait": {
+            "scope": "portrait-ofqonaifmzd",
+            "index": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "account-sticky-320",
+      "pass": true,
+      "data": {
+        "scrollY": 3902,
+        "height": 844,
+        "rail": {
+          "x": 33,
+          "y": -268.1875,
+          "width": 254,
+          "height": 145.390625,
+          "top": -268.1875,
+          "right": 287,
+          "bottom": -122.796875,
+          "left": 33
+        },
+        "scene": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "modes": {
+          "x": 33,
+          "y": 130,
+          "width": 254,
+          "height": 116.5,
+          "top": 130,
+          "right": 287,
+          "bottom": 246.5,
+          "left": 33
+        },
+        "bar": {
+          "x": 33,
+          "y": 68,
+          "width": 254,
+          "height": 62,
+          "top": 68,
+          "right": 287,
+          "bottom": 130,
+          "left": 33
+        },
+        "identity": {
+          "x": 33,
+          "y": 174,
+          "width": 254,
+          "height": 19.5,
+          "top": 174,
+          "right": 287,
+          "bottom": 193.5,
+          "left": 33
+        },
+        "overflow": 0,
+        "history": {
+          "portrait": {
+            "scope": "portrait-ofqonaifmzd",
+            "index": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "account-native-return-320",
+      "pass": true,
+      "data": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "headingTop": 12.59375,
+          "scrollY": 3902,
+          "readerTop": 0,
+          "readerHeight": 871,
+          "readerScrollHeight": 871,
+          "facet": "Tensions",
+          "focus": "Finding your own direction",
+          "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-reading",
+          "overflow": 0
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "headingTop": 12.59375,
+          "scrollY": 3902,
+          "readerTop": 0,
+          "readerHeight": 871,
+          "readerScrollHeight": 871,
+          "facet": "Tensions",
+          "focus": "Your Pattern",
+          "presentation": "portrait-explorer observatory-explorer explorer-embedded explorer-presentation-reading",
+          "overflow": 0
+        }
+      }
+    },
+    {
+      "name": "account-passage-position-320",
+      "pass": true,
+      "data": {
+        "before": 12.59375,
+        "after": 12.59375
+      }
+    },
+    {
+      "name": "account-reopen-sky-320",
+      "pass": true,
+      "data": {
+        "assetRequests": 8
+      }
+    },
+    {
+      "name": "account-reopen-return-320",
+      "pass": true
+    },
+    {
+      "name": "account-exit-320",
+      "pass": true
+    }
+  ]
+}

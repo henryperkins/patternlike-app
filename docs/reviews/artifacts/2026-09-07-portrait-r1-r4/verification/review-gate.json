@@ -1,0 +1,35 @@
+{
+  "command": "npm run ci:local",
+  "exit_code": 0,
+  "passed": true,
+  "lanes_passed": 14,
+  "base_commit": "e4ba2f9c8316cf884f17bcf70da8bc8734d38a9e",
+  "reviewed_source_sha256": "7f48aa63005f4b7680f60c5d427c908b083ea7796cd6007f4a3eb7346f979ad3",
+  "files_checked": 1892,
+  "source_unchanged": true,
+  "changed": [],
+  "added": [],
+  "removed": [],
+  "head_unchanged": true,
+  "status_unchanged": true,
+  "diff_check_exit": 0,
+  "api_results": [
+    "Test Files  144 passed (144)",
+    "Tests  2525 passed (2525)",
+    "Duration  994.86s (transform 7.67s, setup 634.15s, import 10.13s, tests 258.92s, environment 24ms)",
+    "Test Files  1 passed (1)",
+    "Tests  1 passed (1)",
+    "Duration  7.45s (transform 2.40s, setup 6.46s, import 107ms, tests 157ms, environment 1ms)"
+  ],
+  "web_tests_passed": 721,
+  "toolchain": {
+    "node": "v22.23.2",
+    "npm": "10.9.8",
+    "python": "3.14.4",
+    "ci_python_pin": "3.12"
+  },
+  "warnings": [
+    "API Worker EnvironmentTeardownError was emitted; API lane and full gate exited successfully.",
+    "Local Python is 3.14.4; ci.yml pins 3.12."
+  ]
+}

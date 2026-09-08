@@ -1,0 +1,1364 @@
+{
+  "checks": [
+    {
+      "name": "page-1440-1",
+      "pass": true
+    },
+    {
+      "name": "overflow-1440-1",
+      "pass": true,
+      "details": 0
+    },
+    {
+      "name": "first-viewport-1440-1",
+      "pass": true,
+      "details": {
+        "width": 1440,
+        "height": 900,
+        "scrollY": 0,
+        "scene": {
+          "x": 44.625,
+          "y": 160,
+          "width": 848.765625,
+          "height": 535,
+          "top": 160,
+          "right": 893.390625,
+          "bottom": 695,
+          "left": 44.625,
+          "display": "block"
+        },
+        "rail": {
+          "x": 44.625,
+          "y": 695,
+          "width": 848.765625,
+          "height": 76.59375,
+          "top": 695,
+          "right": 893.390625,
+          "bottom": 771.59375,
+          "left": 44.625,
+          "display": "grid"
+        },
+        "controls": {
+          "x": 60.625,
+          "y": 627,
+          "width": 387.75,
+          "height": 52,
+          "top": 627,
+          "right": 448.375,
+          "bottom": 679,
+          "left": 60.625,
+          "display": "flex"
+        },
+        "modes": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0,
+          "display": "none"
+        },
+        "identity": null,
+        "overflow": 0,
+        "heading": "Your Pattern, in four chapters",
+        "sky": "false",
+        "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+      }
+    },
+    {
+      "name": "selected-viewport-1440-1",
+      "pass": true,
+      "details": {
+        "x": 44.625,
+        "y": 695,
+        "width": 848.765625,
+        "height": 76.59375,
+        "top": 695,
+        "right": 893.390625,
+        "bottom": 771.59375,
+        "left": 44.625,
+        "display": "grid"
+      }
+    },
+    {
+      "name": "options-closed-1440-1",
+      "pass": true
+    },
+    {
+      "name": "body-replaces-1440-1",
+      "pass": true
+    },
+    {
+      "name": "native-return-1440-1",
+      "pass": true,
+      "details": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 0,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore",
+          "history": {
+            "portrait": {
+              "scope": "portrait-i8c3tta7snm",
+              "index": 2
+            }
+          }
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 0,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore",
+          "history": {
+            "portrait": {
+              "scope": "portrait-i8c3tta7snm",
+              "index": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "reader-scroll-1440-1",
+      "pass": true,
+      "details": {
+        "origin": 0,
+        "returned": 0
+      }
+    },
+    {
+      "name": "forward-body-1440-1",
+      "pass": true
+    },
+    {
+      "name": "explicit-return-1440-1",
+      "pass": true
+    },
+    {
+      "name": "compare-roundtrip-1440-1",
+      "pass": true
+    },
+    {
+      "name": "page-390-1",
+      "pass": true
+    },
+    {
+      "name": "overflow-390-1",
+      "pass": true,
+      "details": 0
+    },
+    {
+      "name": "first-viewport-390-1",
+      "pass": true,
+      "details": {
+        "width": 390,
+        "height": 844,
+        "scrollY": 0,
+        "scene": {
+          "x": 16,
+          "y": 241.6875,
+          "width": 358,
+          "height": 345,
+          "top": 241.6875,
+          "right": 374,
+          "bottom": 586.6875,
+          "left": 16,
+          "display": "block"
+        },
+        "rail": {
+          "x": 16,
+          "y": 586.6875,
+          "width": 358,
+          "height": 134,
+          "top": 586.6875,
+          "right": 374,
+          "bottom": 720.6875,
+          "left": 16,
+          "display": "grid"
+        },
+        "controls": {
+          "x": 24,
+          "y": 527.6875,
+          "width": 270,
+          "height": 50,
+          "top": 527.6875,
+          "right": 294,
+          "bottom": 577.6875,
+          "left": 24,
+          "display": "flex"
+        },
+        "modes": {
+          "x": 16,
+          "y": 184.6875,
+          "width": 358,
+          "height": 45,
+          "top": 184.6875,
+          "right": 374,
+          "bottom": 229.6875,
+          "left": 16,
+          "display": "flex"
+        },
+        "identity": null,
+        "overflow": 0,
+        "heading": "Your Pattern, in four chapters",
+        "sky": "false",
+        "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+      }
+    },
+    {
+      "name": "selected-viewport-390-1",
+      "pass": true,
+      "details": {
+        "x": 16,
+        "y": 586.6875,
+        "width": 358,
+        "height": 134,
+        "top": 586.6875,
+        "right": 374,
+        "bottom": 720.6875,
+        "left": 16,
+        "display": "grid"
+      }
+    },
+    {
+      "name": "options-closed-390-1",
+      "pass": true
+    },
+    {
+      "name": "identity-return-390-1",
+      "pass": true,
+      "details": {
+        "x": 16,
+        "y": 0,
+        "width": 358,
+        "height": 116.5,
+        "top": 0,
+        "right": 374,
+        "bottom": 116.5,
+        "left": 16,
+        "display": "flex"
+      }
+    },
+    {
+      "name": "body-replaces-390-1",
+      "pass": true
+    },
+    {
+      "name": "native-return-390-1",
+      "pass": true,
+      "details": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 466,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-reading",
+          "history": {
+            "portrait": {
+              "scope": "portrait-5p65lcrr73b",
+              "index": 3
+            }
+          }
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 466,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-reading",
+          "history": {
+            "portrait": {
+              "scope": "portrait-5p65lcrr73b",
+              "index": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "forward-body-390-1",
+      "pass": true
+    },
+    {
+      "name": "explicit-return-390-1",
+      "pass": true
+    },
+    {
+      "name": "explore-keeps-model",
+      "pass": true,
+      "details": {
+        "width": 390,
+        "height": 844,
+        "scrollY": 181,
+        "scene": {
+          "x": 16,
+          "y": 60.6875,
+          "width": 358,
+          "height": 345,
+          "top": 60.6875,
+          "right": 374,
+          "bottom": 405.6875,
+          "left": 16,
+          "display": "block"
+        },
+        "rail": {
+          "x": 16,
+          "y": 405.6875,
+          "width": 358,
+          "height": 134,
+          "top": 405.6875,
+          "right": 374,
+          "bottom": 539.6875,
+          "left": 16,
+          "display": "grid"
+        },
+        "controls": {
+          "x": 24,
+          "y": 346.6875,
+          "width": 270,
+          "height": 50,
+          "top": 346.6875,
+          "right": 294,
+          "bottom": 396.6875,
+          "left": 24,
+          "display": "flex"
+        },
+        "modes": {
+          "x": 16,
+          "y": 3.6875,
+          "width": 358,
+          "height": 45,
+          "top": 3.6875,
+          "right": 374,
+          "bottom": 48.6875,
+          "left": 16,
+          "display": "flex"
+        },
+        "identity": null,
+        "overflow": 0,
+        "heading": "Finding your own direction",
+        "sky": "false",
+        "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+      }
+    },
+    {
+      "name": "compare-roundtrip-390-1",
+      "pass": true
+    },
+    {
+      "name": "page-320-1",
+      "pass": true
+    },
+    {
+      "name": "overflow-320-1",
+      "pass": true,
+      "details": 0
+    },
+    {
+      "name": "options-closed-320-1",
+      "pass": true
+    },
+    {
+      "name": "body-replaces-320-1",
+      "pass": true
+    },
+    {
+      "name": "native-return-320-1",
+      "pass": true,
+      "details": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 619,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore",
+          "history": {
+            "portrait": {
+              "scope": "portrait-08w3jjjtprd7",
+              "index": 2
+            }
+          }
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 0,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore",
+          "history": {
+            "portrait": {
+              "scope": "portrait-08w3jjjtprd7",
+              "index": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "forward-body-320-1",
+      "pass": true
+    },
+    {
+      "name": "explicit-return-320-1",
+      "pass": true
+    },
+    {
+      "name": "page-320-2",
+      "pass": true
+    },
+    {
+      "name": "overflow-320-2",
+      "pass": true,
+      "details": 0
+    },
+    {
+      "name": "options-closed-320-2",
+      "pass": true
+    },
+    {
+      "name": "identity-return-320-2",
+      "pass": true,
+      "details": {
+        "x": 16,
+        "y": 0,
+        "width": 288,
+        "height": 185.28125,
+        "top": 0,
+        "right": 304,
+        "bottom": 185.28125,
+        "left": 16,
+        "display": "flex"
+      }
+    },
+    {
+      "name": "reading-overflow-320-2",
+      "pass": true,
+      "details": 0
+    },
+    {
+      "name": "page-844-1",
+      "pass": true
+    },
+    {
+      "name": "overflow-844-1",
+      "pass": true,
+      "details": 0
+    },
+    {
+      "name": "landscape-scene-height",
+      "pass": true,
+      "details": 260
+    },
+    {
+      "name": "options-closed-844-1",
+      "pass": true
+    },
+    {
+      "name": "body-replaces-844-1",
+      "pass": true
+    },
+    {
+      "name": "native-return-844-1",
+      "pass": true,
+      "details": {
+        "origin": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 156,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore",
+          "history": {
+            "portrait": {
+              "scope": "portrait-u6q8pner3hl",
+              "index": 2
+            }
+          }
+        },
+        "returned": {
+          "heading": "Finding your own direction",
+          "facet": "Tensions",
+          "passage": "Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗",
+          "readerScroll": 0,
+          "scrollY": 0,
+          "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore",
+          "history": {
+            "portrait": {
+              "scope": "portrait-u6q8pner3hl",
+              "index": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "forward-body-844-1",
+      "pass": true
+    },
+    {
+      "name": "explicit-return-844-1",
+      "pass": true
+    },
+    {
+      "name": "expanded-landscape-controls",
+      "pass": true,
+      "details": {
+        "width": 844,
+        "height": 390,
+        "scrollY": 240,
+        "scene": {
+          "x": 25,
+          "y": 73,
+          "width": 544,
+          "height": 296,
+          "top": 73,
+          "right": 569,
+          "bottom": 369,
+          "left": 25,
+          "display": "block"
+        },
+        "rail": {
+          "x": 581,
+          "y": 117,
+          "width": 234,
+          "height": 221,
+          "top": 117,
+          "right": 815,
+          "bottom": 338,
+          "left": 581,
+          "display": "grid"
+        },
+        "controls": {
+          "x": 41,
+          "y": 309,
+          "width": 282.6875,
+          "height": 52,
+          "top": 309,
+          "right": 323.6875,
+          "bottom": 361,
+          "left": 41,
+          "display": "flex"
+        },
+        "modes": {
+          "x": 26.15625,
+          "y": 0,
+          "width": 791.6875,
+          "height": 45,
+          "top": 0,
+          "right": 817.84375,
+          "bottom": 45,
+          "left": 26.15625,
+          "display": "flex"
+        },
+        "identity": null,
+        "overflow": 0,
+        "heading": "Finding your own direction",
+        "sky": "false",
+        "presentation": "portrait-explorer observatory-explorer explorer-presentation-scene"
+      }
+    }
+  ],
+  "states": [
+    {
+      "name": "entry-1440-1",
+      "width": 1440,
+      "height": 900,
+      "scrollY": 0,
+      "scene": {
+        "x": 44.625,
+        "y": 160,
+        "width": 848.765625,
+        "height": 535,
+        "top": 160,
+        "right": 893.390625,
+        "bottom": 695,
+        "left": 44.625,
+        "display": "block"
+      },
+      "rail": {
+        "x": 44.625,
+        "y": 695,
+        "width": 848.765625,
+        "height": 76.59375,
+        "top": 695,
+        "right": 893.390625,
+        "bottom": 771.59375,
+        "left": 44.625,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 60.625,
+        "y": 627,
+        "width": 387.75,
+        "height": 52,
+        "top": 627,
+        "right": 448.375,
+        "bottom": 679,
+        "left": 60.625,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0,
+        "display": "none"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Your Pattern, in four chapters",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "selected-1440-1",
+      "width": 1440,
+      "height": 900,
+      "scrollY": 0,
+      "scene": {
+        "x": 44.625,
+        "y": 160,
+        "width": 848.765625,
+        "height": 535,
+        "top": 160,
+        "right": 893.390625,
+        "bottom": 695,
+        "left": 44.625,
+        "display": "block"
+      },
+      "rail": {
+        "x": 44.625,
+        "y": 695,
+        "width": 848.765625,
+        "height": 76.59375,
+        "top": 695,
+        "right": 893.390625,
+        "bottom": 771.59375,
+        "left": 44.625,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 60.625,
+        "y": 627,
+        "width": 387.75,
+        "height": 52,
+        "top": 627,
+        "right": 448.375,
+        "bottom": 679,
+        "left": 60.625,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0,
+        "display": "none"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "entry-390-1",
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "scene": {
+        "x": 16,
+        "y": 241.6875,
+        "width": 358,
+        "height": 345,
+        "top": 241.6875,
+        "right": 374,
+        "bottom": 586.6875,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 586.6875,
+        "width": 358,
+        "height": 134,
+        "top": 586.6875,
+        "right": 374,
+        "bottom": 720.6875,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 527.6875,
+        "width": 270,
+        "height": 50,
+        "top": 527.6875,
+        "right": 294,
+        "bottom": 577.6875,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 184.6875,
+        "width": 358,
+        "height": 45,
+        "top": 184.6875,
+        "right": 374,
+        "bottom": 229.6875,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Your Pattern, in four chapters",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "selected-390-1",
+      "width": 390,
+      "height": 844,
+      "scrollY": 0,
+      "scene": {
+        "x": 16,
+        "y": 241.6875,
+        "width": 358,
+        "height": 345,
+        "top": 241.6875,
+        "right": 374,
+        "bottom": 586.6875,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 586.6875,
+        "width": 358,
+        "height": 134,
+        "top": 586.6875,
+        "right": 374,
+        "bottom": 720.6875,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 527.6875,
+        "width": 270,
+        "height": 50,
+        "top": 527.6875,
+        "right": 294,
+        "bottom": 577.6875,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 184.6875,
+        "width": 358,
+        "height": 45,
+        "top": 184.6875,
+        "right": 374,
+        "bottom": 229.6875,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "reading-390-1",
+      "width": 390,
+      "height": 844,
+      "scrollY": 466,
+      "scene": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0,
+        "display": "none"
+      },
+      "rail": {
+        "x": 16,
+        "y": -206.8125,
+        "width": 358,
+        "height": 134,
+        "top": -206.8125,
+        "right": 374,
+        "bottom": -72.8125,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 0,
+        "width": 358,
+        "height": 116.5,
+        "top": 0,
+        "right": 374,
+        "bottom": 116.5,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": {
+        "x": 16,
+        "y": 44,
+        "width": 358,
+        "height": 19.5,
+        "top": 44,
+        "right": 374,
+        "bottom": 63.5,
+        "left": 16,
+        "display": "block"
+      },
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-reading"
+    },
+    {
+      "name": "phone-explore-action",
+      "width": 390,
+      "height": 844,
+      "scrollY": 181,
+      "scene": {
+        "x": 16,
+        "y": 60.6875,
+        "width": 358,
+        "height": 345,
+        "top": 60.6875,
+        "right": 374,
+        "bottom": 405.6875,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 405.6875,
+        "width": 358,
+        "height": 134,
+        "top": 405.6875,
+        "right": 374,
+        "bottom": 539.6875,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 346.6875,
+        "width": 270,
+        "height": 50,
+        "top": 346.6875,
+        "right": 294,
+        "bottom": 396.6875,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 3.6875,
+        "width": 358,
+        "height": 45,
+        "top": 3.6875,
+        "right": 374,
+        "bottom": 48.6875,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "entry-320-1",
+      "width": 320,
+      "height": 844,
+      "scrollY": 0,
+      "scene": {
+        "x": 16,
+        "y": 278.265625,
+        "width": 288,
+        "height": 300,
+        "top": 278.265625,
+        "right": 304,
+        "bottom": 578.265625,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 578.265625,
+        "width": 288,
+        "height": 134,
+        "top": 578.265625,
+        "right": 304,
+        "bottom": 712.265625,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 519.265625,
+        "width": 270,
+        "height": 50,
+        "top": 519.265625,
+        "right": 294,
+        "bottom": 569.265625,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 221.265625,
+        "width": 288,
+        "height": 45,
+        "top": 221.265625,
+        "right": 304,
+        "bottom": 266.265625,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Your Pattern, in four chapters",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "selected-320-1",
+      "width": 320,
+      "height": 844,
+      "scrollY": 0,
+      "scene": {
+        "x": 16,
+        "y": 278.265625,
+        "width": 288,
+        "height": 300,
+        "top": 278.265625,
+        "right": 304,
+        "bottom": 578.265625,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 578.265625,
+        "width": 288,
+        "height": 134,
+        "top": 578.265625,
+        "right": 304,
+        "bottom": 712.265625,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 519.265625,
+        "width": 270,
+        "height": 50,
+        "top": 519.265625,
+        "right": 294,
+        "bottom": 569.265625,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 221.265625,
+        "width": 288,
+        "height": 45,
+        "top": 221.265625,
+        "right": 304,
+        "bottom": 266.265625,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "entry-320-2",
+      "width": 320,
+      "height": 844,
+      "scrollY": 0,
+      "scene": {
+        "x": 16,
+        "y": 659.359375,
+        "width": 288,
+        "height": 300,
+        "top": 659.359375,
+        "right": 304,
+        "bottom": 959.359375,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 959.359375,
+        "width": 288,
+        "height": 324.75,
+        "top": 959.359375,
+        "right": 304,
+        "bottom": 1284.109375,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 900.359375,
+        "width": 270,
+        "height": 50,
+        "top": 900.359375,
+        "right": 294,
+        "bottom": 950.359375,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 589.96875,
+        "width": 288,
+        "height": 57.390625,
+        "top": 589.96875,
+        "right": 304,
+        "bottom": 647.359375,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Your Pattern, in four chapters",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "selected-320-2",
+      "width": 320,
+      "height": 844,
+      "scrollY": 0,
+      "scene": {
+        "x": 16,
+        "y": 659.359375,
+        "width": 288,
+        "height": 300,
+        "top": 659.359375,
+        "right": 304,
+        "bottom": 959.359375,
+        "left": 16,
+        "display": "block"
+      },
+      "rail": {
+        "x": 16,
+        "y": 959.359375,
+        "width": 288,
+        "height": 324.75,
+        "top": 959.359375,
+        "right": 304,
+        "bottom": 1284.109375,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 24,
+        "y": 900.359375,
+        "width": 270,
+        "height": 50,
+        "top": 900.359375,
+        "right": 294,
+        "bottom": 950.359375,
+        "left": 24,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 589.96875,
+        "width": 288,
+        "height": 57.390625,
+        "top": 589.96875,
+        "right": 304,
+        "bottom": 647.359375,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "reading-320-2",
+      "width": 320,
+      "height": 844,
+      "scrollY": 1130,
+      "scene": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0,
+        "display": "none"
+      },
+      "rail": {
+        "x": 16,
+        "y": -453.625,
+        "width": 288,
+        "height": 324.75,
+        "top": -453.625,
+        "right": 304,
+        "bottom": -128.875,
+        "left": 16,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 16,
+        "y": 0,
+        "width": 288,
+        "height": 185.28125,
+        "top": 0,
+        "right": 304,
+        "bottom": 185.28125,
+        "left": 16,
+        "display": "flex"
+      },
+      "identity": {
+        "x": 16,
+        "y": 112.78125,
+        "width": 288,
+        "height": 19.5,
+        "top": 112.78125,
+        "right": 304,
+        "bottom": 132.28125,
+        "left": 16,
+        "display": "block"
+      },
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-reading"
+    },
+    {
+      "name": "entry-844-1",
+      "width": 844,
+      "height": 390,
+      "scrollY": 0,
+      "scene": {
+        "x": 26.15625,
+        "y": 217,
+        "width": 791.6875,
+        "height": 260,
+        "top": 217,
+        "right": 817.84375,
+        "bottom": 477,
+        "left": 26.15625,
+        "display": "block"
+      },
+      "rail": {
+        "x": 26.15625,
+        "y": 477,
+        "width": 791.6875,
+        "height": 76.59375,
+        "top": 477,
+        "right": 817.84375,
+        "bottom": 553.59375,
+        "left": 26.15625,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 42.15625,
+        "y": 409,
+        "width": 379.75,
+        "height": 52,
+        "top": 409,
+        "right": 421.90625,
+        "bottom": 461,
+        "left": 42.15625,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 26.15625,
+        "y": 160,
+        "width": 791.6875,
+        "height": 45,
+        "top": 160,
+        "right": 817.84375,
+        "bottom": 205,
+        "left": 26.15625,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Your Pattern, in four chapters",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "selected-844-1",
+      "width": 844,
+      "height": 390,
+      "scrollY": 0,
+      "scene": {
+        "x": 26.15625,
+        "y": 217,
+        "width": 791.6875,
+        "height": 260,
+        "top": 217,
+        "right": 817.84375,
+        "bottom": 477,
+        "left": 26.15625,
+        "display": "block"
+      },
+      "rail": {
+        "x": 26.15625,
+        "y": 477,
+        "width": 791.6875,
+        "height": 76.59375,
+        "top": 477,
+        "right": 817.84375,
+        "bottom": 553.59375,
+        "left": 26.15625,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 42.15625,
+        "y": 409,
+        "width": 379.75,
+        "height": 52,
+        "top": 409,
+        "right": 421.90625,
+        "bottom": 461,
+        "left": 42.15625,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 26.15625,
+        "y": 160,
+        "width": 791.6875,
+        "height": 45,
+        "top": 160,
+        "right": 817.84375,
+        "bottom": 205,
+        "left": 26.15625,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-explore"
+    },
+    {
+      "name": "landscape-expanded",
+      "width": 844,
+      "height": 390,
+      "scrollY": 240,
+      "scene": {
+        "x": 25,
+        "y": 73,
+        "width": 544,
+        "height": 296,
+        "top": 73,
+        "right": 569,
+        "bottom": 369,
+        "left": 25,
+        "display": "block"
+      },
+      "rail": {
+        "x": 581,
+        "y": 117,
+        "width": 234,
+        "height": 221,
+        "top": 117,
+        "right": 815,
+        "bottom": 338,
+        "left": 581,
+        "display": "grid"
+      },
+      "controls": {
+        "x": 41,
+        "y": 309,
+        "width": 282.6875,
+        "height": 52,
+        "top": 309,
+        "right": 323.6875,
+        "bottom": 361,
+        "left": 41,
+        "display": "flex"
+      },
+      "modes": {
+        "x": 26.15625,
+        "y": 0,
+        "width": 791.6875,
+        "height": 45,
+        "top": 0,
+        "right": 817.84375,
+        "bottom": 45,
+        "left": 26.15625,
+        "display": "flex"
+      },
+      "identity": null,
+      "overflow": 0,
+      "heading": "Finding your own direction",
+      "sky": "false",
+      "presentation": "portrait-explorer observatory-explorer explorer-presentation-scene"
+    }
+  ],
+  "errors": []
+}

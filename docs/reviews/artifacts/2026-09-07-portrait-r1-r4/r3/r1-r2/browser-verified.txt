@@ -1,0 +1,44 @@
+PASS page-1440-1 ""
+PASS overflow-1440-1 0
+PASS first-viewport-1440-1 {"width":1440,"height":900,"scrollY":0,"scene":{"x":44.625,"y":160,"width":848.765625,"height":535,"top":160,"right":893.390625,"bottom":695,"left":44.625,"display":"block"},"rail":{"x":44.625,"y":695,"width":848.765625,"height":76.59375,"top":695,"right":893.390625,"bottom":771.59375,"left":44.625,"display":"grid"},"controls":{"x":60.625,"y":627,"width":387.75,"height":52,"top":627,"right":448.375,"bottom":679,"left":60.625,"display":"flex"},"modes":{"x":0,"y":0,"width":0,"height":0,"top":0,"right":0,"bottom":0,"left":0,"display":"none"},"identity":null,"overflow":0,"heading":"Your Pattern, in four chapters","sky":"false","presentation":"portrait-explorer observatory-explorer explorer-presentation-explore"}
+PASS selected-viewport-1440-1 {"x":44.625,"y":695,"width":848.765625,"height":76.59375,"top":695,"right":893.390625,"bottom":771.59375,"left":44.625,"display":"grid"}
+PASS options-closed-1440-1 ""
+PASS body-replaces-1440-1 ""
+PASS native-return-1440-1 {"origin":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":0,"presentation":"portrait-explorer observatory-explorer explorer-presentation-explore","history":{"portrait":{"scope":"portrait-i8c3tta7snm","index":2}}},"returned":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":0,"presentation":"portrait-explorer observatory-explorer explorer-presentation-explore","history":{"portrait":{"scope":"portrait-i8c3tta7snm","index":2}}}}
+PASS reader-scroll-1440-1 {"origin":0,"returned":0}
+PASS forward-body-1440-1 ""
+PASS explicit-return-1440-1 ""
+PASS compare-roundtrip-1440-1 ""
+PASS page-390-1 ""
+PASS overflow-390-1 0
+PASS first-viewport-390-1 {"width":390,"height":844,"scrollY":0,"scene":{"x":16,"y":241.6875,"width":358,"height":345,"top":241.6875,"right":374,"bottom":586.6875,"left":16,"display":"block"},"rail":{"x":16,"y":586.6875,"width":358,"height":134,"top":586.6875,"right":374,"bottom":720.6875,"left":16,"display":"grid"},"controls":{"x":24,"y":527.6875,"width":270,"height":50,"top":527.6875,"right":294,"bottom":577.6875,"left":24,"display":"flex"},"modes":{"x":16,"y":184.6875,"width":358,"height":45,"top":184.6875,"right":374,"bottom":229.6875,"left":16,"display":"flex"},"identity":null,"overflow":0,"heading":"Your Pattern, in four chapters","sky":"false","presentation":"portrait-explorer observatory-explorer explorer-presentation-explore"}
+PASS selected-viewport-390-1 {"x":16,"y":586.6875,"width":358,"height":134,"top":586.6875,"right":374,"bottom":720.6875,"left":16,"display":"grid"}
+PASS options-closed-390-1 ""
+PASS identity-return-390-1 {"x":16,"y":0,"width":358,"height":116.5,"top":0,"right":374,"bottom":116.5,"left":16,"display":"flex"}
+PASS body-replaces-390-1 ""
+PASS native-return-390-1 {"origin":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":466,"presentation":"portrait-explorer observatory-explorer explorer-presentation-reading","history":{"portrait":{"scope":"portrait-5p65lcrr73b","index":3}}},"returned":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":466,"presentation":"portrait-explorer observatory-explorer explorer-presentation-reading","history":{"portrait":{"scope":"portrait-5p65lcrr73b","index":3}}}}
+PASS forward-body-390-1 ""
+PASS explicit-return-390-1 ""
+PASS explore-keeps-model {"width":390,"height":844,"scrollY":181,"scene":{"x":16,"y":60.6875,"width":358,"height":345,"top":60.6875,"right":374,"bottom":405.6875,"left":16,"display":"block"},"rail":{"x":16,"y":405.6875,"width":358,"height":134,"top":405.6875,"right":374,"bottom":539.6875,"left":16,"display":"grid"},"controls":{"x":24,"y":346.6875,"width":270,"height":50,"top":346.6875,"right":294,"bottom":396.6875,"left":24,"display":"flex"},"modes":{"x":16,"y":3.6875,"width":358,"height":45,"top":3.6875,"right":374,"bottom":48.6875,"left":16,"display":"flex"},"identity":null,"overflow":0,"heading":"Finding your own direction","sky":"false","presentation":"portrait-explorer observatory-explorer explorer-presentation-explore"}
+PASS compare-roundtrip-390-1 ""
+PASS page-320-1 ""
+PASS overflow-320-1 0
+PASS options-closed-320-1 ""
+PASS body-replaces-320-1 ""
+PASS native-return-320-1 {"origin":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":619,"presentation":"portrait-explorer observatory-explorer explorer-presentation-explore","history":{"portrait":{"scope":"portrait-08w3jjjtprd7","index":2}}},"returned":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":0,"presentation":"portrait-explorer observatory-explorer explorer-presentation-explore","history":{"portrait":{"scope":"portrait-08w3jjjtprd7","index":2}}}}
+PASS forward-body-320-1 ""
+PASS explicit-return-320-1 ""
+PASS page-320-2 ""
+PASS overflow-320-2 0
+PASS options-closed-320-2 ""
+PASS identity-return-320-2 {"x":16,"y":0,"width":288,"height":185.28125,"top":0,"right":304,"bottom":185.28125,"left":16,"display":"flex"}
+PASS reading-overflow-320-2 0
+PASS page-844-1 ""
+PASS overflow-844-1 0
+PASS landscape-scene-height 260
+PASS options-closed-844-1 ""
+PASS body-replaces-844-1 ""
+PASS native-return-844-1 {"origin":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":156,"presentation":"portrait-explorer observatory-explorer explorer-presentation-explore","history":{"portrait":{"scope":"portrait-u6q8pner3hl","index":2}}},"returned":{"heading":"Finding your own direction","facet":"Tensions","passage":"Looking for an unmistakable sign can delay a choice that is already small enough to explore.Show in portrait ↗","readerScroll":0,"scrollY":0,"presentation":"portrait-explorer observatory-explorer explorer-presentation-explore","history":{"portrait":{"scope":"portrait-u6q8pner3hl","index":2}}}}
+PASS forward-body-844-1 ""
+PASS explicit-return-844-1 ""
+PASS expanded-landscape-controls {"width":844,"height":390,"scrollY":240,"scene":{"x":25,"y":73,"width":544,"height":296,"top":73,"right":569,"bottom":369,"left":25,"display":"block"},"rail":{"x":581,"y":117,"width":234,"height":221,"top":117,"right":815,"bottom":338,"left":581,"display":"grid"},"controls":{"x":41,"y":309,"width":282.6875,"height":52,"top":309,"right":323.6875,"bottom":361,"left":41,"display":"flex"},"modes":{"x":26.15625,"y":0,"width":791.6875,"height":45,"top":0,"right":817.84375,"bottom":45,"left":26.15625,"display":"flex"},"identity":null,"overflow":0,"heading":"Finding your own direction","sky":"false","presentation":"portrait-explorer observatory-explorer explorer-presentation-scene"}

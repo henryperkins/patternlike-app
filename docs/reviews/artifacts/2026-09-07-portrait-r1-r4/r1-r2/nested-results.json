@@ -1,0 +1,130 @@
+{
+  "checks": [
+    {
+      "name": "expanded-body-retained",
+      "pass": true
+    },
+    {
+      "name": "expanded-back-to-pattern",
+      "pass": true
+    },
+    {
+      "name": "sky-read-new-entry",
+      "pass": true
+    },
+    {
+      "name": "prior-facet-preserved",
+      "pass": true
+    },
+    {
+      "name": "whole-portrait-not-skipped",
+      "pass": true
+    },
+    {
+      "name": "reader-link-restores-scroll",
+      "pass": true,
+      "details": {
+        "before": 491,
+        "scrollY": 491,
+        "focus": "Overview",
+        "rect": {
+          "x": 16,
+          "y": 144.90625,
+          "width": 53.375,
+          "height": 44,
+          "top": 144.90625,
+          "right": 69.375,
+          "bottom": 188.90625,
+          "left": 16
+        },
+        "modes": {
+          "x": 16,
+          "y": 0,
+          "width": 358,
+          "height": 116.5,
+          "top": 0,
+          "right": 374,
+          "bottom": 116.5,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "reader-link-visible-focus",
+      "pass": true,
+      "details": {
+        "scrollY": 491,
+        "focus": "Overview",
+        "rect": {
+          "x": 16,
+          "y": 144.90625,
+          "width": 53.375,
+          "height": 44,
+          "top": 144.90625,
+          "right": 69.375,
+          "bottom": 188.90625,
+          "left": 16
+        },
+        "modes": {
+          "x": 16,
+          "y": 0,
+          "width": 358,
+          "height": 116.5,
+          "top": 0,
+          "right": 374,
+          "bottom": 116.5,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "second-column-focus-return",
+      "pass": true,
+      "details": {
+        "comparisonScroll": 933,
+        "scrollY": 933,
+        "heading": {
+          "x": 16,
+          "y": -623.8125,
+          "width": 289,
+          "height": 39.765625,
+          "top": -623.8125,
+          "right": 305,
+          "bottom": -584.046875,
+          "left": 16
+        },
+        "second": true,
+        "rect": {
+          "x": 16,
+          "y": 257.953125,
+          "width": 358,
+          "height": 148.75,
+          "top": 257.953125,
+          "right": 374,
+          "bottom": 406.703125,
+          "left": 16
+        },
+        "inset": 116.5
+      }
+    },
+    {
+      "name": "200-percent-reflow",
+      "pass": true,
+      "details": {
+        "overflow": 0,
+        "bar": {
+          "x": 32,
+          "y": 0,
+          "width": 576,
+          "height": 233,
+          "top": 0,
+          "right": 608,
+          "bottom": 233,
+          "left": 32
+        },
+        "h": 1688
+      }
+    }
+  ],
+  "errors": []
+}

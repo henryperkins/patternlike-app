@@ -1,0 +1,61 @@
+{
+  "scope": "Local R4 implementation; original R1-R3 edits preserved; R5, R6 and P3 remain open",
+  "head": "6e706741f03253f2807d33380afb529161f3481f",
+  "source_manifest": "/tmp/portrait-r4/source-sha256-final.txt",
+  "source_files_verified": 1726,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "result": "passed",
+    "log": "/tmp/portrait-r4/typecheck-final.log"
+  },
+  "build": {
+    "command": "npm run build -w @patternlike/web",
+    "result": "passed",
+    "log": "/tmp/portrait-r4/build-final.log"
+  },
+  "web_tests": {
+    "command": "npm test -w @patternlike/web",
+    "result": "passed",
+    "files": 52,
+    "tests": 704,
+    "log": "/tmp/portrait-r4/web-test-final-rerun.log"
+  },
+  "browser": {
+    "preview": {
+      "checks": 128,
+      "passed": 128,
+      "errors": [],
+      "receipt": "/tmp/portrait-r4/frozen/results.json"
+    },
+    "account": {
+      "checks": 27,
+      "passed": 27,
+      "errors": [],
+      "fixture": "Fictional chapter/image fixtures and deterministic compiled test shapes, all API calls intercepted. Real validators and renderer unchanged.",
+      "receipt": "/tmp/portrait-r4/account-results.json"
+    },
+    "standard_graphics": {
+      "checks": 12,
+      "passed": 12,
+      "errors": [],
+      "warnings": [],
+      "receipt": "/tmp/portrait-r4/actual-results.json"
+    }
+  },
+  "full_suite": {
+    "command": "npm test",
+    "result": "timed out in API Worker lane after 300 seconds",
+    "exit": 124,
+    "log": "/tmp/portrait-r4/full-test-final.log"
+  },
+  "merge_gate": "ci:local not passed",
+  "limitations": [
+    "Local Chromium with SwiftShader",
+    "No live account generation, Safari, physical-device performance or screen-reader verification",
+    "No commit, push, merge or deployment"
+  ],
+  "screenshots": [
+    "/tmp/portrait-r4/actual-1440.png",
+    "/tmp/portrait-r4/actual-390.png"
+  ]
+}

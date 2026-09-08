@@ -1,0 +1,35 @@
+
+> patternlike-app@0.2.0 typecheck
+> npm run typecheck -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/codex-runner -w @patternlike/ontology-signer -w @patternlike/api -w @patternlike/web
+
+
+> @patternlike/shared@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @patternlike/reading-engine@0.3.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @patternlike/pattern-engine@0.7.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @patternlike/calc-stub@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @patternlike/codex-runner@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @patternlike/ontology-signer@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @patternlike/api@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit
+
+
+> @patternlike/web@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit

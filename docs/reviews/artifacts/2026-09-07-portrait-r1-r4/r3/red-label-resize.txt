@@ -1,0 +1,188 @@
+
+> @patternlike/web@0.2.0 test
+> vitest run src/components/portrait-explorer/PortraitScene.runtime.test.tsx -t repositions enlarged annotations --reporter=verbose
+
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/web
+
+ × src/components/portrait-explorer/PortraitScene.runtime.test.tsx > repositions enlarged annotations without moving the camera and releases their size observation 1221ms
+   → expected 'translate(440px, 359px)' not to be 'translate(440px, 359px)' // Object.is equality
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <div
+        class="explorer-scene-renderer"
+        style="position: relative; width: 100%; height: 100%;"
+      >
+        <div
+          class="explorer-canvas-host"
+          style="position: absolute; inset: 0px;"
+        >
+          <canvas
+            aria-label="Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore."
+            role="img"
+            style="display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y;"
+          />
+        </div>
+        <div
+          class="explorer-labels"
+          style="position: absolute; inset: 0px; pointer-events: none; visibility: visible;"
+        >
+          <svg
+            aria-hidden="true"
+            class="sky-marker-connector"
+          >
+            <line
+              data-sky-connector="true"
+              style="visibility: hidden;"
+            />
+          </svg>
+          <button
+            aria-label="Overview: show source passage 1 for Finding your own direction"
+            class="explorer-annotation"
+            data-active-passage="0"
+            data-chapter-id="chapter-1"
+            data-compact="false"
+            data-form-index="0"
+            data-highlighted="false"
+            data-selected="true"
+            style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: visible; transform: translate(440px, 359px);"
+            type="button"
+          >
+            <span>
+              <span
+                aria-hidden="true"
+              >
+                ●
+              </span>
+
+              Overview
+              <span
+                class="explorer-passage-number"
+              >
+                 ·
+                1
+              </span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > frames only the compared displays in reading order and restores the exact original scene and camera
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > restores actual camera coordinates without replaying the last command, and saves before unmount
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps an unselected chapter identifiable on a phone canvas
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > operates real courtyard geometry, honors reduced motion, and releases its resources at rest
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > places the zodiac markers at supplied longitudes and brings the instrument into view
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > selects the previous chapter from the sky view before allowing its reading desk to operate
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > uses a saved Sun sector only without chart context and never substitutes it for a missing chart Sun
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > leaves no live WebGL contexts after repeated scene teardown
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps a reading-only facet change at the same camera pose, then stops drawing at idle
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > saves the old view before framing a new one and accepts only a new command serial
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > releases the canvas and loaded geometry on graphics loss while leaving the reading reachable
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > frames models inside the unobscured viewport above the real toolbar
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > rejects an intact correctly hashed compass assigned to a different chapter before drawing
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps all zodiac labels in frame across expansion and resize and connects the selected readout to the plotted marker
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps the selected readout clear of measured sign labels and its marker in a 288 by 300 canvas
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps the selected readout clear of measured sign labels and its marker in a 544 by 296 canvas
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/portrait-explorer/PortraitScene.runtime.test.tsx > repositions enlarged annotations without moving the camera and releases their size observation
+AssertionError: expected 'translate(440px, 359px)' not to be 'translate(440px, 359px)' // Object.is equality
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <div
+        class="explorer-scene-renderer"
+        style="position: relative; width: 100%; height: 100%;"
+      >
+        <div
+          class="explorer-canvas-host"
+          style="position: absolute; inset: 0px;"
+        >
+          <canvas
+            aria-label="Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore."
+            role="img"
+            style="display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y;"
+          />
+        </div>
+        <div
+          class="explorer-labels"
+          style="position: absolute; inset: 0px; pointer-events: none; visibility: visible;"
+        >
+          <svg
+            aria-hidden="true"
+            class="sky-marker-connector"
+          >
+            <line
+              data-sky-connector="true"
+              style="visibility: hidden;"
+            />
+          </svg>
+          <button
+            aria-label="Overview: show source passage 1 for Finding your own direction"
+            class="explorer-annotation"
+            data-active-passage="0"
+            data-chapter-id="chapter-1"
+            data-compact="false"
+            data-form-index="0"
+            data-highlighted="false"
+            data-selected="true"
+            style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: visible; transform: translate(440px, 359px);"
+            type="button"
+          >
+            <span>
+              <span
+                aria-hidden="true"
+              >
+                ●
+              </span>
+
+              Overview
+              <span
+                class="explorer-passage-number"
+              >
+                 ·
+                1
+              </span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+ ❯ src/components/portrait-explorer/PortraitScene.runtime.test.tsx:104:57
+    102|     for (const observer of observers) if (observer.elements.has(label)…
+    103|   });
+    104|   await waitFor(() => expect(label.style.transform).not.toBe(initialTr…
+       |                                                         ^
+    105|   expect(gpu.position).toEqual(initialPosition);
+    106|   view.unmount();
+ ❯ runWithExpensiveErrorDiagnosticsDisabled ../../node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback ../../node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback ../../node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+   Start at  16:46:30
+   Duration  2.81s (transform 347ms, setup 162ms, import 464ms, tests 1.22s, environment 783ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/henry/patternlike-app/apps/web
+npm error workspace @patternlike/web@0.2.0
+npm error location /home/henry/patternlike-app/apps/web
+npm error command failed
+npm error command sh -c vitest run src/components/portrait-explorer/PortraitScene.runtime.test.tsx -t 'repositions enlarged annotations' --reporter=verbose

@@ -1,0 +1,383 @@
+{
+  "document": {
+    "schema_version": "0.7.0",
+    "pattern_id": "pat_fictional_native_portrait_20260905",
+    "generated_at": "2026-09-05T18:00:00Z",
+    "locale": "en-US",
+    "effective_accuracy": "exact",
+    "provenance": {
+      "assembly_mode": "constrained_model",
+      "provider": "Fictional preview",
+      "model_family": "Authored sample",
+      "raw_birth_details_sent": false
+    },
+    "core_chapters": [
+      {
+        "title": "Finding your own direction",
+        "summary": "You can choose a direction before every part of the journey is clear.",
+        "sections": [
+          {
+            "text": "There may be moments when several sensible paths are available and none carries a guarantee. Another person's certainty can be reassuring, but it cannot tell you which direction feels consistent with what matters to you."
+          },
+          {
+            "text": "You can begin by naming one value you want the next choice to serve. A small step can provide information that thinking in circles cannot. You are allowed to notice what you learn and adjust your course."
+          }
+        ],
+        "tensions": [
+          {
+            "text": "Looking for an unmistakable sign can delay a choice that is already small enough to explore."
+          }
+        ],
+        "resources": [
+          {
+            "text": "You can distinguish a change of direction from a loss of purpose. The value can remain steady while the route changes."
+          }
+        ],
+        "counter_expression": {
+          "text": "Sometimes choosing your direction means listening carefully to advice and then deciding which part belongs with you."
+        }
+      },
+      {
+        "title": "Making room for care",
+        "summary": "Care becomes easier to receive when there is room for your needs alongside someone else's.",
+        "sections": [
+          {
+            "text": "You may recognize another person's needs quickly and make space for them before checking your own capacity. That responsiveness can be generous. It becomes easier to sustain when your own hunger, rest, and limits also have a place."
+          },
+          {
+            "text": "A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return."
+          }
+        ],
+        "tensions": [
+          {
+            "text": "Being needed can feel close to being valued, even when the exchange leaves little room for you."
+          }
+        ],
+        "resources": [
+          {
+            "text": "You can offer care in a form that is simple, practical, and possible to repeat without exhausting yourself."
+          }
+        ],
+        "counter_expression": {
+          "text": "Receiving something without immediately returning the favor can also be an act of trust."
+        }
+      },
+      {
+        "title": "Keeping what matters",
+        "summary": "A dependable commitment can steady you while other parts of life change.",
+        "sections": [
+          {
+            "text": "You do not need every circumstance to stay the same in order to feel grounded. One dependable promise, relationship, or practice can provide enough stability to consider something new."
+          },
+          {
+            "text": "It can help to separate the commitment itself from the form it has taken. You may keep what matters while loosening an arrangement that no longer serves it. Holding on thoughtfully includes knowing when to release some weight."
+          }
+        ],
+        "tensions": [
+          {
+            "text": "Familiar responsibility can become difficult to question when carrying it has become part of how you understand yourself."
+          }
+        ],
+        "resources": [
+          {
+            "text": "You can make a commitment concrete and give it a realistic place in daily life."
+          }
+        ],
+        "counter_expression": {
+          "text": "Staying connected to what matters can sometimes require a deliberate departure from what is familiar."
+        }
+      },
+      {
+        "title": "Seeing beyond the immediate",
+        "summary": "A wider perspective can make room for possibilities that today's pressure hides.",
+        "sections": [
+          {
+            "text": "An urgent question can fill your attention until it seems to be the whole landscape. Taking a little distance may reveal that the present difficulty is one part of a longer story."
+          },
+          {
+            "text": "You can look further ahead without demanding a prediction. A question about the life you want to be moving toward may help you choose what deserves attention today. Curiosity can give the future room to surprise you."
+          }
+        ],
+        "tensions": [
+          {
+            "text": "Imagining a distant possibility can become a way to postpone a small action that is available now."
+          }
+        ],
+        "resources": [
+          {
+            "text": "You can move between detail and perspective, using each to correct what the other leaves out."
+          }
+        ],
+        "counter_expression": {
+          "text": "Sometimes the wider view makes a modest, ordinary next step feel sufficient."
+        }
+      }
+    ],
+    "additional_signatures": [],
+    "uncertainty": {
+      "text": "LOCAL REVIEW FIXTURE: fictional chapters and compiled test shapes; no account or generation service contacted."
+    }
+  },
+  "chart": {
+    "schema_version": "0.2.0",
+    "id": "chart-current",
+    "user_id": "usr_web_test_0001",
+    "profile_version": 1,
+    "fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "contract_id": "calc-contract-launch",
+    "contract_version": "0.2.0",
+    "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "tzdb_version": "2026a",
+    "birth": {
+      "accuracy": "exact",
+      "utc_instant": null,
+      "timezone": null,
+      "place_label": null,
+      "latitude": null,
+      "longitude": null
+    },
+    "positions": [
+      {
+        "body": "sun",
+        "longitude_deg": 54.12,
+        "sign": "taurus",
+        "house": 10,
+        "retrograde": false
+      },
+      {
+        "body": "moon",
+        "longitude_deg": 201.4,
+        "sign": "libra",
+        "house": 3,
+        "retrograde": false
+      },
+      {
+        "body": "ascendant",
+        "longitude_deg": 10,
+        "sign": "aries",
+        "house": 1,
+        "retrograde": false
+      }
+    ],
+    "houses": {
+      "system_used": "placidus",
+      "fallback_applied": false,
+      "cusps_deg": [
+        10,
+        40,
+        70,
+        100,
+        130,
+        160,
+        190,
+        220,
+        250,
+        280,
+        310,
+        340
+      ]
+    },
+    "angles": {
+      "ascendant_deg": 10,
+      "midheaven_deg": 280
+    },
+    "aspects": [],
+    "uncertainty": {
+      "accuracy": "exact",
+      "window": null,
+      "suppressed_features": [],
+      "qualified_features": [],
+      "user_facing_summary": "Birth time is exact; houses and angles are included."
+    },
+    "calculated_at": "2026-07-30T15:00:00Z",
+    "status": "active"
+  },
+  "explorer": {
+    "schema_version": "pattern-portrait-explorer/v1",
+    "status": "ready",
+    "portrait": {
+      "schema_version": "pattern-portrait/v1",
+      "status": "ready",
+      "portrait_id": "portrait-review-fictional",
+      "chart_id": "chart-current",
+      "pattern_id": "pat_fictional_native_portrait_20260905",
+      "generated_at": "2026-09-05T18:00:00Z",
+      "document_revision": "0.7.0:pat_fictional_native_portrait_20260905:2026-09-05T18:00:00Z",
+      "sun_sign": "taurus",
+      "completed_chapters": 4,
+      "retryable": false,
+      "chapters": [
+        {
+          "chapter_id": "chapter-1",
+          "reference_id": "reference-1",
+          "label": "Compiled review shape 1",
+          "rationale": "Synthetic geometry used only for local workflow checks.",
+          "reference_sha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+          "source_text": "{\"title\":\"Finding your own direction\",\"summary\":\"You can choose a direction before every part of the journey is clear.\",\"sections\":[\"There may be moments when several sensible paths are available and none carries a guarantee. Another person's certainty can be reassuring, but it cannot tell you which direction feels consistent with what matters to you.\",\"You can begin by naming one value you want the next choice to serve. A small step can provide information that thinking in circles cannot. You are allowed to notice what you learn and adjust your course.\"],\"tensions\":[\"Looking for an unmistakable sign can delay a choice that is already small enough to explore.\"],\"resources\":[\"You can distinguish a change of direction from a loss of purpose. The value can remain steady while the route changes.\"],\"counterExpression\":\"Sometimes choosing your direction means listening carefully to advice and then deciding which part belongs with you.\"}"
+        },
+        {
+          "chapter_id": "chapter-2",
+          "reference_id": "reference-2",
+          "label": "Compiled review shape 2",
+          "rationale": "Synthetic geometry used only for local workflow checks.",
+          "reference_sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+          "source_text": "{\"title\":\"Making room for care\",\"summary\":\"Care becomes easier to receive when there is room for your needs alongside someone else's.\",\"sections\":[\"You may recognize another person's needs quickly and make space for them before checking your own capacity. That responsiveness can be generous. It becomes easier to sustain when your own hunger, rest, and limits also have a place.\",\"A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return.\"],\"tensions\":[\"Being needed can feel close to being valued, even when the exchange leaves little room for you.\"],\"resources\":[\"You can offer care in a form that is simple, practical, and possible to repeat without exhausting yourself.\"],\"counterExpression\":\"Receiving something without immediately returning the favor can also be an act of trust.\"}"
+        },
+        {
+          "chapter_id": "chapter-3",
+          "reference_id": "reference-3",
+          "label": "Compiled review shape 3",
+          "rationale": "Synthetic geometry used only for local workflow checks.",
+          "reference_sha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1",
+          "source_text": "{\"title\":\"Keeping what matters\",\"summary\":\"A dependable commitment can steady you while other parts of life change.\",\"sections\":[\"You do not need every circumstance to stay the same in order to feel grounded. One dependable promise, relationship, or practice can provide enough stability to consider something new.\",\"It can help to separate the commitment itself from the form it has taken. You may keep what matters while loosening an arrangement that no longer serves it. Holding on thoughtfully includes knowing when to release some weight.\"],\"tensions\":[\"Familiar responsibility can become difficult to question when carrying it has become part of how you understand yourself.\"],\"resources\":[\"You can make a commitment concrete and give it a realistic place in daily life.\"],\"counterExpression\":\"Staying connected to what matters can sometimes require a deliberate departure from what is familiar.\"}"
+        },
+        {
+          "chapter_id": "chapter-4",
+          "reference_id": "reference-4",
+          "label": "Compiled review shape 4",
+          "rationale": "Synthetic geometry used only for local workflow checks.",
+          "reference_sha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+          "source_text": "{\"title\":\"Seeing beyond the immediate\",\"summary\":\"A wider perspective can make room for possibilities that today's pressure hides.\",\"sections\":[\"An urgent question can fill your attention until it seems to be the whole landscape. Taking a little distance may reveal that the present difficulty is one part of a longer story.\",\"You can look further ahead without demanding a prediction. A question about the life you want to be moving toward may help you choose what deserves attention today. Curiosity can give the future room to surprise you.\"],\"tensions\":[\"Imagining a distant possibility can become a way to postpone a small action that is available now.\"],\"resources\":[\"You can move between detail and perspective, using each to correct what the other leaves out.\"],\"counterExpression\":\"Sometimes the wider view makes a modest, ordinary next step feel sufficient.\"}"
+        }
+      ],
+      "graph": {
+        "engine_version": "constellation-v1",
+        "positions": [
+          -1,
+          -1,
+          0,
+          1,
+          -1,
+          0,
+          -1,
+          1,
+          0,
+          1,
+          1,
+          0
+        ],
+        "source_indices": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "star_strengths": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "connections": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "color": [
+          0.5,
+          0.4,
+          0.3
+        ],
+        "contributions": [
+          {
+            "index": 0,
+            "aspect": 1,
+            "coverage": 0.5,
+            "opening_area": 0,
+            "skew": 0,
+            "stars": 1,
+            "interior_lines": 0
+          },
+          {
+            "index": 1,
+            "aspect": 1,
+            "coverage": 0.5,
+            "opening_area": 0,
+            "skew": 0,
+            "stars": 1,
+            "interior_lines": 0
+          },
+          {
+            "index": 2,
+            "aspect": 1,
+            "coverage": 0.5,
+            "opening_area": 0,
+            "skew": 0,
+            "stars": 1,
+            "interior_lines": 0
+          },
+          {
+            "index": 3,
+            "aspect": 1,
+            "coverage": 0.5,
+            "opening_area": 0,
+            "skew": 0,
+            "stars": 1,
+            "interior_lines": 0
+          }
+        ]
+      }
+    },
+    "completed_models": 4,
+    "retryable": false,
+    "models": [
+      {
+        "chapter_id": "chapter-1",
+        "reference_id": "model-1",
+        "sha256": "38ade178287fe44149c19c6ec1c17931d48b101c16d5fc56c2db7ec38ac57fd3",
+        "source_image_sha256": "b3d92f0cc0bc17a1e4546fc3d080752d8cba493211319412d7f2fbf9d2f72d32",
+        "source_text_sha256": "a86cc74ec2711f60f9f0161a8c2b0fe0c78001b288a40e084b49ecfc401061c9",
+        "source_text": "{\"title\":\"Finding your own direction\",\"summary\":\"You can choose a direction before every part of the journey is clear.\",\"sections\":[\"There may be moments when several sensible paths are available and none carries a guarantee. Another person's certainty can be reassuring, but it cannot tell you which direction feels consistent with what matters to you.\",\"You can begin by naming one value you want the next choice to serve. A small step can provide information that thinking in circles cannot. You are allowed to notice what you learn and adjust your course.\"],\"tensions\":[\"Looking for an unmistakable sign can delay a choice that is already small enough to explore.\"],\"resources\":[\"You can distinguish a change of direction from a loss of purpose. The value can remain steady while the route changes.\"],\"counterExpression\":\"Sometimes choosing your direction means listening carefully to advice and then deciding which part belongs with you.\"}",
+        "program_sha256": "cb09cc8d6ca30f84ac6430a7a99f39a20f8e9455d312e14e546fb5e8c2a4f0ee",
+        "compiler_version": "portrait-mesh-compiler/v1",
+        "authoring": "codex-parametric/v1",
+        "document_revision": "0.7.0:pat_fictional_native_portrait_20260905:2026-09-05T18:00:00Z"
+      },
+      {
+        "chapter_id": "chapter-2",
+        "reference_id": "model-2",
+        "sha256": "e97ed38ff48632fc80b80d3da8ab20c01e888cac9a7d3900e460ca6f3758bd4f",
+        "source_image_sha256": "c8cf5e25dd1f1a27318abd05460bbed1506f5e358d0bee74bb3f3ad63c220b66",
+        "source_text_sha256": "9220c07f4e24a2047fd09a9945d73a53ae40968ebc22c79aa8e9d28e8f060f70",
+        "source_text": "{\"title\":\"Making room for care\",\"summary\":\"Care becomes easier to receive when there is room for your needs alongside someone else's.\",\"sections\":[\"You may recognize another person's needs quickly and make space for them before checking your own capacity. That responsiveness can be generous. It becomes easier to sustain when your own hunger, rest, and limits also have a place.\",\"A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return.\"],\"tensions\":[\"Being needed can feel close to being valued, even when the exchange leaves little room for you.\"],\"resources\":[\"You can offer care in a form that is simple, practical, and possible to repeat without exhausting yourself.\"],\"counterExpression\":\"Receiving something without immediately returning the favor can also be an act of trust.\"}",
+        "program_sha256": "c60a40234c52b055d0cd884ced51ad7398d9110132ad71a221683a1906d9d66b",
+        "compiler_version": "portrait-mesh-compiler/v1",
+        "authoring": "codex-parametric/v1",
+        "document_revision": "0.7.0:pat_fictional_native_portrait_20260905:2026-09-05T18:00:00Z"
+      },
+      {
+        "chapter_id": "chapter-3",
+        "reference_id": "model-3",
+        "sha256": "6f47f7c8ce379b9b26706318a70e0ab143953ea0ee6b3ccb4a9e275c82037da2",
+        "source_image_sha256": "562ddb34401e55bece80eac4c554574f463a87fcef7aec89c29f6f1e1e1bcfd1",
+        "source_text_sha256": "1836ba298c509fe2b20b94aa713ac3d8791d2c010d6b8122733868961011562e",
+        "source_text": "{\"title\":\"Keeping what matters\",\"summary\":\"A dependable commitment can steady you while other parts of life change.\",\"sections\":[\"You do not need every circumstance to stay the same in order to feel grounded. One dependable promise, relationship, or practice can provide enough stability to consider something new.\",\"It can help to separate the commitment itself from the form it has taken. You may keep what matters while loosening an arrangement that no longer serves it. Holding on thoughtfully includes knowing when to release some weight.\"],\"tensions\":[\"Familiar responsibility can become difficult to question when carrying it has become part of how you understand yourself.\"],\"resources\":[\"You can make a commitment concrete and give it a realistic place in daily life.\"],\"counterExpression\":\"Staying connected to what matters can sometimes require a deliberate departure from what is familiar.\"}",
+        "program_sha256": "059b142c6d2a5e066086e0041a80df8fe830b907c21debf9370344bed92493d1",
+        "compiler_version": "portrait-mesh-compiler/v1",
+        "authoring": "codex-parametric/v1",
+        "document_revision": "0.7.0:pat_fictional_native_portrait_20260905:2026-09-05T18:00:00Z"
+      },
+      {
+        "chapter_id": "chapter-4",
+        "reference_id": "model-4",
+        "sha256": "38ea6efe9aa986f9a3a0a7577604b7e9fe9df7a62fc781bc9d2d35f4aada6c3a",
+        "source_image_sha256": "f916b2a4b3ed5e6f1fd77d775370ce1a630ee18964357e9597ac1c0fe3134036",
+        "source_text_sha256": "3a0bc8e841d15e43b340da9b3e3b12c6eea1669af5bcfe1aaf06a42bdfadf69d",
+        "source_text": "{\"title\":\"Seeing beyond the immediate\",\"summary\":\"A wider perspective can make room for possibilities that today's pressure hides.\",\"sections\":[\"An urgent question can fill your attention until it seems to be the whole landscape. Taking a little distance may reveal that the present difficulty is one part of a longer story.\",\"You can look further ahead without demanding a prediction. A question about the life you want to be moving toward may help you choose what deserves attention today. Curiosity can give the future room to surprise you.\"],\"tensions\":[\"Imagining a distant possibility can become a way to postpone a small action that is available now.\"],\"resources\":[\"You can move between detail and perspective, using each to correct what the other leaves out.\"],\"counterExpression\":\"Sometimes the wider view makes a modest, ordinary next step feel sufficient.\"}",
+        "program_sha256": "b1ea316af3f16b658a23d980df24e54714e5dcdfe144d0fb4470e3681b59b889",
+        "compiler_version": "portrait-mesh-compiler/v1",
+        "authoring": "codex-parametric/v1",
+        "document_revision": "0.7.0:pat_fictional_native_portrait_20260905:2026-09-05T18:00:00Z"
+      }
+    ]
+  }
+}

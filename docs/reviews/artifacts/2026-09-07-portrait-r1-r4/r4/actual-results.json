@@ -1,0 +1,80 @@
+{
+  "checks": [
+    {
+      "name": "actual-source-load-1440",
+      "pass": true
+    },
+    {
+      "name": "R6-original-image-1440",
+      "pass": true,
+      "data": {
+        "x": 409,
+        "y": 161.5625,
+        "width": 622,
+        "height": 495
+      }
+    },
+    {
+      "name": "R3-comparison-reading-return-1440",
+      "pass": true
+    },
+    {
+      "name": "graphics-reading-fallback-1440",
+      "pass": true
+    },
+    {
+      "name": "graphics-recovery-1440",
+      "pass": true
+    },
+    {
+      "name": "actual-source-load-390",
+      "pass": true
+    },
+    {
+      "name": "R2-sticky-reading-return",
+      "pass": true,
+      "data": {
+        "bar": {
+          "x": 16,
+          "y": 0,
+          "width": 358,
+          "height": 116.5,
+          "top": 0,
+          "right": 374,
+          "bottom": 116.5,
+          "left": 16
+        },
+        "identity": "Keeping what matters",
+        "overflow": 0
+      }
+    },
+    {
+      "name": "R1-phone-reading-sky-back",
+      "pass": true
+    },
+    {
+      "name": "R6-original-image-390",
+      "pass": true,
+      "data": {
+        "x": 36,
+        "y": 189.5625,
+        "width": 318,
+        "height": 318
+      }
+    },
+    {
+      "name": "R3-comparison-reading-return-390",
+      "pass": true
+    },
+    {
+      "name": "graphics-reading-fallback-390",
+      "pass": true
+    },
+    {
+      "name": "graphics-recovery-390",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

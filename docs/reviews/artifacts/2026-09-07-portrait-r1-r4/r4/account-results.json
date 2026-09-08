@@ -1,0 +1,292 @@
+{
+  "fixture": "Fictional chapter/image fixtures and deterministic compiled test shapes, all API calls intercepted. Real validators and renderer unchanged.",
+  "states": [
+    {
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "errors": []
+    },
+    {
+      "width": 844,
+      "errors": []
+    }
+  ],
+  "workflows": [
+    {
+      "name": "reopen-scene-1440",
+      "pass": true,
+      "data": {
+        "before": {
+          "roofOpen": false,
+          "lighting": "dusk",
+          "inspect": true,
+          "openDesks": {
+            "chapter-2": true
+          },
+          "turns": {
+            "chapter-2": 1
+          }
+        },
+        "after": {
+          "roofOpen": false,
+          "lighting": "dusk",
+          "inspect": true,
+          "openDesks": {
+            "chapter-2": true
+          },
+          "turns": {
+            "chapter-2": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "reopen-camera-1440",
+      "pass": true,
+      "data": {
+        "before": {
+          "position": [
+            -0.7235606620592088,
+            4.3687304526401665,
+            1.1522373500061924
+          ],
+          "target": [
+            -2.65,
+            1.56,
+            -2.05
+          ],
+          "frameDistance": 5.565327770382653
+        },
+        "after": {
+          "position": [
+            -0.7235606620592088,
+            4.3687304526401665,
+            1.1522373500061924
+          ],
+          "target": [
+            -2.65,
+            1.56,
+            -2.05
+          ],
+          "frameDistance": 5.565327770382653
+        }
+      }
+    },
+    {
+      "name": "reopen-reading-and-assets-1440",
+      "pass": true,
+      "data": {
+        "assetRequests": 8
+      }
+    },
+    {
+      "name": "private-memory-1440",
+      "pass": true
+    },
+    {
+      "name": "sky-reopen-1440",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-origin-1440",
+      "pass": true
+    },
+    {
+      "name": "comparison-reopen-1440",
+      "pass": true
+    },
+    {
+      "name": "R3-comparison-origin-1440",
+      "pass": true
+    },
+    {
+      "name": "account-exit-1440",
+      "pass": true
+    },
+    {
+      "name": "reopen-scene-390",
+      "pass": true,
+      "data": {
+        "before": {
+          "roofOpen": false,
+          "lighting": "dusk",
+          "inspect": true,
+          "openDesks": {
+            "chapter-2": true
+          },
+          "turns": {
+            "chapter-2": 1
+          }
+        },
+        "after": {
+          "roofOpen": false,
+          "lighting": "dusk",
+          "inspect": true,
+          "openDesks": {
+            "chapter-2": true
+          },
+          "turns": {
+            "chapter-2": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "reopen-camera-390",
+      "pass": true,
+      "data": {
+        "before": {
+          "position": [
+            -0.7235606620592088,
+            4.3687304526401665,
+            1.1522373500061924
+          ],
+          "target": [
+            -2.65,
+            1.56,
+            -2.05
+          ],
+          "frameDistance": 5.565327770382653
+        },
+        "after": {
+          "position": [
+            -0.7235606620592088,
+            4.3687304526401665,
+            1.1522373500061924
+          ],
+          "target": [
+            -2.65,
+            1.56,
+            -2.05
+          ],
+          "frameDistance": 5.565327770382653
+        }
+      }
+    },
+    {
+      "name": "reopen-reading-and-assets-390",
+      "pass": true,
+      "data": {
+        "assetRequests": 8
+      }
+    },
+    {
+      "name": "private-memory-390",
+      "pass": true
+    },
+    {
+      "name": "sky-reopen-390",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-origin-390",
+      "pass": true
+    },
+    {
+      "name": "comparison-reopen-390",
+      "pass": true
+    },
+    {
+      "name": "R3-comparison-origin-390",
+      "pass": true
+    },
+    {
+      "name": "account-exit-390",
+      "pass": true
+    },
+    {
+      "name": "reopen-scene-844",
+      "pass": true,
+      "data": {
+        "before": {
+          "roofOpen": false,
+          "lighting": "dusk",
+          "inspect": true,
+          "openDesks": {
+            "chapter-2": true
+          },
+          "turns": {
+            "chapter-2": 1
+          }
+        },
+        "after": {
+          "roofOpen": false,
+          "lighting": "dusk",
+          "inspect": true,
+          "openDesks": {
+            "chapter-2": true
+          },
+          "turns": {
+            "chapter-2": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "reopen-camera-844",
+      "pass": true,
+      "data": {
+        "before": {
+          "position": [
+            -0.7235606620592088,
+            4.3687304526401665,
+            1.1522373500061924
+          ],
+          "target": [
+            -2.65,
+            1.56,
+            -2.05
+          ],
+          "frameDistance": 5.565327770382653
+        },
+        "after": {
+          "position": [
+            -0.7235606620592088,
+            4.3687304526401665,
+            1.1522373500061924
+          ],
+          "target": [
+            -2.65,
+            1.56,
+            -2.05
+          ],
+          "frameDistance": 5.565327770382653
+        }
+      }
+    },
+    {
+      "name": "reopen-reading-and-assets-844",
+      "pass": true,
+      "data": {
+        "assetRequests": 8
+      }
+    },
+    {
+      "name": "private-memory-844",
+      "pass": true
+    },
+    {
+      "name": "sky-reopen-844",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-origin-844",
+      "pass": true
+    },
+    {
+      "name": "comparison-reopen-844",
+      "pass": true
+    },
+    {
+      "name": "R3-comparison-origin-844",
+      "pass": true
+    },
+    {
+      "name": "account-exit-844",
+      "pass": true
+    }
+  ]
+}

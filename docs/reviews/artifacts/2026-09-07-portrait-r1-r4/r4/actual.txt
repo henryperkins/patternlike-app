@@ -1,0 +1,12 @@
+PASS actual-source-load-1440 ""
+PASS R6-original-image-1440 {"x":409,"y":161.5625,"width":622,"height":495}
+PASS R3-comparison-reading-return-1440 ""
+PASS graphics-reading-fallback-1440 ""
+PASS graphics-recovery-1440 ""
+PASS actual-source-load-390 ""
+PASS R2-sticky-reading-return {"bar":{"x":16,"y":0,"width":358,"height":116.5,"top":0,"right":374,"bottom":116.5,"left":16},"identity":"Keeping what matters","overflow":0}
+PASS R1-phone-reading-sky-back ""
+PASS R6-original-image-390 {"x":36,"y":189.5625,"width":318,"height":318}
+PASS R3-comparison-reading-return-390 ""
+PASS graphics-reading-fallback-390 ""
+PASS graphics-recovery-390 ""

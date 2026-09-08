@@ -1,0 +1,57 @@
+{
+  "schema_version": "portrait-documentation-packaging-checks.v1",
+  "verified_at": "2026-09-08T17:13:37.173855+00:00",
+  "status": "passed",
+  "application_commit": "4394e9c7380c51c19efa1e78d73d81f94ec45992",
+  "gate_base_commit": "e4ba2f9c8316cf884f17bcf70da8bc8734d38a9e",
+  "gate_receipt": "review-gate.json",
+  "gate_summary": "ci-local-summary.txt",
+  "aggregate_gate_rerun_during_packaging": false,
+  "verification_basis": "All runtime, test and build-input files retain their bytes from the immediately preceding 14-lane passing gate. Only the three listed documents and the approved historical artifact packaging changed. The content gate, artifact integrity, local links, and staged whitespace were checked for this packaging.",
+  "review_source_snapshot_sha256": "7f48aa63005f4b7680f60c5d427c908b083ea7796cd6007f4a3eb7346f979ad3",
+  "review_source_before_equals_after": true,
+  "baseline_files_checked": 1892,
+  "unchanged_existing_files": 1739,
+  "runtime_tests_and_build_inputs_unchanged": true,
+  "changed_documents": [
+    {
+      "path": "apps/web/src/components/portrait-explorer/DESIGN.md",
+      "reviewed_sha256": "60fce96835a48b6745c1fe2f80475bcac637069f7740925a232c34fe77522914",
+      "packaged_sha256": "f56fc74e2c590121772ce0d192393e3655ec8eae4089cfb80727bb6ee2177d28"
+    },
+    {
+      "path": "docs/reviews/2026-09-07-portrait-remaining-priorities.md",
+      "reviewed_sha256": "1803c105b7a3e7033b6ee5ecb3979ae0cb6b7cc68ef1ccbbc918781a356ebdf4",
+      "packaged_sha256": "ea41644d98d835d7f719038be57c2a1253ff09048f5e53147461bef54b64fb8f"
+    },
+    {
+      "path": "docs/reviews/2026-09-07-portrait-review-followup.md",
+      "reviewed_sha256": "a46add55dcb36a8e34e2fa97fc9c0c92a042ad8fa36bf3edba4e4be53849d71b",
+      "packaged_sha256": "c124d1a0ae6c0093c7a3a90db08ab9ae54688e7a7a553bdce530edc27b9d5f46"
+    }
+  ],
+  "approved_scratch_paths_removed": 150,
+  "artifact_provenance": "../provenance.json",
+  "artifact_originals_verified": 139,
+  "cleanup_record": "cleanup-record.json",
+  "content_check": {
+    "command": "npm run test:content",
+    "exit_code": 0,
+    "tests_passed": 79,
+    "tests_failed": 0,
+    "node": "v22.23.2",
+    "readable_log": "content-tests.txt",
+    "readable_log_sha256": "db44a9d8eab0853b6e555c0752c5c3c11d85d0ab3ff32bac3ce4ce0aa2940209",
+    "original_log": "content-tests.log.gz",
+    "original_log_sha256": "db44a9d8eab0853b6e555c0752c5c3c11d85d0ab3ff32bac3ce4ce0aa2940209"
+  },
+  "limitations": [
+    "Historical browser captures retain their September 7 source identities.",
+    "No new browser or production verification, push, or deployment.",
+    "The aggregate review gate emitted non-failing Worker teardown warnings and used local Python 3.14.4 against the workflow pin 3.12."
+  ],
+  "local_markdown_links_checked": 83,
+  "local_markdown_links_passed": true,
+  "staged_whitespace_check": "passed",
+  "documentation_commit_file_count": 164
+}

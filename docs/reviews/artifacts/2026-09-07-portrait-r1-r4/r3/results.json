@@ -1,0 +1,1315 @@
+{
+  "checks": [
+    {
+      "name": "R2-entry-1440",
+      "pass": true
+    },
+    {
+      "name": "pair-visible-1440",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.6202093692725169,
+              "y": -0.08855438435498716
+            },
+            "max": {
+              "x": -0.12067123389403919,
+              "y": 0.2788133412676286
+            },
+            "left": 122.5770269568159,
+            "right": 225.10722924324844,
+            "top": 432.6011535004182,
+            "bottom": 502.0336536430926
+          },
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": 0.12161161272761695,
+              "y": -0.06853768957657168
+            },
+            "max": {
+              "x": 0.6917096256510223,
+              "y": 0.5666964922765525
+            },
+            "left": 274.83578351234337,
+            "right": 391.8484006648724,
+            "top": 378.19123795973155,
+            "bottom": 498.25049832997206
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 94.625,
+              "y": 372.296875,
+              "width": 164.078125,
+              "height": 52.890625,
+              "top": 372.296875,
+              "right": 258.703125,
+              "bottom": 425.1875,
+              "left": 94.625
+            }
+          },
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 263.625,
+              "y": 315.296875,
+              "width": 137.375,
+              "height": 52.890625,
+              "top": 315.296875,
+              "right": 401,
+              "bottom": 368.1875,
+              "left": 263.625
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 44.625,
+          "y": 159.796875,
+          "width": 1350.75,
+          "height": 116.5,
+          "top": 159.796875,
+          "right": 1395.375,
+          "bottom": 276.296875,
+          "left": 44.625
+        },
+        "scene": {
+          "x": 44.625,
+          "y": 296.296875,
+          "width": 410.5,
+          "height": 378,
+          "top": 296.296875,
+          "right": 455.125,
+          "bottom": 674.296875,
+          "left": 44.625
+        }
+      }
+    },
+    {
+      "name": "names-and-reflow-1440",
+      "pass": true,
+      "details": [
+        {
+          "id": "chapter-1",
+          "visible": true,
+          "text": "Finding your own direction● Overview · 1",
+          "rect": {
+            "x": 94.625,
+            "y": 372.296875,
+            "width": 164.078125,
+            "height": 52.890625,
+            "top": 372.296875,
+            "right": 258.703125,
+            "bottom": 425.1875,
+            "left": 94.625
+          }
+        },
+        {
+          "id": "chapter-2",
+          "visible": true,
+          "text": "Making room for care● Overview · 1",
+          "rect": {
+            "x": 263.625,
+            "y": 315.296875,
+            "width": 137.375,
+            "height": 52.890625,
+            "top": 315.296875,
+            "right": 401,
+            "bottom": 368.1875,
+            "left": 263.625
+          }
+        }
+      ]
+    },
+    {
+      "name": "labels-clear-of-objects-1440",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.6202093692725169,
+              "y": -0.08855438435498716
+            },
+            "max": {
+              "x": -0.12067123389403919,
+              "y": 0.2788133412676286
+            },
+            "left": 122.5770269568159,
+            "right": 225.10722924324844,
+            "top": 432.6011535004182,
+            "bottom": 502.0336536430926
+          },
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": 0.12161161272761695,
+              "y": -0.06853768957657168
+            },
+            "max": {
+              "x": 0.6917096256510223,
+              "y": 0.5666964922765525
+            },
+            "left": 274.83578351234337,
+            "right": 391.8484006648724,
+            "top": 378.19123795973155,
+            "bottom": 498.25049832997206
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 94.625,
+              "y": 372.296875,
+              "width": 164.078125,
+              "height": 52.890625,
+              "top": 372.296875,
+              "right": 258.703125,
+              "bottom": 425.1875,
+              "left": 94.625
+            }
+          },
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 263.625,
+              "y": 315.296875,
+              "width": 137.375,
+              "height": 52.890625,
+              "top": 315.296875,
+              "right": 401,
+              "bottom": 368.1875,
+              "left": 263.625
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 44.625,
+          "y": 159.796875,
+          "width": 1350.75,
+          "height": 116.5,
+          "top": 159.796875,
+          "right": 1395.375,
+          "bottom": 276.296875,
+          "left": 44.625
+        },
+        "scene": {
+          "x": 44.625,
+          "y": 296.296875,
+          "width": 410.5,
+          "height": 378,
+          "top": 296.296875,
+          "right": 455.125,
+          "bottom": 674.296875,
+          "left": 44.625
+        }
+      }
+    },
+    {
+      "name": "facets-no-camera-move-1440",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-back-1440",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-forward-1440",
+      "pass": true
+    },
+    {
+      "name": "second-source-passage-1440",
+      "pass": true,
+      "details": {
+        "text": "A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return.",
+        "rect": {
+          "x": 951.234375,
+          "y": 407.703125,
+          "width": 444.125,
+          "height": 119,
+          "top": 407.703125,
+          "right": 1395.359375,
+          "bottom": 526.703125,
+          "left": 951.234375
+        },
+        "inset": 116.5
+      }
+    },
+    {
+      "name": "original-camera-return-1440",
+      "pass": true,
+      "details": {
+        "distance": 1.7763568394002505e-15,
+        "original": {
+          "position": [
+            4.848715277391699,
+            3.9538651432256904,
+            5.7048299469522785
+          ],
+          "target": [
+            2.65,
+            0.7481589293479918,
+            2.0499999999999994
+          ],
+          "frameDistance": 5.335605227326039
+        },
+        "returned": {
+          "position": [
+            4.848715277391699,
+            3.953865143225692,
+            5.7048299469522785
+          ],
+          "target": [
+            2.65,
+            0.7481589293479918,
+            2.0499999999999994
+          ],
+          "frameDistance": 5.335605227326039
+        }
+      }
+    },
+    {
+      "name": "R2-entry-390",
+      "pass": true
+    },
+    {
+      "name": "pair-visible-390",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.630314111100606,
+              "y": -0.08521351584601546
+            },
+            "max": {
+              "x": -0.12397701302878586,
+              "y": 0.263206377724767
+            },
+            "left": 82.17377411299152,
+            "right": 172.80811466784735,
+            "top": 397.772657147937,
+            "bottom": 459.52463922252116
+          },
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": 0.12488601503191107,
+              "y": -0.06641193553100908
+            },
+            "max": {
+              "x": 0.6974409344286843,
+              "y": 0.5354544938307612
+            },
+            "left": 217.3545966907121,
+            "right": 319.8419272627345,
+            "top": 349.5209324449637,
+            "bottom": 456.19235288637867
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 48,
+              "y": 274.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 274.1875,
+              "right": 211,
+              "bottom": 342.671875,
+              "left": 48
+            }
+          },
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 215,
+              "y": 289.1875,
+              "width": 137.375,
+              "height": 52.890625,
+              "top": 289.1875,
+              "right": 352.375,
+              "bottom": 342.078125,
+              "left": 215
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "names-and-reflow-390",
+      "pass": true,
+      "details": [
+        {
+          "id": "chapter-1",
+          "visible": true,
+          "text": "Finding your own direction● Overview · 1",
+          "rect": {
+            "x": 48,
+            "y": 274.1875,
+            "width": 163,
+            "height": 68.484375,
+            "top": 274.1875,
+            "right": 211,
+            "bottom": 342.671875,
+            "left": 48
+          }
+        },
+        {
+          "id": "chapter-2",
+          "visible": true,
+          "text": "Making room for care● Overview · 1",
+          "rect": {
+            "x": 215,
+            "y": 289.1875,
+            "width": 137.375,
+            "height": 52.890625,
+            "top": 289.1875,
+            "right": 352.375,
+            "bottom": 342.078125,
+            "left": 215
+          }
+        }
+      ]
+    },
+    {
+      "name": "labels-clear-of-objects-390",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.630314111100606,
+              "y": -0.08521351584601546
+            },
+            "max": {
+              "x": -0.12397701302878586,
+              "y": 0.263206377724767
+            },
+            "left": 82.17377411299152,
+            "right": 172.80811466784735,
+            "top": 397.772657147937,
+            "bottom": 459.52463922252116
+          },
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": 0.12488601503191107,
+              "y": -0.06641193553100908
+            },
+            "max": {
+              "x": 0.6974409344286843,
+              "y": 0.5354544938307612
+            },
+            "left": 217.3545966907121,
+            "right": 319.8419272627345,
+            "top": 349.5209324449637,
+            "bottom": 456.19235288637867
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 48,
+              "y": 274.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 274.1875,
+              "right": 211,
+              "bottom": 342.671875,
+              "left": 48
+            }
+          },
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 215,
+              "y": 289.1875,
+              "width": 137.375,
+              "height": 52.890625,
+              "top": 289.1875,
+              "right": 352.375,
+              "bottom": 342.078125,
+              "left": 215
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "facets-no-camera-move-390",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-back-390",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-forward-390",
+      "pass": true
+    },
+    {
+      "name": "second-source-passage-390",
+      "pass": true,
+      "details": {
+        "text": "A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return.",
+        "rect": {
+          "x": 16,
+          "y": 724.5625,
+          "width": 358,
+          "height": 119,
+          "top": 724.5625,
+          "right": 374,
+          "bottom": 843.5625,
+          "left": 16
+        },
+        "inset": 116.5
+      }
+    },
+    {
+      "name": "original-camera-return-390",
+      "pass": true,
+      "details": {
+        "distance": 0,
+        "original": {
+          "position": [
+            4.848715277391699,
+            3.9538651432256904,
+            5.7048299469522785
+          ],
+          "target": [
+            2.65,
+            0.7481589293479918,
+            2.0499999999999994
+          ],
+          "frameDistance": 5.335605227326039
+        },
+        "returned": {
+          "position": [
+            4.848715277391699,
+            3.9538651432256904,
+            5.7048299469522785
+          ],
+          "target": [
+            2.65,
+            0.7481589293479918,
+            2.0499999999999994
+          ],
+          "frameDistance": 5.335605227326039
+        }
+      }
+    },
+    {
+      "name": "R2-entry-320",
+      "pass": true
+    },
+    {
+      "name": "pair-visible-320",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.6530572430974555,
+              "y": -0.04049770743427859
+            },
+            "max": {
+              "x": -0.1316883476890488,
+              "y": 0.2522091603828604
+            },
+            "left": 65.95975699396641,
+            "right": 141.03687793277697,
+            "top": 480.299867090269,
+            "bottom": 532.1775858660471
+          },
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": 0.13251252870261843,
+              "y": -0.02505023876571517
+            },
+            "max": {
+              "x": 0.7100159996160137,
+              "y": 0.4793877795407094
+            },
+            "left": 179.08180413317703,
+            "right": 262.242303944706,
+            "top": 440.03600651046463,
+            "bottom": 529.4397634112423
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 41,
+              "y": 364.765625,
+              "width": 128,
+              "height": 68.484375,
+              "top": 364.765625,
+              "right": 169,
+              "bottom": 433.25,
+              "left": 41
+            }
+          },
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 156,
+              "y": 536.765625,
+              "width": 128,
+              "height": 68.484375,
+              "top": 536.765625,
+              "right": 284,
+              "bottom": 605.25,
+              "left": 156
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 167.265625,
+          "width": 288,
+          "height": 160.5,
+          "top": 167.265625,
+          "right": 304,
+          "bottom": 327.765625,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 347.765625,
+          "width": 288,
+          "height": 354.46875,
+          "top": 347.765625,
+          "right": 304,
+          "bottom": 702.234375,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "names-and-reflow-320",
+      "pass": true,
+      "details": [
+        {
+          "id": "chapter-1",
+          "visible": true,
+          "text": "Finding your own direction● Overview · 1",
+          "rect": {
+            "x": 41,
+            "y": 364.765625,
+            "width": 128,
+            "height": 68.484375,
+            "top": 364.765625,
+            "right": 169,
+            "bottom": 433.25,
+            "left": 41
+          }
+        },
+        {
+          "id": "chapter-2",
+          "visible": true,
+          "text": "Making room for care● Overview · 1",
+          "rect": {
+            "x": 156,
+            "y": 536.765625,
+            "width": 128,
+            "height": 68.484375,
+            "top": 536.765625,
+            "right": 284,
+            "bottom": 605.25,
+            "left": 156
+          }
+        }
+      ]
+    },
+    {
+      "name": "labels-clear-of-objects-320",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.6530572430974555,
+              "y": -0.04049770743427859
+            },
+            "max": {
+              "x": -0.1316883476890488,
+              "y": 0.2522091603828604
+            },
+            "left": 65.95975699396641,
+            "right": 141.03687793277697,
+            "top": 480.299867090269,
+            "bottom": 532.1775858660471
+          },
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": 0.13251252870261843,
+              "y": -0.02505023876571517
+            },
+            "max": {
+              "x": 0.7100159996160137,
+              "y": 0.4793877795407094
+            },
+            "left": 179.08180413317703,
+            "right": 262.242303944706,
+            "top": 440.03600651046463,
+            "bottom": 529.4397634112423
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 41,
+              "y": 364.765625,
+              "width": 128,
+              "height": 68.484375,
+              "top": 364.765625,
+              "right": 169,
+              "bottom": 433.25,
+              "left": 41
+            }
+          },
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 156,
+              "y": 536.765625,
+              "width": 128,
+              "height": 68.484375,
+              "top": 536.765625,
+              "right": 284,
+              "bottom": 605.25,
+              "left": 156
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 167.265625,
+          "width": 288,
+          "height": 160.5,
+          "top": 167.265625,
+          "right": 304,
+          "bottom": 327.765625,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 347.765625,
+          "width": 288,
+          "height": 354.46875,
+          "top": 347.765625,
+          "right": 304,
+          "bottom": 702.234375,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "facets-no-camera-move-320",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-back-320",
+      "pass": true
+    },
+    {
+      "name": "R1-sky-forward-320",
+      "pass": true
+    },
+    {
+      "name": "second-source-passage-320",
+      "pass": true,
+      "details": {
+        "text": "A small, specific offer can carry more warmth than a promise that leaves you depleted. You can ask what would be useful, say what you can give, and allow someone else to care for you in return.",
+        "rect": {
+          "x": 16,
+          "y": 695.1875,
+          "width": 288,
+          "height": 148.75,
+          "top": 695.1875,
+          "right": 304,
+          "bottom": 843.9375,
+          "left": 16
+        },
+        "inset": 160.5
+      }
+    },
+    {
+      "name": "original-camera-return-320",
+      "pass": true,
+      "details": {
+        "distance": 1.7763568394002505e-15,
+        "original": {
+          "position": [
+            4.848715277391699,
+            3.9538651432256904,
+            5.7048299469522785
+          ],
+          "target": [
+            2.65,
+            0.7481589293479918,
+            2.0499999999999994
+          ],
+          "frameDistance": 5.335605227326039
+        },
+        "returned": {
+          "position": [
+            4.848715277391699,
+            3.9538651432256904,
+            5.70482994695228
+          ],
+          "target": [
+            2.65,
+            0.7481589293479918,
+            2.0499999999999994
+          ],
+          "frameDistance": 5.335605227326039
+        }
+      }
+    },
+    {
+      "name": "all-pairs-1-3",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.630314111100606,
+              "y": -0.08521351584601546
+            },
+            "max": {
+              "x": -0.12397701302878586,
+              "y": 0.263206377724767
+            },
+            "left": 82.17377411299152,
+            "right": 172.80811466784735,
+            "top": 397.772657147937,
+            "bottom": 459.52463922252116
+          },
+          {
+            "id": "chapter-3",
+            "min": {
+              "x": 0.13489684708935543,
+              "y": -0.09692065479225502
+            },
+            "max": {
+              "x": 0.6186127319006842,
+              "y": 0.26627806686733496
+            },
+            "left": 219.14653562899463,
+            "right": 305.7316790102225,
+            "top": 397.22824824255963,
+            "bottom": 461.59954667669604
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 48,
+              "y": 322.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 322.1875,
+              "right": 211,
+              "bottom": 390.671875,
+              "left": 48
+            }
+          },
+          {
+            "id": "chapter-3",
+            "visible": true,
+            "text": "Keeping what matters● Overview · 1",
+            "rect": {
+              "x": 215,
+              "y": 337.1875,
+              "width": 140.0625,
+              "height": 52.890625,
+              "top": 337.1875,
+              "right": 355.0625,
+              "bottom": 390.078125,
+              "left": 215
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "all-pairs-1-4",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-1",
+            "min": {
+              "x": -0.630314111100606,
+              "y": -0.08521351584601546
+            },
+            "max": {
+              "x": -0.12397701302878586,
+              "y": 0.263206377724767
+            },
+            "left": 82.17377411299152,
+            "right": 172.80811466784735,
+            "top": 397.772657147937,
+            "bottom": 459.52463922252116
+          },
+          {
+            "id": "chapter-4",
+            "min": {
+              "x": 0.13030219053578693,
+              "y": 0.03456653385468314
+            },
+            "max": {
+              "x": 0.5983759138393101,
+              "y": 0.17159887541242821
+            },
+            "left": 218.32409210590583,
+            "right": 302.1092885772365,
+            "top": 414.0086555655754,
+            "bottom": 438.2954969763489
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-1",
+            "visible": true,
+            "text": "Finding your own direction● Overview · 1",
+            "rect": {
+              "x": 48,
+              "y": 271.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 271.1875,
+              "right": 211,
+              "bottom": 339.671875,
+              "left": 48
+            }
+          },
+          {
+            "id": "chapter-4",
+            "visible": true,
+            "text": "Seeing beyond the immediate● Overview · 1",
+            "rect": {
+              "x": 180,
+              "y": 466.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 466.1875,
+              "right": 343,
+              "bottom": 534.671875,
+              "left": 180
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "all-pairs-2-3",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": -0.6974409344286843,
+              "y": -0.06641193553100908
+            },
+            "max": {
+              "x": -0.12488601503191107,
+              "y": 0.5354544938307612
+            },
+            "left": 70.15807273726551,
+            "right": 172.6454033092879,
+            "top": 349.5209324449637,
+            "bottom": 456.19235288637867
+          },
+          {
+            "id": "chapter-3",
+            "min": {
+              "x": 0.13489684708935543,
+              "y": -0.09692065479225502
+            },
+            "max": {
+              "x": 0.6186127319006842,
+              "y": 0.26627806686733496
+            },
+            "left": 219.14653562899463,
+            "right": 305.7316790102225,
+            "top": 397.22824824255963,
+            "bottom": 461.59954667669604
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 54,
+              "y": 289.1875,
+              "width": 137.375,
+              "height": 52.890625,
+              "top": 289.1875,
+              "right": 191.375,
+              "bottom": 342.078125,
+              "left": 54
+            }
+          },
+          {
+            "id": "chapter-3",
+            "visible": true,
+            "text": "Keeping what matters● Overview · 1",
+            "rect": {
+              "x": 195,
+              "y": 337.1875,
+              "width": 140.0625,
+              "height": 52.890625,
+              "top": 337.1875,
+              "right": 335.0625,
+              "bottom": 390.078125,
+              "left": 195
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "all-pairs-2-4",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-2",
+            "min": {
+              "x": -0.6974409344286843,
+              "y": -0.06641193553100908
+            },
+            "max": {
+              "x": -0.12488601503191107,
+              "y": 0.5354544938307612
+            },
+            "left": 70.15807273726551,
+            "right": 172.6454033092879,
+            "top": 349.5209324449637,
+            "bottom": 456.19235288637867
+          },
+          {
+            "id": "chapter-4",
+            "min": {
+              "x": 0.13030219053578693,
+              "y": 0.03456653385468314
+            },
+            "max": {
+              "x": 0.5983759138393101,
+              "y": 0.17159887541242821
+            },
+            "left": 218.32409210590583,
+            "right": 302.1092885772365,
+            "top": 414.0086555655754,
+            "bottom": 438.2954969763489
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-2",
+            "visible": true,
+            "text": "Making room for care● Overview · 1",
+            "rect": {
+              "x": 54,
+              "y": 289.1875,
+              "width": 137.375,
+              "height": 52.890625,
+              "top": 289.1875,
+              "right": 191.375,
+              "bottom": 342.078125,
+              "left": 54
+            }
+          },
+          {
+            "id": "chapter-4",
+            "visible": true,
+            "text": "Seeing beyond the immediate● Overview · 1",
+            "rect": {
+              "x": 195,
+              "y": 274.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 274.1875,
+              "right": 358,
+              "bottom": 342.671875,
+              "left": 195
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    },
+    {
+      "name": "all-pairs-3-4",
+      "pass": true,
+      "details": {
+        "objects": [
+          {
+            "id": "chapter-3",
+            "min": {
+              "x": -0.6186127319006842,
+              "y": -0.09692065479225502
+            },
+            "max": {
+              "x": -0.13489684708935543,
+              "y": 0.26627806686733496
+            },
+            "left": 84.26832098977752,
+            "right": 170.85346437100537,
+            "top": 397.22824824255963,
+            "bottom": 461.59954667669604
+          },
+          {
+            "id": "chapter-4",
+            "min": {
+              "x": 0.13030219053578693,
+              "y": 0.03456653385468314
+            },
+            "max": {
+              "x": 0.5983759138393101,
+              "y": 0.17159887541242821
+            },
+            "left": 218.32409210590583,
+            "right": 302.1092885772365,
+            "top": 414.0086555655754,
+            "bottom": 438.2954969763489
+          }
+        ],
+        "labels": [
+          {
+            "id": "chapter-3",
+            "visible": true,
+            "text": "Keeping what matters● Overview · 1",
+            "rect": {
+              "x": 60,
+              "y": 337.1875,
+              "width": 140.0625,
+              "height": 52.890625,
+              "top": 337.1875,
+              "right": 200.0625,
+              "bottom": 390.078125,
+              "left": 60
+            }
+          },
+          {
+            "id": "chapter-4",
+            "visible": true,
+            "text": "Seeing beyond the immediate● Overview · 1",
+            "rect": {
+              "x": 179,
+              "y": 468.1875,
+              "width": 163,
+              "height": 68.484375,
+              "top": 468.1875,
+              "right": 342,
+              "bottom": 536.671875,
+              "left": 179
+            }
+          }
+        ],
+        "overflow": 0,
+        "modes": {
+          "x": 16,
+          "y": 130.6875,
+          "width": 358,
+          "height": 116.5,
+          "top": 130.6875,
+          "right": 374,
+          "bottom": 247.1875,
+          "left": 16
+        },
+        "scene": {
+          "x": 16,
+          "y": 267.1875,
+          "width": 358,
+          "height": 354.46875,
+          "top": 267.1875,
+          "right": 374,
+          "bottom": 621.65625,
+          "left": 16
+        }
+      }
+    }
+  ],
+  "errors": []
+}

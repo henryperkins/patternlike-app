@@ -1,0 +1,26 @@
+[
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "/home/henry/patternlike-app/apps/web/src/components/portrait-explorer/PortraitScene.tsx",
+    "line": 182,
+    "snippet": "Undocumented color #e89775 is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#e89775"
+  },
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "/home/henry/patternlike-app/apps/web/src/components/portrait-explorer/PortraitScene.tsx",
+    "line": 182,
+    "snippet": "Undocumented color #df8064 is outside DESIGN.md colors",
+    "advisory": true,
+    "ignoreValue": "#df8064"
+  }
+]

@@ -1,0 +1,3469 @@
+
+> patternlike-app@0.2.0 test
+> npm run test -w @patternlike/shared -w @patternlike/reading-engine -w @patternlike/pattern-engine -w @patternlike/calc-stub -w @patternlike/codex-runner -w @patternlike/ontology-signer -w @patternlike/api -w @patternlike/web && npm run test:content && npm run test:contracts
+
+
+> @patternlike/shared@0.2.0 test
+> tsx --test "src/**/*.test.ts"
+
+TAP version 13
+# Subtest: golden vectors reproduce byte-for-byte
+ok 1 - golden vectors reproduce byte-for-byte
+  ---
+  duration_ms: 1.656664
+  type: 'test'
+  ...
+# Subtest: cyclePassId reproduces the pass-two vector
+ok 2 - cyclePassId reproduces the pass-two vector
+  ---
+  duration_ms: 16.327822
+  type: 'test'
+  ...
+# Subtest: every pass of one cycle gets a distinct id
+ok 3 - every pass of one cycle gets a distinct id
+  ---
+  duration_ms: 4.948371
+  type: 'test'
+  ...
+# Subtest: the same pass index under a different cycle is a different id
+ok 4 - the same pass index under a different cycle is a different id
+  ---
+  duration_ms: 2.80548
+  type: 'test'
+  ...
+# Subtest: a pass id is stable when refinement moves the pass timestamp
+ok 5 - a pass id is stable when refinement moves the pass timestamp
+  ---
+  duration_ms: 1.455471
+  type: 'test'
+  ...
+# Subtest: pass identity rejects a non-cycle parent and a zero index
+ok 6 - pass identity rejects a non-cycle parent and a zero index
+  ---
+  duration_ms: 0.659395
+  type: 'test'
+  ...
+# Subtest: cycleHash reproduces the retrograde vector and drops importance_score
+ok 7 - cycleHash reproduces the retrograde vector and drops importance_score
+  ---
+  duration_ms: 5.231568
+  type: 'test'
+  ...
+# Subtest: cycleHash changes when the envelope or the pass list changes
+ok 8 - cycleHash changes when the envelope or the pass list changes
+  ---
+  duration_ms: 2.634054
+  type: 'test'
+  ...
+# Subtest: the pinned policy identifiers match the contract package
+ok 9 - the pinned policy identifiers match the contract package
+  ---
+  duration_ms: 1.613381
+  type: 'test'
+  ...
+# Subtest: the closed vocabularies are exactly the contract enums, in order
+ok 10 - the closed vocabularies are exactly the contract enums, in order
+  ---
+  duration_ms: 4.72726
+  type: 'test'
+  ...
+# Subtest: scope is a property of the kind, not of the prose
+ok 11 - scope is a property of the kind, not of the prose
+  ---
+  duration_ms: 0.233063
+  type: 'test'
+  ...
+# Subtest: golden vectors reproduce byte-for-byte, not merely digest-for-digest
+ok 12 - golden vectors reproduce byte-for-byte, not merely digest-for-digest
+  ---
+  duration_ms: 15.352755
+  type: 'test'
+  ...
+# Subtest: the preimage carries the domain tag and drops the two derived members
+ok 13 - the preimage carries the domain tag and drops the two derived members
+  ---
+  duration_ms: 1.103891
+  type: 'test'
+  ...
+# Subtest: fact_id is exactly the first 32 hex characters of content_digest
+ok 14 - fact_id is exactly the first 32 hex characters of content_digest
+  ---
+  duration_ms: 0.461429
+  type: 'test'
+  ...
+# Subtest: moving an event to the next local day changes its identity
+ok 15 - moving an event to the next local day changes its identity
+  ---
+  duration_ms: 0.328034
+  type: 'test'
+  ...
+# Subtest: renderDailySkyFactId refuses anything that is not a full SHA-256 digest
+ok 16 - renderDailySkyFactId refuses anything that is not a full SHA-256 digest
+  ---
+  duration_ms: 0.523708
+  type: 'test'
+  ...
+# Subtest: facts sort by kind rank, then instant, then id
+ok 17 - facts sort by kind rank, then instant, then id
+  ---
+  duration_ms: 0.679474
+  type: 'test'
+  ...
+# Subtest: lunar phase bins are 45 degrees wide and centred on their names
+ok 18 - lunar phase bins are 45 degrees wide and centred on their names
+  ---
+  duration_ms: 0.534668
+  type: 'test'
+  ...
+# Subtest: zodiacSignOf partitions the circle into twelve
+ok 19 - zodiacSignOf partitions the circle into twelve
+  ---
+  duration_ms: 0.242061
+  type: 'test'
+  ...
+# Subtest: a serialized request carries no account or birth identity
+ok 20 - a serialized request carries no account or birth identity
+  ---
+  duration_ms: 0.277469
+  type: 'test'
+  ...
+# Subtest: effective_accuracy and the suppression set each have exactly one copy of the truth
+ok 21 - effective_accuracy and the suppression set each have exactly one copy of the truth
+  ---
+  duration_ms: 0.332704
+  type: 'test'
+  ...
+# Subtest: the request identity pins the tz database and the resolution policy
+ok 22 - the request identity pins the tz database and the resolution policy
+  ---
+  duration_ms: 0.391756
+  type: 'test'
+  ...
+# Subtest: only calculation_failed is worth another delivery
+ok 23 - only calculation_failed is worth another delivery
+  ---
+  duration_ms: 0.181696
+  type: 'test'
+  ...
+# Subtest: newId
+    # Subtest: produces prefix_<32 lowercase hex>
+    ok 1 - produces prefix_<32 lowercase hex>
+      ---
+      duration_ms: 4.724513
+      type: 'test'
+      ...
+    # Subtest: does not repeat across calls
+    ok 2 - does not repeat across calls
+      ---
+      duration_ms: 5.463791
+      type: 'test'
+      ...
+    # Subtest: contains no ':' — reading_key uses it as a field delimiter
+    ok 3 - contains no ':' — reading_key uses it as a field delimiter
+      ---
+      duration_ms: 0.832805
+      type: 'test'
+      ...
+    # Subtest: throws rather than falling back to Math.random when getRandomValues is absent
+    ok 4 - throws rather than falling back to Math.random when getRandomValues is absent
+      ---
+      duration_ms: 0.536391
+      type: 'test'
+      ...
+    1..4
+ok 24 - newId
+  ---
+  duration_ms: 14.493641
+  type: 'suite'
+  ...
+# Subtest: life domains
+    # Subtest: lets a reader exclude every named domain except the ranking remainder
+    ok 1 - lets a reader exclude every named domain except the ranking remainder
+      ---
+      duration_ms: 0.2787
+      type: 'test'
+      ...
+    1..1
+ok 25 - life domains
+  ---
+  duration_ms: 0.416383
+  type: 'suite'
+  ...
+# Subtest: golden vectors reproduce byte-for-byte, not merely digest-for-digest
+ok 26 - golden vectors reproduce byte-for-byte, not merely digest-for-digest
+  ---
+  duration_ms: 4.557987
+  type: 'test'
+  ...
+# Subtest: the cycle identity vector renders through renderCycleId
+ok 27 - the cycle identity vector renders through renderCycleId
+  ---
+  duration_ms: 0.358563
+  type: 'test'
+  ...
+# Subtest: id rendering rejects anything that is not a full lowercase SHA-256 digest
+ok 28 - id rendering rejects anything that is not a full lowercase SHA-256 digest
+  ---
+  duration_ms: 0.781358
+  type: 'test'
+  ...
+# Subtest: reordering object keys does not change identity
+ok 29 - reordering object keys does not change identity
+  ---
+  duration_ms: 0.336641
+  type: 'test'
+  ...
+# Subtest: array order is preserved, so a caller must sort before canonicalizing
+ok 30 - array order is preserved, so a caller must sort before canonicalizing
+  ---
+  duration_ms: 0.198068
+  type: 'test'
+  ...
+# Subtest: JCS and the legacy canonicalJson are not interchangeable
+ok 31 - JCS and the legacy canonicalJson are not interchangeable
+  ---
+  duration_ms: 18.407321
+  type: 'test'
+  ...
+# Subtest: non-I-JSON values are rejected rather than coerced
+ok 32 - non-I-JSON values are rejected rather than coerced
+  ---
+  duration_ms: 0.481386
+  type: 'test'
+  ...
+# Subtest: -0 canonicalizes as 0, matching Number::toString
+ok 33 - -0 canonicalizes as 0, matching Number::toString
+  ---
+  duration_ms: 0.146339
+  type: 'test'
+  ...
+# Subtest: the package constants match the contract package
+ok 34 - the package constants match the contract package
+  ---
+  duration_ms: 1.420254
+  type: 'test'
+  ...
+# Subtest: the AI consent categories are the contract enum, in display order
+ok 35 - the AI consent categories are the contract enum, in display order
+  ---
+  duration_ms: 1.006977
+  type: 'test'
+  ...
+# Subtest: M5_SUPPORTED_USES narrows the frozen M0 enum and adds nothing
+ok 36 - M5_SUPPORTED_USES narrows the frozen M0 enum and adds nothing
+  ---
+  duration_ms: 2.220237
+  type: 'test'
+  ...
+# Subtest: paragraph roles match both contracts and drop the reviewed fallback
+ok 37 - paragraph roles match both contracts and drop the reviewed fallback
+  ---
+  duration_ms: 0.540308
+  type: 'test'
+  ...
+# Subtest: the checked-in fixtures type-check as the exported wire shapes
+ok 38 - the checked-in fixtures type-check as the exported wire shapes
+  ---
+  duration_ms: 0.586867
+  type: 'test'
+  ...
+# Subtest: the publisher vocabulary admits historical OpenAI and new Codex, and nothing else
+ok 39 - the publisher vocabulary admits historical OpenAI and new Codex, and nothing else
+  ---
+  duration_ms: 0.295973
+  type: 'test'
+  ...
+# Subtest: both provider vintages are describable by the same frozen shapes
+ok 40 - both provider vintages are describable by the same frozen shapes
+  ---
+  duration_ms: 0.527214
+  type: 'test'
+  ...
+# Subtest: an unknown publisher has a rejection fixture on both surfaces
+ok 41 - an unknown publisher has a rejection fixture on both surfaces
+  ---
+  duration_ms: 0.261618
+  type: 'test'
+  ...
+# Subtest: a v5 reading carries no release pointer and no reviewed fallback
+ok 42 - a v5 reading carries no release pointer and no reviewed fallback
+  ---
+  duration_ms: 0.480986
+  type: 'test'
+  ...
+# Subtest: every provider-packet context item maps to a disclosed consent category
+ok 43 - every provider-packet context item maps to a disclosed consent category
+  ---
+  duration_ms: 0.637813
+  type: 'test'
+  ...
+# Subtest: a provider packet carries no stored-row handle
+ok 44 - a provider packet carries no stored-row handle
+  ---
+  duration_ms: 0.381016
+  type: 'test'
+  ...
+# Subtest: user-authored text stays a value inside a closed object
+ok 45 - user-authored text stays a value inside a closed object
+  ---
+  duration_ms: 0.401394
+  type: 'test'
+  ...
+# Subtest: every grounded unit declares both evidence arrays
+ok 46 - every grounded unit declares both evidence arrays
+  ---
+  duration_ms: 0.305111
+  type: 'test'
+  ...
+# Subtest: evidence records the frozen input and the winning candidate separately
+ok 47 - evidence records the frozen input and the winning candidate separately
+  ---
+  duration_ms: 0.343824
+  type: 'test'
+  ...
+# Subtest: M7 schema version is 0.7.0
+ok 48 - M7 schema version is 0.7.0
+  ---
+  duration_ms: 1.07723
+  type: 'test'
+  ...
+# Subtest: Pattern consent policy is independently versioned
+ok 49 - Pattern consent policy is independently versioned
+  ---
+  duration_ms: 0.451418
+  type: 'test'
+  ...
+# Subtest: editorial_catalog stays in the wire enum although nothing emits it
+ok 50 - editorial_catalog stays in the wire enum although nothing emits it
+  ---
+  duration_ms: 0.180775
+  type: 'test'
+  ...
+# Subtest: place requests retain M8 while Geoapify consent uses its explicit successor
+ok 51 - place requests retain M8 while Geoapify consent uses its explicit successor
+  ---
+  duration_ms: 1.781521
+  type: 'test'
+  ...
+# Subtest: account-processing consent exports the current immutable recovery contract
+ok 52 - account-processing consent exports the current immutable recovery contract
+  ---
+  duration_ms: 0.454054
+  type: 'test'
+  ...
+# Subtest: public place requests stay provider-neutral
+ok 53 - public place requests stay provider-neutral
+  ---
+  duration_ms: 0.418868
+  type: 'test'
+  ...
+# Subtest: reading history exposes revision-specific Save metadata
+ok 54 - reading history exposes revision-specific Save metadata
+  ---
+  duration_ms: 3.626994
+  type: 'test'
+  ...
+# Subtest: M9 owns the source-update request and ready-plus-regeneration state
+ok 55 - M9 owns the source-update request and ready-plus-regeneration state
+  ---
+  duration_ms: 1.609714
+  type: 'test'
+  ...
+# Subtest: four image contributions survive a serialized saved-graph roundtrip
+ok 56 - four image contributions survive a serialized saved-graph roundtrip
+  ---
+  duration_ms: 89.93818
+  type: 'test'
+  ...
+# Subtest: changing one reference changes its stars while retaining other chapters
+ok 57 - changing one reference changes its stars while retaining other chapters
+  ---
+  duration_ms: 168.415543
+  type: 'test'
+  ...
+# Subtest: saved graphs reject corrupt geometry, source attribution and unsupported versions
+ok 58 - saved graphs reject corrupt geometry, source attribution and unsupported versions
+  ---
+  duration_ms: 27.543393
+  type: 'test'
+  ...
+# Subtest: chapter admission rejects unusable samples before accepting an immutable image
+ok 59 - chapter admission rejects unusable samples before accepting an immutable image
+  ---
+  duration_ms: 26.272714
+  type: 'test'
+  ...
+# Subtest: legacy model projection uses saved identifiers without importing current model or CLI defaults
+ok 60 - legacy model projection uses saved identifiers without importing current model or CLI defaults
+  ---
+  duration_ms: 1.814845
+  type: 'test'
+  ...
+# Subtest: inconsistent stored model evidence cannot be relabelled as a valid legacy record
+ok 61 - inconsistent stored model evidence cannot be relabelled as a valid legacy record
+  ---
+  duration_ms: 0.648835
+  type: 'test'
+  ...
+# Subtest: admits declarative solid geometry and no executable or unknown input
+ok 62 - admits declarative solid geometry and no executable or unknown input
+  ---
+  duration_ms: 5.702837
+  type: 'test'
+  ...
+# Subtest: rejects nonfinite numbers, mirrored/zero transforms, unknown materials, and excessive counts
+ok 63 - rejects nonfinite numbers, mirrored/zero transforms, unknown materials, and excessive counts
+  ---
+  duration_ms: 0.750179
+  type: 'test'
+  ...
+# Subtest: rejects self-intersecting and degenerate profiles before triangulation
+ok 64 - rejects self-intersecting and degenerate profiles before triangulation
+  ---
+  duration_ms: 4.065249
+  type: 'test'
+  ...
+# Subtest: admits all supported shape families with bounded numeric parameters
+ok 65 - admits all supported shape families with bounded numeric parameters
+  ---
+  duration_ms: 0.818519
+  type: 'test'
+  ...
+# Subtest: limits serialized programs to 64 KiB even when declaration counts are valid
+ok 66 - limits serialized programs to 64 KiB even when declaration counts are valid
+  ---
+  duration_ms: 52.717104
+  type: 'test'
+  ...
+# Subtest: visual acceptance requires every check, four views and closed receipt
+ok 67 - visual acceptance requires every check, four views and closed receipt
+  ---
+  duration_ms: 1.047814
+  type: 'test'
+  ...
+# Subtest: machine failures are bounded and closed
+ok 68 - machine failures are bounded and closed
+  ---
+  duration_ms: 0.47217
+  type: 'test'
+  ...
+# Subtest: frozen claim fixtures reject unknown data and chapter substitution
+ok 69 - frozen claim fixtures reject unknown data and chapter substitution
+  ---
+  duration_ms: 0.653243
+  type: 'test'
+  ...
+# Subtest: the versioned program contract matches the trusted parser schema
+ok 70 - the versioned program contract matches the trusted parser schema
+  ---
+  duration_ms: 1.333568
+  type: 'test'
+  ...
+# Subtest: accepts IANA zone ids and rejects everything shaped like an offset
+ok 71 - accepts IANA zone ids and rejects everything shaped like an offset
+  ---
+  duration_ms: 27.709399
+  type: 'test'
+  ...
+# Subtest: reads the offset that was actually in force, not today's
+ok 72 - reads the offset that was actually in force, not today's
+  ---
+  duration_ms: 0.876068
+  type: 'test'
+  ...
+# Subtest: honours one-off historical rule changes
+ok 73 - honours one-off historical rule changes
+  ---
+  duration_ms: 0.322434
+  type: 'test'
+  ...
+# Subtest: resolves an ordinary wall time to exactly one instant
+ok 74 - resolves an ordinary wall time to exactly one instant
+  ---
+  duration_ms: 0.601855
+  type: 'test'
+  ...
+# Subtest: reports a wall time the clock ran through twice
+ok 75 - reports a wall time the clock ran through twice
+  ---
+  duration_ms: 0.409749
+  type: 'test'
+  ...
+# Subtest: reports a wall time the clock skipped, shifting forward across the gap
+ok 76 - reports a wall time the clock skipped, shifting forward across the gap
+  ---
+  duration_ms: 0.258792
+  type: 'test'
+  ...
+# Subtest: handles a zone that skipped an entire day
+ok 77 - handles a zone that skipped an entire day
+  ---
+  duration_ms: 0.545379
+  type: 'test'
+  ...
+# Subtest: resolves pre-1970 local mean time without rounding into the wrong minute
+ok 78 - resolves pre-1970 local mean time without rounding into the wrong minute
+  ---
+  duration_ms: 0.278841
+  type: 'test'
+  ...
+# Subtest: formats offsets the way the onboarding form shows them
+ok 79 - formats offsets the way the onboarding form shows them
+  ---
+  duration_ms: 0.5255
+  type: 'test'
+  ...
+# Subtest: parses the birth profile wire format and refuses dates the calendar lacks
+ok 80 - parses the birth profile wire format and refuses dates the calendar lacks
+  ---
+  duration_ms: 1.419322
+  type: 'test'
+  ...
+# Subtest: pins the year tzdb stops guaranteeing a zone matches its location
+ok 81 - pins the year tzdb stops guaranteeing a zone matches its location
+  ---
+  duration_ms: 0.268912
+  type: 'test'
+  ...
+1..81
+# tests 84
+# suites 2
+# pass 84
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 794.398828
+
+> @patternlike/reading-engine@0.3.0 test
+> tsx --test "src/**/*.test.ts"
+
+TAP version 13
+# Subtest: an eligible day produces a themed reading in fixed role order
+ok 1 - an eligible day produces a themed reading in fixed role order
+  ---
+  duration_ms: 5.468821
+  type: 'test'
+  ...
+# Subtest: the renderer writes no original prose — every paragraph is reviewed copy
+ok 2 - the renderer writes no original prose — every paragraph is reviewed copy
+  ---
+  duration_ms: 0.848726
+  type: 'test'
+  ...
+# Subtest: a timing paragraph carries BOTH its calculated facts and its signed template
+ok 3 - a timing paragraph carries BOTH its calculated facts and its signed template
+  ---
+  duration_ms: 0.848616
+  type: 'test'
+  ...
+# Subtest: every paragraph resolves to an approved content version
+ok 4 - every paragraph resolves to an approved content version
+  ---
+  duration_ms: 2.136457
+  type: 'test'
+  ...
+# Subtest: a day with no cycle inside orb publishes reviewed fallback copy, never nothing
+ok 5 - a day with no cycle inside orb publishes reviewed fallback copy, never nothing
+  ---
+  duration_ms: 0.521873
+  type: 'test'
+  ...
+# Subtest: every supported locale has a byte-stable fallback outcome
+ok 6 - every supported locale has a byte-stable fallback outcome
+  ---
+  duration_ms: 0.841182
+  type: 'test'
+  ...
+# Subtest: locale resolution is exact, then configured fallback, then locale_default
+ok 7 - locale resolution is exact, then configured fallback, then locale_default
+  ---
+  duration_ms: 0.222995
+  type: 'test'
+  ...
+# Subtest: unknown birth time suppresses an angle theme rather than filtering it later
+ok 8 - unknown birth time suppresses an angle theme rather than filtering it later
+  ---
+  duration_ms: 0.542022
+  type: 'test'
+  ...
+# Subtest: identical inputs reproduce identical canonical bytes and assembly id
+ok 9 - identical inputs reproduce identical canonical bytes and assembly id
+  ---
+  duration_ms: 3.121823
+  type: 'test'
+  ...
+# Subtest: a changed generation anchor changes the id; a changed reading id does not
+ok 10 - a changed generation anchor changes the id; a changed reading id does not
+  ---
+  duration_ms: 1.360571
+  type: 'test'
+  ...
+# Subtest: nothing that names a person crosses into the identity preimage
+ok 11 - nothing that names a person crosses into the identity preimage
+  ---
+  duration_ms: 0.47835
+  type: 'test'
+  ...
+# Subtest: generated_at is the frozen anchor, never a clock read
+ok 12 - generated_at is the frozen anchor, never a clock read
+  ---
+  duration_ms: 0.370836
+  type: 'test'
+  ...
+# Subtest: a context source outside the registry allowlist cannot enter assembly
+ok 13 - a context source outside the registry allowlist cannot enter assembly
+  ---
+  duration_ms: 0.493921
+  type: 'test'
+  ...
+# Subtest: a registered source used for a purpose it does not permit is rejected
+ok 14 - a registered source used for a purpose it does not permit is rejected
+  ---
+  duration_ms: 0.379152
+  type: 'test'
+  ...
+# Subtest: revoked or stale context is dropped with a recorded reason
+ok 15 - revoked or stale context is dropped with a recorded reason
+  ---
+  duration_ms: 0.575154
+  type: 'test'
+  ...
+# Subtest: the validation log distinguishes verified from not-applicable
+ok 16 - the validation log distinguishes verified from not-applicable
+  ---
+  duration_ms: 0.452831
+  type: 'test'
+  ...
+# Subtest: finalizeReading stamps the digests the engine could not compute
+ok 17 - finalizeReading stamps the digests the engine could not compute
+  ---
+  duration_ms: 0.977481
+  type: 'test'
+  ...
+# Subtest: finalizeReading refuses to stamp a paragraph it was given no hash for
+ok 18 - finalizeReading refuses to stamp a paragraph it was given no hash for
+  ---
+  duration_ms: 0.902008
+  type: 'test'
+  ...
+# Subtest: every fixture the canonical bundle declares evaluates as claimed
+ok 19 - every fixture the canonical bundle declares evaluates as claimed
+  ---
+  duration_ms: 0.731503
+  type: 'test'
+  ...
+# Subtest: an unresolvable fixture id fails closed rather than passing
+ok 20 - an unresolvable fixture id fails closed rather than passing
+  ---
+  duration_ms: 0.210321
+  type: 'test'
+  ...
+# Subtest: ineligible and fallback are distinguished, not conflated
+ok 21 - ineligible and fallback are distinguished, not conflated
+  ---
+  duration_ms: 0.502807
+  type: 'test'
+  ...
+# Subtest: a zero-fact fixture in every supported locale evaluates to fallback
+ok 22 - a zero-fact fixture in every supported locale evaluates to fallback
+  ---
+  duration_ms: 0.30426
+  type: 'test'
+  ...
+# Subtest: a release with no universal fallback for the locale fails closed
+ok 23 - a release with no universal fallback for the locale fails closed
+  ---
+  duration_ms: 0.270005
+  type: 'test'
+  ...
+# Subtest: a locale with no reflection prompt records the gap instead of hiding it
+ok 24 - a locale with no reflection prompt records the gap instead of hiding it
+  ---
+  duration_ms: 0.293218
+  type: 'test'
+  ...
+# Subtest: claim support rejects swapped placement
+ok 25 - claim support rejects swapped placement
+  ---
+  duration_ms: 27.152288
+  type: 'test'
+  ...
+# Subtest: claim support rejects swapped placement with both facts cited
+ok 26 - claim support rejects swapped placement with both facts cited
+  ---
+  duration_ms: 8.150365
+  type: 'test'
+  ...
+# Subtest: claim support rejects wrong aspect participant
+ok 27 - claim support rejects wrong aspect participant
+  ---
+  duration_ms: 14.426052
+  type: 'test'
+  ...
+# Subtest: claim support rejects reversed transit and natal roles
+ok 28 - claim support rejects reversed transit and natal roles
+  ---
+  duration_ms: 4.874388
+  type: 'test'
+  ...
+# Subtest: claim support rejects borrowed degree
+ok 29 - claim support rejects borrowed degree
+  ---
+  duration_ms: 4.787354
+  type: 'test'
+  ...
+# Subtest: claim support rejects borrowed house
+ok 30 - claim support rejects borrowed house
+  ---
+  duration_ms: 3.243675
+  type: 'test'
+  ...
+# Subtest: claim support rejects borrowed timestamp
+ok 31 - claim support rejects borrowed timestamp
+  ---
+  duration_ms: 19.279502
+  type: 'test'
+  ...
+# Subtest: claim support rejects irrelevant existing citation
+ok 32 - claim support rejects irrelevant existing citation
+  ---
+  duration_ms: 3.17766
+  type: 'test'
+  ...
+# Subtest: claim support rejects cycle start date used as exact date
+ok 33 - claim support rejects cycle start date used as exact date
+  ---
+  duration_ms: 2.848563
+  type: 'test'
+  ...
+# Subtest: claim support rejects cycle exact date used as end date
+ok 34 - claim support rejects cycle exact date used as end date
+  ---
+  duration_ms: 2.126769
+  type: 'test'
+  ...
+# Subtest: claim support rejects orb used as a placement degree
+ok 35 - claim support rejects orb used as a placement degree
+  ---
+  duration_ms: 2.593537
+  type: 'test'
+  ...
+# Subtest: claim support rejects position degree used as an orb
+ok 36 - claim support rejects position degree used as an orb
+  ---
+  duration_ms: 1.488854
+  type: 'test'
+  ...
+# Subtest: claim support rejects wrong timestamp seconds
+ok 37 - claim support rejects wrong timestamp seconds
+  ---
+  duration_ms: 1.66502
+  type: 'test'
+  ...
+# Subtest: claim support rejects wrong ISO timestamp date
+ok 38 - claim support rejects wrong ISO timestamp date
+  ---
+  duration_ms: 1.508191
+  type: 'test'
+  ...
+# Subtest: claim support rejects lunar phase assigned to the Sun
+ok 39 - claim support rejects lunar phase assigned to the Sun
+  ---
+  duration_ms: 2.978811
+  type: 'test'
+  ...
+# Subtest: claim support rejects reversed ingress
+ok 40 - claim support rejects reversed ingress
+  ---
+  duration_ms: 4.054067
+  type: 'test'
+  ...
+# Subtest: claim support rejects mixed-citation collective laundering
+ok 41 - claim support rejects mixed-citation collective laundering
+  ---
+  duration_ms: 4.867425
+  type: 'test'
+  ...
+# Subtest: claim support rejects negated true placement
+ok 42 - claim support rejects negated true placement
+  ---
+  duration_ms: 2.189268
+  type: 'test'
+  ...
+# Subtest: claim support rejects anaphoric swapped placement
+ok 43 - claim support rejects anaphoric swapped placement
+  ---
+  duration_ms: 1.697952
+  type: 'test'
+  ...
+# Subtest: claim support rejects reflexive aspect
+ok 44 - claim support rejects reflexive aspect
+  ---
+  duration_ms: 1.566652
+  type: 'test'
+  ...
+# Subtest: claim support rejects extra reflexive aspect clause
+ok 45 - claim support rejects extra reflexive aspect clause
+  ---
+  duration_ms: 2.02761
+  type: 'test'
+  ...
+# Subtest: claim support rejects longitude substituted for sign degree
+ok 46 - claim support rejects longitude substituted for sign degree
+  ---
+  duration_ms: 2.562488
+  type: 'test'
+  ...
+# Subtest: claim support rejects declination substituted for sign degree
+ok 47 - claim support rejects declination substituted for sign degree
+  ---
+  duration_ms: 1.39793
+  type: 'test'
+  ...
+# Subtest: claim support rejects collective placement with remote natal qualifier
+ok 48 - claim support rejects collective placement with remote natal qualifier
+  ---
+  duration_ms: 2.418374
+  type: 'test'
+  ...
+# Subtest: claim support rejects unparsed past-tense event
+ok 49 - claim support rejects unparsed past-tense event
+  ---
+  duration_ms: 1.409995
+  type: 'test'
+  ...
+# Subtest: claim support rejects predicative wrong lunar phase
+ok 50 - claim support rejects predicative wrong lunar phase
+  ---
+  duration_ms: 1.715936
+  type: 'test'
+  ...
+# Subtest: claim support rejects unprovided illumination
+ok 51 - claim support rejects unprovided illumination
+  ---
+  duration_ms: 1.470048
+  type: 'test'
+  ...
+# Subtest: claim support rejects UTC offset masquerading as UTC
+ok 52 - claim support rejects UTC offset masquerading as UTC
+  ---
+  duration_ms: 3.582971
+  type: 'test'
+  ...
+# Subtest: claim support rejects unparsed calendar date
+ok 53 - claim support rejects unparsed calendar date
+  ---
+  duration_ms: 2.775665
+  type: 'test'
+  ...
+# Subtest: claim support rejects clause retracting a fact
+ok 54 - claim support rejects clause retracting a fact
+  ---
+  duration_ms: 2.144081
+  type: 'test'
+  ...
+# Subtest: claim support rejects anaphoric unbound event
+ok 55 - claim support rejects anaphoric unbound event
+  ---
+  duration_ms: 2.837522
+  type: 'test'
+  ...
+# Subtest: claim support rejects unbound exact pass
+ok 56 - claim support rejects unbound exact pass
+  ---
+  duration_ms: 1.503473
+  type: 'test'
+  ...
+# Subtest: claim support rejects cycle envelope orb as measured separation
+ok 57 - claim support rejects cycle envelope orb as measured separation
+  ---
+  duration_ms: 1.622749
+  type: 'test'
+  ...
+# Subtest: claim support rejects comma does not authorize a borrowed orb
+ok 58 - claim support rejects comma does not authorize a borrowed orb
+  ---
+  duration_ms: 1.823201
+  type: 'test'
+  ...
+# Subtest: claim support rejects comma does not authorize extra factual prose
+ok 59 - claim support rejects comma does not authorize extra factual prose
+  ---
+  duration_ms: 2.202242
+  type: 'test'
+  ...
+# Subtest: claim support rejects current cycle phase assigned to future exact pass
+ok 60 - claim support rejects current cycle phase assigned to future exact pass
+  ---
+  duration_ms: 2.024093
+  type: 'test'
+  ...
+# Subtest: claim support rejects exact contact relabelled as sampled
+ok 61 - claim support rejects exact contact relabelled as sampled
+  ---
+  duration_ms: 2.435277
+  type: 'test'
+  ...
+# Subtest: claim support rejects future exact pass as implicitly present
+ok 62 - claim support rejects future exact pass as implicitly present
+  ---
+  duration_ms: 2.184178
+  type: 'test'
+  ...
+# Subtest: claim support rejects future exact pass without its date
+ok 63 - claim support rejects future exact pass without its date
+  ---
+  duration_ms: 1.452314
+  type: 'test'
+  ...
+# Subtest: claim support rejects unbound exact assertion
+ok 64 - claim support rejects unbound exact assertion
+  ---
+  duration_ms: 1.592782
+  type: 'test'
+  ...
+# Subtest: claim support accepts separate, accurately cited factual sentences
+ok 65 - claim support accepts separate, accurately cited factual sentences
+  ---
+  duration_ms: 11.619681
+  type: 'test'
+  ...
+# Subtest: headlines cannot make uncited factual assertions
+ok 66 - headlines cannot make uncited factual assertions
+  ---
+  duration_ms: 0.66691
+  type: 'test'
+  ...
+# Subtest: timestamp support normalizes UTC offsets and respects the half-open local day
+ok 67 - timestamp support normalizes UTC offsets and respects the half-open local day
+  ---
+  duration_ms: 10.034581
+  type: 'test'
+  ...
+# Subtest: a cycle or sampled position supplies its own timestamp vocabulary
+ok 68 - a cycle or sampled position supplies its own timestamp vocabulary
+  ---
+  duration_ms: 1.830294
+  type: 'test'
+  ...
+# Subtest: a concise cycle-phase clause stays bound to its own cycle record
+ok 69 - a concise cycle-phase clause stays bound to its own cycle record
+  ---
+  duration_ms: 2.754364
+  type: 'test'
+  ...
+# Subtest: an explicit shared-sky prefix retains the cited lunar phase and collective scope
+ok 70 - an explicit shared-sky prefix retains the cited lunar phase and collective scope
+  ---
+  duration_ms: 3.545189
+  type: 'test'
+  ...
+# Subtest: qualified approximate data supports an honest note without inventing suppression
+ok 71 - qualified approximate data supports an honest note without inventing suppression
+  ---
+  duration_ms: 4.21858
+  type: 'test'
+  ...
+# Subtest: a grounded candidate passes and yields the published paragraph plan
+ok 72 - a grounded candidate passes and yields the published paragraph plan
+  ---
+  duration_ms: 1.622799
+  type: 'test'
+  ...
+# Subtest: the reflection may cite only reflection-lane context
+ok 73 - the reflection may cite only reflection-lane context
+  ---
+  duration_ms: 1.029279
+  type: 'test'
+  ...
+# Subtest: the candidate must echo the supplied local date and locale exactly
+ok 74 - the candidate must echo the supplied local date and locale exactly
+  ---
+  duration_ms: 1.499614
+  type: 'test'
+  ...
+# Subtest: a malformed candidate is rejected before any prose check runs
+ok 75 - a malformed candidate is rejected before any prose check runs
+  ---
+  duration_ms: 0.18905
+  type: 'test'
+  ...
+# Subtest: paragraph roles must be unique, allowed, and in the declared order
+ok 76 - paragraph roles must be unique, allowed, and in the declared order
+  ---
+  duration_ms: 1.332006
+  type: 'test'
+  ...
+# Subtest: length bounds are enforced on the headline, lead, paragraphs, and reflection
+ok 77 - length bounds are enforced on the headline, lead, paragraphs, and reflection
+  ---
+  duration_ms: 6.608381
+  type: 'test'
+  ...
+# Subtest: an unknown fact or context reference is rejected
+ok 78 - an unknown fact or context reference is rejected
+  ---
+  duration_ms: 0.949768
+  type: 'test'
+  ...
+# Subtest: a context pin cited outside its authorized lane is rejected
+ok 79 - a context pin cited outside its authorized lane is rejected
+  ---
+  duration_ms: 0.591547
+  type: 'test'
+  ...
+# Subtest: the uncertainty note may cite no personal context at all
+ok 80 - the uncertainty note may cite no personal context at all
+  ---
+  duration_ms: 1.69141
+  type: 'test'
+  ...
+# Subtest: every substantive astrology unit must cite at least one supplied fact
+ok 81 - every substantive astrology unit must cite at least one supplied fact
+  ---
+  duration_ms: 0.711564
+  type: 'test'
+  ...
+# Subtest: a non-astrological reflection needs no fact
+ok 82 - a non-astrological reflection needs no fact
+  ---
+  duration_ms: 0.544968
+  type: 'test'
+  ...
+# Subtest: a body, sign, aspect, house, degree, phase, or date nobody calculated is rejected
+ok 83 - a body, sign, aspect, house, degree, phase, or date nobody calculated is rejected
+  ---
+  duration_ms: 3.044656
+  type: 'test'
+  ...
+# Subtest: vocabulary the facts do license is accepted
+ok 84 - vocabulary the facts do license is accepted
+  ---
+  duration_ms: 1.568065
+  type: 'test'
+  ...
+# Subtest: a natal degree can be followed by a separately supported transit sentence
+ok 85 - a natal degree can be followed by a separately supported transit sentence
+  ---
+  duration_ms: 1.227226
+  type: 'test'
+  ...
+# Subtest: a collective-only unit may not claim the sky is personal
+ok 86 - a collective-only unit may not claim the sky is personal
+  ---
+  duration_ms: 0.533185
+  type: 'test'
+  ...
+# Subtest: personal context may not be described as an astrological discovery
+ok 87 - personal context may not be described as an astrological discovery
+  ---
+  duration_ms: 0.492548
+  type: 'test'
+  ...
+# Subtest: markup, links, and code never reach a reader
+ok 88 - markup, links, and code never reach a reader
+  ---
+  duration_ms: 1.66052
+  type: 'test'
+  ...
+# Subtest: prompt, schema, and identifier leakage is rejected
+ok 89 - prompt, schema, and identifier leakage is rejected
+  ---
+  duration_ms: 1.75397
+  type: 'test'
+  ...
+# Subtest: the supported-locale set names exactly what the rules can judge
+ok 90 - the supported-locale set names exactly what the rules can judge
+  ---
+  duration_ms: 0.37247
+  type: 'test'
+  ...
+# Subtest: the sign Cancer is licensed vocabulary, not a disease term
+ok 91 - the sign Cancer is licensed vocabulary, not a disease term
+  ---
+  duration_ms: 4.419414
+  type: 'test'
+  ...
+# Subtest: diagnosis, medical causation, guarantees, fatalism, and advice replacement are rejected
+ok 92 - diagnosis, medical causation, guarantees, fatalism, and advice replacement are rejected
+  ---
+  duration_ms: 2.03819
+  type: 'test'
+  ...
+# Subtest: a bounded suppressed-Moon disclosure uses the uncertainty record without inventing a fact citation
+ok 93 - a bounded suppressed-Moon disclosure uses the uncertainty record without inventing a fact citation
+  ---
+  duration_ms: 4.597863
+  type: 'test'
+  ...
+# Subtest: a required uncertainty note must be present and must name what is missing
+ok 94 - a required uncertainty note must be present and must name what is missing
+  ---
+  duration_ms: 4.287563
+  type: 'test'
+  ...
+# Subtest: an unrequested uncertainty note is rejected rather than published
+ok 95 - an unrequested uncertainty note is rejected rather than published
+  ---
+  duration_ms: 0.856681
+  type: 'test'
+  ...
+# Subtest: evidence counts must agree with the units the reading will publish
+ok 96 - evidence counts must agree with the units the reading will publish
+  ---
+  duration_ms: 0.894253
+  type: 'test'
+  ...
+# Subtest: a failing candidate reports closed check codes and no candidate prose
+ok 97 - a failing candidate reports closed check codes and no candidate prose
+  ---
+  duration_ms: 0.626994
+  type: 'test'
+  ...
+# Subtest: every eligible calculated fact is included before any context budgeting
+ok 98 - every eligible calculated fact is included before any context budgeting
+  ---
+  duration_ms: 8.857702
+  type: 'test'
+  ...
+# Subtest: facts are ordered by (lane_rank, fact_id) and lanes follow reading priority
+ok 99 - facts are ordered by (lane_rank, fact_id) and lanes follow reading priority
+  ---
+  duration_ms: 2.770243
+  type: 'test'
+  ...
+# Subtest: internal support keeps calculation roles and a detached source record off the provider wire
+ok 100 - internal support keeps calculation roles and a detached source record off the provider wire
+  ---
+  duration_ms: 3.260766
+  type: 'test'
+  ...
+# Subtest: a zero-cycle day is still a factual day
+ok 101 - a zero-cycle day is still a factual day
+  ---
+  duration_ms: 2.370572
+  type: 'test'
+  ...
+# Subtest: a day with no calculated fact at all fails closed
+ok 102 - a day with no calculated fact at all fails closed
+  ---
+  duration_ms: 2.108994
+  type: 'test'
+  ...
+# Subtest: the provider packet carries no birth instant, coordinates, timezone, or storage id
+ok 103 - the provider packet carries no birth instant, coordinates, timezone, or storage id
+  ---
+  duration_ms: 2.109084
+  type: 'test'
+  ...
+# Subtest: an unknown birth time suppresses houses, angles, and time-sensitive Moon facts
+ok 104 - an unknown birth time suppresses houses, angles, and time-sensitive Moon facts
+  ---
+  duration_ms: 2.053018
+  type: 'test'
+  ...
+# Subtest: an approximate birth time qualifies rather than suppresses
+ok 105 - an approximate birth time qualifies rather than suppresses
+  ---
+  duration_ms: 2.257296
+  type: 'test'
+  ...
+# Subtest: an exact birth time needs no uncertainty note
+ok 106 - an exact birth time needs no uncertainty note
+  ---
+  duration_ms: 1.920225
+  type: 'test'
+  ...
+# Subtest: a chart whose effective accuracy disagrees with its uncertainty report fails closed
+ok 107 - a chart whose effective accuracy disagrees with its uncertainty report fails closed
+  ---
+  duration_ms: 0.669615
+  type: 'test'
+  ...
+# Subtest: one pin is produced per signal/use pair inside the exact intersection
+ok 108 - one pin is produced per signal/use pair inside the exact intersection
+  ---
+  duration_ms: 3.340589
+  type: 'test'
+  ...
+# Subtest: every M5 supported use can be pinned by some registry source
+ok 109 - every M5 supported use can be pinned by some registry source
+  ---
+  duration_ms: 25.785637
+  type: 'test'
+  ...
+# Subtest: a source outside the registry allowlist is rejected by the shared partition
+ok 110 - a source outside the registry allowlist is rejected by the shared partition
+  ---
+  duration_ms: 0.950059
+  type: 'test'
+  ...
+# Subtest: a paused, revoked, or expired permission excludes the whole source
+ok 111 - a paused, revoked, or expired permission excludes the whole source
+  ---
+  duration_ms: 3.491406
+  type: 'test'
+  ...
+# Subtest: a revoked source consent excludes the whole source
+ok 112 - a revoked source consent excludes the whole source
+  ---
+  duration_ms: 0.834117
+  type: 'test'
+  ...
+# Subtest: a permission and consent that disagree reject the source rather than intersecting
+ok 113 - a permission and consent that disagree reject the source rather than intersecting
+  ---
+  duration_ms: 2.063027
+  type: 'test'
+  ...
+# Subtest: a stale or expired signal is excluded even under an active source
+ok 114 - a stale or expired signal is excluded even under an active source
+  ---
+  duration_ms: 2.786143
+  type: 'test'
+  ...
+# Subtest: a signal expired at the generation anchor is excluded even when marked fresh
+ok 115 - a signal expired at the generation anchor is excluded even when marked fresh
+  ---
+  duration_ms: 1.606528
+  type: 'test'
+  ...
+# Subtest: a signal naming a source with no permission row is excluded
+ok 116 - a signal naming a source with no permission row is excluded
+  ---
+  duration_ms: 0.703649
+  type: 'test'
+  ...
+# Subtest: a category the AI-synthesis grant does not name cannot be sent
+ok 117 - a category the AI-synthesis grant does not name cannot be sent
+  ---
+  duration_ms: 0.783291
+  type: 'test'
+  ...
+# Subtest: the newest signal of every source is reserved before any source gets a second
+ok 118 - the newest signal of every source is reserved before any source gets a second
+  ---
+  duration_ms: 2.199777
+  type: 'test'
+  ...
+# Subtest: selection is stable under input permutation
+ok 119 - selection is stable under input permutation
+  ---
+  duration_ms: 2.111889
+  type: 'test'
+  ...
+# Subtest: re-running the compiler over its own selected output reproduces both hashes
+ok 120 - re-running the compiler over its own selected output reproduces both hashes
+  ---
+  duration_ms: 3.858114
+  type: 'test'
+  ...
+# Subtest: at most the last seven published readings enter repetition control
+ok 121 - at most the last seven published readings enter repetition control
+  ---
+  duration_ms: 2.217621
+  type: 'test'
+  ...
+# Subtest: a prior reading older than seven days never enters the packet
+ok 122 - a prior reading older than seven days never enters the packet
+  ---
+  duration_ms: 1.124311
+  type: 'test'
+  ...
+# Subtest: at most twenty structured feedback records are selected
+ok 123 - at most twenty structured feedback records are selected
+  ---
+  duration_ms: 5.383779
+  type: 'test'
+  ...
+# Subtest: free text is NFC-normalized and truncated on an exact UTF-8 code-point boundary
+ok 124 - free text is NFC-normalized and truncated on an exact UTF-8 code-point boundary
+  ---
+  duration_ms: 1.275537
+  type: 'test'
+  ...
+# Subtest: the packet ceiling is an exact byte boundary, not an approximate one
+ok 125 - the packet ceiling is an exact byte boundary, not an approximate one
+  ---
+  duration_ms: 5.722114
+  type: 'test'
+  ...
+# Subtest: mandatory facts that cannot fit the ceiling fail closed rather than dropping a fact
+ok 126 - mandatory facts that cannot fit the ceiling fail closed rather than dropping a fact
+  ---
+  duration_ms: 0.501234
+  type: 'test'
+  ...
+# Subtest: identity and manifest are canonical JSON that excludes rejected candidates
+ok 127 - identity and manifest are canonical JSON that excludes rejected candidates
+  ---
+  duration_ms: 1.714383
+  type: 'test'
+  ...
+# Subtest: the identity and the manifest are different preimages
+ok 128 - the identity and the manifest are different preimages
+  ---
+  duration_ms: 0.65683
+  type: 'test'
+  ...
+# Subtest: the identity carries no raw context text and no source secret
+ok 129 - the identity carries no raw context text and no source secret
+  ---
+  duration_ms: 0.913188
+  type: 'test'
+  ...
+# Subtest: a changed selection policy version changes the identity
+ok 130 - a changed selection policy version changes the identity
+  ---
+  duration_ms: 2.160553
+  type: 'test'
+  ...
+# Subtest: golden vectors reproduce byte-for-byte, not merely digest-for-digest
+ok 131 - golden vectors reproduce byte-for-byte, not merely digest-for-digest
+  ---
+  duration_ms: 4.314173
+  type: 'test'
+  ...
+# Subtest: reordering object keys does not change identity
+ok 132 - reordering object keys does not change identity
+  ---
+  duration_ms: 0.57265
+  type: 'test'
+  ...
+# Subtest: an uncertainty change that can alter output changes the id
+ok 133 - an uncertainty change that can alter output changes the id
+  ---
+  duration_ms: 0.250778
+  type: 'test'
+  ...
+# Subtest: array order is preserved, so a caller must sort before canonicalizing
+ok 134 - array order is preserved, so a caller must sort before canonicalizing
+  ---
+  duration_ms: 0.150015
+  type: 'test'
+  ...
+# Subtest: keys sort by UTF-16 code unit, not by insertion
+ok 135 - keys sort by UTF-16 code unit, not by insertion
+  ---
+  duration_ms: 0.348624
+  type: 'test'
+  ...
+# Subtest: integral floats render as integers, per the ECMAScript number rule
+ok 136 - integral floats render as integers, per the ECMAScript number rule
+  ---
+  duration_ms: 0.164584
+  type: 'test'
+  ...
+# Subtest: non-ASCII is emitted literally; control characters are escaped
+ok 137 - non-ASCII is emitted literally; control characters are escaped
+  ---
+  duration_ms: 0.354465
+  type: 'test'
+  ...
+# Subtest: values with no I-JSON form are rejected rather than coerced
+ok 138 - values with no I-JSON form are rejected rather than coerced
+  ---
+  duration_ms: 0.777751
+  type: 'test'
+  ...
+# Subtest: a valid surrogate pair survives
+ok 139 - a valid surrogate pair survives
+  ---
+  duration_ms: 0.476006
+  type: 'test'
+  ...
+# Subtest: renderAssemblyId refuses anything that is not a full lowercase digest
+ok 140 - renderAssemblyId refuses anything that is not a full lowercase digest
+  ---
+  duration_ms: 0.734178
+  type: 'test'
+  ...
+# Subtest: a cycle has no phase outside its calculated orb envelope
+ok 141 - a cycle has no phase outside its calculated orb envelope
+  ---
+  duration_ms: 1.400325
+  type: 'test'
+  ...
+# Subtest: the approach splits into emerging then building
+ok 142 - the approach splits into emerging then building
+  ---
+  duration_ms: 0.270906
+  type: 'test'
+  ...
+# Subtest: peak is a window around ANY pass, not only the first
+ok 143 - peak is a window around ANY pass, not only the first
+  ---
+  duration_ms: 0.222755
+  type: 'test'
+  ...
+# Subtest: reconsidering is reachable — it is the interior of the retrograde loop
+ok 144 - reconsidering is reachable — it is the interior of the retrograde loop
+  ---
+  duration_ms: 0.255196
+  type: 'test'
+  ...
+# Subtest: peak takes precedence over the reconsidering interval it sits inside
+ok 145 - peak takes precedence over the reconsidering interval it sits inside
+  ---
+  duration_ms: 0.522845
+  type: 'test'
+  ...
+# Subtest: integrating follows the final pass
+ok 146 - integrating follows the final pass
+  ---
+  duration_ms: 0.240608
+  type: 'test'
+  ...
+# Subtest: a single-pass cycle never reports reconsidering
+ok 147 - a single-pass cycle never reports reconsidering
+  ---
+  duration_ms: 1.02496
+  type: 'test'
+  ...
+# Subtest: the state machine is total across the whole envelope
+ok 148 - the state machine is total across the whole envelope
+  ---
+  duration_ms: 9.026334
+  type: 'test'
+  ...
+# Subtest: thresholds are a single versioned block, not scattered literals
+ok 149 - thresholds are a single versioned block, not scattered literals
+  ---
+  duration_ms: 0.784243
+  type: 'test'
+  ...
+# Subtest: the generated allowlist still matches the registry
+ok 150 - the generated allowlist still matches the registry
+  ---
+  duration_ms: 339.301488
+  type: 'test'
+  ...
+# Subtest: exactly one excluded source would survive a NO-* prefix check
+ok 151 - exactly one excluded source would survive a NO-* prefix check
+  ---
+  duration_ms: 1.00366
+  type: 'test'
+  ...
+# Subtest: no NO-* source is ingestible either
+ok 152 - no NO-* source is ingestible either
+  ---
+  duration_ms: 0.412576
+  type: 'test'
+  ...
+# Subtest: a source outside the registry entirely cannot enter assembly
+ok 153 - a source outside the registry entirely cannot enter assembly
+  ---
+  duration_ms: 0.202566
+  type: 'test'
+  ...
+# Subtest: a registered source is gated per allowed_use, not per source
+ok 154 - a registered source is gated per allowed_use, not per source
+  ---
+  duration_ms: 0.212504
+  type: 'test'
+  ...
+# Subtest: the M0 allowedUse enum matches the registry vocabulary
+ok 155 - the M0 allowedUse enum matches the registry vocabulary
+  ---
+  duration_ms: 1.735894
+  type: 'test'
+  ...
+# Subtest: every allowed_use a source declares is in the shared vocabulary
+ok 156 - every allowed_use a source declares is in the shared vocabulary
+  ---
+  duration_ms: 0.405893
+  type: 'test'
+  ...
+# Subtest: the allowlist is narrower than the registry, and non-trivially so
+ok 157 - the allowlist is narrower than the registry, and non-trivially so
+  ---
+  duration_ms: 0.146029
+  type: 'test'
+  ...
+1..157
+# tests 157
+# suites 0
+# pass 157
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 583.197496
+
+> @patternlike/pattern-engine@0.7.0 test
+> tsx --test "src/**/*.test.ts"
+
+TAP version 13
+# Subtest: synthetic ontology compiles
+ok 1 - synthetic ontology compiles
+  ---
+  duration_ms: 4.10259
+  type: 'test'
+  ...
+# Subtest: synthetic ontology versions do not share a bundle hash
+ok 2 - synthetic ontology versions do not share a bundle hash
+  ---
+  duration_ms: 0.889222
+  type: 'test'
+  ...
+# Subtest: selection assigns luminary facts as mandatory_core and never sends nft_ ids
+ok 3 - selection assigns luminary facts as mandatory_core and never sends nft_ ids
+  ---
+  duration_ms: 14.165727
+  type: 'test'
+  ...
+# Subtest: selection carries every calculated suppression class into the closed uncertainty block
+ok 4 - selection carries every calculated suppression class into the closed uncertainty block
+  ---
+  duration_ms: 1.415884
+  type: 'test'
+  ...
+# Subtest: selection normalizes the persisted M4 digest to the M7 content-hash form
+ok 5 - selection normalizes the persisted M4 digest to the M7 content-hash form
+  ---
+  duration_ms: 0.736813
+  type: 'test'
+  ...
+# Subtest: deterministic plan and writer pass validators and strip private ledgers
+ok 6 - deterministic plan and writer pass validators and strip private ledgers
+  ---
+  duration_ms: 3.963195
+  type: 'test'
+  ...
+# Subtest: compiler refuses a non-canonical aspect pair
+ok 7 - compiler refuses a non-canonical aspect pair
+  ---
+  duration_ms: 0.787218
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 219.525558
+
+> @patternlike/calc-stub@0.2.0 pretest
+> node scripts/download-ephe.mjs
+
+ephe dir: /home/henry/patternlike-app/apps/calc-stub/data/ephe
+pinned:   85e65da01dce506bd0ec044ad3e39ab6d144d82b
+ok    sepl_18.se1 (verified, 484061 bytes)
+ok    semo_18.se1 (verified, 1304771 bytes)
+ok    seas_18.se1 (verified, 223004 bytes)
+ok    sefstars.txt (verified, 136618 bytes)
+ok    seorbel.txt (verified, 6063 bytes)
+done (5/5 verified)
+
+> @patternlike/calc-stub@0.2.0 test
+> tsx --test "src/**/*.test.ts"
+
+TAP version 13
+# Subtest: applying / separating
+    # Subtest: is true when a conjunction is closing
+    ok 1 - is true when a conjunction is closing
+      ---
+      duration_ms: 1.80169
+      type: 'test'
+      ...
+    # Subtest: is false when a conjunction is opening
+    ok 2 - is false when a conjunction is opening
+      ---
+      duration_ms: 0.31021
+      type: 'test'
+      ...
+    # Subtest: is true when a trine is closing from below the aspect angle
+    ok 3 - is true when a trine is closing from below the aspect angle
+      ---
+      duration_ms: 0.302666
+      type: 'test'
+      ...
+    # Subtest: is false when the separation shrinks away from the aspect angle
+    ok 4 - is false when the separation shrinks away from the aspect angle
+      ---
+      duration_ms: 0.253473
+      type: 'test'
+      ...
+    # Subtest: is true when a trine is closing from above the aspect angle
+    ok 5 - is true when a trine is closing from above the aspect angle
+      ---
+      duration_ms: 0.265756
+      type: 'test'
+      ...
+    # Subtest: is false when a trine is opening from above the aspect angle
+    ok 6 - is false when a trine is opening from above the aspect angle
+      ---
+      duration_ms: 0.253082
+      type: 'test'
+      ...
+    # Subtest: handles the 0/360 wrap
+    ok 7 - handles the 0/360 wrap
+      ---
+      duration_ms: 0.294049
+      type: 'test'
+      ...
+    # Subtest: treats an exact aspect as neither applying nor separating
+    ok 8 - treats an exact aspect as neither applying nor separating
+      ---
+      duration_ms: 0.448094
+      type: 'test'
+      ...
+    # Subtest: matches the sign of the numerically differentiated orb on the golden chart
+    ok 9 - matches the sign of the numerically differentiated orb on the golden chart
+      ---
+      duration_ms: 65.283837
+      type: 'test'
+      ...
+    1..9
+ok 1 - applying / separating
+  ---
+  duration_ms: 72.341652
+  type: 'suite'
+  ...
+# cycle_scan_failed {
+#   request_id: 'req_01JAMPLECYCLEREQ0001',
+#   error: "swe_calc_ut failed: SwissEph file 'sepl_18.se1' not found in PATH '/srv/app/apps/calc-stub/data/ephe/'"
+# }
+# cycle_scan_failed {
+#   request_id: 'req_01JAMPLECYCLEREQ0001',
+#   error: 'no Swiss Ephemeris body id for saturn'
+# }
+# Subtest: time conversion
+    # Subtest: agrees with swe_julday to the last bit
+    ok 1 - agrees with swe_julday to the last bit
+      ---
+      duration_ms: 1.300185
+      type: 'test'
+      ...
+    # Subtest: emits one normalized timestamp form, because the policy sorts raw strings
+    ok 2 - emits one normalized timestamp form, because the policy sorts raw strings
+      ---
+      duration_ms: 0.586697
+      type: 'test'
+      ...
+    1..2
+ok 2 - time conversion
+  ---
+  duration_ms: 3.139375
+  type: 'suite'
+  ...
+# Subtest: oriented targets
+    # Subtest: collapses conjunction and opposition to one branch and splits the rest
+    ok 1 - collapses conjunction and opposition to one branch and splits the rest
+      ---
+      duration_ms: 1.281169
+      type: 'test'
+      ...
+    # Subtest: wraps both branches into [0, 360)
+    ok 2 - wraps both branches into [0, 360)
+      ---
+      duration_ms: 0.282598
+      type: 'test'
+      ...
+    # Subtest: wrap180 lands in [-180, 180)
+    ok 3 - wrap180 lands in [-180, 180)
+      ---
+      duration_ms: 0.345137
+      type: 'test'
+      ...
+    1..3
+ok 3 - oriented targets
+  ---
+  duration_ms: 2.252718
+  type: 'suite'
+  ...
+# Subtest: epoch-anchored unwrapping
+    # Subtest: stays continuous through 0°/360° going forward
+    ok 1 - stays continuous through 0°/360° going forward
+      ---
+      duration_ms: 1.497781
+      type: 'test'
+      ...
+    # Subtest: stays continuous through 360°/0° going backward
+    ok 2 - stays continuous through 360°/0° going backward
+      ---
+      duration_ms: 0.739378
+      type: 'test'
+      ...
+    # Subtest: walks backward from the epoch as well as forward
+    ok 3 - walks backward from the epoch as well as forward
+      ---
+      duration_ms: 0.392487
+      type: 'test'
+      ...
+    # Subtest: is a cache, not a source of identity: halving the step changes nothing
+    ok 4 - is a cache, not a source of identity: halving the step changes nothing
+      ---
+      duration_ms: 263.603976
+      type: 'test'
+      ...
+    1..4
+ok 4 - epoch-anchored unwrapping
+  ---
+  duration_ms: 266.864744
+  type: 'suite'
+  ...
+# Subtest: root finding
+    # Subtest: records a root the grid lands on exactly, once
+    ok 1 - records a root the grid lands on exactly, once
+      ---
+      duration_ms: 1.42912
+      type: 'test'
+      ...
+    # Subtest: emits a station-on-target tangent once, with the outgoing direction
+    ok 2 - emits a station-on-target tangent once, with the outgoing direction
+      ---
+      duration_ms: 14.726354
+      type: 'test'
+      ...
+    # Subtest: refines every root to the declared ±1 s
+    ok 3 - refines every root to the declared ±1 s
+      ---
+      duration_ms: 1.487362
+      type: 'test'
+      ...
+    1..3
+ok 5 - root finding
+  ---
+  duration_ms: 19.007933
+  type: 'suite'
+  ...
+# Subtest: the canonical three-pass encounter
+    # Subtest: is one cycle with three chronological passes, not three cycles
+    ok 1 - is one cycle with three chronological passes, not three cycles
+      ---
+      duration_ms: 10.324965
+      type: 'test'
+      ...
+    # Subtest: keeps intervening orb exits and re-entries inside the same cycle
+    ok 2 - keeps intervening orb exits and re-entries inside the same cycle
+      ---
+      duration_ms: 8.699712
+      type: 'test'
+      ...
+    # Subtest: fails the whole request rather than emit a partial cycle
+    ok 3 - fails the whole request rather than emit a partial cycle
+      ---
+      duration_ms: 2.139382
+      type: 'test'
+      ...
+    # Subtest: returns the identical cycle from two windows that both select it
+    ok 4 - returns the identical cycle from two windows that both select it
+      ---
+      duration_ms: 23.806048
+      type: 'test'
+      ...
+    1..4
+ok 6 - the canonical three-pass encounter
+  ---
+  duration_ms: 45.338628
+  type: 'suite'
+  ...
+# Subtest: scanning the real sky
+    # Subtest: agrees one-for-one with the Sun and Moon crossing oracle
+    ok 1 - agrees one-for-one with the Sun and Moon crossing oracle
+      ---
+      duration_ms: 104.490042
+      type: 'test'
+      ...
+    # Subtest: produces a response that satisfies every semantic rule the validator enforces
+    ok 2 - produces a response that satisfies every semantic rule the validator enforces
+      ---
+      duration_ms: 2248.170953
+      type: 'test'
+      ...
+    # Subtest: holds up on a worst-case request: every natal body, every angle, a month
+    ok 3 - holds up on a worst-case request: every natal body, every angle, a month
+      ---
+      duration_ms: 3304.564343
+      type: 'test'
+      ...
+    # Subtest: echoes every identifier the caller sent
+    ok 4 - echoes every identifier the caller sent
+      ---
+      duration_ms: 2071.081979
+      type: 'test'
+      ...
+    # Subtest: is byte-identical across two runs of the same request
+    ok 5 - is byte-identical across two runs of the same request
+      ---
+      duration_ms: 4161.581673
+      type: 'test'
+      ...
+    # Subtest: returns the same encounter from two overlapping windows
+    ok 6 - returns the same encounter from two overlapping windows
+      ---
+      duration_ms: 4128.429714
+      type: 'test'
+      ...
+    # Subtest: treats the window as a selection interval, never as a clip
+    ok 7 - treats the window as a selection interval, never as a clip
+      ---
+      duration_ms: 2025.465872
+      type: 'test'
+      ...
+    1..7
+ok 7 - scanning the real sky
+  ---
+  duration_ms: 18044.284726
+  type: 'suite'
+  ...
+# Subtest: suppression at the source
+    # Subtest: refuses an angle target under unknown effective accuracy
+    ok 1 - refuses an angle target under unknown effective accuracy
+      ---
+      duration_ms: 0.50393
+      type: 'test'
+      ...
+    # Subtest: refuses an angle target when angles are explicitly suppressed
+    ok 2 - refuses an angle target when angles are explicitly suppressed
+      ---
+      duration_ms: 0.365375
+      type: 'test'
+      ...
+    # Subtest: omits the natal Moon while keeping the transiting Moon
+    ok 3 - omits the natal Moon while keeping the transiting Moon
+      ---
+      duration_ms: 1880.348903
+      type: 'test'
+      ...
+    1..3
+ok 8 - suppression at the source
+  ---
+  duration_ms: 1881.427446
+  type: 'suite'
+  ...
+# Subtest: request validation
+    # Subtest: rejects an undeclared property
+    ok 1 - rejects an undeclared property
+      ---
+      duration_ms: 0.732554
+      type: 'test'
+      ...
+    # Subtest: rejects a second technique
+    ok 2 - rejects a second technique
+      ---
+      duration_ms: 0.188508
+      type: 'test'
+      ...
+    # Subtest: rejects an unimplemented technique
+    ok 3 - rejects an unimplemented technique
+      ---
+      duration_ms: 0.167339
+      type: 'test'
+      ...
+    # Subtest: rejects a stale schema version
+    ok 4 - rejects a stale schema version
+      ---
+      duration_ms: 0.112213
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown cycle policy
+    ok 5 - rejects an unknown cycle policy
+      ---
+      duration_ms: 0.219106
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown orb policy
+    ok 6 - rejects an unknown orb policy
+      ---
+      duration_ms: 0.132733
+      type: 'test'
+      ...
+    # Subtest: rejects a non-semver contract version
+    ok 7 - rejects a non-semver contract version
+      ---
+      duration_ms: 0.172589
+      type: 'test'
+      ...
+    # Subtest: rejects a malformed fingerprint
+    ok 8 - rejects a malformed fingerprint
+      ---
+      duration_ms: 0.147792
+      type: 'test'
+      ...
+    # Subtest: rejects a too-short request id
+    ok 9 - rejects a too-short request id
+      ---
+      duration_ms: 0.221793
+      type: 'test'
+      ...
+    # Subtest: rejects an empty natal position list
+    ok 10 - rejects an empty natal position list
+      ---
+      duration_ms: 0.172528
+      type: 'test'
+      ...
+    # Subtest: rejects a longitude outside [0, 360)
+    ok 11 - rejects a longitude outside [0, 360)
+      ---
+      duration_ms: 0.206693
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown body
+    ok 12 - rejects an unknown body
+      ---
+      duration_ms: 0.13152
+      type: 'test'
+      ...
+    # Subtest: rejects a duplicated body
+    ok 13 - rejects a duplicated body
+      ---
+      duration_ms: 0.120539
+      type: 'test'
+      ...
+    # Subtest: rejects an inverted window
+    ok 14 - rejects an inverted window
+      ---
+      duration_ms: 0.098408
+      type: 'test'
+      ...
+    # Subtest: rejects a zero-length window
+    ok 15 - rejects a zero-length window
+      ---
+      duration_ms: 0.095101
+      type: 'test'
+      ...
+    # Subtest: rejects an undeclared window property
+    ok 16 - rejects an undeclared window property
+      ---
+      duration_ms: 0.114908
+      type: 'test'
+      ...
+    # Subtest: rejects a repeated suppressed feature
+    ok 17 - rejects a repeated suppressed feature
+      ---
+      duration_ms: 0.134907
+      type: 'test'
+      ...
+    # Subtest: rejects an undeclared suppressed feature
+    ok 18 - rejects an undeclared suppressed feature
+      ---
+      duration_ms: 0.105019
+      type: 'test'
+      ...
+    # Subtest: requires a designated offset on both window instants
+    ok 19 - requires a designated offset on both window instants
+      ---
+      duration_ms: 3982.608202
+      type: 'test'
+      ...
+    # Subtest: refuses a window wider than the policy scans
+    ok 20 - refuses a window wider than the policy scans
+      ---
+      duration_ms: 2259.927212
+      type: 'test'
+      ...
+    # Subtest: bounds a caller-supplied name and never splits a surrogate pair
+    ok 21 - bounds a caller-supplied name and never splits a surrogate pair
+      ---
+      duration_ms: 1.000174
+      type: 'test'
+      ...
+    # Subtest: emits a well-formed message for every rejection it can produce
+    ok 22 - emits a well-formed message for every rejection it can produce
+      ---
+      duration_ms: 1.146051
+      type: 'test'
+      ...
+    # Subtest: rejects a body that is not an object at all
+    ok 23 - rejects a body that is not an object at all
+      ---
+      duration_ms: 0.182097
+      type: 'test'
+      ...
+    # Subtest: echoes a readable request id even when the rest of the body is rejected
+    ok 24 - echoes a readable request id even when the rest of the body is rejected
+      ---
+      duration_ms: 0.14155
+      type: 'test'
+      ...
+    # Subtest: refuses a scan span that leaves the pinned ephemeris range
+    ok 25 - refuses a scan span that leaves the pinned ephemeris range
+      ---
+      duration_ms: 0.297095
+      type: 'test'
+      ...
+    1..25
+ok 9 - request validation
+  ---
+  duration_ms: 6249.459405
+  type: 'suite'
+  ...
+# Subtest: failure envelopes
+    # Subtest: never echoes an upstream message, which has carried filesystem paths
+    ok 1 - never echoes an upstream message, which has carried filesystem paths
+      ---
+      duration_ms: 1.248307
+      type: 'test'
+      ...
+    # Subtest: reports an unsupported body without naming the engine internals
+    ok 2 - reports an unsupported body without naming the engine internals
+      ---
+      duration_ms: 0.395162
+      type: 'test'
+      ...
+    1..2
+ok 10 - failure envelopes
+  ---
+  duration_ms: 1.761843
+  type: 'suite'
+  ...
+# Subtest: policy geometry
+    # Subtest: keeps every lift step under half a revolution for its body
+    ok 1 - keeps every lift step under half a revolution for its body
+      ---
+      duration_ms: 27.172227
+      type: 'test'
+      ...
+    # Subtest: bounds every body's real retrograde arc
+    ok 2 - bounds every body's real retrograde arc
+      ---
+      duration_ms: 0.244225
+      type: 'test'
+      ...
+    # Subtest: gives every body enough lookaround to prove a widest-orb encounter
+    ok 3 - gives every body enough lookaround to prove a widest-orb encounter
+      ---
+      duration_ms: 0.133454
+      type: 'test'
+      ...
+    # Subtest: spot-checks the measured arcs against a live decade
+    ok 4 - spot-checks the measured arcs against a live decade
+      ---
+      duration_ms: 1446.71479
+      type: 'test'
+      ...
+    # Subtest: keeps every transit orb inside the schema's ceiling
+    ok 5 - keeps every transit orb inside the schema's ceiling
+      ---
+      duration_ms: 0.30981
+      type: 'test'
+      ...
+    1..5
+ok 11 - policy geometry
+  ---
+  duration_ms: 1474.831594
+  type: 'suite'
+  ...
+# Subtest: daily-sky golden vectors
+    # Subtest: loads the pinned ephemeris data files
+    ok 1 - loads the pinned ephemeris data files
+      ---
+      duration_ms: 1.532147
+      type: 'test'
+      ...
+    # Subtest: reproduces every recorded fact byte for byte
+    ok 2 - reproduces every recorded fact byte for byte
+      ---
+      duration_ms: 329.996352
+      type: 'test'
+      ...
+    # Subtest: carries the container digest and the ephemeris vintage on every fact
+    ok 3 - carries the container digest and the ephemeris vintage on every fact
+      ---
+      duration_ms: 0.637433
+      type: 'test'
+      ...
+    # Subtest: gives every kind at least one real vector
+    ok 4 - gives every kind at least one real vector
+      ---
+      duration_ms: 0.238103
+      type: 'test'
+      ...
+    # Subtest: anchor positions match a direct ephemeris call at the anchor
+    ok 5 - anchor positions match a direct ephemeris call at the anchor
+      ---
+      duration_ms: 0.942655
+      type: 'test'
+      ...
+    # Subtest: every exact transit-to-natal contact is exact when recomputed
+    ok 6 - every exact transit-to-natal contact is exact when recomputed
+      ---
+      duration_ms: 0.544736
+      type: 'test'
+      ...
+    # Subtest: every sign ingress lands on its 30-degree boundary when recomputed
+    ok 7 - every sign ingress lands on its 30-degree boundary when recomputed
+      ---
+      duration_ms: 0.416201
+      type: 'test'
+      ...
+    # Subtest: every exact collective aspect is exact when recomputed
+    ok 8 - every exact collective aspect is exact when recomputed
+      ---
+      duration_ms: 0.513938
+      type: 'test'
+      ...
+    # Subtest: the lunar phase matches the recomputed Sun-to-Moon elongation
+    ok 9 - the lunar phase matches the recomputed Sun-to-Moon elongation
+      ---
+      duration_ms: 0.494672
+      type: 'test'
+      ...
+    # Subtest: house placements put each body between the cusps that bracket it
+    ok 10 - house placements put each body between the cusps that bracket it
+      ---
+      duration_ms: 0.611263
+      type: 'test'
+      ...
+    # Subtest: puts the Sun into Virgo on 2026-08-23 at 02:19 UTC
+    ok 11 - puts the Sun into Virgo on 2026-08-23 at 02:19 UTC
+      ---
+      duration_ms: 0.288159
+      type: 'test'
+      ...
+    # Subtest: orders a real day by kind rank, then instant, then id
+    ok 12 - orders a real day by kind rank, then instant, then id
+      ---
+      duration_ms: 0.258161
+      type: 'test'
+      ...
+    1..12
+ok 12 - daily-sky golden vectors
+  ---
+  duration_ms: 338.297304
+  type: 'suite'
+  ...
+# Subtest: a day with no event still has anchor positions and exactly one phase
+ok 13 - a day with no event still has anchor positions and exactly one phase
+  ---
+  duration_ms: 37.522449
+  type: 'test'
+  ...
+# Subtest: anchor positions carry sign, degree, speed, and retrograde state
+ok 14 - anchor positions carry sign, degree, speed, and retrograde state
+  ---
+  duration_ms: 23.061711
+  type: 'test'
+  ...
+# Subtest: an event exactly at day start is included and one exactly at day end is not
+ok 15 - an event exactly at day start is included and one exactly at day end is not
+  ---
+  duration_ms: 23.760903
+  type: 'test'
+  ...
+# Subtest: an exact transit-to-natal contact is solved, labelled, and marked personalized
+ok 16 - an exact transit-to-natal contact is solved, labelled, and marked personalized
+  ---
+  duration_ms: 15.419964
+  type: 'test'
+  ...
+# Subtest: a sign ingress reports the sign it entered and the direction it entered from
+ok 17 - a sign ingress reports the sign it entered and the direction it entered from
+  ---
+  duration_ms: 22.286685
+  type: 'test'
+  ...
+# Subtest: an exact collective aspect is reported as collective, and the Moon is excluded
+ok 18 - an exact collective aspect is reported as collective, and the Moon is excluded
+  ---
+  duration_ms: 7.754201
+  type: 'test'
+  ...
+# Subtest: every lunar bin is reachable and centred on its name
+ok 19 - every lunar bin is reachable and centred on its name
+  ---
+  duration_ms: 73.978899
+  type: 'test'
+  ...
+# Subtest: a house placement appears only when the request supplies cusps
+ok 20 - a house placement appears only when the request supplies cusps
+  ---
+  duration_ms: 10.255833
+  type: 'test'
+  ...
+# Subtest: the request object is closed, so private fields cannot ride along
+ok 21 - the request object is closed, so private fields cannot ride along
+  ---
+  duration_ms: 1.609384
+  type: 'test'
+  ...
+# Subtest: suppressed features are refused as INPUTS rather than filtered from output
+ok 22 - suppressed features are refused as INPUTS rather than filtered from output
+  ---
+  duration_ms: 0.928508
+  type: 'test'
+  ...
+# Subtest: an unknown-time request still produces a full factual day
+ok 23 - an unknown-time request still produces a full factual day
+  ---
+  duration_ms: 9.210153
+  type: 'test'
+  ...
+# Subtest: identical requests produce byte-identical output
+ok 24 - identical requests produce byte-identical output
+  ---
+  duration_ms: 13.565844
+  type: 'test'
+  ...
+# Subtest: facts are ordered by kind rank, then instant, then id, with unique ids
+ok 25 - facts are ordered by kind rank, then instant, then id, with unique ids
+  ---
+  duration_ms: 8.472258
+  type: 'test'
+  ...
+# Subtest: a moved instant moves the identity
+ok 26 - a moved instant moves the identity
+  ---
+  duration_ms: 10.586672
+  type: 'test'
+  ...
+# Subtest: a refusal is a discriminated body, not a status
+ok 27 - a refusal is a discriminated body, not a status
+  ---
+  duration_ms: 0.508058
+  type: 'test'
+  ...
+# Subtest: the success envelope echoes the day, the anchor, and every policy it was asked for
+ok 28 - the success envelope echoes the day, the anchor, and every policy it was asked for
+  ---
+  duration_ms: 7.763629
+  type: 'test'
+  ...
+# Subtest: a policy version this build does not implement is refused, not answered
+ok 29 - a policy version this build does not implement is refused, not answered
+  ---
+  duration_ms: 0.378701
+  type: 'test'
+  ...
+# Subtest: validation rejects a request whose two copies of one decision disagree
+ok 30 - validation rejects a request whose two copies of one decision disagree
+  ---
+  duration_ms: 0.340318
+  type: 'test'
+  ...
+# Subtest: Swiss Ephemeris engine
+    # Subtest: loads ephemeris data files
+    ok 1 - loads ephemeris data files
+      ---
+      duration_ms: 1.41849
+      type: 'test'
+      ...
+    # Subtest: produces stable fingerprint for fixed exact birth inputs
+    ok 2 - produces stable fingerprint for fixed exact birth inputs
+      ---
+      duration_ms: 57.366446
+      type: 'test'
+      ...
+    # Subtest: Sun is in Taurus for 1990-05-15 LA afternoon (~54° tropical)
+    ok 3 - Sun is in Taurus for 1990-05-15 LA afternoon (~54° tropical)
+      ---
+      duration_ms: 9.37642
+      type: 'test'
+      ...
+    # Subtest: uses true node and includes outer planets
+    ok 4 - uses true node and includes outer planets
+      ---
+      duration_ms: 12.077741
+      type: 'test'
+      ...
+    # Subtest: unknown birth time suppresses houses/angles and never stores noon as utc_instant
+    ok 5 - unknown birth time suppresses houses/angles and never stores noon as utc_instant
+      ---
+      duration_ms: 12.537638
+      type: 'test'
+      ...
+    # Subtest: rejects exact accuracy without birth_date
+    ok 6 - rejects exact accuracy without birth_date
+      ---
+      duration_ms: 0.508297
+      type: 'test'
+      ...
+    # Subtest: resolves America/Los_Angeles to correct UTC offset for golden birth
+    ok 7 - resolves America/Los_Angeles to correct UTC offset for golden birth
+      ---
+      duration_ms: 0.938125
+      type: 'test'
+      ...
+    # Subtest: reports Swiss Ephemeris version pin
+    ok 8 - reports Swiss Ephemeris version pin
+      ---
+      duration_ms: 0.490283
+      type: 'test'
+      ...
+    1..8
+ok 31 - Swiss Ephemeris engine
+  ---
+  duration_ms: 105.222886
+  type: 'suite'
+  ...
+# Subtest: location uncertainty
+    # Subtest: qualifies a medium-confidence birthplace
+    ok 1 - qualifies a medium-confidence birthplace
+      ---
+      duration_ms: 58.668814
+      type: 'test'
+      ...
+    # Subtest: qualifies civil-time conversion for boundary and transition codes
+    ok 2 - qualifies civil-time conversion for boundary and transition codes
+      ---
+      duration_ms: 17.583302
+      type: 'test'
+      ...
+    # Subtest: leaves the exact summary unchanged for high confidence without qualifiers
+    ok 3 - leaves the exact summary unchanged for high confidence without qualifiers
+      ---
+      duration_ms: 4.538741
+      type: 'test'
+      ...
+    # Subtest: rejects unknown confidence and qualifier codes
+    ok 4 - rejects unknown confidence and qualifier codes
+      ---
+      duration_ms: 0.623367
+      type: 'test'
+      ...
+    1..4
+ok 32 - location uncertainty
+  ---
+  duration_ms: 83.031232
+  type: 'suite'
+  ...
+# Subtest: accepts the configured bearer token
+ok 33 - accepts the configured bearer token
+  ---
+  duration_ms: 1.216877
+  type: 'test'
+  ...
+# Subtest: rejects missing or invalid credentials
+ok 34 - rejects missing or invalid credentials
+  ---
+  duration_ms: 0.242071
+  type: 'test'
+  ...
+# Subtest: every computing route checks credentials before it reads a body
+ok 35 - every computing route checks credentials before it reads a body
+  ---
+  duration_ms: 1.255611
+  type: 'test'
+  ...
+# Subtest: timezone agreement between the API preview and this engine
+    # Subtest: agrees with luxon on America/Los_Angeles: the golden fixture
+    ok 1 - agrees with luxon on America/Los_Angeles: the golden fixture
+      ---
+      duration_ms: 27.996696
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on America/New_York: a wall time the spring-forward skipped
+    ok 2 - agrees with luxon on America/New_York: a wall time the spring-forward skipped
+      ---
+      duration_ms: 1.153846
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on America/New_York: a wall time the fall-back ran through twice
+    ok 3 - agrees with luxon on America/New_York: a wall time the fall-back ran through twice
+      ---
+      duration_ms: 0.582569
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on America/New_York: the winter the United States stayed on daylight time
+    ok 4 - agrees with luxon on America/New_York: the winter the United States stayed on daylight time
+      ---
+      duration_ms: 0.538405
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on Europe/Lisbon: a zone that changed its standard offset, not just its DST rule
+    ok 5 - agrees with luxon on Europe/Lisbon: a zone that changed its standard offset, not just its DST rule
+      ---
+      duration_ms: 0.911825
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on Pacific/Apia: the day Samoa deleted when it crossed the date line
+    ok 6 - agrees with luxon on Pacific/Apia: the day Samoa deleted when it crossed the date line
+      ---
+      duration_ms: 1.004803
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on Asia/Kolkata: a half-hour offset
+    ok 7 - agrees with luxon on Asia/Kolkata: a half-hour offset
+      ---
+      duration_ms: 0.916675
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on Australia/Lord_Howe: the only zone whose DST shift is half an hour
+    ok 8 - agrees with luxon on Australia/Lord_Howe: the only zone whose DST shift is half an hour
+      ---
+      duration_ms: 1.20305
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on America/Los_Angeles: local mean time, which is not a whole number of minutes
+    ok 9 - agrees with luxon on America/Los_Angeles: local mean time, which is not a whole number of minutes
+      ---
+      duration_ms: 1.383624
+      type: 'test'
+      ...
+    # Subtest: agrees with luxon on Europe/Amsterdam: Amsterdam Time, UTC+00:19:32
+    ok 10 - agrees with luxon on Europe/Amsterdam: Amsterdam Time, UTC+00:19:32
+      ---
+      duration_ms: 1.725595
+      type: 'test'
+      ...
+    # Subtest: agrees with the instant a chart is actually calculated from
+    ok 11 - agrees with the instant a chart is actually calculated from
+      ---
+      duration_ms: 6.971231
+      type: 'test'
+      ...
+    1..11
+ok 36 - timezone agreement between the API preview and this engine
+  ---
+  duration_ms: 46.48971
+  type: 'suite'
+  ...
+# Subtest: uncertainty reporting
+    # Subtest: never claims angles are suppressed while also returning them
+    ok 1 - never claims angles are suppressed while also returning them
+      ---
+      duration_ms: 61.758726
+      type: 'test'
+      ...
+    # Subtest: suppresses angles when accuracy is exact but no birth time was supplied
+    ok 2 - suppresses angles when accuracy is exact but no birth time was supplied
+      ---
+      duration_ms: 3.527756
+      type: 'test'
+      ...
+    # Subtest: keeps birth.accuracy and uncertainty.accuracy consistent
+    ok 3 - keeps birth.accuracy and uncertainty.accuracy consistent
+      ---
+      duration_ms: 8.146097
+      type: 'test'
+      ...
+    # Subtest: honours the caller's approximate window instead of hardcoding 30 minutes
+    ok 4 - honours the caller's approximate window instead of hardcoding 30 minutes
+      ---
+      duration_ms: 4.790359
+      type: 'test'
+      ...
+    # Subtest: defaults the approximate window to 30 minutes when the caller omits it
+    ok 5 - defaults the approximate window to 30 minutes when the caller omits it
+      ---
+      duration_ms: 2.306801
+      type: 'test'
+      ...
+    # Subtest: suppresses angles when a birthplace is missing even with an exact time
+    ok 6 - suppresses angles when a birthplace is missing even with an exact time
+      ---
+      duration_ms: 2.334574
+      type: 'test'
+      ...
+    1..6
+ok 37 - uncertainty reporting
+  ---
+  duration_ms: 84.859822
+  type: 'suite'
+  ...
+# Subtest: calculation input validation
+    # Subtest: rejects calendar dates that do not exist
+    ok 1 - rejects calendar dates that do not exist
+      ---
+      duration_ms: 32.337329
+      type: 'test'
+      ...
+    # Subtest: accepts a real leap day
+    ok 2 - accepts a real leap day
+      ---
+      duration_ms: 21.321068
+      type: 'test'
+      ...
+    # Subtest: rejects malformed date strings instead of coercing them
+    ok 3 - rejects malformed date strings instead of coercing them
+      ---
+      duration_ms: 0.749837
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown IANA zone instead of silently computing in UTC
+    ok 4 - rejects an unknown IANA zone instead of silently computing in UTC
+      ---
+      duration_ms: 1.004042
+      type: 'test'
+      ...
+    # Subtest: rejects malformed or out-of-range local times
+    ok 5 - rejects malformed or out-of-range local times
+      ---
+      duration_ms: 1.558306
+      type: 'test'
+      ...
+    # Subtest: rejects coordinates outside the valid range or of the wrong type
+    ok 6 - rejects coordinates outside the valid range or of the wrong type
+      ---
+      duration_ms: 3.453054
+      type: 'test'
+      ...
+    # Subtest: rejects dates outside the pinned ephemeris range without leaking a filesystem path
+    ok 7 - rejects dates outside the pinned ephemeris range without leaking a filesystem path
+      ---
+      duration_ms: 0.710212
+      type: 'test'
+      ...
+    # Subtest: never returns a chart containing a null longitude
+    ok 8 - never returns a chart containing a null longitude
+      ---
+      duration_ms: 0.505983
+      type: 'test'
+      ...
+    # Subtest: does not poison Swiss Ephemeris for every subsequent request
+    ok 9 - does not poison Swiss Ephemeris for every subsequent request
+      ---
+      duration_ms: 12.356142
+      type: 'test'
+      ...
+    # Subtest: resolveUtcInstant throws rather than falling back to UTC on a bad zone
+    ok 10 - resolveUtcInstant throws rather than falling back to UTC on a bad zone
+      ---
+      duration_ms: 1.789417
+      type: 'test'
+      ...
+    # Subtest: rejects an in-range local date whose UT instant the files cannot answer
+    ok 11 - rejects an in-range local date whose UT instant the files cannot answer
+      ---
+      duration_ms: 2.251776
+      type: 'test'
+      ...
+    # Subtest: still accepts the first and last fully covered days
+    ok 12 - still accepts the first and last fully covered days
+      ---
+      duration_ms: 10.839684
+      type: 'test'
+      ...
+    1..12
+ok 38 - calculation input validation
+  ---
+  duration_ms: 91.557282
+  type: 'suite'
+  ...
+# Subtest: pinned ephemeris coverage
+    # Subtest: declares bounds that every launch body actually answers
+    ok 1 - declares bounds that every launch body actually answers
+      ---
+      duration_ms: 1.35465
+      type: 'test'
+      ...
+    # Subtest: keeps those bounds covered after an out-of-range call has been served
+    ok 2 - keeps those bounds covered after an out-of-range call has been served
+      ---
+      duration_ms: 1.597922
+      type: 'test'
+      ...
+    # Subtest: refuses a Moshier substitution instead of returning it as Swiss Ephemeris
+    ok 3 - refuses a Moshier substitution instead of returning it as Swiss Ephemeris
+      ---
+      duration_ms: 0.688861
+      type: 'test'
+      ...
+    1..3
+ok 39 - pinned ephemeris coverage
+  ---
+  duration_ms: 3.905345
+  type: 'suite'
+  ...
+1..39
+# tests 144
+# suites 18
+# pass 144
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 28399.37895
+
+> @patternlike/codex-runner@0.2.0 test
+> tsx --test "src/**/*.test.ts"
+
+TAP version 13
+# Subtest: built runner is an installable Node ESM artifact outside the workspace
+ok 1 - built runner is an installable Node ESM artifact outside the workspace
+  ---
+  duration_ms: 2666.654372
+  type: 'test'
+  ...
+# Subtest: claims with dedicated bearer auth and strictly parses the response
+ok 2 - claims with dedicated bearer auth and strictly parses the response
+  ---
+  duration_ms: 45.047033
+  type: 'test'
+  ...
+# Subtest: treats an exact empty 204 as no work
+ok 3 - treats an exact empty 204 as no work
+  ---
+  duration_ms: 0.618126
+  type: 'test'
+  ...
+# Subtest: rejects claim documents with unknown fields
+ok 4 - rejects claim documents with unknown fields
+  ---
+  duration_ms: 1.825846
+  type: 'test'
+  ...
+# Subtest: accepts only the exact terminal acknowledgement
+ok 5 - accepts only the exact terminal acknowledgement
+  ---
+  duration_ms: 6.335691
+  type: 'test'
+  ...
+# Subtest: passes only the explicit Codex child environment allowlist
+ok 6 - passes only the explicit Codex child environment allowlist
+  ---
+  duration_ms: 3.113497
+  type: 'test'
+  ...
+# Subtest: ordinary text uses an isolated fresh high turn with exact prompt/schema and observed usage
+ok 7 - ordinary text uses an isolated fresh high turn with exact prompt/schema and observed usage
+  ---
+  duration_ms: 242.459524
+  type: 'test'
+  ...
+# Subtest: ordinary text uses an isolated fresh xhigh turn with exact prompt/schema and observed usage
+ok 8 - ordinary text uses an isolated fresh xhigh turn with exact prompt/schema and observed usage
+  ---
+  duration_ms: 198.704762
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses auth and never returns provider content
+ok 9 - ordinary text refuses auth and never returns provider content
+  ---
+  duration_ms: 118.796245
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses version and never returns provider content
+ok 10 - ordinary text refuses version and never returns provider content
+  ---
+  duration_ms: 59.619485
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses notify and never returns provider content
+ok 11 - ordinary text refuses notify and never returns provider content
+  ---
+  duration_ms: 214.250074
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses tooloverride and never returns provider content
+ok 12 - ordinary text refuses tooloverride and never returns provider content
+  ---
+  duration_ms: 258.571968
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses mcpavailable and never returns provider content
+ok 13 - ordinary text refuses mcpavailable and never returns provider content
+  ---
+  duration_ms: 189.730217
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses managedinstructions and never returns provider content
+ok 14 - ordinary text refuses managedinstructions and never returns provider content
+  ---
+  duration_ms: 198.174592
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses tier and never returns provider content
+ok 15 - ordinary text refuses tier and never returns provider content
+  ---
+  duration_ms: 173.937354
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses effort and never returns provider content
+ok 16 - ordinary text refuses effort and never returns provider content
+  ---
+  duration_ms: 156.995662
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses tool and never returns provider content
+ok 17 - ordinary text refuses tool and never returns provider content
+  ---
+  duration_ms: 184.755066
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses imagegen and never returns provider content
+ok 18 - ordinary text refuses imagegen and never returns provider content
+  ---
+  duration_ms: 158.760021
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses approval and never returns provider content
+ok 19 - ordinary text refuses approval and never returns provider content
+  ---
+  duration_ms: 176.541431
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses missing-usage and never returns provider content
+ok 20 - ordinary text refuses missing-usage and never returns provider content
+  ---
+  duration_ms: 161.49082
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses usage-invalid and never returns provider content
+ok 21 - ordinary text refuses usage-invalid and never returns provider content
+  ---
+  duration_ms: 180.362685
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses usage-turn and never returns provider content
+ok 22 - ordinary text refuses usage-turn and never returns provider content
+  ---
+  duration_ms: 163.310194
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses rerouted and never returns provider content
+ok 23 - ordinary text refuses rerouted and never returns provider content
+  ---
+  duration_ms: 174.293221
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses malformed and never returns provider content
+ok 24 - ordinary text refuses malformed and never returns provider content
+  ---
+  duration_ms: 168.491637
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses missing and never returns provider content
+ok 25 - ordinary text refuses missing and never returns provider content
+  ---
+  duration_ms: 185.784877
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses duplicate and never returns provider content
+ok 26 - ordinary text refuses duplicate and never returns provider content
+  ---
+  duration_ms: 195.6043
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses failed and never returns provider content
+ok 27 - ordinary text refuses failed and never returns provider content
+  ---
+  duration_ms: 198.011382
+  type: 'test'
+  ...
+# Subtest: text response ceiling is 1 MiB and includes multibyte output bytes
+ok 28 - text response ceiling is 1 MiB and includes multibyte output bytes
+  ---
+  duration_ms: 284.252784
+  type: 'test'
+  ...
+# Subtest: ordinary text refuses inherited host instructions before a provider turn
+ok 29 - ordinary text refuses inherited host instructions before a provider turn
+  ---
+  duration_ms: 3.316454
+  type: 'test'
+  ...
+# Subtest: authentication requires ChatGPT status, not just a zero exit code
+ok 30 - authentication requires ChatGPT status, not just a zero exit code
+  ---
+  duration_ms: 121.240689
+  type: 'test'
+  ...
+# Subtest: timeout is bounded and removes private attempt files
+ok 31 - timeout is bounded and removes private attempt files
+  ---
+  duration_ms: 512.857084
+  type: 'test'
+  ...
+# Subtest: isolated JSON turns preserve multimodal input/schema and enforce ChatGPT-only tool-free configuration
+ok 32 - isolated JSON turns preserve multimodal input/schema and enforce ChatGPT-only tool-free configuration
+  ---
+  duration_ms: 348.482515
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects tooloverride without exposing provider content
+ok 33 - isolated JSON rejects tooloverride without exposing provider content
+  ---
+  duration_ms: 186.786685
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects missinglayers without exposing provider content
+ok 34 - isolated JSON rejects missinglayers without exposing provider content
+  ---
+  duration_ms: 228.497407
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects toolorigin without exposing provider content
+ok 35 - isolated JSON rejects toolorigin without exposing provider content
+  ---
+  duration_ms: 211.717261
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects version without exposing provider content
+ok 36 - isolated JSON rejects version without exposing provider content
+  ---
+  duration_ms: 67.601318
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects auth without exposing provider content
+ok 37 - isolated JSON rejects auth without exposing provider content
+  ---
+  duration_ms: 149.399983
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects wronghome without exposing provider content
+ok 38 - isolated JSON rejects wronghome without exposing provider content
+  ---
+  duration_ms: 245.33048
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects notify without exposing provider content
+ok 39 - isolated JSON rejects notify without exposing provider content
+  ---
+  duration_ms: 179.211373
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects managedinstructions without exposing provider content
+ok 40 - isolated JSON rejects managedinstructions without exposing provider content
+  ---
+  duration_ms: 169.08671
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects imageenabled without exposing provider content
+ok 41 - isolated JSON rejects imageenabled without exposing provider content
+  ---
+  duration_ms: 155.322008
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects mcpavailable without exposing provider content
+ok 42 - isolated JSON rejects mcpavailable without exposing provider content
+  ---
+  duration_ms: 168.871822
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects sandbox without exposing provider content
+ok 43 - isolated JSON rejects sandbox without exposing provider content
+  ---
+  duration_ms: 190.249045
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects approvalpolicy without exposing provider content
+ok 44 - isolated JSON rejects approvalpolicy without exposing provider content
+  ---
+  duration_ms: 181.238001
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects approval without exposing provider content
+ok 45 - isolated JSON rejects approval without exposing provider content
+  ---
+  duration_ms: 173.109908
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects tool without exposing provider content
+ok 46 - isolated JSON rejects tool without exposing provider content
+  ---
+  duration_ms: 172.065961
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects imagegen without exposing provider content
+ok 47 - isolated JSON rejects imagegen without exposing provider content
+  ---
+  duration_ms: 167.084478
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects malformed without exposing provider content
+ok 48 - isolated JSON rejects malformed without exposing provider content
+  ---
+  duration_ms: 166.474697
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects oversized without exposing provider content
+ok 49 - isolated JSON rejects oversized without exposing provider content
+  ---
+  duration_ms: 168.1306
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects missing without exposing provider content
+ok 50 - isolated JSON rejects missing without exposing provider content
+  ---
+  duration_ms: 189.909398
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects duplicate without exposing provider content
+ok 51 - isolated JSON rejects duplicate without exposing provider content
+  ---
+  duration_ms: 183.804837
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects wrongturn without exposing provider content
+ok 52 - isolated JSON rejects wrongturn without exposing provider content
+  ---
+  duration_ms: 196.540641
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects failed without exposing provider content
+ok 53 - isolated JSON rejects failed without exposing provider content
+  ---
+  duration_ms: 186.468849
+  type: 'test'
+  ...
+# Subtest: isolated JSON rejects timeout without exposing provider content
+ok 54 - isolated JSON rejects timeout without exposing provider content
+  ---
+  duration_ms: 262.467674
+  type: 'test'
+  ...
+# Subtest: global instructions and already aborted JSON turns do not launch a child
+ok 55 - global instructions and already aborted JSON turns do not launch a child
+  ---
+  duration_ms: 4.665922
+  type: 'test'
+  ...
+# Subtest: completion transport preserves a qualified image request without claiming observed model identity
+ok 56 - completion transport preserves a qualified image request without claiming observed model identity
+  ---
+  duration_ms: 58.634489
+  type: 'test'
+  ...
+# Subtest: portrait transport uses dedicated auth, exact paths and claim/terminal schemas
+ok 57 - portrait transport uses dedicated auth, exact paths and claim/terminal schemas
+  ---
+  duration_ms: 5.171014
+  type: 'test'
+  ...
+# Subtest: portrait transport accepts204 and rejects extraneous claims/acknowledgements
+ok 58 - portrait transport accepts204 and rejects extraneous claims/acknowledgements
+  ---
+  duration_ms: 2.322021
+  type: 'test'
+  ...
+# Subtest: portrait response body stays bounded and request timeout includes body consumption
+ok 59 - portrait response body stays bounded and request timeout includes body consumption
+  ---
+  duration_ms: 29.426398
+  type: 'test'
+  ...
+# Subtest: native-sized base64 is bounded, canonical and decoded without regex recursion
+ok 60 - native-sized base64 is bounded, canonical and decoded without regex recursion
+  ---
+  duration_ms: 89.320624
+  type: 'test'
+  ...
+# Subtest: requires one completed native image and successful turn, preserves image provenance and cleans only its files
+ok 61 - requires one completed native image and successful turn, preserves image provenance and cleans only its files
+  ---
+  duration_ms: 307.998747
+  type: 'test'
+  ...
+# Subtest: rejects failed native generation without exposing provider content
+ok 62 - rejects failed native generation without exposing provider content
+  ---
+  duration_ms: 213.063826
+  type: 'test'
+  ...
+# Subtest: rejects missing native generation without exposing provider content
+ok 63 - rejects missing native generation without exposing provider content
+  ---
+  duration_ms: 215.349348
+  type: 'test'
+  ...
+# Subtest: rejects multiple native generation without exposing provider content
+ok 64 - rejects multiple native generation without exposing provider content
+  ---
+  duration_ms: 225.313896
+  type: 'test'
+  ...
+# Subtest: rejects bytes native generation without exposing provider content
+ok 65 - rejects bytes native generation without exposing provider content
+  ---
+  duration_ms: 224.934894
+  type: 'test'
+  ...
+# Subtest: rejects escape native generation without exposing provider content
+ok 66 - rejects escape native generation without exposing provider content
+  ---
+  duration_ms: 225.30576
+  type: 'test'
+  ...
+# Subtest: rejects wrongturn native generation without exposing provider content
+ok 67 - rejects wrongturn native generation without exposing provider content
+  ---
+  duration_ms: 176.778783
+  type: 'test'
+  ...
+# Subtest: rejects turnfailed native generation without exposing provider content
+ok 68 - rejects turnfailed native generation without exposing provider content
+  ---
+  duration_ms: 173.870395
+  type: 'test'
+  ...
+# Subtest: rejects auth native generation without exposing provider content
+ok 69 - rejects auth native generation without exposing provider content
+  ---
+  duration_ms: 113.866611
+  type: 'test'
+  ...
+# Subtest: rejects version native generation without exposing provider content
+ok 70 - rejects version native generation without exposing provider content
+  ---
+  duration_ms: 63.79366
+  type: 'test'
+  ...
+# Subtest: rejects timeout native generation without exposing provider content
+ok 71 - rejects timeout native generation without exposing provider content
+  ---
+  duration_ms: 418.025278
+  type: 'test'
+  ...
+# Subtest: rejects notify native generation without exposing provider content
+ok 72 - rejects notify native generation without exposing provider content
+  ---
+  duration_ms: 191.371382
+  type: 'test'
+  ...
+# Subtest: rejects managedinstructions native generation without exposing provider content
+ok 73 - rejects managedinstructions native generation without exposing provider content
+  ---
+  duration_ms: 182.50821
+  type: 'test'
+  ...
+# Subtest: rejects mcpavailable native generation without exposing provider content
+ok 74 - rejects mcpavailable native generation without exposing provider content
+  ---
+  duration_ms: 173.074972
+  type: 'test'
+  ...
+# Subtest: rejects unexpectedtool native generation without exposing provider content
+ok 75 - rejects unexpectedtool native generation without exposing provider content
+  ---
+  duration_ms: 185.235201
+  type: 'test'
+  ...
+# Subtest: nonempty global instructions fail before launching Codex without reading or modifying them
+ok 76 - nonempty global instructions fail before launching Codex without reading or modifying them
+  ---
+  duration_ms: 9.998904
+  type: 'test'
+  ...
+# Subtest: an already aborted invocation never starts Codex
+ok 77 - an already aborted invocation never starts Codex
+  ---
+  duration_ms: 10.18515
+  type: 'test'
+  ...
+# Subtest: an unsafe cleanup destination stops the runner and preserves unrelated files
+ok 78 - an unsafe cleanup destination stops the runner and preserves unrelated files
+  ---
+  duration_ms: 209.994153
+  type: 'test'
+  ...
+# Subtest: PNG samples derive exactly from the sanitized image and malformed input is rejected
+ok 79 - PNG samples derive exactly from the sanitized image and malformed input is rejected
+  ---
+  duration_ms: 22.004969
+  type: 'test'
+  ...
+# Subtest: claim parser rejects unexpected fields, wrong pins, identifiers, and bounds
+ok 80 - claim parser rejects unexpected fields, wrong pins, identifiers, and bounds
+  ---
+  duration_ms: 0.474362
+  type: 'test'
+  ...
+# {"event":"portrait_mesh_canary_completed","ok":true,"elapsed_ms":541}
+# Subtest: fictional canary uses the real pipeline with a fake provider and retains reproducible artifacts without secrets
+ok 81 - fictional canary uses the real pipeline with a fake provider and retains reproducible artifacts without secrets
+  ---
+  duration_ms: 581.487571
+  type: 'test'
+  ...
+# Subtest: mesh client uses authenticated nonredirecting machine routes with exact versioned claims and acknowledgments
+ok 82 - mesh client uses authenticated nonredirecting machine routes with exact versioned claims and acknowledgments
+  ---
+  duration_ms: 36.40915
+  type: 'test'
+  ...
+# Subtest: mesh client rejects malformed or downgraded claims
+ok 83 - mesh client rejects malformed or downgraded claims
+  ---
+  duration_ms: 1.609465
+  type: 'test'
+  ...
+# Subtest: mesh client rejects malformed or downgraded claims
+ok 84 - mesh client rejects malformed or downgraded claims
+  ---
+  duration_ms: 1.773546
+  type: 'test'
+  ...
+# Subtest: mesh client rejects malformed or downgraded claims
+ok 85 - mesh client rejects malformed or downgraded claims
+  ---
+  duration_ms: 0.755278
+  type: 'test'
+  ...
+# Subtest: mesh client rejects malformed or downgraded claims
+ok 86 - mesh client rejects malformed or downgraded claims
+  ---
+  duration_ms: 0.748024
+  type: 'test'
+  ...
+# Subtest: mesh client rejects malformed or downgraded claims
+ok 87 - mesh client rejects malformed or downgraded claims
+  ---
+  duration_ms: 0.557921
+  type: 'test'
+  ...
+# Subtest: mesh client rejects malformed or downgraded claims
+ok 88 - mesh client rejects malformed or downgraded claims
+  ---
+  duration_ms: 1.062322
+  type: 'test'
+  ...
+# Subtest: mesh client accepts only empty 204 and exact current terminal acknowledgments
+ok 89 - mesh client accepts only empty 204 and exact current terminal acknowledgments
+  ---
+  duration_ms: 2.273459
+  type: 'test'
+  ...
+# Subtest: mesh client rejects oversized responses and invalid content types without leaking body content
+ok 90 - mesh client rejects oversized responses and invalid content types without leaking body content
+  ---
+  duration_ms: 5.67304
+  type: 'test'
+  ...
+# Subtest: mesh client rejects invalid failures and executable programs before transport
+ok 91 - mesh client rejects invalid failures and executable programs before transport
+  ---
+  duration_ms: 0.859346
+  type: 'test'
+  ...
+# Subtest: compiles deterministic source-bound GLB bytes that the real loader decodes
+ok 92 - compiles deterministic source-bound GLB bytes that the real loader decodes
+  ---
+  duration_ms: 55.091875
+  type: 'test'
+  ...
+# Subtest: rejects unsafe declarations, excessive triangles, and wrong trusted identities
+ok 93 - rejects unsafe declarations, excessive triangles, and wrong trusted identities
+  ---
+  duration_ms: 27.815751
+  type: 'test'
+  ...
+# Subtest: rejects collapsed rounded-box faces and reversing/repeated open paths
+ok 94 - rejects collapsed rounded-box faces and reversing/repeated open paths
+  ---
+  duration_ms: 1.095875
+  type: 'test'
+  ...
+# Subtest: rejects numerical geometry collapse without rejecting a proper cone
+ok 95 - rejects numerical geometry collapse without rejecting a proper cone
+  ---
+  duration_ms: 22.990255
+  type: 'test'
+  ...
+# Subtest: each supported family has finite indexed normals, meaningful depth, and actual enclosed volume
+ok 96 - each supported family has finite indexed normals, meaningful depth, and actual enclosed volume
+  ---
+  duration_ms: 113.888752
+  type: 'test'
+  ...
+# Subtest: repetition expands actual geometry while canonical property ordering preserves program identity
+ok 97 - repetition expands actual geometry while canonical property ordering preserves program identity
+  ---
+  duration_ms: 3.350047
+  type: 'test'
+  ...
+# Subtest: path end caps share the actual tube perimeter without open boundary edges
+ok 98 - path end caps share the actual tube perimeter without open boundary edges
+  ---
+  duration_ms: 13.888889
+  type: 'test'
+  ...
+# Subtest: rejects the GLB payload budget independently of the triangle count
+ok 99 - rejects the GLB payload budget independently of the triangle count
+  ---
+  duration_ms: 69.964236
+  type: 'test'
+  ...
+# Subtest: generated multi-material GLBs pass the actual Worker publication validator
+ok 100 - generated multi-material GLBs pass the actual Worker publication validator
+  ---
+  duration_ms: 19.886377
+  type: 'test'
+  ...
+# Subtest: provider turns receive chapter content and content hashes, never Pattern, job, or portrait identifiers
+ok 101 - provider turns receive chapter content and content hashes, never Pattern, job, or portrait identifiers
+  ---
+  duration_ms: 598.786031
+  type: 'test'
+  ...
+# Subtest: mesh generation binds complete text/image, compiles unchanged program, and independently checks four views before completion
+ok 102 - mesh generation binds complete text/image, compiles unchanged program, and independently checks four views before completion
+  ---
+  duration_ms: 434.210399
+  type: 'test'
+  ...
+# Subtest: wrong claim source or compiler fails before provider launch: source_text_sha256
+ok 103 - wrong claim source or compiler fails before provider launch: source_text_sha256
+  ---
+  duration_ms: 4.712611
+  type: 'test'
+  ...
+# Subtest: wrong claim source or compiler fails before provider launch: source_image_sha256
+ok 104 - wrong claim source or compiler fails before provider launch: source_image_sha256
+  ---
+  duration_ms: 3.875467
+  type: 'test'
+  ...
+# Subtest: wrong claim source or compiler fails before provider launch: compiler_version
+ok 105 - wrong claim source or compiler fails before provider launch: compiler_version
+  ---
+  duration_ms: 4.799868
+  type: 'test'
+  ...
+# Subtest: wrong claim source or compiler fails before provider launch: chapter_id
+ok 106 - wrong claim source or compiler fails before provider launch: chapter_id
+  ---
+  duration_ms: 5.402905
+  type: 'test'
+  ...
+# Subtest: wrong claim source or compiler fails before provider launch: image_base64
+ok 107 - wrong claim source or compiler fails before provider launch: image_base64
+  ---
+  duration_ms: 3.966832
+  type: 'test'
+  ...
+# Subtest: invalid programs never reach the visual checker or return a completion
+ok 108 - invalid programs never reach the visual checker or return a completion
+  ---
+  duration_ms: 176.636392
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: accepted
+ok 109 - visual rejection has no completion or hidden retry: accepted
+  ---
+  duration_ms: 435.180445
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: recognizable
+ok 110 - visual rejection has no completion or hidden retry: recognizable
+  ---
+  duration_ms: 408.535083
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: substantial
+ok 111 - visual rejection has no completion or hidden retry: substantial
+  ---
+  duration_ms: 416.248596
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: source_correspondence
+ok 112 - visual rejection has no completion or hidden retry: source_correspondence
+  ---
+  duration_ms: 479.186958
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: no_severe_intersections
+ok 113 - visual rejection has no completion or hidden retry: no_severe_intersections
+  ---
+  duration_ms: 481.534908
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: view_count
+ok 114 - visual rejection has no completion or hidden retry: view_count
+  ---
+  duration_ms: 450.593216
+  type: 'test'
+  ...
+# Subtest: visual rejection has no completion or hidden retry: extra
+ok 115 - visual rejection has no completion or hidden retry: extra
+  ---
+  duration_ms: 400.224121
+  type: 'test'
+  ...
+# Subtest: renders deterministic material and silhouette PNGs from four actual geometry views
+ok 116 - renders deterministic material and silhouette PNGs from four actual geometry views
+  ---
+  duration_ms: 170.527612
+  type: 'test'
+  ...
+# Subtest: does not preview malformed or computationally excessive programs
+ok 117 - does not preview malformed or computationally excessive programs
+  ---
+  duration_ms: 72.200132
+  type: 'test'
+  ...
+# Subtest: accepts the exact claim envelope the Worker sends
+ok 118 - accepts the exact claim envelope the Worker sends
+  ---
+  duration_ms: 2.590391
+  type: 'test'
+  ...
+# Subtest: accepts xhigh while preserving the reasoning on legacy high claims
+ok 119 - accepts xhigh while preserving the reasoning on legacy high claims
+  ---
+  duration_ms: 0.346941
+  type: 'test'
+  ...
+# Subtest: the claim wire shape carries no pipeline, pass, or reader identity
+ok 120 - the claim wire shape carries no pipeline, pass, or reader identity
+  ---
+  duration_ms: 0.938125
+  type: 'test'
+  ...
+# Subtest: refuses a claim whose pins or bounds are wrong
+ok 121 - refuses a claim whose pins or bounds are wrong
+  ---
+  duration_ms: 0.879423
+  type: 'test'
+  ...
+# Subtest: refuses a claim whose prompt and schema exceed the request ceiling
+ok 122 - refuses a claim whose prompt and schema exceed the request ceiling
+  ---
+  duration_ms: 0.619389
+  type: 'test'
+  ...
+# Subtest: accepts only closed terminal documents
+ok 123 - accepts only closed terminal documents
+  ---
+  duration_ms: 1.754711
+  type: 'test'
+  ...
+# Subtest: the packaged preflight schema is strict, content-free, and parses
+ok 124 - the packaged preflight schema is strict, content-free, and parses
+  ---
+  duration_ms: 0.692399
+  type: 'test'
+  ...
+# Subtest: the packaged preflight schema is usable as a claim's output schema
+ok 125 - the packaged preflight schema is usable as a claim's output schema
+  ---
+  duration_ms: 0.336259
+  type: 'test'
+  ...
+# Subtest: one claimed invocation produces exactly one completion
+ok 126 - one claimed invocation produces exactly one completion
+  ---
+  duration_ms: 2.491283
+  type: 'test'
+  ...
+# Subtest: one failed invocation produces exactly one safe failure
+ok 127 - one failed invocation produces exactly one safe failure
+  ---
+  duration_ms: 0.40949
+  type: 'test'
+  ...
+# Subtest: a fatal local failure is submitted once before the runner exits
+ok 128 - a fatal local failure is submitted once before the runner exits
+  ---
+  duration_ms: 0.781036
+  type: 'test'
+  ...
+# Subtest: 204 polling waits with bounded jitter and logs no provider content
+ok 129 - 204 polling waits with bounded jitter and logs no provider content
+  ---
+  duration_ms: 0.480565
+  type: 'test'
+  ...
+# Subtest: runner configuration rejects concurrency above one
+ok 130 - runner configuration rejects concurrency above one
+  ---
+  duration_ms: 0.547813
+  type: 'test'
+  ...
+# Subtest: portrait polling is opt-in and waits for the text queue to become idle
+ok 131 - portrait polling is opt-in and waits for the text queue to become idle
+  ---
+  duration_ms: 0.74092
+  type: 'test'
+  ...
+# Subtest: portrait failure is submitted once and fatal authentication stops polling
+ok 132 - portrait failure is submitted once and fatal authentication stops polling
+  ---
+  duration_ms: 0.546821
+  type: 'test'
+  ...
+# Subtest: a definitive portrait completion rejection reports image_invalid with the same lease
+ok 133 - a definitive portrait completion rejection reports image_invalid with the same lease
+  ---
+  duration_ms: 46.759242
+  type: 'test'
+  ...
+# Subtest: accepted or uncertain portrait completions are never overwritten with image failure
+ok 134 - accepted or uncertain portrait completions are never overwritten with image failure
+  ---
+  duration_ms: 1.028798
+  type: 'test'
+  ...
+# Subtest: mesh polling is separately opt-in and preserves text then image queue priority
+ok 135 - mesh polling is separately opt-in and preserves text then image queue priority
+  ---
+  duration_ms: 1.648889
+  type: 'test'
+  ...
+# Subtest: mesh visual failure reports once; fatal authentication reports before exit
+ok 136 - mesh visual failure reports once; fatal authentication reports before exit
+  ---
+  duration_ms: 0.628987
+  type: 'test'
+  ...
+# Subtest: mesh definitive rejection fails same lease and uncertain completion never overwrites acceptance
+ok 137 - mesh definitive rejection fails same lease and uncertain completion never overwrites acceptance
+  ---
+  duration_ms: 0.913309
+  type: 'test'
+  ...
+1..137
+# tests 137
+# suites 0
+# pass 137
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5615.862065
+
+> @patternlike/ontology-signer@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/ontology-signer
+
+
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+   Start at  15:23:05
+   Duration  1.44s (transform 202ms, setup 0ms, import 776ms, tests 77ms, environment 0ms)
+
+
+> @patternlike/api@0.2.0 pretest
+> npm run check:pattern-source
+
+
+> @patternlike/api@0.2.0 check:pattern-source
+> tsx scripts/generate-pattern-source-fingerprint.ts --check
+
+PASS pattern_source_fingerprint_current
+
+> @patternlike/api@0.2.0 test
+> vitest run && vitest run --config vitest.m3-compat.config.ts && npm run test:pattern-source && npm run test:pattern-model-verify && npm run test:ontology-corpus-prepare && npm run test:ontology-release-verify && npm run test:wrangler-config
+
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/api
+
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+uncaught exception; source = Uncaught (in promise); stack = EnvironmentTeardownError: [vitest-worker]: Closing rpc while "resolve" was pending
+    at home/henry/patternlike-app/node_modules/vitest/dist/chunks/init.k9zZ9sLh.js:133:12
+    at home/henry/patternlike-app/node_modules/vitest/dist/chunks/index.Chj8NDwU.js:139:11
+    at Array.map (<anonymous>)
+    at Proxy.$rejectPendingCalls (home/henry/patternlike-app/node_modules/vitest/dist/chunks/index.Chj8NDwU.js:137:62)
+    at home/henry/patternlike-app/node_modules/vitest/dist/chunks/init.k9zZ9sLh.js:132:26
+    at home/henry/patternlike-app/node_modules/vitest/dist/chunks/init.k9zZ9sLh.js:161:42
+    at Array.map (<anonymous>)
+    at execute (home/henry/patternlike-app/node_modules/vitest/dist/chunks/init.k9zZ9sLh.js:161:30)
+    at onMessage (home/henry/patternlike-app/node_modules/vitest/dist/chunks/init.k9zZ9sLh.js:287:14)
+uncaught exception; exception = workerd/jsg/_virtual_includes/iterator/workerd/jsg/value.h:1477: failed: jsg.Error: EnvironmentTeardownError: [vitest-worker]: Closing rpc while "resolve" was pending
+stack: /home/henry/patternlike-app/node_modules/@cloudflare/workerd-linux-64/bin/workerd@307be80
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars
+Using secrets defined in .dev.vars

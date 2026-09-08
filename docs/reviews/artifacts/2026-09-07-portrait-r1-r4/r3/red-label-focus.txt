@@ -1,0 +1,381 @@
+
+> @patternlike/web@0.2.0 test
+> vitest run src/components/portrait-explorer/PortraitScene.runtime.test.tsx -t oversized focused --reporter=verbose
+
+
+ RUN  v4.1.11 /home/henry/patternlike-app/apps/web
+
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > repositions enlarged annotations without moving the camera and releases their size observation
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > frames only the compared displays in reading order and restores the exact original scene and camera
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > restores actual camera coordinates without replaying the last command, and saves before unmount
+ × src/components/portrait-explorer/PortraitScene.runtime.test.tsx > hands an oversized focused comparison label to its matching native source link 1254ms
+   → expect(element).toHaveFocus()
+
+Expected element with focus:
+  <button
+  data-chapter-id="chapter-2"
+>
+  Read second chapter
+</button>
+Received element with focus:
+  <button
+  aria-label="Overview: show source passage 1 for Saved chapter 2"
+  class="explorer-annotation"
+  data-active-passage="0"
+  data-chapter-id="chapter-2"
+  data-compact="false"
+  data-form-index="1"
+  data-highlighted="true"
+  data-selected="true"
+  style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: visible; transform: translate(532px, 4px);"
+  type="button"
+>
+  <span
+    class="explorer-label-title"
+  >
+    Saved chapter 2
+  </span>
+  <span>
+    <span
+      aria-hidden="true"
+    >
+      ●
+    </span>······
+    Overview
+    <span
+      class="explorer-passage-number"
+    >
+       ··
+      1
+    </span>
+  </span>
+</button>
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <div
+        class="explorer-visual"
+      >
+        <div
+          class="explorer-scene-renderer"
+          style="position: relative; width: 100%; height: 100%;"
+        >
+          <div
+            class="explorer-canvas-host"
+            style="position: absolute; inset: 0px;"
+          >
+            <canvas
+              aria-label="Two saved chapter objects: Saved chapter 1 and Saved chapter 2. Use their named source-passage links and scene controls to explore."
+              role="img"
+              style="display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y;"
+            />
+          </div>
+          <div
+            class="explorer-labels"
+            style="position: absolute; inset: 0px; pointer-events: none; visibility: visible;"
+          >
+            <svg
+              aria-hidden="true"
+              class="sky-marker-connector"
+            >
+              <line
+                data-sky-connector="true"
+                style="visibility: hidden;"
+              />
+            </svg>
+            <button
+              aria-label="Overview: show source passage 1 for Saved chapter 1"
+              class="explorer-annotation"
+              data-active-passage="0"
+              data-chapter-id="chapter-1"
+              data-compact="false"
+              data-form-index="0"
+              data-highlighted="false"
+              data-selected="true"
+              style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: hidden; transform: translate(180px, 4px);"
+              type="button"
+            >
+              <span
+                class="explorer-label-title"
+              >
+                Saved chapter 1
+              </span>
+              <span>
+                <span
+                  aria-hidden="true"
+                >
+                  ●
+                </span>
+
+                Overview
+                <span
+                  class="explorer-passage-number"
+                >
+                   ·
+                  1
+                </span>
+              </span>
+            </button>
+            <button
+              aria-label="Overview: show source passage 1 for Saved chapter 2"
+              class="explorer-annotation"
+              data-active-passage="0"
+              data-chapter-id="chapter-2"
+              data-compact="false"
+              data-form-index="1"
+              data-highlighted="true"
+              data-selected="true"
+              style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: visible; transform: translate(532px, 4px);"
+              type="button"
+            >
+              <span
+                class="explorer-label-title"
+              >
+                Saved chapter 2
+              </span>
+              <span>
+                <span
+                  aria-hidden="true"
+                >
+                  ●
+                </span>
+
+                Overview
+                <span
+                  class="explorer-passage-number"
+                >
+                   ·
+                  1
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <nav
+          class="explorer-compared-chapters"
+        >
+          <button
+            data-chapter-id="chapter-1"
+          >
+            Read first chapter
+          </button>
+          <button
+            data-chapter-id="chapter-2"
+          >
+            Read second chapter
+          </button>
+        </nav>
+      </div>
+    </div>
+  </body>
+</html>
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps an unselected chapter identifiable on a phone canvas
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > operates real courtyard geometry, honors reduced motion, and releases its resources at rest
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > places the zodiac markers at supplied longitudes and brings the instrument into view
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > selects the previous chapter from the sky view before allowing its reading desk to operate
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > uses a saved Sun sector only without chart context and never substitutes it for a missing chart Sun
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > leaves no live WebGL contexts after repeated scene teardown
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps a reading-only facet change at the same camera pose, then stops drawing at idle
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > saves the old view before framing a new one and accepts only a new command serial
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > releases the canvas and loaded geometry on graphics loss while leaving the reading reachable
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > frames models inside the unobscured viewport above the real toolbar
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > rejects an intact correctly hashed compass assigned to a different chapter before drawing
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps all zodiac labels in frame across expansion and resize and connects the selected readout to the plotted marker
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps the selected readout clear of measured sign labels and its marker in a 288 by 300 canvas
+ ↓ src/components/portrait-explorer/PortraitScene.runtime.test.tsx > keeps the selected readout clear of measured sign labels and its marker in a 544 by 296 canvas
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/portrait-explorer/PortraitScene.runtime.test.tsx > hands an oversized focused comparison label to its matching native source link
+Error: expect(element).toHaveFocus()
+
+Expected element with focus:
+  <button
+  data-chapter-id="chapter-2"
+>
+  Read second chapter
+</button>
+Received element with focus:
+  <button
+  aria-label="Overview: show source passage 1 for Saved chapter 2"
+  class="explorer-annotation"
+  data-active-passage="0"
+  data-chapter-id="chapter-2"
+  data-compact="false"
+  data-form-index="1"
+  data-highlighted="true"
+  data-selected="true"
+  style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: visible; transform: translate(532px, 4px);"
+  type="button"
+>
+  <span
+    class="explorer-label-title"
+  >
+    Saved chapter 2
+  </span>
+  <span>
+    <span
+      aria-hidden="true"
+    >
+      ●
+    </span>······
+    Overview
+    <span
+      class="explorer-passage-number"
+    >
+       ··
+      1
+    </span>
+  </span>
+</button>
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div>
+      <div
+        class="explorer-visual"
+      >
+        <div
+          class="explorer-scene-renderer"
+          style="position: relative; width: 100%; height: 100%;"
+        >
+          <div
+            class="explorer-canvas-host"
+            style="position: absolute; inset: 0px;"
+          >
+            <canvas
+              aria-label="Two saved chapter objects: Saved chapter 1 and Saved chapter 2. Use their named source-passage links and scene controls to explore."
+              role="img"
+              style="display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y;"
+            />
+          </div>
+          <div
+            class="explorer-labels"
+            style="position: absolute; inset: 0px; pointer-events: none; visibility: visible;"
+          >
+            <svg
+              aria-hidden="true"
+              class="sky-marker-connector"
+            >
+              <line
+                data-sky-connector="true"
+                style="visibility: hidden;"
+              />
+            </svg>
+            <button
+              aria-label="Overview: show source passage 1 for Saved chapter 1"
+              class="explorer-annotation"
+              data-active-passage="0"
+              data-chapter-id="chapter-1"
+              data-compact="false"
+              data-form-index="0"
+              data-highlighted="false"
+              data-selected="true"
+              style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: hidden; transform: translate(180px, 4px);"
+              type="button"
+            >
+              <span
+                class="explorer-label-title"
+              >
+                Saved chapter 1
+              </span>
+              <span>
+                <span
+                  aria-hidden="true"
+                >
+                  ●
+                </span>
+
+                Overview
+                <span
+                  class="explorer-passage-number"
+                >
+                   ·
+                  1
+                </span>
+              </span>
+            </button>
+            <button
+              aria-label="Overview: show source passage 1 for Saved chapter 2"
+              class="explorer-annotation"
+              data-active-passage="0"
+              data-chapter-id="chapter-2"
+              data-compact="false"
+              data-form-index="1"
+              data-highlighted="true"
+              data-selected="true"
+              style="position: absolute; top: 0px; left: 0px; min-width: 44px; min-height: 44px; pointer-events: auto; visibility: visible; transform: translate(532px, 4px);"
+              type="button"
+            >
+              <span
+                class="explorer-label-title"
+              >
+                Saved chapter 2
+              </span>
+              <span>
+                <span
+                  aria-hidden="true"
+                >
+                  ●
+                </span>
+
+                Overview
+                <span
+                  class="explorer-passage-number"
+                >
+                   ·
+                  1
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <nav
+          class="explorer-compared-chapters"
+        >
+          <button
+            data-chapter-id="chapter-1"
+          >
+            Read first chapter
+          </button>
+          <button
+            data-chapter-id="chapter-2"
+          >
+            Read second chapter
+          </button>
+        </nav>
+      </div>
+    </div>
+  </body>
+</html>
+ ❯ src/components/portrait-explorer/PortraitScene.runtime.test.tsx:204:91
+    202|     for (const observer of observers) if (observer.elements.has(label)…
+    203|   });
+    204|   await waitFor(() => expect(screen.getByRole("button", { name: "Read …
+       |                                                                                           ^
+    205|   expect(label.style.visibility).toBe("hidden");
+    206|   expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts…
+ ❯ runWithExpensiveErrorDiagnosticsDisabled ../../node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback ../../node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback ../../node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  16:52:07
+   Duration  2.83s (transform 375ms, setup 167ms, import 477ms, tests 1.26s, environment 766ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/henry/patternlike-app/apps/web
+npm error workspace @patternlike/web@0.2.0
+npm error location /home/henry/patternlike-app/apps/web
+npm error command failed
+npm error command sh -c vitest run src/components/portrait-explorer/PortraitScene.runtime.test.tsx -t 'oversized focused' --reporter=verbose
