@@ -1,14 +1,14 @@
-import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortraitManifest, type PortraitManifest, type PortraitObjectBinding, type PortraitSource } from "../../lib/pattern-portrait.js";
 import { chapterPassages, validateMeshBundle } from "./content.js";
-import { CompleteReading, ExplorerReader } from "./ExplorerReader.js";
+import { CompleteReading, ExplorerReader, ReaderFooter } from "./ExplorerReader.js";
 import { currentFacet, selectedChapterIds, type ExplorerSnapshot } from "./explorer-state.js";
 import { useExplorerNavigation, type ExplorerNavigation } from "./use-explorer-navigation.js";
 import { ObservatoryControls } from "./ObservatoryControls.js";
 import { SceneIcon } from "./SceneIcon.js";
 import { signLabel, skyBodyLabels, SkyPlacements, SkyReader } from "./SkyReader.js";
 import type { PortraitSky, PortraitSkyBody } from "../../lib/portrait-sky.js";
-import type { CameraBookmark, CameraCommand, ObservatoryExperience, PortraitMeshBundle, SceneStatus } from "./types.js";
+import { facets, type CameraBookmark, type CameraCommand, type ObservatoryExperience, type PortraitMeshBundle, type SceneStatus } from "./types.js";
 import "./explorer.css";
 import "./observatory.css";
 
@@ -77,6 +77,7 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
   const selected = manifest.chapters.filter((chapter) => selectedIds.includes(chapter.id)).sort((a, b) => selectedIds.indexOf(a.id) - selectedIds.indexOf(b.id));
   const chapter = selected[0];
   const facet = currentFacet(state);
+  const facetLabel = facets.find(item => item.id === facet)!.label;
   const [status, setStatus] = useState<SceneStatus>("loading");
   const [artworkFallback, setArtworkFallback] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -129,13 +130,14 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
   const passageElements = useRef(new Map<string, HTMLParagraphElement>());
   const scrollPositions = useRef(navigation.memory?.scrollPositions ?? new Map<string, { top: number; headingOffset?: number }>());
   const pendingPassage = useRef<{ chapterId: string; index: number } | null>(null);
-  const pendingScene = useRef<string | null>(null);
+  const [pendingScene, setPendingScene] = useState<string | null>(null);
   const expandButton = useRef<HTMLButtonElement>(null);
   const readButton = useRef<HTMLButtonElement>(null);
   const fullReadingButton = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef<"heading" | "chapter" | "pattern" | "compare-start" | "compare-end" | "guide-end" | null>(null);
   const explorerElement = useRef<HTMLElement>(null);
   const readerElement = useRef<HTMLElement>(null);
+  const readerId = useId();
   const lastFocused = useRef<HTMLElement | null>(null);
   const readerPositions = useRef(navigation.memory?.readerPositions ?? new Map<string, number>());
   const readerKey = skyView ? `sky:${selectedSkyBody ?? "unavailable"}` : `${selectedIds.join("+")}:${facet}`;
@@ -208,23 +210,32 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
   const showPassage = (chapterId: string, index: number) => {
     const linked = selected.find(item => item.id === chapterId);
     if (!linked || index < 0 || index >= chapterPassages(linked, facet).length) return;
-    pendingScene.current = chapterId;
+    setPendingScene(chapterId);
     if (presentation === "reading" && !comparing) dispatch([{ type: "back" }, { type: "select", chapterId }, { type: "facet", facet }, { type: "passage", chapterId, index }]);
     else dispatch({ type: "passage", chapterId, index });
-    issueCommand("frame");
   };
   useEffect(() => {
-    if (!pendingScene.current || (presentation === "reading" && !comparing)) return;
+    if (!pendingScene || (presentation === "reading" && !comparing)) return;
     const handle = requestAnimationFrame(() => {
-      const sceneAnnotation = explorerElement.current?.querySelector<HTMLButtonElement>(`.explorer-annotation[data-chapter-id="${pendingScene.current}"]`);
-      const nativeLink = comparing ? [...explorerElement.current?.querySelectorAll<HTMLButtonElement>(".explorer-compared-chapters button") ?? []].find(button => button.dataset.chapterId === pendingScene.current) : undefined;
+      const sceneAnnotation = explorerElement.current?.querySelector<HTMLButtonElement>(`.explorer-annotation[data-chapter-id="${pendingScene}"]`);
+      const nativeLink = [...explorerElement.current?.querySelectorAll<HTMLButtonElement>(".explorer-chapters button") ?? []].find(button => button.dataset.chapterId === pendingScene);
       const element = sceneAnnotation && getComputedStyle(sceneAnnotation).visibility !== "hidden" ? sceneAnnotation : nativeLink;
       element?.focus({ preventScroll: true });
-      (element === nativeLink && nativeLink ? nativeLink : explorerElement.current?.querySelector(".explorer-scene"))?.scrollIntoView({ behavior: (nativeLink && element === nativeLink) || reducedMotion ? "instant" : "smooth", block: "nearest" });
-      pendingScene.current = null;
+      if (element) {
+        // Reveal the actual link between sticky bars. Scrolling the whole canvas
+        // can leave its annotation covered in short windows; scrolling an absolute
+        // label with scrollIntoView can move its clipped overlay away from the object.
+        const style = getComputedStyle(element);
+        const top = parseFloat(style.scrollMarginBlockStart) || 0;
+        const bottom = window.innerHeight - (parseFloat(style.scrollMarginBlockEnd) || 0);
+        const bounds = element.getBoundingClientRect();
+        const offset = bounds.top < top ? bounds.top - top : bounds.bottom > bottom ? bounds.bottom - bottom : 0;
+        if (offset) window.scrollBy({ top: offset, behavior: reducedMotion ? "instant" : "smooth" });
+      }
+      setPendingScene(null);
     });
     return () => cancelAnimationFrame(handle);
-  }, [command.serial, presentation, reducedMotion, comparing]);
+  }, [pendingScene, presentation, reducedMotion, comparing]);
   useEffect(() => {
     const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     const update = () => setReducedMotion(Boolean(query?.matches));
@@ -232,27 +243,34 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
     return () => query?.removeEventListener("change", update);
   }, []);
   useLayoutEffect(() => {
-    const reader = readerElement.current;
-    if (!reader) return;
-    reader.scrollTop = readerPositions.current.get(readerKey) ?? 0;
-  }, [readerKey, presentation]);
-  useLayoutEffect(() => {
     const root = explorerElement.current;
     if (!root) return;
     const bar = root.querySelector<HTMLElement>(".explorer-embedded-bar");
     const modes = root.querySelector<HTMLElement>(".explorer-mobile-modes");
+    const title = root.querySelector<HTMLElement>(".explorer-title");
+    const header = root.querySelector<HTMLElement>(".explorer-header");
+    const workspace = root.querySelector<HTMLElement>(".explorer-workspace");
     // Measure the actual sticky rows, including wrapped titles and enlarged text.
     const measure = () => {
       root.style.setProperty("--explorer-bar-height", `${bar?.getBoundingClientRect().height ?? 0}px`);
       root.style.setProperty("--explorer-modes-height", `${modes?.getBoundingClientRect().height ?? 0}px`);
+      if (workspace) root.style.setProperty("--explorer-reader-offset", `${workspace.getBoundingClientRect().top - root.getBoundingClientRect().top}px`);
     };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     if (bar) observer.observe(bar);
     if (modes) observer.observe(modes);
+    if (title) observer.observe(title);
+    if (header) observer.observe(header);
     return () => observer.disconnect();
   }, [presentation, readerKey]);
+  useLayoutEffect(() => {
+    const reader = readerElement.current;
+    if (!reader) return;
+    // Restore only after the header rows and reserved footer set the final height.
+    reader.scrollTop = readerPositions.current.get(readerKey) ?? 0;
+  }, [readerKey, presentation]);
   useLayoutEffect(() => {
     const previous = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
@@ -362,8 +380,12 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
       { type: "presentation", presentation: "reading" },
     ]);
   };
-  const chapterRail = <nav aria-label="Pattern chapters" className="explorer-chapters">{manifest.chapters.map((item) => <button key={item.id} aria-label={`${item.ordinal}. ${item.title}`} aria-pressed={selectedIds.includes(item.id)} onClick={() => select(item.id)}><span className="explorer-chapter-number">{String(item.ordinal).padStart(2, "0")}</span><span><span className="explorer-sr-only">{item.ordinal}. </span>{item.title}</span></button>)}</nav>;
-  const comparisonRail = <nav aria-label="Compared chapters" className="explorer-chapters explorer-compared-chapters">{selected.map(item => <button key={item.id} data-chapter-id={item.id} onClick={() => annotation(item.id)}><span className="explorer-chapter-number">{String(item.ordinal).padStart(2, "0")}</span><span>{item.title}<span className="explorer-comparison-link">Read this chapter</span></span></button>)}</nav>;
+  const passageLink = (chapterId: string) => `${facetLabel} · Read passage ${(state.passages[chapterId] ?? 0) + 1}`;
+  const chapterRail = <nav aria-label="Pattern chapters" className="explorer-chapters">{manifest.chapters.map((item) => {
+    const active = selectedIds.includes(item.id);
+    return <button key={item.id} data-chapter-id={item.id} aria-pressed={active} onClick={() => active ? annotation(item.id) : select(item.id)}><span className="explorer-chapter-number" aria-hidden="true">{String(item.ordinal).padStart(2, "0")}</span><span><span className="explorer-sr-only">{item.ordinal}. </span>{item.title}{" "}{active && <span className="explorer-comparison-link">{passageLink(item.id)}</span>}</span></button>;
+  })}</nav>;
+  const comparisonRail = <nav aria-label="Compared chapters" className="explorer-chapters explorer-compared-chapters">{selected.map(item => <button key={item.id} data-chapter-id={item.id} onClick={() => annotation(item.id)}><span className="explorer-chapter-number" aria-hidden="true">{String(item.ordinal).padStart(2, "0")}</span><span>{item.title}{" "}<span className="explorer-comparison-link">{passageLink(item.id)}</span></span></button>)}</nav>;
   const scenePanel = <div className={`explorer-visual${compactExpanded ? " explorer-compact-expanded" : ""}`}>
     <div className="explorer-scene" aria-label="Interactive Pattern portrait">
       {!comparing && <div className="explorer-scene-top"><button onClick={() => {
@@ -407,26 +429,29 @@ function ReadyExplorer({ manifest, meshBundle, navigation, sky, embedded = false
     </div>
   </div>;
   const ReaderHeading = embedded ? "h3" : "h2";
-  const reader = <aside ref={readerElement} className="explorer-reader" aria-label={skyView ? "Birth-chart reading" : "Chapter reading"} onScroll={(event) => { readerPositions.current.set(readerKey, event.currentTarget.scrollTop); }}>
+  const reader = <div className="explorer-reader-shell"><aside id={readerId} ref={readerElement} tabIndex={0} className="explorer-reader" aria-label={skyView ? "Birth-chart reading" : "Chapter reading"} onScroll={(event) => { readerPositions.current.set(readerKey, event.currentTarget.scrollTop); }}><div className="explorer-reader-content">
     {manifest.uncertainty && <p className="explorer-uncertainty">{manifest.uncertainty}</p>}
     {skyView ? <SkyReader sky={sky} sunSign={manifest.sunSign} selected={selectedSkyBody} embedded={embedded} graphicsAvailable={graphicsAvailable}
       onPattern={() => returnPattern(true)} /> : chapter ? <>
       {state.view.kind === "guided" && <div className="explorer-guide"><span>Guided exploration · Stop {state.view.step + 1} of {manifest.chapters.length}</span><button onClick={() => endView("guided")}>Exit guide</button></div>}
       <ExplorerReader embedded={embedded} chapterCount={manifest.chapters.length} chapters={selected} facet={facet} activePassages={state.passages} onFacet={(value) => dispatch({ type: "facet", facet: value })}
         onPassage={showPassage} passageRef={bindPassage} graphicsAvailable={graphicsAvailable} />
-      <div className="explorer-reader-actions">{chapter.object && <button className="explorer-text-button" onClick={() => dispatch({ type: "inspect", open: true })}>Inspect original image <span aria-hidden="true">↗</span></button>}
-        {state.view.kind === "chapter" && <label className="explorer-compare-label"><span className="explorer-sr-only">Compare with another chapter</span><select aria-label="Compare with another chapter" value="" onChange={(event) => { pendingFocus.current = "compare-start"; dispatch({ type: "compare", chapterId: event.target.value }); }}><option value="" disabled>Compare with…</option>{manifest.chapters.filter((item) => item.id !== chapter.id).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}</div>
       {state.view.kind === "guided" ? <div className="explorer-next"><button disabled={state.view.step === 0} onClick={() => { pendingFocus.current = "heading"; dispatch({ type: "guide-step", step: state.view.kind === "guided" ? state.view.step - 1 : 0 }); }}>Previous stop</button>{state.view.step < manifest.chapters.length - 1 ? <button onClick={() => { pendingFocus.current = "heading"; dispatch({ type: "guide-step", step: state.view.kind === "guided" ? state.view.step + 1 : 0 }); }}>Next stop</button> : <button onClick={() => endView("guided")}>Finish exploration</button>}</div>
         : state.view.kind === "chapter" && <button className="explorer-next-chapter" onClick={() => select(manifest.chapters[chapter.ordinal % manifest.chapters.length].id, true)}><span>Next chapter</span><strong>{manifest.chapters[chapter.ordinal % manifest.chapters.length].title} <span aria-hidden="true">→</span></strong></button>}
     </> : <div className="explorer-introduction"><ReaderHeading data-reader-heading tabIndex={-1}>Your Pattern, in {manifest.chapters.length} chapters</ReaderHeading>
       <p>Each reading station opens a saved chapter, with its tensions, resources, and another expression. Choose a station or its chapter name to explore.</p><button className="explorer-primary" onClick={() => select(manifest.chapters[0].id, "scene")}>Explore the first chapter <span aria-hidden="true">→</span></button>
       <p className="explorer-intro-note">Your birth chart supplies the placements. Your saved Pattern supplies the reading.</p></div>}
-  </aside>;
+  </div></aside>
+    {!skyView && chapter && <ReaderFooter readerRef={readerElement} readerId={readerId} contentKey={`${readerKey}:${presentation}`} reducedMotion={reducedMotion}>
+      <div className="explorer-reader-actions">{chapter.object && <button className="explorer-text-button" onClick={() => dispatch({ type: "inspect", open: true })}>Inspect original image <span aria-hidden="true">↗</span></button>}
+        {state.view.kind === "chapter" && <label className="explorer-compare-label"><span className="explorer-sr-only">Compare with another chapter</span><select aria-label="Compare with another chapter" value="" onChange={(event) => { pendingFocus.current = "compare-start"; dispatch({ type: "compare", chapterId: event.target.value }); }}><option value="" disabled>Compare with…</option>{manifest.chapters.filter((item) => item.id !== chapter.id).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}</div>
+    </ReaderFooter>}
+  </div>;
   const Root = embedded ? "section" : "main";
   const observatoryViews = <nav className="observatory-views" aria-label="Observatory views"><button aria-pressed={!skyView} onClick={() => returnPattern()}>Your Pattern</button><button aria-pressed={skyView} onClick={() => openSky()}>Your sky</button></nav>;
   const fullReadingControl = <button ref={fullReadingButton} onClick={() => presentation === "full" ? back() : present("full")}>{presentation === "full" ? "Return to portrait" : "Full reading"}<span aria-hidden="true"> ↗</span></button>;
   return <Root onFocusCapture={(event) => { lastFocused.current = event.target as HTMLElement; }} ref={explorerElement} id="portrait-start" tabIndex={-1} aria-label="Pattern portrait explorer" className={`portrait-explorer observatory-explorer${skyView ? " observatory-sky" : ""}${comparing ? " explorer-comparing" : ""}${embedded ? " explorer-embedded" : ""} explorer-presentation-${presentation}`}>
-    <span className="explorer-sr-only" aria-live="polite" aria-atomic="true">{presentation === "full" ? `Full Pattern reading. ${manifest.chapters.length} chapters available.` : skyView ? `Your sky. ${skyAnnouncement}` : selected.length ? `${selected.map((item) => item.title).join(" and ")}. ${facet === "alternative" ? "Another expression" : facet}.` : `Whole portrait. ${manifest.chapters.length} chapters available.`}</span>
+    <span className="explorer-sr-only" aria-live="polite" aria-atomic="true">{presentation === "full" ? `Full Pattern reading. ${manifest.chapters.length} chapters available.` : skyView ? `Your sky. ${skyAnnouncement}` : selected.length ? selected.map(item => `${item.title}. ${facetLabel}, passage ${(state.passages[item.id] ?? 0) + 1}.`).join(" ") : `Whole portrait. ${manifest.chapters.length} chapters available.`}</span>
     {embedded ? <nav className="explorer-embedded-bar" aria-label="Portrait navigation"><button onClick={navigation.close}>Back to reading</button>{fullReadingControl}</nav> : (<header className="explorer-header"><a href="#portrait-start" className="explorer-wordmark" onClick={(event) => { event.preventDefault(); document.getElementById("portrait-start")?.scrollIntoView({ behavior: reducedMotion ? "instant" : "smooth" }); }}>Pattern<span>/</span>Like</a><div><span className="explorer-study-label">{!meshBundle ? "Your Pattern" : meshBundle.authoring === "codex-parametric/v1" ? "Private portrait" : "Fictional study"}</span>{fullReadingControl}</div></header>)}
 
     {presentation === "full" ? <CompleteReading manifest={manifest} embedded={embedded} /> : <>

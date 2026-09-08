@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nativeImageBindings, nativePattern } from "../../preview/native-image-study.js";
@@ -623,6 +623,58 @@ describe("Portrait exploration", () => {
     expect(scene.props?.activePassages["chapter-1"]).toBe(0);
   });
 
+  it.each([[false, false], [false, true], [true, false], [true, true]])("returns between an occluded annotation and its source without reframing (comparison: %s, reading: %s)", async (comparing, reading) => {
+    const user = userEvent.setup(); mount(reading); await screen.findByTestId("scene"); await chapter(user);
+    if (reading) await user.click(screen.getByRole("button", { name: "Read chapter" }));
+    if (comparing) await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
+    const index = comparing ? 1 : 0;
+    const chapterId = `chapter-${index + 1}`;
+    const text = nativePattern.core_chapters[index].sections[1].text;
+    const bookmark = { position: [4, 2, -3] as [number, number, number], target: [1, 0, 0] as [number, number, number] };
+    act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
+    await user.click(screen.getByRole("button", { name: "Rotate left" }));
+    const command = scene.props!.command;
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    const paragraph = screen.getByText(text);
+    await user.click(within(paragraph.parentElement!).getByRole("button", { name: "Show passage 2 in portrait" }));
+    expect(scene.props!.command).toEqual(command);
+    expect(scene.props!.bookmark).toEqual(bookmark);
+    expect(scene.props!.activePassages[chapterId]).toBe(1);
+    expect(within(paragraph.parentElement!).getByText("Selected in portrait")).toBeVisible();
+    const navigation = screen.getByRole("navigation", { name: comparing ? "Compared chapters" : "Pattern chapters" });
+    const nativeLink = within(navigation).getAllByRole("button")[index];
+    await waitFor(() => expect(nativeLink).toHaveFocus());
+    expect(nativeLink).toHaveTextContent("Overview · Read passage 2");
+    expect(nativeLink).toHaveAccessibleName(/Overview · Read passage 2/);
+    await user.keyboard("{Enter}");
+    expect(paragraph).toHaveFocus();
+    expect(reader).toContainElement(paragraph);
+    expect(scene.props!.command).toEqual(command);
+    expect(scene.props!.selectedIds).toEqual(comparing ? ["chapter-1", "chapter-2"] : ["chapter-1"]);
+    expect(document.querySelector("[aria-live=polite]")).toHaveTextContent(new RegExp(`${nativePattern.core_chapters[index].title}.*Overview.*passage 2`, "i"));
+    const historyEntry = window.history.state;
+    await user.click(within(paragraph.parentElement!).getByRole("button", { name: "Show passage 2 in portrait" }));
+    await waitFor(() => expect(nativeLink).toHaveFocus());
+    await user.keyboard("{Enter}");
+    expect(paragraph).toHaveFocus();
+    expect(scene.props!.command).toEqual(command);
+    expect(window.history.state).toEqual(historyEntry);
+  });
+
+  it.each([[75, -105], [320, 60]])("reveals a source link at y=%i between sticky bars without scrolling its overlay", async (top, offset) => {
+    const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    vi.stubGlobal("innerHeight", 390);
+    const scroll = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    const link = within(screen.getByRole("navigation", { name: "Pattern chapters" })).getAllByRole("button")[0];
+    link.style.scrollMarginBlockStart = "180px";
+    link.style.scrollMarginBlockEnd = "70px";
+    vi.spyOn(link, "getBoundingClientRect").mockReturnValue(new DOMRect(20, top, 240, 60));
+    await user.click(screen.getByRole("button", { name: "Show passage 2 in portrait" }));
+    await waitFor(() => expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ top: offset })));
+    expect(link).toHaveFocus();
+    expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts).not.toContain(link);
+  });
+
   it("preserves a chapter's facet when exploring another chapter and returning", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user); await user.click(screen.getByRole("tab", { name: "Resources" }));
@@ -633,17 +685,26 @@ describe("Portrait exploration", () => {
   it("compares complete source facets and restores the originating chapter", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user); await user.click(screen.getByRole("tab", { name: "Tensions" }));
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    reader.scrollTop = 180; fireEvent.scroll(reader);
     await user.selectOptions(screen.getByRole("combobox", { name: "Compare with another chapter" }), "chapter-2");
     expect(scene.props?.selectedIds).toEqual(["chapter-1", "chapter-2"]);
     for (const c of nativePattern.core_chapters.slice(0, 2)) expect(screen.getByText(c.tensions[0].text)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "End comparison" }));
     await waitFor(() => expect(scene.props?.selectedIds).toEqual(["chapter-1"]));
     expect(screen.getByRole("tab", { name: "Tensions" })).toHaveAttribute("aria-selected", "true");
+    expect(reader.scrollTop).toBe(180);
+    await user.click(screen.getByRole("tab", { name: "Overview" }));
+    expect(reader.scrollTop).toBe(0);
+    await user.click(screen.getByRole("tab", { name: "Tensions" }));
+    expect(reader.scrollTop).toBe(180);
   });
 
   it("retains exact camera bookmarks and facet through full reading", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user); await user.click(screen.getByRole("tab", { name: "Resources" }));
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    reader.scrollTop = 260; fireEvent.scroll(reader);
     const bookmark = { position: [4, 2, -3] as [number, number, number], target: [1, 0, 0] as [number, number, number] };
     act(() => scene.props!.onBookmark(scene.props!.viewKey, bookmark));
     await user.click(screen.getByRole("button", { name: /^Full reading/ }));
@@ -656,10 +717,54 @@ describe("Portrait exploration", () => {
     await user.click(screen.getByRole("button", { name: "Return to portrait" }));
     await waitFor(() => expect(scene.props?.bookmark).toEqual(bookmark));
     expect(screen.getByRole("tab", { name: "Resources" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("complementary", { name: "Chapter reading" }).scrollTop).toBe(260);
+  });
+
+  it("continues an overflowing reading without navigating and lets the reader return to its start", async () => {
+    const user = userEvent.setup(); mount(); await chapter(user);
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    reader.style.overflowY = "auto";
+    Object.defineProperties(reader, { clientHeight: { configurable: true, value: 300 }, scrollHeight: { configurable: true, value: 900 } });
+    reader.scrollBy = (options?: ScrollToOptions | number, y: number = 0) => { reader.scrollTop = Math.min(600, reader.scrollTop + (typeof options === "number" ? y : options?.top ?? 0)); fireEvent.scroll(reader); };
+    reader.scrollTo = (options?: ScrollToOptions | number, y: number = 0) => { reader.scrollTop = typeof options === "number" ? y : options?.top ?? 0; fireEvent.scroll(reader); };
+    fireEvent(window, new Event("resize"));
+    const history = window.history.state;
+    const advance = await screen.findByRole("button", { name: "Continue reading" });
+    expect(advance).toHaveAttribute("aria-controls", reader.id);
+    await user.click(advance);
+    expect(reader.scrollTop).toBeGreaterThan(0);
+    expect(reader.scrollTop).toBeLessThan(300);
+    expect(window.history.state).toEqual(history);
+    await user.click(advance); await user.click(advance);
+    expect(screen.getByText("End of this reading")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Back to start" }));
+    expect(reader.scrollTop).toBe(0);
+    expect(screen.getByRole("button", { name: "Continue reading" })).toHaveFocus();
+  });
+
+  it("only offers internal reading continuation when the pane overflows", async () => {
+    const user = userEvent.setup(); mount(); await chapter(user);
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    reader.style.overflowY = "auto";
+    Object.defineProperties(reader, { clientHeight: { configurable: true, value: 300 }, scrollHeight: { configurable: true, value: 900 } });
+    fireEvent(window, new Event("resize"));
+    (await screen.findByRole("button", { name: "Continue reading" })).focus();
+    reader.style.overflowY = "visible";
+    fireEvent(window, new Event("resize"));
+    expect(screen.queryByRole("button", { name: "Continue reading" })).not.toBeInTheDocument();
+    expect(reader).toHaveFocus();
+    reader.style.overflowY = "auto";
+    Object.defineProperty(reader, "clientHeight", { configurable: true, value: 900 });
+    fireEvent(window, new Event("resize"));
+    expect(screen.queryByRole("button", { name: "Continue reading" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Inspect original image" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Compare with another chapter" })).toBeEnabled();
   });
 
   it("opens the exact source image and restores focus when closed", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene"); await chapter(user);
+    const reader = screen.getByRole("complementary", { name: "Chapter reading" });
+    reader.scrollTop = 240; fireEvent.scroll(reader);
     await user.click(screen.getByRole("button", { name: "Inspect original image" }));
     const dialog = screen.getByRole("dialog", { name: "Original chapter image" });
     expect(within(dialog).getByRole("img")).toHaveAttribute("src", nativeImageBindings[0].object.imageUrl);
@@ -672,6 +777,7 @@ describe("Portrait exploration", () => {
     await user.click(within(dialog).getByRole("button", { name: "Close image" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Inspect original image" })).toHaveFocus();
+    expect(reader.scrollTop).toBe(240);
   });
 
   it("offers a manual guided journey and reversible assembly", async () => {

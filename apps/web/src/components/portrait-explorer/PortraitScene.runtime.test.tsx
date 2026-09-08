@@ -4,7 +4,7 @@ import { createHash, webcrypto } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Box3, BufferGeometry, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Camera, type Scene } from "three";
 import PortraitScene from "./PortraitScene.js";
-import type { PortraitSceneProps } from "./types.js";
+import type { CameraBookmark, PortraitSceneProps } from "./types.js";
 import { compilePortraitMesh } from "../../../../codex-runner/src/portrait-mesh-compiler.js";
 import { verifyGlbAsset } from "./scene-utils.js";
 import { firstVisibleIntersection } from "./scene-utils.js";
@@ -94,6 +94,64 @@ it.each([3, 4, 5, 6])("renders %i distinct chapter stations without downloading 
   expect(screen.getByRole("img")).toHaveAccessibleName(new RegExp(`${count} chapter`));
   view.unmount();
   expect(gpu.contexts.size).toBe(0);
+});
+
+it.each([false, true])("keeps selected chapter names and source-passage feedback in the scene (comparison: %s)", async (comparing) => {
+  const callbacks = props();
+  const chapters = Array.from({ length: 4 }, (_, index) => ({ id: `chapter-${index + 1}`, title: `Saved chapter ${index + 1}`, ordinal: index + 1 }));
+  const current = { ...callbacks, assets: [], chapters, selectedIds: comparing ? ["chapter-1", "chapter-2"] : ["chapter-1"],
+    experience: { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} }, bookmark: undefined };
+  const view = render(<PortraitScene {...current} />);
+  await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const camera = gpu.camera!.position.toArray();
+  view.rerender(<PortraitScene {...current} facet="tensions" activePassages={{ "chapter-1": 1, "chapter-2": 0 }} />);
+  const annotations = [...view.container.querySelectorAll<HTMLButtonElement>(".explorer-annotation")];
+  expect(annotations).toHaveLength(comparing ? 2 : 1);
+  expect(view.container.querySelectorAll("[data-form-index]")).toHaveLength(comparing ? 2 : 4);
+  for (const [index, annotation] of annotations.entries()) {
+    expect(annotation.querySelector(".explorer-label-title")).toHaveTextContent(`Saved chapter ${index + 1}`);
+    expect(annotation).toHaveTextContent(`Tensions · Passage ${index === 0 ? 2 : 1}`);
+    expect(annotation).toHaveAccessibleName(new RegExp(`Saved chapter ${index + 1} Tensions · Passage ${index === 0 ? 2 : 1}`));
+    expect(annotation).toHaveAccessibleDescription("Read this source passage.");
+    act(() => annotation.click());
+    expect(callbacks.onAnnotation).toHaveBeenLastCalledWith(`chapter-${index + 1}`);
+  }
+  expect(gpu.camera!.position.toArray()).toEqual(camera);
+});
+
+it("restores the manual camera when comparison replaces controls without resizing the canvas", async () => {
+  const observers: Array<{ callback: ResizeObserverCallback; elements: Set<Element> }> = [];
+  vi.stubGlobal("ResizeObserver", class {
+    elements = new Set<Element>();
+    constructor(readonly callback: ResizeObserverCallback) { observers.push(this); }
+    observe(element: Element) { this.elements.add(element); }
+    disconnect() { this.elements.clear(); }
+  });
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return this.matches(".explorer-scene-top") ? new DOMRect(0, 0, 800, 44)
+      : this.matches(".explorer-scene-toolbar") ? new DOMRect(0, 210, 280, 44) : new DOMRect(0, 0, 800, 260);
+  });
+  const bookmarks = new Map<string, CameraBookmark>();
+  const current = { ...props(), assets: [], bookmark: undefined, chapters: Array.from({ length: 4 }, (_, index) => ({ id: `chapter-${index + 1}`, title: `Chapter ${index + 1}`, ordinal: index + 1 })),
+    experience: { roofOpen: true, lighting: "day" as const, inspect: false, openDesks: {}, turns: {} }, onBookmark: (key: string, bookmark: CameraBookmark) => bookmarks.set(key, bookmark) };
+  const display = (comparing: boolean, command = current.command, bookmark?: CameraBookmark) => <div className="explorer-scene">
+    {!comparing && <div className="explorer-scene-top">Whole portrait</div>}<div className="explorer-scene-toolbar">Camera controls</div>
+    <PortraitScene {...current} command={command} selectedIds={comparing ? ["chapter-1", "chapter-2"] : ["chapter-1"]} viewKey={comparing ? "chapter-1+chapter-2:assembled" : current.viewKey} bookmark={bookmark} />
+  </div>;
+  const view = render(display(false));
+  await waitFor(() => expect(current.onStatus).toHaveBeenCalledWith("ready"), { timeout: 5000 });
+  const command = { kind: "left" as const, serial: current.command.serial + 1 };
+  view.rerender(display(false, command));
+  const saved = bookmarks.get(current.viewKey)!;
+  const projection = gpu.camera!.projectionMatrix.elements.slice();
+  expect(saved).toBeDefined();
+  view.rerender(display(true, command));
+  // Removal of the old observed toolbar notifies the browser once. The host
+  // keeps its size, so reinserting a different toolbar will not resize it.
+  act(() => { for (const observer of observers) if ([...observer.elements].some(element => !element.isConnected)) observer.callback([], observer as unknown as ResizeObserver); });
+  view.rerender(display(false, command, saved));
+  expect(gpu.camera!.position.distanceTo(new Vector3(...saved.position))).toBeLessThan(0.000001);
+  expect(gpu.camera!.projectionMatrix.elements).toEqual(projection);
 });
 
 it("shows a pointer only over visible pickable geometry, and retains drag feedback", async () => {
@@ -207,7 +265,7 @@ it("frames only the compared displays in reading order and restores the exact or
   for (const ordinal of [1, 4]) {
     const label = document.querySelector(`[data-chapter-id="chapter-${ordinal}"]`)!;
     expect(label).toHaveTextContent(`Saved chapter ${ordinal}`);
-    expect(label).toHaveAccessibleName(`Overview: show source passage 1 for Saved chapter ${ordinal}`);
+    expect(label).toHaveAccessibleName(`Saved chapter ${ordinal} Overview · Passage 1`);
   }
   const pairPosition = [...gpu.position];
   rerender(<PortraitScene {...all} selectedIds={["chapter-4", "chapter-1"]} viewKey="chapter-4+chapter-1:assembled" bookmark={undefined} facet="resources" />);
@@ -459,7 +517,7 @@ it("keeps a reading-only facet change at the same camera pose, then stops drawin
   await waitFor(() => expect(callbacks.onStatus).toHaveBeenCalledWith("ready"));
   const initial = [...gpu.position];
   rerender(<PortraitScene {...callbacks} facet="resources" activePassages={{ "chapter-1": 2 }} />);
-  await waitFor(() => expect(screen.getByRole("button", { name: /Resources: show source passage 3/ })).toBeVisible());
+  await waitFor(() => expect(screen.getByRole("button", { name: /Finding your own direction Resources · Passage 3/ })).toBeVisible());
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
   expect(gpu.position).toEqual(initial);
   const count = gpu.renders;

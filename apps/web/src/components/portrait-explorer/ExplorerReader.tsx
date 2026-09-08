@@ -1,7 +1,53 @@
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { PortraitChapter, PortraitManifest } from "../../lib/pattern-portrait.js";
 import { chapterPassages } from "./content.js";
 import { facets, type Facet } from "./types.js";
+
+export function ReaderFooter({ readerRef, readerId, contentKey, reducedMotion, children }: {
+  readerRef: RefObject<HTMLElement | null>;
+  readerId: string;
+  contentKey: string;
+  reducedMotion: boolean;
+  children: ReactNode;
+}) {
+  const [continuation, setContinuation] = useState<"none" | "more" | "end">("none");
+  const continuationButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const reader = readerRef.current;
+    if (!reader) return;
+    const measure = () => {
+      const scrollable = /^(auto|scroll)$/.test(getComputedStyle(reader).overflowY)
+        && reader.clientHeight > 0 && reader.scrollHeight > reader.clientHeight + 2;
+      if (!scrollable && document.activeElement === continuationButton.current) reader.focus({ preventScroll: true });
+      setContinuation(!scrollable ? "none" : reader.scrollTop + reader.clientHeight < reader.scrollHeight - 2 ? "more" : "end");
+    };
+    measure();
+    reader.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(reader);
+    if (reader.firstElementChild) observer?.observe(reader.firstElementChild);
+    return () => {
+      observer?.disconnect();
+      reader.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [readerRef, contentKey]);
+  const continueReading = () => {
+    const reader = readerRef.current;
+    if (!reader) return;
+    const behavior = reducedMotion ? "instant" : "smooth";
+    if (continuation === "end") reader.scrollTo({ top: 0, behavior });
+    else reader.scrollBy({ top: reader.clientHeight * .8, behavior });
+  };
+  return <div className="explorer-reader-footer" role="group" aria-label="Chapter actions">
+    <div className="explorer-reading-continuation" aria-hidden={continuation === "none"} style={{ visibility: continuation === "none" ? "hidden" : "visible" }}>
+      <span className="explorer-continuation-status" role="status"><span aria-hidden={continuation !== "more"}>More to read</span><span aria-hidden={continuation !== "end"}>End of this reading</span></span>
+      <button ref={continuationButton} className="explorer-text-button" tabIndex={continuation === "none" ? -1 : 0} aria-controls={readerId} onClick={continueReading}><span aria-hidden={continuation !== "more"}>Continue reading <span aria-hidden="true">↓</span></span><span aria-hidden={continuation !== "end"}>Back to start <span aria-hidden="true">↑</span></span></button>
+    </div>
+    {children}
+  </div>;
+}
 
 export function FacetTabs({ facet, onChange, panelId }: { facet: Facet; onChange: (facet: Facet) => void; panelId: string }) {
   const list = useRef<HTMLDivElement>(null);
@@ -43,8 +89,9 @@ export function ExplorerReader({ chapters, chapterCount, facet, activePassages, 
       {chapters.map((chapter) => <section key={chapter.id} aria-label={compare ? chapter.title : undefined}>
         {compare && <><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-summary">{chapter.summary}</p></>}
         {chapterPassages(chapter, facet).map((text, index) => <div className="explorer-passage" data-active={index === (activePassages[chapter.id] ?? 0)} key={`${facet}-${index}`}>
+          <div className="explorer-passage-caption"><span>Passage {index + 1}</span>{" "}<span className="explorer-passage-selection" aria-hidden={!graphicsAvailable || index !== (activePassages[chapter.id] ?? 0)} style={{ visibility: graphicsAvailable && index === (activePassages[chapter.id] ?? 0) ? "visible" : "hidden" }}>Selected in portrait</span></div>
           <p tabIndex={-1} ref={(element) => passageRef(chapter.id, index, element)}>{text}</p>
-          <button className="explorer-text-button" disabled={!graphicsAvailable} aria-label={`Show passage ${index + 1} in portrait`} onClick={() => onPassage(chapter.id, index)}>Show in portrait <span aria-hidden="true">↗</span></button>
+          <button className="explorer-text-button" disabled={!graphicsAvailable} aria-description={`${chapter.title} · ${facets.find(item => item.id === facet)!.label}`} onClick={() => onPassage(chapter.id, index)}>Show passage {index + 1} in portrait <span aria-hidden="true">↗</span></button>
         </div>)}
       </section>)}
     </div>

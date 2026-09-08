@@ -204,8 +204,7 @@ class PortraitRuntime {
     canvas.addEventListener("webglcontextlost", this.onContextLost);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.observer = new ResizeObserver(this.resize);
-    this.observer.observe(host);
-    for (const toolbar of host.closest(".explorer-scene")?.querySelectorAll(".explorer-scene-top, .explorer-scene-toolbar") ?? []) this.observer.observe(toolbar);
+    this.observeViewport();
     this.labelObserver = new ResizeObserver(this.invalidate);
     this.observeLabels();
     this.resize();
@@ -334,9 +333,23 @@ class PortraitRuntime {
       this.motion = null;
       this.save();
     }
+    if (before.viewKey !== props.viewKey) {
+      // Comparison replaces the top controls even when the canvas keeps its
+      // size. Refresh their insets and observation before displaying the return.
+      this.observeViewport();
+      this.resize();
+    }
     this.updateEmphasis();
     this.observeLabels();
     this.invalidate();
+  }
+
+  private observeViewport() {
+    const observer = this.observer;
+    if (!observer) return;
+    observer.disconnect();
+    observer.observe(this.host);
+    for (const toolbar of this.host.closest(".explorer-scene")?.querySelectorAll(".explorer-scene-top, .explorer-scene-toolbar") ?? []) observer.observe(toolbar);
   }
 
   private observeLabels() {
@@ -530,18 +543,16 @@ class PortraitRuntime {
       const height = label.offsetHeight || 44;
       let x = Math.max(8, Math.min(this.width - width - 8, (projected.x + 1) * this.width / 2 - width / 2));
       let y = Math.max(this.topInset + 4, Math.min(this.height - this.bottomInset - height - 4, (1 - projected.y) * this.height / 2 - height));
-      let unplaceable = false;
-      if ((compact || this.comparison()) && visible) {
+      if ((compact || this.props.selectedIds.includes(form.id) || this.comparison()) && visible) {
         const placed = placeLabel({ x, y, width, height }, {
           x: 8, y: this.topInset + 4, width: this.width - 16, height: this.usableHeight - 8,
         }, [...objectRects, ...occupied.map(other => ({ x: other.x - 3, y: other.y - 3, width: other.width + 6, height: other.height + 6 }))]);
-        if (placed) { x = placed.x; y = placed.y; } else { visible = false; unplaceable = true; }
+        if (placed) { x = placed.x; y = placed.y; } else visible = false;
       } else if (occupied.some(other => x < other.x + other.width + 8 && x + width + 8 > other.x && y < other.y + other.height + 8 && y + height + 8 > other.y)) visible = false;
-      // Enlarged comparison labels can outgrow the canvas. Keep keyboard access
-      // in their matching native link instead of forcing an obstructing overlay.
-      if (document.activeElement === label) {
-        const fallback = this.comparison() && unplaceable
-          ? [...this.host.closest(".explorer-visual")?.querySelectorAll<HTMLButtonElement>(".explorer-compared-chapters button") ?? []].find(button => button.dataset.chapterId === form.id) : undefined;
+      // Occluded or enlarged labels defer to the same named native destination.
+      // Moving focus must not force a clipped overlay or change the camera.
+      if (document.activeElement === label && !visible) {
+        const fallback = [...this.host.closest(".explorer-visual")?.querySelectorAll<HTMLButtonElement>(".explorer-chapters button, .explorer-compared-chapters button") ?? []].find(button => button.dataset.chapterId === form.id);
         if (fallback) { fallback.focus({ preventScroll: true }); fallback.scrollIntoView({ behavior: "instant", block: "nearest" }); }
         else visible = true;
       }
@@ -778,12 +789,13 @@ export default function PortraitScene(props: PortraitSceneProps) {
         return <button key={chapter.id} type="button" data-form-index={index} data-chapter-id={chapter.id} data-selected={selected} data-active-passage={annotation ? passage : undefined}
           className={annotation ? "explorer-annotation" : "explorer-chapter-label"}
           style={{ position: "absolute", top: 0, left: 0, minWidth: 44, minHeight: 44, pointerEvents: "auto" }}
-          aria-label={annotation ? `${facet.label}: show source passage ${passage + 1} for ${chapter.title}` : `Explore chapter ${chapter.ordinal}: ${chapter.title}`}
+          aria-label={annotation ? undefined : `Explore chapter ${chapter.ordinal}: ${chapter.title}`}
+          aria-description={annotation ? "Read this source passage." : undefined}
           aria-pressed={annotation ? undefined : selected}
           onFocus={() => runtime.current?.highlight(chapter.id)} onBlur={() => runtime.current?.highlight(null)}
           onPointerEnter={() => runtime.current?.highlight(chapter.id)} onPointerLeave={() => runtime.current?.highlight(null)}
           onClick={() => annotation ? props.onAnnotation(chapter.id) : props.onSelect(chapter.id)}>
-          {annotation ? <>{comparing && <span className="explorer-label-title">{chapter.title}</span>}<span><span aria-hidden="true">●</span> {facet.label}<span className="explorer-passage-number"> · {passage + 1}</span></span></> : <><span className="explorer-label-ordinal"><span className="explorer-label-prefix">Chapter </span>{String(chapter.ordinal).padStart(2, "0")}</span><span className="explorer-label-title">{chapter.title}</span></>}
+          {annotation ? <><span className="explorer-label-title">{chapter.title}</span>{" "}<span className="explorer-annotation-source">{facet.label} · Passage {passage + 1}</span></> : <><span className="explorer-label-ordinal"><span className="explorer-label-prefix">Chapter </span>{String(chapter.ordinal).padStart(2, "0")}</span><span className="explorer-label-title">{chapter.title}</span></>}
         </button>;
       })}
     </div>
