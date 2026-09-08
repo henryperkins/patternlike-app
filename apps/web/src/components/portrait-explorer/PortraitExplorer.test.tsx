@@ -43,6 +43,18 @@ async function chapter(user: ReturnType<typeof userEvent.setup>, ordinal = 1) {
 }
 
 describe("Portrait exploration", () => {
+  it.each([3, 4, 5, 6])("opens a %i-chapter reading in the observatory without requiring artwork", async (count) => {
+    const document = { ...nativePattern, core_chapters: Array.from({ length: count }, (_, index) => ({ ...nativePattern.core_chapters[index % 4], title: `Published chapter ${index + 1}` })) };
+    render(<PortraitExplorer source={{ status: "ready", document }} />);
+    await screen.findByTestId("scene");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rotate left" })).toBeEnabled());
+    expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    expect(within(screen.getByRole("navigation", { name: "Pattern chapters" })).getAllByRole("button")).toHaveLength(count);
+    await userEvent.click(screen.getByRole("button", { name: "Full reading" }));
+    for (const item of document.core_chapters) expect(screen.getByRole("heading", { name: item.title })).toBeVisible();
+    expect(screen.queryByText(/authored models|fictional study/i)).not.toBeInTheDocument();
+  });
+
   it("returns focus to the selected chapter when leaving the sky reader", async () => {
     const user = userEvent.setup(); mount(); await screen.findByTestId("scene");
     await chapter(user, 2);
@@ -54,13 +66,12 @@ describe("Portrait exploration", () => {
   it("does not invite readers to find placements that are unavailable", async () => {
     mount(); await screen.findByTestId("scene");
     expect(screen.queryByText(/Find your Sun, Moon, and rising/)).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Your Pattern, in four chapters" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Your Pattern, in 4 chapters" })).toBeVisible();
   });
 
-  it("offers an entry invitation before the canvas and reads the first chapter immediately", async () => {
+  it("keeps one chapter introduction and reads the first chapter immediately", async () => {
     const user = userEvent.setup(); mount(true); await screen.findByTestId("scene");
-    const invitation = screen.getByText("Four objects hold your saved chapters. Choose one to explore its story.");
-    expect(invitation.compareDocumentPosition(screen.getByTestId("scene")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole("heading", { name: "Your Pattern, in 4 chapters" })).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "Read chapter" }));
     expect(document.querySelector(".portrait-explorer")).toHaveClass("explorer-presentation-reading");
     expect(scene.props?.selectedIds).toEqual(["chapter-1"]);

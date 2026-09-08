@@ -199,5 +199,5 @@ export function LegacyAccountPatternPortrait(props: AccountPatternPortraitProps)
 
 export function AccountPatternPortrait(props: AccountPatternPortraitProps) {
   const revision = JSON.stringify([props.chartId, props.document, props.pattern]);
-  return <AccountPortraitExplorer key={revision} {...props} legacy={<LegacyAccountPatternPortrait {...props} />} />;
+  return <AccountPortraitExplorer key={revision} {...props} />;
 }

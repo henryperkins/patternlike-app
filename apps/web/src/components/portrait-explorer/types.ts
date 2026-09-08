@@ -67,4 +67,5 @@ export interface PortraitSceneProps {
   onSelect: (chapterId: string) => void;
   onAnnotation: () => void;
   onStatus: (status: SceneStatus) => void;
+  onArtworkFallback?: (fallback: boolean) => void;
 }

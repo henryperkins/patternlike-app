@@ -61,10 +61,16 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
 
   return (
     <div className="chart-page page-enter">
+      <header className="page-header chart-page__intro">
+        <div><p className="eyebrow">Your reading and birth chart</p><h1>Your Pattern.</h1></div>
+      </header>
+
+      <PatternExperience chartId={chart.id} onUnauthorized={onUnauthorized} sky={sky} />
+
       <header className="page-header chart-page__header">
         <div>
-          <p className="eyebrow">Your pattern / Calculation layer</p>
-          <h1 aria-label="The architecture of your chart.">The architecture<br />of your chart.</h1>
+          <p className="eyebrow">Your birth chart</p>
+          <h2 aria-label="The architecture of your chart.">The architecture of your chart.</h2>
         </div>
         <div className="calculation-stamp">
           <span>Last calculated</span>
@@ -157,8 +163,8 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
             <p className="kicker">Interpretation boundary</p>
             <h2>Facts first. Meaning second.</h2>
             <p>
-              The facts on this page are calculated. The Pattern below them is
-              written from those facts after you agree — never generic sign
+              The facts on this page are calculated. Your Pattern is
+              written from these facts after you agree — never generic sign
               filler, and never from check-ins, life events, or a biography.
             </p>
             <a href="#today" className="inline-link">
@@ -189,8 +195,6 @@ export function ChartView({ chart, onUnauthorized }: ChartViewProps) {
           ))}
         </div>
       </section>
-
-      <PatternExperience chartId={chart.id} onUnauthorized={onUnauthorized} sky={sky} />
 
       <details className="evidence-drawer">
         <summary>

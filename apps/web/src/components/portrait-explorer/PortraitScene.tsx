@@ -11,7 +11,7 @@ import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { adaptCameraBookmark, cameraFrame, chapterLayout, disposeModel, firstVisibleIntersection, isCameraBookmark, MAX_GLB_BYTES, placeLabel, TapTracker, type LabelRect, verifyGlbAsset } from "./scene-utils.js";
 import { facets, type CameraBookmark, type PortraitSceneProps, type SceneStatus } from "./types.js";
-import { createObservatory, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
+import { createObservatory, createReadingFolio, DISPLAY_HEIGHT, observatoryFrame, stationPosition, type ObservatoryWorld } from "./observatory-world.js";
 import { BodyIcon, signLabel, skyBodyLabels } from "./SkyReader.js";
 import type { PortraitSkyBody } from "../../lib/portrait-sky.js";
 
@@ -113,7 +113,7 @@ class PortraitRuntime {
     try {
     const canvas = this.renderer.domElement;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", props.experience ? `A zodiac observatory with a bronze twelve-sign instrument${props.sky?.placements.length ? ", birth-chart markers" : ""}, four chapter displays, and opening reading desks. Use the named sky, chapter, and scene controls to explore.` : "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.");
+    canvas.setAttribute("aria-label", props.experience ? `A zodiac observatory with a bronze twelve-sign instrument${props.sky?.placements.length ? ", birth-chart markers" : ""}, ${props.chapters.length} chapter displays, and opening reading desks. Use the named sky, chapter, and scene controls to explore.` : "Four sculptural chapter objects. Use the named chapter buttons and 3D controls to explore.");
     canvas.style.cssText = "display:block;width:100%;height:100%;cursor:grab";
     this.host.append(canvas);
     this.renderer.setClearColor("#091b21");
@@ -209,7 +209,7 @@ class PortraitRuntime {
   }
 
   private snapshot = (): CameraBookmark => ({ position: this.camera.position.toArray(), target: this.controls.target.toArray(), frameDistance: this.frameDistance() });
-  private layout = (index: number, unfolded: boolean) => this.world ? stationPosition(index, unfolded) : chapterLayout(index, unfolded);
+  private layout = (index: number, unfolded: boolean) => this.world ? stationPosition(index, unfolded, this.forms.length) : chapterLayout(index, unfolded);
   private save = () => { if (this.ready) this.props.onBookmark(this.props.viewKey, this.snapshot()); };
   private bounds = (unfolded = this.props.unfolded) => this.localBoxes.map((box, index) => {
     const position = new Vector3().fromArray(this.layout(index, unfolded));
@@ -600,7 +600,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
   const latest = useRef(props);
   latest.current = props;
   const [status, setStatus] = useState<SceneStatus>("loading");
-  const assetKey = JSON.stringify(props.assets.map(asset => [asset.chapterId, asset.url, asset.sha256, asset.sourceImageSha256, asset.provenance]));
+  const assetKey = JSON.stringify([props.chapters.map(chapter => chapter.id), props.assets.map(asset => [asset.chapterId, asset.url, asset.sha256, asset.sourceImageSha256, asset.provenance])]);
 
   useLayoutEffect(() => {
     runtime.current?.update(props);
@@ -614,6 +614,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
     const owned: LoadedForm[] = [];
     setStatus("loading");
     latest.current.onStatus("loading");
+    latest.current.onArtworkFallback?.(false);
     const failure = () => {
       if (stopped) return;
       controller.abort();
@@ -625,14 +626,30 @@ export default function PortraitScene(props: PortraitSceneProps) {
     };
     const initialize = async () => {
       try {
-        if (!latest.current.assets.length) throw new Error("Missing chapter models");
-        const forms = await Promise.all(latest.current.assets.map(async asset => {
-          const form = await loadForm(asset, controller.signal);
+        const current = latest.current;
+        if (!current.chapters.length) throw new Error("Missing chapters");
+        let artworkFallback = false;
+        const forms = await Promise.all(current.chapters.map(async chapter => {
+          const asset = current.assets.find(asset => asset.chapterId === chapter.id);
+          if (!asset && !current.experience) throw new Error("Missing chapter model");
+          const folio = (): LoadedForm => {
+            const root = createReadingFolio(chapter.id);
+            return { id: chapter.id, root, resources: [root] };
+          };
+          let form: LoadedForm;
+          try { form = asset ? await loadForm(asset, controller.signal) : folio(); }
+          catch (cause) {
+            if (stopped || controller.signal.aborted || !current.experience) throw cause;
+            // Optional artwork must not take away a usable reading station.
+            artworkFallback = true;
+            form = folio();
+          }
           if (stopped || controller.signal.aborted) { disposeModel(form.resources); throw new Error("Model loading cancelled"); }
           owned.push(form);
           return form;
         }));
         if (stopped || !host.current || !labels.current) return;
+        latest.current.onArtworkFallback?.(artworkFallback);
         runtime.current = new PortraitRuntime(host.current, labels.current, forms, latest.current, failure,
           state => { if (!stopped) { setStatus(state); latest.current.onStatus(state); } });
       } catch {
@@ -658,9 +675,7 @@ export default function PortraitScene(props: PortraitSceneProps) {
       <svg className="sky-marker-connector" aria-hidden="true"><line data-sky-connector style={{ visibility: "hidden" }} /></svg>
       {props.sky?.placements.map(placement => <button key={placement.body} type="button" className="sky-body-label" data-sky-body={placement.body} data-selected={props.selectedSkyBody === placement.body}
         aria-label={`${skyBodyLabels[placement.body]} in ${signLabel(placement.sign)}`} style={{ visibility: "hidden" }} onClick={() => props.onSelectSkyBody?.(placement.body)}><BodyIcon body={placement.body} />{skyBodyLabels[placement.body]}</button>)}
-      {props.assets.map((asset, index) => {
-        const chapter = props.chapters.find(item => item.id === asset.chapterId);
-        if (!chapter) return null;
+      {props.chapters.map((chapter, index) => {
         const selected = props.selectedIds.includes(chapter.id);
         const annotation = selected && chapter.id === props.selectedIds[0];
         return <button key={chapter.id} type="button" data-form-index={index} data-selected={selected} data-active-passage={annotation && props.activePassage !== null ? props.activePassage : undefined}

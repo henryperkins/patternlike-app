@@ -59,7 +59,11 @@ function saved() {
 const modelBlobs = new Map<string, Blob>();
 const sky: PortraitSky = { chartId: "chart-current", placements: [{ body: "sun", longitude: 42, sign: "taurus", degree: 12 }], unavailable: { moon: "missing", ascendant: "missing" } };
 function show(overrides: Partial<typeof props> & { sky?: PortraitSky | null } = {}) { return render(<AccountPortraitExplorer {...props} {...overrides}><p>Complete written reading</p></AccountPortraitExplorer>); }
-beforeEach(() => {
+async function hydrated() {
+  await waitFor(() => expect(vi.mocked(PortraitExplorer).mock.lastCall?.[0].meshBundle?.assets).toHaveLength(4));
+}
+beforeEach(async () => {
+  await new Promise(resolve => window.setTimeout(resolve, 0));
   vi.clearAllMocks(); modelBlobs.clear(); vi.stubGlobal("crypto", webcrypto); vi.stubGlobal("Blob", NodeBlob);
   HTMLElement.prototype.scrollIntoView = vi.fn();
   window.history.replaceState({ route: "pattern" }, "");
@@ -70,6 +74,25 @@ beforeEach(() => {
   vi.mocked(getPatternPortraitModel).mockImplementation(async (id) => modelBlobs.get(id)!);
 });
 describe("automated account portrait delivery", () => {
+  it.each([3, 4, 5, 6])("opens the observatory by default for a %i-chapter Pattern before artwork is available", async (count) => {
+    vi.mocked(getPatternPortraitExplorer).mockReturnValue(new Promise(() => undefined));
+    const current = { ...document, core_chapters: Array.from({ length: count }, (_, index) => ({ ...document.core_chapters[index % 4], title: `Chapter ${index + 1}` })) };
+    show({ document: current, canCreate: false });
+    expect(await screen.findByRole("region", { name: "Pattern portrait explorer" })).toBeInTheDocument();
+    expect(vi.mocked(PortraitExplorer).mock.lastCall![0].source).toMatchObject({ document: current });
+    expect(getPatternPortraitModel).not.toHaveBeenCalled();
+    expect(screen.getByTestId("automation-control")).toHaveAttribute("data-can-enable", "false");
+    expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it.each(["unavailable", "not_started", "generating", "failed"] as const)("keeps the default observatory open when artwork is %s", async (status) => {
+    vi.mocked(getPatternPortraitExplorer).mockResolvedValue({ ...saved(), status, completed_models: 0, retryable: false, models: [] });
+    show();
+    await waitFor(() => expect(screen.queryByText("Checking your saved portrait.")).not.toBeInTheDocument());
+    expect(await screen.findByRole("region", { name: "Pattern portrait explorer" })).toBeInTheDocument();
+    expect(getPatternPortraitModel).not.toHaveBeenCalled();
+  });
+
   it("releases retained portrait bytes and navigation when the Pattern is deleted", async () => {
     let session!: ReturnType<typeof usePortraitSession>;
     function CaptureSession() { session = usePortraitSession(JSON.stringify([props.chartId, document])); return null; }
@@ -79,14 +102,14 @@ describe("automated account portrait delivery", () => {
     vi.mocked(deleteGeneratedPattern).mockResolvedValue(undefined);
     render(<PortraitSessionProvider><CaptureSession /><PatternExperience chartId={props.chartId} onUnauthorized={unauthorized} /></PortraitSessionProvider>);
     const accountEntry = window.history.state;
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    await screen.findByText("Personal interactive explorer");
+    await hydrated();
     act(() => {
       const { dispatch } = vi.mocked(PortraitExplorer).mock.lastCall![0].navigation!;
       dispatch({ type: "select", chapterId: "chapter-2" });
       dispatch({ type: "facet", facet: "resources" });
       dispatch({ type: "presentation", presentation: "reading" });
     });
+    await hydrated();
     expect(session.verified?.artifacts).toHaveLength(4);
     await userEvent.click(screen.getByRole("button", { name: "Delete this Pattern" }));
     await userEvent.type(screen.getByLabelText(/Type DELETE PATTERN to confirm/), "DELETE PATTERN");
@@ -98,6 +121,24 @@ describe("automated account portrait delivery", () => {
     expect(session.memory.history.entries.size).toBe(0);
     await waitFor(() => expect(window.history.state).toEqual(accountEntry));
   });
+  it("retains a deliberate reading choice across remounts and focuses an explicit reopen", async () => {
+    function Routes() {
+      const [visible, setVisible] = useState(true);
+      return <PortraitSessionProvider><button onClick={() => setVisible(value => !value)}>Change page</button>
+        {visible && <AccountPortraitExplorer {...props}><p>Complete written reading</p></AccountPortraitExplorer>}
+      </PortraitSessionProvider>;
+    }
+    render(<Routes />);
+    await hydrated();
+    await userEvent.click(screen.getByRole("button", { name: "Back to reading" }));
+    await waitFor(() => expect(window.history.state).toEqual({ route: "pattern" }));
+    await userEvent.click(screen.getByRole("button", { name: "Change page" }));
+    await userEvent.click(screen.getByRole("button", { name: "Change page" }));
+    expect(screen.queryByText("Personal interactive explorer")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Explore your 3D portrait" }));
+    expect(screen.getByText("Personal interactive explorer")).toHaveFocus();
+  });
+
   it("reuses verified blobs with fresh URLs when returning to a retained history entry", async () => {
     function Routes() {
       const [visible, setVisible] = useState(true);
@@ -106,19 +147,19 @@ describe("automated account portrait delivery", () => {
       </PortraitSessionProvider>;
     }
     render(<Routes />);
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
     await screen.findByText("Personal interactive explorer");
+    await hydrated();
     const original = vi.mocked(PortraitExplorer).mock.lastCall![0];
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(8);
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
-    await screen.findByText("Personal interactive explorer");
+    await hydrated();
     const reopened = vi.mocked(PortraitExplorer).mock.lastCall![0];
     expect(getPatternPortraitExplorer).toHaveBeenCalledTimes(2);
     expect(getPatternPortraitImage).toHaveBeenCalledTimes(4);
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(4);
-    expect(reopened.meshBundle.assets[0].url).not.toBe(original.meshBundle.assets[0].url);
-    expect(reopened.meshBundle.assets[0].sourceText).toBe(original.meshBundle.assets[0].sourceText);
+    expect(reopened.meshBundle!.assets[0].url).not.toBe(original.meshBundle!.assets[0].url);
+    expect(reopened.meshBundle!.assets[0].sourceText).toBe(original.meshBundle!.assets[0].sourceText);
   });
 
   it("refetches assets when the authenticated response changes their identity", async () => {
@@ -129,8 +170,8 @@ describe("automated account portrait delivery", () => {
       </PortraitSessionProvider>;
     }
     render(<Routes />);
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
     await screen.findByText("Personal interactive explorer");
+    await hydrated();
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
     const replacement = saved();
     for (const model of replacement.models) {
@@ -141,18 +182,19 @@ describe("automated account portrait delivery", () => {
     vi.mocked(getPatternPortraitExplorer).mockResolvedValue(replacement);
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
     await screen.findByText("Personal interactive explorer");
+    await hydrated();
     expect(getPatternPortraitImage).toHaveBeenCalledTimes(8);
+    await hydrated();
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(8);
   });
 
   it("discards cached bytes when the session boundary is replaced", async () => {
     const renderSession = (key: number) => <PortraitSessionProvider key={key}><AccountPortraitExplorer {...props}><p>Complete written reading</p></AccountPortraitExplorer></PortraitSessionProvider>;
     const view = render(renderSession(1));
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    await screen.findByText("Personal interactive explorer");
+    await hydrated();
     view.rerender(renderSession(2));
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    await screen.findByText("Personal interactive explorer");
+    await hydrated();
+    await hydrated();
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(8);
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(8);
   });
@@ -165,8 +207,8 @@ describe("automated account portrait delivery", () => {
       </PortraitSessionProvider>;
     }
     render(<Routes />);
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
     await screen.findByText("Personal interactive explorer");
+    await hydrated();
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
     vi.mocked(getPatternPortraitExplorer).mockRejectedValueOnce(new ApiError(401, { error: { code: "unauthorized", message: "Sign in again" } }));
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
@@ -176,26 +218,26 @@ describe("automated account portrait delivery", () => {
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
     await userEvent.click(screen.getByRole("button", { name: "Change page" }));
     await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    await screen.findByText("Personal interactive explorer");
+    await hydrated();
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(8);
   });
   it("carries supported sky facts through the Pattern account flow without changing saved source bindings", async () => {
     vi.mocked(getPatternState).mockResolvedValue({ schema_version: "0.9.0", state: "ready", chart: { chart_id: props.chartId, effective_accuracy: "exact", feature_policy_version: "1.0.0" }, consent: null, generation: null, pattern, regeneration: null });
     vi.mocked(getGeneratedPattern).mockResolvedValue(document);
     render(<PatternExperience chartId={props.chartId} onUnauthorized={unauthorized} sky={sky} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
     await screen.findByText("Personal interactive explorer");
+    await hydrated();
     const explorer = vi.mocked(PortraitExplorer).mock.lastCall![0];
     expect(explorer.sky).toEqual(sky);
     expect(explorer.source).toEqual({ status: "ready", document, sunSign: "taurus" });
-    expect(explorer.meshBundle.documentRevision).toBe(revision);
-    expect(explorer.meshBundle.assets.map(asset => asset.sourceText)).toEqual(ready().chapters.map(chapter => chapter.source_text));
+    expect(explorer.meshBundle!.documentRevision).toBe(revision);
+    expect(explorer.meshBundle!.assets.map(asset => asset.sourceText)).toEqual(ready().chapters.map(chapter => chapter.source_text));
   });
 
   it("removes mismatched chart facts without discarding the saved portrait or refetching its assets", async () => {
     const view = show({ sky });
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
     await screen.findByText("Personal interactive explorer");
+    await hydrated();
     const original = vi.mocked(PortraitExplorer).mock.lastCall![0];
     expect(original.sky).toEqual(sky);
     view.rerender(<AccountPortraitExplorer {...props} sky={{ ...sky, chartId: "another-chart" }}><p>Complete written reading</p></AccountPortraitExplorer>);
@@ -206,18 +248,11 @@ describe("automated account portrait delivery", () => {
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(4);
   });
 
-  it("keeps the automation preference reachable for a current Pattern with a different chapter count", () => {
-    show({ document: { ...document, core_chapters: document.core_chapters.slice(0, 3) } });
-    expect(screen.getByTestId("automation-control")).toBeInTheDocument();
-    expect(screen.getByText(/3D portraits currently support four-chapter Patterns/)).toBeInTheDocument();
-    expect(screen.getByText("Complete written reading")).toBeInTheDocument();
-    expect(getPatternPortraitExplorer).not.toHaveBeenCalled();
-  });
-
-  it("loads the saved personal explorer on demand without a generation action, verifies private assets and cleans them up", async () => {
+  it("loads the saved personal explorer by default without a generation action, verifies private assets and cleans them up", async () => {
     const view = show();
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await screen.findByText("Personal interactive explorer");
     expect(await screen.findByText("Personal interactive explorer")).toBeInTheDocument();
+    await hydrated();
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(4);
     expect(getPatternPortraitImage).toHaveBeenCalledTimes(4);
     expect(vi.mocked(PortraitExplorer).mock.lastCall?.[0]).toMatchObject({ source: { document }, meshBundle: { authoring: "codex-parametric/v1", documentRevision: revision } });
@@ -232,24 +267,24 @@ describe("automated account portrait delivery", () => {
     vi.mocked(getPatternPortraitExplorer).mockResolvedValue(value); show();
     expect(await screen.findByRole("alert")).toHaveTextContent(/no longer matches/);
     expect(getPatternPortraitModel).not.toHaveBeenCalled();
-    expect(screen.getByText("Complete written reading")).toBeInTheDocument();
+    expect(screen.getByText("Personal interactive explorer")).toBeInTheDocument();
   });
   it("keeps reading visible and creates no URLs when an actual GLB hash differs", async () => {
     vi.mocked(getPatternPortraitModel).mockResolvedValue(new Blob(["different model"], { type: "model/gltf-binary" })); show();
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await screen.findByText("Personal interactive explorer");
     expect(await screen.findByRole("button", { name: "Retry portrait loading" })).toBeInTheDocument();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
-    expect(screen.getByText("Complete written reading")).toBeInTheDocument();
+    expect(screen.getByText("Personal interactive explorer")).toBeInTheDocument();
   });
-  it("preserves the legacy account flow when connected model delivery is unavailable", async () => {
+  it("keeps the observatory when connected model delivery is unavailable", async () => {
     vi.mocked(getPatternPortraitExplorer).mockRejectedValue(new ApiError(404, { error: { code: "not_found", message: "Not found" } })); show();
-    expect(await screen.findByText("Legacy saved portrait")).toBeInTheDocument();
+    expect(await screen.findByText("Personal interactive explorer")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
   it("shows durable progress while keeping the complete reading available", async () => {
     vi.mocked(getPatternPortraitExplorer).mockResolvedValue({ ...saved(), status: "generating", completed_models: 2, models: [] }); show();
     expect(await screen.findByText(/2 of 4 models/)).toBeInTheDocument();
-    expect(screen.getByText("Complete written reading")).toBeInTheDocument();
+    expect(screen.getByText("Personal interactive explorer")).toBeInTheDocument();
     expect(getPatternPortraitModel).not.toHaveBeenCalled();
   });
   it("downloads the complete saved portrait with the current source identity", async () => {
@@ -263,7 +298,7 @@ describe("automated account portrait delivery", () => {
     let release!: (value: Blob) => void;
     const gate = new Promise<Blob>((resolve) => { release = resolve; });
     vi.mocked(getPatternPortraitModel).mockReturnValue(gate); const view = show();
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await screen.findByText("Personal interactive explorer");
     await waitFor(() => expect(getPatternPortraitModel).toHaveBeenCalledTimes(4));
     const signal = vi.mocked(getPatternPortraitModel).mock.calls[0][1]!; view.unmount();
     expect(signal.aborted).toBe(true);
@@ -274,10 +309,10 @@ describe("automated account portrait delivery", () => {
   it("can cancel stalled asset loading and return to the original account history entry", async () => {
     vi.mocked(getPatternPortraitModel).mockReturnValue(new Promise(() => undefined));
     show();
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    await screen.findByText("Personal interactive explorer");
     await waitFor(() => expect(getPatternPortraitModel).toHaveBeenCalledTimes(4));
     const signal = vi.mocked(getPatternPortraitModel).mock.calls[0][1]!;
-    await userEvent.click(screen.getByRole("button", { name: "Cancel portrait loading" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to reading" }));
     expect(signal.aborted).toBe(true);
     expect(screen.getByRole("button", { name: "Explore your 3D portrait" })).toBeEnabled();
     expect(screen.getByText("Complete written reading").parentElement).toHaveFocus();
@@ -289,52 +324,48 @@ describe("automated account portrait delivery", () => {
     show({ canCreate: false });
     await waitFor(() => expect(screen.queryByText("Checking your saved portrait.")).not.toBeInTheDocument());
     expect(screen.queryByText("Legacy saved portrait")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Complete written reading")).toHaveLength(1);
+    expect(screen.getAllByText("Personal interactive explorer")).toHaveLength(1);
     expect(screen.getByTestId("automation-control")).toHaveAttribute("data-can-enable", "false");
   });
 
-  it("keeps the entry button focused while assets load", async () => {
-    vi.mocked(getPatternPortraitModel).mockReturnValue(new Promise(() => undefined));
-    show();
-    const entry = await screen.findByRole("button", { name: "Explore your 3D portrait" });
-    await userEvent.click(entry);
-    expect(entry).toBeEnabled();
-    expect(entry).toHaveFocus();
-    expect(screen.getByText("Loading your saved images and 3D models.")).toBeInTheDocument();
+  it("does not steal focus when the default observatory opens or artwork arrives", async () => {
+    const button = globalThis.document.createElement("button");
+    globalThis.document.body.append(button); button.focus();
+    show(); await hydrated();
+    expect(button).toHaveFocus();
+    expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    button.remove();
   });
 
   it("lets a failed portrait refresh its status without starting new work", async () => {
     vi.mocked(getPatternPortraitExplorer).mockResolvedValueOnce({ ...saved(), status: "failed", completed_models: 2, retryable: true, models: [] });
     show();
     await userEvent.click(await screen.findByRole("button", { name: "Refresh portrait status" }));
-    expect(await screen.findByRole("button", { name: "Explore your 3D portrait" })).toBeInTheDocument();
-    expect(getPatternPortraitModel).not.toHaveBeenCalled();
+    await hydrated();
+    expect(screen.getByText("Personal interactive explorer")).toBeInTheDocument();
     expect(screen.queryByText("Legacy saved portrait")).not.toBeInTheDocument();
   });
 
-  it("reveals and focuses the explorer after hydration and returns to reading when a status refresh fails", async () => {
-    show();
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    const explorer = await screen.findByText("Personal interactive explorer");
-    await waitFor(() => expect(explorer).toHaveFocus());
-    expect(vi.mocked(explorer.scrollIntoView).mock.contexts).toContain(explorer);
-    expect(explorer.scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "start" });
+  it("keeps navigation open while failed status refreshes discard private artwork, then recovers", async () => {
+    show(); await hydrated();
+    const navigation = vi.mocked(PortraitExplorer).mock.lastCall![0].navigation!;
+    act(() => navigation.dispatch({ type: "select", chapterId: "chapter-2" }));
     vi.mocked(getPatternPortraitExplorer).mockRejectedValueOnce(new Error("Refresh failed."));
     await userEvent.click(screen.getByTestId("automation-control"));
     expect(await screen.findByRole("alert")).toHaveTextContent("Refresh failed.");
-    expect(screen.queryByText("Personal interactive explorer")).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("Complete written reading").parentElement).toHaveFocus());
+    expect(screen.getByText("Personal interactive explorer")).toBeInTheDocument();
+    expect(vi.mocked(PortraitExplorer).mock.lastCall![0].meshBundle).toBeUndefined();
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(8);
     await userEvent.click(screen.getByRole("button", { name: "Refresh portrait status" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    expect(await screen.findByText("Personal interactive explorer")).toBeInTheDocument();
+    await hydrated();
     expect(getPatternPortraitModel).toHaveBeenCalledTimes(8);
+    expect(vi.mocked(PortraitExplorer).mock.lastCall![0].navigation!.state.view).toMatchObject({ kind: "chapter", chapterId: "chapter-2" });
   });
 
   it("aborts asset hydration immediately when refreshed authorization fails", async () => {
     let release!: (blob: Blob) => void;
     vi.mocked(getPatternPortraitModel).mockReturnValue(new Promise(resolve => { release = resolve; }));
-    show(); await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
+    show(); await screen.findByText("Personal interactive explorer");
     await waitFor(() => expect(getPatternPortraitModel).toHaveBeenCalledTimes(4));
     const signal = vi.mocked(getPatternPortraitModel).mock.calls[0][1]!;
     vi.mocked(getPatternPortraitExplorer).mockRejectedValueOnce(new Error("Current source unavailable."));
@@ -346,8 +377,8 @@ describe("automated account portrait delivery", () => {
   });
 
   it("preserves hydrated source and mesh props across an unchanged status refresh", async () => {
-    show(); await userEvent.click(await screen.findByRole("button", { name: "Explore your 3D portrait" }));
-    await screen.findByText("Personal interactive explorer");
+    show(); await screen.findByText("Personal interactive explorer");
+    await hydrated();
     const original = vi.mocked(PortraitExplorer).mock.lastCall![0];
     vi.mocked(getPatternPortraitExplorer).mockResolvedValue(saved());
     await userEvent.click(screen.getByTestId("automation-control"));

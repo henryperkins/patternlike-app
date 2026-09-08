@@ -56,7 +56,7 @@ export function clearExplorerMemory(memory: ExplorerMemory): void {
 
 /** The account session retains the controller across route changes. Browser
  * history contains opaque indices only; all chapter content stays in memory. */
-export function useExplorerNavigation(chapterIds: readonly string[], { embedded = false, memory: suppliedMemory }: { embedded?: boolean; memory?: ExplorerMemory } = {}): ExplorerNavigation {
+export function useExplorerNavigation(chapterIds: readonly string[], { embedded = false, defaultOpen = false, memory: suppliedMemory }: { embedded?: boolean; defaultOpen?: boolean; memory?: ExplorerMemory } = {}): ExplorerNavigation {
   const localMemory = useRef(createExplorerMemory());
   const memory = suppliedMemory ?? localMemory.current;
   const [state, setState] = useState(() => memory.snapshot ?? createExplorerState(chapterIds));
@@ -131,6 +131,12 @@ export function useExplorerNavigation(chapterIds: readonly string[], { embedded 
     }
     apply(next); show(true);
   }, [apply, history, show]);
+
+  // Only the first visit to this source opens automatically. A deliberate return
+  // to reading, including native Back, survives status polls and route remounts.
+  useEffect(() => {
+    if (defaultOpen && memory.snapshot === null) open();
+  }, [defaultOpen, memory, open]);
 
   const close = useCallback(() => {
     if (!opened.current) return;

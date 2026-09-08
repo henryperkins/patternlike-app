@@ -10,9 +10,34 @@ import { createZodiacInstrument, type ZodiacInstrument } from "./zodiac-instrume
 
 const positions: Point3[] = [[2.65, 0, 2.05], [-2.65, 0, -2.05], [2.65, 0, -2.05], [-2.65, 0, 2.05]];
 export const DISPLAY_HEIGHT = 0.56;
-export function stationPosition(index: number, unfolded: boolean): Point3 {
-  const [x, y, z] = positions[index] ?? [0, 0, 0];
+export function stationPosition(index: number, unfolded: boolean, count = 4): Point3 {
+  // Longer readings use three stations per aisle, clear of the central instrument.
+  const [x, y, z] = count > 4 ? [index % 2 === 0 ? 2.65 : -2.65, 0, 2.8 - Math.floor(index / 2) * 2.8] : positions[index] ?? [0, 0, 0];
   return [x * (unfolded ? 1.32 : 1), y, z * (unfolded ? 1.32 : 1)];
+}
+
+/** A reading folio is part of the authored room, not a generated chapter metaphor. */
+export function createReadingFolio(chapterId: string): Group {
+  const root = new Group();
+  root.name = "Chapter reading folio";
+  root.userData.chapterId = chapterId;
+  const cover = new MeshStandardMaterial({ color: "#173f35", roughness: 0.8 });
+  const paper = new MeshStandardMaterial({ color: "#ede1bf", roughness: 0.95 });
+  const bronze = new MeshStandardMaterial({ color: "#ad8950", roughness: 0.4, metalness: 0.65 });
+  const part = (size: Point3, position: Point3, material: MeshStandardMaterial) => {
+    const mesh = new Mesh(new BoxGeometry(...size), material);
+    mesh.position.set(...position);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.userData.chapterId = chapterId;
+    root.add(mesh);
+  };
+  part([1.65, 0.08, 1.15], [0, 0.04, 0], cover);
+  for (const side of [-1, 1]) {
+    part([0.74, 0.14, 1.03], [side * 0.4, 0.15, 0], paper);
+    for (let line = 0; line < 7; line++) part([line === 6 ? 0.3 : 0.55, 0.006, 0.012], [side * 0.4, 0.223, -0.35 + line * 0.105], bronze);
+  }
+  part([0.035, 0.025, 1.07], [0, 0.225, 0], bronze);
+  return root;
 }
 
 /** Chapter destinations are actual approaches; the overview includes the courtyard architecture. */
@@ -233,7 +258,7 @@ export function createObservatory(count: number, placements: readonly PortraitSk
     const light = new PointLight("#ffd3a0", 1, 5, 2);
     light.position.set(0.95, 2.6, -0.95);
     station.add(light);
-    station.position.set(...stationPosition(index, false));
+    station.position.set(...stationPosition(index, false, count));
     root.add(station);
     stations.push(station); desks.push(lid); lights.push(light);
   }
@@ -247,7 +272,7 @@ export function createObservatory(count: number, placements: readonly PortraitSk
       const goal = state.open[index] ? -1.25 : 0;
       desk.rotation.x = approach(desk.rotation.x, goal, fraction);
       moving ||= desk.rotation.x !== goal;
-      const destination = stationPosition(index, state.unfolded);
+      const destination = stationPosition(index, state.unfolded, count);
       for (const [axis, value] of (["x", "y", "z"] as const).map((axis, i) => [axis, destination[i]] as const)) {
         stations[index].position[axis] = approach(stations[index].position[axis], value, fraction);
         moving ||= stations[index].position[axis] !== value;
