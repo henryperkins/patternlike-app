@@ -7,6 +7,7 @@ import {
 import Ajv2020 from "ajv/dist/2020.js";
 import type { ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
+import { lazy } from "./lazy-validator.js";
 import commonSchema from "../../../../contracts/m0/common.schema.json";
 import contentReleaseSchema from "../../../../contracts/m0/content-release.schema.json";
 import m3CommonSchema from "../../../../contracts/m3/common.schema.json";
@@ -405,15 +406,18 @@ const RELEASE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 // Register every absolute document reached by either supported release schema.
 // Version selection remains explicit below; registration alone never makes a
 // schema version ingestible.
-const schemaValidator = new Ajv2020({ strict: true });
-addFormats(schemaValidator);
-schemaValidator.addSchema(commonSchema);
-schemaValidator.addSchema(contentReleaseSchema);
-schemaValidator.addSchema(m3CommonSchema);
-schemaValidator.addSchema(m3ContentReleaseSchema);
-schemaValidator.addSchema(m4CommonSchema);
-schemaValidator.addSchema(m4NatalFeatureSchema);
-schemaValidator.addSchema(m4ContentReleaseSchema);
+const schemaValidator = lazy(() => {
+  const validator = new Ajv2020({ strict: true });
+  addFormats(validator);
+  validator.addSchema(commonSchema);
+  validator.addSchema(contentReleaseSchema);
+  validator.addSchema(m3CommonSchema);
+  validator.addSchema(m3ContentReleaseSchema);
+  validator.addSchema(m4CommonSchema);
+  validator.addSchema(m4NatalFeatureSchema);
+  validator.addSchema(m4ContentReleaseSchema);
+  return validator;
+});
 
 /**
  * Explicit, bounded version dispatch. A `schema_version` with no entry here
@@ -428,7 +432,7 @@ const RELEASE_REQUEST_SCHEMAS: ReadonlyArray<readonly [string, { $id: string }]>
 
 const releaseRequestValidators = new Map<string, ValidateFunction<ContentReleaseIngestionRequest>>(
   RELEASE_REQUEST_SCHEMAS.map(([version, schema]) => {
-    const validator = schemaValidator.getSchema<ContentReleaseIngestionRequest>(
+    const validator = schemaValidator().getSchema<ContentReleaseIngestionRequest>(
       `${schema.$id}#/$defs/contentReleaseIngestionRequest`,
     );
     if (!validator) throw new Error(`Could not load ${version} content release schema`);

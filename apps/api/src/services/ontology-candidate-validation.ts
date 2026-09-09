@@ -5,6 +5,7 @@ import {
 } from "@patternlike/shared";
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import { lazy } from "./lazy-validator.js";
 
 import m0ChartContractSchema from "../../../../contracts/m0/chart-contract.schema.json";
 import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
@@ -50,33 +51,35 @@ export interface OntologyCandidateValidationOptions {
   maximumCandidateBytes: number;
 }
 
-const schemaValidator = new Ajv2020({ strict: true });
-addFormats(schemaValidator);
-for (const schema of [
-  m0CommonSchema,
-  m3CommonSchema,
-  m4CommonSchema,
-  m4NatalFeatureSchema,
-  m7CommonSchema,
-  ontologyRecordSchema,
-  ontologyEvaluationSchema,
-  ontologyReleaseSchema,
-]) {
-  schemaValidator.addSchema(schema);
-}
+const frozenValidators = lazy(() => {
+  const schemaValidator = new Ajv2020({ strict: true });
+  addFormats(schemaValidator);
+  for (const schema of [
+    m0CommonSchema,
+    m3CommonSchema,
+    m4CommonSchema,
+    m4NatalFeatureSchema,
+    m7CommonSchema,
+    ontologyRecordSchema,
+    ontologyEvaluationSchema,
+    ontologyReleaseSchema,
+  ]) {
+    schemaValidator.addSchema(schema);
+  }
 
-function requiredValidator<T>(schemaId: string): ValidateFunction<T> {
-  const validator = schemaValidator.getSchema<T>(schemaId);
-  if (!validator) throw new Error("Frozen M7 ontology release schema is unavailable");
-  return validator;
-}
+  function requiredValidator<T>(schemaId: string): ValidateFunction<T> {
+    const validator = schemaValidator.getSchema<T>(schemaId);
+    if (!validator) throw new Error("Frozen M7 ontology release schema is unavailable");
+    return validator;
+  }
 
-const validateFrozenRelease = requiredValidator<PatternOntologyRelease>(
-  ontologyReleaseSchema.$id,
-);
-const validateFrozenPredicate = requiredValidator<
-  PatternOntologyRecord["feature_predicate"]
->(`${m4NatalFeatureSchema.$id}#/$defs/natalPredicate`);
+  return {
+    release: requiredValidator<PatternOntologyRelease>(ontologyReleaseSchema.$id),
+    predicate: requiredValidator<PatternOntologyRecord["feature_predicate"]>(
+      `${m4NatalFeatureSchema.$id}#/$defs/natalPredicate`,
+    ),
+  };
+});
 const FROZEN_PATTERN_TYPES: ReadonlySet<string> = new Set(
   m0ChartContractSchema.$defs.chartSnapshot.properties.patterns.items
     .properties.pattern_type.enum,
@@ -340,7 +343,7 @@ export function validateOntologyCandidateRelease(
   options: OntologyCandidateValidationOptions,
 ): OntologyCandidateValidationResult {
   if (
-    !validateFrozenRelease(value) ||
+    !frozenValidators().release(value) ||
     canonicalJson(value) !== options.canonicalBytes
   ) {
     return {
@@ -369,7 +372,7 @@ export function validateOntologyCandidateRelease(
   }
   if (
     !value.records.every((record) => {
-      if (!validateFrozenPredicate(record.feature_predicate)) {
+      if (!frozenValidators().predicate(record.feature_predicate)) {
         return options.coverageSourceHints.some((hint) =>
           predicateMatchesHint(record.feature_predicate, hint)
         );

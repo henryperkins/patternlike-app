@@ -8,6 +8,7 @@ import {
 } from "@patternlike/shared";
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import { lazy } from "./lazy-validator.js";
 
 import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
 import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
@@ -200,19 +201,22 @@ const WRITER_FIELDS = new Set([
 ]);
 const PUBLIC_KEY_FIELDS = new Set(["alg", "public_key"]);
 
-const schemaValidator = new Ajv2020({ strict: true });
-addFormats(schemaValidator);
-for (const schema of [
-  m0CommonSchema,
-  m7CommonSchema,
-  replayEventSchema,
-  m9CommonSchema,
-  regenerationReplayEventSchema,
-]) {
-  schemaValidator.addSchema(schema);
-}
+const schemaValidator = lazy(() => {
+  const validator = new Ajv2020({ strict: true });
+  addFormats(validator);
+  for (const schema of [
+    m0CommonSchema,
+    m7CommonSchema,
+    replayEventSchema,
+    m9CommonSchema,
+    regenerationReplayEventSchema,
+  ]) {
+    validator.addSchema(schema);
+  }
+  return validator;
+});
 function requiredReplayEventValidator(): ValidateFunction<PatternErasureReplayEvent> {
-  const validator = schemaValidator.getSchema<PatternErasureReplayEvent>(
+  const validator = schemaValidator().getSchema<PatternErasureReplayEvent>(
     replayEventSchema.$id,
   );
   if (!validator) {
@@ -220,10 +224,10 @@ function requiredReplayEventValidator(): ValidateFunction<PatternErasureReplayEv
   }
   return validator;
 }
-const validateReplayEvent = requiredReplayEventValidator();
+const validateReplayEvent = lazy(requiredReplayEventValidator);
 
 function requiredRegenerationReplayEventValidator(): ValidateFunction<PatternRegenerationReplayEvent> {
-  const validator = schemaValidator.getSchema<PatternRegenerationReplayEvent>(
+  const validator = schemaValidator().getSchema<PatternRegenerationReplayEvent>(
     regenerationReplayEventSchema.$id,
   );
   if (!validator) {
@@ -231,7 +235,9 @@ function requiredRegenerationReplayEventValidator(): ValidateFunction<PatternReg
   }
   return validator;
 }
-const validateRegenerationReplayEvent = requiredRegenerationReplayEventValidator();
+const validateRegenerationReplayEvent = lazy(
+  requiredRegenerationReplayEventValidator,
+);
 
 function fail(code: string): never {
   throw new PatternReplayLedgerError(code);
@@ -368,8 +374,8 @@ export async function verifyPatternReplayEvent(
   rawKeyring: string | undefined,
 ): Promise<PatternReplayEvent> {
   const valid = isRecord(value) && value.schema_version === M9_SCHEMA_VERSION
-    ? validateRegenerationReplayEvent(value)
-    : validateReplayEvent(value);
+    ? validateRegenerationReplayEvent()(value)
+    : validateReplayEvent()(value);
   if (!valid) fail("replay_event_schema_invalid");
   const event = value as PatternReplayEvent;
   const payload = replaySigningPayload(event);

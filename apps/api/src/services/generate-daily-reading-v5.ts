@@ -69,12 +69,15 @@ import {
   READING_PUBLISHER_PROVIDER,
 } from "./reading-publisher.js";
 import { READING_PROMPT_VERSION } from "./reading-prompt.js";
+import { lazy } from "./lazy-validator.js";
 import { safeLog } from "./safe-log.js";
 import type { StoredReadingV5 } from "./stored-reading.js";
 
-const ajv = new Ajv2020({ strict: false });
-addFormats(ajv);
-const validateOutputSchema = ajv.compile(outputSchema);
+const validateOutputSchema = lazy(() => {
+  const ajv = new Ajv2020({ strict: false });
+  addFormats(ajv);
+  return ajv.compile(outputSchema);
+});
 
 /**
  * The reader-facing statement of what wrote this reading.
@@ -716,7 +719,7 @@ export async function generateDailyReadingV5(
       failures,
     });
   };
-  if (!validateOutputSchema(publisher.candidate)) {
+  if (!validateOutputSchema()(publisher.candidate)) {
     logRejection([{ code: "schema_shape", detail_code: "schema_mismatch" }]);
     return fail("publisher_output_invalid", "schema_mismatch");
   }

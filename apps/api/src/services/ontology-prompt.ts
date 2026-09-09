@@ -1,6 +1,7 @@
 /** Separate generator/evaluator policies and strict OpenAI Responses schemas. */
 
 import Ajv2020 from "ajv/dist/2020.js";
+import { lazy } from "./lazy-validator.js";
 import m0ChartContractSchema from "../../../../contracts/m0/chart-contract.schema.json";
 import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
 import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
@@ -325,18 +326,20 @@ export const ONTOLOGY_STRICT_SCHEMA: Record<OntologyProviderPass, unknown> = {
   evaluator: EVALUATOR_SCHEMA,
 };
 
-const outputValidator = new Ajv2020({ strict: true });
-const validateGenerationChunk = outputValidator.compile(GENERATOR_SCHEMA);
-const validateRuleVerdict = outputValidator.compile<OntologyRuleVerdict>(
-  EVALUATOR_SCHEMA,
-);
+const outputValidators = lazy(() => {
+  const outputValidator = new Ajv2020({ strict: true });
+  return {
+    generationChunk: outputValidator.compile(GENERATOR_SCHEMA),
+    ruleVerdict: outputValidator.compile<OntologyRuleVerdict>(EVALUATOR_SCHEMA),
+  };
+});
 
 export function isOntologyGenerationChunk(value: unknown): value is OntologyGenerationChunk {
-  return validateGenerationChunk(value);
+  return outputValidators().generationChunk(value);
 }
 
 export function isOntologyRuleVerdict(value: unknown): value is OntologyRuleVerdict {
-  if (!validateRuleVerdict(value)) return false;
+  if (!outputValidators().ruleVerdict(value)) return false;
   const everyDimensionPasses = ONTOLOGY_EVALUATOR_DIMENSIONS.every(
     (dimension) => value.dimensions[dimension] === "pass",
   );
