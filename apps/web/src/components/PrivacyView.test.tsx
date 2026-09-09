@@ -24,6 +24,7 @@ import {
 
 const CONSENT = "/v1/consents/ai-synthesis";
 const TOPICS = "/v1/preferences/topic-exclusions";
+const PORTRAIT_AUTOMATION = "/v1/pattern-portrait/automation";
 
 const ok = (body: unknown): MockResponse => ({ status: 200, body });
 
@@ -78,9 +79,23 @@ function renderPrivacy(
   ) {
     responses[`GET ${GEOCODER_CONSENT_PATH}`] = ok(geocoderNotGranted);
   }
+  if (
+    !(`GET ${PORTRAIT_AUTOMATION}` in responses) &&
+    !(PORTRAIT_AUTOMATION in responses)
+  ) {
+    responses[`GET ${PORTRAIT_AUTOMATION}`] = {
+      status: 404,
+      body: { error: { code: "not_found", message: "Not found" } },
+    };
+  }
   mockApiResponses(responses);
+  const portraitProps = {
+    chartId: "chart-current",
+    onUnauthorized: () => undefined,
+  };
   return render(
     <PrivacyView
+      {...portraitProps}
       hasChart
       onSignOut={() => undefined}
       onDeletionAccepted={() => undefined}
@@ -102,6 +117,44 @@ function geocoderPanel(): HTMLElement {
 }
 
 describe("Context & privacy", () => {
+  it("keeps the automatic portrait choice in privacy", async () => {
+    renderPrivacy({
+      [`GET ${CONSENT}`]: ok(consentNotGranted),
+      [`GET ${PORTRAIT_AUTOMATION}`]: ok({
+        schema_version: "portrait-automation/v1",
+        available: true,
+        chart_id: "chart-current",
+        enabled: true,
+        consent_policy_version: "1.1.0",
+      }),
+    });
+
+    expect(await screen.findByRole("checkbox", { name: "Automatically create my 3D portrait" })).toBeChecked();
+    expect(screen.getByText(/complete chapter text and generated images are sent to Codex/i)).toBeInTheDocument();
+  });
+
+  it("keeps portrait automation available when Pattern consent cannot be read", async () => {
+    renderPrivacy({
+      "GET /v1/consents/pattern-generation": {
+        status: 503,
+        body: errorBody("temporarily_unavailable", "Pattern consent is temporarily unavailable"),
+      },
+      [`GET ${CONSENT}`]: ok(consentNotGranted),
+      [`GET ${PORTRAIT_AUTOMATION}`]: ok({
+        schema_version: "portrait-automation/v1",
+        available: true,
+        chart_id: "chart-current",
+        enabled: true,
+        consent_policy_version: "1.1.0",
+      }),
+    });
+
+    expect(await screen.findByText(/Pattern consent is temporarily unavailable/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Automatically create my 3D portrait" }),
+    ).toBeChecked();
+  });
+
   it("shows the server's own provider, purpose, policy, and category list", async () => {
     renderPrivacy({ [`GET ${CONSENT}`]: ok(consentNotGranted) });
 

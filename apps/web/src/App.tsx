@@ -470,7 +470,9 @@ export default function App({ isAuth0Redirect = false }: AppProps) {
     content = (
       <PrivacyView
         hasChart={chart !== null}
+        chartId={chart?.id ?? null}
         onSignOut={() => void endSessionAndSignOut()}
+        onUnauthorized={handleSignedOut}
         onDeletionAccepted={showDeletionStatus}
         onCorrectBirth={chart ? () => setCorrectingBirth(true) : undefined}
         onProcessingFrozen={(consent) => {

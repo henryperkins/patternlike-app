@@ -21,6 +21,7 @@ import { formatInstant } from "../lib/reading-format.js";
 import { AccountDataControls } from "./AccountDataControls.js";
 import { AiConsentTerms } from "./AiConsent.js";
 import { PatternConsentTerms } from "./PatternConsent.js";
+import { PortraitAutomationControl } from "./PortraitAutomationControl.js";
 import { ContextSourceControl } from "./ContextSourceControl.js";
 import { TopicExclusionsPanel } from "./TopicExclusionsPanel.js";
 import { Icon } from "./icons.js";
@@ -561,7 +562,10 @@ function AiSynthesisConsentPanel() {
   );
 }
 
-function PatternGenerationConsentPanel() {
+function PatternGenerationConsentPanel({ chartId, onUnauthorized }: {
+  chartId: string | null;
+  onUnauthorized: () => void;
+}) {
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "ready"; consent: PatternConsent }
@@ -655,6 +659,12 @@ function PatternGenerationConsentPanel() {
       ) : (
         <p>Reading Pattern consent.</p>
       )}
+      {chartId ? (
+        <PortraitAutomationControl
+          chartId={chartId}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : null}
       <p className="privacy-action__status" role="status" aria-live="polite">
         {problem ?? ""}
       </p>
@@ -673,16 +683,20 @@ function PatternGenerationConsentPanel() {
 
 export function PrivacyView({
   hasChart,
+  chartId = null,
   onSignOut,
   onDeletionAccepted,
   onCorrectBirth,
   onProcessingFrozen,
+  onUnauthorized = onSignOut,
 }: {
   hasChart: boolean;
+  chartId?: string | null;
   onSignOut: () => void;
   onDeletionAccepted: () => void;
   onCorrectBirth?: () => void;
   onProcessingFrozen: (consent: AccountProcessingConsentDocument) => void;
+  onUnauthorized?: () => void;
 }) {
   return (
     <div className="privacy-page page-enter">
@@ -719,7 +733,7 @@ export function PrivacyView({
 
       <GeocoderConsentPanel />
 
-      <PatternGenerationConsentPanel />
+      <PatternGenerationConsentPanel chartId={chartId} onUnauthorized={onUnauthorized} />
 
       <TopicExclusionsPanel />
 
