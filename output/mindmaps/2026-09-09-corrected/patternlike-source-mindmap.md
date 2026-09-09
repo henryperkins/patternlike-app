@@ -136,6 +136,11 @@
 - Text generation, native portrait images, and compiled portrait meshes have distinct execution paths; image and mesh lanes require runner enablement.
 - One process polls those lanes strictly in order, text first and meshes last, each checked only when the lane above it is idle, so distinct job types are not fair or parallel and sustained text work can delay artwork. This code is present in the repository; no installation or liveness on a host is claimed.
 
+### Operator generation and repair
+
+- Internal generation exposes operator action alongside automated scheduling: POST /internal/readings/reissue requires the live reading id and one revision reason drawn from a closed set.
+- The revision reason distinguishes a safety correction or defect repair from an automated retry. It is frozen into the command and stored with the published revision, so the record states which kind of act produced it rather than leaving operator repair indistinguishable from scheduled work.
+
 ### Storage and isolated signing
 
 - D1 stores account state, chart snapshots, permissions, readings, and durable job records; R2 stores releases and protected generation artifacts.
@@ -148,6 +153,16 @@
 - These are committed settings only. They do not establish deployed secrets, runner health, an active ontology, applied migrations, granted consent, or which release production is serving.
 
 ## Identity and privacy
+
+### Route authority zones
+
+- Six authorities share one Worker: unauthenticated health, session exchange and deletion status; the product API behind authenticate and the account-state gate; service-token /internal; Cloudflare Access /admin; the runner's /codex-provider; and /crypto-operator for key maintenance.
+- configGuard precedes every authority, and the product API mounts last so its wildcard middleware cannot reach the named zones. Each zone's credential must stay distinct: crypto-operator authority is deliberately neither service nor runner authority.
+
+### Administrator inspection and audit
+
+- Pattern administration is a Cloudflare Access boundary rather than a shared bearer: adminAuth validates the Access assertion against the configured team and application audience, then binds the verified subject to a short-lived hashed session.
+- Every inspection declares exactly one purpose from a closed set and writes a pattern_admin_access_events row naming the admin subject, target account, scope hash, and generation. This is privileged access to generation evidence, recorded separately from ordinary reader access.
 
 ### Sessions and account state
 
@@ -186,6 +201,11 @@
 
 - reading-engine and pattern-engine isolate deterministic product rules from network and storage access; shared contains the cross-service wire vocabulary.
 - The Swiss Ephemeris service declares AGPL-3.0-or-later while packages/shared declares UNLICENSED pending the boundary decision, so the repository records that question as open rather than settled.
+
+### Release assurance tooling
+
+- scripts/pattern-release/ holds distinct harnesses beyond the release builder: fresh reading, fresh Pattern, and verifier evaluation, plus an operational canary, release-evidence assembly, and release reconciliation, each with its own tests.
+- They are offline by construction — release-evidence cannot deploy or certify a provider account, and reconciliation makes no platform, provider, or database call. Their presence in the repository is not a record of any having been run.
 
 ### Local verification and release gate
 

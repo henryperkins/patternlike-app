@@ -237,6 +237,16 @@
   - apps/codex-runner/src/isolated-codex-json.ts:52
   - apps/api/src/routes/codex-provider.ts:266
 
+### Operator generation and repair
+
+- Internal generation exposes operator action alongside automated scheduling: POST /internal/readings/reissue requires the live reading id and one revision reason drawn from a closed set.
+- The revision reason distinguishes a safety correction or defect repair from an automated retry. It is frozen into the command and stored with the published revision, so the record states which kind of act produced it rather than leaving operator repair indistinguishable from scheduled work.
+- Source anchors
+  - apps/api/src/routes/internal-generation.ts:138
+  - apps/api/src/routes/internal-generation.ts:41
+  - apps/api/src/services/reading-invalidation.ts:247
+  - apps/api/src/services/generation-command-v2.ts:87
+
 ### Storage and isolated signing
 
 - D1 stores account state, chart snapshots, permissions, readings, and durable job records; R2 stores releases and protected generation artifacts.
@@ -257,6 +267,25 @@
   - apps/api/src/services/pattern-execute.ts:123
 
 ## Identity and privacy
+
+### Route authority zones
+
+- Six authorities share one Worker: unauthenticated health, session exchange and deletion status; the product API behind authenticate and the account-state gate; service-token /internal; Cloudflare Access /admin; the runner's /codex-provider; and /crypto-operator for key maintenance.
+- configGuard precedes every authority, and the product API mounts last so its wildcard middleware cannot reach the named zones. Each zone's credential must stay distinct: crypto-operator authority is deliberately neither service nor runner authority.
+- Source anchors
+  - apps/api/src/index.ts:68
+  - apps/api/src/index.ts:105
+  - apps/api/src/index.ts:133
+  - apps/api/src/index.ts:137
+
+### Administrator inspection and audit
+
+- Pattern administration is a Cloudflare Access boundary rather than a shared bearer: adminAuth validates the Access assertion against the configured team and application audience, then binds the verified subject to a short-lived hashed session.
+- Every inspection declares exactly one purpose from a closed set and writes a pattern_admin_access_events row naming the admin subject, target account, scope hash, and generation. This is privileged access to generation evidence, recorded separately from ordinary reader access.
+- Source anchors
+  - apps/api/src/middleware/admin-auth.ts:111
+  - apps/api/src/routes/admin-pattern.ts:79
+  - apps/api/src/routes/admin-pattern.ts:54
 
 ### Sessions and account state
 
@@ -329,6 +358,17 @@
   - packages/pattern-engine/src/index.ts:9
   - apps/calc-stub/package.json:5
   - packages/shared/package.json:6
+
+### Release assurance tooling
+
+- scripts/pattern-release/ holds distinct harnesses beyond the release builder: fresh reading, fresh Pattern, and verifier evaluation, plus an operational canary, release-evidence assembly, and release reconciliation, each with its own tests.
+- They are offline by construction — release-evidence cannot deploy or certify a provider account, and reconciliation makes no platform, provider, or database call. Their presence in the repository is not a record of any having been run.
+- Source anchors
+  - scripts/pattern-release/fresh-reading-evaluation.mjs:10
+  - scripts/pattern-release/fresh-pattern-verifier-evaluation.mjs:1
+  - scripts/pattern-release/operational-canary.mjs:7
+  - scripts/pattern-release/release-evidence.mjs:2
+  - scripts/pattern-release/release-reconciliation.mjs:2
 
 ### Local verification and release gate
 
