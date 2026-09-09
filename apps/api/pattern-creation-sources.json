@@ -3,6 +3,7 @@
   "sources": [
     "apps/api/src/db/natal-features.ts",
     "apps/api/src/db/pattern-ontology.ts",
+    "apps/api/src/db/reader-relationship-supports.ts",
     "apps/api/src/services/codex-pattern-publisher.ts",
     "apps/api/src/services/codex-provider-contract.ts",
     "apps/api/src/services/natal-features.ts",
@@ -19,6 +20,7 @@
     "apps/api/src/services/pattern-publisher.ts",
     "apps/api/src/services/pattern-semantic.ts",
     "apps/api/src/services/pattern-stage-protocol.ts",
+    "apps/api/src/services/reader-relationship-support.ts",
     "apps/codex-runner/src/codex-cli.ts",
     "apps/codex-runner/src/codex-environment.ts",
     "apps/codex-runner/src/isolated-codex-json.ts",

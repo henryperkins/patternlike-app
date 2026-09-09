@@ -16,6 +16,7 @@ import { preferenceRoutes } from "./routes/preferences.js";
 import { consentRoutes } from "./routes/consents.js";
 import { accountProcessingConsentRoutes } from "./routes/account-processing-consents.js";
 import { readingRoutes } from "./routes/readings.js";
+import { readerRelationshipRoutes } from "./routes/reader-relationships.js";
 import { timingRoutes } from "./routes/timing.js";
 import { patternRoutes } from "./routes/pattern.js";
 import { patternPortraitRoutes, codexPortraitRoutes } from "./routes/pattern-portrait.js";
@@ -65,6 +66,13 @@ app.route("/", deletionStatusRoutes);
 // Authenticated product API. configGuard runs first so no surface serves on a
 // development-shaped configuration in a non-development environment.
 const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
+// Relationship coordinates and unavailable results are private even when a
+// request is refused before its read handler (configuration/account/consent).
+api.use("*", async (c, next) => {
+  if (/^\/v1\/readings\/[^/]+\/(?:relationship-source|relationships|relationship-target)$/.test(c.req.path)
+    || /^\/v1\/timing\/cycles\/[^/]+$/.test(c.req.path)) c.header("Cache-Control", "private, no-store");
+  await next();
+});
 api.use("*", configGuard);
 api.use("*", authenticate);
 api.use("*", accountStateGate);
@@ -76,6 +84,7 @@ api.route("/", consentRoutes);
 api.route("/", placeRoutes);
 api.route("/", accountProcessingConsentRoutes);
 api.route("/", readingRoutes);
+api.route("/", readerRelationshipRoutes);
 api.route("/", timingRoutes);
 api.route("/", patternAiRoutes);
 api.route("/", patternRoutes);

@@ -23,6 +23,7 @@ const expectedTail = [
   "0027_portrait_mesh_automation.sql",
   "0028_reading_saves.sql",
   "0029_daily_publication_receipts.sql",
+  "0030_reader_relationship_supports.sql",
 ];
 if (
   JSON.stringify(migrationNames.slice(-expectedTail.length)) !==
@@ -351,7 +352,7 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 await assertBirthCalcSchema(env.DB, "clean apply");
 await assertAccountProcessingConsentSchema(env.DB, "clean apply");
 await assertReadingSavesSchema(env.DB, "clean apply");
-await assertDatabaseHealthy(env.DB, "0029 clean apply");
+await assertDatabaseHealthy(env.DB, "0030 clean apply");
 
 // The isolated upgrade binding stops before 0009, carries live rows through the
 // adapter rebuild/additive migrations and 0011, and only then applies 0012.
@@ -1441,7 +1442,7 @@ for (const [index, table] of providerTables.entries()) {
 }
 await assertDatabaseHealthy(upgradeDb, "0025 populated apply");
 
-// 0029: upgrade the populated current 0028 schema without changing any prior
+// 0029–0030: upgrade the populated current 0028 schema without changing any prior
 // table values, including D1's serialized ciphertext byte arrays.
 const beforeReceiptTables = await upgradeDb.prepare(
   "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '_cf_*' AND name != 'd1_migrations' ORDER BY name",
@@ -1455,7 +1456,7 @@ await applyD1Migrations(upgradeDb, env.TEST_MIGRATIONS.slice(publicationReceiptM
 for (const [name, before] of beforeReceiptRows) {
   const after = await upgradeDb.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all();
   if (JSON.stringify(after.results) !== before) {
-    throw new Error(`0029 changed historical ${name} rows`);
+    throw new Error(`0029–0030 changed historical ${name} rows`);
   }
 }
-await assertDatabaseHealthy(upgradeDb, "0029 populated apply");
+await assertDatabaseHealthy(upgradeDb, "0030 populated apply");

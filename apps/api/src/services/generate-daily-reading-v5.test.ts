@@ -47,7 +47,8 @@ import {
 import { loadCodexProviderJob } from "../db/codex-provider-jobs.js";
 import { nudgeCodexProviderOwner } from "./codex-provider-domain.js";
 import { loadCurrentDailyOwner } from "./reading-current-owner.js";
-import { decryptPayload } from "../db/users.js";
+import { decryptPayload, rotateUserDek } from "../db/users.js";
+import { loadReaderRelationshipSupport } from "../db/reader-relationship-supports.js";
 import { dispatch, enqueueConstrainedReading, resolveV5TargetDate } from "./enqueue.js";
 import { dispatchGeneration } from "./generate-daily-reading.js";
 import { ensureTodayReading } from "./ensure-today-reading.js";
@@ -283,8 +284,27 @@ describe("V5 execution", () => {
     );
     expect(reading!.status).toBe("published");
     expect(job).toEqual({ status: "succeeded", result_class: "published" });
+    expect(await rows("SELECT document_id FROM reader_relationship_supports WHERE reading_id = ?", enqueued.readingId))
+      .toEqual([{ document_id: enqueued.readingId }]);
 
     const stored = await decryptReading(enqueued.readingId);
+    const coordinate = { documentKind: "daily" as const, documentId: enqueued.readingId,
+      revisionKey: String(stored.reading.revision), contentHash: stored.evidence_header.content_hash };
+    const support = await loadReaderRelationshipSupport(env, IDENTITY_A, coordinate);
+    expect(support?.units.map((unit) => unit.target.kind === "daily" ? unit.target.paragraph_id : null))
+      .toEqual(stored.reading.paragraphs.map((paragraph) => paragraph.paragraph_id));
+    expect(support?.units[0]?.day).toMatchObject({ local_date: stored.reading.local_date, time_zone: ZONE });
+    expect(await loadReaderRelationshipSupport(env, IDENTITY_B, coordinate)).toBeNull();
+    expect(await loadReaderRelationshipSupport(env, IDENTITY_A, { ...coordinate, revisionKey: "999" })).toBeNull();
+    expect(await loadReaderRelationshipSupport(env, IDENTITY_A, { ...coordinate, contentHash: `sha256:${"f".repeat(64)}` })).toBeNull();
+    const beforeSupport = await rows<{ support_enc: ArrayBuffer; support_key_version: number }>(
+      "SELECT support_enc, support_key_version FROM reader_relationship_supports WHERE document_id = ?", enqueued.readingId);
+    await rotateUserDek(env, IDENTITY_A);
+    const afterSupport = await rows<{ support_enc: ArrayBuffer; support_key_version: number }>(
+      "SELECT support_enc, support_key_version FROM reader_relationship_supports WHERE document_id = ?", enqueued.readingId);
+    expect(afterSupport[0]!.support_key_version).toBe(beforeSupport[0]!.support_key_version + 1);
+    expect(afterSupport[0]!.support_enc).not.toEqual(beforeSupport[0]!.support_enc);
+    expect(await loadReaderRelationshipSupport(env, IDENTITY_A, coordinate)).toEqual(support);
     expect(stored.schema_version).toBe("0.5.0");
     expect(stored.reading).toMatchObject({
       reading_id: enqueued.readingId,
@@ -316,6 +336,28 @@ describe("V5 execution", () => {
     expect(stored.evidence_header.model).not.toHaveProperty("provider_job_id");
     expect(await rows("SELECT id FROM reading_sources WHERE reading_id = ?", enqueued.readingId))
       .toHaveLength(stored.reading.paragraphs.length);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM reading_sources WHERE reading_id = ?").bind(enqueued.readingId),
+      env.DB.prepare("DELETE FROM daily_readings WHERE id = ?").bind(enqueued.readingId),
+    ]);
+    expect(await rows("SELECT id FROM reader_relationship_supports WHERE reading_id = ?", enqueued.readingId)).toEqual([]);
+  });
+
+  it("rolls back the reading and evidence if atomic support persistence fails", async () => {
+    const { enqueued, claim } = await claimReserved();
+    await env.DB.prepare(`CREATE TRIGGER reject_reader_relationship_support BEFORE INSERT ON reader_relationship_supports
+      BEGIN SELECT RAISE(ABORT, 'injected support insert failure'); END`).run();
+    try {
+      await expect(withProvider((candidate) => candidate,
+        () => dispatchGeneration(enabledEnv(), claim))).rejects.toThrow("V5 publication transaction did not commit");
+      expect(await rows("SELECT status, reading_enc FROM daily_readings WHERE id = ?", enqueued.readingId))
+        .toEqual([{ status: "pending", reading_enc: null }]);
+      expect(await rows("SELECT id FROM reading_sources WHERE reading_id = ?", enqueued.readingId)).toEqual([]);
+      expect(await rows("SELECT reading_id FROM daily_publication_receipts WHERE reading_id = ?", enqueued.readingId)).toEqual([]);
+      expect(await rows("SELECT id FROM reader_relationship_supports WHERE reading_id = ?", enqueued.readingId)).toEqual([]);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER reject_reader_relationship_support").run();
+    }
   });
 
   it("executes a command that pinned USR-12 feedback and USR-05 exclusions", async () => {

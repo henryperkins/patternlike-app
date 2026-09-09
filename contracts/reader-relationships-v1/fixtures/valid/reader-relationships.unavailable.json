@@ -1,0 +1,13 @@
+{
+  "schema_version": "reader-relationships/v1",
+  "source": {
+    "kind": "daily",
+    "reading_id": "rd_owned",
+    "revision": 2,
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "paragraph_id": "paragraph_actual"
+  },
+  "status": "unavailable",
+  "items": [],
+  "truncated": false
+}

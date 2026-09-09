@@ -419,6 +419,9 @@ export async function assembleAccountExport(
   }
 
   if (options.include_readings) {
+    // reader_relationship_supports is the non-portable derived join sidecar,
+    // like reading_sources' internal coordinates. Export readable artifacts and
+    // their existing evidence shape without widening frozen export contracts.
     const readingRows = await env.DB.prepare(
       `SELECT r.id, r.local_date, r.release_version, r.chart_fingerprint,
               r.contract_id, r.assembly_mode, r.status, r.revision,

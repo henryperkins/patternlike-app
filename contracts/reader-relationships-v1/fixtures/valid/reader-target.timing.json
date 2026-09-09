@@ -1,0 +1,44 @@
+{
+  "schema_version": "reader-relationship-target/v1",
+  "status": "available",
+  "kind": "timing",
+  "target": {
+    "kind": "timing",
+    "cycle_id": "cyc_dddddddddddddddddddddddddddddddd",
+    "cycle_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "pass_index": 2,
+    "starts_at": "2026-09-01T00:00:00Z",
+    "ends_at": "2026-09-08T00:00:00Z",
+    "exact_at": "2026-09-03T11:00:00Z",
+    "local_date": "2026-09-03",
+    "time_zone": "America/New_York",
+    "policy_version": "cycle-policy/v1"
+  },
+  "timing": {
+    "target": {
+      "kind": "timing",
+      "cycle_id": "cyc_dddddddddddddddddddddddddddddddd",
+      "cycle_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "pass_index": 2,
+      "starts_at": "2026-09-01T00:00:00Z",
+      "ends_at": "2026-09-08T00:00:00Z",
+      "exact_at": "2026-09-03T11:00:00Z",
+      "local_date": "2026-09-03",
+      "time_zone": "America/New_York",
+      "policy_version": "cycle-policy/v1"
+    },
+    "technique": "transit",
+    "body": "saturn",
+    "natal_target": "sun",
+    "aspect": "square",
+    "phase": "exact",
+    "orb_deg": 1,
+    "passes": [
+      {
+        "pass_index": 2,
+        "direction": "retrograde",
+        "exact_at": "2026-09-03T11:00:00Z"
+      }
+    ]
+  }
+}

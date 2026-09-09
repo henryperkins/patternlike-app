@@ -1,0 +1,149 @@
+openapi: 3.1.0
+info:
+  title: Authorized reader relationships v1
+  version: 1.0.0
+paths:
+  /v1/readings/{id}/relationship-source:
+    get:
+      operationId: getReaderRelationshipSource
+      description: Discover the content hash of the authenticated owner’s exact readable
+        Daily revision and actual paragraph. Does not start generation.
+      security:
+      - sessionCookie: []
+      parameters:
+      - &id002
+        in: path
+        name: id
+        required: true
+        schema: &id001
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,128}$
+      - &id003
+        in: query
+        name: revision
+        required: true
+        schema: &id006
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      - &id004
+        in: query
+        name: paragraph_id
+        required: true
+        schema: *id001
+      responses:
+        '200':
+          description: 'Private result; Cache-Control: private, no-store.'
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/reader-relationships-v1/reader-relationships.schema.json#/$defs/sourceResponse
+        default:
+          description: Structured error; no private reading payload is returned.
+  /v1/readings/{id}/relationships:
+    get:
+      operationId: getReaderRelationships
+      description: Resolve up to three hops, twelve edges and four outgoing relationships
+        per node. Every unit is owner-authorized and supported by retained calculated
+        evidence. No newest-edition substitution.
+      security:
+      - sessionCookie: []
+      parameters:
+      - *id002
+      - *id003
+      - *id004
+      - &id005
+        in: query
+        name: content_hash
+        required: true
+        schema:
+          type: string
+          pattern: ^sha256:[a-f0-9]{64}$
+      responses:
+        '200':
+          description: 'Private result; Cache-Control: private, no-store.'
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/reader-relationships-v1/reader-relationships.schema.json#/$defs/relationshipsResponse
+        default:
+          description: Structured error; no private reading payload is returned.
+  /v1/readings/{id}/relationship-target:
+    get:
+      operationId: getReaderRelationshipTarget
+      description: Recompute the source-bound graph and load that exact still-eligible
+        destination. Missing, replaced or foreign resources are unavailable.
+      security:
+      - sessionCookie: []
+      parameters:
+      - *id002
+      - *id003
+      - *id004
+      - *id005
+      - in: query
+        name: relationship_id
+        required: true
+        schema:
+          type: string
+          pattern: ^reader-relationship:[a-f0-9]{64}$
+      responses:
+        '200':
+          description: 'Private result; Cache-Control: private, no-store.'
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/reader-relationships-v1/reader-relationships.schema.json#/$defs/targetResponse
+        default:
+          description: Structured error; no private reading payload is returned.
+  /v1/timing/cycles/{id}:
+    get:
+      operationId: getReaderTimingDetail
+      description: Read the authenticated owner’s exact retained cycle/pass for the
+        current chart. Past stored cycles remain readable; this route does not rescan.
+      security:
+      - sessionCookie: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          pattern: ^cyc_[a-f0-9]{32}$
+      - in: query
+        name: cycle_hash
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+      - in: query
+        name: pass_index
+        required: true
+        schema: *id006
+      - in: query
+        name: local_date
+        required: true
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: time_zone
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      responses:
+        '200':
+          description: 'Private result; Cache-Control: private, no-store.'
+          content:
+            application/json:
+              schema:
+                $ref: https://patternlike.app/contracts/reader-relationships-v1/reader-relationships.schema.json#/$defs/timingDetail
+        default:
+          description: Structured error; no private reading payload is returned.
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pl_session

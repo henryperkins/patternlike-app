@@ -104,6 +104,7 @@ export async function collectDeletionArtifactKeys(
  * are therefore classified separately below rather than silently omitted.
  */
 export const DELETED_USER_TABLES = [
+  "reader_relationship_supports",
   "reading_saves",
   "reading_sources",
   "reading_feedback",
@@ -180,6 +181,8 @@ export const PORTABLE_USER_TABLES = [
 ] as const;
 
 export const NON_PORTABLE_USER_TABLES = [
+  // Derived passage support, like reading_sources. Reader prose remains portable.
+  "reader_relationship_supports",
   // Operational inventory; accepted images and graph are available through the
   // separate private /v1/pattern-portrait/download bundle, not frozen account export.
   "portrait_mesh_assets",

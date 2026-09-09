@@ -5,6 +5,7 @@ import {
   type DailyPublicationReceiptInput,
 } from "./daily-publication-receipts.js";
 import { encryptPayload, loadUserKey, type UserIdentity } from "../db/users.js";
+import { buildReaderRelationshipSupportInsert, type PreparedReaderRelationshipSupport } from "./reader-relationship-supports.js";
 import { asCryptoSubject, decryptJson } from "../crypto.js";
 import {
   LEASE_RETRY_DELAY_SECONDS,
@@ -1391,6 +1392,8 @@ export interface PublicationInput {
   predecessor: PredecessorTransition;
   reading: { ciphertext: Uint8Array; keyVersion: number; nonce: string };
   evidence: EvidenceRow[];
+  /** V5 stores accepted passage support atomically; older deterministic editions have none. */
+  relationshipSupport?: PreparedReaderRelationshipSupport;
   /**
    * The durable publication receipt, or null for a deterministic reading.
    *
@@ -1434,7 +1437,12 @@ export async function completeReading(
   const keyVersion = requireSingleCryptoWriteVersion([
     input.reading.keyVersion,
     ...input.evidence.map((row) => row.keyVersion),
+    ...(input.relationshipSupport ? [input.relationshipSupport.keyVersion] : []),
   ]);
+  if (input.relationshipSupport && (input.relationshipSupport.userId !== identity.userId ||
+    input.relationshipSupport.documentKind !== "daily" || input.relationshipSupport.documentId !== readingId)) {
+    throw new Error("Reader relationship support names a different reading or owner");
+  }
 
   const statements: D1PreparedStatement[] = [
     buildCryptoWriteFence(env, {
@@ -1540,6 +1548,9 @@ export async function completeReading(
   // nothing fact as the ciphertext.
   if (input.receipt) {
     statements.push(buildDailyPublicationReceiptInsert(env, input.receipt, now));
+  }
+  if (input.relationshipSupport) {
+    statements.push(buildReaderRelationshipSupportInsert(env, input.relationshipSupport, now));
   }
 
   statements.push(

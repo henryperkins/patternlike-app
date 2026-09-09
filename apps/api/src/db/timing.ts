@@ -26,7 +26,7 @@ export class StoredTimingReceiptInvalidError extends Error {
   }
 }
 
-interface CycleInstanceRow {
+export interface CycleInstanceRow {
   id: string;
   end_at: string;
   cycle_json: string;
@@ -151,7 +151,7 @@ function parsePass(value: unknown, expectedIndex: number): CyclePass | null {
   };
 }
 
-function parseStoredCycle(row: CycleInstanceRow): NormalizedCycle | null {
+export function parseStoredCycle(row: CycleInstanceRow): NormalizedCycle | null {
   let value: unknown;
   try {
     value = JSON.parse(row.cycle_json);

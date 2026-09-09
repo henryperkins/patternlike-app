@@ -1,0 +1,552 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://patternlike.app/contracts/reader-relationships-v1/reader-relationships.schema.json",
+  "title": "Authorized exact-edition reader relationships v1",
+  "$defs": {
+    "dailyTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "reading_id",
+        "revision",
+        "content_hash",
+        "paragraph_id"
+      ],
+      "properties": {
+        "kind": {
+          "const": "daily"
+        },
+        "reading_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "paragraph_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      }
+    },
+    "patternTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "pattern_id",
+        "document_revision",
+        "content_hash",
+        "chapter_index",
+        "chapter_source_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "pattern"
+        },
+        "pattern_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "document_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "chapter_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "chapter_source_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "timingTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "cycle_id",
+        "cycle_hash",
+        "pass_index",
+        "starts_at",
+        "ends_at",
+        "exact_at",
+        "local_date",
+        "time_zone",
+        "policy_version"
+      ],
+      "properties": {
+        "kind": {
+          "const": "timing"
+        },
+        "cycle_id": {
+          "type": "string",
+          "pattern": "^cyc_[a-f0-9]{32}$"
+        },
+        "cycle_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pass_index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "starts_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ends_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "exact_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "local_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "time_zone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "target": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/dailyTarget"
+        },
+        {
+          "$ref": "#/$defs/patternTarget"
+        },
+        {
+          "$ref": "#/$defs/timingTarget"
+        }
+      ]
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "from",
+        "to",
+        "kind",
+        "reason_code",
+        "support_digest",
+        "evidence_identity"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^reader-relationship:[a-f0-9]{64}$"
+        },
+        "from": {
+          "$ref": "#/$defs/target"
+        },
+        "to": {
+          "$ref": "#/$defs/target"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "shared_calculated_feature",
+            "shared_natal_participant",
+            "dated_occurrence"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "shared_calculated_feature",
+            "shared_natal_participant",
+            "dated_occurrence"
+          ]
+        },
+        "support_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "evidence_identity": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "shared_calculated_feature"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason_code": {
+                "const": "shared_calculated_feature"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "shared_natal_participant"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason_code": {
+                "const": "shared_natal_participant"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "dated_occurrence"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason_code": {
+                "const": "dated_occurrence"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sourceResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "status",
+            "source"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "reader-relationship-source/v1"
+            },
+            "status": {
+              "const": "available"
+            },
+            "source": {
+              "$ref": "#/$defs/dailyTarget"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "status",
+            "source"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "reader-relationship-source/v1"
+            },
+            "status": {
+              "const": "unavailable"
+            },
+            "source": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "relationshipsResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "source",
+        "status",
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "reader-relationships/v1"
+        },
+        "source": {
+          "$ref": "#/$defs/dailyTarget"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "available",
+            "no_supported_connection",
+            "unavailable"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          },
+          "maxItems": 12
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "available"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "items": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "timingDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "technique",
+        "body",
+        "natal_target",
+        "aspect",
+        "phase",
+        "orb_deg",
+        "passes"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/timingTarget"
+        },
+        "technique": {
+          "const": "transit"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1
+        },
+        "natal_target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aspect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "orb_deg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "passes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pass_index",
+              "direction",
+              "exact_at"
+            ],
+            "properties": {
+              "pass_index": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "direct",
+                  "retrograde"
+                ]
+              },
+              "exact_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "targetResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "status"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "reader-relationship-target/v1"
+            },
+            "status": {
+              "const": "unavailable"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "status",
+            "kind",
+            "target",
+            "reading",
+            "reading_status"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "reader-relationship-target/v1"
+            },
+            "status": {
+              "const": "available"
+            },
+            "kind": {
+              "const": "daily"
+            },
+            "target": {
+              "$ref": "#/$defs/dailyTarget"
+            },
+            "reading": {
+              "oneOf": [
+                {
+                  "$ref": "https://patternlike.app/contracts/m3/daily-reading.schema.json#/$defs/dailyReadingResponse"
+                },
+                {
+                  "$ref": "https://patternlike.app/contracts/m5/daily-reading.schema.json#/$defs/dailyReadingResponseV5"
+                }
+              ]
+            },
+            "reading_status": {
+              "type": "string",
+              "enum": [
+                "published",
+                "superseded",
+                "invalidated"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "status",
+            "kind",
+            "target",
+            "pattern"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "reader-relationship-target/v1"
+            },
+            "status": {
+              "const": "available"
+            },
+            "kind": {
+              "const": "pattern"
+            },
+            "target": {
+              "$ref": "#/$defs/patternTarget"
+            },
+            "pattern": {
+              "$ref": "https://patternlike.app/contracts/m7/pattern-response.schema.json#/$defs/patternResponse"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "status",
+            "kind",
+            "target",
+            "timing"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "reader-relationship-target/v1"
+            },
+            "status": {
+              "const": "available"
+            },
+            "kind": {
+              "const": "timing"
+            },
+            "target": {
+              "$ref": "#/$defs/timingTarget"
+            },
+            "timing": {
+              "$ref": "#/$defs/timingDetail"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

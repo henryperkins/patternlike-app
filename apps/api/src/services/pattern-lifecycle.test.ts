@@ -234,6 +234,8 @@ describe("machine ontology activation lifecycle", () => {
   it("commits a reader deletion and its replay receipt atomically", async () => {
     const generationId = await reserveAndPublishSliceAPattern();
     const semanticKey = "idem-delete-receipt";
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM reader_relationship_supports WHERE user_id = ? AND document_kind = 'pattern'")
+      .bind(USER_A).first()).toEqual({ count: 1 });
 
     await expect(deleteCurrentPattern(
       env,
@@ -244,6 +246,8 @@ describe("machine ontology activation lifecycle", () => {
     expect(await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM pattern_documents WHERE generation_id = ?`,
     ).bind(generationId).first()).toEqual({ count: 0 });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM reader_relationship_supports WHERE user_id = ? AND document_kind = 'pattern'")
+      .bind(USER_A).first()).toEqual({ count: 0 });
     expect(await env.DB.prepare(
       `SELECT event_class FROM pattern_erasure_replay_events WHERE event_id = ?`,
     ).bind(await patternReplayEventId(
