@@ -55,6 +55,18 @@ describe("Portrait exploration", () => {
     expect(screen.queryByText(/authored models|fictional study/i)).not.toBeInTheDocument();
   });
 
+  it.each([[3, "three"], [4, "four"], [5, "five"], [6, "six"]] as const)(
+    "counts the courtyard's chapter spaces for a %i-chapter reading",
+    async (count, word) => {
+      const user = userEvent.setup();
+      const document = { ...nativePattern, core_chapters: Array.from({ length: count }, (_, index) => ({ ...nativePattern.core_chapters[index % 4], title: `Published chapter ${index + 1}` })) };
+      render(<PortraitExplorer source={{ status: "ready", document }} />);
+      await screen.findByTestId("scene");
+      await user.click(screen.getByText("Scene options"));
+      expect(screen.getByText(`A court, ${word} chapter spaces. Choose a chapter to approach its display.`)).toBeVisible();
+    },
+  );
+
   it("retains display choices and camera bookmarks across account close and reopen", async () => {
     const memory = createExplorerMemory();
     function Account() {

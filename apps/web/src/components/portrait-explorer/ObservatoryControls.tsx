@@ -1,13 +1,22 @@
 import type { ObservatoryExperience } from "./types.js";
 
-export function ObservatoryControls({ experience, onChange, available, chapterId, onOperate, skyView = false }: {
+// The court is built from the published chapter count, which runs three
+// through six, so the overview hint has to count the spaces it describes.
+const SPACE_WORDS: Partial<Record<number, string>> = { 3: "three", 4: "four", 5: "five", 6: "six" };
+
+export function ObservatoryControls({ experience, onChange, available, chapterId, chapterCount, onOperate, skyView = false }: {
   experience: ObservatoryExperience;
   onChange: (update: Partial<ObservatoryExperience>) => void;
   available: boolean;
   chapterId?: string;
+  chapterCount: number;
   onOperate: () => void;
   skyView?: boolean;
 }) {
+  const spaces = SPACE_WORDS[chapterCount];
+  const overview = spaces
+    ? `A court, ${spaces} chapter spaces. Choose a chapter to approach its display.`
+    : "A court with a space for every chapter. Choose a chapter to approach its display.";
   return <div className="observatory-controls">
     <div className="observatory-environment" role="group" aria-label="Courtyard atmosphere">
       <div className="observatory-light" role="group" aria-label="Lighting">
@@ -29,6 +38,6 @@ export function ObservatoryControls({ experience, onChange, available, chapterId
     </div>}
     <p className="observatory-hint" aria-live="polite">{!available ? "Your chapter reading remains available while the scene is paused." : skyView ? "Explore the twelve-sign ring and any available placements." : chapterId
       ? experience.openDesks[chapterId] ? "The reading desk is open. Tap the selected object again or use Close reading desk to close it." : "Look closer frames the object; Step back restores its approach. Tap the selected object again or use Open reading desk to open its desk."
-      : "A court, four chapter spaces. Choose a chapter to approach its display."}</p>
+      : overview}</p>
   </div>;
 }
