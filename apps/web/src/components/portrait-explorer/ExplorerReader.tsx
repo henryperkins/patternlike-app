@@ -98,6 +98,14 @@ export function ExplorerReader({ chapters, chapterCount, facet, activePassages, 
   </>;
 }
 
+export function CompleteChapter({ chapter, embedded = false }: { chapter: PortraitChapter; embedded?: boolean }) {
+  const ChapterHeading = embedded ? "h3" : "h2";
+  const FacetHeading = embedded ? "h4" : "h3";
+  return <article data-reading-chapter={chapter.id} tabIndex={-1}><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-chapter-meta">Chapter {chapter.ordinal}</p><p className="explorer-summary">{chapter.summary}</p>
+    {facets.map(({ id, label }) => <section key={id}><FacetHeading>{label}</FacetHeading>{chapterPassages(chapter, id).map((text, index) => <p key={index}>{text}</p>)}</section>)}
+  </article>;
+}
+
 export function CompleteReading({ manifest, embedded = false }: { manifest: PortraitManifest; embedded?: boolean }) {
   const Heading = embedded ? "h2" : "h1";
   const ChapterHeading = embedded ? "h3" : "h2";
@@ -105,9 +113,7 @@ export function CompleteReading({ manifest, embedded = false }: { manifest: Port
   return <section className="explorer-complete" aria-label="Complete Pattern reading">
     <Heading>{manifest.chapters.length === 4 ? "Four chapters. One portrait." : "Your complete Pattern."}</Heading><p className="explorer-chapter-meta">Your Pattern · complete reading</p>
     {manifest.uncertainty && <p className="explorer-uncertainty">{manifest.uncertainty}</p>}
-    {manifest.chapters.map((chapter) => <article key={chapter.id} data-reading-chapter={chapter.id} tabIndex={-1}><ChapterHeading>{chapter.title}</ChapterHeading><p className="explorer-chapter-meta">Chapter {chapter.ordinal}</p><p className="explorer-summary">{chapter.summary}</p>
-      {facets.map(({ id, label }) => <section key={id}><FacetHeading>{label}</FacetHeading>{chapterPassages(chapter, id).map((text, index) => <p key={index}>{text}</p>)}</section>)}
-    </article>)}
+    {manifest.chapters.map((chapter) => <CompleteChapter key={chapter.id} chapter={chapter} embedded={embedded} />)}
     {manifest.signatures.length > 0 && <section><ChapterHeading>Additional signatures</ChapterHeading>{manifest.signatures.map((signature, index) => <article key={index}><FacetHeading>{signature.title}</FacetHeading><p>{signature.text}</p></article>)}</section>}
     <p className="explorer-image-source">Source revision: {manifest.revision}</p>
   </section>;

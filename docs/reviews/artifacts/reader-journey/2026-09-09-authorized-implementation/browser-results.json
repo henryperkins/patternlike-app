@@ -1,0 +1,25 @@
+{
+  "checks": [
+    "Actual observatory opens exact chapter 3 in reading mode and returns without artwork or generation",
+    "Production Today article, keyboard entry, exact Pattern chapter, browser Back restores focus/scroll without ensuring or generating Today again",
+    "Complete text without artwork; exact Timing pass and saved revision; existing feedback mutation carries saved reading ID",
+    "Foreground revalidation removes inaccessible destination prose",
+    "390x844 full journey and long evidence digest without horizontal overflow",
+    "Axe WCAG A/AA scan of mobile saved destination"
+  ],
+  "errors": [],
+  "warnings": [],
+  "unknown": [],
+  "scope": "Production application with contract-shaped browser API fixtures; backend encryption, authorization, publication and lifecycle checked separately in real D1 integration suites.",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "request_count": 83
+}

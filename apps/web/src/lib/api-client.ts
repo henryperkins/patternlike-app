@@ -683,6 +683,40 @@ export function listReadingHistory(
   });
 }
 
+export function getReadingRelationshipSource(
+  readingId: string,
+  input: { revision: number; paragraph_id: string },
+  signal?: AbortSignal,
+): Promise<import("@patternlike/shared").ReaderRelationshipSourceResponse> {
+  const query = new URLSearchParams({ revision: String(input.revision), paragraph_id: input.paragraph_id });
+  return request(`/v1/readings/${encodeURIComponent(readingId)}/relationship-source?${query}`, {
+    method: "GET", headers: requestHeaders(), signal,
+  });
+}
+
+export function getReadingRelationships(
+  source: import("@patternlike/shared").ReaderDailyTarget,
+  signal?: AbortSignal,
+): Promise<import("@patternlike/shared").ReaderRelationshipsResponse> {
+  const query = new URLSearchParams({ revision: String(source.revision), content_hash: source.content_hash, paragraph_id: source.paragraph_id });
+  return request(`/v1/readings/${encodeURIComponent(source.reading_id)}/relationships?${query}`, {
+    method: "GET", headers: requestHeaders(), signal,
+  });
+}
+
+export type ReadingRelationshipTargetResponse = import("@patternlike/shared").ReaderRelationshipTargetResponse<DailyReadingResponse, PatternResponseV7>;
+
+export function getReadingRelationshipTarget(
+  source: import("@patternlike/shared").ReaderDailyTarget,
+  relationshipId: string,
+  signal?: AbortSignal,
+): Promise<ReadingRelationshipTargetResponse> {
+  const query = new URLSearchParams({ revision: String(source.revision), content_hash: source.content_hash, paragraph_id: source.paragraph_id, relationship_id: relationshipId });
+  return request(`/v1/readings/${encodeURIComponent(source.reading_id)}/relationship-target?${query}`, {
+    method: "GET", headers: requestHeaders(), signal,
+  });
+}
+
 export function getReading(
   readingId: string,
   signal?: AbortSignal,
