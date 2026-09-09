@@ -32,6 +32,7 @@ import { patternGenerationIsEnabled } from "./pattern-generation-control.js";
 
 export interface DocumentRow {
   id: string;
+  content_hash: string;
   claim_id: string;
   generation_id: string;
   locale: string;
@@ -66,7 +67,7 @@ export async function loadAnyPatternDocument(
   userId: string,
 ): Promise<DocumentRow | null> {
   return env.DB.prepare(
-    `SELECT id, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
+    `SELECT id, content_hash, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
             wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
             generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version,
             pattern_source_hash
@@ -82,7 +83,7 @@ export async function loadActivePatternDocument(
   fingerprintHash: string,
 ): Promise<DocumentRow | null> {
   return env.DB.prepare(
-    `SELECT id, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
+    `SELECT id, content_hash, claim_id, generation_id, locale, effective_accuracy, document_enc, document_nonce,
             wrapped_document_key_enc, wrapped_document_key_version, wrapped_document_key_nonce,
             generated_at, chart_fingerprint_hash, compact_provenance_json, ontology_version,
             pattern_source_hash

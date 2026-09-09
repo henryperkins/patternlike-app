@@ -5,7 +5,7 @@ import {
   getQueueResult,
   SELF,
 } from "cloudflare:test";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import worker from "../index.js";
 import type { PrivacyMessage } from "../env.js";
 import {
@@ -185,6 +185,12 @@ describe("account deletion", () => {
   });
 
   it("atomically locks the account and returns a narrowly scoped receipt", async () => {
+    // Inspect acceptance before delivery. The real queue consumer can otherwise
+    // complete deletion between these assertions and the receipt status read.
+    const dispatch = vi.spyOn(env.PRIVACY_QUEUE, "send").mockResolvedValue({
+      metadata: { metrics: { backlogCount: 1, backlogBytes: 0 } },
+    });
+    onTestFinished(() => dispatch.mockRestore());
     const now = new Date().toISOString();
     await env.DB.batch([
       env.DB.prepare(
@@ -214,6 +220,11 @@ describe("account deletion", () => {
     });
     expect(accepted.body.job_id).toMatch(/^job_/);
     expect(accepted.body.resource_id).toMatch(/^del_/);
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+      kind: "privacy",
+      job_id: accepted.body.job_id,
+      job_type: "delete_account",
+    });
     const setCookie = accepted.response.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("pl_deletion_receipt=");
     expect(setCookie).toContain("HttpOnly");

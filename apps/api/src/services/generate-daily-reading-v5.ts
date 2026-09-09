@@ -72,6 +72,8 @@ import { READING_PROMPT_VERSION } from "./reading-prompt.js";
 import { lazy } from "./lazy-validator.js";
 import { safeLog } from "./safe-log.js";
 import type { StoredReadingV5 } from "./stored-reading.js";
+import { deriveDailyReaderRelationshipSupport } from "./reader-relationship-support.js";
+import { prepareReaderRelationshipSupport } from "../db/reader-relationship-supports.js";
 
 const validateOutputSchema = lazy(() => {
   const ajv = new Ajv2020({ strict: false });
@@ -842,6 +844,16 @@ export async function generateDailyReadingV5(
     });
   }
 
+  const relationshipSupport = await prepareReaderRelationshipSupport(env, identity, {
+    documentKind: "daily", documentId: command.reading_id, revisionKey: String(command.revision), contentHash: content_hash,
+    support: await deriveDailyReaderRelationshipSupport({
+      reading, contentHash: content_hash, paragraphEvidence, selectedFacts: prepared.selected_facts,
+      chartFingerprint: command.chart.fingerprint, contractId: command.chart.contract_id,
+      contractVersion: command.chart.contract_version, effectiveAccuracy: command.chart.effective_accuracy,
+      suppressedFeatures, timeZone: command.target_timezone, dayStartAt: command.day_start_at,
+      dayEndAt: command.day_end_at, cyclePolicyVersion: command.cycle_scan.policy_version,
+    }),
+  });
   const published = await completeReading(env, {
     identity,
     readingId: command.reading_id,
@@ -859,6 +871,7 @@ export async function generateDailyReadingV5(
       nonce: sealedReading.nonce,
     },
     evidence: evidenceRows,
+    relationshipSupport,
     receipt: {
       readingId: command.reading_id,
       jobId: claim.jobId,

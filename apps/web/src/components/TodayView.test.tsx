@@ -181,7 +181,8 @@ describe("TodayView", () => {
     const evidence = column!.querySelector<HTMLDetailsElement>(".today-evidence");
 
     expect(body).not.toBeNull();
-    expect(lead).toBe(body!.firstElementChild);
+    expect(body!.firstElementChild).toHaveAttribute("data-reading-paragraph", todayResponse.reading.paragraphs[0]!.paragraph_id);
+    expect(body!.firstElementChild).toContainElement(lead);
     expect(evidence).toBe(body!.nextElementSibling);
   });
 

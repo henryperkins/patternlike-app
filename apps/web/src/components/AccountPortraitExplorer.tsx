@@ -14,6 +14,9 @@ interface Props {
   chartId: string; document: PatternResponseV7; pattern: PatternStatePattern;
   sky?: PortraitSky | null;
   canCreate: boolean; onUnauthorized: () => void; children: ReactNode;
+  /** Passed only after an exact relationship target has been server validated. */
+  initialChapterIndex?: number;
+  defaultOpen?: boolean;
 }
 interface LoadedPortrait { identity: string; bindings: PortraitObjectBinding[]; bundle: PortraitMeshBundle; }
 const mismatch = "This 3D portrait no longer matches the current Pattern. Refresh its status to continue.";
@@ -40,7 +43,7 @@ function validate(response: PatternPortraitExplorerResponse, chartId: string, do
   }
 }
 
-export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthorized, children, sky }: Props) {
+export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthorized, children, sky, initialChapterIndex, defaultOpen }: Props) {
   const sourceMatches = patternMatchesDocument(pattern, document);
   const canRender = sourceMatches && document.core_chapters.length >= 3 && document.core_chapters.length <= 6;
   // The v1 generated-artwork service is optional and supports four chapters.
@@ -50,7 +53,12 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const session = usePortraitSession(JSON.stringify([chartId, document]));
-  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), { embedded: true, defaultOpen: canRender, memory: session.memory });
+  const navigation = useExplorerNavigation(document.core_chapters.map((_, index) => `chapter-${index + 1}`), {
+    embedded: true, defaultOpen: defaultOpen ?? canRender, memory: session.memory,
+    initialActions: initialChapterIndex !== undefined && Number.isInteger(initialChapterIndex) && document.core_chapters[initialChapterIndex]
+      ? [{ type: "select", chapterId: `chapter-${initialChapterIndex + 1}` }, { type: "presentation", presentation: "reading" }]
+      : undefined,
+  });
   const { isOpen: open, open: openExplorer, close: closeExplorer } = navigation;
   const [loaded, setLoaded] = useState<LoadedPortrait | null>(null);
   const [assetError, setAssetError] = useState(false);
@@ -182,16 +190,18 @@ export function AccountPortraitExplorer({ chartId, document, pattern, onUnauthor
   useLayoutEffect(() => {
     if (initialOpening.current && open) {
       initialOpening.current = false;
-      if (!pendingFocus.current) { previousOpen.current = open; return; }
+      if (!pendingFocus.current && initialChapterIndex === undefined) { previousOpen.current = open; return; }
     }
     if (previousOpen.current !== open) pendingFocus.current = true;
     previousOpen.current = open;
     if (!pendingFocus.current || (open && !showingExplorer)) return;
-    const target = showingExplorer ? contentElement.current?.querySelector<HTMLElement>("#portrait-start") : contentElement.current;
+    const target = showingExplorer
+      ? contentElement.current?.querySelector<HTMLElement>(initialChapterIndex === undefined ? "#portrait-start" : "[data-reader-heading]")
+      : initialChapterIndex === undefined ? contentElement.current : contentElement.current?.querySelector<HTMLElement>(`[data-reading-chapter="chapter-${initialChapterIndex + 1}"]`);
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ behavior: "instant", block: "start" });
     pendingFocus.current = false;
-  }, [open, showingExplorer]);
+  }, [open, showingExplorer, initialChapterIndex]);
 
   if (!canRender) return <>{children}</>;
   return <>

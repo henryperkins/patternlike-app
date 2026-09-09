@@ -1,0 +1,13 @@
+{
+  "package": "contracts/reader-relationships-v1",
+  "schema_version": "reader-relationships/v1",
+  "document_date": "2026-09-09",
+  "status": "additive_local_implementation",
+  "schemas": [
+    "reader-relationships.schema.json"
+  ],
+  "openapi": [
+    "openapi/openapi.yaml"
+  ],
+  "note": "Existing M0\u2013M9, geocoder-v2 and portrait-v1 schemas are unchanged. Runtime checks enforce exact hashes, owner and lifecycle eligibility, relationship IDs, graph topology and temporal coordinates; JSON Schema validates public shape only. Apply additive migration 0030 and compatible publication code before enabling these reads."
+}

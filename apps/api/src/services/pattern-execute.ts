@@ -1,3 +1,5 @@
+import { derivePatternReaderRelationshipSupport } from "./reader-relationship-support.js";
+import { prepareReaderRelationshipSupport, buildReaderRelationshipSupportInsert } from "../db/reader-relationship-supports.js";
 import {
   contentHash,
   newId,
@@ -1793,6 +1795,18 @@ async function publishPattern(
     { claim_id: proof.claimId, generation_id: proof.generationId },
   );
   const content = await contentHash(JSON.stringify(internal));
+  const relationshipSupport = await prepareReaderRelationshipSupport(env, identity, {
+    documentKind: "pattern", documentId: patternId,
+    revisionKey: `${internal.schema_version}:${patternId}:${generatedAt}`, contentHash: content,
+    support: await derivePatternReaderRelationshipSupport({
+      document: internal, generatedAt, contentHash: content, chartFingerprintHash: proof.chartFingerprintHash,
+      contractId: publication.calculation.contractId, contractVersion: publication.calculation.contractVersion,
+      packet: publication.packet, plan: publication.plan,
+    }),
+  });
+  if (relationshipSupport.keyVersion !== wrapped.keyVersion) {
+    return { status: "retry", failureClass: "publication_authorization_changed" };
+  }
   const compactProvenance = {
     ...internal.compact_provenance,
     pattern_source_hash: proof.patternSourceHash,
@@ -1928,6 +1942,7 @@ async function publishPattern(
         generatedAt,
         generatedAt,
       ),
+      buildReaderRelationshipSupportInsert(env, relationshipSupport, generatedAt),
       ...priorGenerationErasure,
       claimMutation,
       ...publicationTransition.mutations,

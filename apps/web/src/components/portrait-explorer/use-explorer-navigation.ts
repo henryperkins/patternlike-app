@@ -62,10 +62,16 @@ export function clearExplorerMemory(memory: ExplorerMemory): void {
 
 /** The account session retains the controller across route changes. Browser
  * history contains opaque indices only; all chapter content stays in memory. */
-export function useExplorerNavigation(chapterIds: readonly string[], { embedded = false, defaultOpen = false, memory: suppliedMemory }: { embedded?: boolean; defaultOpen?: boolean; memory?: ExplorerMemory } = {}): ExplorerNavigation {
+export function useExplorerNavigation(chapterIds: readonly string[], { embedded = false, defaultOpen = false, memory: suppliedMemory, initialActions }: { embedded?: boolean; defaultOpen?: boolean; memory?: ExplorerMemory; initialActions?: readonly ExplorerAction[] } = {}): ExplorerNavigation {
   const localMemory = useRef(createExplorerMemory());
   const memory = suppliedMemory ?? localMemory.current;
-  const [state, setState] = useState(() => memory.snapshot ?? createExplorerState(chapterIds));
+  const [state, setState] = useState(() => {
+    if (!initialActions) return memory.snapshot ?? createExplorerState(chapterIds);
+    const initial = initialActions.reduce(explorerReducer, createExplorerState(chapterIds));
+    // The bound chapter keeps its immediate presentation return, without an
+    // unrelated whole-portrait stop before the reader's originating passage.
+    return { ...initial, past: initial.past.slice(-1) };
+  });
   const [isOpen, setIsOpen] = useState(!embedded);
   const current = useRef(state);
   const opened = useRef(!embedded);

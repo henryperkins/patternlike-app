@@ -28,7 +28,7 @@ export interface PortraitObjectBinding {
   object: PortraitObject;
 }
 
-function chapterSourceText({ title, summary, sections, tensions, resources, counterExpression }: PortraitChapter): string {
+export function chapterSourceText({ title, summary, sections, tensions, resources, counterExpression }: PortraitChapter): string {
   return JSON.stringify({ title, summary, sections, tensions, resources, counterExpression });
 }
 

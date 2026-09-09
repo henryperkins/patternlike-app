@@ -3,6 +3,7 @@ import {
   canonicalJson,
   sha256Hex,
   type PatternDocumentInternal,
+  type PatternFactPacket,
   type PatternPlan,
   type PatternSemanticVerdict,
   type PatternWriterOutput,
@@ -53,6 +54,8 @@ export interface PatternPublicationBundle {
   plan: PatternPlan;
   writer: PatternWriterOutput;
   document: PatternDocumentInternal;
+  packet: PatternFactPacket;
+  calculation: { contractId: string; contractVersion: string };
   generatedAt: string;
 }
 
@@ -247,6 +250,8 @@ export async function buildPatternPublicationProof(input: {
     plan,
     writer,
     document,
+    packet: input.safety.packet,
+    calculation: { contractId: command.calc_contract_id, contractVersion: command.calc_contract_version },
     generatedAt: input.publication.generatedAt,
   };
 }

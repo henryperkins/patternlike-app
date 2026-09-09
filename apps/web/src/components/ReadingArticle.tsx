@@ -18,6 +18,7 @@ import { ReadingFeedbackCard } from "./ReadingFeedbackCard.js";
 import { ReadingSaveButton } from "./ReadingSaveButton.js";
 import { WhyThisDrawer } from "./WhyThisDrawer.js";
 import { Icon } from "./icons.js";
+import { ReadingConnections, type ParagraphConnectionAction } from "./ReadingConnections.js";
 
 export interface ReadingArticleProps {
   response: DailyReadingResponse;
@@ -74,14 +75,15 @@ function statusLabel(status: ReadingHistoryStatus | undefined): string | null {
   return null;
 }
 
-export function ReadingArticle({
+function ReadingArticleBody({
   response,
   status,
   showCheckIn,
   onReload,
   onUnauthorized,
   onSaveStateChange,
-}: ReadingArticleProps) {
+  paragraphConnection,
+}: ReadingArticleProps & { paragraphConnection?: ParagraphConnectionAction }) {
   const headingId = useId();
   const { reading } = response;
   const paragraphs = [...reading.paragraphs].sort((a, b) => a.order - b.order);
@@ -142,15 +144,17 @@ export function ReadingArticle({
       <div className="today-reading">
         <div className="today-body">
           {paragraphs.map((paragraph, index) => (
-            <Paragraph
-              key={paragraph.paragraph_id}
-              role={paragraph.role}
-              text={paragraph.text}
-              presentation={v5
-                ? ROLE_PRESENTATION_V5[paragraph.role as keyof typeof ROLE_PRESENTATION_V5]
-                : ROLE_PRESENTATION[paragraph.role as keyof typeof ROLE_PRESENTATION]}
-              kicker={v5 && index === 0 ? response.reading.headline : undefined}
-            />
+            <div key={paragraph.paragraph_id} data-reading-paragraph={paragraph.paragraph_id} tabIndex={-1}>
+              <Paragraph
+                role={paragraph.role}
+                text={paragraph.text}
+                presentation={v5
+                  ? ROLE_PRESENTATION_V5[paragraph.role as keyof typeof ROLE_PRESENTATION_V5]
+                  : ROLE_PRESENTATION[paragraph.role as keyof typeof ROLE_PRESENTATION]}
+                kicker={v5 && index === 0 ? response.reading.headline : undefined}
+              />
+              {paragraphConnection ? <div className="reading-paragraph-connections">{paragraphConnection(paragraph.paragraph_id, paragraph.order)}</div> : null}
+            </div>
           ))}
         </div>
 
@@ -178,4 +182,16 @@ export function ReadingArticle({
       )}
     </article>
   );
+}
+
+export function ReadingArticle(props: ReadingArticleProps) {
+  return <ReadingConnections
+    key={`${props.response.reading.reading_id}:${props.response.reading.revision}`}
+    response={props.response}
+    onUnauthorized={props.onUnauthorized}
+    onReload={props.onReload}
+    reloadLabel={props.showCheckIn ? "Open current Today" : "Reload source reading"}
+    renderSource={(paragraphConnection) => <ReadingArticleBody {...props} paragraphConnection={paragraphConnection} />}
+    renderDaily={(response, status, onReload) => <ReadingArticleBody response={response} status={status} showCheckIn={false} onReload={onReload} onUnauthorized={props.onUnauthorized} />}
+  />;
 }

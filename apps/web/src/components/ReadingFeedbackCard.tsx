@@ -160,9 +160,15 @@ export function ReadingFeedbackCard({
           <p className="reading-feedback__invite" id="reading-feedback-invite">
             Optional. It never changes the published chapter.
           </p>
+          <p className="reading-feedback__permission" id="reading-feedback-permission">
+            Sending this enables reading feedback for content quality, repetition
+            control, and theme ranking. An optional note is stored encrypted; its
+            text is not used for repetition control or theme ranking. This does
+            not enable model training.
+          </p>
           <fieldset
             className="reading-feedback__choices"
-            aria-describedby="reading-feedback-invite"
+            aria-describedby="reading-feedback-invite reading-feedback-permission"
           >
             <legend>How this reading landed</legend>
             <div className="reading-feedback__options">

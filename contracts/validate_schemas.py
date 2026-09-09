@@ -48,6 +48,7 @@ M8 = ROOT / "m8"
 M9 = ROOT / "m9"
 GEOCODER_V2 = ROOT / "geocoder-v2"
 PORTRAIT_V1 = ROOT / "portrait-v1"
+READER_RELATIONSHIPS_V1 = ROOT / "reader-relationships-v1"
 PATTERN_PROVIDER_BOUNDARY_POLICY_PATH = (
     ROOT / "policies" / "pattern-provider-boundary-v1.json"
 )
@@ -64,10 +65,17 @@ M8_BASE = "https://patternlike.app/contracts/m8/"
 M9_BASE = "https://patternlike.app/contracts/m9/"
 GEOCODER_V2_BASE = "https://patternlike.app/contracts/geocoder-v2/"
 PORTRAIT_V1_BASE = "https://patternlike.app/contracts/portrait-v1/"
+READER_RELATIONSHIPS_V1_BASE = "https://patternlike.app/contracts/reader-relationships-v1/"
 
 # package -> fixture filename prefix -> schema URI (longest prefix wins WITHIN
 # a package). Never flatten these two maps: see the module docstring.
 FIXTURE_SCHEMA = {
+    "reader-relationships-v1": {
+        "reader-source": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/sourceResponse",
+        "reader-relationships": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/relationshipsResponse",
+        "reader-target": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/targetResponse",
+        "reader-timing": READER_RELATIONSHIPS_V1_BASE + "reader-relationships.schema.json#/$defs/timingDetail",
+    },
     "portrait-v1": {
         "portrait-response": PORTRAIT_V1_BASE + "portrait.schema.json#/$defs/response",
         "portrait-request": PORTRAIT_V1_BASE + "portrait.schema.json#/$defs/generationRequest",
@@ -217,6 +225,7 @@ FIXTURE_SCHEMA = {
 # Fixtures whose defect is a policy rule rather than a schema rule. The schema
 # may legitimately accept them; the policy check below must not.
 POLICY_ONLY = {
+    "reader-relationships-v1": set(),
     "portrait-v1": set(),
     "geocoder-v2": set(),
     "m3": {
@@ -398,7 +407,7 @@ FORBIDDEN_VALUES_IN_GENERATION_REQUEST = ("usr_", "cs_", "rdg_", "cht_", "cns_",
 
 def load_registry() -> Registry:
     registry = Registry()
-    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1):
+    for package in (M0, M3, M4, M5, M6, M7, M8, M9, GEOCODER_V2, PORTRAIT_V1, READER_RELATIONSHIPS_V1):
         if not package.is_dir():
             continue
         for path in sorted(package.glob("*.schema.json")):
@@ -1395,7 +1404,7 @@ def validate_package(
             return _m7_policy_errors(fixture, instance)
         if name == "m8":
             return _m8_policy_errors(fixture, instance)
-        if name in ("m9", "geocoder-v2", "portrait-v1"):
+        if name in ("m9", "geocoder-v2", "portrait-v1", "reader-relationships-v1"):
             return []
         raise ValueError(f"unregistered contract package policy: {name}")
 
@@ -1464,6 +1473,7 @@ PACKAGE_BASE = {
     "m9": M9_BASE,
     "geocoder-v2": GEOCODER_V2_BASE,
     "portrait-v1": PORTRAIT_V1_BASE,
+    "reader-relationships-v1": READER_RELATIONSHIPS_V1_BASE,
 }
 
 
@@ -1543,7 +1553,7 @@ def check_openapi(package: Path, registry: Registry) -> list[str]:
     for path in sorted((package / "openapi").glob("*.yaml")):
         spec = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
-            if package in (M8, M9, GEOCODER_V2, PORTRAIT_V1):
+            if package in (M8, M9, GEOCODER_V2, PORTRAIT_V1, READER_RELATIONSHIPS_V1):
                 # The validate() shortcut builds SchemaPath with its own handlers
                 # before instantiating `cls`, so a custom class cannot affect
                 # retrieval there. Construct the validator from the raw mapping.
@@ -4044,6 +4054,10 @@ def main() -> int:
     errors += validate_package(registry, "portrait-v1", PORTRAIT_V1, set())
     errors += check_openapi(PORTRAIT_V1, registry)
     errors += check_geocoder_v2_projection(registry)
+
+    print("\n== contracts/reader-relationships-v1 ==")
+    errors += validate_package(registry, "reader-relationships-v1", READER_RELATIONSHIPS_V1, set())
+    errors += check_openapi(READER_RELATIONSHIPS_V1, registry)
 
     if errors:
         print(f"\n{len(errors)} error(s)")
