@@ -163,6 +163,65 @@ describe("Pattern document safety policy", () => {
     expect(evaluatePatternPublicationSafety(input).failures).toEqual([]);
   });
 
+  it("permits the retained writer's optional prediction sentence in its complete counter-expression", () => {
+    const input = fixture(0);
+    const retained = "Activity pursued for its own sake creates room to try something before a defensible reason exists. Its value may lie in allowing the attempt to precede the explanation. You do not have to predict what the attempt will become in order to recognize this experimental space as part of the Pattern.";
+    input.writer.chapters[0]!.counter_expression.text += ` ${retained}`;
+    expectStructurallyValid(input);
+    expect(evaluatePatternPublicationSafety(input).failures).toEqual([]);
+  });
+
+  it.each([
+    "You do not have to predict what the attempt will become.",
+    "You don't have to predict what happens next.",
+    "You don’t have to predict what this work will become!",
+    "You do not have to predict what happens; this can remain an experiment.",
+    "You do not have to predict what happens, and this can remain an experiment.",
+    "You  do not have to predict what happens. This reading makes no predictions.",
+  ])("permits an anchored optional prediction without asserting an outcome: %s", (text) => {
+    const input = fixture(0);
+    input.writer.chapters[0]!.summary = text;
+    expect(evaluatePatternPublicationSafety(input).failures).toEqual([]);
+  });
+
+  it.each([
+    "You have to predict what the attempt will become.",
+    "You do not always have to predict what the attempt will become.",
+    "You do not have to predict success.",
+    "You do not have to predict that you will become wealthy.",
+    "You do not have to make predictions about what happens next.",
+    "Your chart does not have to predict what happens next.",
+    "It is false that you do not have to predict what happens next.",
+    "You do not not have to predict what happens next.",
+    "Do you not have to predict what happens next?",
+    "You do not have to predict what happens next?",
+    "You do not have to predict what happens next, do you?",
+    "You do not have to predict what happens next, but your chart predicts wealth.",
+    "You do not have to predict what happens next and your chart guarantees success.",
+    "You do not have to predict what happens next; success is inevitable.",
+    "You do not have to predict what happens next: your fate is wealth.",
+    "You do not have to predict what happens next. Your chart predicts wealth.",
+    "You do not have to predict what happens next\nYour chart predicts wealth.",
+    "You do not have to predict what happens next—your chart guarantees success.",
+    "You do not have to predict what your chart predicts for you.",
+    "You do not have to predict what is guaranteed to happen.",
+  ])("does not extend reader optionality to an assertion or another claim: %s", (text) => {
+    const input = fixture(0);
+    input.writer.chapters[0]!.summary = text;
+    expect(evaluatePatternPublicationSafety(input).failures.map((failure) => failure.code))
+      .toContain("prohibited_claim");
+  });
+
+  it("still rejects an ontology-prohibited phrase inside otherwise permitted reader optionality", () => {
+    const input = fixture(0);
+    const section = input.writer.chapters[0]!.sections[0]!;
+    input.ontology.find((record) => record.id === section.ontology_rule_ids[0])!
+      .prohibited_claims.push("what happens next");
+    section.text = `You do not have to predict what happens next. ${section.text}`;
+    expect(evaluatePatternPublicationSafety(input).failures.map((failure) => failure.code))
+      .toContain("prohibited_claim");
+  });
+
   it("rejects an explicit astrological assertion in a summary without a citation ledger", () => {
     const input = fixture(0);
     input.writer.chapters[0]!.summary = "Your Mars is in Leo.";

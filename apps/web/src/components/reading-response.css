@@ -1,0 +1,42 @@
+.reading-response > p,
+.reading-response form > p,
+.reading-response__effect p,
+.reading-response__correction p {
+  max-width: 65ch;
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.reading-response fieldset legend {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.reading-response__correction {
+  margin-top: 24px;
+}
+
+.reading-response__correction a,
+.reading-response__overall summary {
+  color: var(--forest);
+  font-size: 13px;
+  text-underline-offset: 3px;
+}
+
+.reading-response__overall {
+  margin-top: 24px;
+}
+
+.reading-response__overall summary {
+  cursor: pointer;
+}
+
+.reading-response__overall .reading-feedback {
+  margin-top: 14px;
+  padding-top: 0;
+  border: 0;
+}

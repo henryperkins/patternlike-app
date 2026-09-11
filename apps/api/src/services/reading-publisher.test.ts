@@ -94,6 +94,14 @@ const enabled: Partial<Env> = {
 };
 
 describe("Codex-only Daily publisher configuration", () => {
+  it("requires matching categorical activation and prompt pins", () => {
+    const resolved = resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1", OPENAI_READING_PROMPT_VERSION: "1.0.4" });
+    expect(resolved.ok).toBe(true);
+    if (resolved.ok) expect(resolved.config?.pin).toMatchObject({ prompt_version: "1.0.4", selection_policy_version: "1.2.0" });
+    expect(resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1" }).ok).toBe(false);
+    expect(resolvePublisherConfiguration({ ...enabled, OPENAI_READING_PROMPT_VERSION: "1.0.4" }).ok).toBe(false);
+    expect(resolvePublisherConfiguration({ ...enabled, CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "true" }).ok).toBe(false);
+  });
   it("accepts a complete hybrid Codex deployment with no OpenAI credential", () => {
     expect(checkSecureConfig(enabled)).toBeNull();
     const resolved = resolvePublisherConfiguration(enabled);

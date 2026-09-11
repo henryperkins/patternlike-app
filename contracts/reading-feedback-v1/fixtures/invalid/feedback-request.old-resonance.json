@@ -1,0 +1,11 @@
+{
+  "schema_version": "reading-feedback-event/v1",
+  "category": "not_helpful",
+  "revision": 2,
+  "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "paragraph_id": "par_fixture",
+  "note": "This repeats yesterday\u2019s framing.",
+  "feedback_use_policy_version": "categorized-feedback-use/v1",
+  "expected_grant_state": "feedback-grant:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "confirm_feedback_use": true
+}

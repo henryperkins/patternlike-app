@@ -2136,6 +2136,15 @@ summary:focus-visible {
   margin-top: 4px;
 }
 
+.reading-feedback__permission {
+  max-width: 65ch;
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .reading-feedback__choices {
   margin: 16px 0 0;
   padding: 0;

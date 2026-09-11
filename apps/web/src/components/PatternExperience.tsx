@@ -595,13 +595,16 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
     available: "Generate my Pattern",
   };
 
+  const canRetry = state.generation?.retryable === true;
   const details: Partial<Record<PatternState, string>> = {
     chart_required: "Your Pattern is written from calculated natal facts, so it waits for an active chart.",
     locale_confirmation_required: "The Pattern is written in the language you confirm.",
     ontology_unavailable: "No activated interpretation meanings are available. Chart facts above are unaffected.",
     deleted: "Deleting a Pattern consumes this chart's one generation. A later chart correction can start a new one.",
     withdrawn: "The meanings used to write it were recalled. Chart facts above are unaffected.",
-    failed: "A failed attempt does not use up this chart's one Pattern. You can try again.",
+    failed: canRetry
+      ? "A failed attempt does not use up this chart's one Pattern. You can try again."
+      : "A failed attempt does not use up this chart's one Pattern. A retry is not available right now. Check again for an updated status.",
     consent_required:
       "The first visit is the consent surface. Review exactly what will and will not be sent, then generate one Pattern for this chart.",
     available:
@@ -610,7 +613,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
 
   const consent = state.consent;
   const canGenerate =
-    (state.state === "consent_required" || state.state === "available" || state.state === "failed") &&
+    (state.state === "consent_required" || state.state === "available" || (state.state === "failed" && canRetry)) &&
     consent !== null;
   const reason = state.state === "failed" ? "failed_attempt_retry" as const : "first_open" as const;
 
@@ -635,7 +638,7 @@ function CurrentChartPatternExperience({ chartId, onUnauthorized, sky }: Pattern
             </button>
           </>
         ) : null}
-        {state.state === "failed" && canGenerate ? (
+        {state.state === "failed" ? (
           <button
             className="button button--secondary"
             type="button"

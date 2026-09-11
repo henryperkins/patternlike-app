@@ -263,6 +263,15 @@ describe("the read-only current Daily owner", () => {
 describe("reading provider owner admission", () => {
   beforeEach(resetDb);
 
+  it("keeps an incumbent frozen command executable after opting new commands into categorical feedback", async () => {
+    const { jobId } = await reserveClaimed();
+    const original = (await loadCurrentDailyOwner(enabledEnv(), jobId))!.command;
+    const current = enabledEnv({ CATEGORIZED_FEEDBACK_EFFECTS_ENABLED: "1", OPENAI_READING_PROMPT_VERSION: "1.0.4" });
+    expect(await readingProviderOwnerIsCurrent(current, providerJob({ ownerId: jobId }))).toBe(true);
+    expect(await readingProviderOwnerIsCurrent(current, providerJob({ ownerId: jobId, promptVersion: "1.0.4" }))).toBe(false);
+    expect((await loadCurrentDailyOwner(current, jobId))!.command).toEqual(original);
+  });
+
   it("admits exactly the coordinate the frozen command describes", async () => {
     const { jobId } = await reserveClaimed();
     const current = enabledEnv();

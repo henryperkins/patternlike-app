@@ -1,0 +1,14 @@
+{
+  "package": "contracts/reading-feedback-v1",
+  "schema_version": "reading-feedback-event/v1",
+  "document_date": "2026-09-09",
+  "status": "additive_local_implementation",
+  "schemas": [
+    "reading-feedback.schema.json",
+    "account-export.schema.json"
+  ],
+  "openapi": [
+    "openapi/openapi.yaml"
+  ],
+  "note": "M0\u2013M9, geocoder-v2, portrait-v1 and reader-relationships-v1 remain unchanged. Runtime tests enforce exact ownership/edition, atomic grant-state preconditions, idempotency, calendar retention, cleanup and compiler eligibility. Existing USR-12 24-month retention is adopted without an aggregate extension; seven-day signal expiry is separate."
+}

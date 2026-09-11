@@ -307,6 +307,13 @@ export async function rewrapUserKey(
  */
 export const ENCRYPTED_COLUMNS = [
   {
+    table: "reading_feedback_events",
+    idColumn: "id",
+    encColumn: "event_enc",
+    keyVersionColumn: "event_key_version",
+    nonceColumn: "event_nonce",
+  },
+  {
     table: "reader_relationship_supports",
     idColumn: "id",
     encColumn: "support_enc",

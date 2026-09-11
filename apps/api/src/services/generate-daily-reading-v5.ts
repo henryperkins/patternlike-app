@@ -3,7 +3,6 @@ import addFormats from "ajv-formats";
 
 import {
   ConstrainedInputError,
-  SELECTION_POLICY_VERSION,
   VALIDATION_POLICY_VERSION,
   prepareConstrainedReadingInput,
   validateReadingCandidate,
@@ -68,7 +67,9 @@ import {
   READING_CONTEXT_MAX_BYTES,
   READING_PUBLISHER_PROVIDER,
 } from "./reading-publisher.js";
-import { READING_PROMPT_VERSION } from "./reading-prompt.js";
+import { supportsFeedbackGenerationPolicy } from "./reading-feedback-policy.js";
+import { currentCategoricalFeedbackMatches, isCategoricalFeedbackPin } from "./reading-feedback-admission.js";
+import { buildReadingFeedbackPublicationGuards } from "../db/reading-feedback-publication.js";
 import { lazy } from "./lazy-validator.js";
 import { safeLog } from "./safe-log.js";
 import type { StoredReadingV5 } from "./stored-reading.js";
@@ -190,9 +191,8 @@ function supportedCommand(command: GenerateDailyReadingCommandV2): boolean {
     command.publisher.provider === READING_PUBLISHER_PROVIDER &&
     command.publisher.model === OPENAI_READING_MODEL &&
     isCodexProviderReasoningEffort(command.publisher.reasoning_effort) &&
-    command.publisher.prompt_version === READING_PROMPT_VERSION &&
+    supportsFeedbackGenerationPolicy(command.publisher.prompt_version, command.publisher.selection_policy_version) &&
     command.publisher.output_schema === "daily-reading-v5" &&
-    command.publisher.selection_policy_version === SELECTION_POLICY_VERSION &&
     command.publisher.validation_policy_version === VALIDATION_POLICY_VERSION &&
     command.publisher.max_output_tokens === OPENAI_READING_MAX_OUTPUT_TOKENS &&
     command.publisher.context_max_bytes === READING_CONTEXT_MAX_BYTES
@@ -241,9 +241,11 @@ async function pinnedContextEligible(
   env: Env,
   userId: string,
   pins: readonly ContextPinV2[],
+  selectionVersion: string,
   now = new Date(),
 ): Promise<boolean> {
   if (pins.length === 0) return true;
+  if (!(await currentCategoricalFeedbackMatches(env, userId, pins, selectionVersion, now))) return false;
   const grants = new Map(
     (await loadContextSourceGrants(env, userId)).map((grant) => [grant.source_id, grant]),
   );
@@ -264,6 +266,7 @@ async function pinnedContextEligible(
     }
 
     if (pin.source_id === "USR-12" || pin.category === "reading_feedback") {
+      if (isCategoricalFeedbackPin(pin)) continue;
       if (!(await pinnedFeedbackEligible(env, userId, pin))) return false;
       continue;
     }
@@ -427,7 +430,7 @@ export async function generateDailyReadingV5(
   if (!(await currentAiConsentMatches(env, userId, command))) {
     return fail("ai_synthesis_consent_required", "consent_not_active");
   }
-  if (!(await pinnedContextEligible(env, userId, command.context))) {
+  if (!(await pinnedContextEligible(env, userId, command.context, command.publisher.selection_policy_version))) {
     return fail("context_ineligible", "context_not_eligible");
   }
 
@@ -621,7 +624,7 @@ export async function generateDailyReadingV5(
   if (!(await currentAiConsentMatches(env, userId, command))) {
     return fail("ai_synthesis_consent_required", "consent_not_active");
   }
-  if (!(await pinnedContextEligible(env, userId, command.context))) {
+  if (!(await pinnedContextEligible(env, userId, command.context, command.publisher.selection_policy_version))) {
     return fail("context_ineligible", "context_not_eligible");
   }
 
@@ -854,6 +857,8 @@ export async function generateDailyReadingV5(
       dayEndAt: command.day_end_at, cyclePolicyVersion: command.cycle_scan.policy_version,
     }),
   });
+  const feedbackGuards = await buildReadingFeedbackPublicationGuards(env, identity, command.context, new Date());
+  if (feedbackGuards === null) return fail("context_ineligible", "context_not_eligible");
   const published = await completeReading(env, {
     identity,
     readingId: command.reading_id,
@@ -872,6 +877,7 @@ export async function generateDailyReadingV5(
     },
     evidence: evidenceRows,
     relationshipSupport,
+    feedbackGuards,
     receipt: {
       readingId: command.reading_id,
       jobId: claim.jobId,

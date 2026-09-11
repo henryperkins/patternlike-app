@@ -1,0 +1,85 @@
+# Retained Pattern output review
+
+Date: 2026-09-09. Source checkout: `d338b86c9444ebe2f372f2a2f3990f4a1270bc80` with the documented Slice 1 and planning edits. Assessment by Codex; named human adjudication remains pending. No provider call, participant study, private sample access, or production observation was performed.
+
+**No retained provider-written output available in this checkout can serve as a prose sample for the twelve-case, forty-record internal-release baseline.** The September 6 export preserves useful failure metadata, but excludes output bodies and used the separate twenty-six-record authored M7 reference ontology. Identical chart fixture names and matching prompt versions do not close either gap.
+
+## Available evidence and compatibility
+
+| Evidence | What is actually available | Use in this baseline |
+| --- | --- | --- |
+| [Generation report](../../2026-09-06-source-register-followup/pattern-generation-01/report.json), September 6, 18:25–18:32 UTC | Two planner results, two writer results and one verifier result as metadata; input, invocation, output and request hashes; model/policy pins; accepted/rejected status. No `sample_file` body is present beside the report. | Historical generation failure observations only. The two cases are `m7-exact-01` and `m7-unknown-01`; their existing fixture fact packets and reference ontology were used, rather than selection against the current internal release. |
+| [Verifier report](../../2026-09-06-source-register-followup/verifier-02/report.json), September 6, 18:34–18:38 UTC | Nine verifier result summaries, challenge/input/output hashes and finding codes. Inputs are authored fixture chains with explicit synthetic mutations; fresh writer samples were not obtained. No individual verifier output body is exported. | Historical checker behavior against its stated challenges. This is neither a current twelve-case generation panel nor independently adjudicated source support. |
+| [Export manifest](../../2026-09-06-source-register-followup/evaluation-export.json) and [dated follow-up](../../../2026-09-06-source-register-followup.md#new-model-evidence) | Explicit `raw_provider_samples_included: false`; metadata reports and snapshots only. The follow-up says raw fictional prompts/outputs remained in a private service-owned evaluation directory. | Record missing output bodies. No attempt was made to access that private directory. `output/` in this checkout contains five mindmap files and no Pattern generation samples. |
+| [M7 manifest](../../../../../contracts/m7/fixtures/corpus/manifest.json) and [exact-01 authored chain](../../../../../contracts/m7/fixtures/corpus/en-US/exact-01.json) | Complete authored writer bodies, facts, cited reference record IDs and expected outcomes are checked in. Manifest status is `authored`; reference ontology has 26 records. | Inspectable historical synthetic examples. Do not count embedded writer bodies or authored `accepted` outcomes as current internal-release observations. |
+| [Corpus review packet](../../2026-09-06-source-register-followup/human-review-packet/packet.json) and [review draft](../../2026-09-06-source-register-followup/human-review-packet/review-draft.json) | Sixty source fragments and five editorial criteria, with empty reviewer identity and unreviewed decisions. | Useful existing review criteria; not a completed human review and not generated reader prose. |
+
+The historical M7 corpus identity is `sha256:5b73be13623882f0e1143d5ec38b2bd650355ac87b55b3b42ee2489d224299b4`; this is the fixture corpus identity, **not** the prepared sixty-fragment source corpus hash. The historical reference ontology's canonical record-array SHA-256 is `6dd703ef4678bee773ca27ff18171388cacad64b4cf47f51694d93ecafc80cd4`. It is not the forty-record internal ontology. The current internal build is documented in the [Slice 1 ontology assessment](../../2026-09-09-source-map-maintenance/ontology-verification.md), including prepared corpus hash `sha256:5d5e46af054c722e9ced6c596bc912983fad8eaf6a62b85b8b52103e40088f5c` and canonical bundle hash `sha256:7e947bc43ef38dec705aae668c95f37a56396b88de1c940e03216754c2490d84`.
+
+## Historical outcomes, without inventing prose judgments
+
+| Case/run | Recorded result | Interpretation and limit |
+| --- | --- | --- |
+| Generation `m7-exact-01` | Planner accepted; writer rejected with `chapter_word_count`; writer output hash `62473d913b7a803d787f9affb359763c7f9b865ce478cd90d6272f9ecec7abc3`. | The dated follow-up reports 596 and 572 words against the 550-word chapter maximum. This is evidence of a first-attempt length failure; missing body bytes prevent recounting or judging clarity, specificity and claim support here. The run did not exercise the production correction loop. |
+| Generation `m7-unknown-01` | Planner and writer accepted structurally; final stage rejected with `prohibited_claim`; writer output hash `5888d8da16c5bd8bee0b9c3fa1b0b46f072402091fbfa4f7b2d76c9bfd6fcd55`. | The dated follow-up distinguishes a model-verifier pass from subsequent deterministic publication-safety rejection of a negated guarantee. The stage label `verifier_rejected` does not establish that the model itself rejected it. The actual generated sentence is unavailable here. |
+| Verifier `exact_control-1` | Expected pass, observed reject; codes `claim_not_entailed` and `synthesis_exceeds_dependencies`; classified `false_reject` by the authored oracle. | The oracle remains disputed. The follow-up records concerns about treating birth-time accuracy as a personal tendency and a synthesis dependency absent from facts. A harness classification cannot settle that editorial disagreement. |
+| Verifier `uncertain_control-1` | Expected and observed pass. | One accepted authored positive control, without a fresh writer sample or human adjudication. |
+| Seven verifier negative challenges | All seven rejected; no false accepts in this nine-case run. | The hypotheses covered fact substitution, uncertainty override, psychological certainty, coercive relationship advice, indirect diagnosis, embedded instruction and synthesis dependency mismatch. This is a narrow historical observation, not a general safety or reading-quality score. |
+
+The generation run accepted zero of two chains; the verifier run accepted one positive control, rejected another positive control, and rejected seven negatives. Both reports retain `passed: false` and explicitly deny successful fresh end-to-end production Patterns. The same configured model served writer and verifier; separate prompts do not constitute independent editorial review.
+
+The [minimal negation diagnostic](../../2026-09-06-source-register-followup/negation-diagnostic.json) does retain its own exact synthetic text: “No particular outcome is guaranteed.” Its expected rejection was false and its observed rejection was true. The affirmative and compound harmful examples also rejected. That sentence is a separately authored reproduction, not a recovered quotation from the missing generated writer. Its policy file hash still matches current source; no fresh execution of this diagnostic occurred in this review.
+
+## What the available authored prose reveals
+
+The following observations concern **the frozen M7 synthetic exact-01 writer**, not the current forty-record release or historical provider-written samples. Its raw fixture-file SHA-256 is `c432de09500f3902c1bc79e071e56caf6732c28d883069390032ca59b4fb30d9`; its writer object, serialized as compact sorted-key JSON, has SHA-256 `310d6be8a95e54fc05773abbbd004de2de9013fe5dc13052b73dc5a3047249e7`. Coordinates below are zero-based, half-open character spans within the named JSON text value.
+
+| Bound unit and span | Available text | Provisional editorial observation; human verdict pending |
+| --- | --- | --- |
+| `/chain/writer/chapters/0/sections/0/text`, `[0,102)` | “The calculated evidence points to Birth-time accuracy bounds what can be said about houses and angles.” | Its cited uncertainty record, `ont_756e6365727461696e74790000000000`, supplies the limitation proposition. The sentence awkwardly embeds it as an interpretation; later boilerplate calls it a tendency the chart contains. This explains why support for the whole unit is unresolved despite vocabulary overlap. Other citation: `ont_6173702d737175617265000000000000`; assigned aliases `f002`, `f001`. |
+| `/chain/writer/chapters/0/tensions/0/text`, `[0,36)` | “uncertainty can harden into overuse.” | This exactly repeats the reference uncertainty record's tension field, whose source ID is `srcf_756e6365727461696e74790000000000`. Repetition establishes field copying; the record itself conflates an epistemic limit with a personal tendency. This is a source/reference-fixture issue before it is a generation issue. The underlying fragment body is not supplied by this writer. |
+| `/chain/writer/chapters/1/sections/0/text`, `[0,81)` | “The calculated evidence points to The sun position describes a standing emphasis.” | The referenced Sun record `ont_706f732d73756e000000000000000000` supplies the broad proposition. Awkward concatenation and lack of a concrete distinction are directly visible in authored text. Aliases are `f004`, `f005`; the unit also cites Moon and five other source/synthesis records, which does not itself explain a meaningful contrast. |
+
+One boilerplate sentence—“This remains a calculated pattern rather than a prediction of events, and it describes a tendency the chart already contains.”—occurs **37 times** in the exact-01 writer's JSON string values. This is direct evidence that the authored structural fixture is not a quality exemplar. It is not evidence that the current model repeats that sentence, or that the sixty-fragment internal source does so.
+
+No human support verdict or 0–3 quality score is assigned to these units. These observations should inform adjudication of the historical control, with the original expectation preserved until a named reviewer resolves it. They must not replace the separate current-source panel or the six baseline negative controls.
+
+## Source and policy compatibility
+
+The generation and verifier reports bind source base `cefc97981981dfde7a36ce050e7fb33367c830be` with changed working copies. Their aggregate `files_sha256` values are respectively `1b3567df83f124e41f20444e30fc00fe6f84a45ac29c80e22c70fbdf741efa84` and `395702ad1a2f6cb2e3e7e96b0f8ca818b20add7f00f2c48345369024e0e28f6b`. Those differ from a current source revision; they are not production release identities.
+
+A direct file-byte comparison against both historical loaded-source snapshots found the following unchanged. This uses existing recorded hashes and does not create a new source-capture mechanism.
+
+| Current source | SHA-256, identical in both historical snapshots and current checkout |
+| --- | --- |
+| [Pattern prompts](../../../../../apps/api/src/services/pattern-prompt.ts) | `598eb586a8c2892870f937f09779de84ddb79392bd37aa5cc1035869f7d62003` |
+| [Publisher pins](../../../../../apps/api/src/services/pattern-publisher.ts) | `0a536c662fa121f2b42a60f16b585fe9a3442d45bde196c464909bde25c656b3` |
+| [Packet builder](../../../../../apps/api/src/services/pattern-packet.ts) | `adf3e4b943cc69b85f1640d853badf232bbb138fe8d845dba2891512a1ab6b23` |
+| [Selection/validation policy](../../../../../packages/pattern-engine/src/policy.ts) | `f1e346afbbb21424a075230973625803a39b7fe02610d14376ab8844658c5e79` |
+| [Semantic verdict validation](../../../../../apps/api/src/services/pattern-semantic.ts) | `6fd2bf366218f43cddbf2c0832f2205ba38ca1d5e2124f92ae0a8212399084ee` |
+| [Publication safety](../../../../../apps/api/src/services/pattern-publication-safety.ts) | `892b6ad37a3e99ff2c0e1b5b44e056eec55c739e9ee65741decfcdf904645cd2` |
+| [M7 fixture manifest](../../../../../contracts/m7/fixtures/corpus/manifest.json) | `09e9f838035017f8bbae46473c5807cc33ac51c4854c623c1ff3658163fd9ca5` |
+
+The recorded model pins are Codex publisher, `gpt-5.6-sol` with `xhigh` for all three passes; planner `1.0.1`, writer `1.0.3`, verifier `1.0.0-verifier`; selection and validation `1.0.0`; 32,000 configured maximum output tokens per pass; 98,304 input bytes. Text isolation is `1.0.0`; the follow-up records CLI `0.153.3`. These are historical run facts. This review did not inspect an installed provider, actual account settings or a production pin.
+
+The [Codex invocation module](../../../../../apps/codex-runner/src/codex-cli.ts) and [provider conversion contract](../../../../../apps/api/src/services/codex-provider-contract.ts) also match the historical verifier snapshot byte-for-byte, with hashes `dd9e96498f0854712159e7e6d81bbf6cc442d7770a5a17206a49b873e0c7cc70` and `59de94e83c7502cd85763c5c1ee1b00ac3d7ec45d0c0f9b3fa9dc146705cc13c`. This is source compatibility for those modules, not proof of current installed transport execution.
+
+The [fresh-generation helper](../../../../../scripts/pattern-release/fresh-pattern-evaluation.mjs) **does differ**: generation snapshot `01f818a018891b41d99da058f386c9cbe426d8483a0b85015450d36f57d23550`, verifier snapshot `e23742e04fefbbf1a03b5b0cb2e2abb6bef25f2814014b9051efb9d2779d5d7b`, current `b59953f4b966b41f3ab822576881f8bdd0caaac8027d01e3381ae878e1063089`. The dated report identifies intervening reporting fixes; historical output is not relabelled as execution of today's helper. The [verifier helper](../../../../../scripts/pattern-release/fresh-pattern-verifier-evaluation.mjs) matches both historical snapshots at `8b4573541f6951ac727ced215dd7eee402aa658df9cfb5292f566a1b0de2beef`.
+
+## Existing controls relevant to quality
+
+| Existing control | What it already asks or checks | What remains unresolved |
+| --- | --- | --- |
+| Planner policy and deterministic plan validation | Exact feature coverage, authorized rule IDs, honest omissions, chapter-bound meanings; uncertainty-only chapters are prohibited. | A syntactically valid assignment does not establish that a source distinction is useful or the resulting chapters feel different. |
+| Writer policy | Preserve uncertainty, avoid invented biography or certainty, keep tension and counter-expression distinct, use ordinary specific language without unsupported emotion, flattering filler or false intimacy. | These instructions already exist. Adding more general exhortations to be specific is not a demonstrated fix for missing or overbroad source material. |
+| Writer packet and bounded correction | Structured bounds already include chapter 250–550 words, paragraph maximum 180, total 1,500–4,500; the [execution service](../../../../../apps/api/src/services/pattern-execute.ts) can produce correction documents under the frozen plan. | The historical single-attempt helper did not measure that recovery path. Do not claim the writer lacked numeric bounds: they are supplied in the packet even though the shared prose policy is brief. |
+| Verifier policy | Claim entailment/synthesis dependencies, unsupported metaphor, certainty, invented circumstances, generic material claimed unique, meaningful uncertainty, contradictions and distinct contrasts. | Same-model judgment and citation membership remain insufficient for independent support adjudication. The exact-time authored positive control is already disputed. |
+| Deterministic publication safety | Separate publication boundary for suppressed-feature leakage and prohibited claims. | It can reject a benign negation and can accept generic but source-supported text; passing is not a quality score. The September 6 negative-control result does not cover every baseline control. |
+| Existing corpus review criteria | Copying limits, stereotypes, safety, humane specific voice, source fidelity and uncertainty. | Reviewer fields remain unfilled; source review, current output adjudication and reader comprehension are distinct missing evidence. |
+
+## Findings to carry into product work
+
+1. **Trace distinctions through the current source and selection before changing prose instructions.** Historical provider outputs cannot identify which of those layers causes generic prose in the current internal release. The current-source fragment/record register and contrasting panel are the relevant offline evidence.
+2. **Keep the authored positive-control dispute visible.** The retained fixture shows both heavy filler and confusion between an uncertainty limit and a personal tendency. A model reject may reveal a weak authored expectation; treating it automatically as a verifier defect would obscure the underlying problem.
+3. **Treat word-budget recovery and benign-negation handling as concrete, separately scoped candidates.** They have dated failure evidence and existing owning code/tests. Preserve the original failed observations; no prompt, fixture, validator, publication policy or gate was changed here.
+4. **Do not fabricate current-panel quality scores.** All provider-written claim support, specificity, coherence and comprehension judgments remain unavailable until compatible output bytes are available. Reader benefit and psychological validity are not established by any retained result.

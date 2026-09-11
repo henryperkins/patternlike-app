@@ -1,0 +1,157 @@
+{
+  "scope": "Local candidate validation and generic prohibited-claim check only; no new semantic verdict, complete publication-safety evaluation, provider call, or publication.",
+  "publication_safety_policy_version": "1.0.1",
+  "cases": [
+    {
+      "case_id": "exact-02",
+      "variant": "before",
+      "retained_file": "/home/henry/patternlike-app-source-map/docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-before-writer.json",
+      "retained_file_sha256": "a290290d982602fe1d24a71a2e7684b3e851619cdc7e4ddc9608890c1b93bdc2",
+      "retained_output_sha256": "03f107f87df036cfc56f602fb4add6bcd7352b4b62c533c6440167fe45a9b7ee",
+      "retained_writer_status": "rejected",
+      "retained_writer_findings": [
+        {
+          "code": "chapter_word_count",
+          "message": "chapter_04:245"
+        }
+      ],
+      "candidate_validation": {
+        "ok": false,
+        "failures": [
+          {
+            "code": "chapter_word_count",
+            "message": "chapter_04:245"
+          }
+        ]
+      },
+      "unqualified_prohibited_claim": null,
+      "chapter_04_counts": {
+        "summary": 19,
+        "sections": [
+          64,
+          62
+        ],
+        "tensions": [
+          51
+        ],
+        "resources": [],
+        "counter_expression": 49,
+        "title_excluded": 9
+      },
+      "length_only_perturbations": [
+        {
+          "words": 249,
+          "appended_diagnostic_text": "Keep this distinction visible.",
+          "candidate_validation": {
+            "ok": false,
+            "failures": [
+              {
+                "code": "chapter_word_count",
+                "message": "chapter_04:249"
+              }
+            ]
+          }
+        },
+        {
+          "words": 250,
+          "appended_diagnostic_text": "Keep this particular distinction visible.",
+          "candidate_validation": {
+            "ok": true,
+            "failures": []
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "exact-02",
+      "variant": "after",
+      "retained_file": "/home/henry/patternlike-app-source-map/docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/exact-02-after-writer.json",
+      "retained_file_sha256": "87a478558a8786e4119eec3d1a4bd14a216f35d8361ed610a3d20943f0bf27fc",
+      "retained_output_sha256": "6fb7293409f2d36438ff962b70651ab0ce143f4a3b770d23e8432dd818f91be3",
+      "retained_writer_status": "accepted",
+      "retained_writer_findings": [],
+      "candidate_validation": {
+        "ok": true,
+        "failures": []
+      },
+      "unqualified_prohibited_claim": null,
+      "chapter_04_counts": {
+        "summary": 18,
+        "sections": [
+          72,
+          71,
+          70
+        ],
+        "tensions": [
+          60
+        ],
+        "resources": [],
+        "counter_expression": 51,
+        "title_excluded": 6
+      }
+    },
+    {
+      "case_id": "unknown-02",
+      "variant": "before",
+      "retained_file": "/home/henry/patternlike-app-source-map/docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-before-writer.json",
+      "retained_file_sha256": "65f860cfecf3d323fde3469c7548d1341c5ed1e00a3b17da755e785fe1b687d4",
+      "retained_output_sha256": "cce15701613a8da0584d09c62b74c4920bc99e5f978dd38a098a121f38f50bc8",
+      "retained_writer_status": "accepted",
+      "retained_writer_findings": [],
+      "candidate_validation": {
+        "ok": true,
+        "failures": []
+      },
+      "unqualified_prohibited_claim": null,
+      "chapter_04_counts": {
+        "summary": 21,
+        "sections": [
+          52,
+          49,
+          55
+        ],
+        "tensions": [
+          52,
+          53,
+          50,
+          53
+        ],
+        "resources": [],
+        "counter_expression": 68,
+        "title_excluded": 5
+      }
+    },
+    {
+      "case_id": "unknown-02",
+      "variant": "after",
+      "retained_file": "/home/henry/patternlike-app-source-map/docs/reviews/artifacts/interpretation-quality/2026-09-09-applicability-fix/pinned-cli/samples/unknown-02-after-writer.json",
+      "retained_file_sha256": "e26aeffb981df1a5e99411a4f5f70347aa0fb095c3a7d48acc945df80c0130cd",
+      "retained_output_sha256": "c2b3a766dcbfd8d7c6294284e47886159109906c3d2aef9abba812393d199dbe",
+      "retained_writer_status": "accepted",
+      "retained_writer_findings": [],
+      "candidate_validation": {
+        "ok": true,
+        "failures": []
+      },
+      "unqualified_prohibited_claim": null,
+      "chapter_04_counts": {
+        "summary": 26,
+        "sections": [
+          60,
+          61,
+          53,
+          62
+        ],
+        "tensions": [
+          36,
+          33,
+          34,
+          37
+        ],
+        "resources": [],
+        "counter_expression": 70,
+        "title_excluded": 5
+      }
+    }
+  ]
+}

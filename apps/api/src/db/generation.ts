@@ -1394,6 +1394,8 @@ export interface PublicationInput {
   evidence: EvidenceRow[];
   /** V5 stores accepted passage support atomically; older deterministic editions have none. */
   relationshipSupport?: PreparedReaderRelationshipSupport;
+  /** Categorical inputs must still be eligible in the publication transaction. */
+  feedbackGuards?: readonly D1PreparedStatement[];
   /**
    * The durable publication receipt, or null for a deterministic reading.
    *
@@ -1445,6 +1447,7 @@ export async function completeReading(
   }
 
   const statements: D1PreparedStatement[] = [
+    ...(input.feedbackGuards ?? []),
     buildCryptoWriteFence(env, {
       userId: identity.userId,
       keyVersion,

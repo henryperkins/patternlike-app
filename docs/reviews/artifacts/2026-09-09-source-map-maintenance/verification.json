@@ -1,0 +1,50 @@
+{
+  "status": "focused_verification_passed",
+  "node_version": "v22.23.2",
+  "base_commit": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+  "branch": "codex/source-map-maintenance",
+  "working_tree_changes_included": true,
+  "content_tests": {
+    "tests": 148,
+    "pass": 148,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "source_map_tests_in_content_suite": 69,
+  "included_source_unchanged_during_content_tests": true,
+  "included_source_sha256": "775886e03b917637141ee1863bec2cfddbc3bd30c9c89879f24dbc99f49922e0",
+  "map_check": {
+    "status": "verified",
+    "scope": "referenced_files_and_map_inputs_only",
+    "snapshot_path": "docs/architecture/source-map/snapshots/2026-09-09-slice-1",
+    "content_sha256": "53588fcb54226eadb520770b88187d1cf6112d32189a1f79872ca5aa8aa3f9a0",
+    "base_commit": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+    "current_head": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+    "base_commit_matches": true,
+    "node_version": "v22.23.2",
+    "counts": {
+      "branches": 8,
+      "topics": 42,
+      "leaves": 97,
+      "evidence_entries": 201,
+      "referenced_files": 119
+    },
+    "problem_count": 0,
+    "problems_truncated": false,
+    "problems": []
+  },
+  "pattern_source_fingerprint": "passed",
+  "typescript_non_trivia_tokens_unchanged": {
+    "builder": 1135,
+    "signer": 961
+  },
+  "archive_bytes_preserved": 5,
+  "full_local_gate": {
+    "status": "not_run",
+    "reason": "user_requested_focused_verification_only"
+  },
+  "merge_status": "not_performed",
+  "deployment_status": "not_performed",
+  "tooling_environment": "Node22 on Linux with functioning /proc/self/fd"
+}

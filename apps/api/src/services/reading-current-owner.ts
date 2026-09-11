@@ -24,6 +24,8 @@ import {
 } from "./generation-command-v2.js";
 import { resolvePublisherConfiguration } from "./reading-publisher.js";
 import { isCodexProviderReasoningEffort } from "./codex-provider-contract.js";
+import { supportsFeedbackGenerationPolicy } from "./reading-feedback-policy.js";
+import { currentCategoricalFeedbackMatches } from "./reading-feedback-admission.js";
 
 export interface CurrentDailyOwner {
   jobId: string;
@@ -113,9 +115,8 @@ function publisherPinIsCurrent(
     frozen.provider === pin.provider &&
     frozen.model === pin.model &&
     isCodexProviderReasoningEffort(frozen.reasoning_effort) &&
-    frozen.prompt_version === pin.prompt_version &&
+    supportsFeedbackGenerationPolicy(frozen.prompt_version, frozen.selection_policy_version) &&
     frozen.output_schema === pin.output_schema &&
-    frozen.selection_policy_version === pin.selection_policy_version &&
     frozen.validation_policy_version === pin.validation_policy_version &&
     frozen.max_output_tokens === pin.max_output_tokens &&
     frozen.context_max_bytes === pin.context_max_bytes &&
@@ -143,11 +144,7 @@ function publisherPinIsCurrent(
 export async function readingProviderOwnerIsCurrent(
   env: Env,
   job: CodexProviderJob,
-  // Accepted for signature parity with the Pattern and ontology predicates the
-  // shared dispatcher calls. Nothing here is time-dependent: the Daily grant is
-  // an append-only chain whose latest row is the answer, and the provider
-  // lease's own expiry is the D1 layer's business.
-  _now: Date = new Date(),
+  now: Date = new Date(),
 ): Promise<boolean> {
   if (job.pipeline !== "reading" || job.pass !== "publisher") return false;
   const owner = await loadCurrentDailyOwner(env, job.ownerId);
@@ -164,5 +161,6 @@ export async function readingProviderOwnerIsCurrent(
   ) {
     return false;
   }
-  return await currentAiConsentMatches(env, owner.userId, owner.command);
+  return await currentAiConsentMatches(env, owner.userId, owner.command) &&
+    await currentCategoricalFeedbackMatches(env, owner.userId, owner.command.context, owner.command.publisher.selection_policy_version, now);
 }

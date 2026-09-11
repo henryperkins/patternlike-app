@@ -2,6 +2,10 @@ import { env, SELF } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { syntheticOntologyRelease } from "@patternlike/pattern-engine";
 import { storeOntologyRelease } from "../db/pattern-ontology.js";
+import { decryptPayload, encryptPayload } from "../db/users.js";
+import { b64 } from "../crypto.js";
+import { PATTERN_CREATION_SOURCE_HASH } from "../generated/pattern-creation-source.js";
+import type { GeneratePatternCommandV2 } from "./pattern-command.js";
 import { computeOntologyBundleHash } from "./pattern-ontology-verify.js";
 import {
   DETERMINISTIC_PATTERN_PUBLISHER,
@@ -96,6 +100,51 @@ describe("universal Pattern publication safety", () => {
 
   afterEach(() => disablePatternAi());
 
+  it("cancels a command frozen under the prior publication-safety source before running a provider", async () => {
+    await seedActiveOntology("ont-safety-frozen-source");
+    const generationId = await reserve("idem-safety-frozen-source");
+    const reserved = (await loadPatternJob(env, generationId))!;
+    // main 69a4f78 used safety 1.0.0. Model a legitimate old command whose
+    // encrypted pin and job agree, not corruption of only one stored hash.
+    const priorSourceHash = "sha256:dd93fde6dbc7f7de8c7598c3eafc70912533e41efe66b4a964f08206f2985e34";
+    expect(priorSourceHash).not.toBe(PATTERN_CREATION_SOURCE_HASH);
+    const payload = await env.DB.prepare(
+      "SELECT payload_enc, payload_key_version, payload_nonce FROM jobs WHERE id = ?",
+    ).bind(reserved.job_id).first<{
+      payload_enc: ArrayBuffer; payload_key_version: number; payload_nonce: string;
+    }>();
+    const context = { subject: IDENTITY_A.cryptoSubject, field: "jobs.payload_enc", recordId: reserved.job_id };
+    const command = await decryptPayload<GeneratePatternCommandV2>(env, IDENTITY_A, {
+      ciphertext: b64(payload!.payload_enc),
+      key_version: payload!.payload_key_version,
+      nonce: payload!.payload_nonce,
+    }, context);
+    const sealed = await encryptPayload(env, IDENTITY_A, {
+      ...command, pattern_source_hash: priorSourceHash,
+    }, context);
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE jobs SET payload_enc = ?, payload_key_version = ?, payload_nonce = ? WHERE id = ?",
+      ).bind(Uint8Array.from(atob(sealed.ciphertext), (character) => character.charCodeAt(0)),
+        sealed.keyVersion, sealed.nonce, reserved.job_id),
+      env.DB.prepare("UPDATE pattern_generation_jobs SET pattern_source_hash = ? WHERE generation_id = ?")
+        .bind(priorSourceHash, generationId),
+    ]);
+    const job = await drain(generationId, {
+      publisher: () => { throw new Error("an old source must not start a provider"); },
+    });
+    expect(job.stage).toBe("cancelled");
+    expect(job.planner_attempts).toBe(0);
+    expect(job.writer_attempts).toBe(0);
+    expect(await env.DB.prepare(
+      "SELECT cancellation_reason FROM pattern_generation_jobs WHERE generation_id = ?",
+    ).bind(generationId).first()).toEqual({ cancellation_reason: "cancel_source_changed" });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM pattern_documents").first()).toEqual({ n: 0 });
+    expect(await env.DB.prepare(
+      "SELECT status FROM pattern_generation_claims WHERE user_id = ?",
+    ).bind(USER_A).first()).toEqual({ status: "available" });
+  });
+
   it.each(["internal", "public"] as const)(
     "rejects unsafe summary prose despite a passing semantic verifier for %s ontology",
     async (activationScope) => {
@@ -131,7 +180,7 @@ describe("universal Pattern publication safety", () => {
     ).bind(USER_A).first<{ compact_provenance_json: string }>();
     expect(JSON.parse(stored!.compact_provenance_json)).toMatchObject({
       publication_safety: {
-        policy_version: "1.0.0",
+        policy_version: "1.0.1",
         candidate_hash: originalJob.candidate_hash,
         result_hash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
       },

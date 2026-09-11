@@ -28,6 +28,9 @@ import type {
   ReadingHistoryResponse,
   ReadingHistoryView,
   ReadingSaveState,
+  ReadingFeedbackOptionsResponse,
+  ReadingFeedbackEventRequest,
+  ReadingFeedbackEventReceipt,
   TimeTravelResponse,
   TimezoneLookupRequest,
   TimezoneLookupResponse,
@@ -1185,6 +1188,32 @@ export function submitReadingFeedback(
   signal?: AbortSignal,
 ): Promise<Pick<ReadingFeedbackRecord, "id" | "reading_id" | "created_at">> {
   return request(`/v1/readings/${readingId}/feedback`, {
+    method: "POST",
+    headers: requestHeaders({ json: true, idempotencyKey }),
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
+export function getReadingFeedbackOptions(
+  readingId: string,
+  coordinates: { revision: number; paragraph_id?: string },
+  signal?: AbortSignal,
+): Promise<ReadingFeedbackOptionsResponse> {
+  const query = new URLSearchParams({ revision: String(coordinates.revision) });
+  if (coordinates.paragraph_id) query.set("paragraph_id", coordinates.paragraph_id);
+  return request(`/v1/readings/${readingId}/feedback-options?${query}`, {
+    method: "GET", headers: requestHeaders(), signal,
+  });
+}
+
+export function submitReadingFeedbackEvent(
+  readingId: string,
+  body: ReadingFeedbackEventRequest,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+): Promise<ReadingFeedbackEventReceipt> {
+  return request(`/v1/readings/${readingId}/feedback-events`, {
     method: "POST",
     headers: requestHeaders({ json: true, idempotencyKey }),
     body: JSON.stringify(body),

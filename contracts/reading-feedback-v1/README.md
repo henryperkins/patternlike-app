@@ -1,0 +1,15 @@
+# Reading feedback v1
+
+Additive categorical feedback for an exact retained Daily edition and optional paragraph. Existing resonance requests, stored records, and M0–M9 contract packages remain unchanged. Categorical actions never fabricate a resonance rating. Opening birth correction records no event and grants no permission.
+
+`GET /v1/readings/{id}/feedback-options?revision=…&paragraph_id=…` is read only. The paragraph is optional; the response discovers the exact server-held content hash and explains whether a deliberate submission creates, reuses, or renews the bounded USR-12 grant. An opaque grant-state tag is a concurrency precondition, never a credential. All responses are private and use `Cache-Control: private, no-store`; duplicate or unknown query keys are rejected.
+
+`POST /v1/readings/{id}/feedback-events` requires the exact edition, the options policy/tag, explicit confirmation, and an idempotency key. Completed same-key/same-body replay returns the original receipt without renewing permission, including after later revocation. A different body conflicts. For a new event, compare the grant-state tag inside the same guarded transaction as any grant renewal and event write; a changed state returns `409 feedback_use_changed` with no event or grant mutation. The existing `usr-12-v1` grant policy and allowed uses remain in force.
+
+Repetitive feedback may be admitted for repetition control and relevance feedback for theme ranking for seven days after submission. Unclear feedback has no generation signal. Note text is stored encrypted and is never generation input or training permission. `generation_effects_active` reports whether the categorical compiler is activated; recording an event does not establish that a future reading used or benefited from it. Supported associations come only from the actual reading evidence.
+
+New event payloads, notes, derived associations, and encrypted idempotency copies adopt the existing USR-12 registry limit of 24 calendar months from submission, with bounded cleanup at that deadline. Read/export/compiler paths reject expired material even before a maintenance sweep. There is no aggregate retention extension. Seven-day effect expiry, check-in freshness, and data deletion are separate. Revocation prevents future use but does not itself erase retained feedback; existing account/target deletion and crypto maintenance also cover the new table. A retry never advances either deadline.
+
+The portable successor `account-export-feedback/v1` retains M8 sections and adds `reading_feedback_events` when `include_readings` is true, including authored notes and exact targets. New export reservations pin the successor; already frozen `0.7.0` and `0.8.0` commands retain their original shapes. No frozen export schema is widened in place.
+
+Release compatible schema/storage/cleanup/export code before the categorical client or compiler. JSON Schema checks public shape; existing focused API tests establish authorization, atomic grants, idempotency, expiry, encryption, and erasure. These fixtures join the existing contract command and introduce no new gate.

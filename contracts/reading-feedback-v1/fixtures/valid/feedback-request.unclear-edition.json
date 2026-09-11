@@ -1,0 +1,9 @@
+{
+  "schema_version": "reading-feedback-event/v1",
+  "category": "unclear",
+  "revision": 2,
+  "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "feedback_use_policy_version": "categorized-feedback-use/v1",
+  "expected_grant_state": "feedback-grant:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "confirm_feedback_use": true
+}

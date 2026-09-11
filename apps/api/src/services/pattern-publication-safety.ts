@@ -11,7 +11,7 @@ import {
 import { findSemanticVerdictProblem } from "./pattern-semantic.js";
 
 /** Included in the creation-source fingerprint, which freezes in-flight commands. */
-export const PATTERN_PUBLICATION_SAFETY_POLICY_VERSION = "1.0.0" as const;
+export const PATTERN_PUBLICATION_SAFETY_POLICY_VERSION = "1.0.1" as const;
 
 export type PatternPublicationSafetyFailureCode =
   | "suppressed_feature_leak"
@@ -159,6 +159,12 @@ function prohibitedClaim(text: string): boolean {
       return triggers.some((trigger) => {
         const prefix = clause.slice(0, trigger.index);
         if (/\b(?:not|never|cannot|can't|doesn't|isn't)\s+(?:not|without)\b/i.test(prefix)) return true;
+        // Reader optionality is not an asserted prediction. Keep this tied to
+        // the bare verb and an open question, never a general negation bypass.
+        // Other triggers in this clause and all companion clauses still run.
+        if (trigger[0].toLowerCase() === "predict" && !sentence.includes("?") &&
+          /^\s*you\s+(?:do\s+not|don't)\s+have\s+to\s+$/i.test(prefix) &&
+          /^\s+what\b/i.test(clause.slice(trigger.index + trigger[0].length))) return false;
         // Only direct denials of the claim are safe. In particular, "without
         // doubt", "not only", and "cannot avoid your fate" are assertions.
         return !(

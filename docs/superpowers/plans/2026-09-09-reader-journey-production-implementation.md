@@ -2,7 +2,7 @@
 
 Date: 2026-09-09. User authorization: “finish slice 4 with real, authorized reading data.”
 
-Scope follows the approved [reader relationship specification](../specs/2026-09-08-reader-relationships-feedback-design.md). Work remains in `codex/source-map-maintenance`; no production migration, deployment, or provider generation is implied.
+Scope follows the approved [reader relationship specification](../specs/2026-09-08-reader-relationships-feedback-design.md). The initial local implementation below remains a dated record. The subsequent “Approved next steps” authorization included a separate Slice 4 release, recorded at the end of this document.
 
 1. Retain encrypted support for the accepted paragraphs and chapters in the existing atomic Daily and Pattern publication transactions. Bind support to owner, document revision, and content hash. Register account key rotation and erasure; preserve frozen export contracts.
 2. Add authenticated, owner-scoped source discovery, bounded relationship reads, source-bound destination reads, and exact retained Timing detail. Recheck current eligibility on every request. Existing editions without sufficient retained support yield no supported connection.
@@ -88,4 +88,23 @@ The source fingerprint now includes both publication-support helpers and is `sha
 
 Migration 0030 must be applied before compatible Worker code is deployed. This task did not migrate production, deploy, merge, push or generate a live account reading. Earlier editions without retained passage evidence remain readable with no supported connection; there is no historical backfill or retention extension. Pattern support follows existing current-document eligibility and does not create a historical Pattern library.
 
-A consented human comprehension exercise remains open. Navigation tests establish the working software path; they do not establish that a person understands the connections or that interpretation quality improved. Slice 5’s categorized feedback and Slice 7’s shared permission-consequence presentation remain separate planned work.
+A consented human comprehension exercise remains open. Navigation tests establish the working software path; they do not establish that a person understands the connections or that interpretation quality improved. At this initial implementation boundary, Slice 5’s categorized feedback and Slice 7’s shared permission-consequence presentation remained separate planned work. Slice 5’s subsequent local implementation is recorded in its [own plan](2026-09-09-reader-feedback-implementation.md).
+
+## Authorized separate release — 2026-09-09
+
+[PR 52](https://github.com/henryperkins/patternlike-app/pull/52) released only the authenticated reader journey, support storage/lifecycle, additive contracts, client navigation and associated verification. The candidate branch `codex/reader-journey-release` ended at `308178ab69cd7c0c1978d678040743f7bf4accac`; the merge at 06:59:35 UTC produced `c4e94f2257c258e8c06f80e6b77df698838234b2`. Local map tooling, ontology candidates, the publication-safety 1.0.1 fix and Slice 5 were excluded.
+
+The existing `npm run ci:local` merge gate passed all 14 steps on that exact candidate, and its complete summary was pasted into the PR before merging. Environment: Node 22.23.2, npm 10.9.8, Python 3.14.4; the summary discloses the Python difference from CI’s 3.12. The initial run exposed one obsolete Today layout assertion after passage wrappers were added; the corrected test preserves the lead paragraph and adjacent evidence assertions. The full rerun passed. This reused the existing merge procedure and added no verification stage.
+
+Production D1 migration `0030_reader_relationship_supports.sql` was applied and recorded at **06:58:26 UTC**, before the merge. The migration history, ten expected columns, composite owner/document cascade references and empty initial support table were verified. No historical support was backfilled. The immediate pre-release Pattern-job aggregate had eight successes and seven failures, with no unfinished job observed; it is a dated aggregate, not an ongoing queue guarantee.
+
+Workers Builds run `77df2ecd-0b91-4513-bce7-53f6345f441c` for the merge commit completed successfully at **07:00:55.257 UTC**. Deployment `d4e0392e-18fe-476c-a11f-c76213c149b1`, created at 07:00:43.866 UTC, serves 100% Worker version `f637dc53-4824-4415-8160-bf98e551c209`. The released Pattern creation source fingerprint is `sha256:dd93fde6dbc7f7de8c7598c3eafc70912533e41efe66b4a964f08206f2985e34`.
+
+Public curl checks at approximately 11:02–11:09 UTC observed:
+
+- Worker `/health`: HTTP 200 with `ok: true`, service `patternlike-api`, environment `production`.
+- [Production application](https://pattern.lakefrontdev.com/): HTTP 200 for the app shell.
+- [Production metadata](https://pattern.lakefrontdev.com/v1/meta): HTTP 200 with `release_git_sha` equal to the merge commit, `worker_version_id` equal to the version above, and `auth_stub: false`.
+- The new `/v1/readings/:id/relationship-source` route with well-formed test coordinates and no session: HTTP 401 `unauthorized`, with `Cache-Control: private, no-store`.
+
+These checks establish the deployed identity, public liveness and unauthenticated rejection. They do not demonstrate an authenticated personal reading or prove a supported connection exists in older data. No account session was fabricated, live reading generated, provider request made, or reader result invented. The [human-review worksheet](../../reviews/artifacts/reader-feedback/2026-09-09-implementation/human-review-worksheet.md) remains unfilled; a signed-in reader check was requested separately.

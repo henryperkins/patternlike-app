@@ -51,6 +51,8 @@ import type {
  */
 export const SELECTION_POLICY_ID = "constrained-context-selection" as const;
 export const SELECTION_POLICY_VERSION = "1.1.0" as const;
+/** Opt-in categorical feedback projection; incumbent pins retain 1.1.0. */
+export const CATEGORIZED_FEEDBACK_SELECTION_VERSION = "1.2.0" as const;
 
 /**
  * Bump for ANY change to what a candidate must satisfy. Stored in v5 evidence,

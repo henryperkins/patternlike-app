@@ -14,7 +14,7 @@ import {
   type RolePresentation,
 } from "../lib/reading-format.js";
 import { DailyCheckInCard } from "./DailyCheckInCard.js";
-import { ReadingFeedbackCard } from "./ReadingFeedbackCard.js";
+import { ReadingResponseCard } from "./ReadingResponseCard.js";
 import { ReadingSaveButton } from "./ReadingSaveButton.js";
 import { WhyThisDrawer } from "./WhyThisDrawer.js";
 import { Icon } from "./icons.js";
@@ -172,14 +172,13 @@ function ReadingArticleBody({
         ) : null}
       </div>
 
-      {showCheckIn ? (
-        <DailyCheckInCard />
-      ) : (
-        <ReadingFeedbackCard
-          readingId={reading.reading_id}
-          onUnauthorized={onUnauthorized}
-        />
-      )}
+      <ReadingResponseCard
+        key={reading.reading_id}
+        readingId={reading.reading_id}
+        revision={reading.revision}
+        onUnauthorized={onUnauthorized}
+      />
+      {showCheckIn ? <DailyCheckInCard /> : null}
     </article>
   );
 }

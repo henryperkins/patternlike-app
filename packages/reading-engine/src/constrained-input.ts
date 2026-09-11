@@ -52,6 +52,7 @@ import {
   PARAGRAPH_MAX_CHARS,
   REFLECTION_MAX_CHARS,
   SELECTION_POLICY_ID,
+  CATEGORIZED_FEEDBACK_SELECTION_VERSION,
   type ConstrainedContextContent,
   type ConstrainedContextRef,
   type ConstrainedContextSignalInput,
@@ -723,13 +724,27 @@ function toRequestFact(fact: ConstrainedFact): RequestFact {
   };
 }
 
-function toRequestContext(ref: ConstrainedContextRef): RequestContext {
+function toRequestContext(ref: ConstrainedContextRef, selectionVersion: string): RequestContext {
+  let snapshot = ref.snapshot;
+  if (selectionVersion === CATEGORIZED_FEEDBACK_SELECTION_VERSION && ref.source_id === "USR-12" &&
+    ref.category === "reading_feedback" && snapshot.kind === "structured" &&
+    snapshot.value.schema_version === "reading-feedback-signal/v1") {
+    // Exact private edition coordinates remain in the encrypted frozen pin.
+    // The provider gets only this packet's context alias and closed targets.
+    snapshot = { kind: "structured", value: {
+      schema_version: "reading-feedback-signal/v1",
+      category: snapshot.value.category,
+      target_ref: ref.context_ref,
+      fact_ids: snapshot.value.fact_ids,
+      theme_ids: snapshot.value.theme_ids,
+    } };
+  }
   return {
     context_ref: ref.context_ref,
     category: ref.category,
     allowed_use: ref.allowed_use,
     observed_on: dateOf(ref.observed_at),
-    content: toRequestContent(ref.snapshot),
+    content: toRequestContent(snapshot),
   };
 }
 
@@ -929,7 +944,7 @@ export function prepareConstrainedReadingInput(
       expires_at: pin.signal.expires_at,
       snapshot: toSnapshot(pin.signal.content),
     };
-    request.context.push(toRequestContext(ref));
+    request.context.push(toRequestContext(ref, input.selection_policy_version));
     const next = packetBytes(request);
     if (next > input.context_max_bytes) {
       request.context.pop();

@@ -116,27 +116,17 @@ function validateResponse(
 }
 
 /**
- * Narrow handoff used by the future durable executor after compilation and
- * independent evaluation. Regression fields are signed bytes but deliberately
- * are not an admission input.
- */
-/**
- * Sign an authored `synthetic_internal` release.
+ * Sign a compiled `synthetic_internal` candidate and return its signature.
+ * This function does not ingest or activate the release. Once admitted through
+ * release loading, internal-origin releases can serve eligible readers:
+ * ontologyServesAccount admits that origin independently of machine public
+ * scope, with remaining account and generation gates still enforced.
  *
- * Deliberately a sibling of `signOntologyCandidate` rather than a relaxation of
- * it. That function refuses anything that is not `machine_pipeline`, not
- * `candidate`, and not already carrying an evaluation report hash, and those
- * refusals are the machine path's contract -- widening them so one function
- * could serve both origins is how a synthetic release would eventually be
- * signed as a machine one.
- *
- * What both share is the part that matters: the payload is canonical, the
- * bundle hash is recomputed here rather than trusted, and the isolated signer
- * is the only holder of the key. What this one drops is the evidence chain,
- * because the synthetic path has no pipeline run, no evaluation report, and no
- * regression report to bind to. A release signed this way is never
- * public-capable, so `ontologyServesAccount` keeps it out of every reader's
- * generation at reservation.
+ * Keep this separate from signOntologyCandidate, whose machine origin,
+ * candidate status, and evaluation report hash requirements remain intact.
+ * Both paths use canonical payloads, recomputed bundle hashes, and the isolated
+ * signer. Neither signature certifies interpretation quality; this path binds
+ * no machine pipeline run, evaluation report, or regression report.
  */
 export async function signInternalOntology(
   signer: OntologySignerBinding,
@@ -163,6 +153,10 @@ export async function signInternalOntology(
   return validateResponse(await signer.signOntology(request), keyId, computedHash);
 }
 
+/**
+ * Machine handoff after compilation and independent evaluation. Regression
+ * fields are signed bytes but deliberately are not a signing admission input.
+ */
 export async function signOntologyCandidate(
   signer: OntologySignerBinding,
   release: PatternOntologyRelease,

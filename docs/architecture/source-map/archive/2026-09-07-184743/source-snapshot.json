@@ -1,0 +1,763 @@
+{
+  "schemaVersion": "patternlike-source-mindmap/v1",
+  "repository": "/home/henry/patternlike-app",
+  "branch": "main",
+  "head": "6e706741f03253f2807d33380afb529161f3481f",
+  "capturedAt": "2026-09-07T18:47:43.524Z",
+  "verifiedAt": "2026-09-07T18:56:19.975Z",
+  "scope": "Local source and configuration including pre-existing uncommitted changes; no production or runtime verification.",
+  "map": {
+    "plugin": "Mapify",
+    "root": "Patternlike application",
+    "branches": 8,
+    "topics": 34,
+    "leaves": 68
+  },
+  "verification": {
+    "headingStructure": "passed",
+    "bulletWordCounts": "passed",
+    "sourceAnchorsResolved": 103,
+    "uniqueReferencedFiles": 86,
+    "referencedFilesStableSinceCapture": true,
+    "headStableSinceCapture": true,
+    "testsRun": false,
+    "productionChecked": false,
+    "writtenMarkdownMatchesRendererInput": true,
+    "markdownSha256": "a6f49b58777a4e43e29fd13778f33c03f50dec23b7cbc1dcccf2fa7f666ca2e3",
+    "sourceLinksCheckedAfterWriting": 105,
+    "preexistingGitStatusUnchanged": true,
+    "mapifyReportedSuccessfulRendering": true
+  },
+  "preexistingGitStatus": [
+    " M apps/web/src/components/portrait-explorer/DESIGN.md",
+    " M apps/web/src/components/portrait-explorer/ExplorerReader.tsx",
+    " M apps/web/src/components/portrait-explorer/ObservatoryControls.tsx",
+    " M apps/web/src/components/portrait-explorer/PortraitExplorer.test.tsx",
+    " M apps/web/src/components/portrait-explorer/PortraitExplorer.tsx",
+    " M apps/web/src/components/portrait-explorer/PortraitScene.runtime.test.tsx",
+    " M apps/web/src/components/portrait-explorer/PortraitScene.test.tsx",
+    " M apps/web/src/components/portrait-explorer/PortraitScene.tsx",
+    " M apps/web/src/components/portrait-explorer/explorer-state.test.ts",
+    " M apps/web/src/components/portrait-explorer/explorer-state.ts",
+    " M apps/web/src/components/portrait-explorer/explorer.css",
+    " M apps/web/src/components/portrait-explorer/observatory-world.test.ts",
+    " M apps/web/src/components/portrait-explorer/observatory-world.ts",
+    " M apps/web/src/components/portrait-explorer/observatory.css",
+    " M apps/web/src/components/portrait-explorer/scene-utils.ts",
+    " M apps/web/src/components/portrait-explorer/types.ts",
+    " M apps/web/src/components/portrait-explorer/use-explorer-navigation.test.tsx",
+    " M apps/web/src/components/portrait-explorer/use-explorer-navigation.ts",
+    "?? .impeccable/critique/",
+    "?? apps/web/src/components/portrait-explorer/portrait-session.test.tsx",
+    "?? docs/reviews/2026-09-07-portrait-remaining-priorities.md",
+    "?? docs/reviews/2026-09-07-portrait-review-followup.md",
+    "?? output/"
+  ],
+  "sourceFiles": [
+    {
+      "path": "apps/web/src/App.tsx",
+      "sha256": "6df374ad993619ad39c4738f2f203e46bbe6efe195e909bb141d29c3f2929499",
+      "uncommitted": false,
+      "anchors": [
+        60
+      ]
+    },
+    {
+      "path": "apps/web/src/components/AppShell.tsx",
+      "sha256": "32f68f4bd4cd4d3790512b03be571990e89be5f642419ab03a2c9083d500cb83",
+      "uncommitted": false,
+      "anchors": [
+        6
+      ]
+    },
+    {
+      "path": "apps/web/src/components/ReadingArticle.tsx",
+      "sha256": "2fd578f1e03185ba4b22dee92017cb9a2328aa381f6d41272cac6597cea199a6",
+      "uncommitted": false,
+      "anchors": [
+        77
+      ]
+    },
+    {
+      "path": "apps/web/src/components/HistoryView.tsx",
+      "sha256": "91936e98bf7acaaffa538b193101406f5d1ffbefa4b2861b2baa176f3d3ed775",
+      "uncommitted": false,
+      "anchors": [
+        43
+      ]
+    },
+    {
+      "path": "apps/web/src/components/ChartView.tsx",
+      "sha256": "37478e26d0b8e9211aeaf085817a3b0210758e30062c3fa06f77cf3899690237",
+      "uncommitted": false,
+      "anchors": [
+        54
+      ]
+    },
+    {
+      "path": "apps/web/src/components/PatternExperience.tsx",
+      "sha256": "2b824b4f8b23415cbb5c0c723576861ebf63588353000d2308d3c29483a2c338",
+      "uncommitted": false,
+      "anchors": [
+        258
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/timing.ts",
+      "sha256": "e6de1b453b4b2dfd3c96b478f45489f63c3574a5129ab05802346bcae52b6885",
+      "uncommitted": false,
+      "anchors": [
+        127
+      ]
+    },
+    {
+      "path": "apps/api/src/services/time-travel.ts",
+      "sha256": "d1dcf67030db8b692fb10e9ef8441184f9a077ead01fd4b25775f2eb4f4c2fab",
+      "uncommitted": false,
+      "anchors": [
+        54
+      ]
+    },
+    {
+      "path": "apps/web/src/components/TimeTravelView.tsx",
+      "sha256": "3fd19dbb8b8ea5e8cff964a60a7cfc7f97d2ae89a7a3ccad548d6a9a1b7eaac0",
+      "uncommitted": false,
+      "anchors": [
+        681
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/birth.ts",
+      "sha256": "2192df66f68e3de0d6a450202f048c458e763878a015b1e254ae1da388f98254",
+      "uncommitted": false,
+      "anchors": [
+        355
+      ]
+    },
+    {
+      "path": "apps/api/src/services/geocoder/index.ts",
+      "sha256": "e8af215741d3ec2a0e0b8ecbda4a89275e8826c6ccc01101b4eb3c9c3fcb87a0",
+      "uncommitted": false,
+      "anchors": [
+        9
+      ]
+    },
+    {
+      "path": "apps/web/src/components/Onboarding.tsx",
+      "sha256": "b76335d09e09100b85e02228d9a4d26ceef0813de83499cfc6efb1af03f0e44d",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/timezone.ts",
+      "sha256": "dbd7d11f146950b1185bc40428ebecc96931bc4fbd4588ffbdef042f360cf692",
+      "uncommitted": false,
+      "anchors": [
+        155
+      ]
+    },
+    {
+      "path": "apps/calc-stub/src/engine.ts",
+      "sha256": "b18f99b25714c0501c3953a5e831054a6c98b805d424c286e828082b2dcf0653",
+      "uncommitted": false,
+      "anchors": [
+        476,
+        689
+      ]
+    },
+    {
+      "path": "apps/calc-stub/src/server.ts",
+      "sha256": "2e62dd9524b49fa80e5d139249700a19493796e121261eed239e2c2b07fae680",
+      "uncommitted": false,
+      "anchors": [
+        95
+      ]
+    },
+    {
+      "path": "apps/api/src/services/natal-features.ts",
+      "sha256": "3ed3575ffd36b73ad7ffead2805b4d759481323b985a45b9887ab15de92b0a81",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/daily-sky-client.ts",
+      "sha256": "8c0f639e43a3d534fb761557743f566c01d5438dc2f1db74f1c78d458f61441d",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/birth-operational-config.ts",
+      "sha256": "68b88a039f0261ede39e41b9491d7c3e5dc9902a7960dd363fafac372a003b1e",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/readings.ts",
+      "sha256": "2feec6d2a9908d928a0cbba5ee794cc66ed94d4c8d3c4bc6736dd0c8b272ce9f",
+      "uncommitted": false,
+      "anchors": [
+        46,
+        269,
+        521
+      ]
+    },
+    {
+      "path": "apps/api/src/services/ensure-today-reading.ts",
+      "sha256": "b81f18f25e74dcdfce021314a324a6fcfe4a264895a7fae5cf7b2eb19016cc94",
+      "uncommitted": false,
+      "anchors": [
+        107,
+        157
+      ]
+    },
+    {
+      "path": "apps/api/src/services/run-reading-scheduler.ts",
+      "sha256": "2d53b6d9231840c128d4cc3cc5b1179f78adf9412faab736b5e7319743551fef",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/context-compiler.ts",
+      "sha256": "d4cb7774539cbb708b305a806ccab3930f3901de75f0039a4b0b49945481263d",
+      "uncommitted": false,
+      "anchors": [
+        11,
+        82
+      ]
+    },
+    {
+      "path": "packages/reading-engine/src/constrained-input.ts",
+      "sha256": "57717d707edeefa33ba3c8bdeeda7055f26b6832e4bf206957817d123c6afd18",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/stubs.ts",
+      "sha256": "56cadccdf6dbdb77d899052715bc932af6b393f22d10ab1fd7554964770b13b4",
+      "uncommitted": false,
+      "anchors": [
+        6,
+        40
+      ]
+    },
+    {
+      "path": "apps/api/src/services/generate-daily-reading-v5.ts",
+      "sha256": "20af644b1d6f51f33908917c8c1dc5eea756a633ee02d7fa969d45ad1cae525d",
+      "uncommitted": false,
+      "anchors": [
+        723,
+        842
+      ]
+    },
+    {
+      "path": "packages/reading-engine/src/candidate-validation.ts",
+      "sha256": "c5e1c3cf8befa3961d2e6a58d5ad720dbb12f19a5e8b1f7632fa1e0e09503bf3",
+      "uncommitted": false,
+      "anchors": [
+        291
+      ]
+    },
+    {
+      "path": "packages/reading-engine/src/claim-support.ts",
+      "sha256": "6f9bba95c99296e10bbcf932ec79854030cc9609f0e181e16df8e91eb127c399",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-execute.ts",
+      "sha256": "3992b26d16e831445b74b6750eeeaf678f0502310e8849e5fff6c708d20c34cf",
+      "uncommitted": false,
+      "anchors": [
+        10,
+        11,
+        123
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-command.ts",
+      "sha256": "1f8f93cf3ea5d31fd80989829a24690fa8aaf51430c157cf89535076f3504a7c",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "packages/pattern-engine/src/selection.ts",
+      "sha256": "ade154e0cf4b9c9e8f447dba7f1f7356c42c40599365b204b5f00422b0aefdb8",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-publication-proof.ts",
+      "sha256": "b49197e0b398cfdb0e31c9365a949e455aa0ca234f0ccbf2f8a67c467ad25775",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-publication-safety.ts",
+      "sha256": "892b6ad37a3e99ff2c0e1b5b44e056eec55c739e9ee65741decfcdf904645cd2",
+      "uncommitted": false,
+      "anchors": [
+        1,
+        189
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/pattern.ts",
+      "sha256": "c1d66af3cfcbb2b41b02cede934500d82bfbb90f53d8852694afecb3956df944",
+      "uncommitted": false,
+      "anchors": [
+        12,
+        19
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/pattern-ai.ts",
+      "sha256": "2c7d8522dc55ddd0899b6722fdc15c06b534fba051706a82bd6929dec1b91484",
+      "uncommitted": false,
+      "anchors": [
+        82
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-state.ts",
+      "sha256": "763ae8d6f87bfe2eb0c225261157fdf6b03fe2ec9a2ff38489f159e163b0c85e",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/ontology-pipeline-execute.ts",
+      "sha256": "6398a4e103e7523a5b0541233f45ad03b0eb5f8c7af81bd48d58a5d0f8c7d165",
+      "uncommitted": false,
+      "anchors": [
+        3154
+      ]
+    },
+    {
+      "path": "apps/api/src/db/pattern-ontology.ts",
+      "sha256": "5e15be35cdd4a59ae4309ad3bae7ece4a39fc60c850b84126ee1b97035b9ddaa",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/wrangler.toml",
+      "sha256": "e744fdcea2605ab668cd044c1161fd067d20e11ccbe3e583c1a9378ac983fe13",
+      "uncommitted": false,
+      "anchors": [
+        18,
+        42,
+        75,
+        276,
+        312,
+        559
+      ]
+    },
+    {
+      "path": "pattern-corpus/README.md",
+      "sha256": "bcb07a4b01e8b2ad7162d19ddfe4fe8e5f7ebb12a5e3fe6dbdb5c78ceb3689b8",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "pattern-corpus/validate-fragments.mjs",
+      "sha256": "389fad70165ed2d1b499afc4af163c0d67cf0c912d027a9f6b85af24b129589b",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-portrait.ts",
+      "sha256": "a17a5b2e0c1def763b79663814d136a93f910ad541181f4abeb1946aa703d4e4",
+      "uncommitted": false,
+      "anchors": [
+        53,
+        171
+      ]
+    },
+    {
+      "path": "apps/codex-runner/src/portrait-invocation.ts",
+      "sha256": "377e306d4bfe90362a66069e828fbd2318a57435771f231abbafe460d0ba02ba",
+      "uncommitted": false,
+      "anchors": [
+        24
+      ]
+    },
+    {
+      "path": "apps/codex-runner/src/portrait-mesh-invocation.ts",
+      "sha256": "dfd1612a160c7c4504f53ea93cc002a8219c335cbf2ee1facc4c4c936eed533b",
+      "uncommitted": false,
+      "anchors": [
+        71
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-portrait-mesh.ts",
+      "sha256": "496a72734cbeb87dbfcf67c4efb15725e5b4708bde713925643b0d3f828f221b",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/web/src/components/AccountPortraitExplorer.tsx",
+      "sha256": "170fb6732f309c9c2f8e9826a7515d3a1ee7883f5fd2391781625ffb96f470c1",
+      "uncommitted": false,
+      "anchors": [
+        133
+      ]
+    },
+    {
+      "path": "apps/web/src/components/portrait-explorer/PortraitExplorer.tsx",
+      "sha256": "a6dfa7d932176fb82e28ef15ad210dfcd3246cd3d98fe0e170503a9ba1900cab",
+      "uncommitted": true,
+      "anchors": [
+        18
+      ]
+    },
+    {
+      "path": "apps/web/src/components/portrait-explorer/observatory-world.ts",
+      "sha256": "7c5e647292dacf37346d4377c720076ecc9d34e2d02a99a73da4b5dd8a612784",
+      "uncommitted": true,
+      "anchors": [
+        13
+      ]
+    },
+    {
+      "path": "apps/web/src/components/portrait-explorer/ObservatoryControls.tsx",
+      "sha256": "5152ba539f1009c30050071eee1a40a64189320eaf9400d32a95b02682b76217",
+      "uncommitted": true,
+      "anchors": [
+        3
+      ]
+    },
+    {
+      "path": "apps/web/src/lib/pattern-portrait.ts",
+      "sha256": "3b3f3e2a58e45667181e2e3436cbd6961e6dde526ae6b1e0a08122dfd0b151f5",
+      "uncommitted": false,
+      "anchors": [
+        76
+      ]
+    },
+    {
+      "path": "apps/web/src/components/portrait-explorer/ExplorerReader.tsx",
+      "sha256": "041881ac0f8ad1aedb7df69b40d689664b136171061b8c80b2d1b6b90def7845",
+      "uncommitted": true,
+      "anchors": [
+        54
+      ]
+    },
+    {
+      "path": "apps/web/src/components/portrait-explorer/PortraitScene.tsx",
+      "sha256": "39944ba9d266b4ac9c5826e0c29f9d850aa90aba8ca4eaa9bdf509adcdb2bf50",
+      "uncommitted": true,
+      "anchors": [
+        685
+      ]
+    },
+    {
+      "path": "apps/web/src/components/portrait-explorer/use-explorer-navigation.ts",
+      "sha256": "1ae8202e18595d0d077c192a32f7bfa0c578cb7501b45879fa3f2969aa66d5e1",
+      "uncommitted": true,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/index.ts",
+      "sha256": "592cd93158b00c4937d5ac9add472da9733f46a3bee038278c515c768bb60586",
+      "uncommitted": false,
+      "anchors": [
+        187
+      ]
+    },
+    {
+      "path": "apps/web/public/sw.js",
+      "sha256": "f76238cd81bb37e340719d159a5286b3ade84a9a80cffd008d65e36967203d87",
+      "uncommitted": false,
+      "anchors": [
+        25
+      ]
+    },
+    {
+      "path": "apps/api/src/queue.ts",
+      "sha256": "318ccd3f8f6347d4bbbc67f726157540a29d723e28406b05fabca45b801e056e",
+      "uncommitted": false,
+      "anchors": [
+        161
+      ]
+    },
+    {
+      "path": "apps/api/src/scheduled.ts",
+      "sha256": "500a845e7c7418d26fe89fb4eb3f8ecf2c4b8edeb41cfffbe737a2185ceedd53",
+      "uncommitted": false,
+      "anchors": [
+        21
+      ]
+    },
+    {
+      "path": "apps/codex-runner/src/index.ts",
+      "sha256": "10483fb3bbd28b3a3741e312a53cd6167ed35fe568f521cbb039a59746865ff5",
+      "uncommitted": false,
+      "anchors": [
+        21
+      ]
+    },
+    {
+      "path": "apps/codex-runner/src/codex-cli.ts",
+      "sha256": "dd9e96498f0854712159e7e6d81bbf6cc442d7770a5a17206a49b873e0c7cc70",
+      "uncommitted": false,
+      "anchors": [
+        42
+      ]
+    },
+    {
+      "path": "apps/codex-runner/src/isolated-codex-json.ts",
+      "sha256": "8df0b523bf3e936f4fff6057b278284181ba6b60d3b7cfb07efb0c88333713ef",
+      "uncommitted": false,
+      "anchors": [
+        52
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/codex-provider.ts",
+      "sha256": "e379e8917bf548bd7d2239ebaacf913c60b772ce50a412381a11a5ed598074b8",
+      "uncommitted": false,
+      "anchors": [
+        266
+      ]
+    },
+    {
+      "path": "apps/ontology-signer/src/index.ts",
+      "sha256": "25c96ce00080a505cf61550ebbea3a04797b37f1d394844722e33382411adb9b",
+      "uncommitted": false,
+      "anchors": [
+        68
+      ]
+    },
+    {
+      "path": "apps/api/src/services/reading-publisher.ts",
+      "sha256": "f1073e69468eca194fab6482465d21ff108390cb4f22ca234845abceafd4fba2",
+      "uncommitted": false,
+      "anchors": [
+        50
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/sessions.ts",
+      "sha256": "c8e68111c3fe6302ea2eefc40e59081073873c4bd63246d76c3b45ca315650ff",
+      "uncommitted": false,
+      "anchors": [
+        84
+      ]
+    },
+    {
+      "path": "apps/api/src/middleware/auth.ts",
+      "sha256": "dbb0d7589cb93d6708b6ad29e06eca04ec10d4250e53a69284ab712206641803",
+      "uncommitted": false,
+      "anchors": [
+        106
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/account-processing-consents.ts",
+      "sha256": "7444fa35defbc89b406424114975f3a01fbf95352c893821335fedbbb296a082",
+      "uncommitted": false,
+      "anchors": [
+        49
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/consents.ts",
+      "sha256": "91f4d5706c4a6934de9720e088b594d9cf15010c4f3fb78ccf378908f7021b46",
+      "uncommitted": false,
+      "anchors": [
+        95
+      ]
+    },
+    {
+      "path": "apps/web/src/components/PrivacyView.tsx",
+      "sha256": "3c23c2daf76ad7fd652da0ada4b00bfaea57688073662aa23e0122a959d01362",
+      "uncommitted": false,
+      "anchors": [
+        724
+      ]
+    },
+    {
+      "path": "apps/api/src/crypto.ts",
+      "sha256": "6eccb19eb8cbd4f34d008f346b723117b329dc72c28985ea1c897c5bc45dad39",
+      "uncommitted": false,
+      "anchors": [
+        2
+      ]
+    },
+    {
+      "path": "apps/api/src/services/pattern-crypto.ts",
+      "sha256": "b6e9d4e8c96f59dbc42a89c69f0eee9a64d2cdd1872decc7c59683568007fc03",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/services/safe-log.ts",
+      "sha256": "6d761c42b81f7ef23bb3921c62452369b153329abe5c1159257ff4b48bb2df45",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/privacy.ts",
+      "sha256": "26d10b1deaf86ac8a7d7fce249eb4cb352882795ddb6535982750728f2ff5078",
+      "uncommitted": false,
+      "anchors": [
+        87
+      ]
+    },
+    {
+      "path": "apps/api/src/services/account-deletion.ts",
+      "sha256": "f1ca0214991ec280f4711bd26093deeae832a4230795ba4652c72a2feb857d0b",
+      "uncommitted": false,
+      "anchors": [
+        259
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/internal-crypto.ts",
+      "sha256": "96c4a76726ba841e6661baa3a821adb4c95c5eb7d76796e592c7663033743f23",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/db/crypto-write-fence.ts",
+      "sha256": "ec7df260a33bbdaa9983eaefcb18ced3dc6a5d0f8fcf95e6ab71cd189a8d572d",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "contracts/validate_schemas.py",
+      "sha256": "715037c5a25a5a09bf8e22420d08dcfee884f94e103283073470345596651f91",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "db/d1/MIGRATIONS.json",
+      "sha256": "57991f1fff5fe52df4c10f6211040cd61df1d97a9dcfde61015922dd0f4a09b6",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "sha256": "9e6a28178f85b9a7dff51cf3bc686bbaeea4d1cc7ad5fccafe456f33ab70cd5c",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "apps/api/src/routes/content-releases.ts",
+      "sha256": "ad45279f96b9fbb8ca0707dfb9cd28148fe59a0d65edb959689fbb0d7e23da47",
+      "uncommitted": false,
+      "anchors": [
+        29
+      ]
+    },
+    {
+      "path": "scripts/pattern-release/build.test.mjs",
+      "sha256": "6b3b9ad3aab6894593117aff085b00fa26a3ed6bf35115988360cb277464fe57",
+      "uncommitted": false,
+      "anchors": [
+        1
+      ]
+    },
+    {
+      "path": "packages/reading-engine/src/index.ts",
+      "sha256": "198c43429ce97f3b120ccd86f8b354086e8cffbc38bff11e40227b170e0ed4a3",
+      "uncommitted": false,
+      "anchors": [
+        13
+      ]
+    },
+    {
+      "path": "packages/pattern-engine/src/index.ts",
+      "sha256": "f1111bd7b042b70739c11fa4ddcbe3f65502db534d186cac28dab55b200e63a4",
+      "uncommitted": false,
+      "anchors": [
+        9
+      ]
+    },
+    {
+      "path": "apps/calc-stub/package.json",
+      "sha256": "454e077e21b904db7cf7fe65a3e8c8a290ded35aabf74c316d72e547e1045bc0",
+      "uncommitted": false,
+      "anchors": [
+        5
+      ]
+    },
+    {
+      "path": "packages/shared/package.json",
+      "sha256": "d631838fade01d67e30cbb5c0172a6e24a0b982283e0bd30649445c6b11b57ab",
+      "uncommitted": false,
+      "anchors": [
+        5
+      ]
+    },
+    {
+      "path": "package.json",
+      "sha256": "e753b591f6c9ae6ba87965ea92c79556ba4379aba956ce0a96077b5714944035",
+      "uncommitted": false,
+      "anchors": [
+        20
+      ]
+    },
+    {
+      "path": "scripts/ci-local.sh",
+      "sha256": "ce68a6169445a2212187d8d4701e4739ba706aba52076d2a505a23a07e2341e0",
+      "uncommitted": false,
+      "anchors": [
+        113
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "d7ffd61a89da3c185973daf812eeda7717b66a0437cf9593cfd72b326befe57b",
+      "uncommitted": false,
+      "anchors": [
+        31
+      ]
+    }
+  ]
+}

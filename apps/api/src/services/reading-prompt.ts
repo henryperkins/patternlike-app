@@ -20,6 +20,7 @@
 
 import type { ReadingGenerationRequest } from "@patternlike/shared";
 import outputSchema from "../../../../contracts/m5/reading-generation-output.schema.json";
+import { CATEGORIZED_FEEDBACK_PROMPT_VERSION } from "./reading-feedback-policy.js";
 import {
   OPENAI_RESPONSES_URL,
   READING_PROMPT_VERSION,
@@ -136,7 +137,9 @@ export function buildResponsesRequest(
   return {
     model: pin.model,
     store: false,
-    instructions: READING_SYSTEM_POLICY,
+    instructions: pin.prompt_version === CATEGORIZED_FEEDBACK_PROMPT_VERSION
+      ? `${READING_SYSTEM_POLICY}\n\nCategorized reading feedback carries closed category and target fields, not reader notes. A repetitive signal may guide repetition control only. A not_relevant_today signal may guide theme emphasis only for its supplied evidence-derived themes. It never removes calculated facts, supplies astrological evidence, suppresses uncertainty, or overrides safety. Admission is not proof of an effect. Do not claim that feedback improved or determined this reading.`
+      : READING_SYSTEM_POLICY,
     input: [
       {
         role: "user",

@@ -10,6 +10,10 @@ import { b64, decryptJson } from "../crypto.js";
 import { loadUserKey, type UserIdentity } from "../db/users.js";
 import { loadContextSourceGrants } from "../db/consents.js";
 import { isStoredReadingV5 } from "./stored-reading.js";
+import { loadRetainedReadingFeedbackEvents } from "../db/reading-feedback-events.js";
+import { compileReadingFeedbackEvent } from "./reading-feedback-compiler.js";
+import { CATEGORIZED_FEEDBACK_SELECTION_VERSION } from "./reading-feedback-policy.js";
+import { loadCurrentCategoricalFeedbackGrant } from "./reading-feedback-grant.js";
 
 /**
  * Read the complete eligible context corpus for one owner.
@@ -83,6 +87,7 @@ export async function loadConstrainedContext(
   env: Env,
   identity: UserIdentity,
   targetLocalDate: string,
+  feedbackPolicy?: { selectionVersion: string; anchor: Date },
 ): Promise<ConstrainedContextLoad> {
   const sources = await loadContextSourceGrants(env, identity.userId);
   const { dek } = await loadUserKey(env, identity);
@@ -202,6 +207,20 @@ export async function loadConstrainedContext(
         },
       },
     });
+  }
+
+  if (feedbackPolicy?.selectionVersion === CATEGORIZED_FEEDBACK_SELECTION_VERSION) {
+    const grant = await loadCurrentCategoricalFeedbackGrant(env, identity.userId, feedbackPolicy.anchor);
+    if (grant) {
+      // Compile the entire bounded candidate window. Unsupported categories or
+      // obsolete grants do not consume the engine's shared feedback-record cap;
+      // prepareConstrainedReadingInput applies it after eligibility, together
+      // with legacy feedback and the ordinary packet limits.
+      for (const event of await loadRetainedReadingFeedbackEvents(env, identity, feedbackPolicy.anchor)) {
+        const signal = await compileReadingFeedbackEvent(event, grant, feedbackPolicy.anchor);
+        if (signal) signals.push(signal);
+      }
+    }
   }
 
   // Repetition control reads the reader's own recent editions. Only v5 artifacts

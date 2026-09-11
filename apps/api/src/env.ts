@@ -187,6 +187,8 @@ export interface Env {
   OPENAI_READING_MODEL?: string;
   OPENAI_READING_REASONING?: string;
   OPENAI_READING_PROMPT_VERSION?: string;
+  /** Explicit categorical compiler opt-in; requires its matching prompt pin. */
+  CATEGORIZED_FEEDBACK_EFFECTS_ENABLED?: string;
   /**
    * The runner's own deadline, in milliseconds. Pinned to 900000: the external
    * call no longer runs inside a Queue lease, so it is the Codex contract's

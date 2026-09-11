@@ -41,6 +41,7 @@ import { adminAuth } from "./middleware/admin-auth.js";
 import { placeRoutes } from "./routes/places.js";
 import { cryptoOperatorAuth } from "./middleware/crypto-operator-auth.js";
 import { internalCryptoRoutes } from "./routes/internal-crypto.js";
+import { feedbackEventRoutes } from "./routes/feedback-events.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -69,7 +70,7 @@ const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 // Relationship coordinates and unavailable results are private even when a
 // request is refused before its read handler (configuration/account/consent).
 api.use("*", async (c, next) => {
-  if (/^\/v1\/readings\/[^/]+\/(?:relationship-source|relationships|relationship-target)$/.test(c.req.path)
+  if (/^\/v1\/readings\/[^/]+\/(?:relationship-source|relationships|relationship-target|feedback-options|feedback-events)$/.test(c.req.path)
     || /^\/v1\/timing\/cycles\/[^/]+$/.test(c.req.path)) c.header("Cache-Control", "private, no-store");
   await next();
 });
@@ -84,6 +85,7 @@ api.route("/", consentRoutes);
 api.route("/", placeRoutes);
 api.route("/", accountProcessingConsentRoutes);
 api.route("/", readingRoutes);
+api.route("/", feedbackEventRoutes);
 api.route("/", readerRelationshipRoutes);
 api.route("/", timingRoutes);
 api.route("/", patternAiRoutes);

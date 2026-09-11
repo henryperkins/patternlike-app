@@ -202,8 +202,12 @@ export function DailyCheckInCard() {
     <section className="daily-check-in" aria-labelledby="daily-check-in-heading">
       <div className="daily-check-in__heading">
         <h2 id="daily-check-in-heading">How are you arriving?</h2>
-        <p className="daily-check-in__retention">Private · one day</p>
+        <p className="daily-check-in__retention">Fresh for 24 hours</p>
       </div>
+      <p>
+        Check-ins are stored for up to 13 months, separately from their freshness.
+        Turning permission off stops future use; it does not delete stored check-ins.
+      </p>
 
       {availability.status === "loading" ? (
         <p>Seeing whether check-in is available.</p>
@@ -228,14 +232,14 @@ export function DailyCheckInCard() {
         <div className="daily-check-in__saved">
           <p className="daily-check-in__until">
             <Icon name="check" />
-            Held until {formatInstant(saved.freshness.expires_at)}
+            Fresh until {formatInstant(saved.freshness.expires_at)}
           </p>
           <p>
             {personalContextEligible === true
-              ? "The next reading can use this. Today's chapter stays as it is."
+              ? "Saved. While fresh and permitted, this may be selected for a later reading. Selection is not guaranteed. Today's chapter stays as it is."
               : personalContextEligible === false
                 ? "Saved, and kept from the publisher until reading generation includes personal context. Today's chapter stays as it is."
-                : "Saved. Today's chapter stays as it is."}
+                : "Saved. Personal-context permission could not be confirmed; this receipt does not establish use. Today's chapter stays as it is."}
           </p>
           <button className="button button--secondary" type="button" onClick={beginEdit}>
             Edit
@@ -244,7 +248,8 @@ export function DailyCheckInCard() {
       ) : (
         <form className="daily-check-in__form" onSubmit={submit}>
           <p className="daily-check-in__invite" id="daily-check-in-invite">
-            One mark is enough. Only a later reading can use it — never this one.
+            One mark is enough. This is optional context for a later reading;
+            submitting it does not change today's chapter.
           </p>
           <fieldset className="daily-check-in__energy" aria-describedby="daily-check-in-invite">
             <legend>Energy</legend>

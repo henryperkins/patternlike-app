@@ -1,3 +1,4 @@
+import { FEEDBACK_EXPORT_SCHEMA_VERSION } from "@patternlike/shared";
 import { b64, decryptJson } from "../crypto.js";
 import type { Env } from "../env.js";
 import { loadReadingEvidence } from "../db/readings.js";
@@ -13,7 +14,8 @@ export const M7_EXPORT_SCHEMA_VERSION = "0.7.0" as const;
 export const M8_EXPORT_SCHEMA_VERSION = "0.8.0" as const;
 export type ExportSchemaVersion =
   | typeof M7_EXPORT_SCHEMA_VERSION
-  | typeof M8_EXPORT_SCHEMA_VERSION;
+  | typeof M8_EXPORT_SCHEMA_VERSION
+  | typeof FEEDBACK_EXPORT_SCHEMA_VERSION;
 const M0_SCHEMA_VERSION = "0.2.0" as const;
 
 export interface ExportOptions {
@@ -92,7 +94,7 @@ export async function assembleAccountExport(
   exportId: string,
   generatedAt: string,
   options: ExportOptions,
-  exportSchemaVersion: ExportSchemaVersion = M8_EXPORT_SCHEMA_VERSION,
+  exportSchemaVersion: ExportSchemaVersion = FEEDBACK_EXPORT_SCHEMA_VERSION,
 ): Promise<Uint8Array> {
   const account = await env.DB.prepare(
     `SELECT id, crypto_subject, status, locale, locale_source, locale_updated_at,
@@ -484,7 +486,7 @@ export async function assembleAccountExport(
             header: loadedEvidence.header,
             paragraphs: loadedEvidence.paragraphs,
           };
-      items.push(exportSchemaVersion === M8_EXPORT_SCHEMA_VERSION
+      items.push(exportSchemaVersion !== M7_EXPORT_SCHEMA_VERSION
         ? { ...metadata, artifact, evidence, saved_at: savedAt }
         : { ...metadata, artifact, evidence });
       document.readings = { status: "included", items };
@@ -493,6 +495,16 @@ export async function assembleAccountExport(
     document.readings = { status: "included", items };
   } else {
     document.readings = { status: "omitted_by_request", items: [] };
+  }
+
+  // Frozen M7/M8 jobs keep their original document shape. Only the successor
+  // exports the new encrypted categorical records and their authored notes.
+  if (exportSchemaVersion === FEEDBACK_EXPORT_SCHEMA_VERSION) {
+    const { loadReadingFeedbackEventExports } = await import("../db/reading-feedback-events.js");
+    document.reading_feedback_events = options.include_readings
+      ? { status: "included", items: await loadReadingFeedbackEventExports(env, identity, new Date(generatedAt)) }
+      : { status: "omitted_by_request", items: [] };
+    assertBounded(document);
   }
 
   document.journal = options.include_journal

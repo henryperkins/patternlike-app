@@ -1,0 +1,16 @@
+{
+  "status": "verified",
+  "base_commit": "d338b86c9444ebe2f372f2a2f3990f4a1270bc80",
+  "source_before_sha256": "775886e03b917637141ee1863bec2cfddbc3bd30c9c89879f24dbc99f49922e0",
+  "source_after_sha256": "775886e03b917637141ee1863bec2cfddbc3bd30c9c89879f24dbc99f49922e0",
+  "scope_exclusions": [
+    "docs/reviews/",
+    "docs/superpowers/",
+    "output/"
+  ],
+  "ok": true,
+  "changed": [],
+  "missing": [],
+  "added": [],
+  "problems": []
+}
