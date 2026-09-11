@@ -138,6 +138,15 @@ function options(reserveOk = true): PatternPassOptions {
 }
 
 describe("Pattern publisher configuration", () => {
+  it("refuses offline writer guidance as a deployment configuration", () => {
+    const outcome = resolvePatternPublisherConfiguration(
+      env({ OPENAI_PATTERN_WRITER_PROMPT_VERSION: "1.0.4" }),
+    );
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toContain("OPENAI_PATTERN_WRITER_PROMPT_VERSION");
+  });
+
   it("accepts a complete Codex deployment and pins every frozen value", () => {
     const outcome = resolvePatternPublisherConfiguration(env());
     expect(outcome.ok, JSON.stringify(outcome)).toBe(true);

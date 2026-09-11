@@ -355,6 +355,31 @@ export const PATTERN_WRITER_CORRECTION_POLICY = [
   "Every key listed under preserve must come back exactly as it is given.",
 ].join("\n");
 
+/** Request-assembly opt-in only; deployment still pins the existing writer. */
+export const PATTERN_OFFLINE_WRITER_PROMPT_VERSION = "1.0.4";
+
+const OFFLINE_WRITER_GUIDANCE = [
+  "EDITORIAL GUIDANCE FOR WRITER 1.0.4",
+  "Ground each interpretation in the cited, authorized ontology records for that prose unit. Preserve their conditions, alternatives and limits beside the claim they qualify. Do not resolve an ambiguity in a section and try to restore it in a later tension or closing note.",
+  "Possibility words such as may do not make an unsupported mechanism, feeling, duration or comparison supported. Use the narrowest supported relationship; do not invent why a tendency works or imply a specific personal outcome.",
+  "A practical suggestion is allowed only as a plainly optional illustration of an already supported relationship. Mark it as one optional example or if useful. Do not present it as a chart finding or imply that it is effective for this reader. Omit an example that needs an unsupported mechanism or additional premise.",
+  "In cited prose, name actual assigned bodies or aspect participants when that helps explain the connection. Take identities only from that prose unit's supplied facts and retain its supporting aliases and rule citations. Generic aspect meaning does not authorize sign-, house-, timing- or participant-specific psychological meaning. Never import omitted, unassigned or suppressed facts. Keep the existing title, summary and uncertainty-disclosure restrictions.",
+  "Calculated facts identify the assigned configuration; the cited records supply an interpretation. A source citation establishes traceable support, not empirical proof of a personal trait, psychological mechanism or outcome.",
+  "Give each prose unit a distinct explanatory job: sections explain the supported interpretation, tensions identify its meaningful limits, resources describe a supported way it can be used, and counter-expressions develop a supported alternative. Do not repeat the complete section explanation in tensions, resources and counter-expressions.",
+  "Combine compatible explanation only within the frozen chapter. Do not invent a relationship between unrelated assigned features to force a unified story. Meet the existing section, word and citation bounds using supported detail; never pad with invented specificity.",
+  "Keep fusion, cooperation available when requested, reliable but unexamined operation, friction between methods, and visibility across an opposition distinguishable when those contrasts are authorized by the records assigned to that unit. Do not require every chapter to contain every contrast.",
+].join("\n");
+
+export const PATTERN_OFFLINE_WRITER_POLICY = [
+  WRITER_POLICY,
+  OFFLINE_WRITER_GUIDANCE,
+].join("\n\n");
+
+export const PATTERN_OFFLINE_WRITER_CORRECTION_POLICY = [
+  PATTERN_WRITER_CORRECTION_POLICY,
+  OFFLINE_WRITER_GUIDANCE,
+].join("\n\n");
+
 
 /**
  * Kept as a name, not as a second policy.
@@ -464,10 +489,15 @@ export function buildPatternResponsesRequest(
 ): PatternResponsesRequestBody {
   // A correction is still the writer pass for every pinned value -- same model,
   // same token ceiling, same schema. Only the policy differs.
-  const instructions =
+  let instructions =
     options.correction && pass === "writer"
       ? PATTERN_WRITER_CORRECTION_POLICY
       : PATTERN_SYSTEM_POLICY[pass];
+  if (pass === "writer" && pin.writer_prompt_version === PATTERN_OFFLINE_WRITER_PROMPT_VERSION) {
+    instructions = options.correction
+      ? PATTERN_OFFLINE_WRITER_CORRECTION_POLICY
+      : PATTERN_OFFLINE_WRITER_POLICY;
+  }
   return {
     model: pin[`${pass}_model`],
     store: false,
