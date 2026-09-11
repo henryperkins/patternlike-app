@@ -264,6 +264,34 @@ afterEach(() => {
 describe("V5 execution", () => {
   beforeEach(resetDb);
 
+  it("publishes a completed candidate when runtime code generation is forbidden", async () => {
+    const { enqueued, claim } = await claimReserved();
+    // The Vitest Worker pool permits eval for its module loader. Production
+    // permits it only at startup, so reproduce the handler boundary explicitly.
+    const forbidCodeGeneration = () => {
+      throw new EvalError("Code generation from strings disallowed for this context");
+    };
+    vi.stubGlobal("Function", new Proxy(globalThis.Function, {
+      apply: forbidCodeGeneration,
+      construct: forbidCodeGeneration,
+    }));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    let result: unknown;
+    try {
+      ({ result } = await withProvider(
+        (candidate) => candidate,
+        () => dispatchGeneration(enabledEnv(), claim),
+      ));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(result).toMatchObject({ ok: true, readingId: enqueued.readingId });
+    expect(await rows("SELECT status FROM daily_readings WHERE id = ?", enqueued.readingId))
+      .toEqual([{ status: "published" }]);
+  });
+
   it("dispatches a frozen V2 command, validates it, and atomically publishes V5", async () => {
     const { enqueued, claim } = await claimReserved();
 

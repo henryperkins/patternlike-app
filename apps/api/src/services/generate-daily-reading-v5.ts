@@ -1,5 +1,4 @@
-import Ajv2020 from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
+import { validateReadingOutput as validateOutputSchema } from "../generated/reading-validators.js";
 
 import {
   ConstrainedInputError,
@@ -29,7 +28,6 @@ import {
   type DailySkyFact,
   type ParagraphEvidenceV5,
 } from "@patternlike/shared";
-import outputSchema from "../../../../contracts/m5/reading-generation-output.schema.json";
 import type { Env } from "../env.js";
 import { asCryptoSubject } from "../crypto.js";
 import { loadContextSourceGrants } from "../db/consents.js";
@@ -70,17 +68,10 @@ import {
 import { supportsFeedbackGenerationPolicy } from "./reading-feedback-policy.js";
 import { currentCategoricalFeedbackMatches, isCategoricalFeedbackPin } from "./reading-feedback-admission.js";
 import { buildReadingFeedbackPublicationGuards } from "../db/reading-feedback-publication.js";
-import { lazy } from "./lazy-validator.js";
 import { safeLog } from "./safe-log.js";
 import type { StoredReadingV5 } from "./stored-reading.js";
 import { deriveDailyReaderRelationshipSupport } from "./reader-relationship-support.js";
 import { prepareReaderRelationshipSupport } from "../db/reader-relationship-supports.js";
-
-const validateOutputSchema = lazy(() => {
-  const ajv = new Ajv2020({ strict: false });
-  addFormats(ajv);
-  return ajv.compile(outputSchema);
-});
 
 /**
  * The reader-facing statement of what wrote this reading.
@@ -724,7 +715,7 @@ export async function generateDailyReadingV5(
       failures,
     });
   };
-  if (!validateOutputSchema()(publisher.candidate)) {
+  if (!validateOutputSchema(publisher.candidate)) {
     logRejection([{ code: "schema_shape", detail_code: "schema_mismatch" }]);
     return fail("publisher_output_invalid", "schema_mismatch");
   }

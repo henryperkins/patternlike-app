@@ -1,11 +1,5 @@
 import { canonicalJson, contentHash, type PatternTransformationClass } from "@patternlike/shared";
-import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
-import { lazy } from "./lazy-validator.js";
-import m0CommonSchema from "../../../../contracts/m0/common.schema.json";
-import m7CommonSchema from "../../../../contracts/m7/common.schema.json";
-import sourceCorpusReleaseSchema from "../../../../contracts/m7/pattern-source-corpus-release.schema.json";
-import sourceFragmentSchema from "../../../../contracts/m7/pattern-source-fragment.schema.json";
+import { validateSourceCorpusRelease } from "../generated/strict-validators.js";
 import type { Env } from "../env.js";
 import {
   findRegisteredOntologyCorpus,
@@ -79,23 +73,6 @@ function fail(code: string): never {
   throw new OntologyCorpusError(code);
 }
 
-const validateSourceCorpusRelease = lazy<ValidateFunction>(() => {
-  const schemaValidator = new Ajv2020({ strict: true });
-  addFormats(schemaValidator);
-  for (const schema of [
-    m0CommonSchema,
-    m7CommonSchema,
-    sourceFragmentSchema,
-    sourceCorpusReleaseSchema,
-  ]) {
-    schemaValidator.addSchema(schema);
-  }
-  const schemaId = `${sourceCorpusReleaseSchema.$id}#/$defs/patternSourceCorpusRelease`;
-  const validator = schemaValidator.getSchema(schemaId);
-  if (!validator) throw new Error("Frozen M7 source corpus schema is unavailable");
-  return validator;
-});
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -129,7 +106,7 @@ function corpusIdentity(
 function assertSchemaAndPolicy(
   value: unknown,
 ): OntologyCorpusRelease {
-  if (!isRecord(value) || !validateSourceCorpusRelease()(value)) {
+  if (!isRecord(value) || !validateSourceCorpusRelease(value)) {
     fail("ontology_corpus_manifest_invalid");
   }
   const release = value as unknown as OntologyCorpusRelease;
